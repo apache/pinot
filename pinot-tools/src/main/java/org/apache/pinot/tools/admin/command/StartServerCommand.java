@@ -51,14 +51,14 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
   @CommandLine.Option(names = {"-serverPort"}, required = false, description = "Port number to start the server at.")
   private int _serverPort = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
-  @CommandLine.Option(names = {"-serverAdminPort"}, required = false, 
+  @CommandLine.Option(names = {"-serverAdminPort"}, required = false,
       description = "Port number to serve the server admin API at.")
   private int _serverAdminPort = CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 
   @CommandLine.Option(names = {"-dataDir"}, required = false, description = "Path to directory containing data.")
   private String _dataDir = PinotConfigUtils.TMP_DIR + "data/pinotServerData";
 
-  @CommandLine.Option(names = {"-segmentDir"}, required = false, 
+  @CommandLine.Option(names = {"-segmentDir"}, required = false,
       description = "Path to directory containing segments.")
   private String _segmentDir = PinotConfigUtils.TMP_DIR + "data/pinotSegments";
 
@@ -176,7 +176,6 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
 
   @Override
   public void cleanup() {
-
   }
 
   @Override
@@ -193,15 +192,16 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)
               .setBootstrapServices(new String[0]).addBootstrapService(ServiceRole.SERVER, serverConf);
-      startServiceManagerCommand.execute();
-      String pidFile = ".pinotAdminServer-" + System.currentTimeMillis() + ".pid";
-      savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
-      return true;
+      if (startServiceManagerCommand.execute()) {
+        String pidFile = ".pinotAdminServer-" + System.currentTimeMillis() + ".pid";
+        savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
+        return true;
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while starting Pinot server, exiting.", e);
-      System.exit(-1);
-      return false;
     }
+    System.exit(-1);
+    return false;
   }
 
   protected Map<String, Object> getServerConf()

@@ -50,6 +50,7 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -269,7 +270,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private static void addPhysicalColumns(List src, Collection<String> dest) {
     for (Object o : src) {
       String column = o.toString();
-      if (!column.isEmpty() && column.charAt(0) != '$' && !dest.contains(column)) {
+      if (!column.isEmpty() && !dest.contains(column)) {
+        if (column.charAt(0) == '$') {
+          // Skip virtual columns starting with '$', but keep time column with granularity as physical column.
+          if (!TimestampIndexGranularity.isValidTimeColumnWithGranularityName(column)) {
+            continue;
+          }
+        }
         dest.add(column);
       }
     }

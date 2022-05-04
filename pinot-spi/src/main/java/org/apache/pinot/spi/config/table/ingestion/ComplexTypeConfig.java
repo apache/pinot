@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
@@ -44,13 +45,18 @@ public class ComplexTypeConfig extends BaseJsonConfig {
   @JsonPropertyDescription("The mode of converting collection to JSON string")
   private final CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
 
+  @JsonPropertyDescription("Map of <prefix, replacement> so matching fields are renamed to start with the replacement")
+  private final Map<String, String> _prefixesToRename;
+
   @JsonCreator
   public ComplexTypeConfig(@JsonProperty("fieldsToUnnest") @Nullable List<String> fieldsToUnnest,
       @JsonProperty("delimiter") @Nullable String delimiter,
-      @JsonProperty("collectionNotUnnestedToJson") @Nullable CollectionNotUnnestedToJson collectionNotUnnestedToJson) {
+      @JsonProperty("collectionNotUnnestedToJson") @Nullable CollectionNotUnnestedToJson collectionNotUnnestedToJson,
+      @JsonProperty("prefixesToRename") @Nullable Map<String, String> prefixesToRename) {
     _fieldsToUnnest = fieldsToUnnest;
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
+    _prefixesToRename = prefixesToRename;
   }
 
   @Nullable
@@ -66,5 +72,10 @@ public class ComplexTypeConfig extends BaseJsonConfig {
   @Nullable
   public CollectionNotUnnestedToJson getCollectionNotUnnestedToJson() {
     return _collectionNotUnnestedToJson;
+  }
+
+  @Nullable
+  public Map<String, String> getPrefixesToRename() {
+    return _prefixesToRename;
   }
 }

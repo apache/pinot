@@ -28,21 +28,16 @@ public class PreparedStatement {
   private final Connection _connection;
   private final String _statement;
   private final String[] _parameters;
-  private final String _queryFormat;
 
-  @Deprecated
   PreparedStatement(Connection connection, String query) {
     _connection = connection;
     _statement = query;
     _parameters = new String[getQuestionMarkCount(query)];
-    _queryFormat = "pql";
   }
 
+  @Deprecated
   PreparedStatement(Connection connection, Request request) {
-    _connection = connection;
-    _statement = request.getQuery();
-    _parameters = new String[getQuestionMarkCount(request.getQuery())];
-    _queryFormat = request.getQueryFormat();
+    this(connection, request.getQuery());
   }
 
   private int getQuestionMarkCount(String query) {
@@ -69,7 +64,7 @@ public class PreparedStatement {
    * @return The query results
    */
   public ResultSetGroup execute() {
-    return _connection.execute(new Request(_queryFormat, fillStatementWithParameters()));
+    return _connection.execute(fillStatementWithParameters());
   }
 
   /**
@@ -78,7 +73,7 @@ public class PreparedStatement {
    * @return The query results
    */
   public Future<ResultSetGroup> executeAsync() {
-    return _connection.executeAsync(new Request(_queryFormat, fillStatementWithParameters()));
+    return _connection.executeAsync(fillStatementWithParameters());
   }
 
   /**

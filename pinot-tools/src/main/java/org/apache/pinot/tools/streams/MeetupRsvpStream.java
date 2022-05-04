@@ -18,24 +18,13 @@
  */
 package org.apache.pinot.tools.streams;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.net.URI;
 import java.util.Properties;
-import javax.websocket.ClientEndpointConfig;
-import javax.websocket.Endpoint;
-import javax.websocket.EndpointConfig;
-import javax.websocket.MessageHandler;
-import javax.websocket.Session;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
-import org.glassfish.tyrus.client.ClientManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class MeetupRsvpStream {
@@ -43,11 +32,7 @@ public class MeetupRsvpStream {
   private static final String DEFAULT_TOPIC_NAME = "meetupRSVPEvents";
   protected String _topicName = DEFAULT_TOPIC_NAME;
 
-  protected final boolean _partitionByKey;
-  protected final StreamDataProducer _producer;
-
-  protected ClientManager _client;
-  protected volatile boolean _keepPublishing;
+  protected PinotRealtimeSource _pinotRealtimeSource;
 
   public MeetupRsvpStream()
       throws Exception {
@@ -56,84 +41,42 @@ public class MeetupRsvpStream {
 
   public MeetupRsvpStream(boolean partitionByKey)
       throws Exception {
-    _partitionByKey = partitionByKey;
+    // calling this constructor means that we wish to use EVENT_ID as key. RsvpId is used by MeetupRsvpJsonStream
+    this(partitionByKey ? RsvpSourceGenerator.KeyColumn.EVENT_ID : RsvpSourceGenerator.KeyColumn.NONE);
+  }
 
+  public MeetupRsvpStream(RsvpSourceGenerator.KeyColumn keyColumn)
+      throws Exception {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
-    _producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
-  }
-
-  public MeetupRsvpStream(boolean partitionByKey, StreamDataProducer producer, String topicName) {
-    _partitionByKey = partitionByKey;
-    _producer = producer;
-    _topicName = topicName;
+    StreamDataProducer producer =
+        StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+    _pinotRealtimeSource =
+        PinotRealtimeSource.builder().setGenerator(new RsvpSourceGenerator(keyColumn)).setProducer(producer)
+            .setRateLimiter(permits -> {
+              int delay = (int) (Math.log(ThreadLocalRandom.current().nextDouble()) / Math.log(0.999)) + 1;
+              try {
+                Thread.sleep(delay);
+              } catch (InterruptedException ex) {
+                LOGGER.warn("Interrupted from sleep but will continue", ex);
+              }
+            })
+            .setTopic(_topicName)
+            .build();
   }
 
   public void run()
       throws Exception {
-    _client = ClientManager.createClient();
-    _keepPublishing = true;
-
-    _client.connectToServer(new Endpoint() {
-      @Override
-      public void onOpen(Session session, EndpointConfig config) {
-        session.addMessageHandler(String.class, getMessageHandler());
-      }
-    }, ClientEndpointConfig.Builder.create().build(), new URI("wss://stream.meetup.com/2/rsvps"));
+    _pinotRealtimeSource.run();
   }
 
   public void stopPublishing() {
-    _keepPublishing = false;
-    _client.shutdown();
-    _producer.close();
-  }
-
-  protected MessageHandler.Whole<String> getMessageHandler() {
-    return message -> {
-      try {
-        JsonNode messageJson = JsonUtils.stringToJsonNode(message);
-        ObjectNode extractedJson = JsonUtils.newObjectNode();
-
-        JsonNode venue = messageJson.get("venue");
-        if (venue != null) {
-          extractedJson.set("venue_name", venue.get("venue_name"));
-        }
-
-        JsonNode event = messageJson.get("event");
-        String eventId = "";
-        if (event != null) {
-          extractedJson.set("event_name", event.get("event_name"));
-          eventId = event.get("event_id").asText();
-          extractedJson.put("event_id", eventId);
-          extractedJson.set("event_time", event.get("time"));
-        }
-
-        JsonNode group = messageJson.get("group");
-        if (group != null) {
-          extractedJson.set("group_city", group.get("group_city"));
-          extractedJson.set("group_country", group.get("group_country"));
-          extractedJson.set("group_id", group.get("group_id"));
-          extractedJson.set("group_name", group.get("group_name"));
-          extractedJson.set("group_lat", group.get("group_lat"));
-          extractedJson.set("group_lon", group.get("group_lon"));
-        }
-
-        extractedJson.set("mtime", messageJson.get("mtime"));
-        extractedJson.put("rsvp_count", 1);
-
-        if (_keepPublishing) {
-          if (_partitionByKey) {
-            _producer.produce(_topicName, eventId.getBytes(UTF_8),
-                extractedJson.toString().getBytes(UTF_8));
-          } else {
-            _producer.produce(_topicName, extractedJson.toString().getBytes(UTF_8));
-          }
-        }
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while processing the message: {}", message, e);
-      }
-    };
+    try {
+      _pinotRealtimeSource.close();
+    } catch (Exception ex) {
+      LOGGER.error("Failed to close real time source. ignored and continue", ex);
+    }
   }
 }

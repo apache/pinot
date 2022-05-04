@@ -33,7 +33,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 
 
 public class StreamingInstanceResponseOperator extends InstanceResponseOperator {
-  private static final String OPERATOR_NAME = "StreamingInstanceResponseOperator";
+
   private final StreamObserver<Server.ServerResponse> _streamObserver;
 
   public StreamingInstanceResponseOperator(BaseCombineOperator combinedOperator, List<IndexSegment> indexSegments,

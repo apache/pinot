@@ -45,7 +45,6 @@ import org.apache.pinot.core.util.GroupByUtils;
  */
 @SuppressWarnings("rawtypes")
 public class AggregationGroupByOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = "AggregationGroupByOrderByOperator";
   private static final String EXPLAIN_NAME = "AGGREGATE_GROUPBY_ORDERBY";
 
   private final AggregationFunction[] _aggregationFunctions;
@@ -109,6 +108,9 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       groupByExecutor.process(transformBlock);
     }
 
+    // Check if the groups limit is reached
+    boolean numGroupsLimitReached = groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsLimit();
+
     // Trim the groups when iff:
     // - Query has ORDER BY clause
     // - Segment group trim is enabled
@@ -121,16 +123,17 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       if (groupByExecutor.getNumGroups() > trimSize) {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
-        return new IntermediateResultsBlock(_aggregationFunctions, intermediateRecords, _dataSchema);
+        IntermediateResultsBlock resultsBlock =
+            new IntermediateResultsBlock(_aggregationFunctions, intermediateRecords, _dataSchema);
+        resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+        return resultsBlock;
       }
     }
 
-    return new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
-  }
-
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
+    IntermediateResultsBlock resultsBlock =
+        new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
+    resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+    return resultsBlock;
   }
 
   @Override

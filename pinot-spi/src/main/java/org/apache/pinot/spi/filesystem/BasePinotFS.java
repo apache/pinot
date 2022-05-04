@@ -57,4 +57,11 @@ public abstract class BasePinotFS implements PinotFS {
     }
     return doMove(srcUri, dstUri);
   }
+
+  /**
+   * Actual move implementation for each PinotFS. It should not be directly called, instead use
+   * {@link PinotFS#move(URI, URI, boolean)}.
+   */
+  protected abstract boolean doMove(URI srcUri, URI dstUri)
+      throws IOException;
 }

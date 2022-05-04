@@ -23,7 +23,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
@@ -51,7 +50,7 @@ public class AliasApplier implements QueryRewriter {
       if (functionCall == null) {
         continue;
       }
-      if (functionCall.getOperator().equalsIgnoreCase(SqlKind.AS.toString())) {
+      if (functionCall.getOperator().equals("as")) {
         Expression identifierExpr = functionCall.getOperands().get(1);
         aliasMap.put(identifierExpr.getIdentifier(), functionCall.getOperands().get(0));
       }

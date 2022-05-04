@@ -137,7 +137,7 @@ public class CommonConstants {
       public static final String ADMIN_PORT_KEY = "adminPort";
       public static final String ADMIN_HTTPS_PORT_KEY = "adminHttpsPort";
       public static final String GRPC_PORT_KEY = "grpcPort";
-      public static final String NETTYTLS_PORT_KEY = "nettyTlsPort";
+      public static final String NETTY_TLS_PORT_KEY = "nettyTlsPort";
       public static final String SYSTEM_RESOURCE_INFO_KEY = "SYSTEM_RESOURCE_INFO";
     }
 
@@ -224,9 +224,14 @@ public class CommonConstants {
     public static final String DEFAULT_BROKER_REQUEST_HANDLER_TYPE = NETTY_BROKER_REQUEST_HANDLER_TYPE;
 
     public static final String BROKER_TLS_PREFIX = "pinot.broker.tls";
+    public static final String BROKER_NETTY_PREFIX = "pinot.broker.netty";
     public static final String BROKER_NETTYTLS_ENABLED = "pinot.broker.nettytls.enabled";
     //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
     public static final String BROKER_SERVICE_AUTO_DISCOVERY = "pinot.broker.service.auto.discovery";
+
+    public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
+
+    public static final String CONTROLLER_URL = "pinot.broker.controller.url";
 
     public static class Request {
       public static final String PQL = "pql";
@@ -244,7 +249,34 @@ public class CommonConstants {
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
         public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
+        public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
       }
+    }
+
+    public static class FailureDetector {
+      public enum Type {
+        // Do not detect any failure
+        NO_OP,
+
+        // Detect connection failures
+        CONNECTION,
+
+        // Use the custom failure detector of the configured class name
+        CUSTOM
+      }
+
+      public static final String CONFIG_OF_TYPE = "pinot.broker.failure.detector.type";
+      public static final String DEFAULT_TYPE = Type.NO_OP.name();
+      public static final String CONFIG_OF_CLASS_NAME = "pinot.broker.failure.detector.class";
+
+      // Exponential backoff delay of retrying an unhealthy server when a failure is detected
+      public static final String CONFIG_OF_RETRY_INITIAL_DELAY_MS =
+          "pinot.broker.failure.detector.retry.initial.delay.ms";
+      public static final long DEFAULT_RETRY_INITIAL_DELAY_MS = 5_000L;
+      public static final String CONFIG_OF_RETRY_DELAY_FACTOR = "pinot.broker.failure.detector.retry.delay.factor";
+      public static final double DEFAULT_RETRY_DELAY_FACTOR = 2.0;
+      public static final String CONFIG_OF_MAX_RETRIES = "pinot.broker.failure.detector.max.retries";
+      public static final int DEFAULT_MAX_RETIRES = 10;
     }
   }
 
@@ -269,6 +301,8 @@ public class CommonConstants {
     public static final boolean DEFAULT_ENABLE_GRPC_SERVER = false;
     public static final String CONFIG_OF_GRPC_PORT = "pinot.server.grpc.port";
     public static final int DEFAULT_GRPC_PORT = 8090;
+    public static final String CONFIG_OF_GRPCTLS_SERVER_ENABLED = "pinot.server.grpctls.enabled";
+    public static final boolean DEFAULT_GRPCTLS_SERVER_ENABLED = false;
     public static final String CONFIG_OF_NETTYTLS_SERVER_ENABLED = "pinot.server.nettytls.enabled";
     public static final boolean DEFAULT_NETTYTLS_SERVER_ENABLED = false;
     public static final String CONFIG_OF_SWAGGER_SERVER_ENABLED = "pinot.server.swagger.enabled";
@@ -360,6 +394,8 @@ public class CommonConstants {
 
     public static final String SERVER_TLS_PREFIX = "pinot.server.tls";
     public static final String SERVER_NETTYTLS_PREFIX = "pinot.server.nettytls";
+    public static final String SERVER_GRPCTLS_PREFIX = "pinot.server.grpctls";
+    public static final String SERVER_NETTY_PREFIX = "pinot.server.netty";
 
     // The complete config key is pinot.server.instance.segment.store.uri
     public static final String CONFIG_OF_SEGMENT_STORE_URI = "segment.store.uri";
@@ -440,6 +476,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_INSTANCE_ID = "pinot.controller.instance.id";
     public static final String CONFIG_OF_CONTROLLER_QUERY_REWRITER_CLASS_NAMES =
         "pinot.controller.query.rewriter.class.names";
+    //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
+    public static final String CONTROLLER_SERVICE_AUTO_DISCOVERY = "pinot.controller.service.auto.discovery";
   }
 
   public static class Minion {
@@ -488,11 +526,9 @@ public class CommonConstants {
     public static class Realtime {
       public enum Status {
         // Means the segment is in CONSUMING state.
-        IN_PROGRESS,
-        // Means the segment is in ONLINE state (segment completed consuming and has been saved in
+        IN_PROGRESS, // Means the segment is in ONLINE state (segment completed consuming and has been saved in
         // segment store).
-        DONE,
-        // Means the segment is uploaded to a Pinot controller by an external party.
+        DONE, // Means the segment is uploaded to a Pinot controller by an external party.
         UPLOADED
       }
 
@@ -503,8 +539,7 @@ public class CommonConstants {
       public enum CompletionMode {
         // default behavior - if the in memory segment in the non-winner server is equivalent to the committed
         // segment, then build and replace, else download
-        DEFAULT,
-        // non-winner servers always download the segment, never build it
+        DEFAULT, // non-winner servers always download the segment, never build it
         DOWNLOAD
       }
 
@@ -541,6 +576,7 @@ public class CommonConstants {
     public static final String CRYPTER_NAME = "segment.crypter";
     public static final String PARTITION_METADATA = "segment.partition.metadata";
     public static final String CUSTOM_MAP = "custom.map";
+    public static final String SIZE_IN_BYTES = "segment.size.in.bytes";
 
     /**
      * This field is used for parallel push protection to lock the segment globally.

@@ -63,6 +63,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   // NOTE: map size = map capacity (power of 2) * load factor
   private static final int INITIAL_MAP_SIZE = (int) ((1 << 9) * 0.75f);
   private static final int MAX_CACHING_MAP_SIZE = (int) ((1 << 20) * 0.75f);
+  private static final int MAX_DICTIONARY_INTERN_TABLE_SIZE = 10000;
 
   @VisibleForTesting
   static final ThreadLocal<IntGroupIdMap> THREAD_LOCAL_INT_MAP = ThreadLocal.withInitial(IntGroupIdMap::new);
@@ -91,6 +92,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   // Reusable buffer for multi-value column dictionary ids
   private final int[][][] _multiValueDictIds;
 
+  private final Object[][] _internedDictionaryValues;
+
   private final int _globalGroupIdUpperBound;
   private final RawKeyHolder _rawKeyHolder;
 
@@ -106,6 +109,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     _dictionaries = new Dictionary[_numGroupByExpressions];
     _singleValueDictIds = new int[_numGroupByExpressions][];
     _multiValueDictIds = new int[_numGroupByExpressions][][];
+    // no need to intern dictionary values when there is only one group by expression because
+    // only one call will be made to the dictionary to extract each raw value.
+    _internedDictionaryValues = _numGroupByExpressions > 1 ? new Object[_numGroupByExpressions][] : null;
 
     long cardinalityProduct = 1L;
     boolean longOverflow = false;
@@ -114,6 +120,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       _dictionaries[i] = transformOperator.getDictionary(groupByExpression);
       int cardinality = _dictionaries[i].length();
       _cardinalities[i] = cardinality;
+      if (_internedDictionaryValues != null && cardinality < MAX_DICTIONARY_INTERN_TABLE_SIZE) {
+        _internedDictionaryValues[i] = new Object[cardinality];
+      }
       if (!longOverflow) {
         if (cardinalityProduct > Long.MAX_VALUE / cardinality) {
           longOverflow = true;
@@ -613,11 +622,26 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       Object[] groupKeys = new Object[_numGroupByExpressions];
       for (int i = 0; i < _numGroupByExpressions; i++) {
         int cardinality = _cardinalities[i];
-        groupKeys[i] = _dictionaries[i].getInternal(rawKey % cardinality);
+        groupKeys[i] = getRawValue(i, rawKey % cardinality);
         rawKey /= cardinality;
       }
       return groupKeys;
     }
+  }
+
+  private Object getRawValue(int dictionaryIndex, int dictId) {
+    Dictionary dictionary = _dictionaries[dictionaryIndex];
+    Object[] table = _internedDictionaryValues[dictionaryIndex];
+    if (table == null) {
+      // high cardinality dictionary values aren't interned
+      return dictionary.getInternal(dictId);
+    }
+    Object rawValue = table[dictId];
+    if (rawValue == null) {
+      rawValue = dictionary.getInternal(dictId);
+      table[dictId] = rawValue;
+    }
+    return rawValue;
   }
 
   /**
@@ -825,7 +849,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     Object[] groupKeys = new Object[_numGroupByExpressions];
     for (int i = 0; i < _numGroupByExpressions; i++) {
       int cardinality = _cardinalities[i];
-      groupKeys[i] = _dictionaries[i].getInternal((int) (rawKey % cardinality));
+      groupKeys[i] = getRawValue(i, (int) (rawKey % cardinality));
       rawKey /= cardinality;
     }
     return groupKeys;
@@ -1035,7 +1059,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private Object[] getKeys(IntArray rawKey) {
     Object[] groupKeys = new Object[_numGroupByExpressions];
     for (int i = 0; i < _numGroupByExpressions; i++) {
-      groupKeys[i] = _dictionaries[i].getInternal(rawKey._elements[i]);
+      groupKeys[i] = getRawValue(i, rawKey._elements[i]);
     }
     return groupKeys;
   }

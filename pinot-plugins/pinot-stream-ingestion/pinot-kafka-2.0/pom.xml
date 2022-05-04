@@ -26,7 +26,7 @@
   <parent>
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.10.0-SNAPSHOT</version>
+    <version>0.11.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
 
@@ -36,8 +36,6 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <kafka.lib.version>2.8.1</kafka.lib.version>
-    <scala.compat.version>2.13</scala.compat.version>
-    <scala.version>2.13.3</scala.version>
     <phase.prop>package</phase.prop>
   </properties>
 
@@ -100,4 +98,28 @@
       <artifactId>jopt-simple</artifactId>
     </dependency>
   </dependencies>
+
+
+  <profiles>
+    <profile>
+      <id>scala-2.12</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <properties>
+        <scala.version>2.12.11</scala.version>
+        <scala.compat.version>2.12</scala.compat.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>scala-2.13</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+        <scala.version>2.13.3</scala.version>
+        <scala.compat.version>2.13</scala.compat.version>
+      </properties>
+    </profile>
+  </profiles>
 </project>

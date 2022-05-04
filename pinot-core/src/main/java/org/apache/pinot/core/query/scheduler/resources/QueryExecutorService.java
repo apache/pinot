@@ -48,7 +48,6 @@ public abstract class QueryExecutorService implements ExecutorService {
   }
 
   public void releaseWorkers() {
-
   }
 
   @Override

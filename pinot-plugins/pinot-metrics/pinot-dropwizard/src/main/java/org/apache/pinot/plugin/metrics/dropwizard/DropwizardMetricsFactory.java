@@ -34,7 +34,6 @@ public class DropwizardMetricsFactory implements PinotMetricsFactory {
 
   @Override
   public void init(PinotConfiguration metricsConfiguration) {
-
   }
 
   @Override

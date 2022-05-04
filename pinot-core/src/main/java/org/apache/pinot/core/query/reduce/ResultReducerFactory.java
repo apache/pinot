@@ -23,7 +23,6 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
-import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -58,8 +57,6 @@ public final class ResultReducerFactory {
         } else {
           return new AggregationDataTableReducer(queryContext);
         }
-      } else if (GapfillUtils.isPostAggregateGapfill(queryContext)) {
-        return new GapFillGroupByDataTableReducer(queryContext);
       } else {
         // Aggregation group-by query
         return new GroupByDataTableReducer(queryContext);

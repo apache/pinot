@@ -56,7 +56,7 @@ public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminComma
   @CommandLine.Option(names = {"-clusterName"}, required = true, description = "Helix cluster name")
   private String _clusterName;
 
-  @CommandLine.Option(names = {"-tableNames"}, 
+  @CommandLine.Option(names = {"-tableNames"},
       description = "Comma separated list of tables to check for invalid segment intervals")
   private String _tableNames;
 
@@ -80,7 +80,6 @@ public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminComma
 
   @Override
   public void cleanup() {
-
   }
 
   @Override

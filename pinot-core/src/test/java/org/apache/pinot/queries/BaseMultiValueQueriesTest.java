@@ -37,11 +37,12 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeTest;
+
+import static org.testng.Assert.assertNotNull;
 
 
 /**
@@ -68,9 +69,11 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "MultiValueQueriesTest");
 
   // Hard-coded query filter.
-  private static final String QUERY_FILTER =
-      " WHERE column1 > 100000000" + " AND column2 BETWEEN 20000000 AND 1000000000" + " AND column3 <> 'w'"
-          + " AND (column6 < 500000 OR column7 NOT IN (225, 407))" + " AND daysSinceEpoch = 1756015683";
+  protected static final String FILTER = " WHERE column1 > 100000000"
+      + " AND column2 BETWEEN 20000000 AND 1000000000"
+      + " AND column3 <> 'w'"
+      + " AND (column6 < 500000 OR column7 NOT IN (225, 407))"
+      + " AND daysSinceEpoch = 1756015683";
 
   private IndexSegment _indexSegment;
   // Contains 2 identical index segments.
@@ -83,7 +86,7 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
 
     // Get resource file path.
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
-    Assert.assertNotNull(resource);
+    assertNotNull(resource);
     String filePath = resource.getFile();
 
     // Build the segment schema.
@@ -137,7 +140,7 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
 
   @Override
   protected String getFilter() {
-    return QUERY_FILTER;
+    return FILTER;
   }
 
   @Override

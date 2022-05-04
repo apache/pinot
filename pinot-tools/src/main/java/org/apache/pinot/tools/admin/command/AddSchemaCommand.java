@@ -89,7 +89,6 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public void cleanup() {
-
   }
 
   public AddSchemaCommand setControllerHost(String controllerHost) {

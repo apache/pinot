@@ -227,7 +227,9 @@ const App = () => {
                   ))}
                   <Route path="*">
                     <Redirect
-                      to={app_state.queryConsoleOnlyView ? '/query' : '/'}
+                      to={PinotMethodUtils.getURLWithoutAccessToken(
+                        app_state.queryConsoleOnlyView ? '/query' : '/'
+                      )}
                     />
                   </Route>
                 </Switch>

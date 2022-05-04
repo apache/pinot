@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
-import org.apache.pinot.segment.spi.index.reader.MutableForwardIndex;
+import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
 import static org.apache.pinot.segment.spi.Constants.UNKNOWN_CARDINALITY;
@@ -100,6 +101,12 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics {
     } else {
       return 0;
     }
+  }
+
+  @Override
+  public Map<String, String> getPartitionFunctionConfig() {
+    PartitionFunction partitionFunction = _dataSourceMetadata.getPartitionFunction();
+    return partitionFunction != null ? partitionFunction.getFunctionConfig() : null;
   }
 
   @Override

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.transport;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -26,18 +27,25 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 
 
 public class ServerInstance {
-  private static final char HOSTNAME_PORT_DELIMITER = '_';
+  public enum RoutingType {
+    NETTY, GRPC, NETTY_TLS
+  }
 
+  private static final char HOSTNAME_PORT_DELIMITER = '_';
+  private static final int INVALID_PORT = -1;
+
+  private final String _instanceId;
   private final String _hostname;
   private final int _port;
   private final int _grpcPort;
-  private final int _tlsPort;
+  private final int _nettyTlsPort;
 
   /**
    * By default (auto joined instances), server instance name is of format: {@code Server_<hostname>_<port>}, e.g.
    * {@code Server_localhost_12345}, hostname is of format: {@code Server_<hostname>}, e.g. {@code Server_localhost}.
    */
   public ServerInstance(InstanceConfig instanceConfig) {
+    _instanceId = instanceConfig.getInstanceName();
     String hostname = instanceConfig.getHostName();
     if (hostname != null) {
       if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
@@ -57,23 +65,21 @@ public class ServerInstance {
       _hostname = hostnameAndPort[0];
       _port = Integer.parseInt(hostnameAndPort[1]);
     }
-
-    int tlsPort = -1;
-    int grpcPort = -1;
-    if (instanceConfig.getRecord() != null) {
-      tlsPort = instanceConfig.getRecord().getIntField(Helix.Instance.NETTYTLS_PORT_KEY, -1);
-      grpcPort = instanceConfig.getRecord().getIntField(Helix.Instance.GRPC_PORT_KEY, -1);
-    }
-    _tlsPort = tlsPort;
-    _grpcPort = grpcPort;
+    _grpcPort = instanceConfig.getRecord().getIntField(Helix.Instance.GRPC_PORT_KEY, INVALID_PORT);
+    _nettyTlsPort = instanceConfig.getRecord().getIntField(Helix.Instance.NETTY_TLS_PORT_KEY, INVALID_PORT);
   }
 
   @VisibleForTesting
   ServerInstance(String hostname, int port) {
+    _instanceId = Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port;
     _hostname = hostname;
     _port = port;
-    _grpcPort = -1;
-    _tlsPort = -1;
+    _grpcPort = INVALID_PORT;
+    _nettyTlsPort = INVALID_PORT;
+  }
+
+  public String getInstanceId() {
+    return _instanceId;
   }
 
   public String getHostname() {
@@ -88,71 +94,57 @@ public class ServerInstance {
     return _grpcPort;
   }
 
-  public ServerRoutingInstance toServerRoutingInstance(TableType tableType) {
-    return new ServerRoutingInstance(_hostname, _port, tableType);
+  public int getNettyTlsPort() {
+    return _nettyTlsPort;
   }
 
+  // Does not require TLS until all servers guaranteed to be on TLS
   @Deprecated
-  public ServerRoutingInstance toServerRoutingInstance(TableType tableType, boolean preferTls) {
-    if (!preferTls) {
-      return toServerRoutingInstance(tableType);
+  public ServerRoutingInstance toServerRoutingInstance(TableType tableType, boolean preferNettyTls) {
+    if (preferNettyTls && _nettyTlsPort > 0) {
+      return new ServerRoutingInstance(_instanceId, _hostname, _nettyTlsPort, tableType, true);
+    } else {
+      return new ServerRoutingInstance(_instanceId, _hostname, _port, tableType);
     }
-
-    if (_tlsPort <= 0) {
-      return toServerRoutingInstance(tableType);
-    }
-
-    return new ServerRoutingInstance(_hostname, _tlsPort, tableType, true);
   }
 
-  public ServerRoutingInstance toServerRoutingInstance(TableType tableType, Type type) {
-    switch (type) {
+  public ServerRoutingInstance toServerRoutingInstance(TableType tableType, RoutingType routingType) {
+    switch (routingType) {
+      case NETTY:
+        Preconditions.checkState(_port > 0, "Netty port is not configured for server: %s", _instanceId);
+        return new ServerRoutingInstance(_instanceId, _hostname, _port, tableType);
       case GRPC:
-        if (_grpcPort > 0) {
-          return new ServerRoutingInstance(_hostname, _grpcPort, tableType, false);
-        } else {
-          return new ServerRoutingInstance(_hostname, _port, tableType);
-        }
-      case TTS:
-        if (_tlsPort > 0) {
-          return new ServerRoutingInstance(_hostname, _tlsPort, tableType, true);
-        } else {
-          return new ServerRoutingInstance(_hostname, _port, tableType);
-        }
-      case DEFAULT:
+        Preconditions.checkState(_grpcPort > 0, "GRPC port is not configured for server: %s", _instanceId);
+        return new ServerRoutingInstance(_instanceId, _hostname, _grpcPort, tableType);
+      case NETTY_TLS:
+        Preconditions.checkState(_nettyTlsPort > 0, "Netty TLS port is not configured for server: %s", _instanceId);
+        return new ServerRoutingInstance(_instanceId, _hostname, _nettyTlsPort, tableType, true);
       default:
-        return new ServerRoutingInstance(_hostname, _port, tableType);
+        throw new IllegalStateException("Unsupported routing type: " + routingType);
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof ServerInstance)) {
+      return false;
+    }
+    ServerInstance that = (ServerInstance) o;
+    // Only check instanceId because it can identify an instance within the same query
+    return _instanceId.equals(that._instanceId);
   }
 
   @Override
   public int hashCode() {
-    return 31 * _hostname.hashCode() + _port;
+    // Only hash instanceId because it can identify an instance within the same query
+    return _instanceId.hashCode();
   }
 
-  @Override
-  public boolean equals(Object obj) {
-    if (this == obj) {
-      return true;
-    }
-    if (obj instanceof ServerInstance) {
-      ServerInstance that = (ServerInstance) obj;
-      return _hostname.equals(that._hostname) && _port == that._port;
-    }
-    return false;
-  }
-
-  /**
-   * Use default format {@code Server_<hostname>_<port>} for backward-compatibility.
-   */
   @Override
   public String toString() {
-    return Helix.PREFIX_OF_SERVER_INSTANCE + _hostname + HOSTNAME_PORT_DELIMITER + _port;
-  }
-
-  public enum Type {
-    DEFAULT,
-    GRPC,
-    TTS
+    return _instanceId;
   }
 }

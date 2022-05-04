@@ -1,0 +1,43 @@
+{
+  "schemaName": "demand",
+  "dimensionFieldSpecs": [
+    {
+      "name": "demand_uuid",
+      "singleValueField": true,
+      "dataType": "STRING",
+      "virtualColumnProvider": null,
+      "defaultNullValue": "null",
+      "transformFunction": null,
+      "maxLength" : 4096
+    },
+    {
+      "name": "geofence",
+      "singleValueField": true,
+      "dataType": "STRING",
+      "virtualColumnProvider": null,
+      "defaultNullValue": "null",
+      "transformFunction": null
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "dataType": "DOUBLE",
+      "singleValueField": true,
+      "fieldSize": 8,
+      "derivedMetricType": null,
+      "name": "surge_multiplier",
+      "virtualColumnProvider": null,
+      "defaultNullValue": 0.0,
+      "transformFunction": null
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "timestamp",
+      "dataType": "INT",
+      "format": "1:DAYS:EPOCH",
+      "granularity": "1:DAYS"
+    }
+  ],
+  "primaryKeyColumns" : [ "demand_uuid" ]
+}

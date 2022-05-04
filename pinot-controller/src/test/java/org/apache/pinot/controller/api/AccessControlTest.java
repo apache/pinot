@@ -42,17 +42,14 @@ public class AccessControlTest {
     try {
       ControllerTestUtils.sendGetRequest(
           ControllerTestUtils.getControllerRequestURLBuilder().forSegmentDownload(TABLE_NAME, "testSegment"));
+      Assert.fail("Access not denied");
     } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 403"));
-      return;
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 403 (Forbidden)"));
     }
-    Assert.fail("Access not denied");
   }
 
   public static class DenyAllAccessFactory implements AccessControlFactory {
-    private static final AccessControl DENY_ALL_ACCESS = (httpHeaders, tableName) -> {
-      return !tableName.equals(TABLE_NAME);
-    };
+    private static final AccessControl DENY_ALL_ACCESS = (httpHeaders, tableName) -> !tableName.equals(TABLE_NAME);
 
     @Override
     public AccessControl create() {

@@ -163,6 +163,15 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     // Restart controller
     stopController();
     startController(properties);
+    // wait for controller to start correctly.
+    TestUtils.waitForCondition((aVoid) -> {
+      try {
+        long tableSize = getTableSize(OFFLINE_TABLE_NAME);
+        return tableSize >= 0;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 5000L, "Failed to restart controller");
 
     // Update table to add a new task
     tableConfig.setTaskConfig(new TableTaskConfig(

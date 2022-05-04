@@ -29,6 +29,7 @@ import org.apache.pinot.spi.utils.TimeUtils;
 public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
+  private String _deletedSegmentsRetentionPeriod;
   @Deprecated
   private String _segmentPushFrequency; // DO NOT REMOVE, this is used in internal segment generation management
   @Deprecated
@@ -38,12 +39,11 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _schemaName;
   private String _timeColumnName;
   private TimeUnit _timeType;
-  // Flag to indicate if null value in time column is allowed.
-  private boolean _allowNullTimeValue;
   private String _segmentAssignmentStrategy;
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
+  private boolean _minimizeDataMovement;
   // Possible values can be http or https. If this field is set, a Pinot server can download segments from peer servers
   // using the specified download scheme. Both realtime tables and offline tables can set this field.
   // For more usage of this field, please refer to this design doc: https://tinyurl.com/f63ru4sb
@@ -78,14 +78,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _timeType = TimeUtils.timeUnitFromString(timeType);
   }
 
-  public boolean isAllowNullTimeValue() {
-    return _allowNullTimeValue;
-  }
-
-  public void setAllowNullTimeValue(boolean allowNullTimeValue) {
-    _allowNullTimeValue = allowNullTimeValue;
-  }
-
   public String getRetentionTimeUnit() {
     return _retentionTimeUnit;
   }
@@ -100,6 +92,14 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setRetentionTimeValue(String retentionTimeValue) {
     _retentionTimeValue = retentionTimeValue;
+  }
+
+  public String getDeletedSegmentsRetentionPeriod() {
+    return _deletedSegmentsRetentionPeriod;
+  }
+
+  public void setDeletedSegmentsRetentionPeriod(String deletedSegmentsRetentionPeriod) {
+    _deletedSegmentsRetentionPeriod = deletedSegmentsRetentionPeriod;
   }
 
   /**
@@ -190,5 +190,13 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setCrypterClassName(String crypterClassName) {
     _crypterClassName = crypterClassName;
+  }
+
+  public boolean isMinimizeDataMovement() {
+    return _minimizeDataMovement;
+  }
+
+  public void setMinimizeDataMovement(boolean minimizeDataMovement) {
+    _minimizeDataMovement = minimizeDataMovement;
   }
 }

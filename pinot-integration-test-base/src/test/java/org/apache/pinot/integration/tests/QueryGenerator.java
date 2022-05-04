@@ -42,7 +42,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
- * The <code>QueryGenerator</code> class is used to generate random equivalent PQL/SQL query pairs based on Avro files.
+ * The <code>QueryGenerator</code> class is used to generate random equivalent Pinot and H2 query pairs based on Avro
+ * files.
  * <ul>
  *   <li>
  *     Supports COMPARISON, IN and BETWEEN predicate for both single-value and multi-value columns.
@@ -71,16 +72,13 @@ public class QueryGenerator {
   private static final int MAX_NUM_PREDICATES = 3;
   private static final int MAX_NUM_IN_CLAUSE_VALUES = 5;
   private static final int MAX_RESULT_LIMIT = 30;
-  private static final int MAX_COUNT_FUNCTION_RESULT = 1000;
+  private static final int MAX_INT_FOR_HAVING_CLAUSE_PREDICATE = 1000;
   private static final float MAX_FLOAT_FOR_HAVING_CLAUSE_PREDICATE = 10000;
-  private static final int MAX_INT_FOR_HAVING_CLAUSE_PREDICATE = 10000;
   private static final List<String> BOOLEAN_OPERATORS = Arrays.asList("OR", "AND");
   private static final List<String> COMPARISON_OPERATORS = Arrays.asList("=", "<>", "<", ">", "<=", ">=");
 
-  // TODO: fix DISTINCTCOUNT implementation and add it back.
-  // Currently for DISTINCTCOUNT we use hashcode as the key, should change it to use raw values.
   private static final List<String> AGGREGATION_FUNCTIONS =
-      Arrays.asList("SUM", "MIN", "MAX", "AVG", "COUNT"/*, "DISTINCTCOUNT"*/);
+      Arrays.asList("SUM", "MIN", "MAX", "AVG", "COUNT", "DISTINCTCOUNT");
   private static final Random RANDOM = new Random();
 
   private final Map<String, Set<String>> _columnToValueSet = new HashMap<>();
@@ -92,11 +90,11 @@ public class QueryGenerator {
 
   private final List<QueryGenerationStrategy> _queryGenerationStrategies =
       Arrays.asList(new SelectionQueryGenerationStrategy(), new AggregationQueryGenerationStrategy());
-  private final List<PredicateGenerator> _singleValuePredicateGenerators = Arrays
-      .asList(new SingleValueComparisonPredicateGenerator(), new SingleValueInPredicateGenerator(),
+  private final List<PredicateGenerator> _singleValuePredicateGenerators =
+      Arrays.asList(new SingleValueComparisonPredicateGenerator(), new SingleValueInPredicateGenerator(),
           new SingleValueBetweenPredicateGenerator(), new SingleValueRegexPredicateGenerator());
-  private final List<PredicateGenerator> _multiValuePredicateGenerators = Arrays
-      .asList(new MultiValueComparisonPredicateGenerator(), new MultiValueInPredicateGenerator(),
+  private final List<PredicateGenerator> _multiValuePredicateGenerators =
+      Arrays.asList(new MultiValueComparisonPredicateGenerator(), new MultiValueInPredicateGenerator(),
           new MultiValueBetweenPredicateGenerator());
 
   private final String _pinotTableName;
@@ -127,7 +125,7 @@ public class QueryGenerator {
         switch (fieldType) {
           case UNION:
             _columnNames.add(fieldName);
-            _columnToValueSet.put(fieldName, new HashSet<String>());
+            _columnToValueSet.put(fieldName, new HashSet<>());
             Schema.Type type = fieldSchema.getTypes().get(0).getType();
             if (type == Schema.Type.ARRAY) {
               _multiValueColumnMaxNumElements.put(fieldName, 0);
@@ -140,7 +138,7 @@ public class QueryGenerator {
             break;
           case ARRAY:
             _columnNames.add(fieldName);
-            _columnToValueSet.put(fieldName, new HashSet<String>());
+            _columnToValueSet.put(fieldName, new HashSet<>());
             _multiValueColumnMaxNumElements.put(fieldName, 0);
             break;
           case INT:
@@ -148,14 +146,14 @@ public class QueryGenerator {
           case FLOAT:
           case DOUBLE:
             _columnNames.add(fieldName);
-            _columnToValueSet.put(fieldName, new HashSet<String>());
+            _columnToValueSet.put(fieldName, new HashSet<>());
             _singleValueColumnNames.add(fieldName);
             _singleValueNumericalColumnNames.add(fieldName);
             break;
           case BOOLEAN:
           case STRING:
             _columnNames.add(fieldName);
-            _columnToValueSet.put(fieldName, new HashSet<String>());
+            _columnToValueSet.put(fieldName, new HashSet<>());
             _singleValueColumnNames.add(fieldName);
             break;
           default:
@@ -217,13 +215,13 @@ public class QueryGenerator {
     File avroFile = new File("pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_1.avro");
     QueryGenerator queryGenerator = new QueryGenerator(Collections.singletonList(avroFile), "mytable", "mytable");
     File outputFile = new File(
-        "pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K.pql");
+        "pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K.sql");
     try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
       for (int i = 0; i < 10000; i++) {
         Query query = queryGenerator.generateQuery();
         ObjectNode queryJson = JsonUtils.newObjectNode();
-        queryJson.put("pql", query.generatePql());
-        queryJson.set("hsqls", JsonUtils.objectToJsonNode(query.generateH2Sql()));
+        queryJson.put("sql", query.generatePinotQuery());
+        queryJson.set("hsqls", JsonUtils.objectToJsonNode(query.generateH2Query()));
         writer.write(queryJson.toString());
         writer.newLine();
       }
@@ -348,7 +346,7 @@ public class QueryGenerator {
 
     if (predicateCount < 2) {
       // No need to join.
-      return new PredicateQueryFragment(predicates, Collections.<QueryFragment>emptyList());
+      return new PredicateQueryFragment(predicates, Collections.emptyList());
     } else {
       // Join predicates with ANDs and ORs.
       List<QueryFragment> operators = new ArrayList<>(predicateCount - 1);
@@ -359,44 +357,18 @@ public class QueryGenerator {
     }
   }
 
-  /**
-   * Query interface with capability of generating PQL and H2 SQL query.
-   */
   public interface Query {
 
-    /**
-     * Generate PQL query.
-     *
-     * @return generated PQL query.
-     */
-    String generatePql();
+    String generatePinotQuery();
 
-    /**
-     * Generate H2 SQL queries equivalent to the PQL query.
-     *
-     * @return generated H2 SQL queries.
-     */
-    List<String> generateH2Sql();
+    String generateH2Query();
   }
 
-  /**
-   * Query fragment interface with capability of generating PQL and H2 SQL query fragment.
-   */
   private interface QueryFragment {
 
-    /**
-     * Generate PQL query fragment.
-     *
-     * @return generated PQL query fragment.
-     */
-    String generatePql();
+    String generatePinotQuery();
 
-    /**
-     * Generate H2 SQL query fragment equivalent to the PQL query fragment.
-     *
-     * @return generated H2 SQL query fragment.
-     */
-    String generateH2Sql();
+    String generateH2Query();
   }
 
   /**
@@ -430,10 +402,10 @@ public class QueryGenerator {
    * Selection query.
    */
   private class SelectionQuery implements Query {
-    private final List<String> _projectionColumns;
-    private final PredicateQueryFragment _predicate;
-    private final OrderByQueryFragment _orderBy;
-    private final LimitQueryFragment _limit;
+    final List<String> _projectionColumns;
+    final PredicateQueryFragment _predicate;
+    final OrderByQueryFragment _orderBy;
+    final LimitQueryFragment _limit;
 
     /**
      * Constructor for <code>SelectionQuery</code>.
@@ -452,13 +424,13 @@ public class QueryGenerator {
     }
 
     @Override
-    public String generatePql() {
+    public String generatePinotQuery() {
       return joinWithSpaces("SELECT", StringUtils.join(_projectionColumns, ", "), "FROM", _pinotTableName,
-          _predicate.generatePql(), _orderBy.generatePql(), _limit.generatePql());
+          _predicate.generatePinotQuery(), _orderBy.generatePinotQuery(), _limit.generatePinotQuery());
     }
 
     @Override
-    public List<String> generateH2Sql() {
+    public String generateH2Query() {
       List<String> h2ProjectionColumns = new ArrayList<>();
       for (String projectionColumn : _projectionColumns) {
         if (_multiValueColumnMaxNumElements.containsKey(projectionColumn)) {
@@ -471,9 +443,8 @@ public class QueryGenerator {
           h2ProjectionColumns.add(projectionColumn);
         }
       }
-      return Collections.singletonList(
-          joinWithSpaces("SELECT", StringUtils.join(h2ProjectionColumns, ", "), "FROM", _h2TableName,
-              _predicate.generateH2Sql(), _orderBy.generateH2Sql(), _limit.generateH2Sql()));
+      return joinWithSpaces("SELECT", StringUtils.join(h2ProjectionColumns, ", "), "FROM", _h2TableName,
+          _predicate.generateH2Query(), _orderBy.generateH2Query(), _limit.generateH2Query());
     }
   }
 
@@ -481,11 +452,11 @@ public class QueryGenerator {
    * Aggregation query.
    */
   private class AggregationQuery implements Query {
-    private List<String> _aggregateColumnsAndFunctions;
-    private PredicateQueryFragment _predicate;
-    private HavingQueryFragment _havingPredicate;
-    private Set<String> _groupColumns;
-    private TopQueryFragment _top;
+    final List<String> _aggregateColumnsAndFunctions;
+    final PredicateQueryFragment _predicate;
+    final HavingQueryFragment _havingPredicate;
+    final Set<String> _groupColumns;
+    final LimitQueryFragment _limit;
 
     /**
      * Constructor for <code>AggregationQuery</code>.
@@ -493,107 +464,88 @@ public class QueryGenerator {
      * @param aggregateColumnsAndFunctions aggregation functions.
      * @param predicate predicate fragment.
      * @param groupColumns group-by columns.
-     * @param top top fragment.
+     * @param havingPredicate having predicate fragment.
+     * @param limit limit fragment.
      */
     public AggregationQuery(List<String> aggregateColumnsAndFunctions, PredicateQueryFragment predicate,
-        Set<String> groupColumns, TopQueryFragment top, HavingQueryFragment havingPredicate) {
+        Set<String> groupColumns, HavingQueryFragment havingPredicate, LimitQueryFragment limit) {
       _aggregateColumnsAndFunctions = aggregateColumnsAndFunctions;
       _predicate = predicate;
       _groupColumns = groupColumns;
-      _top = top;
       _havingPredicate = havingPredicate;
+      _limit = limit;
     }
 
     @Override
-    public String generatePql() {
+    public String generatePinotQuery() {
       if (_groupColumns.isEmpty()) {
         return joinWithSpaces("SELECT", StringUtils.join(_aggregateColumnsAndFunctions, ", "), "FROM", _pinotTableName,
-            _predicate.generatePql(), _top.generatePql());
+            _predicate.generatePinotQuery());
       } else {
-        String groupByColumns = StringUtils.join(_groupColumns, ", ");
-
-        // TODO: After fixing having clause, we need to add back the having predicate.
         return joinWithSpaces("SELECT", StringUtils.join(_aggregateColumnsAndFunctions, ", "), "FROM", _pinotTableName,
-            _predicate.generatePql(), "GROUP BY", StringUtils.join(_groupColumns, ", "), _top.generatePql());
+            _predicate.generatePinotQuery(), "GROUP BY", StringUtils.join(_groupColumns, ", "),
+            _havingPredicate.generatePinotQuery(), _limit.generatePinotQuery());
       }
     }
 
     @Override
-    public List<String> generateH2Sql() {
-      List<String> queries = new ArrayList<>();
-
-      // For each aggregation function, generate one separate H2 SQL query.
+    public String generateH2Query() {
+      List<String> h2AggregateColumnAndFunctions = new ArrayList<>();
       for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
-        String replacedAggregateColumnAndFunction;
+        String h2AggregateColumnAndFunction;
         // Make 'AVG' and 'DISTINCTCOUNT' compatible with H2 SQL query.
         if (aggregateColumnAndFunction.startsWith("AVG(")) {
-          replacedAggregateColumnAndFunction =
+          h2AggregateColumnAndFunction =
               aggregateColumnAndFunction.replace("AVG(", "AVG(CAST(").replace(")", " AS DOUBLE))");
         } else if (aggregateColumnAndFunction.startsWith("DISTINCTCOUNT(")) {
-          replacedAggregateColumnAndFunction = aggregateColumnAndFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
+          h2AggregateColumnAndFunction = aggregateColumnAndFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
         } else {
-          replacedAggregateColumnAndFunction = aggregateColumnAndFunction;
+          h2AggregateColumnAndFunction = aggregateColumnAndFunction;
         }
-
-        if (_groupColumns.isEmpty()) {
-          // Aggregation query.
-          queries.add(
-              joinWithSpaces("SELECT", replacedAggregateColumnAndFunction, "FROM", _h2TableName,
-                  _predicate.generateH2Sql(),
-                  _top.generateH2Sql()));
-        } else {
-          // Group-by query.
-
-          // Unlike PQL, SQL expects the group columns in select statements.
-          String groupByColumns = StringUtils.join(_groupColumns, ", ");
-
-          // TODO: After fixing having clause, we need to add back the having predicate.
-          queries.add(
-              joinWithSpaces("SELECT", groupByColumns + ",", replacedAggregateColumnAndFunction, "FROM", _h2TableName,
-                  _predicate.generateH2Sql(), "GROUP BY", groupByColumns, _top.generateH2Sql()));
-        }
+        h2AggregateColumnAndFunctions.add(h2AggregateColumnAndFunction);
       }
-
-      return queries;
+      if (_groupColumns.isEmpty()) {
+        return joinWithSpaces("SELECT", StringUtils.join(h2AggregateColumnAndFunctions, ", "), "FROM", _h2TableName,
+            _predicate.generateH2Query());
+      } else {
+        return joinWithSpaces("SELECT", StringUtils.join(h2AggregateColumnAndFunctions, ", "), "FROM", _h2TableName,
+            _predicate.generateH2Query(), "GROUP BY", StringUtils.join(_groupColumns, ", "),
+            _havingPredicate.generateH2Query(), _limit.generateH2Query());
+      }
     }
   }
 
   /**
    * Most basic query fragment.
    */
-  private class StringQueryFragment implements QueryFragment {
-    String _pql;
-    String _sql;
+  private static class StringQueryFragment implements QueryFragment {
+    final String _pinotQuery;
+    final String _h2Query;
 
     /**
-     * Constructor for with same PQL and H2 SQL query fragment.
-     *
-     * @param pql PQL (H2 SQL) query fragment.
+     * Constructor with same Pinot and H2 query fragment.
      */
-    StringQueryFragment(String pql) {
-      _pql = pql;
-      _sql = pql;
+    StringQueryFragment(String query) {
+      _pinotQuery = query;
+      _h2Query = query;
     }
 
     /**
-     * Constructor for <code>StringQueryFragment</code> with different PQL and H2 SQL query fragment.
-     *
-     * @param pql PQL query fragment.
-     * @param sql H2 SQL query fragment.
+     * Constructor for <code>StringQueryFragment</code> with different Pinot and H2 query fragment.
      */
-    StringQueryFragment(String pql, String sql) {
-      _pql = pql;
-      _sql = sql;
+    StringQueryFragment(String pinotQuery, String h2Query) {
+      _pinotQuery = pinotQuery;
+      _h2Query = h2Query;
     }
 
     @Override
-    public String generatePql() {
-      return _pql;
+    public String generatePinotQuery() {
+      return _pinotQuery;
     }
 
     @Override
-    public String generateH2Sql() {
-      return _sql;
+    public String generateH2Query() {
+      return _h2Query;
     }
   }
 
@@ -603,24 +555,10 @@ public class QueryGenerator {
    *   <li>SELECT ... FROM ... WHERE ... 'LIMIT ...'</li>
    * </ul>
    */
-  private class LimitQueryFragment extends StringQueryFragment {
+  private static class LimitQueryFragment extends StringQueryFragment {
     LimitQueryFragment(int limit) {
       // When limit is MAX_RESULT_LIMIT, construct query without LIMIT.
       super(limit == MAX_RESULT_LIMIT ? "" : "LIMIT " + limit,
-          "LIMIT " + ClusterIntegrationTestUtils.MAX_NUM_ROWS_TO_COMPARE);
-    }
-  }
-
-  /**
-   * Top query fragment for aggregation queries.
-   * <ul>
-   *   <li>SELECT ... FROM ... WHERE ... 'TOP ...'</li>
-   * </ul>
-   */
-  private class TopQueryFragment extends StringQueryFragment {
-    TopQueryFragment(int top) {
-      // When top is MAX_RESULT_LIMIT, construct query without TOP.
-      super(top == MAX_RESULT_LIMIT ? "" : "TOP " + top,
           "LIMIT " + ClusterIntegrationTestUtils.MAX_NUM_ROWS_TO_COMPARE);
     }
   }
@@ -631,7 +569,7 @@ public class QueryGenerator {
    *   <li>SELECT ... FROM ... WHERE ... 'ORDER BY ...'</li>
    * </ul>
    */
-  private class OrderByQueryFragment extends StringQueryFragment {
+  private static class OrderByQueryFragment extends StringQueryFragment {
     OrderByQueryFragment(Set<String> columns) {
       super(columns.isEmpty() ? "" : "ORDER BY " + StringUtils.join(columns, ", "));
     }
@@ -643,9 +581,9 @@ public class QueryGenerator {
    *   <li>SELECT ... FROM ... 'WHERE ...'</li>
    * </ul>
    */
-  private class PredicateQueryFragment implements QueryFragment {
-    List<QueryFragment> _predicates;
-    List<QueryFragment> _operators;
+  private static class PredicateQueryFragment implements QueryFragment {
+    final List<QueryFragment> _predicates;
+    final List<QueryFragment> _operators;
 
     /**
      * Constructor for <code>PredicateQueryFragment</code>.
@@ -659,58 +597,55 @@ public class QueryGenerator {
     }
 
     @Override
-    public String generatePql() {
+    public String generatePinotQuery() {
       if (_predicates.isEmpty()) {
         return "";
       } else {
-        StringBuilder pql = new StringBuilder("WHERE ");
+        StringBuilder pinotQuery = new StringBuilder("WHERE ");
 
         // One less than the number of predicates.
         int operatorCount = _operators.size();
         for (int i = 0; i < operatorCount; i++) {
-          pql.append(_predicates.get(i).generatePql()).append(' ').append(_operators.get(i).generatePql()).append(' ');
+          pinotQuery.append(_predicates.get(i).generatePinotQuery()).append(' ')
+              .append(_operators.get(i).generatePinotQuery()).append(' ');
         }
-        pql.append(_predicates.get(operatorCount).generatePql());
+        pinotQuery.append(_predicates.get(operatorCount).generatePinotQuery());
 
-        return pql.toString();
+        return pinotQuery.toString();
       }
     }
 
     @Override
-    public String generateH2Sql() {
+    public String generateH2Query() {
       if (_predicates.isEmpty()) {
         return "";
       } else {
-        StringBuilder sql = new StringBuilder("WHERE ");
+        StringBuilder h2Query = new StringBuilder("WHERE ");
 
         // One less than the number of predicates.
         int operatorCount = _operators.size();
         for (int i = 0; i < operatorCount; i++) {
-          sql.append(_predicates.get(i).generateH2Sql()).append(' ').append(_operators.get(i).generateH2Sql())
+          h2Query.append(_predicates.get(i).generateH2Query()).append(' ').append(_operators.get(i).generateH2Query())
               .append(' ');
         }
-        sql.append(_predicates.get(operatorCount).generateH2Sql());
+        h2Query.append(_predicates.get(operatorCount).generateH2Query());
 
-        return sql.toString();
+        return h2Query.toString();
       }
     }
   }
 
   /**
-   * Predicate query fragment.
+   * Having query fragment.
    * <ul>
-   *   <li>SELECT ... FROM ... 'WHERE ... GROUP BY ... HAVING ...'</li>
+   *   <li>SELECT ... FROM ... WHERE ... GROUP BY ... 'HAVING ...'</li>
    * </ul>
    */
-  private class HavingQueryFragment implements QueryFragment {
-    private List<String> _havingClauseAggregationFunctions;
-    private List<String> _havingClauseOperatorsAndValues;
-    private List<String> _havingClauseBooleanOperators;
+  private static class HavingQueryFragment implements QueryFragment {
+    final List<String> _havingClauseAggregationFunctions;
+    final List<String> _havingClauseOperatorsAndValues;
+    final List<String> _havingClauseBooleanOperators;
 
-    /**
-     * Constructor for <code>PredicateQueryFragment</code>.
-     *
-     */
     HavingQueryFragment(List<String> havingClauseAggregationFunctions, List<String> havingClauseOperatorsAndValues,
         List<String> havingClauseBooleanOperators) {
       _havingClauseAggregationFunctions = havingClauseAggregationFunctions;
@@ -719,36 +654,36 @@ public class QueryGenerator {
     }
 
     @Override
-    public String generatePql() {
-      String pqlHavingClause = "";
+    public String generatePinotQuery() {
+      String pinotQuery = "";
       int aggregationFunctionCount = _havingClauseAggregationFunctions.size();
       if (aggregationFunctionCount > 0) {
-        pqlHavingClause += "HAVING";
-        pqlHavingClause = joinWithSpaces(pqlHavingClause, _havingClauseAggregationFunctions.get(0));
-        pqlHavingClause = joinWithSpaces(pqlHavingClause, _havingClauseOperatorsAndValues.get(0));
+        pinotQuery += "HAVING";
+        pinotQuery = joinWithSpaces(pinotQuery, _havingClauseAggregationFunctions.get(0));
+        pinotQuery = joinWithSpaces(pinotQuery, _havingClauseOperatorsAndValues.get(0));
         for (int i = 1; i < aggregationFunctionCount; i++) {
-          pqlHavingClause = joinWithSpaces(pqlHavingClause, _havingClauseBooleanOperators.get(i - 1));
-          pqlHavingClause = joinWithSpaces(pqlHavingClause, _havingClauseAggregationFunctions.get(i));
-          pqlHavingClause = joinWithSpaces(pqlHavingClause, _havingClauseOperatorsAndValues.get(i));
+          pinotQuery = joinWithSpaces(pinotQuery, _havingClauseBooleanOperators.get(i - 1));
+          pinotQuery = joinWithSpaces(pinotQuery, _havingClauseAggregationFunctions.get(i));
+          pinotQuery = joinWithSpaces(pinotQuery, _havingClauseOperatorsAndValues.get(i));
         }
       }
-      return pqlHavingClause;
+      return pinotQuery;
     }
 
     @Override
-    public String generateH2Sql() {
-      String sqlHavingClause = "";
+    public String generateH2Query() {
+      String h2Query = "";
       int aggregationFunctionCount = _havingClauseAggregationFunctions.size();
       if (aggregationFunctionCount > 0) {
-        sqlHavingClause += "HAVING";
+        h2Query += "HAVING";
         String aggregationFunction = _havingClauseAggregationFunctions.get(0);
         if (aggregationFunction.startsWith("AVG(")) {
           aggregationFunction = aggregationFunction.replace("AVG(", "AVG(CAST(").replace(")", " AS DOUBLE))");
         } else if (aggregationFunction.startsWith("DISTINCTCOUNT(")) {
           aggregationFunction = aggregationFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
         }
-        sqlHavingClause = joinWithSpaces(sqlHavingClause, aggregationFunction);
-        sqlHavingClause = joinWithSpaces(sqlHavingClause, _havingClauseOperatorsAndValues.get(0));
+        h2Query = joinWithSpaces(h2Query, aggregationFunction);
+        h2Query = joinWithSpaces(h2Query, _havingClauseOperatorsAndValues.get(0));
         for (int i = 1; i < aggregationFunctionCount; i++) {
           aggregationFunction = _havingClauseAggregationFunctions.get(i);
           if (aggregationFunction.startsWith("AVG(")) {
@@ -756,12 +691,12 @@ public class QueryGenerator {
           } else if (aggregationFunction.startsWith("DISTINCTCOUNT(")) {
             aggregationFunction = aggregationFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
           }
-          sqlHavingClause = joinWithSpaces(sqlHavingClause, _havingClauseBooleanOperators.get(i - 1));
-          sqlHavingClause = joinWithSpaces(sqlHavingClause, aggregationFunction);
-          sqlHavingClause = joinWithSpaces(sqlHavingClause, _havingClauseOperatorsAndValues.get(i));
+          h2Query = joinWithSpaces(h2Query, _havingClauseBooleanOperators.get(i - 1));
+          h2Query = joinWithSpaces(h2Query, aggregationFunction);
+          h2Query = joinWithSpaces(h2Query, _havingClauseOperatorsAndValues.get(i));
         }
       }
-      return sqlHavingClause;
+      return h2Query;
     }
   }
 
@@ -833,8 +768,9 @@ public class QueryGenerator {
       ArrayList<String> arrayOfAggregationColumnsAndFunctions = new ArrayList<>(aggregationColumnsAndFunctions);
       HavingQueryFragment havingPredicate = generateHavingPredicate(arrayOfAggregationColumnsAndFunctions);
       // Generate a result limit of at most MAX_RESULT_LIMIT.
-      TopQueryFragment top = new TopQueryFragment(RANDOM.nextInt(MAX_RESULT_LIMIT + 1));
-      return new AggregationQuery(arrayOfAggregationColumnsAndFunctions, predicate, groupColumns, top, havingPredicate);
+      LimitQueryFragment limit = new LimitQueryFragment(RANDOM.nextInt(MAX_RESULT_LIMIT + 1));
+      return new AggregationQuery(arrayOfAggregationColumnsAndFunctions, predicate, groupColumns, havingPredicate,
+          limit);
     }
 
     /**
@@ -844,9 +780,9 @@ public class QueryGenerator {
      */
     private HavingQueryFragment generateHavingPredicate(ArrayList<String> arrayOfAggregationColumnsAndFunctions) {
       //Generate a HAVING clause for group by query
-      List<String> havingClauseAggregationFunctions = new ArrayList<String>();
-      List<String> havingClauseOperatorsAndValues = new ArrayList<String>();
-      List<String> havingClauseBooleanOperators = new ArrayList<String>();
+      List<String> havingClauseAggregationFunctions = new ArrayList<>();
+      List<String> havingClauseOperatorsAndValues = new ArrayList<>();
+      List<String> havingClauseBooleanOperators = new ArrayList<>();
       createHavingClause(arrayOfAggregationColumnsAndFunctions, havingClauseAggregationFunctions,
           havingClauseOperatorsAndValues, havingClauseBooleanOperators);
       return new HavingQueryFragment(havingClauseAggregationFunctions, havingClauseOperatorsAndValues,
@@ -858,7 +794,6 @@ public class QueryGenerator {
         List<String> havingClauseBooleanOperators) {
       int numOfFunctionsInSelectList = arrayOfAggregationColumnsAndFunctions.size();
       int aggregationFunctionCount = RANDOM.nextInt(numOfFunctionsInSelectList + 1);
-      ArrayList<String> aggregationPredicates = new ArrayList<>();
       for (int i = 0; i < aggregationFunctionCount; i++) {
         int aggregationFunctionIndex = RANDOM.nextInt(numOfFunctionsInSelectList);
         String aggregationFunction = arrayOfAggregationColumnsAndFunctions.get(aggregationFunctionIndex);
@@ -895,45 +830,30 @@ public class QueryGenerator {
     }
 
     private String createOperatorAndValueForAggregationFunction(String aggregationFunction) {
+      boolean generateInt = aggregationFunction.startsWith("COUNT") || aggregationFunction.startsWith("DISTINCTCOUNT");
       boolean comparisonOperatorNotBetweenOrIN = RANDOM.nextBoolean();
-      String valueOperator = new String();
-      String comparisonOperator = new String();
       if (comparisonOperatorNotBetweenOrIN) {
-        String functionValue = new String();
-        comparisonOperator = pickRandom(COMPARISON_OPERATORS);
-        if (aggregationFunction.startsWith("COUNT") || aggregationFunction.startsWith("DISTINCTCOUNT")) {
-          functionValue = Integer.toString(RANDOM.nextInt(MAX_COUNT_FUNCTION_RESULT) + 1);
-        } else {
-          functionValue = Float.toString(RANDOM.nextFloat() * MAX_FLOAT_FOR_HAVING_CLAUSE_PREDICATE);
-        }
-        valueOperator = joinWithSpaces(valueOperator, comparisonOperator);
-        valueOperator = joinWithSpaces(valueOperator, functionValue);
+        return pickRandom(COMPARISON_OPERATORS) + " " + generateRandomValue(generateInt);
       } else {
         boolean isItBetween = RANDOM.nextBoolean();
         if (isItBetween) {
-          String leftValue = Float.toString(RANDOM.nextFloat() * MAX_FLOAT_FOR_HAVING_CLAUSE_PREDICATE);
-          String rightValue = Float.toString(RANDOM.nextFloat() * MAX_FLOAT_FOR_HAVING_CLAUSE_PREDICATE);
-          comparisonOperator = "BETWEEN " + leftValue + " AND " + rightValue;
-          valueOperator = comparisonOperator;
+          return "BETWEEN " + generateRandomValue(generateInt) + " AND " + generateRandomValue(generateInt);
         } else {
           int numValues = RANDOM.nextInt(MAX_NUM_IN_CLAUSE_VALUES) + 1;
           Set<String> values = new HashSet<>();
           while (values.size() < numValues) {
-            values.add(Integer.toString(RANDOM.nextInt(MAX_INT_FOR_HAVING_CLAUSE_PREDICATE)));
+            values.add(generateRandomValue(generateInt));
           }
-          comparisonOperator = StringUtils.join(values, ", ");
+          String valuesString = StringUtils.join(values, ", ");
           boolean isItIn = RANDOM.nextBoolean();
-          if (isItIn) {
-            comparisonOperator = "IN (" + comparisonOperator;
-            comparisonOperator += ")";
-          } else {
-            comparisonOperator = "NOT IN (" + comparisonOperator;
-            comparisonOperator += ")";
-          }
-          valueOperator = comparisonOperator;
+          return (isItIn ? "" : "NOT ") + "IN (" + valuesString + ")";
         }
       }
-      return valueOperator;
+    }
+
+    private String generateRandomValue(boolean generateInt) {
+      return generateInt ? Integer.toString(RANDOM.nextInt(MAX_INT_FOR_HAVING_CLAUSE_PREDICATE) + 1)
+          : Float.toString(RANDOM.nextFloat() * MAX_FLOAT_FOR_HAVING_CLAUSE_PREDICATE);
     }
   }
 
@@ -998,27 +918,15 @@ public class QueryGenerator {
     @Override
     public QueryFragment generatePredicate(String columnName) {
       List<String> columnValues = _columnToValueList.get(columnName);
-      String value;
-      value = pickRandom(columnValues);
-      StringBuilder pqlRegexBuilder = new StringBuilder();
-      StringBuilder sqlRegexBuilder = new StringBuilder();
+      String value = pickRandom(columnValues);
       // do regex only for string type
       if (value.startsWith("'") && value.endsWith("'")) {
         // replace only one character for now with .* ignore the first and last character
         int indexToReplaceWithRegex = 1 + _random.nextInt(value.length() - 2);
-        for (int i = 1; i < value.length() - 1; i++) {
-          if (i == indexToReplaceWithRegex) {
-            pqlRegexBuilder.append(".*");
-            sqlRegexBuilder.append(".*");
-          } else {
-            pqlRegexBuilder.append(value.charAt(i));
-            sqlRegexBuilder.append(value.charAt(i));
-          }
-        }
-
-        String pql = String.format(" REGEXP_LIKE(%s, '%s')", columnName, pqlRegexBuilder.toString());
-        String sql = String.format(" REGEXP_LIKE(%s, '%s', 'i')", columnName, sqlRegexBuilder.toString());
-        return new StringQueryFragment(pql, sql);
+        String regex = value.substring(1, indexToReplaceWithRegex) + ".*" + value.substring(indexToReplaceWithRegex + 1,
+            value.length() - 1);
+        return new StringQueryFragment(String.format(" REGEXP_LIKE(%s, '%s')", columnName, regex),
+            String.format(" REGEXP_LIKE(%s, '%s', 'i')", columnName, regex));
       } else {
         String equalsPredicate = String.format("%s = %s", columnName, value);
         return new StringQueryFragment(equalsPredicate);

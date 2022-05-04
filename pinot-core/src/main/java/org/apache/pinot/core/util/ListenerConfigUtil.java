@@ -36,8 +36,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.core.transport.ListenerConfig;
-import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.HttpServer;
@@ -49,9 +50,11 @@ import org.glassfish.jersey.internal.guava.ThreadFactoryBuilder;
 import org.glassfish.jersey.process.JerseyProcessingUncaughtExceptionHandler;
 import org.glassfish.jersey.server.ResourceConfig;
 
+import static org.apache.pinot.spi.utils.CommonConstants.HTTPS_PROTOCOL;
+
 
 /**
- * Utility class that generates Http {@link ListenerConfig} instances 
+ * Utility class that generates Http {@link ListenerConfig} instances
  * based on the properties provided by a property namespace in {@link PinotConfiguration}.
  */
 public final class ListenerConfigUtil {
@@ -72,7 +75,7 @@ public final class ListenerConfigUtil {
    * @param config property holders for controller configuration
    * @param namespace property namespace to extract from
    *
-   * @return List of {@link ListenerConfig} for which http listeners 
+   * @return List of {@link ListenerConfig} for which http listeners
    * should be created.
    */
   public static List<ListenerConfig> buildListenerConfigs(PinotConfiguration config, String namespace,
@@ -236,6 +239,20 @@ public final class ListenerConfigUtil {
     }
 
     httpServer.addListener(listener);
+  }
+
+  /**
+   * Finds the last listener that has HTTPS protocol, and returns its port. If not found any TLS, return defaultValue
+   * @param configs the config to search
+   * @param defaultValue the default value if the TLS listener is not found
+   * @return the port number of last entry that has secure protocol. If not found then defaultValue
+   */
+  public static int findLastTlsPort(List<ListenerConfig> configs, int defaultValue) {
+    return configs.stream()
+        .filter(config -> config.getProtocol().equalsIgnoreCase(HTTPS_PROTOCOL))
+        .map(ListenerConfig::getPort)
+        .reduce((first, second) -> second)
+        .orElse(defaultValue);
   }
 
   private static SSLEngineConfigurator buildSSLEngineConfigurator(TlsConfig tlsConfig) {

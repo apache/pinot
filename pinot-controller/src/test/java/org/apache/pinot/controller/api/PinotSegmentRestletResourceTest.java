@@ -71,6 +71,21 @@ public class PinotSegmentRestletResourceTest {
     // Get crc info from API and check that they are correct.
     checkCrcRequest(segmentMetadataTable, 5);
 
+    // validate the segment metadata
+    Map.Entry<String, SegmentMetadata> entry =
+        (Map.Entry<String, SegmentMetadata>) segmentMetadataTable.entrySet().toArray()[0];
+    String resp = ControllerTestUtils.sendGetRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forSegmentMetadata(TABLE_NAME, entry.getKey()));
+    Map<String, String> fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
+    Assert.assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
+
+    // use table name with table type
+    resp = ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder()
+        .forSegmentMetadata(TABLE_NAME + "_OFFLINE", entry.getKey()));
+    fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
+    Assert.assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
+
+
     // Add more segments
     for (int i = 0; i < 5; i++) {
       SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME);

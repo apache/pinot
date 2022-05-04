@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
@@ -77,11 +76,11 @@ public class SubtractionTransformFunction extends BaseTransformFunction {
   @SuppressWarnings("Duplicates")
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_differences == null) {
-      _differences = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-
     int length = projectionBlock.getNumDocs();
+
+    if (_differences == null || _differences.length < length) {
+      _differences = new double[length];
+    }
 
     if (_firstTransformFunction == null) {
       Arrays.fill(_differences, 0, length, _firstLiteral);

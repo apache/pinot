@@ -53,10 +53,10 @@ public class DistinctCountRewriteTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     BaseBrokerRequestHandler.handleSegmentPartitionedDistinctCountOverride(pinotQuery, ImmutableSet.of("col2", "col3"));
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(),
-        AggregationFunctionType.DISTINCTCOUNT.name());
+        AggregationFunctionType.DISTINCTCOUNT.name().toLowerCase());
     BaseBrokerRequestHandler.handleSegmentPartitionedDistinctCountOverride(pinotQuery,
         ImmutableSet.of("col1", "col2", "col3"));
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(),
-        AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name());
+        AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT.name().toLowerCase());
   }
 }

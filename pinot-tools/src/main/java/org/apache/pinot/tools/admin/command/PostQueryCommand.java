@@ -79,7 +79,6 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public void cleanup() {
-
   }
 
   @Override

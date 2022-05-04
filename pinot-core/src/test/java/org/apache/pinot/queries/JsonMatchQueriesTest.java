@@ -191,7 +191,7 @@ public class JsonMatchQueriesTest extends BaseQueriesTest {
 
   private Set<Integer> getSelectedIds(String jsonMatchExpression) {
     String query = String.format("SELECT id FROM testTable WHERE JSON_MATCH(json, %s) LIMIT 100", jsonMatchExpression);
-    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
     List<Object[]> rows = brokerResponse.getResultTable().getRows();
     Set<Integer> selectedIds = new HashSet<>();
     for (Object[] row : rows) {

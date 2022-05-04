@@ -24,6 +24,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -169,7 +170,7 @@ public class PinotTablePartitionRule extends AbstractRule {
   static Optional<String> findBestColumnForPartitioning(List<Pair<String, Double>> columnNameToWeightPairs,
       Function<String, Double> cardinalityExtractor, double topCandidateRatio, int numPartitions) {
     return columnNameToWeightPairs.stream().filter(colToWeight -> cardinalityExtractor.apply(colToWeight.getLeft())
-        > numPartitions * PartitionRule.ACCEPTABLE_CARDINALITY_TO_NUM_PARTITIONS_RATIO)
+            > numPartitions * PartitionRule.ACCEPTABLE_CARDINALITY_TO_NUM_PARTITIONS_RATIO)
         .max(Comparator.comparingDouble(Pair::getRight)).map(Pair::getRight).flatMap(maxWeight -> {
           double topCandidatesThreshold = maxWeight * topCandidateRatio;
           return columnNameToWeightPairs.stream().filter(colToWeight -> colToWeight.getRight() > topCandidatesThreshold)
@@ -191,10 +192,12 @@ public class PinotTablePartitionRule extends AbstractRule {
     return parsePredicateList(queryContext.getFilter());
   }
 
+  @Nullable
   public FixedLenBitset parsePredicateList(FilterContext filterContext) {
     FilterContext.Type type = filterContext.getType();
     FixedLenBitset ret;
-    if (type == FilterContext.Type.AND) { // a column can appear in only one sub predicate to partition AND predicate
+    if (type == FilterContext.Type.AND) {
+      // a column can appear in only one sub predicate to partition AND predicate
       ret = mutableEmptySet();
       for (int i = 0; i < filterContext.getChildren().size(); i++) {
         FixedLenBitset childResult = parsePredicateList(filterContext.getChildren().get(i));
@@ -202,7 +205,8 @@ public class PinotTablePartitionRule extends AbstractRule {
           ret.union(childResult);
         }
       }
-    } else if (type == FilterContext.Type.OR) { // a column must appear in each sub predicate to partition OR predicate
+    } else if (type == FilterContext.Type.OR) {
+      // a column must appear in each sub predicate to partition OR predicate
       ret = null;
       for (int i = 0; i < filterContext.getChildren().size(); i++) {
         FixedLenBitset childResult = parsePredicateList(filterContext.getChildren().get(i));
@@ -210,7 +214,11 @@ public class PinotTablePartitionRule extends AbstractRule {
           ret = (ret == null) ? childResult : ret.intersect(childResult);
         }
       }
-    } else { // a for leaf we consider only IN (with literal size < threshold) / EQ
+    } else if (type == FilterContext.Type.NOT) {
+      // partition doesn't help for NOT predicate
+      ret = null;
+    } else {
+      // a for leaf we consider only IN (with literal size < threshold) / EQ
       ret = mutableEmptySet();
       Predicate predicate = filterContext.getPredicate();
       Predicate.Type predicateType = predicate.getType();
@@ -226,6 +234,7 @@ public class PinotTablePartitionRule extends AbstractRule {
         return null;
       } else if (!_input.isSingleValueColumn(colName)) { // only SV column can be used as partitioning column
         LOGGER.trace("Skipping the MV column {}", colName);
+        return null;
       } else if (predicateType == Predicate.Type.IN) {
         int numValuesSelected;
 
@@ -248,7 +257,7 @@ public class PinotTablePartitionRule extends AbstractRule {
         ret.add(_input.colNameToInt(colName));
       }
     }
-    LOGGER.debug("ret {}", ret.toString());
+    LOGGER.debug("ret {}", ret);
     return ret;
   }
 

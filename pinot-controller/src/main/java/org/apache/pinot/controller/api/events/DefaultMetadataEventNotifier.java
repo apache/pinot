@@ -24,10 +24,8 @@ import org.apache.pinot.spi.data.Schema;
 
 public class DefaultMetadataEventNotifier implements MetadataEventNotifier {
   public void notifyOnSchemaEvents(Schema schema, SchemaEventType eventType) {
-
   }
 
   public void notifyOnSegmentFlush(TableConfig tableConfig) {
-
   }
 }

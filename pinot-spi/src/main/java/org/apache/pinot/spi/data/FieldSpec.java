@@ -21,6 +21,7 @@ package org.apache.pinot.spi.data;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.BooleanUtils;
@@ -59,6 +60,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
   public static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = 0.0F;
   public static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
+  public static final BigDecimal DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL = BigDecimal.ZERO;
   public static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
   public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new byte[0];
 
@@ -205,6 +207,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_METRIC_NULL_VALUE_OF_FLOAT;
             case DOUBLE:
               return DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
+            case BIG_DECIMAL:
+              // todo(nhejazi): update documentation w/ default null values.
+              return DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL;
             case STRING:
               return DEFAULT_METRIC_NULL_VALUE_OF_STRING;
             case BYTES:
@@ -299,6 +304,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case DOUBLE:
           jsonNode.put(key, (Double) _defaultNullValue);
           break;
+        case BIG_DECIMAL:
+          jsonNode.put(key, (BigDecimal) _defaultNullValue);
+          break;
         case BOOLEAN:
           jsonNode.put(key, (Integer) _defaultNullValue == 1);
           break;
@@ -375,18 +383,45 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public enum DataType {
     // LIST is for complex lists which is different from multi-value column of primitives
     // STRUCT, MAP and LIST are composable to form a COMPLEX field
-    INT,
-    LONG,
-    FLOAT,
-    DOUBLE,
-    BOOLEAN /* Stored as INT */,
-    TIMESTAMP /* Stored as LONG */,
-    STRING,
-    JSON /* Stored as STRING */,
-    BYTES,
-    STRUCT,
-    MAP,
-    LIST;
+    INT(Integer.BYTES, true, true),
+    LONG(Long.BYTES, true, true),
+    FLOAT(Float.BYTES, true, true),
+    DOUBLE(Double.BYTES, true, true),
+    BIG_DECIMAL(true, true),
+    BOOLEAN(INT, false, true),
+    TIMESTAMP(LONG, false, true),
+    STRING(false, true),
+    JSON(STRING, false, false),
+    BYTES(false, false),
+    STRUCT(false, false),
+    MAP(false, false),
+    LIST(false, false);
+
+    private final DataType _storedType;
+    private final int _size;
+    private final boolean _sortable;
+    private final boolean _numeric;
+
+    DataType(boolean numeric, boolean sortable) {
+      _storedType = this;
+      _size = -1;
+      _sortable = sortable;
+      _numeric = numeric;
+    }
+
+    DataType(DataType storedType, boolean numeric, boolean sortable) {
+      _storedType = storedType;
+      _size = storedType._size;
+      _sortable = sortable;
+      _numeric = numeric;
+    }
+
+    DataType(int size, boolean numeric, boolean sortable) {
+      _storedType = this;
+      _size = size;
+      _sortable = sortable;
+      _numeric = numeric;
+    }
 
     /**
      * Returns the data type stored in Pinot.
@@ -395,16 +430,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
      * <p>Stored type should be used when reading the physical stored values from Dictionary, Forward Index etc.
      */
     public DataType getStoredType() {
-      switch (this) {
-        case BOOLEAN:
-          return INT;
-        case TIMESTAMP:
-          return LONG;
-        case JSON:
-          return STRING;
-        default:
-          return this;
-      }
+      return _storedType;
     }
 
     /**
@@ -412,34 +438,24 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
      * {@code false} otherwise.
      */
     public boolean isFixedWidth() {
-      return this.ordinal() < STRING.ordinal();
+      return _size >= 0;
     }
 
     /**
      * Returns the number of bytes needed to store the data type.
      */
     public int size() {
-      switch (this) {
-        case INT:
-        case BOOLEAN:
-          return Integer.BYTES;
-        case LONG:
-        case TIMESTAMP:
-          return Long.BYTES;
-        case FLOAT:
-          return Float.BYTES;
-        case DOUBLE:
-          return Double.BYTES;
-        default:
-          throw new IllegalStateException("Cannot get number of bytes for: " + this);
+      if (_size >= 0) {
+        return _size;
       }
+      throw new IllegalStateException("Cannot get number of bytes for: " + this);
     }
 
     /**
      * Returns {@code true} if the data type is numeric (INT, LONG, FLOAT, DOUBLE), {@code false} otherwise.
      */
     public boolean isNumeric() {
-      return this == INT || this == LONG || this == FLOAT || this == DOUBLE;
+      return _numeric;
     }
 
     /**
@@ -456,6 +472,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return Float.valueOf(value);
           case DOUBLE:
             return Double.valueOf(value);
+          case BIG_DECIMAL:
+            return new BigDecimal(value);
           case BOOLEAN:
             return BooleanUtils.toInt(value);
           case TIMESTAMP:
@@ -487,6 +505,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return Float.valueOf(value);
           case DOUBLE:
             return Double.valueOf(value);
+          case BIG_DECIMAL:
+            return new BigDecimal(value);
           case BOOLEAN:
             return BooleanUtils.toInt(value);
           case TIMESTAMP:
@@ -508,7 +528,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
      * Checks whether the data type can be a sorted column.
      */
     public boolean canBeASortedColumn() {
-      return this != BYTES && this != JSON && this != STRUCT && this != MAP && this != LIST;
+      return _sortable;
     }
   }
 

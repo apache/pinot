@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.connector.spark.datasource
 
-import org.apache.pinot.connector.spark.BaseTest
+import org.apache.pinot.connector.spark.{BaseTest, datasource}
 import org.apache.pinot.connector.spark.exceptions.PinotException
 import org.apache.spark.sql.sources.v2.DataSourceOptions
 
@@ -36,7 +36,8 @@ class PinotDataSourceReadOptionsTest extends BaseTest {
       PinotDataSourceReadOptions.CONFIG_CONTROLLER -> "localhost:9000",
       PinotDataSourceReadOptions.CONFIG_BROKER -> "localhost:8000",
       PinotDataSourceReadOptions.CONFIG_SEGMENTS_PER_SPLIT -> "1",
-      PinotDataSourceReadOptions.CONFIG_USE_PUSH_DOWN_FILTERS -> "false"
+      PinotDataSourceReadOptions.CONFIG_USE_PUSH_DOWN_FILTERS -> "false",
+      PinotDataSourceReadOptions.CONFIG_USE_GRPC_SERVER -> "false",
     )
 
     val datasourceOptions = new DataSourceOptions(options.asJava)
@@ -50,7 +51,8 @@ class PinotDataSourceReadOptionsTest extends BaseTest {
         "localhost:8000",
         false,
         1,
-        10000
+        10000,
+        false
       )
 
     pinotDataSourceReadOptions shouldEqual expected

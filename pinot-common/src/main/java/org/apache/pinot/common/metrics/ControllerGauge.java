@@ -39,6 +39,11 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   PERCENT_SEGMENTS_AVAILABLE("segments", false),
 
   SEGMENT_COUNT("SegmentCount", false),
+
+  // Number of segments including the replaced segments which are specified in the segment lineage entries and cannot
+  // be queried from the table.
+  SEGMENT_COUNT_INCLUDING_REPLACED("SegmentCount", false),
+
   IDEALSTATE_ZNODE_SIZE("idealstate", false),
   IDEALSTATE_ZNODE_BYTE_SIZE("idealstate", false),
   REALTIME_TABLE_COUNT("TableCount", true),
@@ -62,7 +67,19 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   CONTROLLER_LEADER_PARTITION_COUNT("ControllerLeaderPartitionCount", true),
 
   // Estimated size of offline table
+  @Deprecated // Instead use TABLE_TOTAL_SIZE_ON_SERVER
   OFFLINE_TABLE_ESTIMATED_SIZE("OfflineTableEstimatedSize", false),
+
+  LARGEST_SEGMENT_SIZE_ON_SERVER("LargestSegmentSizeOnServer", false),
+
+  // Total size of table across replicas on servers
+  TABLE_TOTAL_SIZE_ON_SERVER("TableTotalSizeOnServer", false),
+
+  // Size of table per replica on servers
+  TABLE_SIZE_PER_REPLICA_ON_SERVER("TableSizePerReplicaOnServer", false),
+
+  // Total size of compressed segments per table
+  TABLE_COMPRESSED_SIZE("TableCompressedSize", false),
 
   // Table quota based on setting in table config
   TABLE_QUOTA("TableQuotaBasedOnTableConfig", false),

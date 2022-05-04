@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
@@ -60,10 +59,11 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    if (_results == null) {
-      _results = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
     int numDocs = projectionBlock.getNumDocs();
+
+    if (_results == null || _results.length < numDocs) {
+      _results = new int[numDocs];
+    }
     ArrayCopyUtils.copy(_arguments.get(0).transformToIntValuesSV(projectionBlock), _results, numDocs);
     int numArguments = _arguments.size();
     for (int i = 1; i < numArguments; i++) {

@@ -289,9 +289,8 @@ public class QueryInvertedSortedIndexRecommender {
       // case: OR connected top level predicates, recursively run parseTopLevel on each on its children and
       // simply return all the results. Each result will contribute to the global recommendation equally
       List<List<PredicateParseResult>> childResults = new ArrayList<>();
-      for (int i = 0; i < filterContextTopLevel.getChildren().size(); i++) {
-        List<List<PredicateParseResult>> childResult =
-            parseTopLevel(filterContextTopLevel.getChildren().get(i), queryWeight);
+      for (FilterContext child : filterContextTopLevel.getChildren()) {
+        List<List<PredicateParseResult>> childResult = parseTopLevel(child, queryWeight);
         if (childResult != null) {
           childResults.addAll(childResult);
         }
@@ -302,6 +301,9 @@ public class QueryInvertedSortedIndexRecommender {
       } else {
         return childResults;
       }
+    } else if (type == FilterContext.Type.NOT) {
+      assert filterContextTopLevel.getChildren().size() == 1;
+      return parseTopLevel(filterContextTopLevel.getChildren().get(0), queryWeight);
     } else {
       // case: Return result directly.
       PredicateParseResult predicateParseResult = parseLeafPredicate(filterContextTopLevel, NESTED_TOP_LEVEL);
@@ -328,6 +330,7 @@ public class QueryInvertedSortedIndexRecommender {
    * Recommend inverted index for:
    * Case AND: The dimension which selects the lowest percentage of rows.
    * Case OR:  All the recommended dimensions from evaluating all its child predicates.
+   * Case NOT: Same as the underlying predicate
    * Case Leaf: See {@link QueryInvertedSortedIndexRecommender#parseLeafPredicate(FilterContext, int)}
    * @param predicateList Single or nested predicates.
    * @param depth         The depth of current AST tree. >= Second level in this function. Top level is handled in
@@ -501,6 +504,9 @@ public class QueryInvertedSortedIndexRecommender {
             .setRecommendationPriorityEnum(RecommendationPriorityEnum.NESTED).setnESI(nESI)
             .setPercentSelected(percentSelected).setnESIWithIdx(nESI).build();
       }
+    } else if (type == FilterContext.Type.NOT) {
+      assert predicateList.getChildren().size() == 1;
+      return parsePredicateList(predicateList.getChildren().get(0), depth);
     } else {
       // case:Leaf predicate
       PredicateParseResult predicateParseResult = parseLeafPredicate(predicateList, depth);

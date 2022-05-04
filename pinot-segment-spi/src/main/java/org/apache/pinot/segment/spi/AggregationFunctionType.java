@@ -45,6 +45,7 @@ public enum AggregationFunctionType {
   SEGMENTPARTITIONEDDISTINCTCOUNT("segmentPartitionedDistinctCount"),
   DISTINCTCOUNTHLL("distinctCountHLL"),
   DISTINCTCOUNTRAWHLL("distinctCountRawHLL"),
+  DISTINCTCOUNTSMARTHLL("distinctCountSmartHLL"),
   FASTHLL("fastHLL"),
   DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch"),
   DISTINCTCOUNTRAWTHETASKETCH("distinctCountRawThetaSketch"),
@@ -53,6 +54,7 @@ public enum AggregationFunctionType {
   PERCENTILERAWEST("percentileRawEst"),
   PERCENTILETDIGEST("percentileTDigest"),
   PERCENTILERAWTDIGEST("percentileRawTDigest"),
+  PERCENTILESMARTTDIGEST("percentileSmartTDigest"),
   IDSET("idSet"),
 
   // Geo aggregation functions

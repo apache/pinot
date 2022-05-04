@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.util;
 
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.transport.ListenerConfig;
@@ -170,6 +171,31 @@ public class ListenerConfigUtilTest {
     controllerConf.setProperty("controller.access.protocols.https.port", "");
 
     ListenerConfigUtil.buildControllerConfigs(controllerConf);
+  }
+
+  @Test
+  public void testFindLastTlsPort() {
+    List<ListenerConfig> configs = ImmutableList.of(
+        new ListenerConfig("conf1", "host1", 9000, "http", null),
+        new ListenerConfig("conf2", "host2", 9001, "https", null),
+        new ListenerConfig("conf3", "host3", 9002, "http", null),
+        new ListenerConfig("conf4", "host4", 9003, "https", null),
+        new ListenerConfig("conf5", "host5", 9004, "http", null)
+    );
+    int tlsPort = ListenerConfigUtil.findLastTlsPort(configs, -1);
+    Assert.assertEquals(tlsPort, 9003);
+  }
+
+  @Test
+  public void testFindLastTlsPortMissing() {
+    List<ListenerConfig> configs = ImmutableList.of(
+        new ListenerConfig("conf1", "host1", 9000, "http", null),
+        new ListenerConfig("conf2", "host2", 9001, "http", null),
+        new ListenerConfig("conf3", "host3", 9002, "http", null),
+        new ListenerConfig("conf4", "host4", 9004, "http", null)
+    );
+    int tlsPort = ListenerConfigUtil.findLastTlsPort(configs, -1);
+    Assert.assertEquals(tlsPort, -1);
   }
 
   private void assertLegacyListener(ListenerConfig legacyListener) {

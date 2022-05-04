@@ -20,10 +20,12 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -70,6 +72,11 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
   }
 
   @Override
+  protected void overrideServerConf(PinotConfiguration configuration) {
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, false);
+  }
+
+  @Override
   protected List<String> getNoDictionaryColumns() {
     // Randomly set time column as no dictionary column.
     if (new Random().nextInt(2) == 0) {
@@ -77,20 +84,6 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     } else {
       return super.getNoDictionaryColumns();
     }
-  }
-
-  @Test
-  @Override
-  public void testQueriesFromQueryFile()
-      throws Exception {
-    super.testQueriesFromQueryFile();
-  }
-
-  @Test
-  @Override
-  public void testGeneratedQueriesWithMultiValues()
-      throws Exception {
-    super.testGeneratedQueriesWithMultiValues();
   }
 
   /**
@@ -129,6 +122,34 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     testDictionaryBasedFunctions("ArrDelay");
   }
 
+  private void testDictionaryBasedFunctions(String column)
+      throws Exception {
+    testQuery(String.format("SELECT MIN(%s) FROM %s", column, getTableName()));
+    testQuery(String.format("SELECT MAX(%s) FROM %s", column, getTableName()));
+    testQuery(String.format("SELECT MIN_MAX_RANGE(%s) FROM %s", column, getTableName()),
+        String.format("SELECT MAX(%s)-MIN(%s) FROM %s", column, column, getTableName()));
+  }
+
+  @Test
+  public void testHardcodedQueries()
+      throws Exception {
+    super.testHardcodedQueries();
+  }
+
+  @Test
+  @Override
+  public void testQueriesFromQueryFile()
+      throws Exception {
+    super.testQueriesFromQueryFile();
+  }
+
+  @Test
+  @Override
+  public void testGeneratedQueriesWithMultiValues()
+      throws Exception {
+    super.testGeneratedQueriesWithMultiValues();
+  }
+
   @Test
   @Override
   public void testQueryExceptions()
@@ -147,39 +168,12 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
   public void tearDown()
       throws Exception {
     dropRealtimeTable(getTableName());
+    cleanupTestTableDataManager(TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
     stopServer();
     stopBroker();
     stopController();
     stopKafka();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
-  }
-
-  private void testDictionaryBasedFunctions(String column)
-      throws Exception {
-    String pqlQuery;
-    String sqlQuery;
-    pqlQuery = "SELECT MAX(" + column + ") FROM " + getTableName();
-    sqlQuery = "SELECT MAX(" + column + ") FROM " + getTableName();
-    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
-    pqlQuery = "SELECT MIN(" + column + ") FROM " + getTableName();
-    sqlQuery = "SELECT MIN(" + column + ") FROM " + getTableName();
-    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
-    pqlQuery = "SELECT MINMAXRANGE(" + column + ") FROM " + getTableName();
-    sqlQuery = "SELECT MAX(" + column + ")-MIN(" + column + ") FROM " + getTableName();
-    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
-  }
-
-  @Test
-  public void testHardcodedSqlQueries()
-      throws Exception {
-    super.testHardcodedSqlQueries();
-  }
-
-  @Test
-  @Override
-  public void testSqlQueriesFromQueryFile()
-      throws Exception {
-    super.testSqlQueriesFromQueryFile();
   }
 }

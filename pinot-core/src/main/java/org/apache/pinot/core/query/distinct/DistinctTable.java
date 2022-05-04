@@ -24,6 +24,7 @@ import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -258,6 +259,9 @@ public class DistinctTable {
           case DOUBLE:
             dataTableBuilder.setColumn(i, (double) values[i]);
             break;
+          case BIG_DECIMAL:
+            dataTableBuilder.setColumn(i, (BigDecimal) values[i]);
+            break;
           case STRING:
             dataTableBuilder.setColumn(i, (String) values[i]);
             break;
@@ -301,6 +305,9 @@ public class DistinctTable {
             break;
           case DOUBLE:
             values[j] = dataTable.getDouble(i, j);
+            break;
+          case BIG_DECIMAL:
+            values[j] = dataTable.getBigDecimal(i, j);
             break;
           case STRING:
             values[j] = dataTable.getString(i, j);

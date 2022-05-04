@@ -25,17 +25,13 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -56,10 +52,12 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 /**
@@ -123,23 +121,21 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
       throws Exception {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
-      HashMap<String, Object> valueMap = new HashMap<>();
+      GenericRow row = new GenericRow();
 
       double value = RANDOM.nextDouble() * VALUE_RANGE;
-      valueMap.put(DOUBLE_COLUMN, value);
+      row.putValue(DOUBLE_COLUMN, value);
 
       TDigest tDigest = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
       tDigest.add(value);
       ByteBuffer byteBuffer = ByteBuffer.allocate(tDigest.byteSize());
       tDigest.asBytes(byteBuffer);
-      valueMap.put(TDIGEST_COLUMN, byteBuffer.array());
+      row.putValue(TDIGEST_COLUMN, byteBuffer.array());
 
       String group = GROUPS[RANDOM.nextInt(GROUPS.length)];
-      valueMap.put(GROUP_BY_COLUMN, group);
+      row.putValue(GROUP_BY_COLUMN, group);
 
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(valueMap);
-      rows.add(genericRow);
+      rows.add(row);
     }
 
     Schema schema = new Schema();
@@ -164,11 +160,11 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   @Test
   public void testInnerSegmentAggregation() {
     // For inner segment case, percentile does not affect the intermediate result
-    AggregationOperator aggregationOperator = getOperatorForPqlQuery(getAggregationQuery(0));
+    AggregationOperator aggregationOperator = getOperator(getAggregationQuery(0));
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
-    Assert.assertNotNull(aggregationResult);
-    Assert.assertEquals(aggregationResult.size(), 6);
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 6);
     DoubleList doubleList0 = (DoubleList) aggregationResult.get(0);
     Collections.sort(doubleList0);
     assertTDigest((TDigest) aggregationResult.get(1), doubleList0);
@@ -176,7 +172,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
 
     DoubleList doubleList3 = (DoubleList) aggregationResult.get(3);
     Collections.sort(doubleList3);
-    Assert.assertEquals(doubleList3, doubleList0);
+    assertEquals(doubleList3, doubleList0);
     assertTDigest((TDigest) aggregationResult.get(4), doubleList0);
     assertTDigest((TDigest) aggregationResult.get(5), doubleList0);
   }
@@ -184,31 +180,23 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   @Test
   public void testInterSegmentAggregation() {
     for (int percentile = 0; percentile <= 100; percentile++) {
-      BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getAggregationQuery(percentile));
-      List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-      Assert.assertNotNull(aggregationResults);
-      Assert.assertEquals(aggregationResults.size(), 6);
-      double expected = Double.parseDouble((String) aggregationResults.get(0).getValue());
-      double resultForDoubleColumn1 = Double.parseDouble((String) aggregationResults.get(1).getValue());
-      Assert.assertEquals(resultForDoubleColumn1, expected, DELTA, ERROR_MESSAGE);
-      double resultForTDigestColumn2 = Double.parseDouble((String) aggregationResults.get(2).getValue());
-      Assert.assertEquals(resultForTDigestColumn2, expected, DELTA, ERROR_MESSAGE);
-      double resultForDoubleColumn3 = Double.parseDouble((String) aggregationResults.get(3).getValue());
-      Assert.assertEquals(resultForDoubleColumn3, expected, DELTA, ERROR_MESSAGE);
-      double resultForDoubleColumn4 = Double.parseDouble((String) aggregationResults.get(4).getValue());
-      Assert.assertEquals(resultForDoubleColumn4, expected, DELTA, ERROR_MESSAGE);
-      double resultForTDigestColumn5 = Double.parseDouble((String) aggregationResults.get(5).getValue());
-      Assert.assertEquals(resultForTDigestColumn5, expected, DELTA, ERROR_MESSAGE);
+      BrokerResponseNative brokerResponse = getBrokerResponse(getAggregationQuery(percentile));
+      Object[] results = brokerResponse.getResultTable().getRows().get(0);
+      assertEquals(results.length, 6);
+      double expectedResult = (Double) results[0];
+      for (int i = 1; i < 6; i++) {
+        assertEquals((Double) results[i], expectedResult, DELTA, ERROR_MESSAGE);
+      }
     }
   }
 
   @Test
   public void testInnerSegmentGroupBy() {
     // For inner segment case, percentile does not affect the intermediate result
-    AggregationGroupByOperator groupByOperator = getOperatorForPqlQuery(getGroupByQuery(0));
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(getGroupByQuery(0));
     IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
     AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
-    Assert.assertNotNull(groupByResult);
+    assertNotNull(groupByResult);
     Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
     while (groupKeyIterator.hasNext()) {
       int groupId = groupKeyIterator.next()._groupId;
@@ -219,7 +207,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
 
       DoubleList doubleList3 = (DoubleList) groupByResult.getResultForGroupId(3, groupId);
       Collections.sort(doubleList3);
-      Assert.assertEquals(doubleList3, doubleList0);
+      assertEquals(doubleList3, doubleList0);
       assertTDigest((TDigest) groupByResult.getResultForGroupId(4, groupId), doubleList0);
       assertTDigest((TDigest) groupByResult.getResultForGroupId(5, groupId), doubleList0);
     }
@@ -228,53 +216,24 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   @Test
   public void testInterSegmentGroupBy() {
     for (int percentile = 0; percentile <= 100; percentile++) {
-      BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getGroupByQuery(percentile));
-      List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-      Assert.assertNotNull(aggregationResults);
-      Assert.assertEquals(aggregationResults.size(), 6);
-      Map<String, Double> expectedValues = new HashMap<>();
-      for (GroupByResult groupByResult : aggregationResults.get(0).getGroupByResult()) {
-        expectedValues.put(groupByResult.getGroup().get(0), Double.parseDouble((String) groupByResult.getValue()));
-      }
-      for (GroupByResult groupByResult : aggregationResults.get(1).getGroupByResult()) {
-        String group = groupByResult.getGroup().get(0);
-        double expected = expectedValues.get(group);
-        double resultForDoubleColumn = Double.parseDouble((String) groupByResult.getValue());
-        Assert.assertEquals(resultForDoubleColumn, expected, DELTA, ERROR_MESSAGE);
-      }
-      for (GroupByResult groupByResult : aggregationResults.get(2).getGroupByResult()) {
-        String group = groupByResult.getGroup().get(0);
-        double expected = expectedValues.get(group);
-        double resultForTDigestColumn = Double.parseDouble((String) groupByResult.getValue());
-        Assert.assertEquals(resultForTDigestColumn, expected, DELTA, ERROR_MESSAGE);
-      }
-      for (GroupByResult groupByResult : aggregationResults.get(3).getGroupByResult()) {
-        String group = groupByResult.getGroup().get(0);
-        double expected = expectedValues.get(group);
-        double resultForTDigestColumn = Double.parseDouble((String) groupByResult.getValue());
-        Assert.assertEquals(resultForTDigestColumn, expected, DELTA, ERROR_MESSAGE);
-      }
-      for (GroupByResult groupByResult : aggregationResults.get(4).getGroupByResult()) {
-        String group = groupByResult.getGroup().get(0);
-        double expected = expectedValues.get(group);
-        double resultForTDigestColumn = Double.parseDouble((String) groupByResult.getValue());
-        Assert.assertEquals(resultForTDigestColumn, expected, DELTA, ERROR_MESSAGE);
-      }
-      for (GroupByResult groupByResult : aggregationResults.get(5).getGroupByResult()) {
-        String group = groupByResult.getGroup().get(0);
-        double expected = expectedValues.get(group);
-        double resultForTDigestColumn = Double.parseDouble((String) groupByResult.getValue());
-        Assert.assertEquals(resultForTDigestColumn, expected, DELTA, ERROR_MESSAGE);
+      BrokerResponseNative brokerResponse = getBrokerResponse(getGroupByQuery(percentile));
+      List<Object[]> rows = brokerResponse.getResultTable().getRows();
+      assertEquals(rows.size(), 3);
+      for (Object[] row : rows) {
+        assertEquals(row.length, 6);
+        double expectedResult = (Double) row[0];
+        for (int i = 1; i < 6; i++) {
+          assertEquals((Double) row[i], expectedResult, DELTA, ERROR_MESSAGE);
+        }
       }
     }
   }
 
   protected String getAggregationQuery(int percentile) {
-    return String.format(
-        "SELECT PERCENTILE%1$d(%2$s), PERCENTILETDIGEST%1$d(%2$s), PERCENTILETDIGEST%1$d(%3$s), PERCENTILE(%2$s, "
-            + "%1$d), "
-            + "PERCENTILETDIGEST(%2$s, %1$d), PERCENTILETDIGEST(%3$s, %1$d) FROM %4$s", percentile, DOUBLE_COLUMN,
-        TDIGEST_COLUMN, TABLE_NAME);
+    return String.format("SELECT PERCENTILE%1$d(%2$s), PERCENTILETDIGEST%1$d(%2$s), PERCENTILETDIGEST%1$d(%3$s), "
+            + "PERCENTILE(%2$s, %1$d), PERCENTILETDIGEST(%2$s, %1$d), PERCENTILETDIGEST(%3$s, %1$d) FROM %4$s",
+        percentile,
+        DOUBLE_COLUMN, TDIGEST_COLUMN, TABLE_NAME);
   }
 
   private String getGroupByQuery(int percentile) {
@@ -289,8 +248,45 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
       } else {
         expected = doubleList.getDouble(doubleList.size() * percentile / 100);
       }
-      Assert.assertEquals(tDigest.quantile(percentile / 100.0), expected, DELTA, ERROR_MESSAGE);
+      assertEquals(tDigest.quantile(percentile / 100.0), expected, DELTA, ERROR_MESSAGE);
     }
+  }
+
+  @Test
+  public void testSmartTDigest() {
+    // Inner segment
+    // For inner segment case, percentile does not affect the intermediate result
+    AggregationOperator aggregationOperator = getOperator(getSmartTDigestQuery(0));
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 4);
+    DoubleList doubleList0 = (DoubleList) aggregationResult.get(0);
+    Collections.sort(doubleList0);
+    DoubleList doubleList1 = (DoubleList) aggregationResult.get(1);
+    Collections.sort(doubleList1);
+    assertEquals(doubleList1, doubleList0);
+    TDigest tDigest2 = (TDigest) aggregationResult.get(2);
+    TDigest tDigest3 = (TDigest) aggregationResult.get(3);
+    assertTDigest(tDigest2, doubleList0);
+    assertTDigest(tDigest3, doubleList0);
+
+    // Inter segments
+    for (int percentile = 0; percentile <= 100; percentile++) {
+      BrokerResponseNative brokerResponse = getBrokerResponse(getSmartTDigestQuery(percentile));
+      Object[] results = brokerResponse.getResultTable().getRows().get(0);
+      assertEquals(results.length, 4);
+      double expectedResult = (double) results[0];
+      assertEquals(results[1], expectedResult);
+      assertEquals((double) results[2], expectedResult, DELTA, ERROR_MESSAGE);
+      assertEquals((double) results[3], expectedResult, DELTA, ERROR_MESSAGE);
+    }
+  }
+
+  protected String getSmartTDigestQuery(int percentile) {
+    return String.format("SELECT PERCENTILE(%2$s, %1$d), PERCENTILESMARTTDIGEST(%2$s, %1$d), "
+            + "PERCENTILETDIGEST(%2$s, %1$d), PERCENTILESMARTTDIGEST(%2$s, %1$d, 'threshold=10') FROM %3$s", percentile,
+        DOUBLE_COLUMN, TABLE_NAME);
   }
 
   @AfterClass

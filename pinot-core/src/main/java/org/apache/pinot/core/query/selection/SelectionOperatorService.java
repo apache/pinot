@@ -104,13 +104,15 @@ public class SelectionOperatorService {
 
     int numValuesToCompare = valueIndexList.size();
     int[] valueIndices = new int[numValuesToCompare];
-    boolean[] isNumber = new boolean[numValuesToCompare];
+    boolean[] useDoubleComparison = new boolean[numValuesToCompare];
     // Use multiplier -1 or 1 to control ascending/descending order
     int[] multipliers = new int[numValuesToCompare];
     for (int i = 0; i < numValuesToCompare; i++) {
       int valueIndex = valueIndexList.get(i);
       valueIndices[i] = valueIndex;
-      isNumber[i] = columnDataTypes[valueIndex].isNumber();
+      if (columnDataTypes[valueIndex].isNumber()) {
+        useDoubleComparison[i] = true;
+      }
       multipliers[i] = orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
     }
 
@@ -120,7 +122,7 @@ public class SelectionOperatorService {
         Object v1 = o1[index];
         Object v2 = o2[index];
         int result;
-        if (isNumber[i]) {
+        if (useDoubleComparison[i]) {
           result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
         } else {
           //noinspection unchecked

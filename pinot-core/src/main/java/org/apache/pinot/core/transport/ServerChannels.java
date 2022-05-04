@@ -24,6 +24,10 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.EpollSocketChannel;
+import io.netty.channel.kqueue.KQueueEventLoopGroup;
+import io.netty.channel.kqueue.KQueueSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -35,15 +39,20 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.config.NettyConfig;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.core.util.TlsUtils;
+import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.core.util.OsCheck;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
+import org.apache.thrift.transport.TTransportException;
 
 
 /**
@@ -54,24 +63,16 @@ import org.apache.thrift.protocol.TCompactProtocol;
 @ThreadSafe
 public class ServerChannels {
   public static final String CHANNEL_LOCK_TIMEOUT_MSG = "Timeout while acquiring channel lock";
+  private static final long TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS = 5_000L;
+
   private final QueryRouter _queryRouter;
   private final BrokerMetrics _brokerMetrics;
   // TSerializer currently is not thread safe, must be put into a ThreadLocal.
-  private final ThreadLocal<TSerializer> _threadLocalTSerializer =
-      ThreadLocal.withInitial(() -> new TSerializer(new TCompactProtocol.Factory()));
+  private final ThreadLocal<TSerializer> _threadLocalTSerializer;
   private final ConcurrentHashMap<ServerRoutingInstance, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
-  private final EventLoopGroup _eventLoopGroup = new NioEventLoopGroup();
   private final TlsConfig _tlsConfig;
-
-  /**
-   * Create an unsecured server channel
-   *
-   * @param queryRouter query router
-   * @param brokerMetrics broker metrics
-   */
-  public ServerChannels(QueryRouter queryRouter, BrokerMetrics brokerMetrics) {
-    this(queryRouter, brokerMetrics, null);
-  }
+  private final EventLoopGroup _eventLoopGroup;
+  private final Class<? extends SocketChannel> _channelClass;
 
   /**
    * Create a server channel with TLS config
@@ -80,10 +81,31 @@ public class ServerChannels {
    * @param brokerMetrics broker metrics
    * @param tlsConfig TLS/SSL config
    */
-  public ServerChannels(QueryRouter queryRouter, BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
+  public ServerChannels(QueryRouter queryRouter, BrokerMetrics brokerMetrics, @Nullable NettyConfig nettyConfig,
+      @Nullable TlsConfig tlsConfig) {
+    if (nettyConfig != null && nettyConfig.isNativeTransportsEnabled()
+        && OsCheck.getOperatingSystemType() == OsCheck.OSType.Linux) {
+      _eventLoopGroup = new EpollEventLoopGroup();
+      _channelClass = EpollSocketChannel.class;
+    } else if (nettyConfig != null && nettyConfig.isNativeTransportsEnabled()
+        && OsCheck.getOperatingSystemType() == OsCheck.OSType.MacOS) {
+      _eventLoopGroup = new KQueueEventLoopGroup();
+      _channelClass = KQueueSocketChannel.class;
+    } else {
+      _eventLoopGroup = new NioEventLoopGroup();
+      _channelClass = NioSocketChannel.class;
+    }
+
     _queryRouter = queryRouter;
     _brokerMetrics = brokerMetrics;
     _tlsConfig = tlsConfig;
+    _threadLocalTSerializer = ThreadLocal.withInitial(() -> {
+      try {
+        return new TSerializer(new TCompactProtocol.Factory());
+      } catch (TTransportException e) {
+        throw new RuntimeException("Failed to initialize Thrift Serializer", e);
+      }
+    });
   }
 
   public void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
@@ -92,6 +114,11 @@ public class ServerChannels {
     byte[] requestBytes = _threadLocalTSerializer.get().serialize(instanceRequest);
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new)
         .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
+  }
+
+  public void connect(ServerRoutingInstance serverRoutingInstance)
+      throws InterruptedException, TimeoutException {
+    _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).connect();
   }
 
   public void shutDown() {
@@ -110,7 +137,7 @@ public class ServerChannels {
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
       _serverRoutingInstance = serverRoutingInstance;
       _bootstrap = new Bootstrap().remoteAddress(serverRoutingInstance.getHostname(), serverRoutingInstance.getPort())
-          .group(_eventLoopGroup).channel(NioSocketChannel.class).option(ChannelOption.SO_KEEPALIVE, true)
+          .group(_eventLoopGroup).channel(_channelClass).option(ChannelOption.SO_KEEPALIVE, true)
           .handler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
@@ -128,7 +155,7 @@ public class ServerChannels {
           });
     }
 
-    private void attachSSLHandler(SocketChannel ch) {
+    void attachSSLHandler(SocketChannel ch) {
       try {
         SslContextBuilder sslContextBuilder =
             SslContextBuilder.forClient().sslProvider(SslProvider.valueOf(_tlsConfig.getSslProvider()));
@@ -147,12 +174,13 @@ public class ServerChannels {
       }
     }
 
-    private void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
+    void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
         ServerRoutingInstance serverRoutingInstance, byte[] requestBytes, long timeoutMs)
-        throws Exception {
+        throws InterruptedException, TimeoutException {
       if (_channelLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)) {
         try {
-          sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes);
+          connectWithoutLocking();
+          sendRequestWithoutLocking(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes);
         } finally {
           _channelLock.unlock();
         }
@@ -161,24 +189,40 @@ public class ServerChannels {
       }
     }
 
-    private void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
-        ServerRoutingInstance serverRoutingInstance, byte[] requestBytes)
-        throws Exception {
+    void connectWithoutLocking()
+        throws InterruptedException {
       if (_channel == null || !_channel.isActive()) {
         long startTime = System.currentTimeMillis();
         _channel = _bootstrap.connect().sync().channel();
         _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.NETTY_CONNECTION_CONNECT_TIME_MS,
             System.currentTimeMillis() - startTime);
       }
-      long sendRequestStartTimeMs = System.currentTimeMillis();
+    }
+
+    void sendRequestWithoutLocking(String rawTableName, AsyncQueryResponse asyncQueryResponse,
+        ServerRoutingInstance serverRoutingInstance, byte[] requestBytes) {
+      long startTimeMs = System.currentTimeMillis();
       _channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes)).addListener(f -> {
-        long requestSentLatencyMs = System.currentTimeMillis() - sendRequestStartTimeMs;
+        long requestSentLatencyMs = System.currentTimeMillis() - startTimeMs;
         _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.NETTY_CONNECTION_SEND_REQUEST_LATENCY,
             requestSentLatencyMs, TimeUnit.MILLISECONDS);
         asyncQueryResponse.markRequestSent(serverRoutingInstance, requestSentLatencyMs);
       });
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_REQUESTS_SENT, 1);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_SENT, requestBytes.length);
+    }
+
+    void connect()
+        throws InterruptedException, TimeoutException {
+      if (_channelLock.tryLock(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+        try {
+          connectWithoutLocking();
+        } finally {
+          _channelLock.unlock();
+        }
+      } else {
+        throw new TimeoutException(CHANNEL_LOCK_TIMEOUT_MSG);
+      }
     }
   }
 }

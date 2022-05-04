@@ -59,6 +59,10 @@ public interface IndexCreationContext {
 
   boolean hasDictionary();
 
+  Comparable<?> getMinValue();
+
+  Comparable<?> getMaxValue();
+
   final class Builder {
     private File _indexDir;
     private int _lengthOfLongestEntry;
@@ -71,6 +75,8 @@ public interface IndexCreationContext {
     private int _totalNumberOfEntries;
     private int _totalDocs;
     private boolean _hasDictionary = true;
+    private Comparable<?> _minValue;
+    private Comparable<?> _maxValue;
 
     public Builder withColumnIndexCreationInfo(ColumnIndexCreationInfo columnIndexCreationInfo) {
       return withLengthOfLongestEntry(columnIndexCreationInfo.getLengthOfLongestEntry())
@@ -94,7 +100,9 @@ public interface IndexCreationContext {
           .withCardinality(columnMetadata.getCardinality())
           .withTotalNumberOfEntries(columnMetadata.getTotalNumberOfEntries())
           .withTotalDocs(columnMetadata.getTotalDocs())
-          .withDictionary(columnMetadata.hasDictionary());
+          .withDictionary(columnMetadata.hasDictionary())
+          .withMinValue(columnMetadata.getMinValue())
+          .withMaxValue(columnMetadata.getMaxValue());
     }
 
     public Builder withLengthOfLongestEntry(int lengthOfLongestEntry) {
@@ -142,11 +150,20 @@ public interface IndexCreationContext {
       return this;
     }
 
+    public Builder withMinValue(Comparable<?> minValue) {
+      _minValue = minValue;
+      return this;
+    }
+
+    public Builder withMaxValue(Comparable<?> maxValue) {
+      _maxValue = maxValue;
+      return this;
+    }
+
     public Common build() {
-      return new Common(Objects.requireNonNull(_indexDir),
-          _lengthOfLongestEntry, _maxNumberOfMultiValueElements, _maxRowLengthInBytes,
-          _onHeap, Objects.requireNonNull(_fieldSpec),
-          _sorted, _cardinality, _totalNumberOfEntries, _totalDocs, _hasDictionary);
+      return new Common(Objects.requireNonNull(_indexDir), _lengthOfLongestEntry, _maxNumberOfMultiValueElements,
+          _maxRowLengthInBytes, _onHeap, Objects.requireNonNull(_fieldSpec), _sorted, _cardinality,
+          _totalNumberOfEntries, _totalDocs, _hasDictionary, _minValue, _maxValue);
     }
   }
 
@@ -167,11 +184,13 @@ public interface IndexCreationContext {
     private final int _totalNumberOfEntries;
     private final int _totalDocs;
     private final boolean _hasDictionary;
+    private final Comparable<?> _minValue;
+    private final Comparable<?> _maxValue;
 
     public Common(File indexDir, int lengthOfLongestEntry,
         int maxNumberOfMultiValueElements, int maxRowLengthInBytes, boolean onHeap,
         FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries,
-        int totalDocs, boolean hasDictionary) {
+        int totalDocs, boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue) {
       _indexDir = indexDir;
       _lengthOfLongestEntry = lengthOfLongestEntry;
       _maxNumberOfMultiValueElements = maxNumberOfMultiValueElements;
@@ -183,6 +202,8 @@ public interface IndexCreationContext {
       _totalNumberOfEntries = totalNumberOfEntries;
       _totalDocs = totalDocs;
       _hasDictionary = hasDictionary;
+      _minValue = minValue;
+      _maxValue = maxValue;
     }
 
     public FieldSpec getFieldSpec() {
@@ -229,6 +250,16 @@ public interface IndexCreationContext {
       return _hasDictionary;
     }
 
+    @Override
+    public Comparable<?> getMinValue() {
+      return _minValue;
+    }
+
+    @Override
+    public Comparable<?> getMaxValue() {
+      return _maxValue;
+    }
+
     public BloomFilter forBloomFilter(BloomFilterConfig bloomFilterConfig) {
       return new BloomFilter(this, bloomFilterConfig);
     }
@@ -254,8 +285,8 @@ public interface IndexCreationContext {
       return new Json(this);
     }
 
-    public Range forRangeIndex(int rangeIndexVersion, Comparable<?> min, Comparable<?> max) {
-      return new Range(this, rangeIndexVersion, min, max);
+    public Range forRangeIndex(int rangeIndexVersion) {
+      return new Range(this, rangeIndexVersion);
     }
 
     public Text forTextIndex(boolean commitOnClose) {
@@ -325,6 +356,16 @@ public interface IndexCreationContext {
     public boolean hasDictionary() {
       return _delegate.hasDictionary();
     }
+
+    @Override
+    public Comparable getMinValue() {
+      return _delegate.getMinValue();
+    }
+
+    @Override
+    public Comparable getMaxValue() {
+      return _delegate.getMaxValue();
+    }
   }
 
   class BloomFilter extends Wrapper {
@@ -346,8 +387,7 @@ public interface IndexCreationContext {
     private final ChunkCompressionType _chunkCompressionType;
     private final Map<String, Map<String, String>> _columnProperties;
 
-    Forward(IndexCreationContext delegate,
-        ChunkCompressionType chunkCompressionType,
+    Forward(IndexCreationContext delegate, ChunkCompressionType chunkCompressionType,
         @Nullable Map<String, Map<String, String>> columnProperties) {
       super(delegate);
       _chunkCompressionType = chunkCompressionType;
@@ -393,25 +433,12 @@ public interface IndexCreationContext {
   }
 
   class Range extends Wrapper {
-
-    private final Comparable<?> _min;
-    private final Comparable<?> _max;
     private final int _rangeIndexVersion;
 
 
-    Range(IndexCreationContext delegate, int rangeIndexVersion, Comparable<?> min, Comparable<?> max) {
+    Range(IndexCreationContext delegate, int rangeIndexVersion) {
       super(delegate);
       _rangeIndexVersion = rangeIndexVersion;
-      _min = min;
-      _max = max;
-    }
-
-    public Comparable<?> getMin() {
-      return _min;
-    }
-
-    public Comparable<?> getMax() {
-      return _max;
     }
 
     public int getRangeIndexVersion() {

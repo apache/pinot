@@ -32,7 +32,7 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
   private EmptyFilterOperator() {
   }
 
-  private static final String OPERATOR_NAME = "EmptyFilterOperator";
+
   private static final String EXPLAIN_NAME = "FILTER_EMPTY";
 
   private static final EmptyFilterOperator INSTANCE = new EmptyFilterOperator();
@@ -47,14 +47,20 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
   }
 
   @Override
+  public boolean canOptimizeCount() {
+    return true;
+  }
+
+  @Override
+  public int getNumMatchingDocs() {
+    return 0;
+  }
+
+  @Override
   protected FilterBlock getNextBlock() {
     return EmptyFilterBlock.getInstance();
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {

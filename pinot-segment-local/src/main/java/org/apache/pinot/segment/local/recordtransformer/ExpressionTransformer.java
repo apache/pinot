@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -26,7 +28,9 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -40,14 +44,18 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 public class ExpressionTransformer implements RecordTransformer {
 
-  private final LinkedHashMap<String, FunctionEvaluator> _expressionEvaluators = new LinkedHashMap<>();
+  @VisibleForTesting
+  final LinkedHashMap<String, FunctionEvaluator> _expressionEvaluators = new LinkedHashMap<>();
 
   public ExpressionTransformer(TableConfig tableConfig, Schema schema) {
     Map<String, FunctionEvaluator> expressionEvaluators = new HashMap<>();
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getTransformConfigs() != null) {
       for (TransformConfig transformConfig : tableConfig.getIngestionConfig().getTransformConfigs()) {
-        expressionEvaluators.put(transformConfig.getColumnName(),
+        FunctionEvaluator previous = expressionEvaluators.put(transformConfig.getColumnName(),
             FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction()));
+        Preconditions
+            .checkState(previous == null, "Cannot set more than one ingestion transform function on column: %s.",
+                transformConfig.getColumnName());
       }
     }
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -59,30 +67,54 @@ public class ExpressionTransformer implements RecordTransformer {
         }
       }
     }
+    // For fields with Timestamp indexes, also generate the corresponding values during record transformation.
+    if (tableConfig.getFieldConfigList() != null) {
+      for (FieldConfig fieldConfig : tableConfig.getFieldConfigList()) {
+        if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.TIMESTAMP)) {
+          for (TimestampIndexGranularity granularity : fieldConfig.getTimestampConfig().getGranularities()) {
+            expressionEvaluators.put(
+                TimestampIndexGranularity.getColumnNameWithGranularity(fieldConfig.getName(), granularity),
+                FunctionEvaluatorFactory.getExpressionEvaluator(
+                    String.format("dateTrunc(\'" + granularity + "\', " + fieldConfig.getName() + ")")));
+          }
+        }
+      }
+    }
 
-    // Sort the transform functions based on dependencies
-    Set<String> visited = new HashSet<>();
+    // Carry out DFS traversal to topologically sort column names based on transform function dependencies. Throw
+    // exception if a cycle is discovered. When a name is first seen it is added to discoveredNames set. When a name
+    // is completely processed (i.e the name and all of its dependencies have been fully explored and no cycles have
+    // been seen), it gets added to the _expressionEvaluators list in topologically sorted order. Fully explored
+    // names are removed from discoveredNames set.
+    Set<String> discoveredNames = new HashSet<>();
     for (Map.Entry<String, FunctionEvaluator> entry : expressionEvaluators.entrySet()) {
-      topologicalSort(entry.getKey(), expressionEvaluators, visited);
+      String columnName = entry.getKey();
+      if (!_expressionEvaluators.containsKey(columnName)) {
+        topologicalSort(columnName, expressionEvaluators, discoveredNames);
+      }
     }
   }
 
   private void topologicalSort(String column, Map<String, FunctionEvaluator> expressionEvaluators,
-      Set<String> visited) {
-    if (visited.contains(column)) {
-      return;
-    }
+      Set<String> discoveredNames) {
     FunctionEvaluator functionEvaluator = expressionEvaluators.get(column);
     if (functionEvaluator == null) {
-      visited.add(column);
       return;
     }
-    List<String> arguments = functionEvaluator.getArguments();
-    for (String arg : arguments) {
-      topologicalSort(arg, expressionEvaluators, visited);
+
+    if (discoveredNames.add(column)) {
+      List<String> arguments = functionEvaluator.getArguments();
+      for (String arg : arguments) {
+        if (!_expressionEvaluators.containsKey(arg)) {
+          topologicalSort(arg, expressionEvaluators, discoveredNames);
+        }
+      }
+      _expressionEvaluators.put(column, functionEvaluator);
+      discoveredNames.remove(column);
+    } else {
+      throw new IllegalStateException("Expression cycle found for column '" + column + "' in Ingestion Transform "
+          + "Function definitions.");
     }
-    visited.add(column);
-    _expressionEvaluators.put(column, functionEvaluator);
   }
 
   @Override

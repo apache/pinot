@@ -26,7 +26,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.10.0-SNAPSHOT</version>
+    <version>0.11.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-plugins</artifactId>
@@ -124,6 +124,10 @@
                     <relocation>
                       <pattern>org.apache.parquet</pattern>
                       <shadedPattern>shaded.org.apache.parquet</shadedPattern>
+                    </relocation>
+                    <relocation>
+                      <pattern>org.apache.kafka</pattern>
+                      <shadedPattern>shaded.org.apache.kafka</shadedPattern>
                     </relocation>
                   </relocations>
                 </configuration>

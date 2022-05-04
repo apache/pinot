@@ -20,13 +20,20 @@ package org.apache.pinot.controller.helix;
 
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.lineage.LineageEntry;
+import org.apache.pinot.common.lineage.LineageEntryState;
+import org.apache.pinot.common.lineage.SegmentLineage;
+import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -35,13 +42,17 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -49,10 +60,13 @@ import static org.mockito.Mockito.when;
 public class SegmentStatusCheckerTest {
   private SegmentStatusChecker _segmentStatusChecker;
   private PinotHelixResourceManager _helixResourceManager;
+  private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
   private LeadControllerManager _leadControllerManager;
   private PinotMetricsRegistry _metricsRegistry;
   private ControllerMetrics _controllerMetrics;
   private ControllerConf _config;
+  private TableSizeReader _tableSizeReader;
+  private ExecutorService _executorService = Executors.newFixedThreadPool(1);
 
   @Test
   public void offlineBasicTest()
@@ -68,6 +82,12 @@ public class SegmentStatusCheckerTest {
     idealState.setPartitionState("myTable_1", "pinot2", "ONLINE");
     idealState.setPartitionState("myTable_1", "pinot3", "ONLINE");
     idealState.setPartitionState("myTable_2", "pinot3", "OFFLINE");
+    idealState.setPartitionState("myTable_3", "pinot1", "ONLINE");
+    idealState.setPartitionState("myTable_3", "pinot2", "ONLINE");
+    idealState.setPartitionState("myTable_3", "pinot3", "ONLINE");
+    idealState.setPartitionState("myTable_4", "pinot1", "ONLINE");
+    idealState.setPartitionState("myTable_4", "pinot2", "ONLINE");
+    idealState.setPartitionState("myTable_4", "pinot3", "ONLINE");
     idealState.setReplicas("2");
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
 
@@ -76,12 +96,32 @@ public class SegmentStatusCheckerTest {
     externalView.setState("myTable_0", "pinot2", "ONLINE");
     externalView.setState("myTable_1", "pinot1", "ERROR");
     externalView.setState("myTable_1", "pinot2", "ONLINE");
+    externalView.setState("myTable_1", "pinot3", "ERROR");
+    externalView.setState("myTable_3", "pinot1", "ERROR");
+    externalView.setState("myTable_3", "pinot2", "ONLINE");
+    externalView.setState("myTable_3", "pinot3", "ONLINE");
+    externalView.setState("myTable_4", "pinot1", "ONLINE");
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
+    }
+    {
+      _helixPropertyStore = mock(ZkHelixPropertyStore.class);
+      when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
+      // Based on the lineage entries: {myTable_1 -> myTable_3, COMPLETED}, {myTable_3 -> myTable_4, IN_PROGRESS},
+      // myTable_1 and myTable_4 will be skipped for the metrics.
+      SegmentLineage segmentLineage = new SegmentLineage(tableName);
+      segmentLineage.addLineageEntry(SegmentLineageUtils.generateLineageEntryId(),
+          new LineageEntry(Collections.singletonList("myTable_1"), Collections.singletonList("myTable_3"),
+              LineageEntryState.COMPLETED, 11111L));
+      segmentLineage.addLineageEntry(SegmentLineageUtils.generateLineageEntryId(),
+          new LineageEntry(Collections.singletonList("myTable_3"), Collections.singletonList("myTable_4"),
+              LineageEntryState.IN_PROGRESS, 11111L));
+      when(_helixPropertyStore.get(eq("/SEGMENT_LINEAGE/" + tableName), any(), eq(AccessOption.PERSISTENT)))
+          .thenReturn(segmentLineage.toZNRecord());
     }
     {
       _config = mock(ControllerConf.class);
@@ -92,23 +132,36 @@ public class SegmentStatusCheckerTest {
       _leadControllerManager = mock(LeadControllerManager.class);
       when(_leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
+    {
+      _tableSizeReader = mock(TableSizeReader.class);
+      when(_tableSizeReader.getTableSizeDetails(anyString(), anyInt())).thenReturn(null);
+    }
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
-        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+            _executorService);
+    _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
+    Assert
+        .assertEquals(_controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENT_COUNT), 3);
+    Assert.assertEquals(
+        _controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENT_COUNT_INCLUDING_REPLACED),
+        5);
     Assert.assertEquals(
         _controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENTS_IN_ERROR_STATE), 1);
     Assert
         .assertEquals(_controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS),
-            1);
+            2);
     Assert
         .assertEquals(
             _controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_OF_REPLICAS),
-            33);
+            66);
     Assert.assertEquals(
         _controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
+    Assert.assertEquals(
+        _controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.TABLE_COMPRESSED_SIZE), 0);
   }
 
   @Test
@@ -147,6 +200,8 @@ public class SegmentStatusCheckerTest {
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
+      _helixPropertyStore = mock(ZkHelixPropertyStore.class);
+      when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
@@ -160,10 +215,16 @@ public class SegmentStatusCheckerTest {
       _leadControllerManager = mock(LeadControllerManager.class);
       when(_leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
+    {
+      _tableSizeReader = mock(TableSizeReader.class);
+      when(_tableSizeReader.getTableSizeDetails(anyString(), anyInt())).thenReturn(null);
+    }
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
-        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+            _executorService);
+    _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
     Assert.assertEquals(
@@ -180,7 +241,8 @@ public class SegmentStatusCheckerTest {
   }
 
   @Test
-  public void missingEVPartitionTest() {
+  public void missingEVPartitionTest()
+      throws Exception {
     String offlineTableName = "myTable_OFFLINE";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(offlineTableName);
@@ -213,6 +275,7 @@ public class SegmentStatusCheckerTest {
     znrecord.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "http://localhost:8000/myTable_0");
     znrecord.setLongField(CommonConstants.Segment.PUSH_TIME, System.currentTimeMillis());
     znrecord.setLongField(CommonConstants.Segment.REFRESH_TIME, System.currentTimeMillis());
+    znrecord.setLongField(CommonConstants.Segment.SIZE_IN_BYTES, 1111);
 
     ZkHelixPropertyStore<ZNRecord> propertyStore;
     {
@@ -223,6 +286,8 @@ public class SegmentStatusCheckerTest {
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
+      _helixPropertyStore = mock(ZkHelixPropertyStore.class);
+      when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(offlineTableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(offlineTableName)).thenReturn(externalView);
@@ -238,10 +303,16 @@ public class SegmentStatusCheckerTest {
       _leadControllerManager = mock(LeadControllerManager.class);
       when(_leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
+    {
+      _tableSizeReader = mock(TableSizeReader.class);
+      when(_tableSizeReader.getTableSizeDetails(anyString(), anyInt())).thenReturn(null);
+    }
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
-        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+            _executorService);
+    _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
     Assert.assertEquals(
@@ -251,6 +322,8 @@ public class SegmentStatusCheckerTest {
             0);
     Assert.assertEquals(
         _controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 75);
+    Assert.assertEquals(
+        _controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.TABLE_COMPRESSED_SIZE), 1111);
   }
 
   @Test
@@ -272,6 +345,8 @@ public class SegmentStatusCheckerTest {
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
+      _helixPropertyStore = mock(ZkHelixPropertyStore.class);
+      when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(null);
@@ -285,14 +360,22 @@ public class SegmentStatusCheckerTest {
       _leadControllerManager = mock(LeadControllerManager.class);
       when(_leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
+    {
+      _tableSizeReader = mock(TableSizeReader.class);
+      when(_tableSizeReader.getTableSizeDetails(anyString(), anyInt())).thenReturn(null);
+    }
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
-        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+            _executorService);
+    _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
     Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS), 0);
+    Assert.assertEquals(
+        _controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.TABLE_COMPRESSED_SIZE), 0);
   }
 
   @Test
@@ -317,10 +400,16 @@ public class SegmentStatusCheckerTest {
       _leadControllerManager = mock(LeadControllerManager.class);
       when(_leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
+    {
+      _tableSizeReader = mock(TableSizeReader.class);
+      when(_tableSizeReader.getTableSizeDetails(anyString(), anyInt())).thenReturn(null);
+    }
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
-        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+            _executorService);
+    _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
     Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE),
@@ -329,10 +418,13 @@ public class SegmentStatusCheckerTest {
         Long.MIN_VALUE);
     Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS),
         Long.MIN_VALUE);
+    Assert.assertEquals(
+        _controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.TABLE_COMPRESSED_SIZE), 0);
   }
 
   @Test
-  public void missingEVPartitionPushTest() {
+  public void missingEVPartitionPushTest()
+      throws Exception {
     String offlineTableName = "myTable_OFFLINE";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(offlineTableName);
@@ -340,12 +432,17 @@ public class SegmentStatusCheckerTest {
     idealState.setPartitionState("myTable_0", "pinot1", "ONLINE");
     idealState.setPartitionState("myTable_1", "pinot1", "ONLINE");
     idealState.setPartitionState("myTable_1", "pinot2", "ONLINE");
+    idealState.setPartitionState("myTable_2", "pinot1", "ONLINE");
+    idealState.setPartitionState("myTable_2", "pinot2", "ONLINE");
     idealState.setReplicas("2");
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
 
     ExternalView externalView = new ExternalView(offlineTableName);
     externalView.setState("myTable_1", "pinot1", "ONLINE");
     externalView.setState("myTable_1", "pinot2", "ONLINE");
+    // myTable_2 is push in-progress and only one replica has been downloaded by servers. It will be skipped for
+    // the segment status check.
+    externalView.setState("myTable_2", "pinot1", "ONLINE");
 
     ZNRecord znrecord = new ZNRecord("myTable_0");
     znrecord.setSimpleField(CommonConstants.Segment.INDEX_VERSION, "v1");
@@ -358,14 +455,32 @@ public class SegmentStatusCheckerTest {
     znrecord.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "http://localhost:8000/myTable_0");
     znrecord.setLongField(CommonConstants.Segment.PUSH_TIME, System.currentTimeMillis());
     znrecord.setLongField(CommonConstants.Segment.REFRESH_TIME, System.currentTimeMillis());
+    znrecord.setLongField(CommonConstants.Segment.SIZE_IN_BYTES, 1111);
+
+    ZNRecord znrecord2 = new ZNRecord("myTable_2");
+    znrecord2.setSimpleField(CommonConstants.Segment.INDEX_VERSION, "v1");
+    znrecord2.setLongField(CommonConstants.Segment.START_TIME, 1000);
+    znrecord2.setLongField(CommonConstants.Segment.END_TIME, 2000);
+    znrecord2.setSimpleField(CommonConstants.Segment.TIME_UNIT, TimeUnit.HOURS.toString());
+    znrecord2.setLongField(CommonConstants.Segment.TOTAL_DOCS, 10000);
+    znrecord2.setLongField(CommonConstants.Segment.CRC, 1235);
+    znrecord2.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
+    znrecord2.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "http://localhost:8000/myTable_2");
+    znrecord2.setLongField(CommonConstants.Segment.PUSH_TIME, System.currentTimeMillis());
+    znrecord2.setLongField(CommonConstants.Segment.REFRESH_TIME, System.currentTimeMillis());
+    znrecord.setLongField(CommonConstants.Segment.SIZE_IN_BYTES, 1111);
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
+      _helixPropertyStore = mock(ZkHelixPropertyStore.class);
+      when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(offlineTableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(offlineTableName)).thenReturn(externalView);
       when(_helixResourceManager.getSegmentZKMetadata(offlineTableName, "myTable_0"))
           .thenReturn(new SegmentZKMetadata(znrecord));
+      when(_helixResourceManager.getSegmentZKMetadata(offlineTableName, "myTable_2"))
+          .thenReturn(new SegmentZKMetadata(znrecord2));
     }
     {
       _config = mock(ControllerConf.class);
@@ -376,10 +491,16 @@ public class SegmentStatusCheckerTest {
       _leadControllerManager = mock(LeadControllerManager.class);
       when(_leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
+    {
+      _tableSizeReader = mock(TableSizeReader.class);
+      when(_tableSizeReader.getTableSizeDetails(anyString(), anyInt())).thenReturn(null);
+    }
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
-        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+            _executorService);
+    _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
     Assert.assertEquals(
@@ -393,6 +514,8 @@ public class SegmentStatusCheckerTest {
             100);
     Assert.assertEquals(
         _controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
+    Assert.assertEquals(
+        _controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.TABLE_COMPRESSED_SIZE), 0);
   }
 
   @Test
@@ -410,6 +533,8 @@ public class SegmentStatusCheckerTest {
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
+      _helixPropertyStore = mock(ZkHelixPropertyStore.class);
+      when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(null);
@@ -423,10 +548,16 @@ public class SegmentStatusCheckerTest {
       _leadControllerManager = mock(LeadControllerManager.class);
       when(_leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
+    {
+      _tableSizeReader = mock(TableSizeReader.class);
+      when(_tableSizeReader.getTableSizeDetails(anyString(), anyInt())).thenReturn(null);
+    }
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
-        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+            _executorService);
+    _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
     Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
@@ -470,7 +601,8 @@ public class SegmentStatusCheckerTest {
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
-        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+            _executorService);
     // verify state before test
     Assert.assertEquals(_controllerMetrics.getValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT), 0);
     // update metrics
@@ -509,7 +641,8 @@ public class SegmentStatusCheckerTest {
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
-        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+            _executorService);
     // verify state before test
     Assert.assertEquals(_controllerMetrics.getValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT), 0);
     // update metrics
@@ -556,10 +689,16 @@ public class SegmentStatusCheckerTest {
       _leadControllerManager = mock(LeadControllerManager.class);
       when(_leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     }
+    {
+      _tableSizeReader = mock(TableSizeReader.class);
+      when(_tableSizeReader.getTableSizeDetails(anyString(), anyInt())).thenReturn(null);
+    }
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
-        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+            _executorService);
+    _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
     Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE),

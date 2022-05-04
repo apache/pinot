@@ -54,6 +54,10 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     }
   }
 
+  public int getLog2m() {
+    return _log2m;
+  }
+
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.DISTINCTCOUNTHLL;

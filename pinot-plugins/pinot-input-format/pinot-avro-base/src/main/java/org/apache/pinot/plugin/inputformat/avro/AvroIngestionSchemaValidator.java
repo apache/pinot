@@ -97,6 +97,13 @@ public class AvroIngestionSchemaValidator implements IngestionSchemaValidator {
                 fieldSpec.getDataType().name(), getInputSchemaType()));
         continue;
       }
+
+      if (fieldSpec.getDataType() == FieldSpec.DataType.JSON) {
+        // No need to carry out further validation if this is a JSON column and we allow for ingesting any AVRO type
+        // into JSON column.
+        continue;
+      }
+
       String avroColumnName = avroColumnField.schema().getName();
       org.apache.avro.Schema avroColumnSchema = avroColumnField.schema();
       org.apache.avro.Schema.Type avroColumnType = avroColumnSchema.getType();

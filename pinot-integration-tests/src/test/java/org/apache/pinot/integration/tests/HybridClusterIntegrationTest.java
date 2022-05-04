@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.net.URLEncoder;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +29,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -60,6 +60,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   @Override
   protected void overrideServerConf(PinotConfiguration configuration) {
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, false);
   }
 
   @BeforeClass
@@ -82,8 +83,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
 
     // Create and upload segments
-    ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
+        _tarDir);
     uploadSegments(getTableName(), _tarDir);
 
     // Push data into Kafka
@@ -122,21 +123,16 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testSegmentMetadataApi()
       throws Exception {
-    {
-      String jsonOutputStr = sendGetRequest(
-          _controllerRequestURLBuilder.forSegmentMetadata(getTableName()));
-      JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
-      Assert.assertEquals(tableSegmentsMetadata.size(), 8);
+    String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName()));
+    JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
+    Assert.assertEquals(tableSegmentsMetadata.size(), 8);
 
-      JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
-      String segmentName = URLEncoder.encode(segmentMetadataFromAllEndpoint.get("segmentName").asText(),
-          "UTF-8");
-      jsonOutputStr = sendGetRequest(
-          _controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
-      JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
-      Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
-          segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
-    }
+    JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
+    String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
+    jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
+    JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
+    Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
+        segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
   }
 
   @Test
@@ -222,23 +218,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   @Test
   @Override
-  public void testHardcodedSqlQueries()
-      throws Exception {
-    super.testHardcodedSqlQueries();
-  }
-
-  @Test
-  @Override
   public void testQueriesFromQueryFile()
       throws Exception {
     super.testQueriesFromQueryFile();
-  }
-
-  @Test
-  @Override
-  public void testSqlQueriesFromQueryFile()
-      throws Exception {
-    super.testSqlQueriesFromQueryFile();
   }
 
   @Test
@@ -288,10 +270,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       try {
         getDebugInfo("debug/routingTable/" + tableName);
         return false;
-      } catch (FileNotFoundException e) {
-        return true;
       } catch (Exception e) {
-        return null;
+        // only return true if 404 not found error is thrown.
+        return e.getMessage().contains("Got error status code: 404");
       }
     }, 60_000L, "Routing table is not empty after dropping all tables");
 

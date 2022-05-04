@@ -27,7 +27,6 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.roaringbitmap.RangeBitmap;
-import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -56,25 +55,41 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
     _numDocs = metadata.getTotalDocs();
   }
 
-  @Nullable
+  @Override
+  public int getNumMatchingDocs(int min, int max) {
+    return queryRangeBitmapCardinality(Math.max(min, _min) - _min, max - _min, _max - _min);
+  }
+
+  @Override
+  public int getNumMatchingDocs(long min, long max) {
+    return queryRangeBitmapCardinality(Math.max(min, _min) - _min, max - _min, _max - _min);
+  }
+
+  @Override
+  public int getNumMatchingDocs(float min, float max) {
+    return queryRangeBitmapCardinality(FPOrdering.ordinalOf(min), FPOrdering.ordinalOf(max), 0xFFFFFFFFL);
+  }
+
+  @Override
+  public int getNumMatchingDocs(double min, double max) {
+    return queryRangeBitmapCardinality(FPOrdering.ordinalOf(min), FPOrdering.ordinalOf(max), 0xFFFFFFFFFFFFFFFFL);
+  }
+
   @Override
   public ImmutableRoaringBitmap getMatchingDocIds(int min, int max) {
     return queryRangeBitmap(Math.max(min, _min) - _min, max - _min, _max - _min);
   }
 
-  @Nullable
   @Override
   public ImmutableRoaringBitmap getMatchingDocIds(long min, long max) {
     return queryRangeBitmap(Math.max(min, _min) - _min, max - _min, _max - _min);
   }
 
-  @Nullable
   @Override
   public ImmutableRoaringBitmap getMatchingDocIds(float min, float max) {
     return queryRangeBitmap(FPOrdering.ordinalOf(min), FPOrdering.ordinalOf(max), 0xFFFFFFFFL);
   }
 
-  @Nullable
   @Override
   public ImmutableRoaringBitmap getMatchingDocIds(double min, double max) {
     return queryRangeBitmap(FPOrdering.ordinalOf(min), FPOrdering.ordinalOf(max), 0xFFFFFFFFFFFFFFFFL);
@@ -109,11 +124,10 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
   private ImmutableRoaringBitmap queryRangeBitmap(long min, long max, long columnMax) {
     RangeBitmap rangeBitmap = mapRangeBitmap();
     if (Long.compareUnsigned(max, columnMax) < 0) {
-      RoaringBitmap lte = rangeBitmap.lte(max);
       if (Long.compareUnsigned(min, 0) > 0) {
-        return rangeBitmap.gte(min, lte).toMutableRoaringBitmap();
+        return rangeBitmap.between(min, max).toMutableRoaringBitmap();
       }
-      return lte.toMutableRoaringBitmap();
+      return rangeBitmap.lte(max).toMutableRoaringBitmap();
     } else {
       if (Long.compareUnsigned(min, 0) > 0) {
         return rangeBitmap.gte(min).toMutableRoaringBitmap();
@@ -121,6 +135,21 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
       MutableRoaringBitmap all = new MutableRoaringBitmap();
       all.add(0, _numDocs);
       return all;
+    }
+  }
+
+  private int queryRangeBitmapCardinality(long min, long max, long columnMax) {
+    RangeBitmap rangeBitmap = mapRangeBitmap();
+    if (Long.compareUnsigned(max, columnMax) < 0) {
+      if (Long.compareUnsigned(min, 0) > 0) {
+        return (int) rangeBitmap.betweenCardinality(min, max);
+      }
+      return (int) rangeBitmap.lteCardinality(max);
+    } else {
+      if (Long.compareUnsigned(min, 0) > 0) {
+        return (int) rangeBitmap.gteCardinality(min);
+      }
+      return (int) _numDocs;
     }
   }
 

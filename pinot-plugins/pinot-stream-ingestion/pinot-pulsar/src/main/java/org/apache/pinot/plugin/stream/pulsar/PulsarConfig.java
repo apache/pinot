@@ -19,13 +19,12 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pulsar.client.api.MessageId;
+import org.apache.pulsar.client.api.SubscriptionInitialPosition;
 
 
 /**
@@ -35,11 +34,16 @@ import org.apache.pulsar.client.api.MessageId;
 public class PulsarConfig {
   public static final String STREAM_TYPE = "pulsar";
   public static final String BOOTSTRAP_SERVERS = "bootstrap.servers";
+  public static final String AUTHENTICATION_TOKEN = "authenticationToken";
+  public static final String TLS_TRUST_CERTS_FILE_PATH = "tlsTrustCertsFilePath";
 
   private String _pulsarTopicName;
   private String _subscriberId;
   private String _bootstrapServers;
   private MessageId _initialMessageId;
+  private SubscriptionInitialPosition _subscriptionInitialPosition;
+  private String _authenticationToken;
+  private String _tlsTrustCertsFilePath;
 
   public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
@@ -48,21 +52,19 @@ public class PulsarConfig {
         streamConfigMap.get(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, BOOTSTRAP_SERVERS));
     _subscriberId = subscriberId;
 
+    String authenticationTokenKey = StreamConfigProperties.constructStreamProperty(STREAM_TYPE, AUTHENTICATION_TOKEN);
+    _authenticationToken = streamConfigMap.get(authenticationTokenKey);
+
+    String tlsTrustCertsFilePathKey = StreamConfigProperties.
+            constructStreamProperty(STREAM_TYPE, TLS_TRUST_CERTS_FILE_PATH);
+    _tlsTrustCertsFilePath = streamConfigMap.get(tlsTrustCertsFilePathKey);
+
     Preconditions.checkNotNull(_bootstrapServers, "No brokers provided in the config");
 
     OffsetCriteria offsetCriteria = streamConfig.getOffsetCriteria();
 
-    if (offsetCriteria.isSmallest()) {
-      _initialMessageId = MessageId.earliest;
-    } else if (offsetCriteria.isLargest()) {
-      _initialMessageId = MessageId.latest;
-    } else if (offsetCriteria.isCustom()) {
-      try {
-        _initialMessageId = MessageId.fromByteArray(offsetCriteria.getOffsetString().getBytes(StandardCharsets.UTF_8));
-      } catch (IOException e) {
-        throw new RuntimeException("Invalid offset string found: " + offsetCriteria.getOffsetString());
-      }
-    }
+    _subscriptionInitialPosition = PulsarUtils.offsetCriteriaToSubscription(offsetCriteria);
+    _initialMessageId = PulsarUtils.offsetCriteriaToMessageId(offsetCriteria);
   }
 
   public String getPulsarTopicName() {
@@ -79,5 +81,17 @@ public class PulsarConfig {
 
   public MessageId getInitialMessageId() {
     return _initialMessageId;
+  }
+
+  public SubscriptionInitialPosition getInitialSubscriberPosition() {
+   return _subscriptionInitialPosition;
+  }
+
+  public String getAuthenticationToken() {
+    return _authenticationToken;
+  }
+
+  public String getTlsTrustCertsFilePath() {
+    return _tlsTrustCertsFilePath;
   }
 }

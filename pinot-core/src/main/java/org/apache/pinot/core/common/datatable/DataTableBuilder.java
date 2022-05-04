@@ -21,12 +21,14 @@ package org.apache.pinot.core.common.datatable;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -157,6 +159,15 @@ public class DataTableBuilder {
   public void setColumn(int colId, double value) {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putDouble(value);
+  }
+
+  public void setColumn(int colId, BigDecimal value)
+      throws IOException {
+    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
+    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    byte[] bytes = BigDecimalUtils.serialize(value);
+    _currentRowDataByteBuffer.putInt(bytes.length);
+    _variableSizeDataByteArrayOutputStream.write(bytes);
   }
 
   public void setColumn(int colId, String value) {

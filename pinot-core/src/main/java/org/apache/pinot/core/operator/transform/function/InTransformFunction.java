@@ -31,7 +31,6 @@ import java.util.Set;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -139,13 +138,14 @@ public class InTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_intValuesSV == null) {
-      _intValuesSV = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _intValuesSV = new int[length];
     } else {
       Arrays.fill(_intValuesSV, 0);
     }
 
-    int length = projectionBlock.getNumDocs();
     TransformResultMetadata mainFunctionMetadata = _mainFunction.getResultMetadata();
     DataType storedType = mainFunctionMetadata.getDataType().getStoredType();
     if (_valueSet != null) {

@@ -58,7 +58,9 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
         _segmentNamePrefix != null && isValidSegmentName(_segmentNamePrefix));
     _excludeSequenceId = excludeSequenceId;
     _appendPushType = "APPEND".equalsIgnoreCase(pushType);
-    _segmentNamePostfix = segmentNamePostfix;
+    _segmentNamePostfix = segmentNamePostfix != null ? segmentNamePostfix.trim() : null;
+    Preconditions.checkArgument(
+        _segmentNamePostfix == null || isValidSegmentName(_segmentNamePostfix));
 
     // Include time info for APPEND push type
     if (_appendPushType) {
@@ -70,10 +72,10 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
       }
       _outputSDF.setTimeZone(TimeZone.getTimeZone("UTC"));
 
-      // Parse input time format: 'EPOCH' or 'SIMPLE_DATE_FORMAT' using pattern
+      // Parse input time format: 'EPOCH'/'TIMESTAMP' or 'SIMPLE_DATE_FORMAT' using pattern
       Preconditions.checkNotNull(dateTimeFormatSpec);
       TimeFormat timeFormat = dateTimeFormatSpec.getTimeFormat();
-      if (timeFormat == TimeFormat.EPOCH) {
+      if (timeFormat == TimeFormat.EPOCH || timeFormat == TimeFormat.TIMESTAMP) {
         _inputTimeUnit = dateTimeFormatSpec.getColumnUnit();
         _inputSDF = null;
       } else {
@@ -96,13 +98,9 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
     // Include time value for APPEND push type
     if (_appendPushType) {
       return JOINER.join(_segmentNamePrefix, getNormalizedDate(Preconditions.checkNotNull(minTimeValue)),
-          getNormalizedDate(Preconditions.checkNotNull(maxTimeValue)), sequenceIdInSegmentName);
+          getNormalizedDate(Preconditions.checkNotNull(maxTimeValue)), _segmentNamePostfix, sequenceIdInSegmentName);
     } else {
-      if (_segmentNamePostfix != null) {
-        return JOINER.join(_segmentNamePrefix, _segmentNamePostfix, sequenceIdInSegmentName);
-      } else {
-        return JOINER.join(_segmentNamePrefix, sequenceIdInSegmentName);
-      }
+      return JOINER.join(_segmentNamePrefix, _segmentNamePostfix, sequenceIdInSegmentName);
     }
   }
 
@@ -129,8 +127,11 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   @Override
   public String toString() {
     StringBuilder stringBuilder =
-        new StringBuilder("NormalizedDateSegmentNameGenerator: segmentNamePrefix=").append(_segmentNamePrefix)
-            .append(", appendPushType=").append(_appendPushType);
+        new StringBuilder("NormalizedDateSegmentNameGenerator: segmentNamePrefix=").append(_segmentNamePrefix);
+    if (_segmentNamePostfix != null) {
+      stringBuilder.append(", segmentNamePostfix=").append(_segmentNamePostfix);
+    }
+    stringBuilder.append(", appendPushType=").append(_appendPushType);
     if (_excludeSequenceId) {
       stringBuilder.append(", excludeSequenceId=true");
     }

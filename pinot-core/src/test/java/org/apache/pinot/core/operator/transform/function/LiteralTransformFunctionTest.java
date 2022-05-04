@@ -32,6 +32,7 @@ public class LiteralTransformFunctionTest {
     Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("2147483649"), DataType.LONG);
     Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("1.2"), DataType.FLOAT);
     Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("41241241.2412"), DataType.DOUBLE);
+    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("1.7976931348623159e+308"), DataType.BIG_DECIMAL);
     Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("true"), DataType.BOOLEAN);
     Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("false"), DataType.BOOLEAN);
     Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("2020-02-02 20:20:20.20"), DataType.TIMESTAMP);

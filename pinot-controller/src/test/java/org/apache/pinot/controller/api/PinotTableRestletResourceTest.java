@@ -22,12 +22,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.api.resources.TableAndSchemaConfig;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
@@ -42,6 +38,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -92,7 +89,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of an OFFLINE table with two underscores in the table name does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     offlineTableConfig = _offlineBuilder.build();
@@ -103,7 +100,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of an OFFLINE table with dot in the table name does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Create an OFFLINE table with a valid name which should succeed
@@ -117,7 +114,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of an existing OFFLINE table does not fail");
     } catch (IOException e) {
       // Expected 409 Conflict
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 409"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 409"));
     }
 
     // Create an OFFLINE table with invalid replication config
@@ -127,7 +124,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of an invalid OFFLINE table does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Create a REALTIME table with an invalid name which should fail
@@ -140,7 +137,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of a REALTIME table with two underscores in the table name does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Creating a REALTIME table without a valid schema should fail
@@ -150,7 +147,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of a REALTIME table without a valid schema does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Creating a REALTIME table with a different schema name in the config should succeed (backwards compatibility
@@ -166,7 +163,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of a REALTIME table with a invalid time column name does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Create a REALTIME table with a valid name and schema which should succeed
@@ -187,7 +184,7 @@ public class PinotTableRestletResourceTest {
       Assert.fail("Creation of an OFFLINE table with an invalid cron expression does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Succeed to create a table
@@ -196,7 +193,8 @@ public class PinotTableRestletResourceTest {
             ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *")))).build();
     try {
       String response = ControllerTestUtils.sendPostRequest(_createTableUrl, tableConfig.toJsonString());
-      Assert.assertEquals(response, "{\"status\":\"Table test_table_cron_schedule_OFFLINE succesfully added\"}");
+      Assert.assertEquals(response,
+          "{\"unrecognizedProperties\":{},\"status\":\"Table test_table_cron_schedule_OFFLINE succesfully added\"}");
     } catch (IOException e) {
       // Expected 400 Bad Request
       Assert.fail("This is a valid table config with cron schedule");
@@ -207,13 +205,13 @@ public class PinotTableRestletResourceTest {
         new TableTaskConfig(ImmutableMap.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
             ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "5 5 5 5 5 5 5")))).build();
     try {
-      ControllerTestUtils
-          .sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig(rawTableName),
-              tableConfig.toJsonString());
+      ControllerTestUtils.sendPutRequest(
+          ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig(rawTableName),
+          tableConfig.toJsonString());
       Assert.fail("Update of an OFFLINE table with an invalid cron expression does not fail");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
   }
 
@@ -278,7 +276,7 @@ public class PinotTableRestletResourceTest {
       ControllerTestUtils.sendPostRequest(_createTableUrl, tableConfig.toJsonString());
       Assert.fail("Creation of a DIMENSION table with larger than allowed storage quota should fail");
     } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Successful creation with proper quota
@@ -316,9 +314,9 @@ public class PinotTableRestletResourceTest {
     tableConfig.getValidationConfig().setRetentionTimeUnit("HOURS");
     tableConfig.getValidationConfig().setRetentionTimeValue("10");
 
-    JsonNode jsonResponse = JsonUtils.stringToJsonNode(ControllerTestUtils
-        .sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig(tableName),
-            tableConfig.toJsonString()));
+    JsonNode jsonResponse = JsonUtils.stringToJsonNode(ControllerTestUtils.sendPutRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig(tableName),
+        tableConfig.toJsonString()));
     Assert.assertTrue(jsonResponse.has("status"));
 
     TableConfig modifiedConfig = getTableConfig(tableName, "OFFLINE");
@@ -336,30 +334,27 @@ public class PinotTableRestletResourceTest {
 
     QuotaConfig quota = new QuotaConfig("10G", "100.0");
     tableConfig.setQuotaConfig(quota);
-    ControllerTestUtils
-        .sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig(tableName),
-            tableConfig.toJsonString());
+    ControllerTestUtils.sendPutRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig(tableName),
+        tableConfig.toJsonString());
     modifiedConfig = getTableConfig(tableName, "REALTIME");
     Assert.assertNotNull(modifiedConfig.getQuotaConfig());
     Assert.assertEquals(modifiedConfig.getQuotaConfig().getStorage(), "10G");
     Assert.assertEquals(modifiedConfig.getQuotaConfig().getMaxQueriesPerSecond(), "100.0");
 
-    boolean notFoundException = false;
     try {
       // table does not exist
       ObjectNode tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
       tableConfigJson.put(TableConfig.TABLE_NAME_KEY, "noSuchTable_REALTIME");
-      ControllerTestUtils
-          .sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig("noSuchTable"),
-              tableConfigJson.toString());
+      ControllerTestUtils.sendPutRequest(
+          ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig("noSuchTable"),
+          tableConfigJson.toString());
     } catch (Exception e) {
-      Assert.assertTrue(e instanceof FileNotFoundException);
-      notFoundException = true;
+      Assert.assertTrue(e instanceof IOException);
     }
-    Assert.assertTrue(notFoundException);
   }
 
-  @Test(expectedExceptions = FileNotFoundException.class)
+  @Test(expectedExceptions = IOException.class)
   public void rebalanceNonExistentTable()
       throws Exception {
     ControllerTestUtils.sendPostRequest(
@@ -374,7 +369,8 @@ public class PinotTableRestletResourceTest {
 
     // Rebalance should return status NO_OP
     RebalanceResult rebalanceResult = JsonUtils.stringToObject(ControllerTestUtils.sendPostRequest(
-        ControllerTestUtils.getControllerRequestURLBuilder().forTableRebalance(OFFLINE_TABLE_NAME, "offline"), null),
+            ControllerTestUtils.getControllerRequestURLBuilder().forTableRebalance(OFFLINE_TABLE_NAME, "offline"),
+            null),
         RebalanceResult.class);
     Assert.assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
   }
@@ -385,7 +381,8 @@ public class PinotTableRestletResourceTest {
     // Case 1: Create a REALTIME table and delete it directly w/o using query param.
     TableConfig realtimeTableConfig = _realtimeBuilder.setTableName("table0").build();
     String creationResponse = ControllerTestUtils.sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table0_REALTIME succesfully added\"}");
+    Assert.assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table0_REALTIME succesfully added\"}");
 
     // Delete realtime table using REALTIME suffix.
     String deleteResponse = ControllerTestUtils.sendDeleteRequest(
@@ -395,7 +392,8 @@ public class PinotTableRestletResourceTest {
     // Case 2: Create an offline table and delete it directly w/o using query param.
     TableConfig offlineTableConfig = _offlineBuilder.setTableName("table0").build();
     creationResponse = ControllerTestUtils.sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table0_OFFLINE succesfully added\"}");
+    Assert.assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table0_OFFLINE succesfully added\"}");
 
     // Delete offline table using OFFLINE suffix.
     deleteResponse = ControllerTestUtils.sendDeleteRequest(
@@ -405,29 +403,34 @@ public class PinotTableRestletResourceTest {
     // Case 3: Create REALTIME and OFFLINE tables and delete both of them.
     TableConfig rtConfig1 = _realtimeBuilder.setTableName("table1").build();
     creationResponse = ControllerTestUtils.sendPostRequest(_createTableUrl, rtConfig1.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table1_REALTIME succesfully added\"}");
+    Assert.assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table1_REALTIME succesfully added\"}");
 
     TableConfig offlineConfig1 = _offlineBuilder.setTableName("table1").build();
     creationResponse = ControllerTestUtils.sendPostRequest(_createTableUrl, offlineConfig1.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table1_OFFLINE succesfully added\"}");
+    Assert.assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table1_OFFLINE succesfully added\"}");
 
-    deleteResponse = ControllerTestUtils
-        .sendDeleteRequest(StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table1"));
+    deleteResponse = ControllerTestUtils.sendDeleteRequest(
+        StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table1"));
     Assert.assertEquals(deleteResponse, "{\"status\":\"Tables: [table1_OFFLINE, table1_REALTIME] deleted\"}");
 
     // Case 4: Create REALTIME and OFFLINE tables and delete the realtime/offline table using query params.
     TableConfig rtConfig2 = _realtimeBuilder.setTableName("table2").build();
     creationResponse = ControllerTestUtils.sendPostRequest(_createTableUrl, rtConfig2.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table2_REALTIME succesfully added\"}");
+    Assert.assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table2_REALTIME succesfully added\"}");
 
     TableConfig offlineConfig2 = _offlineBuilder.setTableName("table2").build();
     creationResponse = ControllerTestUtils.sendPostRequest(_createTableUrl, offlineConfig2.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table2_OFFLINE succesfully added\"}");
+    Assert.assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table2_OFFLINE succesfully added\"}");
 
     // The conflict between param type and table name suffix causes no table being deleted.
     try {
-      ControllerTestUtils.sendDeleteRequest(StringUtil
-          .join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table2_OFFLINE?type=realtime"));
+      ControllerTestUtils.sendDeleteRequest(
+          StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables",
+              "table2_OFFLINE?type=realtime"));
       Assert.fail("Deleting a realtime table with OFFLINE suffix.");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof IOException);
@@ -453,11 +456,13 @@ public class PinotTableRestletResourceTest {
     // Case 6: Create REALTIME and OFFLINE tables and delete the realtime/offline table using query params and suffixes.
     TableConfig rtConfig3 = _realtimeBuilder.setTableName("table3").build();
     creationResponse = ControllerTestUtils.sendPostRequest(_createTableUrl, rtConfig3.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table3_REALTIME succesfully added\"}");
+    Assert.assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table3_REALTIME succesfully added\"}");
 
     TableConfig offlineConfig3 = _offlineBuilder.setTableName("table3").build();
     creationResponse = ControllerTestUtils.sendPostRequest(_createTableUrl, offlineConfig3.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table table3_OFFLINE succesfully added\"}");
+    Assert.assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table3_OFFLINE succesfully added\"}");
 
     deleteResponse = ControllerTestUtils.sendDeleteRequest(
         StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table3_REALTIME?type=realtime"));
@@ -475,39 +480,44 @@ public class PinotTableRestletResourceTest {
     // Create a valid REALTIME table
     TableConfig realtimeTableConfig = _realtimeBuilder.setTableName("testTable").build();
     String creationResponse = ControllerTestUtils.sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table testTable_REALTIME succesfully added\"}");
+    Assert.assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table testTable_REALTIME succesfully added\"}");
 
     // Create a valid OFFLINE table
     TableConfig offlineTableConfig = _offlineBuilder.setTableName("testTable").build();
     creationResponse = ControllerTestUtils.sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
-    Assert.assertEquals(creationResponse, "{\"status\":\"Table testTable_OFFLINE succesfully added\"}");
+    Assert.assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table testTable_OFFLINE succesfully added\"}");
 
     // Case 1: Check table state with specifying tableType as realtime should return 1 [enabled]
-    String realtimeStateResponse = ControllerTestUtils.sendGetRequest(StringUtil
-        .join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "testTable", "state?type=realtime"));
+    String realtimeStateResponse = ControllerTestUtils.sendGetRequest(
+        StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "testTable",
+            "state?type=realtime"));
     Assert.assertEquals(realtimeStateResponse, "{\"state\":\"enabled\"}");
 
     // Case 2: Check table state with specifying tableType as offline should return 1 [enabled]
-    String offlineStateResponse = ControllerTestUtils.sendGetRequest(StringUtil
-        .join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "testTable", "state?type=offline"));
+    String offlineStateResponse = ControllerTestUtils.sendGetRequest(
+        StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "testTable",
+            "state?type=offline"));
     Assert.assertEquals(offlineStateResponse, "{\"state\":\"enabled\"}");
 
     // Case 3: Request table state with invalid type should return bad request
     try {
-      ControllerTestUtils.sendGetRequest(StringUtil
-          .join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "testTable",
+      ControllerTestUtils.sendGetRequest(
+          StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "testTable",
               "state?type=non_valid_type"));
       Assert.fail("Requesting with invalid type should fail");
     } catch (Exception e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
     // Case 4: Request state for non-existent table should return not found
     boolean notFoundException = false;
     try {
-      ControllerTestUtils.sendGetRequest(StringUtil
-          .join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table_not_exist", "state?type=offline"));
+      ControllerTestUtils.sendGetRequest(
+          StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "table_not_exist",
+              "state?type=offline"));
       Assert.fail("Requesting state for non-existent table should fail");
     } catch (Exception e) {
       // Expected 404 Not Found
@@ -529,9 +539,9 @@ public class PinotTableRestletResourceTest {
         _offlineBuilder.setTableName(tableName).setInvertedIndexColumns(Arrays.asList("dimA", "dimB")).build();
 
     try {
-      ControllerTestUtils
-          .sendPostRequest(StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validate"),
-              offlineTableConfig.toJsonString());
+      ControllerTestUtils.sendPostRequest(
+          StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validate"),
+          offlineTableConfig.toJsonString());
     } catch (IOException e) {
       Assert.fail("Valid table config with existing schema validation should succeed.");
     }
@@ -542,13 +552,13 @@ public class PinotTableRestletResourceTest {
             .build();
 
     try {
-      ControllerTestUtils
-          .sendPostRequest(StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validate"),
-              offlineTableConfig.toJsonString());
+      ControllerTestUtils.sendPostRequest(
+          StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validate"),
+          offlineTableConfig.toJsonString());
       Assert.fail("Validation of an invalid table config should fail.");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
   }
 
@@ -563,13 +573,11 @@ public class PinotTableRestletResourceTest {
     TableConfig offlineTableConfig =
         _offlineBuilder.setTableName(tableName).setInvertedIndexColumns(Arrays.asList("dimA", "dimB")).build();
     TableAndSchemaConfig tableAndSchemaConfig = new TableAndSchemaConfig(offlineTableConfig, schema);
-    Map<String, String> headerMap = new HashMap<>();
-    headerMap.put("Content-Type", "application/json");
 
     try {
       ControllerTestUtils.sendPostRequest(
           StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validateTableAndSchema"),
-          tableAndSchemaConfig.toJsonString(), headerMap);
+          tableAndSchemaConfig.toJsonString());
     } catch (IOException e) {
       Assert.fail("Valid table config and schema validation should succeed.");
     }
@@ -580,7 +588,7 @@ public class PinotTableRestletResourceTest {
     try {
       ControllerTestUtils.sendPostRequest(
           StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validateTableAndSchema"),
-          tableAndSchemaConfig.toJsonString(), headerMap);
+          tableAndSchemaConfig.toJsonString());
     } catch (IOException e) {
       Assert.fail("Valid table config and existing schema validation should succeed.");
     }
@@ -593,12 +601,44 @@ public class PinotTableRestletResourceTest {
     try {
       ControllerTestUtils.sendPostRequest(
           StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validateTableAndSchema"),
-          tableAndSchemaConfig.toJsonString(), headerMap);
+          tableAndSchemaConfig.toJsonString());
       Assert.fail("Validation of an invalid table config and schema should fail.");
     } catch (IOException e) {
       // Expected
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+      Assert.assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
+  }
+
+  @Test
+  public void testUnrecognizedProperties()
+      throws IOException {
+    // Create an OFFLINE table with a valid name but with unrecognizedProperties which should succeed
+    // Should have unrecognizedProperties set correctly
+    String tableName = "valid_table_name_extra_props";
+    TableConfig offlineTableConfig = _realtimeBuilder.setTableName("valid_table_name_extra_props").build();
+    JsonNode jsonNode = JsonUtils.objectToJsonNode(offlineTableConfig);
+    ((ObjectNode) jsonNode).put("illegalKey1", 1);
+    ObjectNode internalObj = JsonUtils.newObjectNode();
+    internalObj.put("illegalKey3", 2);
+    ((ObjectNode) jsonNode).put("illegalKey2", internalObj);
+
+    String creationResponse = ControllerTestUtils.sendPostRequest(_createTableUrl, jsonNode.toString());
+    Assert.assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{\"/illegalKey1\":1,\"/illegalKey2/illegalKey3\":2},\"status\":\"Table "
+            + "valid_table_name_extra_props_REALTIME succesfully added\"}");
+
+    // update table with unrecognizedProperties
+    String updationResponse = ControllerTestUtils.sendPutRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forUpdateTableConfig(tableName), jsonNode.toString());
+    Assert.assertEquals(updationResponse,
+        "{\"unrecognizedProperties\":{\"/illegalKey1\":1,\"/illegalKey2/illegalKey3\":2},\"status\":\"Table "
+            + "config updated for valid_table_name_extra_props\"}");
+
+    // validate table with unrecognizedProperties
+    String validationResponse = ControllerTestUtils.sendPostRequest(
+        StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "tables", "validate"), jsonNode.toString());
+    Assert.assertTrue(validationResponse.contains(
+        "unrecognizedProperties\":{\"/illegalKey1\":1," + "\"/illegalKey2/illegalKey3\":2}}"));
   }
 
   @AfterClass

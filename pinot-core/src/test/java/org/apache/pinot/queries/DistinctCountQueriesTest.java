@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.queries;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -29,17 +31,18 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
-import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
+import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -53,7 +56,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -186,14 +188,13 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
   @Test
   public void testAggregationOnly() {
     // Dictionary based
-    String query =
-        "SELECT DISTINCTCOUNT(intColumn), DISTINCTCOUNT(longColumn), DISTINCTCOUNT(floatColumn), DISTINCTCOUNT"
-            + "(doubleColumn), DISTINCTCOUNT(stringColumn), DISTINCTCOUNT(bytesColumn) FROM testTable";
+    String query = "SELECT DISTINCTCOUNT(intColumn), DISTINCTCOUNT(longColumn), DISTINCTCOUNT(floatColumn), "
+        + "DISTINCTCOUNT(doubleColumn), DISTINCTCOUNT(stringColumn), DISTINCTCOUNT(bytesColumn) FROM testTable";
 
     // Inner segment
-    for (Object operator : Arrays.asList(getOperatorForSqlQuery(query), getOperatorForSqlQueryWithFilter(query))) {
-      assertTrue(operator instanceof DictionaryBasedAggregationOperator);
-      IntermediateResultsBlock resultsBlock = ((DictionaryBasedAggregationOperator) operator).nextBlock();
+    for (Object operator : Arrays.asList(getOperator(query), getOperatorWithFilter(query))) {
+      assertTrue(operator instanceof NonScanBasedAggregationOperator);
+      IntermediateResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
           0, 0, NUM_RECORDS);
       List<Object> aggregationResult = resultsBlock.getAggregationResult();
@@ -205,14 +206,10 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     }
 
     // Inter segments
-    String[] expectedResults = new String[6];
-    for (int i = 0; i < 6; i++) {
-      expectedResults[i] = Integer.toString(_values.size());
-    }
-    for (BrokerResponseNative brokerResponse : Arrays.asList(getBrokerResponseForPqlQuery(query),
-        getBrokerResponseForPqlQueryWithFilter(query))) {
-      QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS,
-          expectedResults);
+    Object[] expectedResults = Collections.nCopies(6, _values.size()).toArray();
+    for (BrokerResponseNative brokerResponse : Arrays.asList(getBrokerResponse(query),
+        getBrokerResponseWithFilter(query))) {
+      QueriesTestUtils.testInterSegmentsResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS, expectedResults);
     }
 
     // Regular aggregation
@@ -225,9 +222,8 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
         expectedResult++;
       }
     }
-    Operator operator = getOperatorForSqlQuery(query);
-    assertTrue(operator instanceof AggregationOperator);
-    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
+    AggregationOperator aggregationOperator = getOperator(query);
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getAggregationResult();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 6);
     for (int i = 0; i < 6; i++) {
@@ -235,27 +231,20 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     }
 
     // Inter segment
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-    assertNotNull(aggregationResults);
-    assertEquals(aggregationResults.size(), 6);
-    for (int i = 0; i < 6; i++) {
-      assertEquals(aggregationResults.get(i).getValue(), Integer.toString(expectedResult));
-    }
+    expectedResults = Collections.nCopies(6, expectedResult).toArray();
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query), expectedResults);
   }
 
   @Test
   public void testAggregationGroupBy() {
-    String query =
-        "SELECT DISTINCTCOUNT(intColumn), DISTINCTCOUNT(longColumn), DISTINCTCOUNT(floatColumn), DISTINCTCOUNT"
-            + "(doubleColumn), DISTINCTCOUNT(stringColumn), DISTINCTCOUNT(bytesColumn) FROM testTable GROUP BY "
-            + "intColumn";
+    String query = "SELECT DISTINCTCOUNT(intColumn), DISTINCTCOUNT(longColumn), DISTINCTCOUNT(floatColumn), "
+        + "DISTINCTCOUNT(doubleColumn), DISTINCTCOUNT(stringColumn), DISTINCTCOUNT(bytesColumn) "
+        + "FROM testTable GROUP BY intColumn";
 
     // Inner segment
-    Operator operator = getOperatorForPqlQuery(query);
-    assertTrue(operator instanceof AggregationGroupByOperator);
-    IntermediateResultsBlock resultsBlock = ((AggregationGroupByOperator) operator).nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0,
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
+    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         6 * NUM_RECORDS, NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
@@ -273,28 +262,185 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     assertEquals(numGroups, _values.size());
 
     // Inter segments
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    Assert.assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 6 * NUM_RECORDS);
-    Assert.assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
-    // size of this array will be equal to number of aggregation functions since
-    // we return each aggregation function separately
-    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-    int numAggregationColumns = aggregationResults.size();
-    Assert.assertEquals(numAggregationColumns, 6);
-    for (AggregationResult aggregationResult : aggregationResults) {
-      Assert.assertNull(aggregationResult.getValue());
-      List<GroupByResult> groupByResults = aggregationResult.getGroupByResult();
-      numGroups = groupByResults.size();
-      for (int i = 0; i < numGroups; i++) {
-        GroupByResult groupByResult = groupByResults.get(i);
-        List<String> group = groupByResult.getGroup();
-        assertEquals(group.size(), 1);
-        assertTrue(_values.contains(Integer.parseInt(group.get(0))));
-        assertEquals(groupByResult.getValue(), Integer.toString(1));
+    Object[] expectedRow = Collections.nCopies(6, 1).toArray();
+    List<Object[]> expectedRows = Collections.nCopies(10, expectedRow);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query), 4 * NUM_RECORDS, 0, 4 * 6 * NUM_RECORDS,
+        4 * NUM_RECORDS, expectedRows);
+  }
+
+  @Test
+  public void testHLL() {
+    // Dictionary based
+    String query = "SELECT DISTINCTCOUNTHLL(intColumn), DISTINCTCOUNTHLL(longColumn), DISTINCTCOUNTHLL(floatColumn), "
+        + "DISTINCTCOUNTHLL(doubleColumn), DISTINCTCOUNTHLL(stringColumn) FROM testTable";
+
+    // Inner segment
+    Object[] interSegmentsExpectedResults = new Object[5];
+    for (Object operator : Arrays.asList(getOperator(query), getOperatorWithFilter(query))) {
+      assertTrue(operator instanceof NonScanBasedAggregationOperator);
+      IntermediateResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
+          0, 0, NUM_RECORDS);
+      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      assertNotNull(aggregationResult);
+      assertEquals(aggregationResult.size(), 5);
+      for (int i = 0; i < 5; i++) {
+        assertTrue(aggregationResult.get(i) instanceof HyperLogLog);
+        HyperLogLog hll = (HyperLogLog) aggregationResult.get(i);
+
+        // Check log2m is 8
+        assertEquals(hll.sizeof(), 172);
+
+        long actualResult = hll.cardinality();
+        int expectedResult = _values.size();
+        // The standard deviation of the error for log2m 8 is 6.5%, allow 20% error
+        assertEquals(actualResult, expectedResult, expectedResult * 0.2);
+
+        interSegmentsExpectedResults[i] = actualResult;
       }
     }
+
+    // Inter segments
+    for (BrokerResponseNative brokerResponse : Arrays.asList(getBrokerResponse(query),
+        getBrokerResponseWithFilter(query))) {
+      QueriesTestUtils.testInterSegmentsResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS,
+          interSegmentsExpectedResults);
+    }
+
+    // Regular aggregation
+    query = query + " WHERE intColumn >= 500";
+
+    // Inner segment
+    int expectedResult = 0;
+    for (Integer value : _values) {
+      if (value >= 500) {
+        expectedResult++;
+      }
+    }
+    AggregationOperator aggregationOperator = getOperator(query);
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 5);
+    for (int i = 0; i < 5; i++) {
+      assertTrue(aggregationResult.get(i) instanceof HyperLogLog);
+      HyperLogLog hll = (HyperLogLog) aggregationResult.get(i);
+
+      // Check log2m is 8
+      assertEquals(hll.sizeof(), 172);
+
+      long actualResult = hll.cardinality();
+      // The standard deviation of the error for log2m 8 is 6.5%, allow 20% error
+      assertEquals(actualResult, expectedResult, expectedResult * 0.2);
+
+      interSegmentsExpectedResults[i] = actualResult;
+    }
+
+    // Inter segments
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query), interSegmentsExpectedResults);
+
+    // Change log2m
+    query = "SELECT DISTINCTCOUNTHLL(intColumn, 12) FROM testTable";
+    NonScanBasedAggregationOperator nonScanOperator = getOperator(query);
+    aggregationResult = nonScanOperator.nextBlock().getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 1);
+    assertTrue(aggregationResult.get(0) instanceof HyperLogLog);
+    HyperLogLog hll = (HyperLogLog) aggregationResult.get(0);
+    // Check log2m is 12
+    assertEquals(hll.sizeof(), 2732);
+  }
+
+  @Test
+  public void testSmartHLL() {
+    // Dictionary based
+    String query = "SELECT DISTINCTCOUNTSMARTHLL(intColumn, 'threshold=10'), "
+        + "DISTINCTCOUNTSMARTHLL(longColumn, 'threshold=10'), DISTINCTCOUNTSMARTHLL(floatColumn, 'threshold=10'), "
+        + "DISTINCTCOUNTSMARTHLL(doubleColumn, 'threshold=10'), DISTINCTCOUNTSMARTHLL(stringColumn, 'threshold=10'), "
+        + "DISTINCTCOUNTSMARTHLL(bytesColumn, 'threshold=10') FROM testTable";
+
+    // Inner segment
+    Object[] interSegmentsExpectedResults = new Object[6];
+    for (Object operator : Arrays.asList(getOperator(query), getOperatorWithFilter(query))) {
+      assertTrue(operator instanceof NonScanBasedAggregationOperator);
+      IntermediateResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
+          0, 0, NUM_RECORDS);
+      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      assertNotNull(aggregationResult);
+      assertEquals(aggregationResult.size(), 6);
+      for (int i = 0; i < 6; i++) {
+        assertTrue(aggregationResult.get(i) instanceof HyperLogLog);
+        HyperLogLog hll = (HyperLogLog) aggregationResult.get(i);
+
+        // Check log2m is 12
+        assertEquals(hll.sizeof(), 2732);
+
+        int actualResult = (int) hll.cardinality();
+        int expectedResult = _values.size();
+        // The standard deviation of the error for log2m 12 is 1.625%, allow 5% error
+        assertEquals(actualResult, expectedResult, expectedResult * 0.05);
+
+        interSegmentsExpectedResults[i] = actualResult;
+      }
+    }
+
+    // Inter segments
+    for (BrokerResponseNative brokerResponse : Arrays.asList(getBrokerResponse(query),
+        getBrokerResponseWithFilter(query))) {
+      QueriesTestUtils.testInterSegmentsResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS,
+          interSegmentsExpectedResults);
+    }
+
+    // Regular aggregation
+    query = query + " WHERE intColumn >= 500";
+
+    // Inner segment
+    int expectedResult = 0;
+    for (Integer value : _values) {
+      if (value >= 500) {
+        expectedResult++;
+      }
+    }
+    AggregationOperator aggregationOperator = getOperator(query);
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 6);
+    for (int i = 0; i < 6; i++) {
+      assertTrue(aggregationResult.get(i) instanceof HyperLogLog);
+      HyperLogLog hll = (HyperLogLog) aggregationResult.get(i);
+
+      // Check log2m is 12
+      assertEquals(hll.sizeof(), 2732);
+
+      int actualResult = (int) hll.cardinality();
+      // The standard deviation of the error for log2m 12 is 1.625%, allow 5% error
+      assertEquals(actualResult, expectedResult, expectedResult * 0.05);
+
+      interSegmentsExpectedResults[i] = actualResult;
+    }
+
+    // Inter segments
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query), interSegmentsExpectedResults);
+
+    // Change log2m
+    query = "SELECT DISTINCTCOUNTSMARTHLL(intColumn, 'threshold=10;log2m=8') FROM testTable";
+    NonScanBasedAggregationOperator nonScanOperator = getOperator(query);
+    aggregationResult = nonScanOperator.nextBlock().getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 1);
+    assertTrue(aggregationResult.get(0) instanceof HyperLogLog);
+    HyperLogLog hll = (HyperLogLog) aggregationResult.get(0);
+    // Check log2m is 8
+    assertEquals(hll.sizeof(), 172);
+
+    // Test legacy parameters
+    query = "SELECT DISTINCTCOUNTSMARTHLL(intColumn, 'hllConversionThreshold=10;hllLog2m=8') FROM testTable";
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
+    assertNotNull(queryContext.getAggregationFunctions());
+    DistinctCountSmartHLLAggregationFunction function =
+        (DistinctCountSmartHLLAggregationFunction) queryContext.getAggregationFunctions()[0];
+    assertEquals(function.getThreshold(), 10);
+    assertEquals(function.getLog2m(), 8);
   }
 
   @AfterClass

@@ -1,0 +1,9 @@
+rules:
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(\\w+)\"><>(\\w+)"
+  name: "pinot_minion_$1_$2"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(\\w+).(\\w+)\"><>(\\w+)"
+  name: "pinot_minion_$2_$3"
+  cache: true
+  labels:
+    id: "$1"

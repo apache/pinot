@@ -29,10 +29,10 @@ import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -93,7 +93,6 @@ public class PinotFSSegmentUploaderTest {
 
     @Override
     public void init(PinotConfiguration config) {
-
     }
 
     @Override
@@ -115,7 +114,7 @@ public class PinotFSSegmentUploaderTest {
     }
 
     @Override
-    public boolean copy(URI srcUri, URI dstUri)
+    public boolean copyDir(URI srcUri, URI dstUri)
         throws IOException {
       return false;
     }

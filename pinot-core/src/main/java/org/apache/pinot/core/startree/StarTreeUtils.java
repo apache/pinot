@@ -121,6 +121,9 @@ public class StarTreeUtils {
                 .add(new CompositePredicateEvaluator(predicateEvaluators));
           }
           break;
+        case NOT:
+          // TODO: Support NOT in star-tree
+          return null;
         case PREDICATE:
           Predicate predicate = filterNode.getPredicate();
           PredicateEvaluator predicateEvaluator = getPredicateEvaluator(indexSegment, predicate, predicateEvaluatorMap);
@@ -188,7 +191,9 @@ public class StarTreeUtils {
     assert filter.getType() == FilterContext.Type.OR;
 
     List<Predicate> predicates = new ArrayList<>();
-    extractOrClausePredicates(filter, predicates);
+    if (!extractOrClausePredicates(filter, predicates)) {
+      return null;
+    }
 
     String identifier = null;
     List<PredicateEvaluator> predicateEvaluators = new ArrayList<>();
@@ -219,7 +224,9 @@ public class StarTreeUtils {
   }
 
   /**
-   * Extracts the predicates under the given OR clause, returns {@code false} if there is nested AND under OR clause.
+   * Extracts the predicates under the given OR clause, returns {@code false} if there is nested AND or NOT under OR
+   * clause.
+   * TODO: Support NOT in star-tree
    */
   private static boolean extractOrClausePredicates(FilterContext filter, List<Predicate> predicates) {
     assert filter.getType() == FilterContext.Type.OR;
@@ -227,6 +234,7 @@ public class StarTreeUtils {
     for (FilterContext child : filter.getChildren()) {
       switch (child.getType()) {
         case AND:
+        case NOT:
           return false;
         case OR:
           if (!extractOrClausePredicates(child, predicates)) {

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.Assert;
@@ -65,7 +66,7 @@ public class DataSchemaTest {
   public void testSerDe()
       throws Exception {
     DataSchema dataSchema = new DataSchema(COLUMN_NAMES, COLUMN_DATA_TYPES);
-    DataSchema dataSchemaAfterSerDe = DataSchema.fromBytes(dataSchema.toBytes());
+    DataSchema dataSchemaAfterSerDe = DataSchema.fromBytes(ByteBuffer.wrap(dataSchema.toBytes()));
     Assert.assertEquals(dataSchema, dataSchemaAfterSerDe);
     Assert.assertEquals(dataSchema.hashCode(), dataSchemaAfterSerDe.hashCode());
   }

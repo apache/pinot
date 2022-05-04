@@ -87,6 +87,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
     switch (kind) {
       case AND:
       case OR:
+      case NOT:
         // Recursively traverse the expression tree to find an operator node that can be rewritten.
         operands.forEach(operand -> optimize(operand, schema));
 
@@ -127,35 +128,44 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
    */
   private static Expression optimizeCurrent(Expression expression) {
     Function function = expression.getFunctionCall();
+    String operator = function.getOperator();
     List<Expression> operands = function.getOperands();
-    if (function.getOperator().equals(FilterKind.AND.name())) {
+    if (operator.equals(FilterKind.AND.name())) {
       // If any of the literal operands are FALSE, then replace AND function with FALSE.
       for (Expression operand : operands) {
         if (operand.equals(FALSE)) {
-          return setExpressionToBoolean(expression, false);
+          return FALSE;
         }
       }
 
       // Remove all Literal operands that are TRUE.
       operands.removeIf(x -> x.equals(TRUE));
       if (operands.isEmpty()) {
-        return setExpressionToBoolean(expression, true);
+        return TRUE;
       }
-    } else if (function.getOperator().equals(FilterKind.OR.name())) {
+    } else if (operator.equals(FilterKind.OR.name())) {
       // If any of the literal operands are TRUE, then replace OR function with TRUE
       for (Expression operand : operands) {
         if (operand.equals(TRUE)) {
-          return setExpressionToBoolean(expression, true);
+          return TRUE;
         }
       }
 
       // Remove all Literal operands that are FALSE.
       operands.removeIf(x -> x.equals(FALSE));
       if (operands.isEmpty()) {
-        return setExpressionToBoolean(expression, false);
+        return FALSE;
+      }
+    } else if (operator.equals(FilterKind.NOT.name())) {
+      assert operands.size() == 1;
+      Expression operand = operands.get(0);
+      if (operand.equals(TRUE)) {
+        return FALSE;
+      }
+      if (operand.equals(FALSE)) {
+        return TRUE;
       }
     }
-
     return expression;
   }
 
@@ -481,11 +491,9 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
   }
 
   /** Change the expression value to boolean literal with given value. */
-  private static Expression setExpressionToBoolean(Expression expression, boolean value) {
+  private static void setExpressionToBoolean(Expression expression, boolean value) {
     expression.unsetFunctionCall();
     expression.setType(ExpressionType.LITERAL);
     expression.setLiteral(Literal.boolValue(value));
-
-    return expression;
   }
 }

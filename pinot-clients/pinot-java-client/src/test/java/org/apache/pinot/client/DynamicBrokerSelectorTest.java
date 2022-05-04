@@ -62,6 +62,11 @@ public class DynamicBrokerSelectorTest {
       }
 
       @Override
+      protected ExternalViewReader getEvReader(ZkClient zkClient, boolean preferTlsPort) {
+        return _mockExternalViewReader;
+      }
+
+      @Override
       protected ZkClient getZkClient(String zkServers) {
         return _mockZkClient;
       }
@@ -131,5 +136,4 @@ public class DynamicBrokerSelectorTest {
 
     Mockito.verify(_mockZkClient, times(1)).close();
   }
-
 }

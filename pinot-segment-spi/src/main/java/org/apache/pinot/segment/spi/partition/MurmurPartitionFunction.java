@@ -41,9 +41,8 @@ public class MurmurPartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public int getPartition(Object valueIn) {
-    String value = (valueIn instanceof String) ? (String) valueIn : valueIn.toString();
-    return (murmur2(value.getBytes(UTF_8)) & 0x7fffffff) % _numPartitions;
+  public int getPartition(Object value) {
+    return (murmur2(value.toString().getBytes(UTF_8)) & Integer.MAX_VALUE) % _numPartitions;
   }
 
   @Override

@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.core.common.MinionConstants.MergeTask;
 import org.apache.pinot.core.segment.processing.framework.MergeType;
 import org.apache.pinot.core.segment.processing.framework.SegmentConfig;
@@ -101,6 +102,20 @@ public class MergeTaskUtilsTest {
     assertEquals(columnPartitionConfig.getFunctionName(), "murmur");
     assertEquals(columnPartitionConfig.getNumPartitions(), 10);
 
+    // Table with multiple partition columns.
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
+    columnPartitionConfigMap.put("memberId", new ColumnPartitionConfig("murmur", 10));
+    columnPartitionConfigMap.put("memberName", new ColumnPartitionConfig("HashCode", 5));
+    TableConfig tableConfigWithMultiplePartitionColumns =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable")
+            .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap)).build();
+    Schema schemaWithMultipleColumns = new Schema.SchemaBuilder().addSingleValueDimension("memberId", DataType.LONG)
+        .addSingleValueDimension("memberName", DataType.STRING).build();
+    partitionerConfigs =
+        MergeTaskUtils.getPartitionerConfigs(tableConfigWithMultiplePartitionColumns, schemaWithMultipleColumns,
+            taskConfig);
+    assertEquals(partitionerConfigs.size(), 2);
+
     // No partition column in table config
     TableConfig tableConfigWithoutPartitionColumn =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
@@ -161,12 +176,40 @@ public class MergeTaskUtilsTest {
     Map<String, String> taskConfig = new HashMap<>();
     taskConfig.put(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, "10000");
     taskConfig.put(MergeTask.SEGMENT_NAME_PREFIX_KEY, "myPrefix");
+    taskConfig.put(MergeTask.SEGMENT_NAME_POSTFIX_KEY, "myPostfix");
+    taskConfig.put(MergeTask.FIXED_SEGMENT_NAME_KEY, "mySegment");
     SegmentConfig segmentConfig = MergeTaskUtils.getSegmentConfig(taskConfig);
     assertEquals(segmentConfig.getMaxNumRecordsPerSegment(), 10000);
     assertEquals(segmentConfig.getSegmentNamePrefix(), "myPrefix");
+    assertEquals(segmentConfig.getSegmentNamePostfix(), "myPostfix");
+    assertEquals(segmentConfig.getSegmentNamePostfix(), "myPostfix");
+    assertEquals(segmentConfig.getFixedSegmentName(), "mySegment");
+    assertEquals(segmentConfig.toString(),
+        "SegmentConfig{_maxNumRecordsPerSegment=10000, _segmentNamePrefix='myPrefix', "
+            + "_segmentNamePostfix='myPostfix', _fixedSegmentName='mySegment'}");
 
     segmentConfig = MergeTaskUtils.getSegmentConfig(Collections.emptyMap());
     assertEquals(segmentConfig.getMaxNumRecordsPerSegment(), SegmentConfig.DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT);
     assertNull(segmentConfig.getSegmentNamePrefix());
+    assertNull(segmentConfig.getSegmentNamePostfix());
+    assertNull(segmentConfig.getFixedSegmentName());
+  }
+
+  @Test
+  public void testAllowMerge() {
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata("seg01");
+    assertNull(segmentZKMetadata.getCustomMap());
+    assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
+
+    segmentZKMetadata.setCustomMap(Collections.emptyMap());
+    assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
+
+    segmentZKMetadata
+        .setCustomMap(Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "false"));
+    assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
+
+    segmentZKMetadata
+        .setCustomMap(Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "true"));
+    assertFalse(MergeTaskUtils.allowMerge(segmentZKMetadata));
   }
 }

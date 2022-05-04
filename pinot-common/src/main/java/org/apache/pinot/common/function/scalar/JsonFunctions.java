@@ -31,6 +31,7 @@ import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -66,8 +67,8 @@ public class JsonFunctions {
   /**
    * Convert Map to Json String
    */
-  @ScalarFunction
-  public static String toJsonMapStr(Map map)
+  @ScalarFunction(nullableParameters = true)
+  public static String toJsonMapStr(@Nullable Map map)
       throws JsonProcessingException {
     return JsonUtils.objectToString(map);
   }
@@ -75,7 +76,7 @@ public class JsonFunctions {
   /**
    * Convert object to Json String
    */
-  @ScalarFunction
+  @ScalarFunction(nullableParameters = true)
   public static String jsonFormat(Object object)
       throws JsonProcessingException {
     return JsonUtils.objectToString(object);
@@ -89,7 +90,7 @@ public class JsonFunctions {
     if (object instanceof String) {
       return PARSE_CONTEXT.parse((String) object).read(jsonPath, NO_PREDICATES);
     }
-    return object == null ? null : PARSE_CONTEXT.parse(object).read(jsonPath, NO_PREDICATES);
+    return PARSE_CONTEXT.parse(object).read(jsonPath, NO_PREDICATES);
   }
 
   /**
@@ -103,8 +104,8 @@ public class JsonFunctions {
     return convertObjectToArray(PARSE_CONTEXT.parse(object).read(jsonPath, NO_PREDICATES));
   }
 
-  @ScalarFunction
-  public static Object[] jsonPathArrayDefaultEmpty(Object object, String jsonPath) {
+  @ScalarFunction(nullableParameters = true)
+  public static Object[] jsonPathArrayDefaultEmpty(@Nullable Object object, String jsonPath) {
     try {
       Object[] result = object == null ? null : jsonPathArray(object, jsonPath);
       return result == null ? EMPTY : result;
@@ -134,14 +135,14 @@ public class JsonFunctions {
     if (jsonValue instanceof String) {
       return (String) jsonValue;
     }
-    return jsonValue == null ? null : JsonUtils.objectToString(jsonValue);
+    return JsonUtils.objectToString(jsonValue);
   }
 
   /**
    * Extract from Json with path to String
    */
-  @ScalarFunction
-  public static String jsonPathString(Object object, String jsonPath, String defaultValue) {
+  @ScalarFunction(nullableParameters = true)
+  public static String jsonPathString(@Nullable Object object, String jsonPath, String defaultValue) {
     try {
       Object jsonValue = jsonPath(object, jsonPath);
       if (jsonValue instanceof String) {
@@ -164,8 +165,8 @@ public class JsonFunctions {
   /**
    * Extract from Json with path to Long
    */
-  @ScalarFunction
-  public static long jsonPathLong(Object object, String jsonPath, long defaultValue) {
+  @ScalarFunction(nullableParameters = true)
+  public static long jsonPathLong(@Nullable Object object, String jsonPath, long defaultValue) {
     try {
       Object jsonValue = jsonPath(object, jsonPath);
       if (jsonValue == null) {
@@ -191,8 +192,8 @@ public class JsonFunctions {
   /**
    * Extract from Json with path to Double
    */
-  @ScalarFunction
-  public static double jsonPathDouble(Object object, String jsonPath, double defaultValue) {
+  @ScalarFunction(nullableParameters = true)
+  public static double jsonPathDouble(@Nullable Object object, String jsonPath, double defaultValue) {
     try {
       Object jsonValue = jsonPath(object, jsonPath);
       if (jsonValue == null) {

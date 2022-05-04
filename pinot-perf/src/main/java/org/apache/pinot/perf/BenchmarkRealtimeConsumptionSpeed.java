@@ -67,9 +67,9 @@ public class BenchmarkRealtimeConsumptionSpeed extends BaseClusterIntegrationTes
     // Generate ROW_COUNT rows and write them into Kafka
     new Thread(() -> {
       try {
-        ClusterIntegrationTestUtils
-            .pushRandomAvroIntoKafka(avroFile, KafkaStarterUtils.DEFAULT_KAFKA_BROKER, getKafkaTopic(), ROW_COUNT,
-                getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
+        ClusterIntegrationTestUtils.pushRandomAvroIntoKafka(avroFile, KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
+            getKafkaTopic(), ROW_COUNT, getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(),
+            getPartitionColumn());
       } catch (Exception e) {
         // Ignored
       }
@@ -86,7 +86,7 @@ public class BenchmarkRealtimeConsumptionSpeed extends BaseClusterIntegrationTes
       // Run the query
       try {
         JsonNode response = postQuery("select count(*) from mytable");
-        pinotRecordCount = response.get("aggregationResults").get(0).get("value").asInt();
+        pinotRecordCount = response.get("resultTable").get("rows").get(0).get(0).asInt();
       } catch (Exception e) {
         // Ignore
         continue;

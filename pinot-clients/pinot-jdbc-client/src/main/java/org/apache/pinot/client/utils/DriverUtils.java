@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client.utils;
 
+import java.math.BigDecimal;
 import java.net.URI;
 import java.sql.Timestamp;
 import java.sql.Types;
@@ -97,6 +98,9 @@ public class DriverUtils {
       case "DOUBLE":
         columnsSQLDataType = Types.DOUBLE;
         break;
+      case "BIG_DECIMAL":
+        columnsSQLDataType = Types.DECIMAL;
+        break;
       case "BOOLEAN":
         columnsSQLDataType = Types.BOOLEAN;
         break;
@@ -133,6 +137,9 @@ public class DriverUtils {
         break;
       case "DOUBLE":
         columnsJavaClassName = Double.class.getTypeName();
+        break;
+      case "BIG_DECIMAL":
+        columnsJavaClassName = BigDecimal.class.getTypeName();
         break;
       case "BOOLEAN":
         columnsJavaClassName = Boolean.class.getTypeName();

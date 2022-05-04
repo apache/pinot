@@ -1,0 +1,120 @@
+rules:
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.documentCount.(\\w+)_(\\w+)\"><>(\\w+)"
+  name: "pinot_server_documentCount_$3"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.segmentCount.(\\w+)_(\\w+)\"><>(\\w+)"
+  name: "pinot_server_segmentCount_$3"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)_(\\w+)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_server_$3_$4"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)_(\\w+)\\-(.+)\\-(\\w+).realtimeRowsConsumed\"><>(\\w+)"
+  name: "pinot_server_realtimeRowsConsumed_$5"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    topic: "$3"
+    partition: "$4"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.helix.connected\"><>(\\w+)"
+  name: "pinot_server_helix_connected_$1"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.helixZookeeperReconnects\"><>(\\w+)"
+  name: "pinot_server_helix_zookeeperReconnects_$1"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.highestKafkaOffsetConsumed.(\\w+)_(\\w+)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+  name: "pinot_server_highestKafkaOffsetConsumed_$5"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    topic: "$3"
+    partition: "$4"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.highestStreamOffsetConsumed.(\\w+)_(\\w+)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+  name: "pinot_server_highestStreamOffsetConsumed_$5"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    topic: "$3"
+    partition: "$4"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.lastRealtimeSegment(\\w+)Seconds.(\\w+)_(\\w+)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+  name: "pinot_server_lastRealtimeSegment$1Seconds_$6"
+  cache: true
+  labels:
+    table: "$2"
+    tableType: "$3"
+    topic: "$4"
+    partition: "$5"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.llcControllerResponse(\\w+)\"><>(\\w+)"
+  name: "pinot_server_llcControllerResponse_$1_$2"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.llcPartitionConsuming.(\\w+)_(\\w+)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+  name: "pinot_server_llcPartitionConsuming_$5"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    topic: "$3"
+    partition: "$4"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.llcSimultaneousSegmentBuilds\"><>(\\w+)"
+  name: "pinot_server_llcSimultaneousSegmentBuilds_$1"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.memory.(\\w+)\"><>(\\w+)"
+  name: "pinot_server_memory_$1_$2"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.queries\"><>(\\w+)"
+  name: "pinot_server_queries_$1"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeConsumptionExceptions\"><>(\\w+)"
+  name: "pinot_server_realtime_consumptionExceptions_$1"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeOffheapMemoryUsed.(\\w+)\"><>(\\w+)"
+  name: "pinot_server_realtime_offheapMemoryUsed_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeOffsetCommits\"><>(\\w+)"
+  name: "pinot_server_realtime_offsetCommits_$1"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeRowsConsumed\"><>(\\w+)"
+  name: "pinot_server_realtime_rowsConsumed_$1"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)Exceptions\"><>(\\w+)"
+  name: "pinot_server_realtime_exceptions_$1_$2"
+  cache: true
+- pattern: "\"org.apache.pinot.transport.netty.NettyTCPServer_(\\w+)_\"<type=\"\", name=\"(\\w+)\"><>(\\w+)"
+  name: "pinot_server_netty_tcp_$2_$3"
+  cache: true
+  labels:
+    id: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.nettyConnection(\\w+)\"><>(\\w+)"
+  name: "pinot_server_nettyConnection_$1_$2"
+  cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeSegmentNumPartitions.(\\w+)\"><>(\\w+)"
+  name: "pinot_server_realtimeSegmentNumPartitions_$2"
+  cache: true
+  labels:
+    table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.resizeTimeMs.(\\w+)_(\\w+)\"><>(\\w+)"
+  name: "pinot_server_resizeTimeMs_$3"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.upsertPrimaryKeysCount.(\\w+)_(\\w+).(\\w+)\"><>(\\w+)"
+  name: "pinot_server_upsertPrimaryKeysCount_$4"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    partition: "$3"

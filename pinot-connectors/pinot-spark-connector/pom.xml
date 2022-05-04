@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot-connectors</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.10.0-SNAPSHOT</version>
+    <version>0.11.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-spark-connector</artifactId>
@@ -69,12 +69,22 @@
               <groupId>com.thoughtworks.paranamer</groupId>
               <artifactId>paranamer</artifactId>
             </exclusion>
+            <exclusion>
+              <groupId>org.scala-lang</groupId>
+              <artifactId>scala-library</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
         <dependency>
           <groupId>org.scala-lang.modules</groupId>
           <artifactId>scala-xml_${scala.compat.version}</artifactId>
           <version>${scalaxml.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>org.scala-lang</groupId>
+              <artifactId>scala-library</artifactId>
+            </exclusion>
+          </exclusions>
         </dependency>
         <dependency>
           <groupId>org.apache.spark</groupId>
@@ -98,17 +108,50 @@
               <groupId>org.scala-lang.modules</groupId>
               <artifactId>scala-xml_${scala.compat.version}</artifactId>
             </exclusion>
+            <exclusion>
+              <groupId>org.scala-lang</groupId>
+              <artifactId>scala-library</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>com.zaxxer</groupId>
+              <artifactId>HikariCP-java7</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
         <dependency>
           <groupId>io.circe</groupId>
           <artifactId>circe-parser_${scala.compat.version}</artifactId>
           <version>${circe.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>org.scala-lang</groupId>
+              <artifactId>scala-library</artifactId>
+            </exclusion>
+          </exclusions>
         </dependency>
         <dependency>
           <groupId>io.circe</groupId>
           <artifactId>circe-generic_${scala.compat.version}</artifactId>
           <version>${circe.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>org.scala-lang</groupId>
+              <artifactId>scala-library</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>io.grpc</groupId>
+          <artifactId>grpc-netty-shaded</artifactId>
+          <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>io.grpc</groupId>
+          <artifactId>grpc-protobuf</artifactId>
+        </dependency>
+        <dependency>
+          <groupId>io.grpc</groupId>
+          <artifactId>grpc-stub</artifactId>
         </dependency>
         <dependency>
           <groupId>org.scala-lang</groupId>
@@ -127,12 +170,51 @@
               <groupId>org.scala-lang.modules</groupId>
               <artifactId>scala-xml_${scala.compat.version}</artifactId>
             </exclusion>
+            <exclusion>
+              <groupId>org.scala-lang</groupId>
+              <artifactId>scala-library</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
       </dependencies>
       <build>
         <plugins>
           <!-- scala build -->
+          <plugin>
+            <groupId>org.xolstice.maven.plugins</groupId>
+            <artifactId>protobuf-maven-plugin</artifactId>
+            <version>0.6.1</version>
+            <configuration>
+              <protocArtifact>com.google.protobuf:protoc:3.19.2:exe:${os.detected.classifier}</protocArtifact>
+              <pluginId>grpc-java</pluginId>
+              <pluginArtifact>io.grpc:protoc-gen-grpc-java:1.44.1:exe:${os.detected.classifier}</pluginArtifact>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>compile</goal>
+                  <goal>compile-custom</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <artifactId>maven-assembly-plugin</artifactId>
+            <configuration>
+              <descriptorRefs>
+                <descriptorRef>jar-with-dependencies</descriptorRef>
+              </descriptorRefs>
+            </configuration>
+            <executions>
+              <execution>
+                <id>assemble-all</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>single</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
           <plugin>
             <groupId>net.alchim31.maven</groupId>
             <artifactId>scala-maven-plugin</artifactId>

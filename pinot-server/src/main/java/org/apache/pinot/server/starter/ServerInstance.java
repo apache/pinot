@@ -18,14 +18,16 @@
  */
 package org.apache.pinot.server.starter;
 
-import com.google.common.base.Preconditions;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.config.NettyConfig;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
@@ -33,9 +35,7 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.query.scheduler.QuerySchedulerFactory;
 import org.apache.pinot.core.transport.QueryServer;
-import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
-import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.conf.ServerConf;
@@ -96,6 +96,8 @@ public class ServerInstance {
 
     TlsConfig tlsConfig =
         TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
+    NettyConfig nettyConfig =
+        NettyConfig.extractNettyConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_NETTY_PREFIX);
     accessControlFactory.init(
         serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL));
     _accessControl = accessControlFactory.create();
@@ -103,7 +105,7 @@ public class ServerInstance {
     if (serverConf.isNettyServerEnabled()) {
       int nettyPort = serverConf.getNettyPort();
       LOGGER.info("Initializing Netty query server on port: {}", nettyPort);
-      _nettyQueryServer = new QueryServer(nettyPort, _queryScheduler, _serverMetrics);
+      _nettyQueryServer = new QueryServer(nettyPort, _queryScheduler, _serverMetrics, nettyConfig);
     } else {
       _nettyQueryServer = null;
     }
@@ -111,20 +113,17 @@ public class ServerInstance {
     if (serverConf.isNettyTlsServerEnabled()) {
       int nettySecPort = serverConf.getNettyTlsPort();
       LOGGER.info("Initializing TLS-secured Netty query server on port: {}", nettySecPort);
-      _nettyTlsQueryServer = new QueryServer(nettySecPort, _queryScheduler, _serverMetrics, tlsConfig,
-          _accessControl);
+      _nettyTlsQueryServer =
+          new QueryServer(nettySecPort, _queryScheduler, _serverMetrics, nettyConfig, tlsConfig, _accessControl);
     } else {
       _nettyTlsQueryServer = null;
     }
-
     if (serverConf.isEnableGrpcServer()) {
-      if (tlsConfig.isCustomized()) {
-        LOGGER.warn("gRPC query server does not support TLS yet");
-      }
-
       int grpcPort = serverConf.getGrpcPort();
       LOGGER.info("Initializing gRPC query server on port: {}", grpcPort);
-      _grpcQueryServer = new GrpcQueryServer(grpcPort, _queryExecutor, _serverMetrics, _accessControl);
+      _grpcQueryServer = new GrpcQueryServer(grpcPort,
+          serverConf.isGrpcTlsServerEnabled() ? TlsUtils.extractTlsConfig(serverConf.getPinotConfig(),
+              CommonConstants.Server.SERVER_GRPCTLS_PREFIX) : null, _queryExecutor, _serverMetrics, _accessControl);
     } else {
       _grpcQueryServer = null;
     }
@@ -178,7 +177,11 @@ public class ServerInstance {
   }
 
   public synchronized void shutDown() {
-    Preconditions.checkState(_started, "Server instance is not running");
+    if (!_started) {
+      LOGGER.warn("Server instance is not running, skipping the shut down");
+      return;
+    }
+
     LOGGER.info("Shutting down server instance");
 
     if (_nettyTlsQueryServer != null) {

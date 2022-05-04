@@ -18,12 +18,16 @@
  */
 package org.apache.pinot.client;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -45,13 +49,24 @@ public class ExternalViewReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExternalViewReader.class);
   private static final ObjectReader OBJECT_READER = new ObjectMapper().reader();
   public static final String BROKER_EXTERNAL_VIEW_PATH = "/EXTERNALVIEW/brokerResource";
+  public static final String BROKER_INSTANCE_PATH = "/CONFIGS/PARTICIPANT";
   public static final String REALTIME_SUFFIX = "_REALTIME";
   public static final String OFFLINE_SUFFIX = "_OFFLINE";
+  public static final String KEY_PINOT_TLS_PORT = "PINOT_TLS_PORT";
+  public static final String KEY_SIMPLE_FIELDS = "simpleFields";
+  public static final String KEY_HELIX_HOST = "HELIX_HOST";
+  public static final String KEY_HELIX_PORT = "HELIX_PORT";
 
   private ZkClient _zkClient;
 
-  public ExternalViewReader(ZkClient zkClient) {
+  @VisibleForTesting
+  boolean _preferTlsPort;
+  public ExternalViewReader(ZkClient zkClient, boolean preferTlsPort) {
+    _preferTlsPort = preferTlsPort;
     _zkClient = zkClient;
+  }
+  public ExternalViewReader(ZkClient zkClient) {
+    this(zkClient, false);
   }
 
   public List<String> getLiveBrokers() {
@@ -70,9 +85,7 @@ public class ExternalViewReader {
           Entry<String, JsonNode> brokerEntry = brokerEntries.next();
           String brokerName = brokerEntry.getKey();
           if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
-            // Turn Broker_12.34.56.78_1234 into 12.34.56.78:1234
-            String brokerHostPort = brokerName.replace("Broker_", "").replace("_", ":");
-            brokerUrls.add(brokerHostPort);
+            brokerUrls.add(getHostPort(brokerName));
           }
         }
       }
@@ -83,6 +96,43 @@ public class ExternalViewReader {
     return brokerUrls;
   }
 
+  @VisibleForTesting
+  String getHostPort(String brokerName) {
+    // Turn Broker_12.34.56.78_1234 into 12.34.56.78:1234, try InstanceConfig first, naming convention as backup
+    try {
+      byte[] znStrBytes = _zkClient.readData(BROKER_INSTANCE_PATH + "/" + brokerName, true);
+      if (znStrBytes != null) {
+        JsonNode record = OBJECT_READER.readTree(new String(znStrBytes, StandardCharsets.UTF_8));
+        if (record != null) {
+          JsonNode simpleFields = record.get(KEY_SIMPLE_FIELDS);
+          if (simpleFields != null) {
+            JsonNode hostNameNode = simpleFields.get(KEY_HELIX_HOST);
+            JsonNode tlsPortNode = simpleFields.get(KEY_PINOT_TLS_PORT);
+            JsonNode helixPortNode = simpleFields.get(KEY_HELIX_PORT);
+            String[] splitItems = brokerName.split("_");
+            if (splitItems.length < 3) {
+              throw new RuntimeException("Wrong BrokerName format " + brokerName);
+            }
+            String hostName = splitItems[1];
+            if (hostNameNode != null && !Strings.isNullOrEmpty(hostNameNode.asText())) {
+              hostName = hostNameNode.asText();
+            }
+            if (tlsPortNode != null && !Strings.isNullOrEmpty(tlsPortNode.asText()) && _preferTlsPort) {
+              return hostName + ":" + tlsPortNode.asText();
+            }
+            if (helixPortNode != null && !Strings.isNullOrEmpty(helixPortNode.asText())) {
+              return hostName + ":" + helixPortNode.asText();
+            }
+            return hostName + ":" + splitItems[splitItems.length - 1];
+          }
+        }
+      }
+    } catch (JsonProcessingException ex) {
+      LOGGER.error("Failed to read broker instance config for {}. Return by naming convention", brokerName, ex);
+    }
+    return brokerName.replace("Broker_", "").replace("_", ":");
+  }
+
   protected ByteArrayInputStream getInputStream(byte[] brokerResourceNodeData) {
     return new ByteArrayInputStream(brokerResourceNodeData);
   }
@@ -90,7 +140,7 @@ public class ExternalViewReader {
   public Map<String, List<String>> getTableToBrokersMap() {
     Map<String, Set<String>> brokerUrlsMap = new HashMap<>();
     try {
-      byte[] brokerResourceNodeData = _zkClient.readData("/EXTERNALVIEW/brokerResource", true);
+      byte[] brokerResourceNodeData = _zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
       brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
       JsonNode jsonObject = OBJECT_READER.readTree(getInputStream(brokerResourceNodeData));
       JsonNode brokerResourceNode = jsonObject.get("mapFields");
@@ -107,9 +157,7 @@ public class ExternalViewReader {
           Entry<String, JsonNode> brokerEntry = brokerEntries.next();
           String brokerName = brokerEntry.getKey();
           if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
-            // Turn Broker_12.34.56.78_1234 into 12.34.56.78:1234
-            String brokerHostPort = brokerName.replace("Broker_", "").replace("_", ":");
-            brokerUrls.add(brokerHostPort);
+            brokerUrls.add(getHostPort(brokerName));
           }
         }
       }

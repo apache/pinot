@@ -26,7 +26,7 @@ A stream plugin for another version of kafka, or another stream, can be added in
 
 * How to build and release Pinot package with Kafka 2.x connector
 ```$xslt
-mvn clean package -DskipTests -Pbin-dist -Dkafka.version=2.0
+mvn clean package -DskipTests -Pbin-dist
 ```
 
 * How to use Kafka 2.x connector

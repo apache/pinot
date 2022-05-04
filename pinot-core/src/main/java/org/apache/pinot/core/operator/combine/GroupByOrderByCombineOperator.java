@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory;
 public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByOrderByCombineOperator.class);
-  private static final String OPERATOR_NAME = "GroupByOrderByCombineOperator";
+
   private static final String EXPLAIN_NAME = "COMBINE_GROUPBY_ORDERBY";
   private final int _trimSize;
   private final int _trimThreshold;
@@ -71,6 +71,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   private final CountDownLatch _operatorLatch;
 
   private volatile IndexedTable _indexedTable;
+  private volatile boolean _numGroupsLimitReached;
 
   public GroupByOrderByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
@@ -113,10 +114,6 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     return queryContext;
   }
 
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
 
   @Override
   public String toExplainString() {
@@ -158,6 +155,11 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
         List<ProcessingException> processingExceptionsToMerge = resultsBlock.getProcessingExceptions();
         if (processingExceptionsToMerge != null) {
           _mergedProcessingExceptions.addAll(processingExceptionsToMerge);
+        }
+
+        // Set groups limit reached flag.
+        if (resultsBlock.isNumGroupsLimitReached()) {
+          _numGroupsLimitReached = true;
         }
 
         // Merge aggregation group-by result.
@@ -235,15 +237,15 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     IndexedTable indexedTable = _indexedTable;
     indexedTable.finish(false);
     IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(indexedTable);
+    mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
+    mergedBlock.setNumResizes(indexedTable.getNumResizes());
+    mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
 
     // Set the processing exceptions.
     if (!_mergedProcessingExceptions.isEmpty()) {
       mergedBlock.setProcessingExceptions(new ArrayList<>(_mergedProcessingExceptions));
     }
 
-    mergedBlock.setNumResizes(indexedTable.getNumResizes());
-    mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
-    // TODO - set numGroupsLimitReached
     return mergedBlock;
   }
 

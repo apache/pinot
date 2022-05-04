@@ -44,7 +44,7 @@
       },
       {
         "name": "l",
-        "dataType": "STRING",
+        "dataType": "DOUBLE",
         "cardinality":10000,
         "numValuesPerEntry":1,
         "averageLength" : 10

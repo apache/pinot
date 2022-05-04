@@ -157,20 +157,19 @@ public class SegmentAssignmentUtils {
   }
 
   /**
-   * Rebalances the table for the replica-group based segment assignment strategy.
-   * <p>The number of partitions for the segments can be different from the number of partitions in the instance
-   * partitions. Uniformly spray the segment partitions over the instance partitions.
+   * Rebalances the table for the replica-group based segment assignment strategy by uniformly spraying group of
+   * segments belonging to each instancePartitionId to the instances of that instance partition.
    */
   public static Map<String, Map<String, String>> rebalanceReplicaGroupBasedTable(
       Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions,
-      Map<Integer, List<String>> partitionIdToSegmentsMap) {
+      Map<Integer, List<String>> instancePartitionIdToSegmentsMap) {
     Map<String, Map<String, String>> newAssignment = new TreeMap<>();
-    int numPartitions = instancePartitions.getNumPartitions();
-    for (Map.Entry<Integer, List<String>> entry : partitionIdToSegmentsMap.entrySet()) {
+    for (Map.Entry<Integer, List<String>> entry : instancePartitionIdToSegmentsMap.entrySet()) {
       // Uniformly spray the segment partitions over the instance partitions
-      int partitionId = entry.getKey() % numPartitions;
+      int instancePartitionId = entry.getKey();
+      List<String> segments = entry.getValue();
       SegmentAssignmentUtils
-          .rebalanceReplicaGroupBasedPartition(currentAssignment, instancePartitions, partitionId, entry.getValue(),
+          .rebalanceReplicaGroupBasedPartition(currentAssignment, instancePartitions, instancePartitionId, segments,
               newAssignment);
     }
     return newAssignment;

@@ -52,6 +52,9 @@ public class AggregationFunctionFactory {
       ExpressionContext firstArgument = arguments.get(0);
       if (upperCaseFunctionName.startsWith("PERCENTILE")) {
         String remainingFunctionName = upperCaseFunctionName.substring(10);
+        if (remainingFunctionName.equals("SMARTTDIGEST")) {
+          return new PercentileSmartTDigestAggregationFunction(arguments);
+        }
         int numArguments = arguments.size();
         if (numArguments == 1) {
           // Single argument percentile (e.g. Percentile99(foo), PercentileTDigest95(bar), etc.)
@@ -195,13 +198,12 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Third argument of lastWithTime Function should be literal."
                     + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
               }
-              FieldSpec.DataType fieldDataType
-                  = FieldSpec.DataType.valueOf(dataType.getLiteral().toUpperCase());
+              FieldSpec.DataType fieldDataType = FieldSpec.DataType.valueOf(dataType.getLiteral().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
-                  return new LastIntValueWithTimeAggregationFunction(
-                      firstArgument, timeCol, fieldDataType == FieldSpec.DataType.BOOLEAN);
+                  return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol,
+                      fieldDataType == FieldSpec.DataType.BOOLEAN);
                 case LONG:
                   return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol);
                 case FLOAT:
@@ -229,6 +231,8 @@ public class AggregationFunctionFactory {
             return new DistinctCountHLLAggregationFunction(arguments);
           case DISTINCTCOUNTRAWHLL:
             return new DistinctCountRawHLLAggregationFunction(arguments);
+          case DISTINCTCOUNTSMARTHLL:
+            return new DistinctCountSmartHLLAggregationFunction(arguments);
           case FASTHLL:
             return new FastHLLAggregationFunction(firstArgument);
           case DISTINCTCOUNTTHETASKETCH:

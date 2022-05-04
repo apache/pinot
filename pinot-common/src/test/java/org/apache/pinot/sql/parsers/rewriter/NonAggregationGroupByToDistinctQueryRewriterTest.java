@@ -32,7 +32,7 @@ public class NonAggregationGroupByToDistinctQueryRewriterTest {
   public void testQuery1() {
     final PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT A FROM myTable GROUP BY A");
     QUERY_REWRITER.rewrite(pinotQuery);
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "DISTINCT");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinct");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "A");
   }
@@ -43,7 +43,7 @@ public class NonAggregationGroupByToDistinctQueryRewriterTest {
     final PinotQuery pinotQuery =
         CalciteSqlParser.compileToPinotQuery("SELECT col1+col2*5 FROM foo GROUP BY col1, col2");
     QUERY_REWRITER.rewrite(pinotQuery);
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "DISTINCT");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinct");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
             .getIdentifier().getName(), "col1");
@@ -61,7 +61,7 @@ public class NonAggregationGroupByToDistinctQueryRewriterTest {
     final PinotQuery pinotQuery =
         CalciteSqlParser.compileToPinotQuery("SELECT col1, col2 FROM foo GROUP BY col1, col2 ");
     QUERY_REWRITER.rewrite(pinotQuery);
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "DISTINCT");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinct");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col1");
     Assert.assertEquals(
@@ -73,9 +73,9 @@ public class NonAggregationGroupByToDistinctQueryRewriterTest {
   public void testQuery4() {
     final PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT col1 as col2 FROM foo GROUP BY col1");
     QUERY_REWRITER.rewrite(pinotQuery);
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "DISTINCT");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinct");
     Assert.assertEquals(
-        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "AS");
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "as");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
             .getIdentifier().getName(), "col1");
@@ -91,9 +91,9 @@ public class NonAggregationGroupByToDistinctQueryRewriterTest {
     final PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
         "SELECT col1 as a, col2 as b, concat(col3, col4, '') as c FROM foo GROUP BY a,b,c");
     QUERY_REWRITER.rewrite(pinotQuery);
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "DISTINCT");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinct");
     Assert.assertEquals(
-        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "AS");
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "as");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
             .getIdentifier().getName(), "col1");
@@ -101,7 +101,7 @@ public class NonAggregationGroupByToDistinctQueryRewriterTest {
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1)
             .getIdentifier().getName(), "a");
     Assert.assertEquals(
-        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperator(), "AS");
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperator(), "as");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0)
             .getIdentifier().getName(), "col2");
@@ -109,10 +109,10 @@ public class NonAggregationGroupByToDistinctQueryRewriterTest {
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(1)
             .getIdentifier().getName(), "b");
     Assert.assertEquals(
-        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(2).getFunctionCall().getOperator(), "AS");
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(2).getFunctionCall().getOperator(), "as");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(2).getFunctionCall().getOperands().get(0)
-            .getFunctionCall().getOperator(), "CONCAT");
+            .getFunctionCall().getOperator(), "concat");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(2).getFunctionCall().getOperands().get(0)
             .getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col3");
@@ -134,9 +134,9 @@ public class NonAggregationGroupByToDistinctQueryRewriterTest {
     final PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
         "SELECT col1 as a, col2 as b, concat(col3, col4, '') as c FROM foo GROUP BY col1, col2, col3, col4");
     QUERY_REWRITER.rewrite(pinotQuery);
-    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "DISTINCT");
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinct");
     Assert.assertEquals(
-        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "AS");
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "as");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
             .getIdentifier().getName(), "col1");
@@ -144,7 +144,7 @@ public class NonAggregationGroupByToDistinctQueryRewriterTest {
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1)
             .getIdentifier().getName(), "a");
     Assert.assertEquals(
-        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperator(), "AS");
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperator(), "as");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0)
             .getIdentifier().getName(), "col2");
@@ -152,10 +152,10 @@ public class NonAggregationGroupByToDistinctQueryRewriterTest {
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(1)
             .getIdentifier().getName(), "b");
     Assert.assertEquals(
-        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(2).getFunctionCall().getOperator(), "AS");
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(2).getFunctionCall().getOperator(), "as");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(2).getFunctionCall().getOperands().get(0)
-            .getFunctionCall().getOperator(), "CONCAT");
+            .getFunctionCall().getOperator(), "concat");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(2).getFunctionCall().getOperands().get(0)
             .getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col3");

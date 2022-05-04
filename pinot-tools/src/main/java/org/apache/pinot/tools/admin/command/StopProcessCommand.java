@@ -211,7 +211,6 @@ public class StopProcessCommand extends AbstractBaseAdminCommand implements Comm
 
   @Override
   public void cleanup() {
-
   }
 
   private boolean stopProcess(String fileName)

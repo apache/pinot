@@ -20,6 +20,7 @@ package org.apache.pinot.common.function;
 
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -59,12 +60,20 @@ public class FunctionRegistry {
             .setScanners(new MethodAnnotationsScanner()));
     Set<Method> methodSet = reflections.getMethodsAnnotatedWith(ScalarFunction.class);
     for (Method method : methodSet) {
+      if (!Modifier.isPublic(method.getModifiers())) {
+        continue;
+      }
       ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
       if (scalarFunction.enabled()) {
-        if (!scalarFunction.name().isEmpty()) {
-          FunctionRegistry.registerFunction(scalarFunction.name(), method);
+        // Annotated function names
+        String[] scalarFunctionNames = scalarFunction.names();
+        boolean nullableParameters = scalarFunction.nullableParameters();
+        if (scalarFunctionNames.length > 0) {
+          for (String name : scalarFunctionNames) {
+            FunctionRegistry.registerFunction(name, method, nullableParameters);
+          }
         } else {
-          FunctionRegistry.registerFunction(method);
+          FunctionRegistry.registerFunction(method, nullableParameters);
         }
       }
     }
@@ -83,15 +92,15 @@ public class FunctionRegistry {
   /**
    * Registers a method with the name of the method.
    */
-  public static void registerFunction(Method method) {
-    registerFunction(method.getName(), method);
+  public static void registerFunction(Method method, boolean nullableParameters) {
+    registerFunction(method.getName(), method, nullableParameters);
   }
 
   /**
    * Registers a method with the given function name.
    */
-  public static void registerFunction(String functionName, Method method) {
-    FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass());
+  public static void registerFunction(String functionName, Method method, boolean nullableParameters) {
+    FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), nullableParameters);
     String canonicalName = canonicalize(functionName);
     Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.computeIfAbsent(canonicalName, k -> new HashMap<>());
     Preconditions.checkState(functionInfoMap.put(method.getParameterCount(), functionInfo) == null,

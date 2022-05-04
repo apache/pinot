@@ -519,7 +519,7 @@ export default function CustomizedTables({
                             className={isCellClickable ? classes.isCellClickable : (isSticky ? classes.isSticky : '')}
                             onClick={() => {cellClickCallback && cellClickCallback(cell);}}
                           >
-                            {makeCell(cell || '--', index)}
+                            {makeCell(cell ?? '--', index)}
                           </StyledTableCell>
                         );
                       })}

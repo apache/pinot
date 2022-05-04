@@ -42,7 +42,7 @@ import org.apache.pinot.spi.utils.Obfuscator;
  * Provides a configuration abstraction for Pinot to decouple services from configuration sources and frameworks.
  * </p>
  * <p>
- * Pinot services may retreived configurations from PinotConfiguration independently from any source of configuration. 
+ * Pinot services may retreived configurations from PinotConfiguration independently from any source of configuration.
  * {@link PinotConfiguration} currently supports configuration loaded from the following sources :
  *
  * <ul>
@@ -121,9 +121,9 @@ public class PinotConfiguration {
   }
 
   /**
-   * Creates a new instance with existing properties provided through a map as well as environment variables. 
-   * Base properties will have priority offers properties defined in environment variables. Keys will be 
-   * sanitized for relaxed binding. See {@link PinotConfiguration} for further details. 
+   * Creates a new instance with existing properties provided through a map as well as environment variables.
+   * Base properties will have priority offers properties defined in environment variables. Keys will be
+   * sanitized for relaxed binding. See {@link PinotConfiguration} for further details.
    *
    * @param baseProperties with highest precedences (e.g. CLI arguments)
    * @param environmentVariables as a {@link Map}. Can be provided with {@link SystemEnvironment}
@@ -133,7 +133,7 @@ public class PinotConfiguration {
   }
 
   /**
-   * Helper constructor to create an instance from configurations found in a PinotFSSpec instance. 
+   * Helper constructor to create an instance from configurations found in a PinotFSSpec instance.
    * Intended for use by Job Runners
    *
    * @param pinotFSSpec
@@ -241,7 +241,7 @@ public class PinotConfiguration {
   }
 
   /**
-   * Creates a new instance of {@link PinotConfiguration} by closing the underlying {@link CompositeConfiguration}. 
+   * Creates a new instance of {@link PinotConfiguration} by closing the underlying {@link CompositeConfiguration}.
    * Useful to mutate configurations {@link PinotConfiguration} without impacting the original configurations.
    *
    *  @return a new {@link PinotConfiguration} instance with a cloned {@link CompositeConfiguration}.
@@ -252,7 +252,7 @@ public class PinotConfiguration {
 
   /**
    * Check if the configuration contains the specified key after being sanitized.
-   * @param key to sanitized and lookup 
+   * @param key to sanitized and lookup
    * @return true if key exists.
    */
   public boolean containsKey(String key) {
@@ -272,7 +272,7 @@ public class PinotConfiguration {
    *
    * If multiple properties exists with the same key, all values will be joined as a comma separated String.
    *
-   * @param name of the property to retrieve a value. Property name will be sanitized. 
+   * @param name of the property to retrieve a value. Property name will be sanitized.
    * @return the property String value. Null if missing.
    */
   public String getProperty(String name) {
@@ -283,7 +283,7 @@ public class PinotConfiguration {
    * Retrieves a boolean value with the given property name. See {@link PinotConfiguration} for supported key naming
    * conventions.
    *
-   * @param name of the property to retrieve a value. Property name will be sanitized. 
+   * @param name of the property to retrieve a value. Property name will be sanitized.
    * @return the property boolean value. Fallback to default value if missing.
    */
   public boolean getProperty(String name, boolean defaultValue) {
@@ -296,7 +296,7 @@ public class PinotConfiguration {
    *
    * @param name of the property to retrieve a value. Property name will be sanitized.
    * @param returnType a class reference of the value type.
-   * @return the typed configuration value. Null if missing. 
+   * @return the typed configuration value. Null if missing.
    */
   public <T> T getProperty(String name, Class<T> returnType) {
     return getProperty(name, null, returnType);
@@ -306,7 +306,7 @@ public class PinotConfiguration {
    * Retrieves a double value with the given property name. See {@link PinotConfiguration} for supported key naming
    * conventions.
    *
-   * @param name of the property to retrieve a value. Property name will be sanitized. 
+   * @param name of the property to retrieve a value. Property name will be sanitized.
    * @return the property double value. Fallback to default value if missing.
    */
   public double getProperty(String name, double defaultValue) {
@@ -317,7 +317,7 @@ public class PinotConfiguration {
    * Retrieves a integer value with the given property name. See {@link PinotConfiguration} for supported key naming
    * conventions.
    *
-   * @param name of the property to retrieve a value. Property name will be sanitized. 
+   * @param name of the property to retrieve a value. Property name will be sanitized.
    * @return the property integer value. Fallback to default value if missing.
    */
   public int getProperty(String name, int defaultValue) {
@@ -328,7 +328,7 @@ public class PinotConfiguration {
    * Retrieves a list of String values with the given property name. See {@link PinotConfiguration} for supported key
    * naming conventions.
    *
-   * @param name of the property to retrieve a list of values. Property name will be sanitized. 
+   * @param name of the property to retrieve a list of values. Property name will be sanitized.
    * @return the property String value. Fallback to the provided default values if no property is found.
    */
   public List<String> getProperty(String name, List<String> defaultValues) {
@@ -341,7 +341,7 @@ public class PinotConfiguration {
    * Retrieves a long value with the given property name. See {@link PinotConfiguration} for supported key naming
    * conventions.
    *
-   * @param name of the property to retrieve a value. Property name will be sanitized. 
+   * @param name of the property to retrieve a value. Property name will be sanitized.
    * @return the property long value. Fallback to default value if missing.
    */
   public long getProperty(String name, long defaultValue) {
@@ -352,7 +352,7 @@ public class PinotConfiguration {
    * Retrieves a String value with the given property name. See {@link PinotConfiguration} for supported key naming
    * conventions.
    *
-   * @param name of the property to retrieve a value. Property name will be sanitized. 
+   * @param name of the property to retrieve a value. Property name will be sanitized.
    * @return the property String value. Fallback to default value if missing.
    */
   public String getProperty(String name, String defaultValue) {
@@ -377,7 +377,7 @@ public class PinotConfiguration {
   }
 
   /**
-   * Returns the raw object stored within the underlying {@link CompositeConfiguration}. 
+   * Returns the raw object stored within the underlying {@link CompositeConfiguration}.
    *
    * See {@link PinotConfiguration} for supported key naming conventions.
    *
@@ -389,7 +389,7 @@ public class PinotConfiguration {
   }
 
   /**
-   * Returns the raw object stored within the underlying {@link CompositeConfiguration}. 
+   * Returns the raw object stored within the underlying {@link CompositeConfiguration}.
    *
    * See {@link PinotConfiguration} for supported key naming conventions.
    *
@@ -426,7 +426,7 @@ public class PinotConfiguration {
 
   /**
    * <p>
-   * Creates a copy of the configuration only containing properties matching a property prefix. 
+   * Creates a copy of the configuration only containing properties matching a property prefix.
    * Changes made on the source {@link PinotConfiguration} will not be available in the subset instance
    * since properties are copied.
    * </p>
@@ -436,7 +436,7 @@ public class PinotConfiguration {
    * </p>
    *
    * @param prefix of the properties to copy. Applies relaxed binding on the properties prefix.
-   * @return a new {@link PinotConfiguration} instance with 
+   * @return a new {@link PinotConfiguration} instance with
    */
   public PinotConfiguration subset(String prefix) {
     return new PinotConfiguration(_configuration.subset(relaxPropertyName(prefix)));

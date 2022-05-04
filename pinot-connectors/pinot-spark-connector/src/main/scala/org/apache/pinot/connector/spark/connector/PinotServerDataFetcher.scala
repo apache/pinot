@@ -64,7 +64,7 @@ private[pinot] class PinotServerDataFetcher(
         submitRequestToPinotServer(offlineBrokerRequest, routingTableForRequest, null, null)
     }
 
-    val pinotServerResponse = pinotServerAsyncQueryResponse.getResponse.values().asScala.toList
+    val pinotServerResponse = pinotServerAsyncQueryResponse.getFinalResponses.values().asScala.toList
     logInfo(s"Pinot server total response time in millis: ${System.nanoTime() - requestStartTime}")
 
     closePinotServerConnection()
@@ -95,7 +95,7 @@ private[pinot] class PinotServerDataFetcher(
     val instanceConfig = new InstanceConfig(nullZkId)
     instanceConfig.setHostName(pinotSplit.serverAndSegments.serverHost)
     instanceConfig.setPort(pinotSplit.serverAndSegments.serverPort)
-    // TODO: support grpc and netty-sec
+    // TODO: support netty-sec
     val serverInstance = new ServerInstance(instanceConfig)
     Map(
       serverInstance -> pinotSplit.serverAndSegments.segments.asJava

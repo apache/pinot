@@ -41,7 +41,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -109,6 +108,8 @@ public class ValueInTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[][] transformToDictIdsMV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_dictIdSet == null) {
       _dictIdSet = new IntOpenHashSet();
       assert _dictionary != null;
@@ -118,10 +119,11 @@ public class ValueInTransformFunction extends BaseTransformFunction {
           _dictIdSet.add(dictId);
         }
       }
-      _dictIds = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+      if (_dictIds == null || _dictIds.length < length) {
+        _dictIds = new int[length][];
+      }
     }
     int[][] unFilteredDictIds = _mainTransformFunction.transformToDictIdsMV(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       _dictIds[i] = filterInts(_dictIdSet, unFilteredDictIds[i]);
     }
@@ -134,15 +136,17 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       return super.transformToIntValuesMV(projectionBlock);
     }
 
+    int length = projectionBlock.getNumDocs();
     if (_intValueSet == null) {
       _intValueSet = new IntOpenHashSet();
       for (String inValue : _stringValueSet) {
         _intValueSet.add(Integer.parseInt(inValue));
       }
-      _intValues = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+      if (_intValues == null || _intValues.length < length) {
+        _intValues = new int[length][];
+      }
     }
     int[][] unFilteredIntValues = _mainTransformFunction.transformToIntValuesMV(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       _intValues[i] = filterInts(_intValueSet, unFilteredIntValues[i]);
     }
@@ -155,15 +159,17 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       return super.transformToLongValuesMV(projectionBlock);
     }
 
+    int length = projectionBlock.getNumDocs();
     if (_longValueSet == null) {
       _longValueSet = new LongOpenHashSet();
       for (String inValue : _stringValueSet) {
         _longValueSet.add(Long.parseLong(inValue));
       }
-      _longValues = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+      if (_longValues == null || _longValues.length < length) {
+        _longValues = new long[length][];
+      }
     }
     long[][] unFilteredLongValues = _mainTransformFunction.transformToLongValuesMV(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       _longValues[i] = filterLongs(_longValueSet, unFilteredLongValues[i]);
     }
@@ -176,15 +182,17 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       return super.transformToFloatValuesMV(projectionBlock);
     }
 
+    int length = projectionBlock.getNumDocs();
     if (_floatValueSet == null) {
       _floatValueSet = new FloatOpenHashSet();
       for (String inValue : _stringValueSet) {
         _floatValueSet.add(Float.parseFloat(inValue));
       }
-      _floatValues = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+      if (_floatValues == null || _floatValues.length < length) {
+        _floatValues = new float[length][];
+      }
     }
     float[][] unFilteredFloatValues = _mainTransformFunction.transformToFloatValuesMV(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       _floatValues[i] = filterFloats(_floatValueSet, unFilteredFloatValues[i]);
     }
@@ -197,15 +205,17 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       return super.transformToDoubleValuesMV(projectionBlock);
     }
 
+    int length = projectionBlock.getNumDocs();
     if (_doubleValueSet == null) {
       _doubleValueSet = new DoubleOpenHashSet();
       for (String inValue : _stringValueSet) {
         _doubleValueSet.add(Double.parseDouble(inValue));
       }
-      _doubleValues = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+      if (_doubleValues == null || _doubleValues.length < length) {
+        _doubleValues = new double[length][];
+      }
     }
     double[][] unFilteredDoubleValues = _mainTransformFunction.transformToDoubleValuesMV(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       _doubleValues[i] = filterDoubles(_doubleValueSet, unFilteredDoubleValues[i]);
     }
@@ -218,11 +228,11 @@ public class ValueInTransformFunction extends BaseTransformFunction {
       return super.transformToStringValuesMV(projectionBlock);
     }
 
-    if (_stringValues == null) {
-      _stringValues = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    int length = projectionBlock.getNumDocs();
+    if (_stringValues == null || _stringValues.length < length) {
+      _stringValues = new String[length][];
     }
     String[][] unFilteredStringValues = _mainTransformFunction.transformToStringValuesMV(projectionBlock);
-    int length = projectionBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       _stringValues[i] = filterStrings(_stringValueSet, unFilteredStringValues[i]);
     }

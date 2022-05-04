@@ -173,7 +173,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     verifyTableIdealStates(idealState);
 
     // Restart the servers and check every segment is not in ERROR state.
-    restartServers(NUM_SERVERS);
+    restartServers();
     verifyTableIdealStates(idealState);
     ExternalView ev =
         HelixHelper.getExternalViewForResource(_helixAdmin, this.getHelixClusterName(), TABLE_NAME_WITH_TYPE);

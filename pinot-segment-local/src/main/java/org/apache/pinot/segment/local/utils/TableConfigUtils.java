@@ -51,6 +51,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
@@ -90,10 +91,10 @@ public final class TableConfigUtils {
   private static final String KINESIS_STREAM_TYPE = "kinesis";
 
   /**
-   * @see TableConfigUtils#validate(TableConfig, Schema, String)
+   * @see TableConfigUtils#validate(TableConfig, Schema, String, boolean)
    */
   public static void validate(TableConfig tableConfig, @Nullable Schema schema) {
-    validate(tableConfig, schema, null);
+    validate(tableConfig, schema, null, false);
   }
 
   /**
@@ -106,7 +107,8 @@ public final class TableConfigUtils {
    *
    * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
-  public static void validate(TableConfig tableConfig, @Nullable Schema schema, @Nullable String typesToSkip) {
+  public static void validate(TableConfig tableConfig, @Nullable Schema schema, @Nullable String typesToSkip,
+      boolean disableGroovy) {
     Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       Preconditions.checkState(schema != null, "Schema should not be null for REALTIME table");
@@ -116,7 +118,7 @@ public final class TableConfigUtils {
     // skip all validation if skip type ALL is selected.
     if (!skipTypes.contains(ValidationType.ALL)) {
       validateValidationConfig(tableConfig, schema);
-      validateIngestionConfig(tableConfig, schema);
+      validateIngestionConfig(tableConfig, schema, disableGroovy);
       validateTierConfigList(tableConfig.getTierConfigsList());
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
       validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
@@ -226,12 +228,12 @@ public final class TableConfigUtils {
       }
     }
 
-    if (validationConfig.isAllowNullTimeValue()) {
-      Preconditions.checkState(timeColumnName != null && !timeColumnName.isEmpty(),
-          "'timeColumnName' should exist if null time value is allowed");
-    }
-
     validateRetentionConfig(tableConfig);
+  }
+
+  @VisibleForTesting
+  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema) {
+    validateIngestionConfig(tableConfig, schema, false);
   }
 
   /**
@@ -244,7 +246,7 @@ public final class TableConfigUtils {
    * 6. ingestion type for dimension tables
    */
   @VisibleForTesting
-  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema) {
+  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema, boolean disableGroovy) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
 
     if (ingestionConfig != null) {
@@ -292,6 +294,10 @@ public final class TableConfigUtils {
       if (filterConfig != null) {
         String filterFunction = filterConfig.getFilterFunction();
         if (filterFunction != null) {
+          if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(filterFunction)) {
+            throw new IllegalStateException(
+                "Groovy filter functions are disabled for table config. Found '" + filterFunction + "'");
+          }
           try {
             FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
           } catch (Exception e) {
@@ -319,17 +325,38 @@ public final class TableConfigUtils {
             throw new IllegalStateException("Duplicate transform config found for column '" + columnName + "'");
           }
           FunctionEvaluator expressionEvaluator;
+          if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
+            throw new IllegalStateException(
+                "Groovy transform functions are disabled for table config. Found '" + transformFunction
+                    + "' for column '" + columnName + "'");
+          }
           try {
             expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
           } catch (Exception e) {
             throw new IllegalStateException(
-                "Invalid transform function '" + transformFunction + "' for column '" + columnName + "'");
+                "Invalid transform function '" + transformFunction + "' for column '" + columnName + "'", e);
           }
           List<String> arguments = expressionEvaluator.getArguments();
           if (arguments.contains(columnName)) {
             throw new IllegalStateException(
                 "Arguments of a transform function '" + arguments + "' cannot contain the destination column '"
                     + columnName + "'");
+          }
+        }
+      }
+
+      // Complex configs
+      ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
+      if (complexTypeConfig != null && schema != null) {
+        Map<String, String> prefixesToRename = complexTypeConfig.getPrefixesToRename();
+        Set<String> fieldNames = schema.getFieldSpecMap().keySet();
+        if (MapUtils.isNotEmpty(prefixesToRename)) {
+          for (String prefix : prefixesToRename.keySet()) {
+            for (String field : fieldNames) {
+              Preconditions.checkState(!field.startsWith(prefix),
+                      "Fields in the schema may not begin with any prefix specified in the prefixesToRename"
+                              + " config. Name conflict with field: " + field + " and prefix: " + prefix);
+            }
           }
         }
       }
@@ -494,7 +521,7 @@ public final class TableConfigUtils {
                 segmentSelectorType, tierName);
         Preconditions.checkState(TimeUtils.isPeriodValid(segmentAge),
             "segmentAge: %s must be a valid period string (eg. 30d, 24h) in tier: %s", segmentAge, tierName);
-      } else {
+      } else if (!segmentSelectorType.equalsIgnoreCase(TierFactory.FIXED_SEGMENT_SELECTOR_TYPE)) {
         throw new IllegalStateException(
             "Unsupported segmentSelectorType: " + segmentSelectorType + " in tier: " + tierName);
       }
@@ -714,6 +741,10 @@ public final class TableConfigUtils {
             case TEXT:
               Preconditions.checkState(fieldConfigColSpec.getDataType().getStoredType() == DataType.STRING,
                   "TEXT Index is only supported for string columns");
+              break;
+            case TIMESTAMP:
+              Preconditions.checkState(fieldConfigColSpec.getDataType() == DataType.TIMESTAMP,
+                  "TIMESTAMP Index is only supported for timestamp columns");
               break;
             default:
               break;

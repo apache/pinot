@@ -34,13 +34,19 @@ public class SegmentConfig {
 
   private final int _maxNumRecordsPerSegment;
   private final String _segmentNamePrefix;
+  private final String _segmentNamePostfix;
+  private final String _fixedSegmentName;
 
   @JsonCreator
   private SegmentConfig(@JsonProperty(value = "maxNumRecordsPerSegment", required = true) int maxNumRecordsPerSegment,
-      @JsonProperty("segmentNamePrefix") @Nullable String segmentNamePrefix) {
+      @JsonProperty("segmentNamePrefix") @Nullable String segmentNamePrefix,
+      @JsonProperty("segmentNamePostfix") @Nullable String segmentNamePostfix,
+      @JsonProperty("fixedSegmentName") @Nullable String fixedSegmentName) {
     Preconditions.checkState(maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
     _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
     _segmentNamePrefix = segmentNamePrefix;
+    _segmentNamePostfix = segmentNamePostfix;
+    _fixedSegmentName = fixedSegmentName;
   }
 
   /**
@@ -55,12 +61,24 @@ public class SegmentConfig {
     return _segmentNamePrefix;
   }
 
+  @Nullable
+  public String getSegmentNamePostfix() {
+    return _segmentNamePostfix;
+  }
+
+  @Nullable
+  public String getFixedSegmentName() {
+    return _fixedSegmentName;
+  }
+
   /**
    * Builder for SegmentConfig
    */
   public static class Builder {
     private int _maxNumRecordsPerSegment = DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT;
     private String _segmentNamePrefix;
+    private String _segmentNamePostfix;
+    private String _fixedSegmentName;
 
     public Builder setMaxNumRecordsPerSegment(int maxNumRecordsPerSegment) {
       _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
@@ -72,15 +90,26 @@ public class SegmentConfig {
       return this;
     }
 
+    public Builder setSegmentNamePostfix(String segmentNamePostfix) {
+      _segmentNamePostfix = segmentNamePostfix;
+      return this;
+    }
+
+    public Builder setFixedSegmentName(String fixedSegmentName) {
+      _fixedSegmentName = fixedSegmentName;
+      return this;
+    }
+
     public SegmentConfig build() {
       Preconditions.checkState(_maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
-      return new SegmentConfig(_maxNumRecordsPerSegment, _segmentNamePrefix);
+      return new SegmentConfig(_maxNumRecordsPerSegment, _segmentNamePrefix, _segmentNamePostfix, _fixedSegmentName);
     }
   }
 
   @Override
   public String toString() {
     return "SegmentConfig{" + "_maxNumRecordsPerSegment=" + _maxNumRecordsPerSegment + ", _segmentNamePrefix='"
-        + _segmentNamePrefix + '\'' + '}';
+        + _segmentNamePrefix + '\'' + ", _segmentNamePostfix='" + _segmentNamePostfix + '\'' + ", _fixedSegmentName='"
+        + _fixedSegmentName + '\'' + '}';
   }
 }

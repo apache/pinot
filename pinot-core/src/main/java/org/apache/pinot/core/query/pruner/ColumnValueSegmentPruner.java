@@ -176,6 +176,9 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
           extractPredicateColumns(child, eqInColumns, rangeColumns);
         }
         break;
+      case NOT:
+        // Do not track the predicates under NOT filter
+        break;
       case PREDICATE:
         Predicate predicate = filter.getPredicate();
 
@@ -215,6 +218,9 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
           }
         }
         return true;
+      case NOT:
+        // Do not prune NOT filter
+        return false;
       case PREDICATE:
         Predicate predicate = filter.getPredicate();
         // Only prune columns

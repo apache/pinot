@@ -30,7 +30,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
  */
 public class FilterContext {
   public enum Type {
-    AND, OR, PREDICATE
+    AND, OR, NOT, PREDICATE
   }
 
   private final Type _type;
@@ -81,8 +81,8 @@ public class FilterContext {
       return false;
     }
     FilterContext that = (FilterContext) o;
-    return _type == that._type && Objects.equals(_children, that._children) && Objects
-        .equals(_predicate, that._predicate);
+    return _type == that._type && Objects.equals(_children, that._children) && Objects.equals(_predicate,
+        that._predicate);
   }
 
   @Override
@@ -94,19 +94,22 @@ public class FilterContext {
   public String toString() {
     switch (_type) {
       case AND:
-        StringBuilder stringBuilder = new StringBuilder().append('(').append(_children.get(0).toString());
+        StringBuilder stringBuilder = new StringBuilder().append('(').append(_children.get(0));
         int numChildren = _children.size();
         for (int i = 1; i < numChildren; i++) {
-          stringBuilder.append(" AND ").append(_children.get(i).toString());
+          stringBuilder.append(" AND ").append(_children.get(i));
         }
         return stringBuilder.append(')').toString();
       case OR:
-        stringBuilder = new StringBuilder().append('(').append(_children.get(0).toString());
+        stringBuilder = new StringBuilder().append('(').append(_children.get(0));
         numChildren = _children.size();
         for (int i = 1; i < numChildren; i++) {
-          stringBuilder.append(" OR ").append(_children.get(i).toString());
+          stringBuilder.append(" OR ").append(_children.get(i));
         }
         return stringBuilder.append(')').toString();
+      case NOT:
+        assert _children.size() == 1;
+        return "(NOT " + _children.get(0) + ')';
       case PREDICATE:
         return _predicate.toString();
       default:

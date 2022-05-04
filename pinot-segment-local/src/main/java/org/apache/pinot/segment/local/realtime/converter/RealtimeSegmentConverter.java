@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.realtime.converter;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -31,18 +30,18 @@ import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSe
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
 public class RealtimeSegmentConverter {
   private MutableSegmentImpl _realtimeSegmentImpl;
+  private final SegmentZKPropsConfig _segmentZKPropsConfig;
   private final String _outputPath;
   private final Schema _dataSchema;
   private final String _tableName;
@@ -56,11 +55,13 @@ public class RealtimeSegmentConverter {
   private final List<String> _varLengthDictionaryColumns;
   private final boolean _nullHandlingEnabled;
 
-  public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
-      String tableName, TableConfig tableConfig, String segmentName, String sortedColumn,
-      List<String> invertedIndexColumns, List<String> textIndexColumns, List<String> fstIndexColumns,
-      List<String> noDictionaryColumns, List<String> varLengthDictionaryColumns, boolean nullHandlingEnabled) {
+  public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
+      String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
+      String sortedColumn, List<String> invertedIndexColumns, List<String> textIndexColumns,
+      List<String> fstIndexColumns, List<String> noDictionaryColumns, List<String> varLengthDictionaryColumns,
+      boolean nullHandlingEnabled) {
     _realtimeSegmentImpl = realtimeSegment;
+    _segmentZKPropsConfig = segmentZKPropsConfig;
     _outputPath = outputPath;
     _invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
     if (sortedColumn != null) {
@@ -92,17 +93,6 @@ public class RealtimeSegmentConverter {
         genConfig.createInvertedIndexForColumn(column);
       }
     }
-    if (_noDictionaryColumns != null) {
-      genConfig.setRawIndexCreationColumns(_noDictionaryColumns);
-      Map<String, ChunkCompressionType> columnToCompressionType = new HashMap<>();
-      for (String column : _noDictionaryColumns) {
-        FieldSpec fieldSpec = _dataSchema.getFieldSpecFor(column);
-        if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.METRIC)) {
-          columnToCompressionType.put(column, ChunkCompressionType.PASS_THROUGH);
-        }
-      }
-      genConfig.setRawIndexCompressionType(columnToCompressionType);
-    }
 
     if (_varLengthDictionaryColumns != null) {
       genConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
@@ -119,6 +109,8 @@ public class RealtimeSegmentConverter {
     SegmentPartitionConfig segmentPartitionConfig = _realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
     genConfig.setNullHandlingEnabled(_nullHandlingEnabled);
+    genConfig.setSegmentZKPropsConfig(_segmentZKPropsConfig);
+
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
       int[] sortedDocIds =

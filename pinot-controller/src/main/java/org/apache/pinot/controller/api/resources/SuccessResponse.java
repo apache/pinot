@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-public final class SuccessResponse {
+public class SuccessResponse {
   private final String _status;
 
   public SuccessResponse(String status) {

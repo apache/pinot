@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.readers;
 
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -117,6 +118,11 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
   @Override
   public double getDoubleValue(int dictId) {
     return Double.parseDouble(_unpaddedStrings[dictId]);
+  }
+
+  @Override
+  public BigDecimal getBigDecimalValue(int dictId) {
+    return new BigDecimal(_unpaddedStrings[dictId]);
   }
 
   @Override

@@ -58,7 +58,7 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
   @CommandLine.Option(names = {"-config"}, description = "Cluster config to operate.")
   private String _config;
 
-  @CommandLine.Option(names = {"-operation"}, required = true, 
+  @CommandLine.Option(names = {"-operation"}, required = true,
       description = "Operation to take for Cluster config, currently support GET/ADD/UPDATE/DELETE.")
   private String _operation;
 
@@ -89,7 +89,6 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
 
   @Override
   public void cleanup() {
-
   }
 
   @Override

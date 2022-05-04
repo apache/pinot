@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -80,7 +82,7 @@ public class ArithmeticFunctions {
     return Math.abs(a);
   }
 
-  @ScalarFunction
+  @ScalarFunction(names = {"ceil", "ceiling"})
   public static double ceil(double a) {
     return Math.ceil(a);
   }
@@ -95,13 +97,60 @@ public class ArithmeticFunctions {
     return Math.exp(a);
   }
 
-  @ScalarFunction
+  @ScalarFunction(names = {"ln", "log"})
   public static double ln(double a) {
     return Math.log(a);
   }
 
   @ScalarFunction
+  public static double log2(double a) {
+    return Math.log(a) / Math.log(2);
+  }
+
+  @ScalarFunction
+  public static double log10(double a) {
+    return Math.log10(a);
+  }
+
+  @ScalarFunction
   public static double sqrt(double a) {
     return Math.sqrt(a);
+  }
+
+  @ScalarFunction
+  public static double sign(double a) {
+    return Math.signum(a);
+  }
+
+  @ScalarFunction(names = {"pow", "power"})
+  public static double power(double a, double exponent) {
+    return Math.pow(a, exponent);
+  }
+
+
+  // Big Decimal Implementation has been used here to avoid overflows
+  // when multiplying by Math.pow(10, scale) for rounding
+  @ScalarFunction
+  public static double roundDecimal(double a, int scale) {
+    return BigDecimal.valueOf(a).setScale(scale, RoundingMode.HALF_UP).doubleValue();
+  }
+
+  // TODO: The function should ideally be named 'round'
+  // but it is not possible because of existing DateTimeFunction with same name.
+  @ScalarFunction
+  public static double roundDecimal(double a) {
+    return Math.round(a);
+  }
+
+  // Big Decimal Implementation has been used here to avoid overflows
+  // when multiplying by Math.pow(10, scale) for rounding
+  @ScalarFunction
+  public static double truncate(double a, int scale) {
+    return BigDecimal.valueOf(a).setScale(scale, RoundingMode.DOWN).doubleValue();
+  }
+
+  @ScalarFunction
+  public static double truncate(double a) {
+    return Math.signum(a) * Math.floor(Math.abs(a));
   }
 }

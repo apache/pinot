@@ -64,7 +64,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   @CommandLine.Option(names = {"-schemaFile"}, required = true, description = "File containing schema for data.")
   private String _schemaFile = null;
 
-  @CommandLine.Option(names = {"-schemaAnnotationFile"}, required = false, 
+  @CommandLine.Option(names = {"-schemaAnnotationFile"}, required = false,
       description = "File containing dim/metrics for columns.")
   private String _schemaAnnFile;
 
@@ -108,7 +108,6 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
 
   @Override
   public void cleanup() {
-
   }
 
   @Override

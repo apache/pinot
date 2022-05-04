@@ -21,10 +21,11 @@ package org.apache.pinot.tools.admin.command;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.core.util.TlsUtils;
+import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TlsSpec;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.GroovyTemplateUtils;
 import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
@@ -145,5 +146,10 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
   @Override
   public String description() {
     return "Launch a data ingestion job.";
+  }
+
+  public static void main(String[] args) {
+    PluginManager.get().init();
+    new CommandLine(new LaunchDataIngestionJobCommand()).execute(args);
   }
 }

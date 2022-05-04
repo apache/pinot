@@ -37,7 +37,7 @@ import java.util.Set;
  *      or with a singleton string ({@link #expandSingleton()}) in case
  *      the automaton is known to accept exactly one string.
  *      (Implicitly, all states and transitions of an automaton are reachable from its initial state.)
- * <li> Automata are always reduced (see {@link #reduce()}) 
+ * <li> Automata are always reduced (see {@link #reduce()})
  *      and have no transitions to dead states (see {@link #removeDeadTransitions()}).
  * <li> Automata provided as input to operations are generally assumed to be disjoint.
  * </ul>

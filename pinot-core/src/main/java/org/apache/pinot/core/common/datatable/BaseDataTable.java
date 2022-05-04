@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.core.common.datatable;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +29,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 
@@ -115,27 +115,24 @@ public abstract class BaseDataTable implements DataTable {
   /**
    * Helper method to deserialize dictionary map.
    */
-  protected Map<String, Map<Integer, String>> deserializeDictionaryMap(byte[] bytes)
+  protected Map<String, Map<Integer, String>> deserializeDictionaryMap(ByteBuffer buffer)
       throws IOException {
-    try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-        DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
-      int numDictionaries = dataInputStream.readInt();
+      int numDictionaries = buffer.getInt();
       Map<String, Map<Integer, String>> dictionaryMap = new HashMap<>(numDictionaries);
 
       for (int i = 0; i < numDictionaries; i++) {
-        String column = DataTableUtils.decodeString(dataInputStream);
-        int dictionarySize = dataInputStream.readInt();
+        String column = DataTableUtils.decodeString(buffer);
+        int dictionarySize = buffer.getInt();
         Map<Integer, String> dictionary = new HashMap<>(dictionarySize);
         for (int j = 0; j < dictionarySize; j++) {
-          int key = dataInputStream.readInt();
-          String value = DataTableUtils.decodeString(dataInputStream);
+          int key = buffer.getInt();
+          String value = DataTableUtils.decodeString(buffer);
           dictionary.put(key, value);
         }
         dictionaryMap.put(column, dictionary);
       }
 
       return dictionaryMap;
-    }
   }
 
   @Override
@@ -175,6 +172,14 @@ public abstract class BaseDataTable implements DataTable {
   public double getDouble(int rowId, int colId) {
     _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     return _fixedSizeData.getDouble();
+  }
+
+  @Override
+  public BigDecimal getBigDecimal(int rowId, int colId) {
+    int size = positionCursorInVariableBuffer(rowId, colId);
+    ByteBuffer byteBuffer = _variableSizeData.slice();
+    byteBuffer.limit(size);
+    return BigDecimalUtils.deserialize(byteBuffer);
   }
 
   @Override

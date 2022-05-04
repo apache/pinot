@@ -21,13 +21,14 @@ package org.apache.pinot.compat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,7 +109,7 @@ public class TableOp extends BaseOp {
       Map<String, String> headers = new HashMap<String, String>() {{
         put("Content-type", "application/json");
       }};
-      ControllerTest.sendPostRequest(
+      ControllerTest.sendPostRequestRaw(
           ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl()).forSchemaCreate(),
           FileUtils.readFileToString(new File(getAbsoluteFileName(_schemaFileName))), headers);
       return true;
@@ -120,9 +121,9 @@ public class TableOp extends BaseOp {
 
   private boolean createTable() {
     try {
-      ControllerTest.sendPostRequest(
+      ControllerTest.sendPostRequestRaw(
           ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl()).forTableCreate(),
-          FileUtils.readFileToString(new File(getAbsoluteFileName(_tableConfigFileName))));
+          FileUtils.readFileToString(new File(getAbsoluteFileName(_tableConfigFileName))), Collections.emptyMap());
       return true;
     } catch (IOException e) {
       LOGGER.error("Failed to create table with file: {}", _tableConfigFileName, e);

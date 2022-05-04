@@ -100,7 +100,22 @@ public class DimensionTableDataManagerTest {
     return propertyStore;
   }
 
-  private DimensionTableDataManager makeTestableManager() {
+  private ZkHelixPropertyStore mockPropertyStoreWithNewColumn() {
+    String baseballTeamsSchemaStr =
+        "{\"schemaName\":\"dimBaseballTeams\",\"dimensionFieldSpecs\":[{\"name\":\"teamID\",\"dataType\":\"STRING\"},"
+            + "{\"name\":\"teamName\",\"dataType\":\"STRING\"}, {\"name\":\"teamCity\",\"dataType\":\"STRING\"}],"
+            + "\"primaryKeyColumns\":[\"teamID\"]}";
+    ZNRecord zkSchemaRec = new ZNRecord("dimBaseballTeams");
+    zkSchemaRec.setSimpleField("schemaJSON", baseballTeamsSchemaStr);
+
+    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).
+        thenReturn(zkSchemaRec);
+
+    return propertyStore;
+  }
+
+  private DimensionTableDataManager makeTestableManager(HelixManager helixManager) {
     DimensionTableDataManager tableDataManager = DimensionTableDataManager.createInstanceByTableName(TABLE_NAME);
     TableDataManagerConfig config;
     {
@@ -109,7 +124,7 @@ public class DimensionTableDataManagerTest {
       when(config.getDataDir()).thenReturn(INDEX_DIR.getAbsolutePath());
     }
     tableDataManager.init(config, "dummyInstance", mockPropertyStore(),
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null);
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), helixManager, null);
     tableDataManager.start();
 
     return tableDataManager;
@@ -118,7 +133,10 @@ public class DimensionTableDataManagerTest {
   @Test
   public void instantiationTests()
       throws Exception {
-    DimensionTableDataManager mgr = makeTestableManager();
+    HelixManager helixManager = mock(HelixManager.class);
+    ZkHelixPropertyStore propertyStore = mockPropertyStore();
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    DimensionTableDataManager mgr = makeTestableManager(helixManager);
     Assert.assertEquals(mgr.getTableName(), TABLE_NAME);
 
     // fetch the same instance via static method
@@ -144,7 +162,10 @@ public class DimensionTableDataManagerTest {
   @Test
   public void lookupTests()
       throws Exception {
-    DimensionTableDataManager mgr = makeTestableManager();
+    HelixManager helixManager = mock(HelixManager.class);
+    ZkHelixPropertyStore propertyStore = mockPropertyStore();
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    DimensionTableDataManager mgr = makeTestableManager(helixManager);
 
     // try fetching data BEFORE loading segment
     GenericRow resp = mgr.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
@@ -176,5 +197,32 @@ public class DimensionTableDataManagerTest {
     // confirm table is cleaned up
     resp = mgr.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
     Assert.assertNull(resp, "Response should be null if no segment is loaded");
+  }
+
+  @Test
+  public void onRefreshDimensionTable()
+      throws Exception {
+    HelixManager helixManager = mock(HelixManager.class);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mockPropertyStoreWithNewColumn();
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+
+    DimensionTableDataManager mgr = makeTestableManager(helixManager);
+
+    mgr.addSegment(_indexDir, _indexLoadingConfig);
+
+    // Confirm table is loaded and available for lookup
+    GenericRow resp = mgr.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
+    Assert.assertNotNull(resp, "Should return response after segment load");
+    Assert.assertEquals(resp.getValue("teamName"), "San Francisco Giants");
+
+    // WHEN (segment is refreshed)
+
+    mgr.addSegment(_indexDir, _indexLoadingConfig);
+
+    // THEN
+    FieldSpec teamCitySpec = mgr.getColumnFieldSpec("teamCity");
+    Assert.assertNotNull(teamCitySpec, "Should return spec for existing column");
+    Assert.assertEquals(teamCitySpec.getDataType(), FieldSpec.DataType.STRING,
+        "Should return correct data type for teamCity column");
   }
 }

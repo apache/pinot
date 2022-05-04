@@ -38,9 +38,9 @@ import org.slf4j.LoggerFactory;
  *
  * The execute method is re-usable but there is no real benefit to it. All
  * the connection management is handled by the input HttpConnectionManager.
- * For access through multiple-threads, use MultiThreadedHttpConnectionManager
- * as shown in the example below.
- *
+ * Note that we cannot use SimpleHttpConnectionManager as it is not thread
+ * safe. Use MultiThreadedHttpConnectionManager as shown in the example
+ * below
  * Usage:
  * <pre>
  * {@code
@@ -74,6 +74,8 @@ public class MultiGetRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiGetRequest.class);
 
   private final Executor _executor;
+  // TODO: Verify that _connectionManager is an instaceOf MultithreadedHttpConnectionManager.
+  //       SimpleHttpConnectionManager is not thread-safe.
   private final HttpConnectionManager _connectionManager;
 
   /**

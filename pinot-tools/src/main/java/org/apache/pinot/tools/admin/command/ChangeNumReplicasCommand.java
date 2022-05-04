@@ -35,7 +35,7 @@ public class ChangeNumReplicasCommand extends AbstractBaseAdminCommand implement
   @CommandLine.Option(names = {"-clusterName"}, required = false, description = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
-  @CommandLine.Option(names = {"-tableName"}, required = true, 
+  @CommandLine.Option(names = {"-tableName"}, required = true,
       description = "Table name to rebalance (e.g. myTable_OFFLINE)")
   private String _tableName;
 

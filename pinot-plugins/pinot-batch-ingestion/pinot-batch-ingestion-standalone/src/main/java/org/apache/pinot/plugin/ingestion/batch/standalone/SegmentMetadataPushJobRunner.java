@@ -60,7 +60,7 @@ public class SegmentMetadataPushJobRunner implements IngestionJobRunner {
       PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
     }
 
-    //Get outputFS for writing output Pinot segments
+    //Get outputFS for list of available Pinot segments
     URI outputDirURI;
     try {
       outputDirURI = new URI(_spec.getOutputDirURI());
@@ -79,9 +79,8 @@ public class SegmentMetadataPushJobRunner implements IngestionJobRunner {
     } catch (IOException e) {
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
     }
-    Map<String, String> segmentUriToTarPathMap = SegmentPushUtils
-        .getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec().getSegmentUriPrefix(),
-            _spec.getPushJobSpec().getSegmentUriSuffix(), files);
+    Map<String, String> segmentUriToTarPathMap =
+        SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(), files);
     try {
       SegmentPushUtils.sendSegmentUriAndMetadata(_spec, outputDirFS, segmentUriToTarPathMap);
     } catch (Exception e) {

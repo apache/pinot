@@ -26,7 +26,6 @@ import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.joda.time.DateTimeField;
 
@@ -130,11 +129,12 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+
     if (_longOutputTimes == null) {
-      _longOutputTimes = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _longOutputTimes = new long[length];
     }
 
-    int length = projectionBlock.getNumDocs();
     long[] input = _mainTransformFunction.transformToLongValuesSV(projectionBlock);
     for (int i = 0; i < length; i++) {
       _longOutputTimes[i] = _outputTimeUnit

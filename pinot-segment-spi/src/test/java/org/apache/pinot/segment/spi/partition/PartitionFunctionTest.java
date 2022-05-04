@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.spi.partition;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
@@ -32,6 +34,8 @@ import static org.testng.Assert.assertTrue;
  * Unit test for {@link PartitionFunction}
  */
 public class PartitionFunctionTest {
+  private static final int NUM_ROUNDS = 1000;
+  private static final int MAX_NUM_PARTITIONS = 100;
 
   /**
    * Unit test for {@link ModuloPartitionFunction}.
@@ -46,42 +50,36 @@ public class PartitionFunctionTest {
     long seed = System.currentTimeMillis();
     Random random = new Random(seed);
 
-    for (int i = 0; i < 1000; i++) {
-      int expectedNumPartitions = Math.abs(random.nextInt());
-
-      // Avoid divide-by-zero.
-      if (expectedNumPartitions == 0) {
-        expectedNumPartitions = 1;
-      }
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
 
       String functionName = "MoDuLo";
       PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
 
-      testBasicProperties(partitionFunction, functionName, expectedNumPartitions);
+      testBasicProperties(partitionFunction, functionName, numPartitions);
 
-      // Test int values.
-      for (int j = 0; j < 1000; j++) {
-        int value = random.nextInt();
-        assertEquals(partitionFunction.getPartition(value), (value % expectedNumPartitions));
+      // Test int values
+      for (int j = 0; j < NUM_ROUNDS; j++) {
+        int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
+        int expectedPartition = value % numPartitions;
+        if (expectedPartition < 0) {
+          expectedPartition += numPartitions;
+        }
+        assertEquals(partitionFunction.getPartition(value), expectedPartition);
+        assertEquals(partitionFunction.getPartition((long) value), expectedPartition);
+        assertEquals(partitionFunction.getPartition(Integer.toString(value)), expectedPartition);
       }
 
-      // Test long values.
-      for (int j = 0; j < 1000; j++) {
-        long value = random.nextLong();
-        assertEquals(partitionFunction.getPartition(value), (value % expectedNumPartitions));
-      }
-
-      // Test Integer represented as String.
-      for (int j = 0; j < 1000; j++) {
-        int value = random.nextInt();
-        assertEquals(partitionFunction.getPartition(Integer.toString(value)), (value % expectedNumPartitions));
-      }
-
-      // Test Long represented as String.
-      for (int j = 0; j < 1000; j++) {
-        long value = random.nextLong();
-        assertEquals(partitionFunction.getPartition(Long.toString(value)), (value % expectedNumPartitions));
+      // Test long values
+      for (int j = 0; j < NUM_ROUNDS; j++) {
+        long value = j == 0 ? Long.MIN_VALUE : random.nextLong();
+        int expectedPartition = (int) (value % numPartitions);
+        if (expectedPartition < 0) {
+          expectedPartition += numPartitions;
+        }
+        assertEquals(partitionFunction.getPartition(value), expectedPartition);
+        assertEquals(partitionFunction.getPartition(Long.toString(value)), expectedPartition);
       }
     }
   }
@@ -98,25 +96,21 @@ public class PartitionFunctionTest {
     long seed = System.currentTimeMillis();
     Random random = new Random(seed);
 
-    for (int i = 0; i < 1000; i++) {
-      int expectedNumPartitions = Math.abs(random.nextInt());
-
-      // Avoid divide-by-zero.
-      if (expectedNumPartitions == 0) {
-        expectedNumPartitions = 1;
-      }
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
 
       String functionName = "mUrmur";
       PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
 
-      testBasicProperties(partitionFunction, functionName, expectedNumPartitions);
+      testBasicProperties(partitionFunction, functionName, numPartitions);
 
-      for (int j = 0; j < 1000; j++) {
-        int value = random.nextInt();
-        String stringValue = Integer.toString(value);
-        assertTrue(partitionFunction.getPartition(stringValue) < expectedNumPartitions,
-            "Illegal: " + partitionFunction.getPartition(stringValue) + " " + expectedNumPartitions);
+      for (int j = 0; j < NUM_ROUNDS; j++) {
+        int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
+        int partition1 = partitionFunction.getPartition(value);
+        int partition2 = partitionFunction.getPartition(Integer.toString(value));
+        assertEquals(partition1, partition2);
+        assertTrue(partition1 >= 0 && partition1 < numPartitions);
       }
     }
   }
@@ -133,24 +127,21 @@ public class PartitionFunctionTest {
     long seed = System.currentTimeMillis();
     Random random = new Random(seed);
 
-    for (int i = 0; i < 1000; i++) {
-      int expectedNumPartitions = Math.abs(random.nextInt());
-
-      // Avoid divide-by-zero.
-      if (expectedNumPartitions == 0) {
-        expectedNumPartitions = 1;
-      }
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
 
       String functionName = "bYteArray";
       PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
 
-      testBasicProperties(partitionFunction, functionName, expectedNumPartitions);
+      testBasicProperties(partitionFunction, functionName, numPartitions);
 
-      for (int j = 0; j < 1000; j++) {
-        Integer value = random.nextInt();
-        assertTrue(partitionFunction.getPartition(value) < expectedNumPartitions,
-            "Illegal: " + partitionFunction.getPartition(value) + " " + expectedNumPartitions);
+      for (int j = 0; j < NUM_ROUNDS; j++) {
+        int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
+        int partition1 = partitionFunction.getPartition(value);
+        int partition2 = partitionFunction.getPartition(Integer.toString(value));
+        assertEquals(partition1, partition2);
+        assertTrue(partition1 >= 0 && partition1 < numPartitions);
       }
     }
   }
@@ -160,39 +151,78 @@ public class PartitionFunctionTest {
     long seed = System.currentTimeMillis();
     Random random = new Random(seed);
 
-    for (int i = 0; i < 1000; i++) {
-      int expectedNumPartitions = Math.abs(random.nextInt());
-
-      // Avoid divide-by-zero.
-      if (expectedNumPartitions == 0) {
-        expectedNumPartitions = 1;
-      }
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
 
       String functionName = "HaShCoDe";
       PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
 
-      testBasicProperties(partitionFunction, functionName, expectedNumPartitions);
+      testBasicProperties(partitionFunction, functionName, numPartitions);
 
-      for (int j = 0; j < 1000; j++) {
-        Integer value = random.nextInt();
-        assertEquals(partitionFunction.getPartition(value), Math.abs(value.hashCode()) % expectedNumPartitions);
+      // Test int values
+      for (int j = 0; j < NUM_ROUNDS; j++) {
+        int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
+        int hashCode = Integer.toString(value).hashCode();
+        int expectedPartition = ((hashCode == Integer.MIN_VALUE) ? 0 : Math.abs(hashCode)) % numPartitions;
+        assertEquals(partitionFunction.getPartition(value), expectedPartition);
+        assertEquals(partitionFunction.getPartition(Integer.toString(value)), expectedPartition);
+      }
+
+      // Test double values
+      for (int j = 0; j < NUM_ROUNDS; j++) {
+        double value = j == 0 ? Double.NEGATIVE_INFINITY : random.nextDouble();
+        int hashCode = Double.toString(value).hashCode();
+        int expectedPartition = ((hashCode == Integer.MIN_VALUE) ? 0 : Math.abs(hashCode)) % numPartitions;
+        assertEquals(partitionFunction.getPartition(value), expectedPartition);
+        assertEquals(partitionFunction.getPartition(Double.toString(value)), expectedPartition);
       }
     }
   }
 
+  @Test
+  public void testBoundedColumnValuePartitioner() {
+    String functionName = "BOUndedColumNVaLUE";
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("columnValues", "Maths|english|Chemistry");
+    functionConfig.put("columnValuesDelimiter", "|");
+    PartitionFunction partitionFunction =
+        PartitionFunctionFactory.getPartitionFunction(functionName, 4, functionConfig);
+    testBasicProperties(partitionFunction, functionName, 4, functionConfig);
+    assertEquals(partitionFunction.getPartition("maths"), 1);
+    assertEquals(partitionFunction.getPartition("English"), 2);
+    assertEquals(partitionFunction.getPartition("Chemistry"), 3);
+    assertEquals(partitionFunction.getPartition("Physics"), 0);
+  }
+
   private void testBasicProperties(PartitionFunction partitionFunction, String functionName, int numPartitions) {
+    testBasicProperties(partitionFunction, functionName, numPartitions, null);
+  }
+
+  private void testBasicProperties(PartitionFunction partitionFunction, String functionName, int numPartitions,
+      Map<String, String> functionConfig) {
     assertEquals(partitionFunction.getName().toLowerCase(), functionName.toLowerCase());
     assertEquals(partitionFunction.getNumPartitions(), numPartitions);
 
     JsonNode jsonNode = JsonUtils.objectToJsonNode(partitionFunction);
-    assertEquals(jsonNode.size(), 2);
+    assertEquals(jsonNode.size(), 3);
     assertEquals(jsonNode.get("name").asText().toLowerCase(), functionName.toLowerCase());
     assertEquals(jsonNode.get("numPartitions").asInt(), numPartitions);
+
+    JsonNode functionConfigNode = jsonNode.get("functionConfig");
+    if (functionConfig == null) {
+      assertTrue(functionConfigNode.isNull());
+    } else {
+      functionConfigNode.fields().forEachRemaining(nodeEntry -> {
+        assertTrue(functionConfig.containsKey(nodeEntry.getKey()));
+        assertEquals(nodeEntry.getValue().asText(), functionConfig.get(nodeEntry.getKey()));
+      });
+    }
   }
 
   /**
-   * Tests the equivalence of org.apache.kafka.common.utils.Utils::murmur2 and {@link MurmurPartitionFunction::murmur2}
+   * Tests the equivalence of org.apache.kafka.common.utils.Utils::murmur2 and
+   * {@link MurmurPartitionFunction#getPartition}
    * Our implementation of murmur2 has been copied over from Utils::murmur2
    */
   @Test
@@ -224,8 +254,7 @@ public class PartitionFunctionTest {
 
   /**
    * Tests the equivalence of partitioning using org.apache.kafka.common.utils.Utils::partition and
-   * {@link MurmurPartitionFunction
-   * ::getPartition}
+   * {@link MurmurPartitionFunction#getPartition}
    */
   @Test
   public void testMurmurPartitionFunctionEquivalence() {

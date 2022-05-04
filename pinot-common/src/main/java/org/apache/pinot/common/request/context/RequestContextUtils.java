@@ -118,7 +118,7 @@ public class RequestContextUtils {
     if (functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
       // NOTE: COUNT always take one single argument "*"
       return new FunctionContext(FunctionContext.Type.AGGREGATION, AggregationFunctionType.COUNT.getName(),
-          Collections.singletonList(ExpressionContext.forIdentifier("*")));
+          new ArrayList<>(Collections.singletonList(ExpressionContext.forIdentifier("*"))));
     }
     FunctionContext.Type functionType =
         AggregationFunctionType.isAggregationFunction(functionName) ? FunctionContext.Type.AGGREGATION
@@ -143,7 +143,7 @@ public class RequestContextUtils {
     if (functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
       // NOTE: COUNT always take one single argument "*"
       return new FunctionContext(FunctionContext.Type.AGGREGATION, AggregationFunctionType.COUNT.getName(),
-          Collections.singletonList(ExpressionContext.forIdentifier("*")));
+          new ArrayList<>(Collections.singletonList(ExpressionContext.forIdentifier("*"))));
     }
     FunctionContext.Type functionType =
         AggregationFunctionType.isAggregationFunction(functionName) ? FunctionContext.Type.AGGREGATION
@@ -183,6 +183,9 @@ public class RequestContextUtils {
           children.add(getFilter(operand));
         }
         return new FilterContext(FilterContext.Type.OR, children, null);
+      case NOT:
+        assert numOperands == 1;
+        return new FilterContext(FilterContext.Type.NOT, new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
       case EQUALS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new EqPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -281,6 +284,9 @@ public class RequestContextUtils {
           children.add(getFilter(operand));
         }
         return new FilterContext(FilterContext.Type.OR, children, null);
+      case NOT:
+        assert numOperands == 1;
+        return new FilterContext(FilterContext.Type.NOT, new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
       case EQUALS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new EqPredicate(operands.get(0), getStringValue(operands.get(1))));

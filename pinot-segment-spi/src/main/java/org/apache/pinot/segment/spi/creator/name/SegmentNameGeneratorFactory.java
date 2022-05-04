@@ -29,6 +29,7 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
 public class SegmentNameGeneratorFactory {
+  public static final String FIXED_SEGMENT_NAME_GENERATOR = "fixed";
   public static final String SIMPLE_SEGMENT_NAME_GENERATOR = "simple";
   public static final String NORMALIZED_DATE_SEGMENT_NAME_GENERATOR = "normalizeddate";
 
@@ -39,7 +40,7 @@ public class SegmentNameGeneratorFactory {
    * Create the segment name generator given input configurations
    */
   public static SegmentNameGenerator createSegmentNameGenerator(TableConfig tableConfig, Schema schema,
-      @Nullable String prefix, @Nullable String postfix, boolean excludeSequenceId) {
+      @Nullable String prefix, @Nullable String postfix, @Nullable String fixedSegmentName, boolean excludeSequenceId) {
     String segmentNameGeneratorType = tableConfig.getIndexingConfig().getSegmentNameGeneratorType();
     if (segmentNameGeneratorType == null || segmentNameGeneratorType.isEmpty()) {
       segmentNameGeneratorType = SIMPLE_SEGMENT_NAME_GENERATOR;
@@ -47,6 +48,8 @@ public class SegmentNameGeneratorFactory {
 
     String tableName = tableConfig.getTableName();
     switch (segmentNameGeneratorType.toLowerCase()) {
+      case FIXED_SEGMENT_NAME_GENERATOR:
+        return new FixedSegmentNameGenerator(fixedSegmentName);
       case SIMPLE_SEGMENT_NAME_GENERATOR:
         if (prefix != null) {
           return new SimpleSegmentNameGenerator(prefix, postfix);

@@ -23,7 +23,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -448,6 +447,7 @@ public final class Schema implements Serializable {
             case LONG:
             case FLOAT:
             case DOUBLE:
+            case BIG_DECIMAL:
             case BOOLEAN:
             case TIMESTAMP:
             case STRING:
@@ -465,6 +465,7 @@ public final class Schema implements Serializable {
             case LONG:
             case FLOAT:
             case DOUBLE:
+            case BIG_DECIMAL:
             case BYTES:
               break;
             default:
@@ -716,6 +717,15 @@ public final class Schema implements Serializable {
     return result;
   }
 
+  public Schema clone() {
+    Schema cloned = new SchemaBuilder()
+        .setSchemaName(getSchemaName())
+        .setPrimaryKeyColumns(getPrimaryKeyColumns())
+        .build();
+    getAllFieldSpecs().forEach(fieldSpec -> cloned.addField(fieldSpec));
+    return cloned;
+  }
+
   /**
    * Helper method that converts a {@link TimeFieldSpec} to {@link DateTimeFieldSpec}
    * 1) If timeFieldSpec contains only incoming granularity spec, directly convert it to a dateTimeFieldSpec
@@ -723,8 +733,7 @@ public final class Schema implements Serializable {
    * the dateTimeFieldSpec,
    *    and configure a transform function for the conversion from incoming
    */
-  @VisibleForTesting
-  static DateTimeFieldSpec convertToDateTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
+  public static DateTimeFieldSpec convertToDateTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
     DateTimeFieldSpec dateTimeFieldSpec = new DateTimeFieldSpec();
     TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
     TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
@@ -754,8 +763,8 @@ public final class Schema implements Serializable {
       TimeUnit incomingTimeUnit = incomingGranularitySpec.getTimeType();
       String incomingTimeFormat = incomingGranularitySpec.getTimeFormat();
       Preconditions.checkState(
-          incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) && outgoingTimeFormat
-              .equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()),
+          (incomingTimeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) || incomingTimeFormat.equals(
+              DateTimeFieldSpec.TimeFormat.TIMESTAMP.toString())) && outgoingTimeFormat.equals(incomingTimeFormat),
           "Conversion from incoming to outgoing is not supported for SIMPLE_DATE_FORMAT");
       String transformFunction =
           constructTransformFunctionString(incomingName, incomingTimeSize, incomingTimeUnit, outgoingTimeSize,

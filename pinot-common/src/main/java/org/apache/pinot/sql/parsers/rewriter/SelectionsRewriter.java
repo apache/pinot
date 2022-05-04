@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.sql.parsers.rewriter;
 
-import org.apache.pinot.common.function.TransformFunctionType;
+import java.util.List;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
 public class SelectionsRewriter implements QueryRewriter {
@@ -37,54 +35,50 @@ public class SelectionsRewriter implements QueryRewriter {
   }
 
   private static void tryToRewriteArrayFunction(Expression expression) {
-    if (!expression.isSetFunctionCall()) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
       return;
     }
-    Function functionCall = expression.getFunctionCall();
-    switch (CalciteSqlParser.canonicalize(functionCall.getOperator())) {
+    String functionName = function.getOperator();
+    List<Expression> operands = function.getOperands();
+    switch (functionName) {
       case "sum":
-        if (functionCall.getOperands().size() != 1) {
+        if (operands.size() != 1) {
           return;
         }
-        if (functionCall.getOperands().get(0).isSetFunctionCall()) {
-          Function innerFunction = functionCall.getOperands().get(0).getFunctionCall();
-          if (CalciteSqlParser.isSameFunction(innerFunction.getOperator(), TransformFunctionType.ARRAYSUM.getName())) {
-            Function sumMvFunc = new Function(AggregationFunctionType.SUMMV.getName());
-            sumMvFunc.setOperands(innerFunction.getOperands());
-            expression.setFunctionCall(sumMvFunc);
-          }
+        Function innerFunction = operands.get(0).getFunctionCall();
+        if (innerFunction != null && innerFunction.getOperator().equals("arraysum")) {
+          Function sumMvFunc = new Function("summv");
+          sumMvFunc.setOperands(innerFunction.getOperands());
+          expression.setFunctionCall(sumMvFunc);
         }
         return;
       case "min":
-        if (functionCall.getOperands().size() != 1) {
+        if (operands.size() != 1) {
           return;
         }
-        if (functionCall.getOperands().get(0).isSetFunctionCall()) {
-          Function innerFunction = functionCall.getOperands().get(0).getFunctionCall();
-          if (CalciteSqlParser.isSameFunction(innerFunction.getOperator(), TransformFunctionType.ARRAYMIN.getName())) {
-            Function sumMvFunc = new Function(AggregationFunctionType.MINMV.getName());
-            sumMvFunc.setOperands(innerFunction.getOperands());
-            expression.setFunctionCall(sumMvFunc);
-          }
+        innerFunction = operands.get(0).getFunctionCall();
+        if (innerFunction != null && innerFunction.getOperator().equals("arraymin")) {
+          Function minMvFunc = new Function("minmv");
+          minMvFunc.setOperands(innerFunction.getOperands());
+          expression.setFunctionCall(minMvFunc);
         }
         return;
       case "max":
-        if (functionCall.getOperands().size() != 1) {
+        if (operands.size() != 1) {
           return;
         }
-        if (functionCall.getOperands().get(0).isSetFunctionCall()) {
-          Function innerFunction = functionCall.getOperands().get(0).getFunctionCall();
-          if (CalciteSqlParser.isSameFunction(innerFunction.getOperator(), TransformFunctionType.ARRAYMAX.getName())) {
-            Function sumMvFunc = new Function(AggregationFunctionType.MAXMV.getName());
-            sumMvFunc.setOperands(innerFunction.getOperands());
-            expression.setFunctionCall(sumMvFunc);
-          }
+        innerFunction = operands.get(0).getFunctionCall();
+        if (innerFunction != null && innerFunction.getOperator().equals("arraymax")) {
+          Function maxMvFunc = new Function("maxmv");
+          maxMvFunc.setOperands(innerFunction.getOperands());
+          expression.setFunctionCall(maxMvFunc);
         }
         return;
       default:
         break;
     }
-    for (Expression operand : functionCall.getOperands()) {
+    for (Expression operand : operands) {
       tryToRewriteArrayFunction(operand);
     }
   }

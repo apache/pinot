@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.helix;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -45,9 +46,13 @@ import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.common.helix.ExtraInstanceConfig;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
@@ -186,6 +191,52 @@ public class HelixHelper {
   }
 
   /**
+   * Updates broker resource ideal state for the given broker with the given broker tags. Optional {@code tablesAdded}
+   * and {@code tablesRemoved} can be provided to track the tables added/removed during the update.
+   */
+  public static void updateBrokerResource(HelixManager helixManager, String brokerId, List<String> brokerTags,
+      @Nullable List<String> tablesAdded, @Nullable List<String> tablesRemoved) {
+    Preconditions.checkArgument(brokerId.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE),
+        "Invalid broker id: %s", brokerId);
+    for (String brokerTag : brokerTags) {
+      Preconditions.checkArgument(TagNameUtils.isBrokerTag(brokerTag), "Invalid broker tag: %s", brokerTag);
+    }
+
+    Set<String> tablesForBrokerTag;
+    int numBrokerTags = brokerTags.size();
+    if (numBrokerTags == 0) {
+      tablesForBrokerTag = Collections.emptySet();
+    } else if (numBrokerTags == 1) {
+      tablesForBrokerTag = getTablesForBrokerTag(helixManager, brokerTags.get(0));
+    } else {
+      tablesForBrokerTag = getTablesForBrokerTags(helixManager, brokerTags);
+    }
+
+    updateIdealState(helixManager, BROKER_RESOURCE, idealState -> {
+      if (tablesAdded != null) {
+        tablesAdded.clear();
+      }
+      if (tablesRemoved != null) {
+        tablesRemoved.clear();
+      }
+      for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+        String tableNameWithType = entry.getKey();
+        Map<String, String> brokerAssignment = entry.getValue();
+        if (tablesForBrokerTag.contains(tableNameWithType)) {
+          if (brokerAssignment.put(brokerId, BrokerResourceStateModel.ONLINE) == null && tablesAdded != null) {
+            tablesAdded.add(tableNameWithType);
+          }
+        } else {
+          if (brokerAssignment.remove(brokerId) != null && tablesRemoved != null) {
+            tablesRemoved.add(tableNameWithType);
+          }
+        }
+      }
+      return idealState;
+    });
+  }
+
+  /**
    * Returns all instances for the given cluster.
    *
    * @param helixAdmin The HelixAdmin object used to interact with the Helix cluster
@@ -320,8 +371,8 @@ public class HelixHelper {
 
     // Removing partitions from ideal state
     LOGGER.info("Trying to remove resource {} from idealstate", resourceTag);
-    HelixHelper
-        .updateIdealState(helixManager, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, updater, DEFAULT_RETRY_POLICY);
+    HelixHelper.updateIdealState(helixManager, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, updater,
+        DEFAULT_RETRY_POLICY);
   }
 
   /**
@@ -495,12 +546,12 @@ public class HelixHelper {
       TableType tableType) {
     Set<String> serverInstancesWithType = new HashSet<>();
     if (tableType == null || tableType == TableType.OFFLINE) {
-      serverInstancesWithType
-          .addAll(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getOfflineTagForTenant(tenant)));
+      serverInstancesWithType.addAll(
+          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getOfflineTagForTenant(tenant)));
     }
     if (tableType == null || tableType == TableType.REALTIME) {
-      serverInstancesWithType
-          .addAll(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getRealtimeTagForTenant(tenant)));
+      serverInstancesWithType.addAll(
+          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getRealtimeTagForTenant(tenant)));
     }
     return serverInstancesWithType;
   }
@@ -519,6 +570,28 @@ public class HelixHelper {
     return new HashSet<>(getInstancesConfigsWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
   }
 
+  public static Set<String> getTablesForBrokerTag(HelixManager helixManager, String brokerTag) {
+    Set<String> tablesForBrokerTag = new HashSet<>();
+    List<TableConfig> tableConfigs = ZKMetadataProvider.getAllTableConfigs(helixManager.getHelixPropertyStore());
+    for (TableConfig tableConfig : tableConfigs) {
+      if (TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker()).equals(brokerTag)) {
+        tablesForBrokerTag.add(tableConfig.getTableName());
+      }
+    }
+    return tablesForBrokerTag;
+  }
+
+  public static Set<String> getTablesForBrokerTags(HelixManager helixManager, List<String> brokerTags) {
+    Set<String> tablesForBrokerTags = new HashSet<>();
+    List<TableConfig> tableConfigs = ZKMetadataProvider.getAllTableConfigs(helixManager.getHelixPropertyStore());
+    for (TableConfig tableConfig : tableConfigs) {
+      if (brokerTags.contains(TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker()))) {
+        tablesForBrokerTags.add(tableConfig.getTableName());
+      }
+    }
+    return tablesForBrokerTags;
+  }
+
   /**
    * Returns the instance config for a specific instance.
    */
@@ -535,9 +608,9 @@ public class HelixHelper {
     // NOTE: Use HelixDataAccessor.setProperty() instead of HelixAdmin.setInstanceConfig() because the latter explicitly
     // forbids instance host/port modification
     HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
-    Preconditions.checkState(helixDataAccessor
-            .setProperty(helixDataAccessor.keyBuilder().instanceConfig(instanceConfig.getId()), instanceConfig),
-        "Failed to update instance config for instance: " + instanceConfig.getId());
+    Preconditions.checkState(
+        helixDataAccessor.setProperty(helixDataAccessor.keyBuilder().instanceConfig(instanceConfig.getId()),
+            instanceConfig), "Failed to update instance config for instance: " + instanceConfig.getId());
   }
 
   /**
@@ -560,6 +633,18 @@ public class HelixHelper {
       updated = true;
     }
     return updated;
+  }
+
+  /**
+   * Updates a tlsPort value into Pinot instance config so it can be retrieved later
+   * @param instanceConfig the instance config to update
+   * @param tlsPort the tlsPort number
+   * @return true if updated
+   */
+  public static boolean updateTlsPort(InstanceConfig instanceConfig, int tlsPort) {
+    ExtraInstanceConfig pinotInstanceConfig = new ExtraInstanceConfig(instanceConfig);
+    pinotInstanceConfig.setTlsPort(String.valueOf(tlsPort));
+    return true;
   }
 
   /**

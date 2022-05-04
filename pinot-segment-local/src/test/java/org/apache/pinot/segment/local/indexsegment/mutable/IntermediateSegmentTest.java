@@ -22,6 +22,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -30,12 +32,15 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.IntermediateSegmentRecordReader;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -130,6 +135,21 @@ public class IntermediateSegmentTest {
           assertEquals(actualInvertedIndexReader.getDocIds(j), expectedInvertedIndexReader.getDocIds(j));
         }
       }
+
+      // Check for Partition Metadata.
+      SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+      if (segmentPartitionConfig != null && segmentPartitionConfig.getColumnPartitionMap().containsKey(column)) {
+        ColumnMetadata columnMetadata =
+            segmentFromIntermediateSegment.getSegmentMetadata().getColumnMetadataFor(column);
+        assertNotNull(columnMetadata.getPartitionFunction());
+        assertEquals(columnMetadata.getPartitionFunction().getName(), segmentPartitionConfig.getFunctionName(column));
+        assertEquals(columnMetadata.getPartitionFunction().getNumPartitions(),
+            segmentPartitionConfig.getNumPartitions(column));
+        assertEquals(columnMetadata.getPartitionFunction().getFunctionConfig(),
+            segmentPartitionConfig.getFunctionConfig(column));
+        assertNotNull(columnMetadata.getPartitions());
+        assertEquals(columnMetadata.getPartitions().size(), 1);
+      }
     }
   }
 
@@ -211,10 +231,20 @@ public class IntermediateSegmentTest {
     if (AVRO_DATA_SV.equals(inputFile)) {
       tableConfig =
           new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch")
-              .setInvertedIndexColumns(Arrays.asList("column6", "column7", "column11", "column17", "column18")).build();
+              .setInvertedIndexColumns(Arrays.asList("column6", "column7", "column11", "column17", "column18"))
+              .setSegmentPartitionConfig(getSegmentPartitionConfig()).build();
     } else {
       tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
     }
     return tableConfig;
+  }
+
+  private static SegmentPartitionConfig getSegmentPartitionConfig() {
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
+    ColumnPartitionConfig columnOneConfig = new ColumnPartitionConfig("Murmur", 1);
+    columnPartitionConfigMap.put("column7", columnOneConfig);
+    ColumnPartitionConfig columnTwoConfig = new ColumnPartitionConfig("HashCode", 1);
+    columnPartitionConfigMap.put("column11", columnTwoConfig);
+    return new SegmentPartitionConfig(columnPartitionConfigMap);
   }
 }

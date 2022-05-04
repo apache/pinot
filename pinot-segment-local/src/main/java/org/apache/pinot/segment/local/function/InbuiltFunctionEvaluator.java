@@ -108,11 +108,13 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
   private static class FunctionExecutionNode implements ExecutableNode {
     final FunctionInvoker _functionInvoker;
+    final FunctionInfo _functionInfo;
     final ExecutableNode[] _argumentNodes;
     final Object[] _arguments;
 
     FunctionExecutionNode(FunctionInfo functionInfo, ExecutableNode[] argumentNodes) {
       _functionInvoker = new FunctionInvoker(functionInfo);
+      _functionInfo = functionInfo;
       _argumentNodes = argumentNodes;
       _arguments = new Object[_argumentNodes.length];
     }
@@ -123,6 +125,15 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         int numArguments = _argumentNodes.length;
         for (int i = 0; i < numArguments; i++) {
           _arguments[i] = _argumentNodes[i].execute(row);
+        }
+        if (!_functionInfo.hasNullableParameters()) {
+          // Preserve null values during ingestion transformation if function is an inbuilt
+          // scalar function that cannot handle nulls, and invoked with null parameter(s).
+          for (Object argument : _arguments) {
+            if (argument == null) {
+              return null;
+            }
+          }
         }
         _functionInvoker.convertTypes(_arguments);
         return _functionInvoker.invoke(_arguments);
@@ -137,6 +148,15 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         int numArguments = _argumentNodes.length;
         for (int i = 0; i < numArguments; i++) {
           _arguments[i] = _argumentNodes[i].execute(values);
+        }
+        if (!_functionInfo.hasNullableParameters()) {
+          // Preserve null values during ingestion transformation if function is an inbuilt
+          // scalar function that cannot handle nulls, and invoked with null parameter(s).
+          for (Object argument : _arguments) {
+            if (argument == null) {
+              return null;
+            }
+          }
         }
         _functionInvoker.convertTypes(_arguments);
         return _functionInvoker.invoke(_arguments);

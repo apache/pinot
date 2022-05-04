@@ -61,7 +61,6 @@ public class DeleteClusterCommand extends AbstractBaseAdminCommand implements Co
 
   @Override
   public void cleanup() {
-
   }
 
   public DeleteClusterCommand setClusterName(String clusterName) {

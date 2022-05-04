@@ -26,7 +26,6 @@ import com.google.common.base.Preconditions;
  */
 public final class PartitionerFactory {
   private PartitionerFactory() {
-
   }
 
   public enum PartitionerType {

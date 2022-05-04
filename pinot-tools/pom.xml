@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.10.0-SNAPSHOT</version>
+    <version>0.11.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-tools</artifactId>
@@ -239,6 +239,10 @@
       <artifactId>log4j-core</artifactId>
     </dependency>
     <dependency>
+      <groupId>xml-apis</groupId>
+      <artifactId>xml-apis</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-math3</artifactId>
     </dependency>
@@ -274,50 +278,6 @@
                 <extraArguments>
                   <extraArgument>-Dlog4j2.configurationFile=conf/log4j2.xml</extraArgument>
                   <extraArgument>-Dpinot.admin.system.exit=true</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.tools.scan.query.ScanBasedQueryProcessor</mainClass>
-              <name>scan-query</name>
-              <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>20G</maxMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.tools.query.comparison.QueryComparison</mainClass>
-              <name>query-comparator</name>
-              <jvmSettings>
-                <initialMemorySize>10G</initialMemorySize>
-                <maxMemorySize>30G</maxMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.tools.query.comparison.StarQueryComparison</mainClass>
-              <name>star-query-comparator</name>
-              <jvmSettings>
-                <initialMemorySize>10G</initialMemorySize>
-                <maxMemorySize>30G</maxMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
-                </extraArguments>
-              </jvmSettings>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.tools.query.comparison.StatsGenerator</mainClass>
-              <name>stats-generator</name>
-              <jvmSettings>
-                <initialMemorySize>1G</initialMemorySize>
-                <maxMemorySize>1G</maxMemorySize>
-                <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -498,6 +458,16 @@
                 </extraArguments>
               </jvmSettings>
             </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.perf.QueryRunner</mainClass>
+              <name>query-runner</name>
+              <jvmSettings>
+                <initialMemorySize>4G</initialMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
           </programs>
           <binFileExtensions>
             <unix>.sh</unix>
@@ -534,24 +504,6 @@
                 </manifest>
               </archive>
               <finalName>pinot-tool-launcher</finalName>
-            </configuration>
-            <phase>package</phase>
-            <goals>
-              <goal>single</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>build-query-comparison</id>
-            <configuration>
-              <descriptorRefs>
-                <descriptorRef>jar-with-dependencies</descriptorRef>
-              </descriptorRefs>
-              <archive>
-                <manifest>
-                  <mainClass>org.apache.pinot.tools.query.comparison.QueryComparison</mainClass>
-                </manifest>
-              </archive>
-              <finalName>query-comparison</finalName>
             </configuration>
             <phase>package</phase>
             <goals>

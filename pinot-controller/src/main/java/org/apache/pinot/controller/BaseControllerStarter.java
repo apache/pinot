@@ -51,6 +51,7 @@ import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.model.Message;
 import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -58,6 +59,7 @@ import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
@@ -86,10 +88,9 @@ import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
+import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.transport.ListenerConfig;
-import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
-import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -127,6 +128,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected String _helixClusterName;
   protected String _hostname;
   protected int _port;
+  protected int _tlsPort;
   protected String _helixControllerInstanceId;
   protected String _helixParticipantInstanceId;
   protected boolean _isUpdateStateModel;
@@ -136,6 +138,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected HelixManager _helixParticipantManager;
   protected PinotMetricsRegistry _metricsRegistry;
   protected ControllerMetrics _controllerMetrics;
+  protected SqlQueryExecutor _sqlQueryExecutor;
   // Can only be constructed after resource manager getting started
   protected OfflineSegmentIntervalChecker _offlineSegmentIntervalChecker;
   protected RealtimeSegmentValidationManager _realtimeSegmentValidationManager;
@@ -168,6 +171,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     inferHostnameIfNeeded(_config);
     _hostname = _config.getControllerHost();
     _port = _listenerConfigs.get(0).getPort();
+    _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, 0);
     // NOTE: Use <hostname>_<port> as Helix controller instance id because ControllerLeaderLocator relies on this format
     //       to parse the leader controller's hostname and port
     // TODO: Use the same instance id for controller and participant when leadControllerResource is always enabled after
@@ -391,7 +395,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _helixResourceManager.start(_helixParticipantManager);
 
     LOGGER.info("Starting task resource manager");
-    _helixTaskResourceManager = new PinotHelixTaskResourceManager(new TaskDriver(_helixParticipantManager));
+    _helixTaskResourceManager =
+        new PinotHelixTaskResourceManager(_helixResourceManager, new TaskDriver(_helixParticipantManager));
 
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
     LOGGER.info("Starting realtime segment manager");
@@ -411,6 +416,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       LOGGER.info("Realtime tables with High Level consumers will NOT be supported");
       _realtimeSegmentsManager = null;
     }
+    _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
@@ -458,6 +464,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(metadataEventNotifierFactory).to(MetadataEventNotifierFactory.class);
         bind(_leadControllerManager).to(LeadControllerManager.class);
         bind(_periodicTaskScheduler).to(PeriodicTaskScheduler.class);
+        bind(_sqlQueryExecutor).to(SqlQueryExecutor.class);
       }
     });
 
@@ -490,8 +497,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   private ServiceStatus.ServiceStatusCallback generateServiceStatusCallback(HelixManager helixManager) {
     return new ServiceStatus.ServiceStatusCallback() {
-      private boolean _isStarted = false;
-      private String _statusDescription = "Helix ZK Not connected as " + helixManager.getInstanceType();
+      private volatile boolean _isStarted = false;
+      private volatile String _statusDescription = "Helix ZK Not connected as " + helixManager.getInstanceType();
 
       @Override
       public ServiceStatus.Status getServiceStatus() {
@@ -607,6 +614,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     InstanceConfig instanceConfig =
         HelixHelper.getInstanceConfig(_helixParticipantManager, _helixParticipantInstanceId);
     boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
+    if (_tlsPort > 0) {
+      updated |= HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
+    }
     updated |= HelixHelper
         .addDefaultTags(instanceConfig, () -> Collections.singletonList(CommonConstants.Helix.CONTROLLER_INSTANCE));
     if (updated) {
@@ -641,7 +651,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new BrokerResourceValidationManager(_config, _helixResourceManager, _leadControllerManager, _controllerMetrics);
     periodicTasks.add(_brokerResourceValidationManager);
     _segmentStatusChecker =
-        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+        new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+            _executorService);
     periodicTasks.add(_segmentStatusChecker);
     _segmentRelocator = new SegmentRelocator(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
         _executorService);

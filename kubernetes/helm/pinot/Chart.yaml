@@ -29,7 +29,7 @@ keywords:
   - pinot
 home: https://pinot.apache.org/
 sources:
-  - https://github.com/apache/incubator-pinot
+  - https://github.com/apache/pinot/tree/master/kubernetes/helm
 maintainers:
   - name: pinot-dev
     email: dev@pinot.apache.org

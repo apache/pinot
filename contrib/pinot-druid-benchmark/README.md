@@ -234,9 +234,9 @@ executionFrameworkSpec:
   segmentTarPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.standalone.SegmentTarPushJobRunner'
   segmentUriPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.standalone.SegmentUriPushJobRunner'
 jobType: SegmentCreationAndTarPush
-inputDirURI: '/absolute/path/to/incubator-pinot/contrib/pinot-druid-benchmark/data_out/raw_data/'
+inputDirURI: '/absolute/path/to/pinot/contrib/pinot-druid-benchmark/data_out/raw_data/'
 includeFileNamePattern: 'glob:**/*.csv'
-outputDirURI: '/absolute/path/to/incubator-pinot/contrib/pinot-druid-benchmark/data_out/segments/'
+outputDirURI: '/absolute/path/to/pinot/contrib/pinot-druid-benchmark/data_out/segments/'
 overwriteOutput: true
 pinotFSSpecs:
   - scheme: file
@@ -276,7 +276,7 @@ line appear in the output as:
 
 ```
 ...
-outputDirURI: /absolute/path/to/incubator-pinot/contrib/pinot-druid-benchmark/data_out/segments/
+outputDirURI: /absolute/path/to/pinot/contrib/pinot-druid-benchmark/data_out/segments/
 ...
 ```
 

@@ -24,11 +24,12 @@ import java.lang.reflect.Method;
 public class FunctionInfo {
   private final Method _method;
   private final Class<?> _clazz;
+  private final boolean _nullableParameters;
 
-  public FunctionInfo(Method method, Class<?> clazz) {
-    method.setAccessible(true);
+  public FunctionInfo(Method method, Class<?> clazz, boolean nullableParameters) {
     _method = method;
     _clazz = clazz;
+    _nullableParameters = nullableParameters;
   }
 
   public Method getMethod() {
@@ -37,5 +38,9 @@ public class FunctionInfo {
 
   public Class<?> getClazz() {
     return _clazz;
+  }
+
+  public boolean hasNullableParameters() {
+    return _nullableParameters;
   }
 }

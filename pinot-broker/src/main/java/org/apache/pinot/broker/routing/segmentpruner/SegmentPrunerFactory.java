@@ -21,7 +21,9 @@ package org.apache.pinot.broker.routing.segmentpruner;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.MapUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
@@ -60,7 +62,7 @@ public class SegmentPrunerFactory {
         List<SegmentPruner> configuredSegmentPruners = new ArrayList<>(segmentPrunerTypes.size());
         for (String segmentPrunerType : segmentPrunerTypes) {
           if (RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
-            PartitionSegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
+            SegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
             if (partitionSegmentPruner != null) {
               configuredSegmentPruners.add(partitionSegmentPruner);
             }
@@ -83,9 +85,9 @@ public class SegmentPrunerFactory {
         if ((tableType == TableType.OFFLINE && LEGACY_PARTITION_AWARE_OFFLINE_ROUTING.equalsIgnoreCase(
             routingTableBuilderName)) || (tableType == TableType.REALTIME
             && LEGACY_PARTITION_AWARE_REALTIME_ROUTING.equalsIgnoreCase(routingTableBuilderName))) {
-          PartitionSegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
+          SegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
           if (partitionSegmentPruner != null) {
-            segmentPruners.add(getPartitionSegmentPruner(tableConfig, propertyStore));
+            segmentPruners.add(partitionSegmentPruner);
           }
         }
       }
@@ -94,7 +96,7 @@ public class SegmentPrunerFactory {
   }
 
   @Nullable
-  private static PartitionSegmentPruner getPartitionSegmentPruner(TableConfig tableConfig,
+  private static SegmentPruner getPartitionSegmentPruner(TableConfig tableConfig,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
     String tableNameWithType = tableConfig.getTableName();
     SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
@@ -102,17 +104,17 @@ public class SegmentPrunerFactory {
       LOGGER.warn("Cannot enable partition pruning without segment partition config for table: {}", tableNameWithType);
       return null;
     }
-    Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
-    if (columnPartitionMap.size() != 1) {
-      LOGGER.warn("Cannot enable partition pruning with other than exact one partition column for table: {}",
-          tableNameWithType);
+    if (MapUtils.isEmpty(segmentPartitionConfig.getColumnPartitionMap())) {
+      LOGGER.warn("Cannot enable partition pruning without column partition config for table: {}", tableNameWithType);
       return null;
-    } else {
-      String partitionColumn = columnPartitionMap.keySet().iterator().next();
-      LOGGER.info("Using PartitionSegmentPruner on partition column: {} for table: {}", partitionColumn,
-          tableNameWithType);
-      return new PartitionSegmentPruner(tableNameWithType, partitionColumn, propertyStore);
     }
+    Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
+    Set<String> partitionColumns = columnPartitionMap.keySet();
+    LOGGER.info("Using PartitionSegmentPruner on partition columns: {} for table: {}", partitionColumns,
+        tableNameWithType);
+    return partitionColumns.size() == 1 ? new SinglePartitionColumnSegmentPruner(tableNameWithType,
+        partitionColumns.iterator().next(), propertyStore)
+        : new MultiPartitionColumnsSegmentPruner(tableNameWithType, partitionColumns, propertyStore);
   }
 
   @Nullable
@@ -151,7 +153,8 @@ public class SegmentPrunerFactory {
       }
     }
     for (SegmentPruner pruner : pruners) {
-      if (pruner instanceof PartitionSegmentPruner) {
+      if (pruner instanceof SinglePartitionColumnSegmentPruner
+          || pruner instanceof MultiPartitionColumnsSegmentPruner) {
         sortedPruners.add(pruner);
       }
     }

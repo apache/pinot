@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -27,7 +28,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
@@ -48,6 +48,7 @@ import org.apache.helix.model.Message;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -55,6 +56,7 @@ import org.apache.pinot.common.restlet.resources.SystemResourceInfo;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
+import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -63,9 +65,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.core.transport.ListenerConfig;
-import org.apache.pinot.core.transport.TlsConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
-import org.apache.pinot.core.util.TlsUtils;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -171,13 +171,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _pinotEnvironmentProvider = initializePinotEnvironmentProvider();
 
     // Enable/disable thread CPU time measurement through instance config.
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(_serverConf
-        .getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
+    ThreadTimer.setThreadCpuTimeMeasurementEnabled(
+        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
             Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
 
     // Set data table version send to broker.
-    DataTableBuilder.setCurrentDataTableVersion(_serverConf
-        .getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, Server.DEFAULT_CURRENT_DATA_TABLE_VERSION));
+    DataTableBuilder.setCurrentDataTableVersion(_serverConf.getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION,
+        Server.DEFAULT_CURRENT_DATA_TABLE_VERSION));
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
@@ -217,14 +217,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
    * {@link org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback}s
    */
   private void registerServiceStatusHandler() {
-    double minResourcePercentForStartup = _serverConf
-        .getProperty(Server.CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START,
+    double minResourcePercentForStartup =
+        _serverConf.getProperty(Server.CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START,
             Server.DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START);
-    int realtimeConsumptionCatchupWaitMs = _serverConf
-        .getProperty(Server.CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS,
+    int realtimeConsumptionCatchupWaitMs =
+        _serverConf.getProperty(Server.CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS,
             Server.DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS);
-    boolean isOffsetBasedConsumptionStatusCheckerEnabled = _serverConf
-        .getProperty(Server.CONFIG_OF_ENABLE_REALTIME_OFFSET_BASED_CONSUMPTION_STATUS_CHECKER,
+    boolean isOffsetBasedConsumptionStatusCheckerEnabled =
+        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_REALTIME_OFFSET_BASED_CONSUMPTION_STATUS_CHECKER,
             Server.DEFAULT_ENABLE_REALTIME_OFFSET_BASED_CONSUMPTION_STATUS_CHECKER);
 
     // collect all resources which have this instance in the ideal state
@@ -251,8 +251,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
         }
         if (checkRealtime && TableNameBuilder.isRealtimeTableResource(resourceName)) {
           for (String partitionName : idealState.getPartitionSet()) {
-            if (StateModel.SegmentStateModel.CONSUMING
-                .equals(idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
+            if (StateModel.SegmentStateModel.CONSUMING.equals(
+                idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
               consumingSegments.add(partitionName);
             }
           }
@@ -286,9 +286,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
         new ServiceStatus.MultipleCallbackServiceStatusCallback(serviceStatusCallbackListBuilder.build()));
   }
 
-  private void updateInstanceConfigIfNeeded() {
+  private void updateInstanceConfigIfNeeded(ServerConf serverConf) {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
+
+    // Update hostname and port
     boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
+
+    // Update tags
     updated |= HelixHelper.addDefaultTags(instanceConfig, () -> {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
         return Arrays.asList(TagNameUtils.getOfflineTagForTenant(null), TagNameUtils.getRealtimeTagForTenant(null));
@@ -296,26 +300,76 @@ public abstract class BaseServerStarter implements ServiceStartable {
         return Collections.singletonList(Helix.UNTAGGED_SERVER_INSTANCE);
       }
     });
+
+    // Update admin HTTP/HTTPS port
+    int adminHttpPort = Integer.MIN_VALUE;
+    int adminHttpsPort = Integer.MIN_VALUE;
+    for (ListenerConfig listenerConfig : _listenerConfigs) {
+      String protocol = listenerConfig.getProtocol();
+      if (CommonConstants.HTTP_PROTOCOL.equals(protocol)) {
+        adminHttpPort = listenerConfig.getPort();
+      } else if (CommonConstants.HTTPS_PROTOCOL.equals(protocol)) {
+        adminHttpsPort = listenerConfig.getPort();
+      }
+    }
+    ZNRecord znRecord = instanceConfig.getRecord();
+    Map<String, String> simpleFields = znRecord.getSimpleFields();
+    updated |= updatePortIfNeeded(simpleFields, Instance.ADMIN_PORT_KEY, adminHttpPort);
+    updated |= updatePortIfNeeded(simpleFields, Instance.ADMIN_HTTPS_PORT_KEY, adminHttpsPort);
+
+    // Update netty TLS port
+    int nettyTlsPort = serverConf.isNettyTlsServerEnabled() ? serverConf.getNettyTlsPort() : Integer.MIN_VALUE;
+    updated |= updatePortIfNeeded(simpleFields, Instance.NETTY_TLS_PORT_KEY, nettyTlsPort);
+
+    // Update gRPC port
+    int grpcPort = serverConf.isEnableGrpcServer() ? serverConf.getGrpcPort() : Integer.MIN_VALUE;
+    updated |= updatePortIfNeeded(simpleFields, Instance.GRPC_PORT_KEY, grpcPort);
+
     // Update instance config with environment properties
     if (_pinotEnvironmentProvider != null) {
       // Retrieve failure domain information and add to the environment properties map
       String failureDomain = _pinotEnvironmentProvider.getFailureDomain();
       Map<String, String> environmentProperties =
           Collections.singletonMap(CommonConstants.INSTANCE_FAILURE_DOMAIN, failureDomain);
-
-      // Fetch existing environment properties map from instance configs
-      ZNRecord znRecord = instanceConfig.getRecord();
-      Map<String, String> existingEnvironmentConfigsMap = znRecord.getMapField(CommonConstants.ENVIRONMENT_IDENTIFIER);
-
-      if (!environmentProperties.equals(existingEnvironmentConfigsMap)) {
-        LOGGER.info("Updating instance: {} with environment properties: {}", environmentProperties, _instanceId);
+      if (!environmentProperties.equals(znRecord.getMapField(CommonConstants.ENVIRONMENT_IDENTIFIER))) {
+        LOGGER.info("Updating instance: {} with environment properties: {}", _instanceId, environmentProperties);
         znRecord.setMapField(CommonConstants.ENVIRONMENT_IDENTIFIER, environmentProperties);
         updated = true;
       }
     }
+
+    // If 'shutdownInProgress' is not set (new instance, or not shut down properly), set it to prevent brokers routing
+    // queries to it before finishing the startup check
+    if (!Boolean.parseBoolean(simpleFields.get(Helix.IS_SHUTDOWN_IN_PROGRESS))) {
+      LOGGER.info(
+          "Updating instance: {} with '{}' to prevent brokers routing queries to it before finishing the startup check",
+          _instanceId, Helix.IS_SHUTDOWN_IN_PROGRESS);
+      simpleFields.put(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true));
+      updated = true;
+    }
+
     if (updated) {
       HelixHelper.updateInstanceConfig(_helixManager, instanceConfig);
     }
+  }
+
+  private boolean updatePortIfNeeded(Map<String, String> instanceConfigSimpleFields, String key, int port) {
+    String existingPortStr = instanceConfigSimpleFields.get(key);
+    if (port > 0) {
+      String portStr = Integer.toString(port);
+      if (!portStr.equals(existingPortStr)) {
+        LOGGER.info("Updating '{}' for instance: {} to: {}", key, _instanceId, port);
+        instanceConfigSimpleFields.put(key, portStr);
+        return true;
+      }
+    } else {
+      if (existingPortStr != null) {
+        LOGGER.info("Removing '{}' from instance: {}", key, _instanceId);
+        instanceConfigSimpleFields.remove(key);
+        return true;
+      }
+    }
+    return false;
   }
 
   private void setupHelixSystemProperties() {
@@ -377,8 +431,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // install default SSL context if necessary (even if not force-enabled everywhere)
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_serverConf, Server.SERVER_TLS_PREFIX);
-    if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath()) || StringUtils
-        .isNotBlank(tlsDefaults.getTrustStorePath())) {
+    if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath()) || StringUtils.isNotBlank(
+        tlsDefaults.getTrustStorePath())) {
       LOGGER.info("Installing default SSL context for any client requests");
       TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
     }
@@ -387,7 +441,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     String accessControlFactoryClass =
         _serverConf.getProperty(Server.ACCESS_CONTROL_FACTORY_CLASS, Server.DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
     LOGGER.info("Using class: {} as the AccessControlFactory", accessControlFactoryClass);
-    final AccessControlFactory accessControlFactory;
+    AccessControlFactory accessControlFactory;
     try {
       accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
     } catch (Exception e) {
@@ -399,10 +453,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Initializing server instance and registering state model factory");
     Utils.logVersions();
     ControllerLeaderLocator.create(_helixManager);
-    ServerSegmentCompletionProtocolHandler
-        .init(_serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
-    ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
-    _serverInstance = new ServerInstance(serverInstanceConfig, _helixManager, accessControlFactory);
+    ServerSegmentCompletionProtocolHandler.init(
+        _serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
+    ServerConf serverConf = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_serverConf);
+    _serverInstance = new ServerInstance(serverConf, _helixManager, accessControlFactory);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     initSegmentFetcher(_serverConf);
@@ -417,52 +471,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Connecting Helix manager");
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
-    updateInstanceConfigIfNeeded();
+    updateInstanceConfigIfNeeded(serverConf);
 
     // Start restlet server for admin API endpoint
-
-    // Update admin API port
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _adminApiApplication = new AdminApiApplication(_serverInstance, accessControlFactory, _serverConf);
     _adminApiApplication.start(_listenerConfigs);
-
-    // Update http admin port
-    Optional<ListenerConfig> adminApiHttp =
-        _listenerConfigs.stream().filter(listener -> CommonConstants.HTTP_PROTOCOL.equals(listener.getProtocol()))
-            .findFirst();
-    if (adminApiHttp.isPresent()) {
-      _helixAdmin.setConfig(_instanceConfigScope,
-          Collections.singletonMap(Instance.ADMIN_PORT_KEY, String.valueOf(adminApiHttp.get().getPort())));
-    } else {
-      _helixAdmin.removeConfig(_instanceConfigScope, Collections.singletonList(Instance.ADMIN_PORT_KEY));
-    }
-
-    // Update https admin port
-    Optional<ListenerConfig> adminApiHttps =
-        _listenerConfigs.stream().filter(listener -> CommonConstants.HTTPS_PROTOCOL.equals(listener.getProtocol()))
-            .findFirst();
-    if (adminApiHttps.isPresent()) {
-      _helixAdmin.setConfig(_instanceConfigScope,
-          Collections.singletonMap(Instance.ADMIN_HTTPS_PORT_KEY, String.valueOf(adminApiHttps.get().getPort())));
-    } else {
-      _helixAdmin.removeConfig(_instanceConfigScope, Collections.singletonList(Instance.ADMIN_HTTPS_PORT_KEY));
-    }
-
-    // Update nettytls port
-    if (serverInstanceConfig.isNettyTlsServerEnabled()) {
-      _helixAdmin.setConfig(_instanceConfigScope,
-          Collections.singletonMap(Instance.NETTYTLS_PORT_KEY, String.valueOf(serverInstanceConfig.getNettyTlsPort())));
-    } else {
-      _helixAdmin.removeConfig(_instanceConfigScope, Collections.singletonList(Instance.NETTYTLS_PORT_KEY));
-    }
-
-    // Update gRPC port
-    if (serverInstanceConfig.isEnableGrpcServer()) {
-      _helixAdmin.setConfig(_instanceConfigScope,
-          Collections.singletonMap(Instance.GRPC_PORT_KEY, String.valueOf(serverInstanceConfig.getGrpcPort())));
-    } else {
-      _helixAdmin.removeConfig(_instanceConfigScope, Collections.singletonList(Instance.GRPC_PORT_KEY));
-    }
 
     // Init QueryRewriterFactory
     LOGGER.info("Initializing QueryRewriterFactory");
@@ -475,8 +489,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
 
     serverMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _helixManager.isConnected() ? 1L : 0L);
-    _helixManager
-        .addPreConnectCallback(() -> serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
+    _helixManager.addPreConnectCallback(
+        () -> serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
     // Register the service status handler
     registerServiceStatusHandler();
@@ -531,14 +545,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     long endTimeMs =
         startTimeMs + _serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_TIMEOUT_MS, Server.DEFAULT_SHUTDOWN_TIMEOUT_MS);
-    if (_serverConf
-        .getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, Server.DEFAULT_SHUTDOWN_ENABLE_QUERY_CHECK)) {
+    if (_serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK,
+        Server.DEFAULT_SHUTDOWN_ENABLE_QUERY_CHECK)) {
       shutdownQueryCheck(endTimeMs);
     }
     _helixManager.disconnect();
     _serverInstance.shutDown();
-    if (_serverConf
-        .getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_RESOURCE_CHECK, Server.DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK)) {
+    if (_serverConf.getProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_RESOURCE_CHECK,
+        Server.DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK)) {
       shutdownResourceCheck(endTimeMs);
     }
     _serverQueriesDisabledTracker.stop();
@@ -575,8 +589,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       long sleepTimeMs = Math.min(noQueryThresholdMs - noQueryTimeMs, endTimeMs - currentTimeMs);
       LOGGER.info(
           "Sleep for {}ms as there are still incoming queries (no query time: {}ms is smaller than the threshold: "
-              + "{}ms)",
-          sleepTimeMs, noQueryTimeMs, noQueryThresholdMs);
+              + "{}ms)", sleepTimeMs, noQueryTimeMs, noQueryThresholdMs);
       try {
         Thread.sleep(sleepTimeMs);
       } catch (InterruptedException e) {
@@ -717,6 +730,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
   @Override
   public PinotConfiguration getConfig() {
     return _serverConf;
+  }
+
+  @VisibleForTesting
+  public ServerInstance getServerInstance() {
+    return _serverInstance;
   }
 
   /**
