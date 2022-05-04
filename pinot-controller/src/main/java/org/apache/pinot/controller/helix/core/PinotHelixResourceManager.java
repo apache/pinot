@@ -3010,7 +3010,7 @@ public class PinotHelixResourceManager {
     String segmentLineageEntryId = SegmentLineageUtils.generateLineageEntryId();
 
     // Check that all the segments from 'segmentsFrom' exist in the table
-    Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType, false));
+    Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType, true));
     Preconditions.checkArgument(segmentsForTable.containsAll(segmentsFrom), String.format(
         "Not all segments from 'segmentsFrom' are available in the table. (tableName = '%s', segmentsFrom = '%s', "
             + "segmentsTo = '%s', segmentsFromTable = '%s')", tableNameWithType, segmentsFrom, segmentsTo,
@@ -3060,17 +3060,19 @@ public class PinotHelixResourceManager {
           // By here, the lineage entry is either 'IN_PROGRESS' or 'COMPLETED'.
 
           // When 'forceCleanup' is enabled, we need to proactively clean up at the following cases:
-          // 1. Revert the lineage entry when we find the lineage entry with overlapped 'segmentFrom' values. This is
-          //    used to un-block the segment replacement protocol if the previous attempt failed in the middle.
+          // 1. Revert the lineage entry when we find the lineage entry with overlapped 'segmentsFrom' or 'segmentsTo'
+          //    values. This is used to un-block the segment replacement protocol if the previous attempt failed in the
+          //    middle.
           // 2. Proactively delete the oldest data snapshot to make sure that we only keep at most 2 data snapshots
           //    at any time in case of REFRESH use case.
           if (forceCleanup) {
-            if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && !Collections
-                .disjoint(segmentsFrom, lineageEntry.getSegmentsFrom())) {
+            if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && (!Collections
+                .disjoint(segmentsFrom, lineageEntry.getSegmentsFrom()) || !Collections
+                .disjoint(segmentsTo, lineageEntry.getSegmentsTo()))) {
               LOGGER.info(
-                  "Detected the incomplete lineage entry with the same 'segmentsFrom'. Reverting the lineage "
-                      + "entry to unblock the new segment protocol. tableNameWithType={}, entryId={}, segmentsFrom={}, "
-                      + "segmentsTo={}", tableNameWithType, entryId, lineageEntry.getSegmentsFrom(),
+                  "Detected the incomplete lineage entry with the same 'segmentsFrom' or 'segmentsTo'. Reverting the "
+                      + "lineage entry to unblock the new segment protocol. tableNameWithType={}, entryId={}, "
+                      + "segmentsFrom={}, segmentsTo={}", tableNameWithType, entryId, lineageEntry.getSegmentsFrom(),
                   lineageEntry.getSegmentsTo());
 
               // Update segment lineage entry to 'REVERTED'
