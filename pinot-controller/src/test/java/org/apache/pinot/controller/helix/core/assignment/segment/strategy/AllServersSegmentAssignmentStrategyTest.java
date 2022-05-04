@@ -16,10 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix.core.assignment.segment;
+package org.apache.pinot.controller.helix.core.assignment.segment.strategy;
 
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -29,8 +30,14 @@ import org.apache.helix.HelixProperty;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.controller.helix.core.assignment.segment.OfflineSegmentAssignment;
+import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
+import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
+import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentTestUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -43,7 +50,7 @@ import static org.testng.Assert.assertEqualsNoOrder;
 import static org.testng.Assert.assertTrue;
 
 
-public class OfflineDimTableSegmentAssignmentTest {
+public class AllServersSegmentAssignmentStrategyTest {
   private static final String INSTANCE_NAME_PREFIX = "instance_";
   private static final int NUM_INSTANCES = 10;
   private static final List<String> INSTANCES =
@@ -56,19 +63,35 @@ public class OfflineDimTableSegmentAssignmentTest {
 
   private SegmentAssignment _segmentAssignment;
   private HelixManager _helixManager;
+  private static final String INSTANCE_PARTITIONS_NAME =
+      InstancePartitionsType.OFFLINE.getInstancePartitionsName(RAW_TABLE_NAME);
+  private static final String COMPLETED_INSTANCE_NAME_PREFIX = "completedInstance_";
+  private static final String COMPLETED_INSTANCE_PARTITIONS_NAME =
+      InstancePartitionsType.COMPLETED.getInstancePartitionsName(RAW_TABLE_NAME);
+  private static final List<String> COMPLETED_INSTANCES =
+      SegmentAssignmentTestUtils.getNameList(COMPLETED_INSTANCE_NAME_PREFIX, NUM_INSTANCES);
+
+  private Map<InstancePartitionsType, InstancePartitions> _instancePartitionsMap = new HashMap<>();
 
   @BeforeClass
   public void setup() {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setIsDimTable(true).build();
-
     _helixManager = mock(HelixManager.class);
+    InstancePartitions instancePartitions = new InstancePartitions(INSTANCE_PARTITIONS_NAME);
+    instancePartitions.setInstances(0, 0, INSTANCES);
+
+    InstancePartitions completedInstancePartitions = new InstancePartitions(COMPLETED_INSTANCE_PARTITIONS_NAME);
+    completedInstancePartitions.setInstances(0, 0, COMPLETED_INSTANCES);
+
+    _instancePartitionsMap.put(InstancePartitionsType.OFFLINE, instancePartitions);
+    _instancePartitionsMap.put(InstancePartitionsType.COMPLETED, completedInstancePartitions);
     _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
   }
 
   @Test
   public void testFactory() {
-    assertTrue(_segmentAssignment instanceof OfflineDimTableSegmentAssignment);
+    assertTrue(_segmentAssignment instanceof OfflineSegmentAssignment);
   }
 
   @Test
@@ -85,7 +108,7 @@ public class OfflineDimTableSegmentAssignmentTest {
     when(dataAccessor.getChildValues(builder.instanceConfigs(), true)).thenReturn(instanceConfigList);
     when(_helixManager.getHelixDataAccessor()).thenReturn(dataAccessor);
 
-    List<String> instances = _segmentAssignment.assignSegment(SEGMENT_NAME, new TreeMap(), new TreeMap());
+    List<String> instances = _segmentAssignment.assignSegment(SEGMENT_NAME, new TreeMap(), _instancePartitionsMap);
     assertEquals(instances.size(), NUM_INSTANCES);
     assertEqualsNoOrder(instances.toArray(), INSTANCES.toArray());
 
@@ -101,7 +124,7 @@ public class OfflineDimTableSegmentAssignmentTest {
     when(dataAccessor.getChildValues(builder.instanceConfigs(), true)).thenReturn(instanceConfigList);
 
     Map<String, Map<String, String>> newAssignment =
-        _segmentAssignment.rebalanceTable(currentAssignment, new TreeMap<>(), null, null, null);
+        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, null);
     assertEquals(newAssignment.get(SEGMENT_NAME).size(), NUM_INSTANCES - 1);
   }
 
@@ -119,7 +142,7 @@ public class OfflineDimTableSegmentAssignmentTest {
     when(dataAccessor.getChildValues(builder.instanceConfigs(), true)).thenReturn(instanceConfigList);
     when(_helixManager.getHelixDataAccessor()).thenReturn(dataAccessor);
 
-    List<String> instances = _segmentAssignment.assignSegment(SEGMENT_NAME, new TreeMap(), new TreeMap());
+    List<String> instances = _segmentAssignment.assignSegment(SEGMENT_NAME, new TreeMap(), _instancePartitionsMap);
     assertEquals(instances.size(), NUM_INSTANCES);
     assertEqualsNoOrder(instances.toArray(), INSTANCES.toArray());
   }

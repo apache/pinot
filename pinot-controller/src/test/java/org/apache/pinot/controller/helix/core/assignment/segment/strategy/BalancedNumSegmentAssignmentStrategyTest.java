@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix.core.assignment.segment;
+package org.apache.pinot.controller.helix.core.assignment.segment.strategy;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,6 +27,11 @@ import java.util.TreeMap;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.controller.helix.core.assignment.segment.OfflineSegmentAssignment;
+import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
+import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
+import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentTestUtils;
+import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -40,7 +45,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-public class OfflineNonReplicaGroupSegmentAssignmentTest {
+public class BalancedNumSegmentAssignmentStrategyTest {
   private static final int NUM_REPLICAS = 3;
   private static final String SEGMENT_NAME_PREFIX = "segment_";
   private static final int NUM_SEGMENTS = 100;
@@ -53,7 +58,6 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
   private static final String RAW_TABLE_NAME = "assignmentTable";
   private static final String INSTANCE_PARTITIONS_NAME =
       InstancePartitionsType.OFFLINE.getInstancePartitionsName(RAW_TABLE_NAME);
-
   private SegmentAssignment _segmentAssignment;
   private Map<InstancePartitionsType, InstancePartitions> _instancePartitionsMap;
 
@@ -96,8 +100,8 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
         assertEquals(instancesAssigned.get(replicaId), INSTANCES.get(expectedAssignedInstanceId));
         expectedAssignedInstanceId = (expectedAssignedInstanceId + 1) % NUM_INSTANCES;
       }
-      currentAssignment.put(segmentName,
-          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+      currentAssignment
+          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
   }
 
@@ -107,8 +111,8 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
     for (String segmentName : SEGMENTS) {
       List<String> instancesAssigned =
           _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
-      currentAssignment.put(segmentName,
-          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+      currentAssignment
+          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
 
     // There should be 100 segments assigned
@@ -125,8 +129,9 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
-    assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null,
-        new BaseConfiguration()), currentAssignment);
+    assertEquals(_segmentAssignment
+            .rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, new BaseConfiguration()),
+        currentAssignment);
   }
 
   @Test
@@ -135,8 +140,8 @@ public class OfflineNonReplicaGroupSegmentAssignmentTest {
     for (String segmentName : SEGMENTS) {
       List<String> instancesAssigned =
           _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
-      currentAssignment.put(segmentName,
-          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+      currentAssignment
+          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
 
     // Bootstrap table should reassign all segments based on their alphabetical order
