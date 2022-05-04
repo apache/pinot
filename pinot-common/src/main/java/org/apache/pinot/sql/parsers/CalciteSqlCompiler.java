@@ -29,7 +29,10 @@ public class CalciteSqlCompiler {
   }
 
   public static BrokerRequest compileToBrokerRequest(String query) {
-    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    return convertToBrokerRequest(CalciteSqlParser.compileToPinotQuery(query));
+  }
+
+  public static BrokerRequest convertToBrokerRequest(PinotQuery pinotQuery) {
     BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setPinotQuery(pinotQuery);
     // Set table name in broker request because it is used for access control, query routing etc.
