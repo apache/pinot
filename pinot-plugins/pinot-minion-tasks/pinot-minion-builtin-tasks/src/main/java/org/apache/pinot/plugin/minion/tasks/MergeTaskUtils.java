@@ -64,8 +64,9 @@ public class MergeTaskUtils {
       return null;
     }
     DateTimeFieldSpec fieldSpec = schema.getSpecForTimeColumn(timeColumn);
-    Preconditions.checkState(fieldSpec != null, "No valid spec found for time column: %s in schema for table: %s", timeColumn,
-        tableConfig.getTableName());
+    Preconditions
+        .checkState(fieldSpec != null, "No valid spec found for time column: %s in schema for table: %s", timeColumn,
+            tableConfig.getTableName());
 
     TimeHandlerConfig.Builder timeHandlerConfigBuilder = new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH);
 
