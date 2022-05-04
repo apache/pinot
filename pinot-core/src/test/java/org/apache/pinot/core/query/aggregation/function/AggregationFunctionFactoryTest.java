@@ -89,42 +89,42 @@ public class AggregationFunctionFactoryTest {
 
     function = getFunction("FiRsTwItHtImE", "(column,timeColumn,'BOOLEAN')");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
-    assertTrue(aggregationFunction instanceof LastIntValueWithTimeAggregationFunction);
+    assertTrue(aggregationFunction instanceof FirstIntValueWithTimeAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.FIRSTWITHTIME);
     assertEquals(aggregationFunction.getColumnName(), "firstWithTime_column_timeColumn_BOOLEAN");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
     function = getFunction("FiRsTwItHtImE", "(column,timeColumn,'INT')");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
-    assertTrue(aggregationFunction instanceof LastIntValueWithTimeAggregationFunction);
+    assertTrue(aggregationFunction instanceof FirstIntValueWithTimeAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.FIRSTWITHTIME);
     assertEquals(aggregationFunction.getColumnName(), "firstWithTime_column_timeColumn_INT");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
     function = getFunction("FiRsTwItHtImE", "(column,timeColumn,'LONG')");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
-    assertTrue(aggregationFunction instanceof LastLongValueWithTimeAggregationFunction);
+    assertTrue(aggregationFunction instanceof FirstLongValueWithTimeAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.FIRSTWITHTIME);
     assertEquals(aggregationFunction.getColumnName(), "firstWithTime_column_timeColumn_LONG");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
     function = getFunction("FiRsTwItHtImE", "(column,timeColumn,'FLOAT')");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
-    assertTrue(aggregationFunction instanceof LastFloatValueWithTimeAggregationFunction);
+    assertTrue(aggregationFunction instanceof FirstFloatValueWithTimeAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.FIRSTWITHTIME);
     assertEquals(aggregationFunction.getColumnName(), "firstWithTime_column_timeColumn_FLOAT");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
     function = getFunction("FiRsTwItHtImE", "(column,timeColumn,'DOUBLE')");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
-    assertTrue(aggregationFunction instanceof LastDoubleValueWithTimeAggregationFunction);
+    assertTrue(aggregationFunction instanceof FirstDoubleValueWithTimeAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.FIRSTWITHTIME);
     assertEquals(aggregationFunction.getColumnName(), "firstWithTime_column_timeColumn_DOUBLE");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
     function = getFunction("FiRsTwItHtImE", "(column,timeColumn,'STRING')");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
-    assertTrue(aggregationFunction instanceof LastStringValueWithTimeAggregationFunction);
+    assertTrue(aggregationFunction instanceof FirstStringValueWithTimeAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.FIRSTWITHTIME);
     assertEquals(aggregationFunction.getColumnName(), "firstWithTime_column_timeColumn_STRING");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
