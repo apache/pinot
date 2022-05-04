@@ -71,7 +71,7 @@ public class PinotUpsertRestletResource {
    * ```
    */
   @POST
-  @Path("/estimateHeapUsage")
+  @Path("/upsert/estimateHeapUsage")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Estimate memory usage for an upsert table", notes =
