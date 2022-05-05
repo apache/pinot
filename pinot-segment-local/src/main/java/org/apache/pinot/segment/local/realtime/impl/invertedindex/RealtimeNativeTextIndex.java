@@ -95,29 +95,15 @@ public class RealtimeNativeTextIndex implements MutableTextIndex {
 
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
-    MutableRoaringBitmap matchingDocIds = null;
+    MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
+    _readLock.lock();
     try {
-      _readLock.lock();
-      RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
-      RealTimeRegexpMatcher.regexMatch(searchQuery, _mutableFST, writer::add);
-      ImmutableRoaringBitmap matchingDictIds = writer.get();
-
-      for (PeekableIntIterator it = matchingDictIds.getIntIterator(); it.hasNext(); ) {
-        int dictId = it.next();
-        if (dictId >= 0) {
-          ImmutableRoaringBitmap docIds = _invertedIndex.getDocIds(dictId);
-          if (matchingDocIds == null) {
-            matchingDocIds = docIds.toMutableRoaringBitmap();
-          } else {
-            matchingDocIds.or(docIds);
-          }
-        }
+      RealTimeRegexpMatcher.regexMatch(searchQuery, _mutableFST, dictId -> matchingDocIds.or(_invertedIndex.getDocIds(dictId)));
+      return matchingDocIds;
       }
     } finally {
       _readLock.unlock();
     }
-
-    return matchingDocIds == null ? new MutableRoaringBitmap() : matchingDocIds;
   }
 
   @Override
