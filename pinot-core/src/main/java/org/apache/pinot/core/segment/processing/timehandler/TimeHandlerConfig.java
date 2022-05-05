@@ -24,9 +24,11 @@ package org.apache.pinot.core.segment.processing.timehandler;
 public class TimeHandlerConfig {
   private final TimeHandler.Type _type;
 
-  // Time values not within the time range [_startTimeMs, _endTimeMs) are filtered out
+  // By default negateWindowFilter is false, and the time values not within the time range [_startTimeMs, _endTimeMs)
+  // are filtered out. Otherwise, those inside the time range are filtered out instead.
   private final long _startTimeMs;
   private final long _endTimeMs;
+  private final boolean _negateWindowFilter;
 
   // Time values are rounded (floored) to the nearest time bucket
   // newTimeValue = (originalTimeValue / _roundBucketMs) * _roundBucketMs
@@ -36,11 +38,12 @@ public class TimeHandlerConfig {
   // partition = Long.toString(timeMs / _partitionBucketMs)
   private final long _partitionBucketMs;
 
-  private TimeHandlerConfig(TimeHandler.Type type, long startTimeMs, long endTimeMs, long roundBucketMs,
-      long partitionBucketMs) {
+  private TimeHandlerConfig(TimeHandler.Type type, long startTimeMs, long endTimeMs, boolean negateWindowFilter,
+      long roundBucketMs, long partitionBucketMs) {
     _type = type;
     _startTimeMs = startTimeMs;
     _endTimeMs = endTimeMs;
+    _negateWindowFilter = negateWindowFilter;
     _roundBucketMs = roundBucketMs;
     _partitionBucketMs = partitionBucketMs;
   }
@@ -57,6 +60,10 @@ public class TimeHandlerConfig {
     return _endTimeMs;
   }
 
+  public boolean isNegateWindowFilter() {
+    return _negateWindowFilter;
+  }
+
   public long getRoundBucketMs() {
     return _roundBucketMs;
   }
@@ -68,7 +75,8 @@ public class TimeHandlerConfig {
   @Override
   public String toString() {
     return "TimeHandlerConfig{" + "_type=" + _type + ", _startTimeMs=" + _startTimeMs + ", _endTimeMs=" + _endTimeMs
-        + ", _roundBucketMs=" + _roundBucketMs + ", _partitionBucketMs=" + _partitionBucketMs + '}';
+        + ", _negateWindowFilter=" + _negateWindowFilter + ", _roundBucketMs=" + _roundBucketMs
+        + ", _partitionBucketMs=" + _partitionBucketMs + '}';
   }
 
   public static class Builder {
@@ -76,6 +84,7 @@ public class TimeHandlerConfig {
 
     private long _startTimeMs = -1;
     private long _endTimeMs = -1;
+    private boolean _negateWindowFilter = false;
     private long _roundBucketMs = -1;
     private long _partitionBucketMs = -1;
 
@@ -86,6 +95,11 @@ public class TimeHandlerConfig {
     public Builder setTimeRange(long startTimeMs, long endTimeMs) {
       _startTimeMs = startTimeMs;
       _endTimeMs = endTimeMs;
+      return this;
+    }
+
+    public Builder setNegateWindowFilter(boolean negateWindowFilter) {
+      _negateWindowFilter = negateWindowFilter;
       return this;
     }
 
@@ -100,7 +114,8 @@ public class TimeHandlerConfig {
     }
 
     public TimeHandlerConfig build() {
-      return new TimeHandlerConfig(_type, _startTimeMs, _endTimeMs, _roundBucketMs, _partitionBucketMs);
+      return new TimeHandlerConfig(_type, _startTimeMs, _endTimeMs, _negateWindowFilter, _roundBucketMs,
+          _partitionBucketMs);
     }
   }
 }

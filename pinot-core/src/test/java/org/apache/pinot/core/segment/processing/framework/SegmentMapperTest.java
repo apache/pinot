@@ -224,9 +224,10 @@ public class SegmentMapperTest {
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setPartitionerConfigs(
             Arrays.asList(
                 new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.COLUMN_VALUE)
-                    .setColumnName("campaign").build(), new PartitionerConfig.Builder().setPartitionerType(
-                        PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG).setColumnName("clicks")
-                    .setColumnPartitionConfig(new ColumnPartitionConfig("Modulo", 3, null)).build())).build();
+                    .setColumnName("campaign").build(), new PartitionerConfig.Builder()
+                    .setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
+                    .setColumnName("clicks").setColumnPartitionConfig(new ColumnPartitionConfig("Modulo", 3, null))
+                    .build())).build();
     Map<String, List<Object[]>> expectedRecords4 = new HashMap<>();
     for (Object[] record : outputData) {
       String partition = "0_" + record[0] + "_" + ((int) record[1] % 3);
@@ -267,11 +268,21 @@ public class SegmentMapperTest {
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
             new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597795200000L, 1597881600000L)
                 .setRoundBucketMs(3600000).setPartitionBucketMs(86400000).build()).build();
-    Map<String, List<Object[]>> expectedRecords9 =
+    Map<String, List<Object[]>> expectedRecords8 =
         outputData.stream().filter(r -> ((long) r[2]) >= 1597795200000L && ((long) r[2]) < 1597881600000L)
             .map(r -> new Object[]{r[0], r[1], (((long) r[2]) / 3600000) * 3600000})
             .collect(Collectors.groupingBy(r -> Long.toString(((long) r[2]) / 86400000), Collectors.toList()));
-    inputs.add(new Object[]{config8, expectedRecords9});
+    inputs.add(new Object[]{config8, expectedRecords8});
+
+    // Time handling - negate filter with certain times
+    SegmentProcessorConfig config9 =
+        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
+            new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597795200000L, 1597881600000L)
+                .setNegateWindowFilter(true).build()).build();
+    Map<String, List<Object[]>> expectedRecords9 =
+        outputData.stream().filter(r -> !(((long) r[2]) >= 1597795200000L && ((long) r[2]) < 1597881600000L))
+            .collect(Collectors.groupingBy(r -> "0", Collectors.toList()));
+    inputs.add(new Object[]{config9, expectedRecords9});
 
     return inputs.toArray(new Object[0][]);
   }

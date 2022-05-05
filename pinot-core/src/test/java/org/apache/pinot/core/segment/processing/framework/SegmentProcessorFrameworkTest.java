@@ -281,6 +281,23 @@ public class SegmentProcessorFrameworkTest {
     FileUtils.cleanDirectory(workingDir);
     rewindRecordReaders(_singleSegment);
 
+    // Negate time filter
+    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
+        new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597795200000L, 1597881600000L)
+            .setNegateWindowFilter(true).build()).build();
+    framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 1);
+    segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
+    assertEquals(segmentMetadata.getTotalDocs(), 5);
+    timeMetadata = segmentMetadata.getColumnMetadataFor("time");
+    assertEquals(timeMetadata.getCardinality(), 5);
+    assertEquals(timeMetadata.getMinValue(), 1597719600000L);
+    assertEquals(timeMetadata.getMaxValue(), 1597892400000L);
+    assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
+
     // Time filter - filtered everything
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
         new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597968000000L, 1598054400000L).build())
