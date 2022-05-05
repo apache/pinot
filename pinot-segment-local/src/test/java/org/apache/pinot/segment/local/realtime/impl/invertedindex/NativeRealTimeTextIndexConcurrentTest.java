@@ -34,7 +34,7 @@ import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.AssertJUnit.assertTrue;
 
 
-public class RealtimeNativeTextIndexConcurrentTest {
+public class NativeRealTimeTextIndexConcurrentTest {
   private ExecutorService _threadPool;
   private Set<String> _resultSet;
 
@@ -61,7 +61,7 @@ public class RealtimeNativeTextIndexConcurrentTest {
     words.add("cdd");
     words.add("efg");
 
-    try (RealtimeNativeTextIndex textIndex = new RealtimeNativeTextIndex("testFSTColumn")) {
+    try (NativeRealTimeTextIndex textIndex = new NativeRealTimeTextIndex("testFSTColumn")) {
       _threadPool.submit(() -> {
         try {
           performReads(textIndex, words, 10, 200, countDownLatch);
@@ -108,7 +108,7 @@ public class RealtimeNativeTextIndexConcurrentTest {
     mergedThreadWords.addAll(firstThreadWords);
     mergedThreadWords.addAll(secondThreadWords);
 
-    try (RealtimeNativeTextIndex textIndex = new RealtimeNativeTextIndex("testFSTColumn")) {
+    try (NativeRealTimeTextIndex textIndex = new NativeRealTimeTextIndex("testFSTColumn")) {
       _threadPool.submit(() -> {
         try {
           performReads(textIndex, mergedThreadWords, 10, 200, countDownLatch);
@@ -163,7 +163,7 @@ public class RealtimeNativeTextIndexConcurrentTest {
     mergedThreadWords.addAll(firstThreadWords);
     mergedThreadWords.addAll(secondThreadWords);
 
-    try (RealtimeNativeTextIndex textIndex = new RealtimeNativeTextIndex("testFSTColumn")) {
+    try (NativeRealTimeTextIndex textIndex = new NativeRealTimeTextIndex("testFSTColumn")) {
       _threadPool.submit(() -> {
         try {
           performReads(textIndex, firstThreadWords, 15, 200, countDownLatch);
@@ -218,7 +218,7 @@ public class RealtimeNativeTextIndexConcurrentTest {
     mergedThreadWords.addAll(firstThreadWords);
     mergedThreadWords.addAll(secondThreadWords);
 
-    try (RealtimeNativeTextIndex textIndex = new RealtimeNativeTextIndex("testFSTColumn")) {
+    try (NativeRealTimeTextIndex textIndex = new NativeRealTimeTextIndex("testFSTColumn")) {
       _threadPool.submit(() -> {
         try {
           performReads(textIndex, firstThreadWords, 10, 200, countDownLatch);
@@ -264,7 +264,7 @@ public class RealtimeNativeTextIndexConcurrentTest {
     assertTrue("efg not found in result set", _resultSet.contains("efg"));
   }
 
-  private void performReads(RealtimeNativeTextIndex textIndex, List<String> words, int count, long sleepTime,
+  private void performReads(NativeRealTimeTextIndex textIndex, List<String> words, int count, long sleepTime,
       CountDownLatch countDownLatch)
       throws InterruptedException {
 
@@ -291,7 +291,7 @@ public class RealtimeNativeTextIndexConcurrentTest {
     countDownLatch.countDown();
   }
 
-  private void performWrites(RealtimeNativeTextIndex textIndex, List<String> words, long sleepTime,
+  private void performWrites(NativeRealTimeTextIndex textIndex, List<String> words, long sleepTime,
       CountDownLatch countDownLatch)
       throws InterruptedException {
 

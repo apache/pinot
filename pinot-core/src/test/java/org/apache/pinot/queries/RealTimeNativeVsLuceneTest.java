@@ -24,7 +24,7 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeNativeTextIndex;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeRealTimeTextIndex;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -38,7 +38,7 @@ public class RealTimeNativeVsLuceneTest extends BaseQueriesTest {
   private static final String TEXT_COLUMN_NAME = "testColumnName";
 
   private RealtimeLuceneTextIndex _realtimeLuceneTextIndex;
-  private RealtimeNativeTextIndex _realtimeNativeTextIndex;
+  private NativeRealTimeTextIndex _nativeRealTimeTextIndex;
 
   private List<String> getTextData() {
     return Arrays.asList("Prince Andrew kept looking with an amused smile from Pierre",
@@ -56,12 +56,12 @@ public class RealTimeNativeVsLuceneTest extends BaseQueriesTest {
   public void setUp()
       throws Exception {
     _realtimeLuceneTextIndex = new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar");
-    _realtimeNativeTextIndex = new RealtimeNativeTextIndex(TEXT_COLUMN_NAME);
+    _nativeRealTimeTextIndex = new NativeRealTimeTextIndex(TEXT_COLUMN_NAME);
     List<String> documents = getTextData();
 
     for (String doc : documents) {
       _realtimeLuceneTextIndex.add(doc);
-      _realtimeNativeTextIndex.add(doc);
+      _nativeRealTimeTextIndex.add(doc);
     }
 
     SearcherManager searcherManager = _realtimeLuceneTextIndex.getSearcherManager();
@@ -117,7 +117,7 @@ public class RealTimeNativeVsLuceneTest extends BaseQueriesTest {
     MutableRoaringBitmap resultset = _realtimeLuceneTextIndex.getDocIds(luceneQuery);
     Assert.assertNotNull(resultset);
 
-    MutableRoaringBitmap resultset2 = _realtimeNativeTextIndex.getDocIds(nativeQuery);
+    MutableRoaringBitmap resultset2 = _nativeRealTimeTextIndex.getDocIds(nativeQuery);
     Assert.assertNotNull(resultset2);
 
     Assert.assertEquals(resultset.getCardinality(), resultset2.getCardinality());

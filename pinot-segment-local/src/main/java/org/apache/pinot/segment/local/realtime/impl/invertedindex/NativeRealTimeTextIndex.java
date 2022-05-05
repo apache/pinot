@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,20 +40,22 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public class RealtimeNativeTextIndex implements MutableTextIndex {
+public class NativeRealTimeTextIndex implements MutableTextIndex {
   private final String _column;
   private final MutableFST _mutableFST;
   private final RealtimeInvertedIndex _invertedIndex;
-  private final Map<String, Integer> _termToDictIdMapping;
-  private int _nextDocId = 0;
-  private int _nextDictId = 0;
+  //TODO: Move to mutable dictionary
+  private final Object2IntOpenHashMap<String> _termToDictIdMapping;
   private final ReentrantReadWriteLock.ReadLock _readLock;
   private final ReentrantReadWriteLock.WriteLock _writeLock;
 
-  public RealtimeNativeTextIndex(String column) {
+  private int _nextDocId = 0;
+  private int _nextDictId = 0;
+
+  public NativeRealTimeTextIndex(String column) {
     _column = column;
     _mutableFST = new MutableFSTImpl();
-    _termToDictIdMapping = new HashMap<>();
+    _termToDictIdMapping = new Object2IntOpenHashMap<>();
     _invertedIndex = new RealtimeInvertedIndex();
 
     ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
@@ -66,21 +69,18 @@ public class RealtimeNativeTextIndex implements MutableTextIndex {
     try {
       tokens = analyze(document, new StandardAnalyzer(LuceneTextIndexCreator.ENGLISH_STOP_WORDS_SET));
     } catch (IOException e) {
-      throw new RuntimeException(e.getMessage());
+      throw new RuntimeException(e);
     }
 
+    _writeLock.lock();
     try {
-      _writeLock.lock();
       for (String token : tokens) {
-        Integer currentDictId = _termToDictIdMapping.get(token);
-        if (currentDictId == null) {
-
-          currentDictId = _nextDictId;
-          _mutableFST.addPath(token, currentDictId);
-          _termToDictIdMapping.put(token, currentDictId);
-          ++_nextDictId;
-        }
-        addToPostingList(currentDictId);
+        Integer currentDictId = _termToDictIdMapping.computeIfAbsent(token, k -> {
+          int localDictId = _nextDictId++;
+          _mutableFST.addPath(token, localDictId);
+          return localDictId;
+        });
+        _invertedIndex.add(currentDictId, _nextDocId);
       }
       _nextDocId++;
     } finally {
@@ -98,9 +98,9 @@ public class RealtimeNativeTextIndex implements MutableTextIndex {
     MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
     _readLock.lock();
     try {
-      RealTimeRegexpMatcher.regexMatch(searchQuery, _mutableFST, dictId -> matchingDocIds.or(_invertedIndex.getDocIds(dictId)));
+      RealTimeRegexpMatcher.regexMatch(searchQuery, _mutableFST,
+          dictId -> matchingDocIds.or(_invertedIndex.getDocIds(dictId)));
       return matchingDocIds;
-      }
     } finally {
       _readLock.unlock();
     }
@@ -121,12 +121,5 @@ public class RealtimeNativeTextIndex implements MutableTextIndex {
       result.add(attr.toString());
     }
     return result;
-  }
-
-  /**
-   * Adds the given value to the posting list.
-   */
-  void addToPostingList(int dictId) {
-    _invertedIndex.add(dictId, _nextDocId);
   }
 }

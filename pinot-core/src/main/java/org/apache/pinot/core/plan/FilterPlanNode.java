@@ -49,7 +49,7 @@ import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEv
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeNativeTextIndex;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeRealTimeTextIndex;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -248,7 +248,7 @@ public class FilterPlanNode implements PlanNode {
             case TEXT_CONTAINS:
               TextIndexReader textIndexReader = dataSource.getTextIndex();
               if (!(textIndexReader instanceof NativeTextIndexReader)
-                  && !(textIndexReader instanceof RealtimeNativeTextIndex)) {
+                  && !(textIndexReader instanceof NativeRealTimeTextIndex)) {
                 throw new UnsupportedOperationException("TEXT_CONTAINS is supported only on native text index");
               }
               return new TextContainsFilterOperator(textIndexReader, (TextContainsPredicate) predicate, numDocs);

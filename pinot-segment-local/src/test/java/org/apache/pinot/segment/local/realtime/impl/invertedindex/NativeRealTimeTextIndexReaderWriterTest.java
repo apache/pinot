@@ -23,7 +23,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class RealtimeNativeTextIndexReaderWriterTest {
+public class NativeRealTimeTextIndexReaderWriterTest {
 
   @Test
   public void testIndexWriterReader()
@@ -34,7 +34,7 @@ public class RealtimeNativeTextIndexReaderWriterTest {
     uniqueValues[2] = "still";
     uniqueValues[3] = "zoobar";
 
-    try (RealtimeNativeTextIndex textIndex = new RealtimeNativeTextIndex("testFSTColumn")) {
+    try (NativeRealTimeTextIndex textIndex = new NativeRealTimeTextIndex("testFSTColumn")) {
       for (int i = 0; i < 4; i++) {
         textIndex.add(uniqueValues[i]);
       }
