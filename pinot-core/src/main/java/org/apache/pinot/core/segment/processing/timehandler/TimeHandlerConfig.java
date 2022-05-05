@@ -24,7 +24,8 @@ package org.apache.pinot.core.segment.processing.timehandler;
 public class TimeHandlerConfig {
   private final TimeHandler.Type _type;
 
-  // Time values not within the time range [_startTimeMs, _endTimeMs) are filtered out
+  // By default negateWindowFilter is false, and the time values not within the time range [_startTimeMs, _endTimeMs)
+  // are filtered out. Otherwise, those inside the time range are filtered out instead.
   private final long _startTimeMs;
   private final long _endTimeMs;
   private final boolean _negateWindowFilter;
@@ -59,7 +60,7 @@ public class TimeHandlerConfig {
     return _endTimeMs;
   }
 
-  public boolean getNegateWindowFilter() {
+  public boolean isNegateWindowFilter() {
     return _negateWindowFilter;
   }
 
