@@ -73,9 +73,9 @@ public abstract class BaseQueriesTest {
    */
   @SuppressWarnings({"rawtypes", "unchecked"})
   protected <T extends Operator> T getOperator(String query) {
-    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
-    BrokerRequest serverBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(serverBrokerRequest.getPinotQuery());
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(serverPinotQuery);
     return (T) PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
   }
 
@@ -149,11 +149,10 @@ public abstract class BaseQueriesTest {
    * <p>The result should be equivalent to querying 4 identical index segments.
    */
   private BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery, PlanMaker planMaker) {
-    BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
-    BrokerRequest serverBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
+    PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
-    QueryContext serverQueryContext = serverBrokerRequest == brokerRequest ? queryContext
-        : QueryContextConverterUtils.getQueryContext(serverBrokerRequest.getPinotQuery());
+    QueryContext serverQueryContext =
+        serverPinotQuery == pinotQuery ? queryContext : QueryContextConverterUtils.getQueryContext(serverPinotQuery);
 
     // Server side
     serverQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
@@ -176,6 +175,9 @@ public abstract class BaseQueriesTest {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+    BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
+    BrokerRequest serverBrokerRequest =
+        serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
     BrokerResponseNative brokerResponse =
         brokerReduceService.reduceOnDataTable(brokerRequest, serverBrokerRequest, dataTableMap,
             CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
