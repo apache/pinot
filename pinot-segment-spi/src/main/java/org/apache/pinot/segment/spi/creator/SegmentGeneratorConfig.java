@@ -203,24 +203,16 @@ public class SegmentGeneratorConfig implements Serializable {
         }
       }
 
-      if (indexingConfig.isCreateAllIndicesDuringSegmentGeneration()) {
-        if ((indexingConfig.getBloomFilterColumns() != null || indexingConfig.getBloomFilterConfigs() != null)) {
-          if (indexingConfig.getBloomFilterColumns() != null) {
-            _bloomFilterCreationColumns.addAll(indexingConfig.getBloomFilterColumns());
-          }
+      if (indexingConfig.getBloomFilterColumns() != null) {
+        _bloomFilterCreationColumns.addAll(indexingConfig.getBloomFilterColumns());
+      }
 
-          if (indexingConfig.getBloomFilterConfigs() != null) {
-            _bloomFilterCreationColumns.addAll(indexingConfig.getBloomFilterConfigs().keySet());
-          }
-        }
+      if (indexingConfig.getBloomFilterConfigs() != null) {
+        _bloomFilterCreationColumns.addAll(indexingConfig.getBloomFilterConfigs().keySet());
+      }
 
-        if (indexingConfig.getRangeIndexColumns() != null) {
-          _rangeIndexCreationColumns.addAll(indexingConfig.getRangeIndexColumns());
-        }
-
-        if (indexingConfig.getInvertedIndexColumns() != null) {
-          _invertedIndexCreationColumns.addAll(indexingConfig.getInvertedIndexColumns());
-        }
+      if (indexingConfig.getRangeIndexColumns() != null) {
+        _rangeIndexCreationColumns.addAll(indexingConfig.getRangeIndexColumns());
       }
 
       if (indexingConfig.getJsonIndexColumns() != null) {
