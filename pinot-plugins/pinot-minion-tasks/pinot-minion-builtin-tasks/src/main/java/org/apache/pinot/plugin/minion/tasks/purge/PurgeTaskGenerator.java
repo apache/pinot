@@ -20,6 +20,8 @@ package org.apache.pinot.plugin.minion.tasks.purge;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,11 +41,9 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 @TaskGenerator
 public class PurgeTaskGenerator extends BaseTaskGenerator {
     private static final Logger LOGGER = LoggerFactory.getLogger(PurgeTaskGenerator.class);
-
     private ClusterInfoAccessor _clusterInfoAccessor;
 
     @Override
@@ -59,7 +59,6 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
 
     @Override
     public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
-        // TODO: Pick lastly purged segment first to avoid looping again and again on the same segment
         LOGGER.info("Start generating PurgeTask");
         String taskType = MinionConstants.PurgeTask.TASK_TYPE;
         List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
@@ -97,6 +96,12 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
                 tableMaxNumTasks = Integer.MAX_VALUE;
             }
             List<SegmentZKMetadata> offlineSegmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(tableName);
+
+            Collections.sort(offlineSegmentsZKMetadata,
+                    Comparator.comparing(
+                        segmentZKMetadata -> segmentZKMetadata.getCustomMap().get(
+                            MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX),
+                        Comparator.nullsFirst(Comparator.naturalOrder())));
             int tableNumTasks = 0;
             Set<Segment> runningSegments =
                     TaskGeneratorUtils.getRunningSegments(MinionConstants.PurgeTask.TASK_TYPE, _clusterInfoAccessor);
@@ -110,7 +115,6 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
                 if (tableNumTasks == tableMaxNumTasks) {
                     break;
                 }
-
                 configs.put(MinionConstants.TABLE_NAME_KEY, tableName);
                 configs.put(MinionConstants.SEGMENT_NAME_KEY, segmentName);
                 configs.put(MinionConstants.DOWNLOAD_URL_KEY, segmentZKMetadata.getDownloadUrl());
