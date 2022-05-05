@@ -237,9 +237,28 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
             // entry and its segments
             Set<String> destinationSegments = new HashSet<>(lineageEntry.getSegmentsTo());
             destinationSegments.retainAll(segmentsForTable);
+
+            // Retain zombie segments for the case of rerunning the replace protocol with overlapping segment names.
+            // For the following example, we should not try to delete s1 and s2, but remove entry1 directly.
+            // entry1: { segmentsFrom: [], segmentsTo: [s1, s2], status: REVERTED}
+            // entry2: { segmentsFrom: [], segmentsTo: [s1, s2], status: IN_PROGRESS/COMPLETED}
+            if (lineageEntry.getState() == LineageEntryState.REVERTED) {
+              for (String otherLineageEntryId : segmentLineage.getLineageEntryIds()) {
+                LineageEntry otherLineageEntry = segmentLineage.getLineageEntry(otherLineageEntryId);
+                if (otherLineageEntry.getState() == LineageEntryState.COMPLETED
+                    || otherLineageEntry.getState() == LineageEntryState.IN_PROGRESS) {
+                  destinationSegments.removeAll(otherLineageEntry.getSegmentsTo());
+                }
+              }
+            }
+
             if (destinationSegments.isEmpty()) {
-              // If the lineage state is 'IN_PROGRESS or REVERTED' and source segments are already removed, it is safe
-              // to clean up the lineage entry. Deleting lineage will allow the task scheduler to re-schedule the source
+              // It is safe to clean up the lineage entry in following cases:
+              //  1. The lineage state is 'IN_PROGRESS' and segmentsTo are already removed.
+              //  2. The lineage state is 'REVERTED', all unneeded segments in segmentsTo are already removed.
+              //     (In the case of rerunning segment replacements, it's possible segmentsTo are needed if they are
+              //      in segmentsTo lists of 'IN_PROGRESS/COMPLETED' entries)
+              // For MergeRollupTask, deleting lineage will allow the task scheduler to re-schedule the source
               // segments to be merged again.
               segmentLineage.deleteLineageEntry(lineageEntryId);
             } else {

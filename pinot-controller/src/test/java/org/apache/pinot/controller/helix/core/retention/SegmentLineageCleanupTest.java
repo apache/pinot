@@ -112,7 +112,7 @@ public class SegmentLineageCleanupTest {
   public void testSegmentLineageCleanup()
       throws IOException, InterruptedException {
     // Create metadata for original segments.
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 7; i++) {
       ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_TABLE_NAME,
           SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "segment_" + i), "downloadUrl");
     }
@@ -123,7 +123,7 @@ public class SegmentLineageCleanupTest {
           SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "merged_" + i), "downloadUrl");
     }
     Assert.assertEquals(ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_TABLE_NAME, false).size(),
-        7);
+        9);
     long currentTimeInMillis = System.currentTimeMillis();
 
     // Validate the case when the lineage entry state is 'IN_PROGRESS'.
@@ -134,10 +134,10 @@ public class SegmentLineageCleanupTest {
     SegmentLineageAccessHelper
         .writeSegmentLineage(ControllerTestUtils.getHelixResourceManager().getPropertyStore(), segmentLineage, -1);
     _retentionManager.processTable(OFFLINE_TABLE_NAME);
-    waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 7);
+    waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 9);
     List<String> segmentsForTable =
         ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_TABLE_NAME, false);
-    Assert.assertEquals(segmentsForTable.size(), 7);
+    Assert.assertEquals(segmentsForTable.size(), 9);
 
     // Validate the case when the lineage entry state is 'COMPLETED'.
     segmentLineage.updateLineageEntry("0",
@@ -146,18 +146,18 @@ public class SegmentLineageCleanupTest {
     SegmentLineageAccessHelper
         .writeSegmentLineage(ControllerTestUtils.getHelixResourceManager().getPropertyStore(), segmentLineage, -1);
     _retentionManager.processTable(OFFLINE_TABLE_NAME);
-    waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 5);
+    waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 7);
     segmentsForTable = ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_TABLE_NAME, false);
-    Assert.assertEquals(segmentsForTable.size(), 5);
+    Assert.assertEquals(segmentsForTable.size(), 7);
     Assert.assertTrue(Collections.disjoint(segmentsForTable, Arrays.asList("segment_0", "segment_1")));
 
     // Validate the case when the lineage entry state is 'COMPLETED' and all segments are deleted.
     ControllerTestUtils.getHelixResourceManager().deleteSegment(OFFLINE_TABLE_NAME, "merged_0");
-    waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 4);
+    waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 6);
     _retentionManager.processTable(OFFLINE_TABLE_NAME);
-    waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 4);
+    waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 6);
     segmentsForTable = ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_TABLE_NAME, false);
-    Assert.assertEquals(segmentsForTable.size(), 4);
+    Assert.assertEquals(segmentsForTable.size(), 6);
     Assert.assertTrue(Collections.disjoint(segmentsForTable, Arrays.asList("segment_0", "segment_1", "merged_0")));
     segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(ControllerTestUtils.getHelixResourceManager().getPropertyStore(), OFFLINE_TABLE_NAME);
@@ -171,10 +171,60 @@ public class SegmentLineageCleanupTest {
     SegmentLineageAccessHelper
         .writeSegmentLineage(ControllerTestUtils.getHelixResourceManager().getPropertyStore(), segmentLineage, -1);
     _retentionManager.processTable(OFFLINE_TABLE_NAME);
-    waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 3);
+    waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 5);
     segmentsForTable = ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_TABLE_NAME, false);
-    Assert.assertEquals(segmentsForTable.size(), 3);
+    Assert.assertEquals(segmentsForTable.size(), 5);
     Assert.assertTrue(Collections.disjoint(segmentsForTable, Arrays.asList("merged_1", "merged_2")));
+    segmentLineage = SegmentLineageAccessHelper
+        .getSegmentLineage(ControllerTestUtils.getHelixResourceManager().getPropertyStore(), OFFLINE_TABLE_NAME);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 1);
+
+    // Validate not removing the segmentsTo for 'REVERTED' lineage entries, if they are in the segmentsTo list of
+    // 'IN_PROGRESS/COMPLETED' lineage entries.
+    // For the following case, entry2 is removed, no segment is removed.
+    // entry2: { segmentsFrom: [], segmentsTo: [s4, s5], status: REVERTED}
+    // entry3: { segmentsFrom: [], segmentsTo: [s4, s5], status: IN_PROGRESS/COMPLETED}
+    LineageEntry lineageEntry2 =
+        new LineageEntry(Collections.emptyList(), Arrays.asList("segment_4", "segment_5"), LineageEntryState.REVERTED,
+            currentTimeInMillis);
+    LineageEntry lineageEntry3 =
+        new LineageEntry(Collections.emptyList(), Arrays.asList("segment_4", "segment_5"),
+            LineageEntryState.IN_PROGRESS, currentTimeInMillis);
+    segmentLineage.addLineageEntry("2", lineageEntry2);
+    segmentLineage.addLineageEntry("3", lineageEntry3);
+    SegmentLineageAccessHelper
+        .writeSegmentLineage(ControllerTestUtils.getHelixResourceManager().getPropertyStore(), segmentLineage, -1);
+    _retentionManager.processTable(OFFLINE_TABLE_NAME);
+    waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 5);
+    segmentsForTable = ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_TABLE_NAME, false);
+    Assert.assertEquals(segmentsForTable.size(), 5);
+    segmentLineage = SegmentLineageAccessHelper
+        .getSegmentLineage(ControllerTestUtils.getHelixResourceManager().getPropertyStore(), OFFLINE_TABLE_NAME);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 1);
+    Assert.assertNull(segmentLineage.getLineageEntry("1"));
+    Assert.assertNull(segmentLineage.getLineageEntry("2"));
+
+    // For the following case, s4 is removed, entry2 will be removed for the next round.
+    // entry2: { segmentsFrom: [], segmentsTo: [s4, s5], status: REVERTED}
+    // entry3: { segmentsFrom: [], segmentsTo: [s5, s6], status: IN_PROGRESS/COMPLETED}
+    lineageEntry3 = new LineageEntry(Collections.emptyList(), Arrays.asList("segment_5", "segment_6"),
+        LineageEntryState.IN_PROGRESS, currentTimeInMillis);
+    segmentLineage.addLineageEntry("2", lineageEntry2);
+    segmentLineage.updateLineageEntry("3", lineageEntry3);
+    SegmentLineageAccessHelper
+        .writeSegmentLineage(ControllerTestUtils.getHelixResourceManager().getPropertyStore(), segmentLineage, -1);
+    _retentionManager.processTable(OFFLINE_TABLE_NAME);
+    waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 4);
+    segmentsForTable = ControllerTestUtils.getHelixResourceManager().getSegmentsFor(OFFLINE_TABLE_NAME, false);
+    Assert.assertEquals(segmentsForTable.size(), 4);
+    Assert.assertFalse(segmentsForTable.contains("segment_4"));
+    Assert.assertTrue(segmentsForTable.contains("segment_5"));
+    segmentLineage = SegmentLineageAccessHelper
+        .getSegmentLineage(ControllerTestUtils.getHelixResourceManager().getPropertyStore(), OFFLINE_TABLE_NAME);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 2);
+
+    _retentionManager.processTable(OFFLINE_TABLE_NAME);
+    waitForSegmentsToDelete(OFFLINE_TABLE_NAME, 4);
     segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(ControllerTestUtils.getHelixResourceManager().getPropertyStore(), OFFLINE_TABLE_NAME);
     Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 1);
