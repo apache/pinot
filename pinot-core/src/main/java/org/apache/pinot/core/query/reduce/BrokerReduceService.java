@@ -28,7 +28,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -53,7 +53,7 @@ public class BrokerReduceService extends BaseReduceService {
       return BrokerResponseNative.empty();
     }
 
-    Map<String, String> queryOptions = serverBrokerRequest.getPinotQuery().getQueryOptions();
+    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
     boolean enableTrace =
         queryOptions != null && Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE));
 
@@ -101,7 +101,7 @@ public class BrokerReduceService extends BaseReduceService {
       return brokerResponseNative;
     }
 
-    QueryContext serverQueryContext = BrokerRequestToQueryContextConverter.convert(serverBrokerRequest);
+    QueryContext serverQueryContext = QueryContextConverterUtils.getQueryContext(serverBrokerRequest.getPinotQuery());
     DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(serverQueryContext);
     dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
         new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
@@ -110,7 +110,7 @@ public class BrokerReduceService extends BaseReduceService {
     if (brokerRequest == serverBrokerRequest) {
       queryContext = serverQueryContext;
     } else {
-      queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+      queryContext = QueryContextConverterUtils.getQueryContext(brokerRequest.getPinotQuery());
       GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(queryContext);
       if (gapfillType != null) {
         GapfillProcessor gapfillProcessor = new GapfillProcessor(queryContext, gapfillType);

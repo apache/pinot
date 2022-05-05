@@ -616,7 +616,6 @@ public class CommonConstants {
         public static final String ENABLE_TRACE = "enableTrace";
         public static final String ENABLE_STREAMING = "enableStreaming";
         public static final String PAYLOAD_TYPE = "payloadType";
-        public static final String EXPLAIN = "explain";
       }
 
       public static class PayloadType {

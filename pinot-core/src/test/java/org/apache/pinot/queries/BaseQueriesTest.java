@@ -38,7 +38,7 @@ import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -49,6 +49,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
 /**
@@ -74,7 +75,7 @@ public abstract class BaseQueriesTest {
   protected <T extends Operator> T getOperator(String query) {
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
     BrokerRequest serverBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
-    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(serverBrokerRequest);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(serverBrokerRequest.getPinotQuery());
     return (T) PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
   }
 
@@ -130,8 +131,7 @@ public abstract class BaseQueriesTest {
    */
   private BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker,
       @Nullable Map<String, String> extraQueryOptions) {
-    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     if (extraQueryOptions != null) {
       Map<String, String> queryOptions = pinotQuery.getQueryOptions();
       if (queryOptions == null) {
@@ -140,11 +140,7 @@ public abstract class BaseQueriesTest {
       }
       queryOptions.putAll(extraQueryOptions);
     }
-    BrokerRequest serverBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
-    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    QueryContext serverQueryContext = brokerRequest == serverBrokerRequest ? queryContext
-        : BrokerRequestToQueryContextConverter.convert(serverBrokerRequest);
-    return getBrokerResponse(queryContext, serverQueryContext, planMaker);
+    return getBrokerResponse(pinotQuery, planMaker);
   }
 
   /**
@@ -152,14 +148,18 @@ public abstract class BaseQueriesTest {
    * <p>Use this to test the whole flow from server to broker.
    * <p>The result should be equivalent to querying 4 identical index segments.
    */
-  private BrokerResponseNative getBrokerResponse(QueryContext queryContext, QueryContext serverQueryContext,
-      PlanMaker planMaker) {
+  private BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery, PlanMaker planMaker) {
+    BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
+    BrokerRequest serverBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+    QueryContext serverQueryContext = serverBrokerRequest == brokerRequest ? queryContext
+        : QueryContextConverterUtils.getQueryContext(serverBrokerRequest.getPinotQuery());
+
     // Server side
     serverQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     Plan plan = planMaker.makeInstancePlan(getIndexSegments(), serverQueryContext, EXECUTOR_SERVICE);
-    PinotQuery pinotQuery = serverQueryContext.getBrokerRequest().getPinotQuery();
     DataTable instanceResponse =
-        pinotQuery.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan) : plan.execute();
+        queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan) : plan.execute();
 
     // Broker side
     // Use 2 Threads for 2 data-tables
@@ -177,8 +177,8 @@ public abstract class BaseQueriesTest {
       throw new RuntimeException(e);
     }
     BrokerResponseNative brokerResponse =
-        brokerReduceService.reduceOnDataTable(queryContext.getBrokerRequest(), serverQueryContext.getBrokerRequest(),
-            dataTableMap, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
+        brokerReduceService.reduceOnDataTable(brokerRequest, serverBrokerRequest, dataTableMap,
+            CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
     brokerReduceService.shutDown();
 
     return brokerResponse;
@@ -191,12 +191,8 @@ public abstract class BaseQueriesTest {
    */
   protected BrokerResponseNative getBrokerResponseForOptimizedQuery(String query, @Nullable TableConfig config,
       @Nullable Schema schema) {
-    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     OPTIMIZER.optimize(pinotQuery, config, schema);
-    BrokerRequest serverBrokerRequest = GapfillUtils.stripGapfill(brokerRequest);
-    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-    QueryContext serverQueryContext = BrokerRequestToQueryContextConverter.convert(serverBrokerRequest);
-    return getBrokerResponse(queryContext, serverQueryContext, PLAN_MAKER);
+    return getBrokerResponse(pinotQuery, PLAN_MAKER);
   }
 }

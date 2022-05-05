@@ -30,11 +30,12 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -65,13 +66,13 @@ public class StreamingReduceService extends BaseReduceService {
     }
 
     // prepare contextual info for reduce.
-    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
+    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    Map<String, String> queryOptions = pinotQuery.getQueryOptions();
     boolean enableTrace =
         queryOptions != null && Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE));
 
-    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-
-    String tableName = brokerRequest.getQuerySource().getTableName();
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+    String tableName = queryContext.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
     // initialize empty response.

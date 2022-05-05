@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -38,8 +37,7 @@ public final class ResultReducerFactory {
    * Constructs the right result reducer based on the given query context.
    */
   public static DataTableReducer getResultReducer(QueryContext queryContext) {
-    BrokerRequest brokerRequest = queryContext.getBrokerRequest();
-    if (brokerRequest != null && brokerRequest.getPinotQuery() != null && brokerRequest.getPinotQuery().isExplain()) {
+    if (queryContext.isExplain()) {
       return new ExplainPlanDataTableReducer(queryContext);
     }
 

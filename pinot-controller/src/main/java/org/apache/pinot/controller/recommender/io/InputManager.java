@@ -36,6 +36,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.metadata.FieldMetadata;
 import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
@@ -51,7 +52,7 @@ import org.apache.pinot.controller.recommender.rules.io.params.SegmentSizeRulePa
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -59,6 +60,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -166,10 +168,12 @@ public class InputManager {
     List<String> invalidQueries = new LinkedList<>();
     for (String queryString : _queryWeightMap.keySet()) {
       try {
-        BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(queryString);
-        _queryOptimizer.optimize(brokerRequest.getPinotQuery(), _schema);
-        QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-        _parsedQueries.put(queryString, Triple.of(_queryWeightMap.get(queryString), brokerRequest, queryContext));
+        PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(queryString);
+        _queryOptimizer.optimize(pinotQuery, _schema);
+        QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+        _parsedQueries.put(queryString,
+            Triple.of(_queryWeightMap.get(queryString), CalciteSqlCompiler.convertToBrokerRequest(pinotQuery),
+                queryContext));
       } catch (SqlCompilationException e) {
         invalidQueries.add(queryString);
         _overWrittenConfigs.getFlaggedQueries().add(queryString, ERROR_INVALID_QUERY);
