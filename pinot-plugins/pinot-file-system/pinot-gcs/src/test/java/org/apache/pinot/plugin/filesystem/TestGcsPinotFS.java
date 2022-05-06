@@ -193,6 +193,8 @@ public class TestGcsPinotFS {
     // Test listFiles()
     // Check that all the files are there
     assertEquals(listFilesToStream(_dataDir).collect(toSet()), expectedElements);
+    // listFiles() using only the bucket "gs://bucket" should return the same result
+    assertEquals(listFilesToStream(createGcsUri(_dataDir.getBucketName(), "")).collect(toSet()), expectedElements);
     // Check that the non-empty file has the expected contents
     Path nonEmptyFileFromGcs = localTmpDir.resolve("nonEmptyFileFromGcs");
     _pinotFS.copyToLocalFile(nonEmptyFileGcsUri.getUri(), nonEmptyFileFromGcs.toFile());
@@ -217,8 +219,8 @@ public class TestGcsPinotFS {
     String directoryName = Paths.get(gcsDirectoryUri.getPath()).getFileName().toString();
     String directoryCopyName = Paths.get(gcsDirectoryUriCopy.getPath()).getFileName().toString();
     for (GcsUri element : ImmutableList.copyOf(expectedElements)) {
-      expectedElementsCopy
-          .add(createGcsUri(element.getBucketName(), element.getPath().replace(directoryName, directoryCopyName)));
+      expectedElementsCopy.add(
+          createGcsUri(element.getBucketName(), element.getPath().replace(directoryName, directoryCopyName)));
     }
     expectedElementsCopy.addAll(expectedElements);
     assertEquals(listFilesToStream(_dataDir).collect(toSet()), expectedElementsCopy);
