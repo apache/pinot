@@ -57,7 +57,6 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
       }
     }
 
-    Character multiValueDelimiter = null;
     format = format.withDelimiter(csvDelimiter.charAt(0));
     String csvHeader = props.get(CONFIG_HEADER);
     if (csvHeader == null) {
@@ -76,6 +75,7 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
       format = format.withEscape(props.get(CONFIG_CSV_ESCAPE_CHARACTER).charAt(0));
     }
     _format = format;
+    Character multiValueDelimiter = null;
     if (props.containsKey(CONFIG_CSV_MULTI_VALUE_DELIMITER)) {
       multiValueDelimiter = props.get(CONFIG_CSV_MULTI_VALUE_DELIMITER).charAt(0);
     }
