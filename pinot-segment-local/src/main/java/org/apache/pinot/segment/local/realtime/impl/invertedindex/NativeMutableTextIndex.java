@@ -36,7 +36,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public class NativeRealTimeTextIndex implements MutableTextIndex {
+public class NativeMutableTextIndex implements MutableTextIndex {
   private final String _column;
   private final MutableFST _mutableFST;
   private final RealtimeInvertedIndex _invertedIndex;
@@ -48,7 +48,7 @@ public class NativeRealTimeTextIndex implements MutableTextIndex {
   private int _nextDocId = 0;
   private int _nextDictId = 0;
 
-  public NativeRealTimeTextIndex(String column) {
+  public NativeMutableTextIndex(String column) {
     _column = column;
     _mutableFST = new MutableFSTImpl();
     _termToDictIdMapping = new Object2IntOpenHashMap<>();
@@ -71,7 +71,7 @@ public class NativeRealTimeTextIndex implements MutableTextIndex {
     _writeLock.lock();
     try {
       for (String token : tokens) {
-        Integer currentDictId = _termToDictIdMapping.computeIfAbsent(token, k -> {
+        Integer currentDictId = _termToDictIdMapping.computeIntIfAbsent(token, k -> {
           int localDictId = _nextDictId++;
           _mutableFST.addPath(token, localDictId);
           return localDictId;

@@ -30,11 +30,11 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.AssertJUnit.assertTrue;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
-public class NativeRealTimeTextIndexConcurrentTest {
+public class NativeMutableTextIndexConcurrentTest {
   private ExecutorService _threadPool;
   private Set<String> _resultSet;
 
@@ -61,10 +61,10 @@ public class NativeRealTimeTextIndexConcurrentTest {
     words.add("cdd");
     words.add("efg");
 
-    try (NativeRealTimeTextIndex textIndex = new NativeRealTimeTextIndex("testFSTColumn")) {
+    try (NativeMutableTextIndex textIndex = new NativeMutableTextIndex("testFSTColumn")) {
       _threadPool.submit(() -> {
         try {
-          performReads(textIndex, words, 10, 200, countDownLatch);
+          performReads(textIndex, words, 20, 200, countDownLatch);
         } catch (InterruptedException e) {
           e.printStackTrace();
         }
@@ -83,12 +83,12 @@ public class NativeRealTimeTextIndexConcurrentTest {
 
     assertEquals(_resultSet.size(), words.size());
 
-    assertTrue("ab not found in result set", _resultSet.contains("ab"));
-    assertTrue("abba not found in result set", _resultSet.contains("abba"));
-    assertTrue("aba not found in result set", _resultSet.contains("aba"));
-    assertTrue("bab not found in result set", _resultSet.contains("bab"));
-    assertTrue("cdd not found in result set", _resultSet.contains("cdd"));
-    assertTrue("efg not found in result set", _resultSet.contains("efg"));
+    assertTrue(_resultSet.contains("ab"), "ab not found in result set");
+    assertTrue(_resultSet.contains("abba"), "abba not found in result set");
+    assertTrue(_resultSet.contains("aba"), "aba not found in result set");
+    assertTrue(_resultSet.contains("bab"), "bab not found in result set");
+    assertTrue(_resultSet.contains("cdd"), "cdd not found in result set");
+    assertTrue(_resultSet.contains("efg"), "efg not found in result set");
   }
 
   @Test
@@ -108,10 +108,10 @@ public class NativeRealTimeTextIndexConcurrentTest {
     mergedThreadWords.addAll(firstThreadWords);
     mergedThreadWords.addAll(secondThreadWords);
 
-    try (NativeRealTimeTextIndex textIndex = new NativeRealTimeTextIndex("testFSTColumn")) {
+    try (NativeMutableTextIndex textIndex = new NativeMutableTextIndex("testFSTColumn")) {
       _threadPool.submit(() -> {
         try {
-          performReads(textIndex, mergedThreadWords, 10, 200, countDownLatch);
+          performReads(textIndex, mergedThreadWords, 20, 200, countDownLatch);
         } catch (InterruptedException e) {
           e.printStackTrace();
         }
@@ -138,12 +138,12 @@ public class NativeRealTimeTextIndexConcurrentTest {
 
     assertEquals(_resultSet.size(), mergedThreadWords.size());
 
-    assertTrue("ab not found in result set", _resultSet.contains("ab"));
-    assertTrue("abba not found in result set", _resultSet.contains("abba"));
-    assertTrue("aba not found in result set", _resultSet.contains("aba"));
-    assertTrue("bab not found in result set", _resultSet.contains("bab"));
-    assertTrue("cdd not found in result set", _resultSet.contains("cdd"));
-    assertTrue("efg not found in result set", _resultSet.contains("efg"));
+    assertTrue(_resultSet.contains("ab"), "ab not found in result set");
+    assertTrue(_resultSet.contains("abba"), "abba not found in result set");
+    assertTrue(_resultSet.contains("aba"), "aba not found in result set");
+    assertTrue(_resultSet.contains("bab"), "bab not found in result set");
+    assertTrue(_resultSet.contains("cdd"), "cdd not found in result set");
+    assertTrue(_resultSet.contains("efg"), "efg not found in result set");
   }
 
   @Test
@@ -163,10 +163,10 @@ public class NativeRealTimeTextIndexConcurrentTest {
     mergedThreadWords.addAll(firstThreadWords);
     mergedThreadWords.addAll(secondThreadWords);
 
-    try (NativeRealTimeTextIndex textIndex = new NativeRealTimeTextIndex("testFSTColumn")) {
+    try (NativeMutableTextIndex textIndex = new NativeMutableTextIndex("testFSTColumn")) {
       _threadPool.submit(() -> {
         try {
-          performReads(textIndex, firstThreadWords, 15, 200, countDownLatch);
+          performReads(textIndex, firstThreadWords, 20, 500, countDownLatch);
         } catch (InterruptedException e) {
           e.printStackTrace();
         }
@@ -182,7 +182,7 @@ public class NativeRealTimeTextIndexConcurrentTest {
 
       _threadPool.submit(() -> {
         try {
-          performReads(textIndex, secondThreadWords, 10, 200, countDownLatch);
+          performReads(textIndex, secondThreadWords, 20, 500, countDownLatch);
         } catch (InterruptedException e) {
           e.printStackTrace();
         }
@@ -193,12 +193,12 @@ public class NativeRealTimeTextIndexConcurrentTest {
 
     assertEquals(_resultSet.size(), mergedThreadWords.size());
 
-    assertTrue("ab not found in result set", _resultSet.contains("ab"));
-    assertTrue("abba not found in result set", _resultSet.contains("abba"));
-    assertTrue("aba not found in result set", _resultSet.contains("aba"));
-    assertTrue("bab not found in result set", _resultSet.contains("bab"));
-    assertTrue("cdd not found in result set", _resultSet.contains("cdd"));
-    assertTrue("efg not found in result set", _resultSet.contains("efg"));
+    assertTrue(_resultSet.contains("ab"), "ab not found in result set");
+    assertTrue(_resultSet.contains("abba"), "abba not found in result set");
+    assertTrue(_resultSet.contains("aba"), "aba not found in result set");
+    assertTrue(_resultSet.contains("bab"), "bab not found in result set");
+    assertTrue(_resultSet.contains("cdd"), "cdd not found in result set");
+    assertTrue(_resultSet.contains("efg"), "efg not found in result set");
   }
 
   @Test
@@ -218,10 +218,10 @@ public class NativeRealTimeTextIndexConcurrentTest {
     mergedThreadWords.addAll(firstThreadWords);
     mergedThreadWords.addAll(secondThreadWords);
 
-    try (NativeRealTimeTextIndex textIndex = new NativeRealTimeTextIndex("testFSTColumn")) {
+    try (NativeMutableTextIndex textIndex = new NativeMutableTextIndex("testFSTColumn")) {
       _threadPool.submit(() -> {
         try {
-          performReads(textIndex, firstThreadWords, 10, 200, countDownLatch);
+          performReads(textIndex, firstThreadWords, 20, 200, countDownLatch);
         } catch (InterruptedException e) {
           e.printStackTrace();
         }
@@ -237,7 +237,7 @@ public class NativeRealTimeTextIndexConcurrentTest {
 
       _threadPool.submit(() -> {
         try {
-          performReads(textIndex, secondThreadWords, 10, 200, countDownLatch);
+          performReads(textIndex, secondThreadWords, 20, 200, countDownLatch);
         } catch (InterruptedException e) {
           e.printStackTrace();
         }
@@ -256,15 +256,15 @@ public class NativeRealTimeTextIndexConcurrentTest {
 
     assertEquals(_resultSet.size(), mergedThreadWords.size());
 
-    assertTrue("ab not found in result set", _resultSet.contains("ab"));
-    assertTrue("abba not found in result set", _resultSet.contains("abba"));
-    assertTrue("aba not found in result set", _resultSet.contains("aba"));
-    assertTrue("bab not found in result set", _resultSet.contains("bab"));
-    assertTrue("cdd not found in result set", _resultSet.contains("cdd"));
-    assertTrue("efg not found in result set", _resultSet.contains("efg"));
+    assertTrue(_resultSet.contains("ab"), "ab not found in result set");
+    assertTrue(_resultSet.contains("abba"), "abba not found in result set");
+    assertTrue(_resultSet.contains("aba"), "aba not found in result set");
+    assertTrue(_resultSet.contains("bab"), "bab not found in result set");
+    assertTrue(_resultSet.contains("cdd"), "cdd not found in result set");
+    assertTrue(_resultSet.contains("efg"), "efg not found in result set");
   }
 
-  private void performReads(NativeRealTimeTextIndex textIndex, List<String> words, int count, long sleepTime,
+  private void performReads(NativeMutableTextIndex textIndex, List<String> words, int count, long sleepTime,
       CountDownLatch countDownLatch)
       throws InterruptedException {
 
@@ -291,7 +291,7 @@ public class NativeRealTimeTextIndexConcurrentTest {
     countDownLatch.countDown();
   }
 
-  private void performWrites(NativeRealTimeTextIndex textIndex, List<String> words, long sleepTime,
+  private void performWrites(NativeMutableTextIndex textIndex, List<String> words, long sleepTime,
       CountDownLatch countDownLatch)
       throws InterruptedException {
 

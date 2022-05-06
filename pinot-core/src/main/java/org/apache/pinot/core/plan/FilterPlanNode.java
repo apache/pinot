@@ -49,7 +49,7 @@ import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEv
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeRealTimeTextIndex;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableTextIndex;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -248,7 +248,7 @@ public class FilterPlanNode implements PlanNode {
             case TEXT_CONTAINS:
               TextIndexReader textIndexReader = dataSource.getTextIndex();
               if (!(textIndexReader instanceof NativeTextIndexReader)
-                  && !(textIndexReader instanceof NativeRealTimeTextIndex)) {
+                  && !(textIndexReader instanceof NativeMutableTextIndex)) {
                 throw new UnsupportedOperationException("TEXT_CONTAINS is supported only on native text index");
               }
               return new TextContainsFilterOperator(textIndexReader, (TextContainsPredicate) predicate, numDocs);
@@ -256,7 +256,7 @@ public class FilterPlanNode implements PlanNode {
               textIndexReader = dataSource.getTextIndex();
               // We could check for real time and segment Lucene reader, but easier to check the other way round
               if (textIndexReader instanceof NativeTextIndexReader
-                  || textIndexReader instanceof NativeRealTimeTextIndex) {
+                  || textIndexReader instanceof NativeMutableTextIndex) {
                 throw new UnsupportedOperationException("TEXT_MATCH is not supported on native text index");
               }
               return new TextMatchFilterOperator(textIndexReader, (TextMatchPredicate) predicate, numDocs);

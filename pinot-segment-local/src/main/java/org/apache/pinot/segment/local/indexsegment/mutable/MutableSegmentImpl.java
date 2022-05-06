@@ -41,7 +41,7 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import org.apache.pinot.segment.local.realtime.impl.geospatial.MutableH3Index;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeRealTimeTextIndex;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableTextIndex;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
@@ -301,7 +301,7 @@ public class MutableSegmentImpl implements MutableSegment {
         }
 
         if (useNativeTextIndex) {
-          textIndex = new NativeRealTimeTextIndex(column);
+          textIndex = new NativeMutableTextIndex(column);
         } else {
 
           // TODO - this logic is in the wrong place and belongs in a Lucene-specific submodule,
