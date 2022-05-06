@@ -345,6 +345,16 @@ public class SegmentDictionaryCreator implements Closeable {
           indexes[i] = _stringValueToIndexMap.getInt(multiValues[i]);
         }
         break;
+      case BIG_DECIMAL:
+        for (int i = 0; i < multiValues.length; i++) {
+          indexes[i] = _bigDecimalValueToIndexMap.getInt((BigDecimal) multiValues[i]);
+        }
+        break;
+      case BYTES:
+        for (int i = 0; i < multiValues.length; i++) {
+          indexes[i] = _bytesValueToIndexMap.get(new ByteArray((byte[]) multiValues[i]));
+        }
+        break;
       default:
         throw new UnsupportedOperationException("Unsupported data type : " + _storedType);
     }
