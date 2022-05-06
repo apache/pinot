@@ -341,8 +341,8 @@ minion:
 
   probes:
     endpoint: "/health"
-    livenessEnabled: true
-    readinessEnabled: true
+    livenessEnabled: false
+    readinessEnabled: false
 
   dataDir: /var/pinot/minion/data
   jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
