@@ -34,7 +34,7 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
       throws Exception {
     String csvFormat = props.get(CONFIG_FILE_FORMAT);
     String csvDelimiter = props.get(CONFIG_DELIMITER);
-    CSVFormat format = null;
+    CSVFormat format;
     if (csvFormat == null) {
       format = CSVFormat.DEFAULT;
     } else {
@@ -63,7 +63,6 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
       //parse the header automatically from the input
       format = format.withHeader();
     } else {
-      //validate header for the delimiter before splitting
       format = format.withHeader(StringUtils.split(csvHeader, csvDelimiter));
     }
     if (props.containsKey(CONFIG_COMMENT_MARKER)) {
