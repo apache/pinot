@@ -68,18 +68,18 @@ public class QueryEnvironmentTest extends QueryEnvironmentTestBase {
         // table scan stages; for tableA it should have 2 hosts, for tableB it should have only 1
         Assert.assertEquals(
             e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toList()),
-            tables.get(0).equals("a") ? ImmutableList.of("Server_localhost_1", "Server_localhost_2")
-                : ImmutableList.of("Server_localhost_1"));
+            tables.get(0).equals("a") ? ImmutableList.of("localhost_1", "localhost_2")
+                : ImmutableList.of("localhost_1"));
       } else if (!PlannerUtils.isRootStage(e.getKey())) {
         // join stage should have both servers used.
         Assert.assertEquals(
             e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toList()),
-            ImmutableList.of("Server_localhost_1", "Server_localhost_2"));
+            ImmutableList.of("localhost_1", "localhost_2"));
       } else {
         // reduce stage should have the reducer instance.
         Assert.assertEquals(
             e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toList()),
-            ImmutableList.of("Server_localhost_3"));
+            ImmutableList.of("localhost_3"));
       }
     }
   }
