@@ -44,7 +44,6 @@ import org.slf4j.LoggerFactory;
  */
 public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
-  private static final String OPERATOR_NAME = "MailboxReceiveOperator";
   private static final String EXPLAIN_NAME = "MAILBOX_RECEIVE";
   private static final long DEFAULT_TIMEOUT_NANO = 10_000_000_000L;
 
@@ -66,11 +65,6 @@ public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
     _port = port;
     _jobId = jobId;
     _stageId = stageId;
-  }
-
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
   }
 
   @Override
