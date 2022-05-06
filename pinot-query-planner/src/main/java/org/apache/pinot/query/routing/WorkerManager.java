@@ -45,7 +45,6 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
  * the worker manager later when we split out the query-spi layer.
  */
 public class WorkerManager {
-  private static final CalciteSqlCompiler CALCITE_SQL_COMPILER = new CalciteSqlCompiler();
 
   private final String _hostName;
   private final int _port;
@@ -90,7 +89,7 @@ public class WorkerManager {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     // TODO: support both offline and realtime, now we hard code offline table.
     String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
-    return _routingManager.getRoutingTable(CALCITE_SQL_COMPILER.compileToBrokerRequest(
+    return _routingManager.getRoutingTable(CalciteSqlCompiler.compileToBrokerRequest(
         "SELECT * FROM " + tableNameWithType));
   }
 }
