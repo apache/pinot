@@ -371,6 +371,8 @@ minion:
     nodePort: ""
     protocol: TCP
     name: minion
+    adminPortName: admin
+    adminPort: 6500
 
   resources: {}
 

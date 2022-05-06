@@ -77,13 +77,17 @@ spec:
           - containerPort: {{ .Values.minion.service.port }}
             protocol: {{ .Values.minion.service.protocol }}
             name: {{ .Values.minion.service.name }}
+          - containerPort: {{ .Values.minion.service.adminPort }}
+            protocol: {{ .Values.minion.service.protocol }}
+            name: {{ .Values.minion.service.adminPortName }}
+
         {{- if .Values.minion.probes.livenessEnabled }}
         livenessProbe:
           initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
           periodSeconds: {{ .Values.probes.periodSeconds }}
           httpGet:
             path: {{ .Values.minion.probes.endpoint }}
-            port: {{ .Values.minion.service.port }}
+            port: {{ .Values.minion.service.adminPort }}
         {{- end }}
         {{- if .Values.minion.probes.readinessEnabled }}
         readinessProbe:
@@ -91,7 +95,7 @@ spec:
           periodSeconds: {{ .Values.probes.periodSeconds }}
           httpGet:
             path: {{ .Values.minion.probes.endpoint }}
-            port: {{ .Values.minion.service.port }}
+            port: {{ .Values.minion.service.adminPort }}
         {{- end }}
         volumeMounts:
           - name: config
