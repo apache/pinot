@@ -1987,16 +1987,12 @@ public class PinotHelixResourceManager {
     return instanceSet;
   }
 
+  @VisibleForTesting
   public void addNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata, String downloadUrl) {
-    addNewSegment(tableNameWithType, segmentMetadata, downloadUrl, null);
-  }
-
-  public void addNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata, String downloadUrl,
-      @Nullable String crypter) {
     // NOTE: must first set the segment ZK metadata before assigning segment to instances because segment assignment
     // might need them to determine the partition of the segment, and server will need them to download the segment
     SegmentZKMetadata segmentZkmetadata =
-        constructZkMetadataForNewSegment(tableNameWithType, segmentMetadata, downloadUrl, crypter, -1);
+        ZKMetadataUtils.createSegmentZKMetadata(tableNameWithType, segmentMetadata, downloadUrl, null, -1);
     ZNRecord znRecord = segmentZkmetadata.toZNRecord();
 
     String segmentName = segmentMetadata.getName();
@@ -2007,40 +2003,6 @@ public class PinotHelixResourceManager {
     LOGGER.info("Added segment: {} of table: {} to property store", segmentName, tableNameWithType);
 
     assignTableSegment(tableNameWithType, segmentName);
-  }
-
-  /**
-   * Construct segmentZkMetadata for new segment of offline or realtime table.
-   *
-   * @param tableNameWithType Table name with type
-   * @param segmentMetadata Segment metadata
-   * @param downloadUrl Download URL
-   * @param crypter Crypter
-   * @param segmentSizeInBytes Size of segment in bytes.
-   * @return SegmentZkMetadata of the input segment
-   */
-  public SegmentZKMetadata constructZkMetadataForNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
-      String downloadUrl, @Nullable String crypter, long segmentSizeInBytes) {
-    // Construct segment zk metadata with common fields for offline and realtime.
-    String segmentName = segmentMetadata.getName();
-    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
-    ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
-    segmentZKMetadata.setDownloadUrl(downloadUrl);
-    segmentZKMetadata.setCrypterName(crypter);
-    segmentZKMetadata.setSizeInBytes(segmentSizeInBytes);
-
-    if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-      Preconditions.checkState(isUpsertTable(tableNameWithType),
-          "Upload segment " + segmentName + " for non upsert enabled realtime table " + tableNameWithType
-              + " is not supported");
-      // Set fields specific to realtime segments.
-      segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOADED);
-    } else {
-      // Set fields specific to offline segments.
-      segmentZKMetadata.setPushTime(System.currentTimeMillis());
-    }
-
-    return segmentZKMetadata;
   }
 
   public void assignTableSegment(String tableNameWithType, String segmentName) {
@@ -2168,22 +2130,19 @@ public class PinotHelixResourceManager {
     }
   }
 
+  @VisibleForTesting
   public void refreshSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
-      SegmentZKMetadata segmentZKMetadata, int expectedVersion, String downloadUrl, @Nullable String crypter,
-      long segmentSizeInBytes) {
+      SegmentZKMetadata segmentZKMetadata, int expectedVersion, String downloadUrl) {
     String segmentName = segmentMetadata.getName();
 
     // NOTE: Must first set the segment ZK metadata before trying to refresh because servers and brokers rely on segment
     // ZK metadata to refresh the segment (server will compare the segment ZK metadata with the local metadata to decide
-    // whether to download the new segment; broker will update the the segment partition info & time boundary based on
-    // the segment ZK metadata)
-    ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
-    segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
-    segmentZKMetadata.setDownloadUrl(downloadUrl);
-    segmentZKMetadata.setCrypterName(crypter);
-    segmentZKMetadata.setSizeInBytes(segmentSizeInBytes);
-    if (!ZKMetadataProvider
-        .setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata, expectedVersion)) {
+    // whether to download the new segment; broker will update the segment partition info & time boundary based on the
+    // segment ZK metadata)
+    ZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl, null,
+        -1);
+    if (!ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata,
+        expectedVersion)) {
       throw new RuntimeException(
           "Failed to update ZK metadata for segment: " + segmentName + " of table: " + tableNameWithType);
     }

@@ -77,6 +77,11 @@ public class V1Constants {
       public static final String SEGMENT_PADDING_CHARACTER = "segment.padding.character";
 
       public static final String CUSTOM_SUBSET = "custom";
+
+      public static class Realtime {
+        public static final String START_OFFSET = "segment.realtime.startOffset";
+        public static final String END_OFFSET = "segment.realtime.endOffset";
+      }
     }
 
     public static class Column {
