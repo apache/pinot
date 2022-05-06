@@ -54,11 +54,7 @@ class ScalableGapfillProcessorForCount extends ScalableGapfillProcessor {
     int index = 0;
     while (index < rows.size()) {
       Object[] row = rows.get(index);
-      long time = columnDataType == DataSchema.ColumnDataType.LONG
-          ?
-          (Long) row[_timeBucketColumnIndex]
-          :
-          _dateTimeFormatter.fromFormatToMillis((String) row[_timeBucketColumnIndex]);
+      long time = extractTimeColumn(row, columnDataType);
       int bucketIndex = findGapfillBucketIndex(time);
       if (bucketIndex >= 0) {
         break;
@@ -72,8 +68,7 @@ class ScalableGapfillProcessorForCount extends ScalableGapfillProcessor {
     for (long time = _startMs; time < _endMs; time += _gapfillTimeBucketSize) {
       while (index < rows.size()) {
         Object[] row = rows.get(index);
-        long rowTimestamp = columnDataType == DataSchema.ColumnDataType.LONG ? (Long) row[_timeBucketColumnIndex]
-            : _dateTimeFormatter.fromFormatToMillis((String) row[_timeBucketColumnIndex]);
+        long rowTimestamp = extractTimeColumn(row, columnDataType);
         if (rowTimestamp != time) {
           break;
         } else {
@@ -99,6 +94,14 @@ class ScalableGapfillProcessorForCount extends ScalableGapfillProcessor {
       }
     }
     return result;
+  }
+
+  private long extractTimeColumn(Object[] row, DataSchema.ColumnDataType columnDataType) {
+    if (columnDataType == DataSchema.ColumnDataType.LONG) {
+      return (Long) row[_timeBucketColumnIndex];
+    } else {
+      return _dateTimeFormatter.fromFormatToMillis((String) row[_timeBucketColumnIndex]);
+    }
   }
 
   private void updateCounter(Object[] row) {

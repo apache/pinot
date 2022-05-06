@@ -86,13 +86,14 @@ class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
   @Override
   protected List<Object[]> gapFillAndAggregate(
       List<Object[]> rows, DataSchema dataSchema, DataSchema resultTableSchema) {
-    List<Integer> timeBucketedRawRows = new ArrayList<>(_numOfTimeBuckets + 1);
+    int [] timeBucketedRawRows = new int[_numOfTimeBuckets + 1];
+    int timeBucketedRawRowsIndex = 0;
     for (int i = 0; i < rows.size(); i++) {
       Object[] row = rows.get(i);
       long time = _dateTimeFormatter.fromFormatToMillis(String.valueOf(row[_timeBucketColumnIndex]));
       int index = findGapfillBucketIndex(time);
       if (index >= _numOfTimeBuckets) {
-        timeBucketedRawRows.add(i);
+        timeBucketedRawRows[timeBucketedRawRowsIndex++] = i;
         break;
       }
       Key key = constructGroupKeys(row);
@@ -110,14 +111,14 @@ class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
             }
           }
         });
-      } else if (index >= timeBucketedRawRows.size()) {
-        while (index >= timeBucketedRawRows.size()) {
-          timeBucketedRawRows.add(i);
+      } else if (index >= timeBucketedRawRowsIndex) {
+        while (index >= timeBucketedRawRowsIndex) {
+          timeBucketedRawRows[timeBucketedRawRowsIndex++] = i;
         }
       }
     }
-    while (timeBucketedRawRows.size() < _numOfTimeBuckets + 1) {
-      timeBucketedRawRows.add(rows.size());
+    while (timeBucketedRawRowsIndex < _numOfTimeBuckets + 1) {
+      timeBucketedRawRows[timeBucketedRawRowsIndex++] = rows.size();
     }
 
     _filteredMap = new HashMap<>();
@@ -139,34 +140,29 @@ class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
     long aggregatedCount = 0;
     for (long time = _startMs; time < _endMs; time += _gapfillTimeBucketSize) {
       int timeBucketIndex = findGapfillBucketIndex(time);
-      int start = timeBucketedRawRows.get(timeBucketIndex);
-      int end = timeBucketedRawRows.get(timeBucketIndex + 1);
-      if (start < end) {
-        for (int i = start; i < end; i++) {
-          Object[] resultRow = rows.get(i);
-          boolean isFilter = _postGapfillFilterHandler == null || _postGapfillFilterHandler.isMatch(resultRow);
-          Key key = constructGroupKeys(resultRow);
-          int groupKeyIndex = _groupByKeys.get(key);
-          if ((_filteredMap.containsKey(groupKeyIndex))) {
-            for (int j = 0; j < _columnTypes.length; j++) {
-              if (_columnTypes[j] == 0) {
-                continue;
-              }
-              _sumes[j] -= ((Number) (rows.get(_filteredMap.get(groupKeyIndex))[_sumArgIndexes[j]])).doubleValue();
+      for (int i = timeBucketedRawRows[timeBucketIndex]; i < timeBucketedRawRows[timeBucketIndex + 1]; i++) {
+        Object[] resultRow = rows.get(i);
+        Key key = constructGroupKeys(resultRow);
+        int groupKeyIndex = _groupByKeys.get(key);
+        if ((_filteredMap.containsKey(groupKeyIndex))) {
+          for (int j = 0; j < _columnTypes.length; j++) {
+            if (_columnTypes[j] == 0) {
+              continue;
             }
-            _filteredMap.remove(groupKeyIndex);
-            _count--;
+            _sumes[j] -= ((Number) (rows.get(_filteredMap.get(groupKeyIndex))[_sumArgIndexes[j]])).doubleValue();
           }
-          if (isFilter) {
-            _count++;
-            for (int j = 0; j < _columnTypes.length; j++) {
-              if (_columnTypes[j] == 0) {
-                continue;
-              }
-              _sumes[j] += ((Number) (resultRow[_sumArgIndexes[j]])).doubleValue();
+          _filteredMap.remove(groupKeyIndex);
+          _count--;
+        }
+        if (_postGapfillFilterHandler == null || _postGapfillFilterHandler.isMatch(resultRow)) {
+          _count++;
+          for (int j = 0; j < _columnTypes.length; j++) {
+            if (_columnTypes[j] == 0) {
+              continue;
             }
-            _filteredMap.put(groupKeyIndex, i);
+            _sumes[j] += ((Number) (resultRow[_sumArgIndexes[j]])).doubleValue();
           }
+          _filteredMap.put(groupKeyIndex, i);
         }
       }
       if (_count > 0) {
