@@ -32,16 +32,17 @@ import org.apache.pinot.core.util.GapfillUtils;
  * Helper class to reduce and set gap fill results into the BrokerResponseNative
  */
 class ScalableGapfillProcessorForCount extends ScalableGapfillProcessor {
-  protected Set<Key> _filteredSet;
+  protected final Set<Key> _filteredSet;
 
   ScalableGapfillProcessorForCount(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
     super(queryContext, gapfillType);
+    _filteredSet = new HashSet<>();
   }
 
   @Override
   protected List<Object[]> gapFillAndAggregate(
       List<Object[]> rows, DataSchema dataSchema, DataSchema resultTableSchema) {
-    DataSchema.ColumnDataType columnDataType = resultTableSchema.getColumnDataTypes()[0];
+    DataSchema.ColumnDataType timeColumnDataType = resultTableSchema.getColumnDataTypes()[0];
     if (_queryContext.getSubquery() != null && _queryContext.getFilter() != null) {
       _postGapfillFilterHandler = new GapfillFilterHandler(_queryContext.getFilter(), dataSchema);
     }
@@ -49,13 +50,12 @@ class ScalableGapfillProcessorForCount extends ScalableGapfillProcessor {
       _postAggregateHavingFilterHandler =
           new GapfillFilterHandler(_queryContext.getHavingFilter(), resultTableSchema);
     }
-    _filteredSet = new HashSet<>();
 
-    int index = 0;
-    while (index < rows.size()) {
-      Object[] row = rows.get(index);
-      long time = extractTimeColumn(row, columnDataType);
-      int bucketIndex = findGapfillBucketIndex(time);
+    int rowIndex = 0;
+    while (rowIndex < rows.size()) {
+      Object[] row = rows.get(rowIndex);
+      long rowTimestamp = extractTimeColumn(row, timeColumnDataType);
+      int bucketIndex = findGapfillBucketIndex(rowTimestamp);
       if (bucketIndex >= 0) {
         break;
       }
@@ -66,14 +66,14 @@ class ScalableGapfillProcessorForCount extends ScalableGapfillProcessor {
 
     long aggregatedCount = 0;
     for (long time = _startMs; time < _endMs; time += _gapfillTimeBucketSize) {
-      while (index < rows.size()) {
-        Object[] row = rows.get(index);
-        long rowTimestamp = extractTimeColumn(row, columnDataType);
-        if (rowTimestamp != time) {
-          break;
-        } else {
+      while (rowIndex < rows.size()) {
+        Object[] row = rows.get(rowIndex);
+        long rowTimestamp = extractTimeColumn(row, timeColumnDataType);
+        if (rowTimestamp == time) {
           updateCounter(row);
-          index++;
+          rowIndex++;
+        } else {
+          break;
         }
       }
       int timeBucketIndex = findGapfillBucketIndex(time);
@@ -81,7 +81,7 @@ class ScalableGapfillProcessorForCount extends ScalableGapfillProcessor {
       if (aggregatedCount > 0 && (timeBucketIndex + 1) % _aggregationSize == 0) {
         Object[] aggregatedRow = new Object[_queryContext.getSelectExpressions().size()];
         long aggregationTimeBucketTimestamp = time - (_aggregationSize - 1) * _gapfillTimeBucketSize;
-        aggregatedRow[0] = (columnDataType == DataSchema.ColumnDataType.LONG)
+        aggregatedRow[0] = (timeColumnDataType == DataSchema.ColumnDataType.LONG)
             ? aggregationTimeBucketTimestamp : _dateTimeFormatter.fromMillisToFormat(aggregationTimeBucketTimestamp);
         aggregatedRow[1] = aggregatedCount;
         aggregatedCount = 0;

@@ -32,9 +32,9 @@ import org.apache.pinot.core.util.GapfillUtils;
  * Helper class to reduce and set gap fill results into the BrokerResponseNative
  */
 class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
-  private double [] _sumes;
-  private int [] _columnTypes;
-  private int [] _sumArgIndexes;
+  private final double [] _sumes;
+  private final int [] _columnTypes;
+  private final int [] _sumArgIndexes;
   private final static int COLUMN_TYPE_SUM = 1;
   private final static int COLUMN_TYPE_AVG = 2;
   protected Map<Integer, Integer> _filteredMap;
@@ -43,12 +43,12 @@ class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
   ScalableGapfillProcessorForSumAvg(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
     super(queryContext, gapfillType);
     _groupByKeys = new HashMap<>();
-  }
-
-  protected void initializeAggregationValues(List<Object[]> rows, DataSchema dataSchema) {
     _columnTypes = new int[_queryContext.getSelectExpressions().size()];
     _sumArgIndexes = new int[_columnTypes.length];
     _sumes = new double[_columnTypes.length];
+  }
+
+  protected void initializeAggregationValues(List<Object[]> rows, DataSchema dataSchema) {
     for (int i = 0; i < _columnTypes.length; i++) {
       ExpressionContext expressionContext = _queryContext.getSelectExpressions().get(i);
       if (expressionContext.getType() == ExpressionContext.Type.FUNCTION) {
