@@ -425,7 +425,7 @@ public class DataTableSerDeTest {
             dataTableBuilder.setColumn(colId, DOUBLES[rowId]);
             break;
           case BIG_DECIMAL:
-            BIG_DECIMALS[rowId] = BigDecimal.valueOf(RANDOM.nextInt());
+            BIG_DECIMALS[rowId] = BigDecimal.valueOf(RANDOM.nextDouble());
             dataTableBuilder.setColumn(colId, BIG_DECIMALS[rowId]);
             break;
           case TIMESTAMP:
