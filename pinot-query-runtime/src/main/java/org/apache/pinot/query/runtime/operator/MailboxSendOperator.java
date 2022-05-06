@@ -48,7 +48,6 @@ import org.slf4j.LoggerFactory;
  */
 public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
-  private static final String OPERATOR_NAME = "MailboxSendOperator";
   private static final String EXPLAIN_NAME = "MAILBOX_SEND";
   private static final Set<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPE =
       ImmutableSet.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
@@ -99,11 +98,6 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
     _serverPort = port;
     _jobId = jobId;
     _stageId = stageId;
-  }
-
-  @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
   }
 
   @Override
