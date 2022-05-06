@@ -121,7 +121,6 @@ class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
     }
 
     _filteredMap = new HashMap<>();
-    replaceColumnNameWithAlias(dataSchema);
 
     if (_queryContext.getSubquery() != null && _queryContext.getFilter() != null) {
       _postGapfillFilterHandler = new GapfillFilterHandler(_queryContext.getFilter(), dataSchema);
@@ -136,6 +135,8 @@ class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
 
     List<Object[]> result = new ArrayList<>();
 
+    double [] aggregatedSum = new double[_columnTypes.length];
+    long aggregatedCount = 0;
     for (long time = _startMs; time < _endMs; time += _gapfillTimeBucketSize) {
       int timeBucketIndex = findGapfillBucketIndex(time);
       int start = timeBucketedRawRows.get(timeBucketIndex);
@@ -169,16 +170,27 @@ class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
         }
       }
       if (_count > 0) {
+        aggregatedCount += _count;
+        for (int i = 0; i < _columnTypes.length; i++) {
+          if (_columnTypes[i] != 0) {
+            aggregatedSum[i] += _sumes[i];
+          }
+        }
+      }
+      if ((timeBucketIndex + 1) % _aggregationSize == 0 && aggregatedCount > 0) {
         Object[] aggregatedRow = new Object[_queryContext.getSelectExpressions().size()];
         for (int i = 0; i < _columnTypes.length; i++) {
           if (_columnTypes[i] == 0) {
-            aggregatedRow[i] = _dateTimeFormatter.fromMillisToFormat(time);
+            aggregatedRow[i] = _dateTimeFormatter.fromMillisToFormat(
+                time - (_aggregationSize - 1) * _gapfillTimeBucketSize);
           } else if (_columnTypes[i] == COLUMN_TYPE_SUM) {
-            aggregatedRow[i] = _sumes[i];
+            aggregatedRow[i] = aggregatedSum[i];
           } else { //COLUMN_TYPE_AVG
-            aggregatedRow[i] = _sumes[i] / _count;
+            aggregatedRow[i] = aggregatedSum[i] / aggregatedCount;
           }
         }
+        aggregatedSum = new double[_columnTypes.length];
+        aggregatedCount = 0;
 
         if (_postAggregateHavingFilterHandler == null || _postAggregateHavingFilterHandler.isMatch(aggregatedRow)) {
           result.add(aggregatedRow);

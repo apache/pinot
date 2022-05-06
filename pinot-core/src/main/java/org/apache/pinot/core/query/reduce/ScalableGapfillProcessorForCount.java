@@ -42,16 +42,6 @@ class ScalableGapfillProcessorForCount extends ScalableGapfillProcessor {
   protected List<Object[]> gapFillAndAggregate(
       List<Object[]> rows, DataSchema dataSchema, DataSchema resultTableSchema) {
     DataSchema.ColumnDataType columnDataType = resultTableSchema.getColumnDataTypes()[0];
-    if (columnDataType == DataSchema.ColumnDataType.LONG) {
-      return gapFillAndAggregateWithLongAsTimeCol(rows, dataSchema, resultTableSchema);
-    } else {
-      return gapFillAndAggregateWithStringAsTimeCol(rows, dataSchema, resultTableSchema);
-    }
-  }
-
-  protected List<Object[]> gapFillAndAggregateWithLongAsTimeCol(
-      List<Object[]> rows, DataSchema dataSchema, DataSchema resultTableSchema) {
-    replaceColumnNameWithAlias(dataSchema);
     if (_queryContext.getSubquery() != null && _queryContext.getFilter() != null) {
       _postGapfillFilterHandler = new GapfillFilterHandler(_queryContext.getFilter(), dataSchema);
     }
@@ -64,7 +54,11 @@ class ScalableGapfillProcessorForCount extends ScalableGapfillProcessor {
     int index = 0;
     while (index < rows.size()) {
       Object[] row = rows.get(index);
-      long time = (Long) row[_timeBucketColumnIndex];
+      long time = columnDataType == DataSchema.ColumnDataType.LONG
+          ?
+          (Long) row[_timeBucketColumnIndex]
+          :
+          _dateTimeFormatter.fromFormatToMillis((String) row[_timeBucketColumnIndex]);
       int bucketIndex = findGapfillBucketIndex(time);
       if (bucketIndex >= 0) {
         break;
@@ -74,110 +68,34 @@ class ScalableGapfillProcessorForCount extends ScalableGapfillProcessor {
 
     List<Object[]> result = new ArrayList<>();
 
-    int bucketIndex = -1;
-    long bucketTimestamp = -1;
-    while (index < rows.size()) {
-      Object[] row = rows.get(index);
-      long time = (Long) row[_timeBucketColumnIndex];
-      int timeBucketIndex = findGapfillBucketIndex(time);
-      if (bucketIndex == -1) {
-        bucketIndex = timeBucketIndex;
-        bucketTimestamp = _startMs;
-      } else if (bucketIndex != timeBucketIndex) {
-        if (_count > 0) {
-          Object[] aggregatedRow = new Object[_queryContext.getSelectExpressions().size()];
-          aggregatedRow[0] = bucketTimestamp;
-          aggregatedRow[1] = _count;
-
-          if (_postAggregateHavingFilterHandler == null || _postAggregateHavingFilterHandler.isMatch(aggregatedRow)) {
-            result.add(aggregatedRow);
-            bucketIndex++;
-            bucketTimestamp += _gapfillTimeBucketSize;
-            while (bucketIndex < timeBucketIndex) {
-              time += _gapfillTimeBucketSize;
-              aggregatedRow = new Object[_queryContext.getSelectExpressions().size()];
-              aggregatedRow[0] = bucketTimestamp;
-              aggregatedRow[1] = _count;
-              result.add(aggregatedRow);
-              bucketIndex++;
-              bucketTimestamp += _gapfillTimeBucketSize;
-            }
-          }
-          if (result.size() >= _limitForAggregatedResult) {
-            return result;
-          }
+    long aggregatedCount = 0;
+    for (long time = _startMs; time < _endMs; time += _gapfillTimeBucketSize) {
+      while (index < rows.size()) {
+        Object[] row = rows.get(index);
+        long rowTimestamp = columnDataType == DataSchema.ColumnDataType.LONG ? (Long) row[_timeBucketColumnIndex]
+            : _dateTimeFormatter.fromFormatToMillis((String) row[_timeBucketColumnIndex]);
+        if (rowTimestamp != time) {
+          break;
+        } else {
+          updateCounter(row);
+          index++;
         }
-        bucketIndex = timeBucketIndex;
-        bucketTimestamp = _startMs + bucketIndex * _gapfillTimeBucketSize;
       }
-      if (timeBucketIndex < _numOfTimeBuckets) {
-        updateCounter(row);
-        index++;
-      }
-    }
-    return result;
-  }
-
-  protected List<Object[]> gapFillAndAggregateWithStringAsTimeCol(
-      List<Object[]> rows, DataSchema dataSchema, DataSchema resultTableSchema) {
-    replaceColumnNameWithAlias(dataSchema);
-    if (_queryContext.getSubquery() != null && _queryContext.getFilter() != null) {
-      _postGapfillFilterHandler = new GapfillFilterHandler(_queryContext.getFilter(), dataSchema);
-    }
-    if (_queryContext.getHavingFilter() != null) {
-      _postAggregateHavingFilterHandler =
-          new GapfillFilterHandler(_queryContext.getHavingFilter(), resultTableSchema);
-    }
-
-    int index = 0;
-    while (index < rows.size()) {
-      Object[] row = rows.get(index);
-      long time = _dateTimeFormatter.fromFormatToMillis(String.valueOf(row[_timeBucketColumnIndex]));
-      int bucketIndex = findGapfillBucketIndex(time);
-      if (bucketIndex >= 0) {
-        break;
-      }
-      updateCounter(row);
-    }
-
-    _filteredSet = new HashSet<>();
-
-    List<Object[]> result = new ArrayList<>();
-
-    int bucketIndex = -1;
-    while (index < rows.size()) {
-      Object[] row = rows.get(index);
-      long time = _dateTimeFormatter.fromFormatToMillis(String.valueOf(row[_timeBucketColumnIndex]));
       int timeBucketIndex = findGapfillBucketIndex(time);
-      if (bucketIndex == -1) {
-        bucketIndex = timeBucketIndex;
-      } else if (bucketIndex != timeBucketIndex) {
-        if (_count > 0) {
-          Object[] aggregatedRow = new Object[_queryContext.getSelectExpressions().size()];
-          aggregatedRow[0] = _dateTimeFormatter.fromMillisToFormat(_startMs + bucketIndex * _gapfillTimeBucketSize);
-          aggregatedRow[1] = _count;
-
-          if (_postAggregateHavingFilterHandler == null || _postAggregateHavingFilterHandler.isMatch(aggregatedRow)) {
-            result.add(aggregatedRow);
-            bucketIndex++;
-            while (bucketIndex < timeBucketIndex) {
-              time += _gapfillTimeBucketSize;
-              aggregatedRow = new Object[_queryContext.getSelectExpressions().size()];
-              aggregatedRow[0] = _dateTimeFormatter.fromMillisToFormat(_startMs + bucketIndex * _gapfillTimeBucketSize);
-              aggregatedRow[1] = _count;
-              result.add(aggregatedRow);
-              bucketIndex++;
-            }
-          }
-          if (result.size() >= _limitForAggregatedResult) {
-            return result;
-          }
+      aggregatedCount += _count;
+      if (aggregatedCount > 0 && (timeBucketIndex + 1) % _aggregationSize == 0) {
+        Object[] aggregatedRow = new Object[_queryContext.getSelectExpressions().size()];
+        long aggregationTimeBucketTimestamp = time - (_aggregationSize - 1) * _gapfillTimeBucketSize;
+        aggregatedRow[0] = (columnDataType == DataSchema.ColumnDataType.LONG)
+            ? aggregationTimeBucketTimestamp : _dateTimeFormatter.fromMillisToFormat(aggregationTimeBucketTimestamp);
+        aggregatedRow[1] = aggregatedCount;
+        aggregatedCount = 0;
+        if (_postAggregateHavingFilterHandler == null || _postAggregateHavingFilterHandler.isMatch(aggregatedRow)) {
+          result.add(aggregatedRow);
         }
-        bucketIndex = timeBucketIndex;
-      }
-      if (timeBucketIndex < _numOfTimeBuckets) {
-        updateCounter(row);
-        index++;
+        if (result.size() >= _limitForAggregatedResult) {
+          return result;
+        }
       }
     }
     return result;

@@ -46,10 +46,12 @@ abstract class ScalableGapfillProcessor {
 
   protected final int _limitForAggregatedResult;
   protected final DateTimeGranularitySpec _gapfillDateTimeGranularity;
+  protected final DateTimeGranularitySpec _postGapfillDateTimeGranularity;
   protected final DateTimeFormatSpec _dateTimeFormatter;
   protected final long _startMs;
   protected final long _endMs;
   protected final long _gapfillTimeBucketSize;
+  protected final long _postGapfillTimeBucketSize;
   protected final int _numOfTimeBuckets;
   protected final List<Integer> _groupByKeyIndexes;
   protected final Map<Key, Object[]> _previousByGroupKey;
@@ -58,6 +60,7 @@ abstract class ScalableGapfillProcessor {
   protected final int _timeBucketColumnIndex;
   protected GapfillFilterHandler _postGapfillFilterHandler = null;
   protected GapfillFilterHandler _postAggregateHavingFilterHandler = null;
+  protected final int _aggregationSize;
 
   ScalableGapfillProcessor(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
     _queryContext = queryContext;
@@ -70,12 +73,20 @@ abstract class ScalableGapfillProcessor {
 
     _dateTimeFormatter = new DateTimeFormatSpec(args.get(1).getLiteral());
     _gapfillDateTimeGranularity = new DateTimeGranularitySpec(args.get(4).getLiteral());
+    if (args.get(5).getLiteral() == null) {
+      _postGapfillDateTimeGranularity = _gapfillDateTimeGranularity;
+    } else {
+      _postGapfillDateTimeGranularity = new DateTimeGranularitySpec(args.get(5).getLiteral());
+    }
     String start = args.get(2).getLiteral();
     _startMs = truncate(_dateTimeFormatter.fromFormatToMillis(start));
     String end = args.get(3).getLiteral();
     _endMs = truncate(_dateTimeFormatter.fromFormatToMillis(end));
     _gapfillTimeBucketSize = _gapfillDateTimeGranularity.granularityToMillis();
+    _postGapfillTimeBucketSize = _postGapfillDateTimeGranularity.granularityToMillis();
     _numOfTimeBuckets = (int) ((_endMs - _startMs) / _gapfillTimeBucketSize);
+
+    _aggregationSize = (int) (_postGapfillTimeBucketSize / _gapfillTimeBucketSize);
 
     _previousByGroupKey = new HashMap<>();
     _groupByKeyIndexes = new ArrayList<>();
@@ -117,7 +128,7 @@ abstract class ScalableGapfillProcessor {
    */
   public void process(BrokerResponseNative brokerResponseNative) {
     DataSchema dataSchema = brokerResponseNative.getResultTable().getDataSchema();
-    DataSchema resultTableSchema = getResultTableDataSchema();
+    DataSchema resultTableSchema = getResultTableDataSchema(dataSchema);
     if (brokerResponseNative.getResultTable().getRows().isEmpty()) {
       brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
       return;
@@ -145,6 +156,7 @@ abstract class ScalableGapfillProcessor {
     }
 
     List<Object[]> rows = brokerResponseNative.getResultTable().getRows();
+    replaceColumnNameWithAlias(dataSchema);
     List<Object[]> resultRows = gapFillAndAggregate(rows, dataSchema, resultTableSchema);
     brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, resultRows));
   }
@@ -152,7 +164,7 @@ abstract class ScalableGapfillProcessor {
   /**
    * Constructs the DataSchema for the ResultTable.
    */
-  private DataSchema getResultTableDataSchema() {
+  private DataSchema getResultTableDataSchema(DataSchema dataSchema) {
     int numOfColumns = _queryContext.getSelectExpressions().size();
     String[] columnNames = new String[numOfColumns];
     ColumnDataType[] columnDataTypes = new ColumnDataType[numOfColumns];
@@ -163,7 +175,7 @@ abstract class ScalableGapfillProcessor {
       }
       if (expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
         columnNames[i] = expressionContext.getIdentifier();
-        columnDataTypes[i] = ColumnDataType.STRING;
+        columnDataTypes[i] = dataSchema.getColumnDataType(_timeBucketColumnIndex);
       } else {
         FunctionContext functionContext = expressionContext.getFunction();
         AggregationFunction aggregationFunction =
