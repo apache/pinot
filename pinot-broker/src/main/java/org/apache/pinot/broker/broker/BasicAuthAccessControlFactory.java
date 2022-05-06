@@ -55,10 +55,12 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
     // left blank
   }
 
+  @Override
   public void init(PinotConfiguration configuration) {
     _accessControl = new BasicAuthAccessControl(BasicAuthUtils.extractBasicAuthPrincipals(configuration, PREFIX));
   }
 
+  @Override
   public AccessControl create() {
     return _accessControl;
   }

@@ -37,6 +37,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
@@ -97,7 +98,9 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
+import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -107,6 +110,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
+import org.apache.pinot.controller.api.exception.UserAlreadyExistsException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.api.resources.StateType;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
@@ -133,6 +137,9 @@ import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
+import org.apache.pinot.spi.config.user.ComponentType;
+import org.apache.pinot.spi.config.user.RoleType;
+import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -159,7 +166,7 @@ public class PinotHelixResourceManager {
 
   // TODO: make this configurable
   public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
-  public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
+  public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 secondL
 
   private static final SimpleDateFormat SIMPLE_DATE_FORMAT = new SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'");
 
@@ -1378,6 +1385,35 @@ public class PinotHelixResourceManager {
             AccessOption.PERSISTENT);
   }
 
+  public void initUserACLConfig(ControllerConf controllerConf) throws IOException {
+    if (CollectionUtils.isEmpty(ZKMetadataProvider.getAllUserName(_propertyStore))) {
+      String initUsername = controllerConf.getInitAccessControlUsername();
+      String initPassword = controllerConf.getInitAccessControlPassword();
+      addUser(new UserConfig(initUsername, initPassword, ComponentType.CONTROLLER.name(),
+          RoleType.ADMIN.name(), null, null));
+      addUser(new UserConfig(initUsername, initPassword, ComponentType.BROKER.name(),
+          RoleType.ADMIN.name(), null, null));
+      addUser(new UserConfig(initUsername, initPassword, ComponentType.SERVER.name(),
+          RoleType.ADMIN.name(), null, null));
+    }
+  }
+
+  public void addUser(UserConfig userConfig)
+      throws IOException {
+    String usernamePrefix = userConfig.getUserName() + "_" + userConfig.getComponentType();
+    boolean isExists = Optional.ofNullable(ZKMetadataProvider.getAllUserConfig(_propertyStore))
+        .orElseGet(() -> {
+          return new ArrayList();
+        }).contains(userConfig);
+    if (isExists) {
+      throw new UserAlreadyExistsException("User " + usernamePrefix + " already exists");
+    }
+    userConfig.setPassword(BcryptUtils.encrypt(userConfig.getPassword()));
+    ZKMetadataProvider
+        .setUserConfig(_propertyStore, usernamePrefix, AccessControlUserConfigUtils.toZNRecord(userConfig));
+    LOGGER.info("Successfully add user:{}", usernamePrefix);
+  }
+
   /**
    * Performs validations of table config and adds the table to zookeeper
    * @throws InvalidTableConfigException if validations fail
@@ -1675,6 +1711,13 @@ public class PinotHelixResourceManager {
     }
   }
 
+  public void updateUserConfig(UserConfig userConfig)
+      throws IOException {
+    String usernameWithComponent = userConfig.getUsernameWithComponent();
+    ZKMetadataProvider.setUserConfig(_propertyStore, usernameWithComponent,
+      AccessControlUserConfigUtils.toZNRecord(userConfig));
+  }
+
   /**
    * Validate the table config and update it
    * @throws IOException
@@ -1767,6 +1810,12 @@ public class PinotHelixResourceManager {
     }
     tableConfig.setIndexingConfig(newConfigs);
     setExistingTableConfig(tableConfig);
+  }
+
+  public void deleteUser(String username) {
+    ZKMetadataProvider.removeUserConfigFromPropertyStore(_propertyStore, username);
+    LOGGER.info("Deleting user{}: Removed from user resouces", username);
+    LOGGER.info("Deleting user{} finished", username);
   }
 
   public void deleteOfflineTable(String tableName) {
@@ -2590,6 +2639,11 @@ public class PinotHelixResourceManager {
 
   public String buildPathForSegmentMetadata(String tableNameWithType, String segmentName) {
     return "/SEGMENTS/" + tableNameWithType + "/" + segmentName;
+  }
+
+  public boolean hasUser(String username, String component) {
+    return ZKMetadataProvider.getAllUserConfig(_propertyStore)
+        .stream().anyMatch(user -> user.isExist(username, ComponentType.valueOf(component)));
   }
 
   public boolean hasTable(String tableNameWithType) {

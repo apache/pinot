@@ -90,8 +90,29 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tenants");
   }
 
+  public String forUserCreate() {
+    return StringUtil.join("/", _baseUrl, "users");
+  }
+
   public String forTenantGet() {
     return StringUtil.join("/", _baseUrl, "tenants");
+  }
+
+  public String forUserGet(String username, String componentTypeStr) {
+    StringBuilder params = new StringBuilder();
+    if (StringUtils.isNotBlank(username)) {
+      params.append("?component=" + componentTypeStr);
+    }
+    return StringUtil.join("/", _baseUrl, "users", username, params.toString());
+  }
+
+  public String forUpdateUserConfig(String username, String componentTypeStr, boolean passwordChanged) {
+    StringBuilder params = new StringBuilder();
+    if (StringUtils.isNotBlank(username)) {
+      params.append("?component=" + componentTypeStr);
+    }
+    params.append(String.format("&&passwordChanged=%s", passwordChanged));
+    return StringUtil.join("/", _baseUrl, "users", username, params.toString());
   }
 
   public String forTenantGet(String tenantName) {

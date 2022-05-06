@@ -232,7 +232,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Set up request handling classes
     _routingManager = new BrokerRoutingManager(_brokerMetrics);
     _routingManager.init(_spectatorHelixManager);
-    _accessControlFactory = AccessControlFactory.loadFactory(_brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX));
+    _accessControlFactory = AccessControlFactory.loadFactory(_brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX),
+        _propertyStore);
     HelixExternalViewBasedQueryQuotaManager queryQuotaManager =
         new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics, _instanceId);
     queryQuotaManager.init(_spectatorHelixManager);
