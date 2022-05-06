@@ -23,9 +23,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -34,6 +36,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -51,7 +54,9 @@ import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -59,6 +64,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -213,7 +219,20 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       if (textIndexColumns.contains(columnName)) {
-        _textIndexCreatorMap.put(columnName, _indexCreatorProvider.newTextIndexCreator(context.forTextIndex(true)));
+        FSTType fstType = FSTType.LUCENE;
+        List<FieldConfig> fieldConfigList = _config.getTableConfig().getFieldConfigList();
+        if (fieldConfigList != null) {
+          for (FieldConfig fieldConfig : fieldConfigList) {
+            if (fieldConfig.getName().equals(columnName)) {
+              Map<String, String> properties = fieldConfig.getProperties();
+              if (TextIndexUtils.isFstTypeNative(properties)) {
+                fstType = FSTType.NATIVE;
+              }
+            }
+          }
+        }
+        _textIndexCreatorMap.put(columnName,
+            _indexCreatorProvider.newTextIndexCreator(context.forTextIndex(fstType, true)));
       }
 
       if (fstIndexColumns.contains(columnName)) {
@@ -262,6 +281,26 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         .containsKey(column)) {
       return false;
     }
+
+    // Do not create dictionary if index size with dictionary is going to be larger than index size without dictionary
+    // This is done to reduce the cost of dictionary for high cardinality columns
+    // Off by default and needs optimizeDictionaryEnabled to be set to true
+    if (config.isOptimizeDictionaryForMetrics() && spec.getFieldType() == FieldType.METRIC
+        && spec.isSingleValueField() && spec.getDataType().isFixedWidth()) {
+      long dictionarySize = info.getDistinctValueCount() * spec.getDataType().size();
+      long forwardIndexSize =
+          ((long) info.getTotalNumberOfEntries() * PinotDataBitSet.getNumBitsPerValue(info.getDistinctValueCount() - 1)
+              + Byte.SIZE - 1) / Byte.SIZE;
+
+      double indexWithDictSize = dictionarySize + forwardIndexSize;
+      double indexWithoutDictSize = info.getTotalNumberOfEntries() * spec.getDataType().size();
+
+      double indexSizeRatio = indexWithoutDictSize / indexWithDictSize;
+      if (indexSizeRatio <= config.getNoDictionarySizeRatioThreshold()) {
+        return false;
+      }
+    }
+
     return info.isCreateDictionary();
   }
 
@@ -374,6 +413,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               break;
             case DOUBLE:
               forwardIndexCreator.putDouble((double) columnValueToIndex);
+              break;
+            case BIG_DECIMAL:
+              forwardIndexCreator.putBigDecimal((BigDecimal) columnValueToIndex);
               break;
             case STRING:
               forwardIndexCreator.putString((String) columnValueToIndex);
@@ -617,6 +659,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       int dictionaryElementSize = (dictionaryCreator != null) ? dictionaryCreator.getNumBytesPerEntry() : 0;
       addColumnMetadataInfo(properties, column, columnIndexCreationInfo, _totalDocs, _schema.getFieldSpecFor(column),
           _dictionaryCreatorMap.containsKey(column), dictionaryElementSize);
+    }
+
+    SegmentZKPropsConfig segmentZKPropsConfig = _config.getSegmentZKPropsConfig();
+    if (segmentZKPropsConfig != null) {
+      properties.setProperty(CommonConstants.Segment.Realtime.START_OFFSET, segmentZKPropsConfig.getStartOffset());
+      properties.setProperty(CommonConstants.Segment.Realtime.END_OFFSET, segmentZKPropsConfig.getEndOffset());
     }
 
     properties.save();

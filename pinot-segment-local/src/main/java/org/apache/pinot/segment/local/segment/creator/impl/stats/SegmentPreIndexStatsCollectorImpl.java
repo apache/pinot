@@ -61,6 +61,10 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
         case DOUBLE:
           _columnStatsCollectorMap.put(column, new DoubleColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
+        case BIG_DECIMAL:
+          _columnStatsCollectorMap.put(column,
+              new BigDecimalColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          break;
         case STRING:
           _columnStatsCollectorMap.put(column, new StringColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;

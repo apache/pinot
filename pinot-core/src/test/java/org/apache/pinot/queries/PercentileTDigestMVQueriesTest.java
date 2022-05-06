@@ -22,7 +22,6 @@ import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -59,7 +58,7 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
       throws Exception {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
-      HashMap<String, Object> valueMap = new HashMap<>();
+      GenericRow row = new GenericRow();
 
       int numMultiValues = RANDOM.nextInt(MAX_NUM_MULTI_VALUES) + 1;
       Double[] values = new Double[numMultiValues];
@@ -69,17 +68,16 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
         values[j] = value;
         tDigest.add(value);
       }
-      valueMap.put(DOUBLE_COLUMN, values);
+      row.putValue(DOUBLE_COLUMN, values);
+
       ByteBuffer byteBuffer = ByteBuffer.allocate(tDigest.byteSize());
       tDigest.asBytes(byteBuffer);
-      valueMap.put(TDIGEST_COLUMN, byteBuffer.array());
+      row.putValue(TDIGEST_COLUMN, byteBuffer.array());
 
       String group = GROUPS[RANDOM.nextInt(GROUPS.length)];
-      valueMap.put(GROUP_BY_COLUMN, group);
+      row.putValue(GROUP_BY_COLUMN, group);
 
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(valueMap);
-      rows.add(genericRow);
+      rows.add(row);
     }
 
     Schema schema = new Schema();
@@ -106,5 +104,13 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
     return String.format("SELECT PERCENTILE%1$dMV(%2$s), PERCENTILETDIGEST%1$dMV(%2$s), PERCENTILETDIGEST%1$d(%3$s), "
             + "PERCENTILEMV(%2$s, %1$d), PERCENTILETDIGESTMV(%2$s, %1$d), PERCENTILETDIGEST(%3$s, %1$d) FROM %4$s",
         percentile, DOUBLE_COLUMN, TDIGEST_COLUMN, TABLE_NAME);
+  }
+
+  @Override
+  protected String getSmartTDigestQuery(int percentile) {
+    return String.format("SELECT PERCENTILEMV(%2$s, %1$d), PERCENTILESMARTTDIGEST(%2$s, %1$d), "
+            + "PERCENTILETDIGESTMV(%2$s, %1$d), PERCENTILESMARTTDIGEST(%2$s, %1$d, 'threshold=10') FROM %3$s",
+        percentile,
+        DOUBLE_COLUMN, TABLE_NAME);
   }
 }

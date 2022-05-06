@@ -59,7 +59,7 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -72,6 +72,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.testng.Assert;
@@ -559,15 +560,15 @@ public class ClusterIntegrationTestUtils {
     ResultSet h2ResultSet = h2statement.getResultSet();
 
     // compare results
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(pinotQuery);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
     if (!QueryContextUtils.isAggregationQuery(queryContext)) {
       // selection/distinct
 
-      List<String> orderByColumns = new ArrayList<>();
+      Set<String> orderByColumns = new HashSet<>();
       if (queryContext.getOrderByExpressions() != null) {
-        orderByColumns.addAll(
-            CalciteSqlParser.extractIdentifiers(queryContext.getBrokerRequest().getPinotQuery().getOrderByList(),
-                false));
+        for (OrderByExpressionContext orderByExpression : queryContext.getOrderByExpressions()) {
+          orderByExpression.getColumns(orderByColumns);
+        }
       }
       Set<String> expectedValues = new HashSet<>();
       List<String> expectedOrderByValues = new ArrayList<>();
@@ -717,7 +718,7 @@ public class ClusterIntegrationTestUtils {
 
   private static void comparePinotResultsWithExpectedValues(Set<String> expectedValues,
       List<String> expectedOrderByValues, org.apache.pinot.client.ResultSet connectionResultSet,
-      Collection<String> orderByColumns, String pinotQuery, String h2Query, int h2NumRows,
+      Set<String> orderByColumns, String pinotQuery, String h2Query, int h2NumRows,
       long pinotNumRecordsSelected) {
 
     int pinotNumRows = connectionResultSet.getRowCount();

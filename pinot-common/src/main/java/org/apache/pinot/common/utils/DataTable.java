@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -56,6 +57,8 @@ public interface DataTable {
   float getFloat(int rowId, int colId);
 
   double getDouble(int rowId, int colId);
+
+  BigDecimal getBigDecimal(int rowId, int colId);
 
   String getString(int rowId, int colId);
 

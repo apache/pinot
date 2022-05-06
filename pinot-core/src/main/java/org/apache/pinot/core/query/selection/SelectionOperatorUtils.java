@@ -18,10 +18,7 @@
  */
 package org.apache.pinot.core.query.selection;
 
-import java.io.Serializable;
-import java.sql.Timestamp;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -30,14 +27,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
@@ -73,21 +68,6 @@ public class SelectionOperatorUtils {
 
   public static final ExpressionContext IDENTIFIER_STAR = ExpressionContext.forIdentifier("*");
   public static final int MAX_ROW_HOLDER_INITIAL_CAPACITY = 10_000;
-
-  private static final String INT_PATTERN = "##########";
-  private static final String LONG_PATTERN = "####################";
-  private static final String FLOAT_PATTERN = "#########0.0####";
-  private static final String DOUBLE_PATTERN = "###################0.0#########";
-  private static final DecimalFormatSymbols DECIMAL_FORMAT_SYMBOLS = DecimalFormatSymbols.getInstance(Locale.US);
-
-  private static final ThreadLocal<DecimalFormat> THREAD_LOCAL_INT_FORMAT =
-      ThreadLocal.withInitial(() -> new DecimalFormat(INT_PATTERN, DECIMAL_FORMAT_SYMBOLS));
-  private static final ThreadLocal<DecimalFormat> THREAD_LOCAL_LONG_FORMAT =
-      ThreadLocal.withInitial(() -> new DecimalFormat(LONG_PATTERN, DECIMAL_FORMAT_SYMBOLS));
-  private static final ThreadLocal<DecimalFormat> THREAD_LOCAL_FLOAT_FORMAT =
-      ThreadLocal.withInitial(() -> new DecimalFormat(FLOAT_PATTERN, DECIMAL_FORMAT_SYMBOLS));
-  private static final ThreadLocal<DecimalFormat> THREAD_LOCAL_DOUBLE_FORMAT =
-      ThreadLocal.withInitial(() -> new DecimalFormat(DOUBLE_PATTERN, DECIMAL_FORMAT_SYMBOLS));
 
   /**
    * Extracts the expressions from a selection query, expands {@code 'SELECT *'} to all physical columns if applies.
@@ -273,6 +253,9 @@ public class SelectionOperatorUtils {
           case DOUBLE:
             dataTableBuilder.setColumn(i, ((Number) columnValue).doubleValue());
             break;
+          case BIG_DECIMAL:
+            dataTableBuilder.setColumn(i, (BigDecimal) columnValue);
+            break;
           case STRING:
             dataTableBuilder.setColumn(i, ((String) columnValue));
             break;
@@ -328,8 +311,8 @@ public class SelectionOperatorUtils {
             break;
 
           default:
-            throw new IllegalStateException(String
-                .format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
+            throw new IllegalStateException(
+                String.format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
                     dataSchema.getColumnName(i)));
         }
       }
@@ -367,6 +350,9 @@ public class SelectionOperatorUtils {
         case DOUBLE:
           row[i] = dataTable.getDouble(rowId, i);
           break;
+        case BIG_DECIMAL:
+          row[i] = dataTable.getBigDecimal(rowId, i);
+          break;
         case STRING:
           row[i] = dataTable.getString(rowId, i);
           break;
@@ -392,8 +378,8 @@ public class SelectionOperatorUtils {
           break;
 
         default:
-          throw new IllegalStateException(String
-              .format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
+          throw new IllegalStateException(
+              String.format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
                   dataSchema.getColumnName(i)));
       }
     }
@@ -418,43 +404,6 @@ public class SelectionOperatorUtils {
       }
     }
     return rows;
-  }
-
-  /**
-   * Render the selection rows to a formatted {@link SelectionResults} object for selection queries without
-   * <code>ORDER BY</code>. (Broker side)
-   * <p>{@link SelectionResults} object will be used to build the broker response.
-   * <p>Should be called after method "reduceWithoutOrdering()".
-   *
-   * @param rows unformatted selection rows.
-   * @param dataSchema data schema.
-   * @param selectionColumns selection columns.
-   * @return {@link SelectionResults} object results.
-   */
-  public static SelectionResults renderSelectionResultsWithoutOrdering(List<Object[]> rows, DataSchema dataSchema,
-      List<String> selectionColumns, boolean preserveType) {
-    int numRows = rows.size();
-    List<Serializable[]> resultRows = new ArrayList<>(numRows);
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-    int numColumns = columnDataTypes.length;
-    if (preserveType) {
-      for (Object[] row : rows) {
-        Serializable[] resultRow = new Serializable[numColumns];
-        for (int i = 0; i < numColumns; i++) {
-          resultRow[i] = columnDataTypes[i].convertAndFormat(row[i]);
-        }
-        resultRows.add(resultRow);
-      }
-    } else {
-      for (Object[] row : rows) {
-        Serializable[] resultRow = new Serializable[numColumns];
-        for (int i = 0; i < numColumns; i++) {
-          resultRow[i] = getFormattedValue(row[i], columnDataTypes[i]);
-        }
-        resultRows.add(resultRow);
-      }
-    }
-    return new SelectionResults(selectionColumns, resultRows);
   }
 
   /**
@@ -531,113 +480,6 @@ public class SelectionOperatorUtils {
       columnToIndexMap.put(columns[i], i);
     }
     return columnToIndexMap;
-  }
-
-  /**
-   * Deprecated because this method is only used to construct the PQL response, and PQL is already deprecated.
-   * Formats a value into a {@code String} (single-value column) or {@code String[]} (multi-value column) based on the
-   * data type. (Broker side)
-   * <p>Actual value type can be different with data type passed in, but they must be type compatible.
-   */
-  @Deprecated
-  public static Serializable getFormattedValue(Object value, ColumnDataType dataType) {
-    switch (dataType) {
-      // Single-value column
-      case INT:
-        return THREAD_LOCAL_INT_FORMAT.get().format(((Number) value).intValue());
-      case LONG:
-        return THREAD_LOCAL_LONG_FORMAT.get().format(((Number) value).longValue());
-      case FLOAT:
-        return THREAD_LOCAL_FLOAT_FORMAT.get().format(((Number) value).floatValue());
-      case DOUBLE:
-        return THREAD_LOCAL_DOUBLE_FORMAT.get().format(((Number) value).doubleValue());
-      case BOOLEAN:
-        return (Integer) value == 1 ? "true" : "false";
-      case TIMESTAMP:
-        return new Timestamp((Long) value).toString();
-      // NOTE: Return String for BYTES columns for backward-compatibility
-      case BYTES:
-        return ((ByteArray) value).toHexString();
-
-      // Multi-value column
-      case INT_ARRAY:
-        DecimalFormat intFormat = THREAD_LOCAL_INT_FORMAT.get();
-        int[] ints = (int[]) value;
-        int length = ints.length;
-        String[] formattedValue = new String[length];
-        for (int i = 0; i < length; i++) {
-          formattedValue[i] = intFormat.format(ints[i]);
-        }
-        return formattedValue;
-      case LONG_ARRAY:
-        // LONG_ARRAY type covers INT_ARRAY and LONG_ARRAY
-        DecimalFormat longFormat = THREAD_LOCAL_LONG_FORMAT.get();
-        if (value instanceof int[]) {
-          ints = (int[]) value;
-          length = ints.length;
-          formattedValue = new String[length];
-          for (int i = 0; i < length; i++) {
-            formattedValue[i] = longFormat.format(ints[i]);
-          }
-        } else {
-          long[] longs = (long[]) value;
-          length = longs.length;
-          formattedValue = new String[length];
-          for (int i = 0; i < length; i++) {
-            formattedValue[i] = longFormat.format(longs[i]);
-          }
-        }
-        return formattedValue;
-      case FLOAT_ARRAY:
-        DecimalFormat floatFormat = THREAD_LOCAL_FLOAT_FORMAT.get();
-        float[] floats = (float[]) value;
-        length = floats.length;
-        formattedValue = new String[length];
-        for (int i = 0; i < length; i++) {
-          formattedValue[i] = floatFormat.format(floats[i]);
-        }
-        return formattedValue;
-      case DOUBLE_ARRAY:
-        // DOUBLE_ARRAY type covers INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY and DOUBLE_ARRAY
-        DecimalFormat doubleFormat = THREAD_LOCAL_DOUBLE_FORMAT.get();
-        if (value instanceof int[]) {
-          ints = (int[]) value;
-          length = ints.length;
-          formattedValue = new String[length];
-          for (int i = 0; i < length; i++) {
-            formattedValue[i] = doubleFormat.format((double) ints[i]);
-          }
-          return formattedValue;
-        } else if (value instanceof long[]) {
-          long[] longs = (long[]) value;
-          length = longs.length;
-          formattedValue = new String[length];
-          for (int i = 0; i < length; i++) {
-            formattedValue[i] = doubleFormat.format((double) longs[i]);
-          }
-          return formattedValue;
-        } else if (value instanceof float[]) {
-          floats = (float[]) value;
-          length = floats.length;
-          formattedValue = new String[length];
-          for (int i = 0; i < length; i++) {
-            formattedValue[i] = doubleFormat.format(floats[i]);
-          }
-          return formattedValue;
-        } else {
-          double[] doubles = (double[]) value;
-          length = doubles.length;
-          formattedValue = new String[length];
-          for (int i = 0; i < length; i++) {
-            formattedValue[i] = doubleFormat.format(doubles[i]);
-          }
-          return formattedValue;
-        }
-
-      default:
-        // For STRING and STRING_ARRAY, no need to format
-        return (Serializable) value;
-    }
   }
 
   /**

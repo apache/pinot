@@ -41,7 +41,6 @@ import static org.testng.Assert.assertEquals;
 
 
 public class BrokerReduceServiceTest {
-  private static final CalciteSqlCompiler COMPILER = new CalciteSqlCompiler();
 
   @Test
   public void testReduceTimeout()
@@ -50,8 +49,8 @@ public class BrokerReduceServiceTest {
     properties.put(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2);
     BrokerReduceService brokerReduceService = new BrokerReduceService(new PinotConfiguration(properties));
 
-    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(
-        "SELECT COUNT(*) FROM testTable GROUP BY col1 OPTION(groupByMode=sql,responseFormat=sql)");
+    BrokerRequest brokerRequest =
+        CalciteSqlCompiler.compileToBrokerRequest("SELECT COUNT(*) FROM testTable GROUP BY col1");
     DataSchema dataSchema =
         new DataSchema(new String[]{"col1", "count(*)"}, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);

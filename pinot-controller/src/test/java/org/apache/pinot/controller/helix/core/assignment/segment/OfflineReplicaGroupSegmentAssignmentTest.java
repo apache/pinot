@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -33,7 +34,6 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -41,6 +41,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
+import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.BeforeClass;
@@ -58,7 +59,7 @@ import static org.testng.Assert.assertTrue;
 public class OfflineReplicaGroupSegmentAssignmentTest {
   private static final int NUM_REPLICAS = 3;
   private static final String SEGMENT_NAME_PREFIX = "segment_";
-  private static final int NUM_SEGMENTS = 90;
+  private static final int NUM_SEGMENTS = 12;
   private static final List<String> SEGMENTS =
       SegmentAssignmentTestUtils.getNameList(SEGMENT_NAME_PREFIX, NUM_SEGMENTS);
   private static final String INSTANCE_NAME_PREFIX = "instance_";
@@ -248,13 +249,11 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
           .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
 
-    // There should be 90 segments assigned
     assertEquals(currentAssignment.size(), NUM_SEGMENTS);
     // Each segment should have 3 replicas
     for (Map<String, String> instanceStateMap : currentAssignment.values()) {
       assertEquals(instanceStateMap.size(), NUM_REPLICAS);
     }
-    // Each instance should have 15 segments assigned
     int[] numSegmentsAssignedPerInstance =
         SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(currentAssignment, INSTANCES);
     int[] expectedNumSegmentsAssignedPerInstance = new int[NUM_INSTANCES];
@@ -278,13 +277,11 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
           .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
 
-    // There should be 90 segments assigned
     assertEquals(currentAssignment.size(), NUM_SEGMENTS);
     // Each segment should have 3 replicas
     for (Map<String, String> instanceStateMap : currentAssignment.values()) {
       assertEquals(instanceStateMap.size(), NUM_REPLICAS);
     }
-    // Each instance should have 15 segments assigned
     int[] numSegmentsAssignedPerInstance =
         SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(currentAssignment, INSTANCES);
     int[] expectedNumSegmentsAssignedPerInstance = new int[NUM_INSTANCES];
@@ -355,5 +352,29 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
             currentAssignment.get(partitionIdToSegmentsMap[i][j]));
       }
     }
+  }
+
+  @Test
+  public void testRebalanceTableWithPartitionColumnAndInstancePartitionsMapWithOnePartition() {
+    // make an unbalanced assignment by assigning all segments to the first three instances
+    String instance0 = INSTANCE_NAME_PREFIX + "0";
+    String instance1 = INSTANCE_NAME_PREFIX + "1";
+    String instance2 = INSTANCE_NAME_PREFIX + "2";
+    Map<String, Map<String, String>> unbalancedAssignment = new TreeMap<>();
+    SEGMENTS.forEach(segName ->
+        unbalancedAssignment.put(segName, ImmutableMap.of(
+            instance0, SegmentStateModel.ONLINE,
+            instance1, SegmentStateModel.ONLINE,
+            instance2, SegmentStateModel.ONLINE
+        ))
+    );
+    Map<String, Map<String, String>> balancedAssignment = _segmentAssignmentWithPartition
+        .rebalanceTable(unbalancedAssignment, _instancePartitionsMapWithoutPartition, null, null,
+            new BaseConfiguration());
+    int[] actualNumSegmentsAssignedPerInstance =
+        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(balancedAssignment, INSTANCES);
+    int[] expectedNumSegmentsAssignedPerInstance = new int[NUM_INSTANCES];
+    Arrays.fill(expectedNumSegmentsAssignedPerInstance, NUM_SEGMENTS * NUM_REPLICAS / NUM_INSTANCES);
+    assertEquals(actualNumSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
   }
 }

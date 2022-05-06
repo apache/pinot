@@ -49,9 +49,8 @@ import static org.apache.pinot.controller.recommender.rules.utils.PredicateParse
 
 
 /**
- * A query parser to simulate the nESI cost of a given query(pql/sql) in run-time, recommend an optimal set of
- * dimensions
- * to apply indices on, and calculate the estimated nESI saved by applying such indices
+ * A query parser to simulate the nESI cost of a given query in run-time, recommend an optimal set of dimensions to
+ * apply indices on, and calculate the estimated nESI saved by applying such indices
  */
 public class QueryInvertedSortedIndexRecommender {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryInvertedSortedIndexRecommender.class);
@@ -65,7 +64,6 @@ public class QueryInvertedSortedIndexRecommender {
   private IndexConfig _indexOverwritten;
   private InvertedSortedIndexJointRuleParams _params;
   private int _numColumnsIndexApplicable;
-  private String _queryType;
 
   /**
    * The plan priority for AND-connected sub-predicates in {@link FilterOperatorUtils}
@@ -740,7 +738,6 @@ public class QueryInvertedSortedIndexRecommender {
       queryInvertedSortedIndexRecommender._numColumnsIndexApplicable =
           _inputManager.getNumColumnsInvertedSortedApplicable();
       queryInvertedSortedIndexRecommender._indexOverwritten = _inputManager.getOverWrittenConfigs().getIndexConfig();
-      queryInvertedSortedIndexRecommender._queryType = _inputManager.getQueryType();
 
       return queryInvertedSortedIndexRecommender;
     }

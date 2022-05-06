@@ -38,6 +38,8 @@ import org.apache.pinot.segment.local.segment.index.readers.geospatial.Immutable
 import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
 import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -51,6 +53,7 @@ import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.provider.IndexReaderProvider;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -157,8 +160,13 @@ public class DefaultIndexReaderProvider implements IndexReaderProvider {
   }
 
   @Override
-  public TextIndexReader newTextIndexReader(File file, ColumnMetadata columnMetadata, @Nullable
-      Map<String, String> textIndexProperties) {
+  public TextIndexReader newTextIndexReader(File file, ColumnMetadata columnMetadata,
+      @Nullable Map<String, String> textIndexProperties) {
+    FSTType textIndexFSTType = TextIndexUtils.getFSTTypeOfIndex(file, columnMetadata.getColumnName());
+    if (textIndexFSTType == FSTType.NATIVE) {
+      // TODO: Support loading native text index from a PinotDataBuffer
+      return new NativeTextIndexReader(columnMetadata.getColumnName(), file);
+    }
     return new LuceneTextIndexReader(columnMetadata.getColumnName(), file, columnMetadata.getTotalDocs(),
         textIndexProperties);
   }

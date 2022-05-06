@@ -27,6 +27,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteOrder;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
@@ -35,6 +36,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +57,7 @@ public class SegmentDictionaryCreator implements Closeable {
   private Long2IntOpenHashMap _longValueToIndexMap;
   private Float2IntOpenHashMap _floatValueToIndexMap;
   private Double2IntOpenHashMap _doubleValueToIndexMap;
+  private Object2IntOpenHashMap<BigDecimal> _bigDecimalValueToIndexMap;
   private Object2IntOpenHashMap<String> _stringValueToIndexMap;
   private Object2IntOpenHashMap<ByteArray> _bytesValueToIndexMap;
   private int _numBytesPerEntry = 0;
@@ -163,6 +166,26 @@ public class SegmentDictionaryCreator implements Closeable {
             numValues, sortedDoubles[0], sortedDoubles[numValues - 1]);
         return;
 
+      case BIG_DECIMAL:
+        BigDecimal[] sortedBigDecimals = (BigDecimal[]) _sortedValues;
+        numValues = sortedBigDecimals.length;
+
+        Preconditions.checkState(numValues > 0);
+        _bigDecimalValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
+
+        for (int i = 0; i < numValues; i++) {
+          BigDecimal value = sortedBigDecimals[i];
+          _bigDecimalValueToIndexMap.put(value, i);
+          _numBytesPerEntry = Math.max(_numBytesPerEntry, BigDecimalUtils.byteSize(value));
+        }
+
+        writeBytesValueDictionary(sortedBigDecimals);
+        LOGGER.info(
+            "Created dictionary for BIG_DECIMAL column: {}"
+                + " with cardinality: {}, max length in bytes: {}, range: {} to {}",
+            _columnName, numValues, _numBytesPerEntry, sortedBigDecimals[0], sortedBigDecimals[numValues - 1]);
+        return;
+
       case STRING:
         String[] sortedStrings = (String[]) _sortedValues;
         numValues = sortedStrings.length;
@@ -242,6 +265,31 @@ public class SegmentDictionaryCreator implements Closeable {
     }
   }
 
+  private void writeBytesValueDictionary(BigDecimal[] bigDecimalValues)
+      throws IOException {
+    if (_useVarLengthDictionary) {
+      try (VarLengthValueWriter writer = new VarLengthValueWriter(_dictionaryFile, bigDecimalValues.length)) {
+        for (BigDecimal value : bigDecimalValues) {
+          writer.add(BigDecimalUtils.serialize(value));
+        }
+      }
+      LOGGER.info("Using variable length dictionary for column: {}, size: {}", _columnName, _dictionaryFile.length());
+    } else {
+      // Backward-compatible: index file is always big-endian
+      int numValues = bigDecimalValues.length;
+      try (PinotDataBuffer dataBuffer = PinotDataBuffer
+          .mapFile(_dictionaryFile, false, 0, (long) numValues * _numBytesPerEntry, ByteOrder.BIG_ENDIAN,
+              getClass().getSimpleName());
+          FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
+        for (int i = 0; i < bigDecimalValues.length; i++) {
+          writer.writeBytes(i, _numBytesPerEntry, BigDecimalUtils.serialize(bigDecimalValues[i]));
+        }
+      }
+      LOGGER.info("Using fixed length dictionary for column: {}, size: {}", _columnName,
+          (long) numValues * _numBytesPerEntry);
+    }
+  }
+
   public int getNumBytesPerEntry() {
     return _numBytesPerEntry;
   }
@@ -258,6 +306,8 @@ public class SegmentDictionaryCreator implements Closeable {
         return _doubleValueToIndexMap.get((double) value);
       case STRING:
         return _stringValueToIndexMap.getInt(value);
+      case BIG_DECIMAL:
+        return _bigDecimalValueToIndexMap.getInt((BigDecimal) value);
       case BYTES:
         return _bytesValueToIndexMap.get(new ByteArray((byte[]) value));
       default:

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.selection;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -27,7 +26,6 @@ import java.util.List;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
@@ -104,13 +102,15 @@ public class SelectionOperatorService {
 
     int numValuesToCompare = valueIndexList.size();
     int[] valueIndices = new int[numValuesToCompare];
-    boolean[] isNumber = new boolean[numValuesToCompare];
+    boolean[] useDoubleComparison = new boolean[numValuesToCompare];
     // Use multiplier -1 or 1 to control ascending/descending order
     int[] multipliers = new int[numValuesToCompare];
     for (int i = 0; i < numValuesToCompare; i++) {
       int valueIndex = valueIndexList.get(i);
       valueIndices[i] = valueIndex;
-      isNumber[i] = columnDataTypes[valueIndex].isNumber();
+      if (columnDataTypes[valueIndex].isNumber()) {
+        useDoubleComparison[i] = true;
+      }
       multipliers[i] = orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
     }
 
@@ -120,7 +120,7 @@ public class SelectionOperatorService {
         Object v1 = o1[index];
         Object v2 = o2[index];
         int result;
-        if (isNumber[i]) {
+        if (useDoubleComparison[i]) {
           result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
         } else {
           //noinspection unchecked
@@ -158,53 +158,10 @@ public class SelectionOperatorService {
   }
 
   /**
-   * Render the selection rows to a {@link SelectionResults} object for selection queries with
-   * <code>ORDER BY</code>. (Broker side)
-   * <p>{@link SelectionResults} object will be used to build the broker response.
-   * <p>Should be called after method "reduceWithOrdering()".
-   *
-   * @return {@link SelectionResults} object results.
-   */
-  public SelectionResults renderSelectionResultsWithOrdering(boolean preserveType) {
-    LinkedList<Serializable[]> rowsInSelectionResults = new LinkedList<>();
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(_selectionColumns, _dataSchema);
-    int numColumns = columnIndices.length;
-    ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
-
-    if (preserveType) {
-      while (_rows.size() > _offset) {
-        Object[] row = _rows.poll();
-        assert row != null;
-        Serializable[] extractedRow = new Serializable[numColumns];
-        for (int i = 0; i < numColumns; i++) {
-          int columnIndex = columnIndices[i];
-          extractedRow[i] = columnDataTypes[columnIndex].convertAndFormat(row[columnIndex]);
-        }
-        rowsInSelectionResults.addFirst(extractedRow);
-      }
-    } else {
-      while (_rows.size() > _offset) {
-        Object[] row = _rows.poll();
-        assert row != null;
-        Serializable[] extractedRow = new Serializable[numColumns];
-        for (int i = 0; i < numColumns; i++) {
-          int columnIndex = columnIndices[i];
-          extractedRow[i] = SelectionOperatorUtils.getFormattedValue(row[columnIndex], columnDataTypes[columnIndex]);
-        }
-        rowsInSelectionResults.addFirst(extractedRow);
-      }
-    }
-
-    return new SelectionResults(_selectionColumns, rowsInSelectionResults);
-  }
-
-  /**
-   * Render the selection rows to a {@link ResultTable} object for selection queries with
-   * <code>ORDER BY</code>. (Broker side)
+   * Render the selection rows to a {@link ResultTable} object for selection queries with <code>ORDER BY</code>.
+   * (Broker side)
    * <p>{@link ResultTable} object will be used to build the broker response.
    * <p>Should be called after method "reduceWithOrdering()".
-   *
-   * @return {@link SelectionResults} object results.
    */
   public ResultTable renderResultTableWithOrdering() {
     int[] columnIndices = SelectionOperatorUtils.getColumnIndices(_selectionColumns, _dataSchema);

@@ -30,7 +30,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -71,6 +70,7 @@ import org.apache.pinot.core.util.MemoizedClassAssociation;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class QueryContext {
   private final String _tableName;
+  private final QueryContext _subquery;
   private final List<ExpressionContext> _selectExpressions;
   private final List<String> _aliasList;
   private final FilterContext _filter;
@@ -82,20 +82,15 @@ public class QueryContext {
   private final Map<String, String> _queryOptions;
   private final Map<String, String> _debugOptions;
   private final Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
-
-  // Keep the BrokerRequest to make incremental changes
-  // TODO: Remove it once the whole query engine is using the QueryContext
-  private final BrokerRequest _brokerRequest;
-  private final QueryContext _subquery;
+  private final boolean _explain;
 
   private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
 
   // Pre-calculate the aggregation functions and columns for the query so that it can be shared across all the segments
   private AggregationFunction[] _aggregationFunctions;
-  private List<Pair<AggregationFunction, FilterContext>> _filteredAggregationFunctions;
-
   private Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
   private boolean _hasFilteredAggregations;
+  private List<Pair<AggregationFunction, FilterContext>> _filteredAggregationFunctions;
   private Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationsIndexMap;
   private Set<String> _columns;
 
@@ -120,13 +115,14 @@ public class QueryContext {
   // Trim threshold to use for server combine for SQL GROUP BY
   private int _groupTrimThreshold = InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD;
 
-  private QueryContext(String tableName, List<ExpressionContext> selectExpressions, List<String> aliasList,
-      @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
-      @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
-      int offset, Map<String, String> queryOptions, @Nullable Map<String, String> debugOptions,
-      BrokerRequest brokerRequest, QueryContext subquery,
-      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints) {
+  private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
+      List<ExpressionContext> selectExpressions, List<String> aliasList, @Nullable FilterContext filter,
+      @Nullable List<ExpressionContext> groupByExpressions, @Nullable FilterContext havingFilter,
+      @Nullable List<OrderByExpressionContext> orderByExpressions, int limit, int offset,
+      Map<String, String> queryOptions, @Nullable Map<String, String> debugOptions,
+      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, boolean explain) {
     _tableName = tableName;
+    _subquery = subquery;
     _selectExpressions = selectExpressions;
     _aliasList = Collections.unmodifiableList(aliasList);
     _filter = filter;
@@ -137,16 +133,24 @@ public class QueryContext {
     _offset = offset;
     _queryOptions = queryOptions;
     _debugOptions = debugOptions;
-    _brokerRequest = brokerRequest;
-    _subquery = subquery;
     _expressionOverrideHints = expressionOverrideHints;
+    _explain = explain;
   }
 
   /**
    * Returns the table name.
+   * NOTE: on the broker side, table name might be {@code null} when subquery is available.
    */
   public String getTableName() {
     return _tableName;
+  }
+
+  /**
+   * Returns the subquery.
+   */
+  @Nullable
+  public QueryContext getSubquery() {
+    return _subquery;
   }
 
   /**
@@ -195,10 +199,6 @@ public class QueryContext {
     return _orderByExpressions;
   }
 
-  public QueryContext getSubquery() {
-    return _subquery;
-  }
-
   /**
    * Returns the limit of the query.
    */
@@ -236,10 +236,10 @@ public class QueryContext {
   }
 
   /**
-   * Returns the BrokerRequest where the QueryContext is extracted from.
+   * Returns {@code true} if the query is an EXPLAIN query, {@code false} otherwise.
    */
-  public BrokerRequest getBrokerRequest() {
-    return _brokerRequest;
+  public boolean isExplain() {
+    return _explain;
   }
 
   /**
@@ -381,15 +381,16 @@ public class QueryContext {
    */
   @Override
   public String toString() {
-    return "QueryContext{" + "_tableName='" + _tableName + '\'' + ", _selectExpressions=" + _selectExpressions
-        + ", _aliasList=" + _aliasList + ", _filter=" + _filter + ", _groupByExpressions=" + _groupByExpressions
-        + ", _havingFilter=" + _havingFilter + ", _orderByExpressions=" + _orderByExpressions + ", _limit=" + _limit
-        + ", _offset=" + _offset + ", _queryOptions=" + _queryOptions + ", _debugOptions=" + _debugOptions
-        + ", _brokerRequest=" + _brokerRequest + '}';
+    return "QueryContext{" + "_tableName='" + _tableName + '\'' + ", _subquery=" + _subquery + ", _selectExpressions="
+        + _selectExpressions + ", _aliasList=" + _aliasList + ", _filter=" + _filter + ", _groupByExpressions="
+        + _groupByExpressions + ", _havingFilter=" + _havingFilter + ", _orderByExpressions=" + _orderByExpressions
+        + ", _limit=" + _limit + ", _offset=" + _offset + ", _queryOptions=" + _queryOptions + ", _debugOptions="
+        + _debugOptions + ", _expressionOverrideHints=" + _expressionOverrideHints + ", _explain=" + _explain + '}';
   }
 
   public static class Builder {
     private String _tableName;
+    private QueryContext _subquery;
     private List<ExpressionContext> _selectExpressions;
     private List<String> _aliasList;
     private FilterContext _filter;
@@ -400,12 +401,16 @@ public class QueryContext {
     private int _offset;
     private Map<String, String> _queryOptions;
     private Map<String, String> _debugOptions;
-    private BrokerRequest _brokerRequest;
-    private QueryContext _subquery;
     private Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
+    private boolean _explain;
 
     public Builder setTableName(String tableName) {
       _tableName = tableName;
+      return this;
+    }
+
+    public Builder setSubquery(QueryContext subquery) {
+      _subquery = subquery;
       return this;
     }
 
@@ -419,22 +424,22 @@ public class QueryContext {
       return this;
     }
 
-    public Builder setFilter(@Nullable FilterContext filter) {
+    public Builder setFilter(FilterContext filter) {
       _filter = filter;
       return this;
     }
 
-    public Builder setGroupByExpressions(@Nullable List<ExpressionContext> groupByExpressions) {
+    public Builder setGroupByExpressions(List<ExpressionContext> groupByExpressions) {
       _groupByExpressions = groupByExpressions;
       return this;
     }
 
-    public Builder setHavingFilter(@Nullable FilterContext havingFilter) {
+    public Builder setHavingFilter(FilterContext havingFilter) {
       _havingFilter = havingFilter;
       return this;
     }
 
-    public Builder setOrderByExpressions(@Nullable List<OrderByExpressionContext> orderByExpressions) {
+    public Builder setOrderByExpressions(List<OrderByExpressionContext> orderByExpressions) {
       _orderByExpressions = orderByExpressions;
       return this;
     }
@@ -449,28 +454,23 @@ public class QueryContext {
       return this;
     }
 
-    public Builder setQueryOptions(@Nullable Map<String, String> queryOptions) {
+    public Builder setQueryOptions(Map<String, String> queryOptions) {
       _queryOptions = queryOptions;
       return this;
     }
 
-    public Builder setDebugOptions(@Nullable Map<String, String> debugOptions) {
+    public Builder setDebugOptions(Map<String, String> debugOptions) {
       _debugOptions = debugOptions;
-      return this;
-    }
-
-    public Builder setBrokerRequest(BrokerRequest brokerRequest) {
-      _brokerRequest = brokerRequest;
-      return this;
-    }
-
-    public Builder setSubquery(QueryContext subquery) {
-      _subquery = subquery;
       return this;
     }
 
     public Builder setExpressionOverrideHints(Map<ExpressionContext, ExpressionContext> expressionOverrideHints) {
       _expressionOverrideHints = expressionOverrideHints;
+      return this;
+    }
+
+    public Builder setExplain(boolean explain) {
+      _explain = explain;
       return this;
     }
 
@@ -481,9 +481,9 @@ public class QueryContext {
         _queryOptions = Collections.emptyMap();
       }
       QueryContext queryContext =
-          new QueryContext(_tableName, _selectExpressions, _aliasList, _filter, _groupByExpressions, _havingFilter,
-              _orderByExpressions, _limit, _offset, _queryOptions, _debugOptions, _brokerRequest, _subquery,
-              _expressionOverrideHints);
+          new QueryContext(_tableName, _subquery, _selectExpressions, _aliasList, _filter, _groupByExpressions,
+              _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions, _debugOptions,
+              _expressionOverrideHints, _explain);
 
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);
@@ -555,8 +555,8 @@ public class QueryContext {
           aggregationFunctionIndexMap.put(entry.getKey().getLeft(), entry.getValue());
         }
         queryContext._aggregationFunctions = aggregationFunctions;
-        queryContext._filteredAggregationFunctions = filteredAggregationFunctions;
         queryContext._aggregationFunctionIndexMap = aggregationFunctionIndexMap;
+        queryContext._filteredAggregationFunctions = filteredAggregationFunctions;
         queryContext._filteredAggregationsIndexMap = filteredAggregationsIndexMap;
       }
     }
@@ -582,9 +582,6 @@ public class QueryContext {
           Preconditions.checkState(aggregation != null && aggregation.getType() == FunctionContext.Type.AGGREGATION,
               "First argument of FILTER must be an aggregation function");
           ExpressionContext filterExpression = arguments.get(1);
-          Preconditions.checkState(filterExpression.getFunction() != null
-                  && filterExpression.getFunction().getType() == FunctionContext.Type.TRANSFORM,
-              "Second argument of FILTER must be a filter expression");
           FilterContext filter = RequestContextUtils.getFilter(filterExpression);
           filteredAggregations.add(Pair.of(aggregation, filter));
         } else {

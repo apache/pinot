@@ -19,6 +19,7 @@
 package org.apache.pinot.sql.parsers;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,7 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.calcite.config.Lex;
+import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlExplain;
@@ -45,9 +46,8 @@ import org.apache.calcite.sql.SqlSelectKeyword;
 import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlLikeOperator;
-import org.apache.calcite.sql.parser.SqlParseException;
+import org.apache.calcite.sql.parser.SqlAbstractParserImpl;
 import org.apache.calcite.sql.parser.SqlParser;
-import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.DataSource;
@@ -57,9 +57,11 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.Pairs;
+import org.apache.pinot.sql.FilterKind;
+import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
+import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -73,18 +75,6 @@ public class CalciteSqlParser {
   public static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(QueryRewriterFactory.getQueryRewriters());
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
-  /** Lexical policy similar to MySQL with ANSI_QUOTES option enabled. (To be
-   * precise: MySQL on Windows; MySQL on Linux uses case-sensitive matching,
-   * like the Linux file system.) The case of identifiers is preserved whether
-   * or not they quoted; after which, identifiers are matched
-   * case-insensitively. Double quotes allow identifiers to contain
-   * non-alphanumeric characters. */
-  private static final Lex PINOT_LEX = Lex.MYSQL_ANSI;
-
-  // BABEL is a very liberal conformance value that allows anything supported by any dialect
-  private static final SqlParser.Config PARSER_CONFIG =
-      SqlParser.configBuilder().setLex(PINOT_LEX).setConformance(SqlConformanceEnum.BABEL)
-          .setParserFactory(SqlBabelParserImpl.FACTORY).build();
   // To Keep the backward compatibility with 'OPTION' Functionality in PQL, which is used to
   // provide more hints for query processing.
   //
@@ -95,6 +85,7 @@ public class CalciteSqlParser {
   //   `OPTION (<k1> = <v1>, <k2> = <v2>, <k3> = <v3>)`
   // or
   //   `OPTION (<k1> = <v1>) OPTION (<k2> = <v2>) OPTION (<k3> = <v3>)`
+  // TODO: move to use parser syntax extension: `OPTION` `(` `<key>` = `<value>` [, `<key>` = `<value>`]* `)`
   private static final Pattern OPTIONS_REGEX_PATTEN =
       Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
 
@@ -117,6 +108,40 @@ public class CalciteSqlParser {
     return sql;
   }
 
+  public static SqlNodeAndOptions compileToSqlNodeAndOptions(String sql)
+      throws Exception {
+    // Remove the comments from the query
+    sql = removeComments(sql);
+
+    // Remove the terminating semicolon from the query
+    sql = removeTerminatingSemicolon(sql);
+
+    // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
+    List<String> options = extractOptionsFromSql(sql);
+    if (!options.isEmpty()) {
+      sql = removeOptionsFromSql(sql);
+    }
+
+    try (StringReader inStream = new StringReader(sql)) {
+      SqlParserImpl sqlParser = newSqlParser(inStream);
+      return new SqlNodeAndOptions(sqlParser.parseSqlStmtEof(), options);
+    } catch (Throwable e) {
+      throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
+    }
+  }
+
+  public static PinotSqlType extractSqlType(SqlNode sqlNode) {
+    switch (sqlNode.getKind()) {
+      case OTHER_DDL:
+        if (sqlNode instanceof SqlInsertFromFile) {
+          return PinotSqlType.DML;
+        }
+        throw new SqlCompilationException("Unsupported SqlNode type - " + sqlNode.getKind());
+      default:
+        return PinotSqlType.DQL;
+    }
+  }
+
   public static PinotQuery compileToPinotQuery(String sql)
       throws SqlCompilationException {
     // Remove the comments from the query
@@ -131,11 +156,11 @@ public class CalciteSqlParser {
       sql = removeOptionsFromSql(sql);
     }
 
-    SqlParser sqlParser = SqlParser.create(sql, PARSER_CONFIG);
     SqlNode sqlNode;
-    try {
-      sqlNode = sqlParser.parseQuery();
-    } catch (SqlParseException e) {
+    try (StringReader inStream = new StringReader(sql)) {
+      SqlParserImpl sqlParser = newSqlParser(inStream);
+      sqlNode = sqlParser.parseSqlStmtEof();
+    } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
     }
 
@@ -311,20 +336,30 @@ public class CalciteSqlParser {
    * @throws SqlCompilationException if String is not a valid expression.
    */
   public static Expression compileToExpression(String expression) {
-    SqlParser sqlParser = SqlParser.create(expression, PARSER_CONFIG);
     SqlNode sqlNode;
-    try {
-      sqlNode = sqlParser.parseExpression();
-    } catch (SqlParseException e) {
+    try (StringReader inStream = new StringReader(expression)) {
+      SqlParserImpl sqlParser = newSqlParser(inStream);
+      sqlNode = sqlParser.parseSqlExpressionEof();
+    } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing expression: " + expression, e);
     }
     return toExpression(sqlNode);
   }
 
-  private static void setOptions(PinotQuery pinotQuery, List<String> optionsStatements) {
-    if (optionsStatements.isEmpty()) {
-      return;
-    }
+  @VisibleForTesting
+  static SqlParserImpl newSqlParser(StringReader inStream) {
+    SqlParserImpl sqlParser = new SqlParserImpl(inStream);
+    sqlParser.switchTo(SqlAbstractParserImpl.LexicalState.DQID);
+    // TODO: convert to MySQL conformance once we retired most of the un-tested BABEL tokens
+    sqlParser.setConformance(SqlConformanceEnum.BABEL);
+    sqlParser.setTabSize(1);
+    sqlParser.setQuotedCasing(Casing.UNCHANGED);
+    sqlParser.setUnquotedCasing(Casing.UNCHANGED);
+    sqlParser.setIdentifierMaxLength(SqlParser.DEFAULT_IDENTIFIER_MAX_LENGTH);
+    return sqlParser;
+  }
+
+  public static Map<String, String> extractOptionsMap(List<String> optionsStatements) {
     Map<String, String> options = new HashMap<>();
     for (String optionsStatement : optionsStatements) {
       for (String option : optionsStatement.split(",")) {
@@ -335,10 +370,17 @@ public class CalciteSqlParser {
         options.put(splits[0].trim(), splits[1].trim());
       }
     }
-    pinotQuery.setQueryOptions(options);
+    return options;
   }
 
-  private static PinotQuery compileSqlNodeToPinotQuery(SqlNode sqlNode) {
+  private static void setOptions(PinotQuery pinotQuery, List<String> optionsStatements) {
+    if (optionsStatements.isEmpty()) {
+      return;
+    }
+    pinotQuery.setQueryOptions(extractOptionsMap(optionsStatements));
+  }
+
+  public static PinotQuery compileSqlNodeToPinotQuery(SqlNode sqlNode) {
     PinotQuery pinotQuery = new PinotQuery();
     if (sqlNode instanceof SqlExplain) {
       // Extract sql node for the query

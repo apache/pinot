@@ -23,21 +23,22 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.query.distinct.DistinctTable;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
 @SuppressWarnings("ConstantConditions")
 public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleValueQueriesTest {
-  private static final String AGGREGATION = " COUNT(*), SUM(column1), MAX(column3), MIN(column6), AVG(column7)";
+  private static final String AGGREGATION_QUERY =
+      "SELECT COUNT(*), SUM(column1), MAX(column3), MIN(column6), AVG(column7) FROM testTable";
 
   // ARRAY_BASED
   private static final String SMALL_GROUP_BY = " GROUP BY column9";
@@ -51,171 +52,135 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
   @Test
   public void testAggregationOnly() {
-    String query = "SELECT" + AGGREGATION + " FROM testTable";
-
     // Test query without filter.
-    AggregationOperator aggregationOperator = getOperatorForPqlQuery(query);
+    AggregationOperator aggregationOperator = getOperator(AGGREGATION_QUERY);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 30000L, 0L, 120000L, 30000L);
-    QueriesTestUtils
-        .testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 30000L, 32317185437847L, 2147419555,
-            1689277, 28175373944314L, 30000L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 30000L, 0L,
+        120000L, 30000L);
+    QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 30000L, 32317185437847L,
+        2147419555, 1689277, 28175373944314L, 30000L);
 
     // Test query with filter.
-    aggregationOperator = getOperatorForPqlQueryWithFilter(query);
+    aggregationOperator = getOperator(AGGREGATION_QUERY + FILTER);
     resultsBlock = aggregationOperator.nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 6129L, 84134L, 24516L,
-            30000L);
-    QueriesTestUtils
-        .testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 6129L, 6875947596072L, 999813884,
-            1980174, 4699510391301L, 6129L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 6129L, 84134L,
+        24516L, 30000L);
+    QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 6129L, 6875947596072L,
+        999813884, 1980174, 4699510391301L, 6129L);
   }
 
   @Test
   public void testFilteredAggregations() {
-    String query = "SELECT SUM(column6) FILTER(WHERE column6 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL),"
-        + "MAX(column3) FILTER(WHERE column3 IS NOT NULL), "
-        + "SUM(column3), AVG(column7) FILTER(WHERE column7 > 0) FROM testTable WHERE column3 > 0";
-
-    FilteredAggregationOperator aggregationOperator = getOperatorForSqlQuery(query);
+    String query = "SELECT SUM(column6) FILTER(WHERE column6 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL), "
+        + "MAX(column3) FILTER(WHERE column3 IS NOT NULL), SUM(column3), AVG(column7) FILTER(WHERE column7 > 0) "
+        + "FROM testTable WHERE column3 > 0";
+    FilteredAggregationOperator aggregationOperator = getOperator(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(),
-            180000L, 0L, 540000L, 30000L);
-    QueriesTestUtils
-        .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 22266008882250L,
-            30000, 2147419555,
-            2147483647, 28175373944314L, 30000L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 180000L, 0L,
+        540000L, 30000L);
+    QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 22266008882250L, 30000,
+        2147419555, 32289159189150L, 28175373944314L, 30000L);
 
-    query = "SELECT SUM(column6) FILTER(WHERE column6 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL),"
-        + "MAX(column3) FILTER(WHERE column3 IS NOT NULL), "
-        + "SUM(column3), AVG(column7) FILTER(WHERE column7 > 0) FROM testTable";
-
-    aggregationOperator = getOperatorForSqlQuery(query);
+    query = "SELECT SUM(column6) FILTER(WHERE column6 > 5), COUNT(*) FILTER(WHERE column1 IS NOT NULL), "
+        + "MAX(column3) FILTER(WHERE column3 IS NOT NULL), SUM(column3), AVG(column7) FILTER(WHERE column7 > 0) "
+        + "FROM testTable";
+    aggregationOperator = getOperator(query);
     resultsBlock = aggregationOperator.nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(),
-            180000L, 0L, 540000L, 30000L);
-    QueriesTestUtils
-        .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 22266008882250L,
-            30000, 2147419555,
-            2147483647, 28175373944314L, 30000L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 180000L, 0L,
+        540000L, 30000L);
+    QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 22266008882250L, 30000,
+        2147419555, 32289159189150L, 28175373944314L, 30000L);
 
-    query = "SELECT SUM(column6) FILTER(WHERE column6 > 5 OR column6 < 15),"
-        + "COUNT(*) FILTER(WHERE column1 IS NOT NULL),"
-        + "MAX(column3) FILTER(WHERE column3 IS NOT NULL AND column3 > 0), "
+    query = "SELECT SUM(column6) FILTER(WHERE column6 > 5 OR column6 < 15), "
+        + "COUNT(*) FILTER(WHERE column1 IS NOT NULL), MAX(column3) FILTER(WHERE column3 IS NOT NULL AND column3 > 0), "
         + "SUM(column3), AVG(column7) FILTER(WHERE column7 > 0 AND column7 < 100) FROM testTable";
-
-    aggregationOperator = getOperatorForSqlQuery(query);
+    aggregationOperator = getOperator(query);
     resultsBlock = aggregationOperator.nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(),
-            150000L, 0L, 450000L, 30000L);
-    QueriesTestUtils
-        .testInnerSegmentAggregationResultForFilteredAggs(resultsBlock.getAggregationResult(), 22266008882250L,
-            30000, 2147419555,
-            2147483647, 0L, 0L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 150000L, 0L,
+        450000L, 30000L);
+    QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 22266008882250L, 30000,
+        2147419555, 32289159189150L, 0L, 0L);
   }
 
   @Test
   public void testSmallAggregationGroupBy() {
-    String query = "SELECT" + AGGREGATION + " FROM testTable" + SMALL_GROUP_BY;
-
     // Test query without filter.
-    AggregationGroupByOperator aggregationGroupByOperator = getOperatorForPqlQuery(query);
-    IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 30000L, 0L, 150000L,
-            30000L);
-    QueriesTestUtils
-        .testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(), "11270", 1L, 815409257L,
-            1215316262, 1328642550, 788414092L, 1L);
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(AGGREGATION_QUERY + SMALL_GROUP_BY);
+    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 30000L, 0L, 150000L,
+        30000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
+        new Object[]{11270}, 1L, 815409257L, 1215316262, 1328642550, 788414092L, 1L);
 
     // Test query with filter.
-    aggregationGroupByOperator = getOperatorForPqlQueryWithFilter(query);
-    resultsBlock = aggregationGroupByOperator.nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 6129L, 84134L, 30645L,
-            30000L);
-    QueriesTestUtils
-        .testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(), "242920", 3L, 4348938306L,
-            407993712, 296467636, 5803888725L, 3L);
+    groupByOperator = getOperator(AGGREGATION_QUERY + FILTER + SMALL_GROUP_BY);
+    resultsBlock = groupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 6129L, 84134L,
+        30645L, 30000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
+        new Object[]{242920}, 3L, 4348938306L, 407993712, 296467636, 5803888725L, 3L);
   }
 
   @Test
   public void testMediumAggregationGroupBy() {
-    String query = "SELECT" + AGGREGATION + " FROM testTable" + MEDIUM_GROUP_BY;
-
     // Test query without filter.
-    AggregationGroupByOperator aggregationGroupByOperator = getOperatorForPqlQuery(query);
-    IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 30000L, 0L, 210000L,
-            30000L);
-    QueriesTestUtils
-        .testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(), "1813102948\0P\0HEuxNvH",
-            4L, 2062187196L, 1988589001, 394608493, 4782388964L, 4L);
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(AGGREGATION_QUERY + MEDIUM_GROUP_BY);
+    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 30000L, 0L, 210000L,
+        30000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
+        new Object[]{1813102948, "P", "HEuxNvH"}, 4L, 2062187196L, 1988589001, 394608493, 4782388964L, 4L);
 
     // Test query with filter.
-    aggregationGroupByOperator = getOperatorForPqlQueryWithFilter(query);
-    resultsBlock = aggregationGroupByOperator.nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 6129L, 84134L, 42903L,
-            30000L);
+    groupByOperator = getOperator(AGGREGATION_QUERY + FILTER + MEDIUM_GROUP_BY);
+    resultsBlock = groupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 6129L, 84134L,
+        42903L, 30000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
-        "1176631727\0P\0KrNxpdycSiwoRohEiTIlLqDHnx", 1L, 716185211L, 489993380, 371110078, 487714191L, 1L);
+        new Object[]{1176631727, "P", "KrNxpdycSiwoRohEiTIlLqDHnx"}, 1L, 716185211L, 489993380, 371110078, 487714191L,
+        1L);
   }
 
   @Test
   public void testLargeAggregationGroupBy() {
-    String query = "SELECT" + AGGREGATION + " FROM testTable" + LARGE_GROUP_BY;
-
     // Test query without filter.
-    AggregationGroupByOperator aggregationGroupByOperator = getOperatorForPqlQuery(query);
-    IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 30000L, 0L, 210000L,
-            30000L);
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(AGGREGATION_QUERY + LARGE_GROUP_BY);
+    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 30000L, 0L, 210000L,
+        30000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
-        "484569489\00016200443\0001159557463\0P\0MaztCmmxxgguBUxPti", 2L, 969138978L, 995355481, 16200443, 2222394270L,
-        2L);
+        new Object[]{484569489, 16200443, 1159557463, "P", "MaztCmmxxgguBUxPti"}, 2L, 969138978L, 995355481, 16200443,
+        2222394270L, 2L);
 
     // Test query with filter.
-    aggregationGroupByOperator = getOperatorForPqlQueryWithFilter(query);
-    resultsBlock = aggregationGroupByOperator.nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 6129L, 84134L, 42903L,
-            30000L);
+    groupByOperator = getOperator(AGGREGATION_QUERY + FILTER + LARGE_GROUP_BY);
+    resultsBlock = groupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 6129L, 84134L,
+        42903L, 30000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
-        "1318761745\000353175528\0001172307870\0P\0HEuxNvH", 2L, 2637523490L, 557154208, 353175528, 2427862396L, 2L);
+        new Object[]{1318761745, 353175528, 1172307870, "P", "HEuxNvH"}, 2L, 2637523490L, 557154208, 353175528,
+        2427862396L, 2L);
   }
 
   @Test
   public void testVeryLargeAggregationGroupBy() {
-    String query = "SELECT" + AGGREGATION + " FROM testTable" + VERY_LARGE_GROUP_BY;
-
     // Test query without filter.
-    AggregationGroupByOperator aggregationGroupByOperator = getOperatorForPqlQuery(query);
-    IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 30000L, 0L, 270000L,
-            30000L);
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(AGGREGATION_QUERY + VERY_LARGE_GROUP_BY);
+    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 30000L, 0L, 270000L,
+        30000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
-        "1784773968\000204243323\000628170461\0001985159279\000296467636\0P\0HEuxNvH\000402773817\0002047180536", 1L,
-        1784773968L, 204243323, 628170461, 1985159279L, 1L);
+        new Object[]{1784773968, 204243323, 628170461, 1985159279, 296467636, "P", "HEuxNvH", 402773817, 2047180536},
+        1L, 1784773968L, 204243323, 628170461, 1985159279L, 1L);
 
     // Test query with filter.
-    aggregationGroupByOperator = getOperatorForPqlQueryWithFilter(query);
-    resultsBlock = aggregationGroupByOperator.nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 6129L, 84134L, 55161L,
-            30000L);
-    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
-        "1361199163\000178133991\000296467636\000788414092\0001719301234\0P\0MaztCmmxxgguBUxPti\0001284373442"
-            + "\000752388855",
-        1L, 1361199163L, 178133991, 296467636, 788414092L, 1L);
+    groupByOperator = getOperator(AGGREGATION_QUERY + FILTER + VERY_LARGE_GROUP_BY);
+    resultsBlock = groupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), 6129L, 84134L,
+        55161L, 30000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(), new Object[]{
+        1361199163, 178133991, 296467636, 788414092, 1719301234, "P", "MaztCmmxxgguBUxPti", 1284373442, 752388855
+    }, 1L, 1361199163L, 178133991, 296467636, 788414092L, 1L);
   }
 
   /**
@@ -226,8 +191,8 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
    */
   @Test
   public void testSingleColumnDistinct() {
-    String query = "SELECT DISTINCT(column1) FROM testTable LIMIT 1000000";
-    BaseOperator<IntermediateResultsBlock> distinctOperator = getOperatorForPqlQuery(query);
+    String query = "SELECT DISTINCT column1 FROM testTable LIMIT 1000000";
+    BaseOperator<IntermediateResultsBlock> distinctOperator = getOperator(query);
     IntermediateResultsBlock resultsBlock = distinctOperator.nextBlock();
     List<Object> operatorResult = resultsBlock.getAggregationResult();
 
@@ -242,7 +207,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
 
     for (Record record : distinctTable.getRecords()) {
-      Assert.assertNotNull(record);
+      assertNotNull(record);
       assertEquals(record.getValues().length, 1);
     }
   }
@@ -255,8 +220,8 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
    */
   @Test
   public void testMultiColumnDistinct() {
-    String query = "SELECT DISTINCT(column1, column3) FROM testTable LIMIT 1000000";
-    DistinctOperator distinctOperator = getOperatorForPqlQuery(query);
+    String query = "SELECT DISTINCT column1, column3 FROM testTable LIMIT 1000000";
+    DistinctOperator distinctOperator = getOperator(query);
     IntermediateResultsBlock resultsBlock = distinctOperator.nextBlock();
     List<Object> operatorResult = resultsBlock.getAggregationResult();
 
@@ -272,7 +237,7 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
 
     for (Record record : distinctTable.getRecords()) {
-      Assert.assertNotNull(record);
+      assertNotNull(record);
       assertEquals(record.getValues().length, 2);
     }
   }

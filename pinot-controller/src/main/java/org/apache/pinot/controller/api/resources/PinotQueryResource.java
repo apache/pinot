@@ -35,6 +35,7 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -42,6 +43,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
@@ -51,11 +53,14 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.PinotSqlType;
+import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,9 +68,10 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class PinotQueryResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotQueryResource.class);
-  private static final Pql2Compiler PQL_QUERY_COMPILER = new Pql2Compiler();
-  private static final CalciteSqlCompiler SQL_QUERY_COMPILER = new CalciteSqlCompiler();
   private static final Random RANDOM = new Random();
+
+  @Inject
+  SqlQueryExecutor _sqlQueryExecutor;
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -76,50 +82,6 @@ public class PinotQueryResource {
   @Inject
   ControllerConf _controllerConf;
 
-  @Deprecated
-  @POST
-  @Path("pql")
-  public String handlePostPql(String requestJsonStr, @Context HttpHeaders httpHeaders) {
-    try {
-      JsonNode requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
-      String pqlQuery = requestJson.get("pql").asText();
-      String traceEnabled = "false";
-      if (requestJson.has("trace")) {
-        traceEnabled = requestJson.get("trace").toString();
-      }
-      String queryOptions = null;
-      if (requestJson.has("queryOptions")) {
-        queryOptions = requestJson.get("queryOptions").asText();
-      }
-      LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
-      return getQueryResponse(pqlQuery, traceEnabled, queryOptions, httpHeaders, CommonConstants.Broker.Request.PQL);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while processing post request", e);
-      return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
-    }
-  }
-
-  @Deprecated
-  @GET
-  @Path("pql")
-  public String handleGetPql(@QueryParam("pql") String pqlQuery, @QueryParam("trace") String traceEnabled,
-      @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
-    try {
-      LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
-      return getQueryResponse(pqlQuery, traceEnabled, queryOptions, httpHeaders, CommonConstants.Broker.Request.PQL);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while processing get request", e);
-      return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
-    }
-  }
-
-  /**
-   * Current handlePostSql method internally still use pql compiler to parse query.
-   *
-   * @param requestJsonStr
-   * @param httpHeaders
-   * @return
-   */
   @POST
   @Path("sql")
   public String handlePostSql(String requestJsonStr, @Context HttpHeaders httpHeaders) {
@@ -135,10 +97,29 @@ public class PinotQueryResource {
         queryOptions = requestJson.get("queryOptions").asText();
       }
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
-      return getQueryResponse(sqlQuery, traceEnabled, queryOptions, httpHeaders, CommonConstants.Broker.Request.SQL);
+      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
+    }
+  }
+
+  private String executeSqlQuery(@Context HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
+      String queryOptions)
+      throws Exception {
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
+    PinotSqlType sqlType = CalciteSqlParser.extractSqlType(sqlNodeAndOptions.getSqlNode());
+    switch (sqlType) {
+      case DQL:
+        return getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
+      case DML:
+        Map<String, String> headers =
+            httpHeaders.getRequestHeaders().entrySet().stream().filter(entry -> !entry.getValue().isEmpty())
+                .map(entry -> Pair.of(entry.getKey(), entry.getValue().get(0)))
+                .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+        return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers).toJsonString();
+      default:
+        throw new UnsupportedOperationException("Unsupported SQL type - " + sqlType);
     }
   }
 
@@ -148,33 +129,34 @@ public class PinotQueryResource {
       @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
-      return getQueryResponse(sqlQuery, traceEnabled, queryOptions, httpHeaders, CommonConstants.Broker.Request.SQL);
+      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
+      PinotSqlType sqlType = CalciteSqlParser.extractSqlType(sqlNodeAndOptions.getSqlNode());
+      if (sqlType == PinotSqlType.DQL) {
+        return getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
+      }
+      throw new UnsupportedOperationException("Unsupported SQL type - " + sqlType);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
     }
   }
 
-  public String getQueryResponse(String query, String traceEnabled, String queryOptions, HttpHeaders httpHeaders,
-      String querySyntax) {
+  public String getQueryResponse(String query, String traceEnabled, String queryOptions, HttpHeaders httpHeaders) {
+    return getQueryResponse(query, null, traceEnabled, queryOptions, httpHeaders);
+  }
+
+  public String getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled, String queryOptions,
+      HttpHeaders httpHeaders) {
     // Get resource table name.
     String tableName;
     try {
-      String inputTableName;
-      switch (querySyntax) {
-        case CommonConstants.Broker.Request.SQL:
-          inputTableName = RequestUtils.getTableName(SQL_QUERY_COMPILER.compileToBrokerRequest(query).getPinotQuery());
-          break;
-        case CommonConstants.Broker.Request.PQL:
-          inputTableName = PQL_QUERY_COMPILER.compileToBrokerRequest(query).getQuerySource().getTableName();
-          break;
-        default:
-          throw new UnsupportedOperationException("Unsupported query syntax - " + querySyntax);
-      }
+      String inputTableName =
+          sqlNode != null ? RequestUtils.getTableName(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode))
+              : CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
       tableName = _pinotHelixResourceManager.getActualTableName(inputTableName);
     } catch (Exception e) {
-      LOGGER.error("Caught exception while compiling {} query: {}", querySyntax.toUpperCase(), query, e);
-      return QueryException.getException(QueryException.PQL_PARSING_ERROR, e).toString();
+      LOGGER.error("Caught exception while compiling query: {}", query, e);
+      return QueryException.getException(QueryException.SQL_PARSING_ERROR, e).toString();
     }
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
@@ -213,8 +195,8 @@ public class PinotQueryResource {
     String protocol = _controllerConf.getControllerBrokerProtocol();
     int port = _controllerConf.getControllerBrokerPortOverride() > 0 ? _controllerConf.getControllerBrokerPortOverride()
         : Integer.parseInt(instanceConfig.getPort());
-    String url = getQueryURL(protocol, hostName, String.valueOf(port), querySyntax);
-    ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions, querySyntax);
+    String url = getQueryURL(protocol, hostName, port);
+    ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions);
 
     // forward client-supplied headers
     Map<String, String> headers =
@@ -225,19 +207,9 @@ public class PinotQueryResource {
     return sendRequestRaw(url, query, requestJson, headers);
   }
 
-  private ObjectNode getRequestJson(String query, String traceEnabled, String queryOptions, String querySyntax) {
-    // Currently the request is still processed by PQL parser.
+  private ObjectNode getRequestJson(String query, String traceEnabled, String queryOptions) {
     ObjectNode requestJson = JsonUtils.newObjectNode();
-    switch (querySyntax) {
-      case CommonConstants.Broker.Request.SQL:
-        requestJson.put("sql", query);
-        break;
-      case CommonConstants.Broker.Request.PQL:
-        requestJson.put("pql", query);
-        break;
-      default:
-        throw new UnsupportedOperationException("Unsupported query syntax - " + querySyntax);
-    }
+    requestJson.put("sql", query);
     if (traceEnabled != null && !traceEnabled.isEmpty()) {
       requestJson.put("trace", traceEnabled);
     }
@@ -247,15 +219,8 @@ public class PinotQueryResource {
     return requestJson;
   }
 
-  private String getQueryURL(String protocol, String hostName, String port, String querySyntax) {
-    switch (querySyntax) {
-      case CommonConstants.Broker.Request.SQL:
-        return String.format("%s://%s:%s/query/sql", protocol, hostName, port);
-      case CommonConstants.Broker.Request.PQL:
-        return String.format("%s://%s:%s/query", protocol, hostName, port);
-      default:
-        throw new UnsupportedOperationException("Unsupported query syntax - " + querySyntax);
-    }
+  private String getQueryURL(String protocol, String hostName, int port) {
+    return String.format("%s://%s:%d/query/sql", protocol, hostName, port);
   }
 
   public String sendPostRaw(String urlStr, String requestStr, Map<String, String> headers) {

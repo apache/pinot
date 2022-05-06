@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -91,7 +92,13 @@ public final class Schema implements Serializable {
     return JsonUtils.stringToObject(schemaString, Schema.class);
   }
 
-  public static Schema fromInputSteam(InputStream schemaInputStream)
+  public static Pair<Schema, Map<String, Object>> parseSchemaAndUnrecognizedPropsfromInputStream(
+      InputStream schemaInputStream)
+      throws IOException {
+    return JsonUtils.inputStreamToObjectAndUnrecognizedProperties(schemaInputStream, Schema.class);
+  }
+
+  public static Schema fromInputStream(InputStream schemaInputStream)
       throws IOException {
     return JsonUtils.inputStreamToObject(schemaInputStream, Schema.class);
   }
@@ -447,6 +454,7 @@ public final class Schema implements Serializable {
             case LONG:
             case FLOAT:
             case DOUBLE:
+            case BIG_DECIMAL:
             case BOOLEAN:
             case TIMESTAMP:
             case STRING:
@@ -464,6 +472,7 @@ public final class Schema implements Serializable {
             case LONG:
             case FLOAT:
             case DOUBLE:
+            case BIG_DECIMAL:
             case BYTES:
               break;
             default:

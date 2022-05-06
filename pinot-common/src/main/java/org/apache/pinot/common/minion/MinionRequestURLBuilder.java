@@ -20,7 +20,7 @@ package org.apache.pinot.common.minion;
 
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.spi.utils.StringUtil;
 
 
 /**
@@ -89,5 +89,9 @@ public class MinionRequestURLBuilder {
 
   public String forTaskTypeDelete(String taskType) {
     return StringUtil.join("/", _baseUrl, "tasks", taskType);
+  }
+
+  public String forTaskExecute() {
+    return StringUtil.join("/", _baseUrl, "tasks/execute");
   }
 }

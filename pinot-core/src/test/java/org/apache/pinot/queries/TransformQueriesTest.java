@@ -21,16 +21,13 @@ package org.apache.pinot.queries;
 
 import com.google.common.collect.ImmutableList;
 import java.io.File;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.response.broker.AggregationResult;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -185,7 +182,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
   }
 
   private void runAndVerifyInnerSegmentQuery(String query, double expectedSum, int expectedCount) {
-    AggregationOperator aggregationOperator = getOperatorForPqlQuery(query);
+    AggregationOperator aggregationOperator = getOperator(query);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
     assertNotNull(aggregationResult);
@@ -200,59 +197,54 @@ public class TransformQueriesTest extends BaseQueriesTest {
     String query =
         "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('week', ADD(SUB(DIV(T, 1000), INT_COL2), INT_COL2), "
             + "'SECONDS', 'Europe/Berlin')";
-    verifyDateTruncationResult(query, "95295600");
+    verifyDateTruncationResult(query, new Object[]{95295600L});
 
     query =
         "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('week', DIV(MULT(DIV(ADD(SUB(T, 5), 5), 1000), INT_COL2), "
             + "INT_COL2), 'SECONDS', 'Europe/Berlin', 'MILLISECONDS')";
-    verifyDateTruncationResult(query, "95295600000");
+    verifyDateTruncationResult(query, new Object[]{95295600000L});
 
     query = "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('quarter', T, 'MILLISECONDS')";
-    verifyDateTruncationResult(query, "94694400000");
+    verifyDateTruncationResult(query, new Object[]{94694400000L});
   }
 
-  private void verifyDateTruncationResult(String query, String expectedStringKey) {
-    AggregationGroupByOperator aggregationGroupByOperator = getOperatorForPqlQuery(query);
-    IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
+  private void verifyDateTruncationResult(String query, Object[] expectedGroupKey) {
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
+    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
-    List<GroupKeyGenerator.StringGroupKey> groupKeys =
-        ImmutableList.copyOf(aggregationGroupByResult.getStringGroupKeyIterator());
+    List<GroupKeyGenerator.GroupKey> groupKeys = ImmutableList.copyOf(aggregationGroupByResult.getGroupKeyIterator());
     assertEquals(groupKeys.size(), 1);
-    assertEquals(groupKeys.get(0)._stringKey, expectedStringKey);
-    Object resultForKey = aggregationGroupByResult.getResultForKey(groupKeys.get(0), 0);
+    assertEquals(groupKeys.get(0)._keys, expectedGroupKey);
+    Object resultForKey = aggregationGroupByResult.getResultForGroupId(groupKeys.get(0)._groupId, 0);
     assertEquals(resultForKey, (long) NUM_ROWS);
   }
 
   @Test
   public void testTransformWithAvgInterSegmentInterServer() {
     String query = "SELECT AVG(SUB(INT_COL1, INT_COL2)) FROM testTable";
-    runAndVerifyInterSegmentQuery(query, "-1000.00000");
+    runAndVerifyInterSegmentQuery(query, -1000.0);
 
     query = "SELECT AVG(SUB(LONG_COL1, INT_COL1)) FROM testTable";
-    runAndVerifyInterSegmentQuery(query, "499000.00000");
+    runAndVerifyInterSegmentQuery(query, 499000.0);
 
     query = "SELECT AVG(SUB(LONG_COL2, LONG_COL1)) FROM testTable";
-    runAndVerifyInterSegmentQuery(query, "500000.00000");
+    runAndVerifyInterSegmentQuery(query, 500000.0);
 
     query = "SELECT AVG(ADD(INT_COL1, INT_COL2)) FROM testTable";
-    runAndVerifyInterSegmentQuery(query, "3000.00000");
+    runAndVerifyInterSegmentQuery(query, 3000.0);
 
     query = "SELECT AVG(ADD(INT_COL1, LONG_COL1)) FROM testTable";
-    runAndVerifyInterSegmentQuery(query, "501000.00000");
+    runAndVerifyInterSegmentQuery(query, 501000.0);
 
     query = "SELECT AVG(ADD(LONG_COL1, LONG_COL2)) FROM testTable";
-    runAndVerifyInterSegmentQuery(query, "1500000.00000");
+    runAndVerifyInterSegmentQuery(query, 1500000.0);
 
     query = "SELECT AVG(ADD(DIV(INT_COL1, INT_COL2), DIV(LONG_COL1, LONG_COL2))) FROM testTable";
-    runAndVerifyInterSegmentQuery(query, "1.00000");
+    runAndVerifyInterSegmentQuery(query, 1.0);
   }
 
-  private void runAndVerifyInterSegmentQuery(String query, String expectedValue) {
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-    assertEquals(aggregationResults.size(), 1);
-    Serializable value = aggregationResults.get(0).getValue();
-    assertEquals(value, expectedValue);
+  private void runAndVerifyInterSegmentQuery(String query, double expectedResult) {
+    assertEquals(getBrokerResponse(query).getResultTable().getRows().get(0)[0], expectedResult);
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
@@ -41,6 +42,7 @@ public class FunctionUtils {
     put(Float.class, PinotDataType.FLOAT);
     put(double.class, PinotDataType.DOUBLE);
     put(Double.class, PinotDataType.DOUBLE);
+    put(BigDecimal.class, PinotDataType.BIG_DECIMAL);
     put(boolean.class, PinotDataType.BOOLEAN);
     put(Boolean.class, PinotDataType.BOOLEAN);
     put(Timestamp.class, PinotDataType.TIMESTAMP);
@@ -51,6 +53,7 @@ public class FunctionUtils {
     put(float[].class, PinotDataType.PRIMITIVE_FLOAT_ARRAY);
     put(double[].class, PinotDataType.PRIMITIVE_DOUBLE_ARRAY);
     put(String[].class, PinotDataType.STRING_ARRAY);
+    put(Object.class, PinotDataType.OBJECT);
   }};
 
   // Types allowed as the function argument (actual value passed into the function) for type conversion
@@ -63,6 +66,7 @@ public class FunctionUtils {
     put(Long.class, PinotDataType.LONG);
     put(Float.class, PinotDataType.FLOAT);
     put(Double.class, PinotDataType.DOUBLE);
+    put(BigDecimal.class, PinotDataType.BIG_DECIMAL);
     put(Timestamp.class, PinotDataType.TIMESTAMP);
     put(String.class, PinotDataType.STRING);
     put(byte[].class, PinotDataType.BYTES);
@@ -75,6 +79,7 @@ public class FunctionUtils {
     put(double[].class, PinotDataType.PRIMITIVE_DOUBLE_ARRAY);
     put(Double[].class, PinotDataType.DOUBLE_ARRAY);
     put(String[].class, PinotDataType.STRING_ARRAY);
+    put(Object.class, PinotDataType.OBJECT);
   }};
 
   private static final Map<Class<?>, DataType> DATA_TYPE_MAP = new HashMap<Class<?>, DataType>() {{
@@ -86,6 +91,7 @@ public class FunctionUtils {
     put(Float.class, DataType.FLOAT);
     put(double.class, DataType.DOUBLE);
     put(Double.class, DataType.DOUBLE);
+    put(BigDecimal.class, DataType.BIG_DECIMAL);
     put(boolean.class, DataType.BOOLEAN);
     put(Boolean.class, DataType.BOOLEAN);
     put(Timestamp.class, DataType.TIMESTAMP);
@@ -107,6 +113,7 @@ public class FunctionUtils {
     put(Float.class, ColumnDataType.FLOAT);
     put(double.class, ColumnDataType.DOUBLE);
     put(Double.class, ColumnDataType.DOUBLE);
+    put(BigDecimal.class, ColumnDataType.BIG_DECIMAL);
     put(boolean.class, ColumnDataType.BOOLEAN);
     put(Boolean.class, ColumnDataType.BOOLEAN);
     put(Timestamp.class, ColumnDataType.TIMESTAMP);
@@ -117,6 +124,7 @@ public class FunctionUtils {
     put(float[].class, ColumnDataType.FLOAT_ARRAY);
     put(double[].class, ColumnDataType.DOUBLE_ARRAY);
     put(String[].class, ColumnDataType.STRING_ARRAY);
+    put(Object.class, ColumnDataType.OBJECT);
   }};
 
   /**

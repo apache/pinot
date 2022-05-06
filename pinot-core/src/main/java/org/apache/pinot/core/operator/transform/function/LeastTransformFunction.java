@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 
@@ -94,6 +95,23 @@ public class LeastTransformFunction extends SelectTupleElementTransformFunction 
       }
     }
     return _doubleValuesSV;
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    int numDocs = projectionBlock.getNumDocs();
+    if (_bigDecimalValuesSV == null || _bigDecimalValuesSV.length < numDocs) {
+      _bigDecimalValuesSV = new BigDecimal[numDocs];
+    }
+    BigDecimal[] values = _arguments.get(0).transformToBigDecimalValuesSV(projectionBlock);
+    System.arraycopy(values, 0, _bigDecimalValuesSV, 0, numDocs);
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToBigDecimalValuesSV(projectionBlock);
+      for (int j = 0; j < numDocs & j < values.length; j++) {
+        _bigDecimalValuesSV[j] = _bigDecimalValuesSV[j].min(values[j]);
+      }
+    }
+    return _bigDecimalValuesSV;
   }
 
   @Override

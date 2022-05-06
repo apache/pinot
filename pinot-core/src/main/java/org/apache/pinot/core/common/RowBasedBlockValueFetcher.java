@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.common;
 
+import java.math.BigDecimal;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -60,6 +61,8 @@ public class RowBasedBlockValueFetcher {
           return new FloatSingleValueFetcher(blockValSet.getFloatValuesSV());
         case DOUBLE:
           return new DoubleSingleValueFetcher(blockValSet.getDoubleValuesSV());
+        case BIG_DECIMAL:
+          return new BigDecimalValueFetcher(blockValSet.getBigDecimalValuesSV());
         case STRING:
           return new StringSingleValueFetcher(blockValSet.getStringValuesSV());
         case BYTES:
@@ -133,6 +136,18 @@ public class RowBasedBlockValueFetcher {
     }
 
     public Double getValue(int docId) {
+      return _values[docId];
+    }
+  }
+
+  private static class BigDecimalValueFetcher implements ValueFetcher {
+    private final BigDecimal[] _values;
+
+    BigDecimalValueFetcher(BigDecimal[] values) {
+      _values = values;
+    }
+
+    public BigDecimal getValue(int docId) {
       return _values[docId];
     }
   }

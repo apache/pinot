@@ -289,8 +289,8 @@ public interface IndexCreationContext {
       return new Range(this, rangeIndexVersion);
     }
 
-    public Text forTextIndex(boolean commitOnClose) {
-      return new Text(this, commitOnClose);
+    public Text forTextIndex(FSTType fstType, boolean commitOnClose) {
+      return new Text(this, fstType, commitOnClose);
     }
   }
 
@@ -455,10 +455,10 @@ public interface IndexCreationContext {
     /**
      * For text indexes
      */
-    public Text(IndexCreationContext wrapped, boolean commitOnClose) {
+    public Text(IndexCreationContext wrapped, FSTType fstType, boolean commitOnClose) {
       super(wrapped);
       _commitOnClose = commitOnClose;
-      _fstType = null;
+      _fstType = fstType;
       _sortedUniqueElementsArray = null;
       _isFst = false;
     }

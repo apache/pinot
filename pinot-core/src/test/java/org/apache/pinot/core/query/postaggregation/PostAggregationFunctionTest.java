@@ -58,5 +58,10 @@ public class PostAggregationFunctionTest {
     assertEquals(function.invoke(
         new Object[]{GeometrySerializer.serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20)))}),
         "POINT (10 20)");
+
+    // Cast
+    function = new PostAggregationFunction("cast", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
+    assertEquals(function.getResultType(), ColumnDataType.OBJECT);
+    assertEquals(function.invoke(new Object[]{1, "LONG"}), 1L);
   }
 }

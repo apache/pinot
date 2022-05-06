@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.creator;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,12 +36,14 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.BigDecimalColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.index.readers.BigDecimalDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.FloatDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.IntDictionary;
@@ -55,6 +58,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -163,6 +167,10 @@ public class DictionariesTest {
         case DOUBLE:
           Assert.assertTrue(heapDictionary instanceof DoubleDictionary);
           Assert.assertTrue(mmapDictionary instanceof DoubleDictionary);
+          break;
+        case BIG_DECIMAL:
+          Assert.assertTrue(heapDictionary instanceof BigDecimalDictionary);
+          Assert.assertTrue(mmapDictionary instanceof BigDecimalDictionary);
           break;
         case STRING:
           Assert.assertTrue(heapDictionary instanceof StringDictionary);
@@ -298,6 +306,33 @@ public class DictionariesTest {
     statsCollector.collect(40d);
     Assert.assertFalse(statsCollector.isSorted());
     statsCollector.collect(20d);
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.seal();
+    Assert.assertEquals(statsCollector.getCardinality(), 6);
+    Assert.assertEquals(((Number) statsCollector.getMinValue()).intValue(), 1);
+    Assert.assertEquals(((Number) statsCollector.getMaxValue()).intValue(), 40);
+    Assert.assertFalse(statsCollector.isSorted());
+  }
+
+  @Test
+  public void testBigDecimalColumnPreIndexStatsCollector() {
+    AbstractColumnStatisticsCollector statsCollector =
+        buildStatsCollector("column1", DataType.BIG_DECIMAL, false);
+    statsCollector.collect(BigDecimal.valueOf(1d));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(BigDecimal.valueOf(2d));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(BigDecimal.valueOf(3d));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(BigDecimal.valueOf(4d));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(BigDecimal.valueOf(4d));
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(BigDecimal.valueOf(2d));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(BigDecimal.valueOf(40d));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(BigDecimal.valueOf(20d));
     Assert.assertFalse(statsCollector.isSorted());
     statsCollector.seal();
     Assert.assertEquals(statsCollector.getCardinality(), 6);
@@ -446,7 +481,25 @@ public class DictionariesTest {
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec(column, dataType, true));
     StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, schema, null);
+    return buildStatsCollector(column, dataType, statsCollectorConfig);
+  }
 
+  private AbstractColumnStatisticsCollector buildStatsCollector(String column, DataType dataType,
+      boolean isDimensionField) {
+    if (isDimensionField) {
+      return buildStatsCollector(column, dataType);
+    }
+
+    Schema schema = new Schema();
+    MetricFieldSpec metricFieldSpec = new MetricFieldSpec(column, dataType);
+    metricFieldSpec.setSingleValueField(true);
+    schema.addField(metricFieldSpec);
+    StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, schema, null);
+    return buildStatsCollector(column, dataType, statsCollectorConfig);
+  }
+
+  private AbstractColumnStatisticsCollector buildStatsCollector(String column, DataType dataType,
+      StatsCollectorConfig statsCollectorConfig) {
     switch (dataType) {
       case INT:
         return new IntColumnPreIndexStatsCollector(column, statsCollectorConfig);
@@ -456,6 +509,8 @@ public class DictionariesTest {
         return new FloatColumnPreIndexStatsCollector(column, statsCollectorConfig);
       case DOUBLE:
         return new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig);
+      case BIG_DECIMAL:
+        return new BigDecimalColumnPreIndexStatsCollector(column, statsCollectorConfig);
       case BOOLEAN:
       case STRING:
         return new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);

@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -72,7 +73,8 @@ public class MergeTaskUtils {
     String windowStartMs = taskConfig.get(MergeTask.WINDOW_START_MS_KEY);
     String windowEndMs = taskConfig.get(MergeTask.WINDOW_END_MS_KEY);
     if (windowStartMs != null && windowEndMs != null) {
-      timeHandlerConfigBuilder.setTimeRange(Long.parseLong(windowStartMs), Long.parseLong(windowEndMs));
+      timeHandlerConfigBuilder.setTimeRange(Long.parseLong(windowStartMs), Long.parseLong(windowEndMs))
+          .setNegateWindowFilter(Boolean.parseBoolean(taskConfig.get(MergeTask.NEGATE_WINDOW_FILTER)));
     }
 
     String roundBucketTimePeriod = taskConfig.get(MergeTask.ROUND_BUCKET_TIME_PERIOD_KEY);
@@ -97,17 +99,19 @@ public class MergeTaskUtils {
     if (segmentPartitionConfig == null) {
       return Collections.emptyList();
     }
+    List<PartitionerConfig> partitionerConfigs = new ArrayList<>();
     Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
-    Preconditions.checkState(columnPartitionMap.size() == 1, "Cannot partition on multiple columns for table: %s",
-        tableConfig.getTableName());
-    Map.Entry<String, ColumnPartitionConfig> entry = columnPartitionMap.entrySet().iterator().next();
-    String partitionColumn = entry.getKey();
-    Preconditions.checkState(schema.hasColumn(partitionColumn),
-        "Partition column: %s does not exist in the schema for table: %s", partitionColumn, tableConfig.getTableName());
-    PartitionerConfig partitionerConfig =
-        new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
-            .setColumnName(partitionColumn).setColumnPartitionConfig(entry.getValue()).build();
-    return Collections.singletonList(partitionerConfig);
+    for (Map.Entry<String, ColumnPartitionConfig> entry : columnPartitionMap.entrySet()) {
+      String partitionColumn = entry.getKey();
+      Preconditions.checkState(schema.hasColumn(partitionColumn),
+          "Partition column: %s does not exist in the schema for table: %s", partitionColumn,
+          tableConfig.getTableName());
+      PartitionerConfig partitionerConfig =
+          new PartitionerConfig.Builder().setPartitionerType(PartitionerFactory.PartitionerType.TABLE_PARTITION_CONFIG)
+              .setColumnName(partitionColumn).setColumnPartitionConfig(entry.getValue()).build();
+      partitionerConfigs.add(partitionerConfig);
+    }
+    return partitionerConfigs;
   }
 
   /**

@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
@@ -42,6 +41,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.RequestContext;
 
 
 /**
@@ -81,17 +81,20 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance,
       List<String>> offlineRoutingTable, @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance,
-      List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
+      List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats, RequestContext requestContext)
       throws Exception {
+    // TODO: Support failure detection
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
     Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = new HashMap<>();
     if (offlineBrokerRequest != null) {
       assert offlineRoutingTable != null;
-      sendRequest(TableType.OFFLINE, offlineBrokerRequest, offlineRoutingTable, responseMap);
+      sendRequest(TableType.OFFLINE, offlineBrokerRequest, offlineRoutingTable, responseMap,
+          requestContext.isSampledRequest());
     }
     if (realtimeBrokerRequest != null) {
       assert realtimeRoutingTable != null;
-      sendRequest(TableType.REALTIME, realtimeBrokerRequest, realtimeRoutingTable, responseMap);
+      sendRequest(TableType.REALTIME, realtimeBrokerRequest, realtimeRoutingTable, responseMap,
+          requestContext.isSampledRequest());
     }
     return _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest, responseMap, timeoutMs,
         _brokerMetrics);
@@ -102,7 +105,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
    */
   private void sendRequest(TableType tableType, BrokerRequest brokerRequest,
       Map<ServerInstance, List<String>> routingTable,
-      Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap) {
+      Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap, boolean trace) {
     for (Map.Entry<ServerInstance, List<String>> routingEntry : routingTable.entrySet()) {
       ServerInstance serverInstance = routingEntry.getKey();
       List<String> segments = routingEntry.getValue();
@@ -110,7 +113,8 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
       int port = serverInstance.getGrpcPort();
       // TODO: enable throttling on per host bases.
       Iterator<Server.ServerResponse> streamingResponse = _streamingQueryClient.submit(serverHost, port,
-          new GrpcRequestBuilder().setSegments(segments).setBrokerRequest(brokerRequest).setEnableStreaming(true));
+          new GrpcRequestBuilder().setSegments(segments).setBrokerRequest(brokerRequest).setEnableStreaming(true)
+              .setEnableTrace(trace));
       responseMap.put(serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.GRPC),
           streamingResponse);
     }

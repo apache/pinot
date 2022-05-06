@@ -34,6 +34,7 @@ public class ServerInstance {
   private static final char HOSTNAME_PORT_DELIMITER = '_';
   private static final int INVALID_PORT = -1;
 
+  private final String _instanceId;
   private final String _hostname;
   private final int _port;
   private final int _grpcPort;
@@ -44,6 +45,7 @@ public class ServerInstance {
    * {@code Server_localhost_12345}, hostname is of format: {@code Server_<hostname>}, e.g. {@code Server_localhost}.
    */
   public ServerInstance(InstanceConfig instanceConfig) {
+    _instanceId = instanceConfig.getInstanceName();
     String hostname = instanceConfig.getHostName();
     if (hostname != null) {
       if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
@@ -69,10 +71,15 @@ public class ServerInstance {
 
   @VisibleForTesting
   ServerInstance(String hostname, int port) {
+    _instanceId = Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port;
     _hostname = hostname;
     _port = port;
     _grpcPort = INVALID_PORT;
     _nettyTlsPort = INVALID_PORT;
+  }
+
+  public String getInstanceId() {
+    return _instanceId;
   }
 
   public String getHostname() {
@@ -95,50 +102,49 @@ public class ServerInstance {
   @Deprecated
   public ServerRoutingInstance toServerRoutingInstance(TableType tableType, boolean preferNettyTls) {
     if (preferNettyTls && _nettyTlsPort > 0) {
-      return new ServerRoutingInstance(_hostname, _nettyTlsPort, tableType, true);
+      return new ServerRoutingInstance(_instanceId, _hostname, _nettyTlsPort, tableType, true);
     } else {
-      return new ServerRoutingInstance(_hostname, _port, tableType);
+      return new ServerRoutingInstance(_instanceId, _hostname, _port, tableType);
     }
   }
 
   public ServerRoutingInstance toServerRoutingInstance(TableType tableType, RoutingType routingType) {
     switch (routingType) {
       case NETTY:
-        Preconditions.checkState(_port > 0, "Netty port is not configured on host: %s", _hostname);
-        return new ServerRoutingInstance(_hostname, _port, tableType);
+        Preconditions.checkState(_port > 0, "Netty port is not configured for server: %s", _instanceId);
+        return new ServerRoutingInstance(_instanceId, _hostname, _port, tableType);
       case GRPC:
-        Preconditions.checkState(_grpcPort > 0, "GRPC port is not configured on host: %s", _hostname);
-        return new ServerRoutingInstance(_hostname, _grpcPort, tableType);
+        Preconditions.checkState(_grpcPort > 0, "GRPC port is not configured for server: %s", _instanceId);
+        return new ServerRoutingInstance(_instanceId, _hostname, _grpcPort, tableType);
       case NETTY_TLS:
-        Preconditions.checkState(_nettyTlsPort > 0, "Netty TLS port is not configured on host: %s", _hostname);
-        return new ServerRoutingInstance(_hostname, _nettyTlsPort, tableType, true);
+        Preconditions.checkState(_nettyTlsPort > 0, "Netty TLS port is not configured for server: %s", _instanceId);
+        return new ServerRoutingInstance(_instanceId, _hostname, _nettyTlsPort, tableType, true);
       default:
         throw new IllegalStateException("Unsupported routing type: " + routingType);
     }
   }
 
   @Override
-  public int hashCode() {
-    return 31 * _hostname.hashCode() + _port;
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (this == obj) {
+  public boolean equals(Object o) {
+    if (this == o) {
       return true;
     }
-    if (obj instanceof ServerInstance) {
-      ServerInstance that = (ServerInstance) obj;
-      return _hostname.equals(that._hostname) && _port == that._port;
+    if (!(o instanceof ServerInstance)) {
+      return false;
     }
-    return false;
+    ServerInstance that = (ServerInstance) o;
+    // Only check instanceId because it can identify an instance within the same query
+    return _instanceId.equals(that._instanceId);
   }
 
-  /**
-   * Use default format {@code Server_<hostname>_<port>} for backward-compatibility.
-   */
+  @Override
+  public int hashCode() {
+    // Only hash instanceId because it can identify an instance within the same query
+    return _instanceId.hashCode();
+  }
+
   @Override
   public String toString() {
-    return Helix.PREFIX_OF_SERVER_INSTANCE + _hostname + HOSTNAME_PORT_DELIMITER + _port;
+    return _instanceId;
   }
 }

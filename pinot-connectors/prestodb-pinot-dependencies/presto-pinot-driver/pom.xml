@@ -516,10 +516,6 @@
                             <relocations>
                                 <!-- everything except the stuff in pinot-spi, pinot-common is shaded -->
                                 <relocation>
-                                    <pattern>org.apache.pinot.pql</pattern>
-                                    <shadedPattern>${shadeBase}.org.apache.pinot.pql</shadedPattern>
-                                </relocation>
-                                <relocation>
                                     <pattern>com.google</pattern>
                                     <shadedPattern>${shadeBase}.com.google</shadedPattern>
                                 </relocation>

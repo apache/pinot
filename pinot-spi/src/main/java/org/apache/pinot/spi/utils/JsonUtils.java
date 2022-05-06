@@ -30,19 +30,29 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.MapDifference;
+import com.google.common.collect.Maps;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -71,10 +81,58 @@ public class JsonUtils {
   public static final ObjectReader DEFAULT_READER = DEFAULT_MAPPER.reader();
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
+  private static final TypeReference<HashMap<String, Object>> GENERIC_JSON_TYPE =
+      new TypeReference<HashMap<String, Object>>() {
+      };
 
   public static <T> T stringToObject(String jsonString, Class<T> valueType)
       throws IOException {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
+  }
+
+  public static <T> Pair<T, Map<String, Object>> inputStreamToObjectAndUnrecognizedProperties(
+      InputStream jsonInputStream, Class<T> valueType)
+      throws IOException {
+    String jsonString = IOUtils.toString(jsonInputStream, StandardCharsets.UTF_8);
+    return stringToObjectAndUnrecognizedProperties(jsonString, valueType);
+  }
+
+  public static <T> Pair<T, Map<String, Object>> stringToObjectAndUnrecognizedProperties(String jsonString,
+      Class<T> valueType)
+      throws IOException {
+    T instance = DEFAULT_READER.forType(valueType).readValue(jsonString);
+    Map<String, Object> inputJsonMap = flatten(DEFAULT_MAPPER.readValue(jsonString, GENERIC_JSON_TYPE));
+
+    String instanceJson = DEFAULT_MAPPER.writeValueAsString(instance);
+    Map<String, Object> instanceJsonMap = flatten(DEFAULT_MAPPER.readValue(instanceJson, GENERIC_JSON_TYPE));
+
+    MapDifference<String, Object> difference = Maps.difference(inputJsonMap, instanceJsonMap);
+    return Pair.of(instance, difference.entriesOnlyOnLeft());
+  }
+
+  private static Map<String, Object> flatten(Map<String, Object> map) {
+    return map.entrySet().stream().flatMap(JsonUtils::flatten)
+        .collect(LinkedHashMap::new, (m, e) -> m.put("/" + e.getKey(), e.getValue()), LinkedHashMap::putAll);
+  }
+
+  private static Stream<Map.Entry<String, Object>> flatten(Map.Entry<String, Object> entry) {
+    if (entry == null) {
+      return Stream.empty();
+    }
+
+    if (entry.getValue() instanceof Map<?, ?>) {
+      return ((Map<?, ?>) entry.getValue()).entrySet().stream()
+          .flatMap(e -> flatten(new AbstractMap.SimpleEntry<>(entry.getKey() + "/" + e.getKey(), e.getValue())));
+    }
+
+    if (entry.getValue() instanceof List<?>) {
+      List<?> list = (List<?>) entry.getValue();
+      return IntStream.range(0, list.size())
+          .mapToObj(i -> new AbstractMap.SimpleEntry<String, Object>(entry.getKey() + "/" + i, list.get(i)))
+          .flatMap(JsonUtils::flatten);
+    }
+
+    return Stream.of(entry);
   }
 
   public static <T> T stringToObject(String jsonString, TypeReference<T> valueTypeRef)
@@ -507,6 +565,8 @@ public class JsonUtils {
       return DataType.BOOLEAN;
     } else if (jsonNode.isBinary()) {
       return DataType.BYTES;
+    } else if (jsonNode.isBigDecimal()) {
+      return DataType.BIG_DECIMAL;
     } else {
       return DataType.STRING;
     }

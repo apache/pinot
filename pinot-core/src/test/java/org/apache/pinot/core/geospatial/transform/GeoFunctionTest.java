@@ -170,7 +170,7 @@ public abstract class GeoFunctionTest {
     ProjectionBlock projectionBlock = new ProjectionOperator(dataSourceMap,
         new DocIdSetOperator(new MatchAllFilterOperator(length), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
 
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(function);
+    ExpressionContext expression = RequestContextUtils.getExpression(function);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, dataSourceMap);
     evaluator.accept(transformFunction, projectionBlock);
   }

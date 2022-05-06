@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.function;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
@@ -47,7 +48,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
   public InbuiltFunctionEvaluator(String functionExpression) {
     _arguments = new ArrayList<>();
-    _rootNode = planExecution(RequestContextUtils.getExpressionFromSQL(functionExpression));
+    _rootNode = planExecution(RequestContextUtils.getExpression(functionExpression));
   }
 
   private ExecutableNode planExecution(ExpressionContext expression) {
@@ -68,17 +69,27 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
           childNodes[i] = planExecution(arguments.get(i));
         }
         String functionName = function.getFunctionName();
-        FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
-        if (functionInfo == null) {
-          if (FunctionRegistry.containsFunction(functionName)) {
-            throw new IllegalStateException(
-              String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
-          } else {
-            throw new IllegalStateException(
-              String.format("Unsupported function: %s not found", functionName));
-          }
+        switch (functionName) {
+          case "and":
+            return new AndExecutionNode(childNodes);
+          case "or":
+            return new OrExecutionNode(childNodes);
+          case "not":
+            Preconditions.checkState(numArguments == 1, "NOT function expects 1 argument, got: %s", numArguments);
+            return new NotExecutionNode(childNodes[0]);
+          default:
+            FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+            if (functionInfo == null) {
+              if (FunctionRegistry.containsFunction(functionName)) {
+                throw new IllegalStateException(
+                    String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
+              } else {
+                throw new IllegalStateException(
+                    String.format("Unsupported function: %s not found", functionName));
+              }
+            }
+            return new FunctionExecutionNode(functionInfo, childNodes);
         }
-        return new FunctionExecutionNode(functionInfo, childNodes);
       default:
         throw new IllegalStateException();
     }
@@ -104,6 +115,84 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     Object execute(GenericRow row);
 
     Object execute(Object[] values);
+  }
+
+  private static class NotExecutionNode implements ExecutableNode {
+    private final ExecutableNode _argumentNode;
+
+    NotExecutionNode(ExecutableNode argumentNode) {
+      _argumentNode = argumentNode;
+    }
+
+    @Override
+    public Object execute(GenericRow row) {
+      return !((Boolean) _argumentNode.execute(row));
+    }
+
+    @Override
+    public Object execute(Object[] values) {
+      return !((Boolean) _argumentNode.execute(values));
+    }
+  }
+
+  private static class OrExecutionNode implements ExecutableNode {
+    private final ExecutableNode[] _argumentNodes;
+
+    OrExecutionNode(ExecutableNode[] argumentNodes) {
+      _argumentNodes = argumentNodes;
+    }
+
+    @Override
+    public Object execute(GenericRow row) {
+      for (ExecutableNode executableNode :_argumentNodes) {
+        Boolean res = (Boolean) executableNode.execute(row);
+        if (res) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    @Override
+    public Object execute(Object[] values) {
+      for (ExecutableNode executableNode :_argumentNodes) {
+        Boolean res = (Boolean) executableNode.execute(values);
+        if (res) {
+          return true;
+        }
+      }
+      return false;
+    }
+  }
+
+  private static class AndExecutionNode implements ExecutableNode {
+    private final ExecutableNode[] _argumentNodes;
+
+    AndExecutionNode(ExecutableNode[] argumentNodes) {
+      _argumentNodes = argumentNodes;
+    }
+
+    @Override
+    public Object execute(GenericRow row) {
+      for (ExecutableNode executableNode :_argumentNodes) {
+        Boolean res = (Boolean) executableNode.execute(row);
+        if (!res) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    @Override
+    public Object execute(Object[] values) {
+      for (ExecutableNode executableNode :_argumentNodes) {
+        Boolean res = (Boolean) executableNode.execute(values);
+        if (!res) {
+          return false;
+        }
+      }
+      return true;
+    }
   }
 
   private static class FunctionExecutionNode implements ExecutableNode {

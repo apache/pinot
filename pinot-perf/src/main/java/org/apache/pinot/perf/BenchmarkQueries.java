@@ -38,10 +38,13 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -150,6 +153,9 @@ public class BenchmarkQueries extends BaseQueriesTest {
       + "MIN(RAW_INT_COL), MAX(RAW_INT_COL), COUNT(*) "
       + "FROM MyTable";
 
+  public static final String STARTREE_SUM_QUERY = "SELECT INT_COL, SORTED_COL, SUM(RAW_INT_COL) from MyTable "
+      + "GROUP BY INT_COL, SORTED_COL ORDER BY SORTED_COL, INT_COL ASC";
+
   @Param("1500000")
   private int _numRows;
   @Param({"EXP(0.001)", "EXP(0.5)", "EXP(0.999)"})
@@ -158,7 +164,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
       MULTI_GROUP_BY_WITH_RAW_QUERY, MULTI_GROUP_BY_WITH_RAW_QUERY_2, FILTERED_QUERY, NON_FILTERED_QUERY,
       SUM_QUERY, NO_INDEX_LIKE_QUERY, MULTI_GROUP_BY_ORDER_BY, MULTI_GROUP_BY_ORDER_BY_LOW_HIGH, TIME_GROUP_BY,
       RAW_COLUMN_SUMMARY_STATS, COUNT_OVER_BITMAP_INDEX_IN, COUNT_OVER_BITMAP_INDEXES,
-      COUNT_OVER_BITMAP_AND_SORTED_INDEXES, COUNT_OVER_BITMAP_INDEX_EQUALS
+      COUNT_OVER_BITMAP_AND_SORTED_INDEXES, COUNT_OVER_BITMAP_INDEX_EQUALS, STARTREE_SUM_QUERY
   })
   String _query;
   private IndexSegment _indexSegment;
@@ -230,6 +236,10 @@ public class BenchmarkQueries extends BaseQueriesTest {
         .setFieldConfigList(fieldConfigs)
         .setNoDictionaryColumns(Arrays.asList(RAW_INT_COL_NAME, RAW_STRING_COL_NAME))
         .setSortedColumn(SORTED_COL_NAME)
+        .setStarTreeIndexConfigs(Collections.singletonList(new StarTreeIndexConfig(
+            Arrays.asList(SORTED_COL_NAME, INT_COL_NAME), null, Collections.singletonList(
+                new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
+            Integer.MAX_VALUE)))
         .build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(SORTED_COL_NAME, FieldSpec.DataType.INT)
@@ -254,7 +264,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
 
   @Benchmark
   public BrokerResponseNative query() {
-    return getBrokerResponseForSqlQuery(_query);
+    return getBrokerResponse(_query);
   }
 
   @Override

@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.task.TaskState;
@@ -32,6 +34,8 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -99,8 +103,16 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
     List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(_offlineTableName);
     Assert.assertTrue(segmentsZKMetadata.isEmpty());
 
+    // The number of offline segments would be equal to the product of number of partitions for all the
+    // partition columns if segment partitioning is configured.
+    SegmentPartitionConfig segmentPartitionConfig =
+        getOfflineTableConfig().getIndexingConfig().getSegmentPartitionConfig();
+    int numOfflineSegmentsPerTask =
+        segmentPartitionConfig != null ? segmentPartitionConfig.getColumnPartitionMap().values().stream()
+            .map(ColumnPartitionConfig::getNumPartitions).reduce((a, b) -> a * b)
+            .orElseThrow(() -> new RuntimeException("Expected accumulated result but not found.")) : 1;
+
     long expectedWatermark = _dataSmallestTimeMs + 86400000;
-    int numOfflineSegments = 0;
     for (int i = 0; i < 3; i++) {
       // Schedule task
       Assert.assertNotNull(_taskManager.scheduleTasks().get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
@@ -113,12 +125,21 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
       waitForTaskToComplete(expectedWatermark);
       // check segment is in offline
       segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(_offlineTableName);
-      numOfflineSegments++;
-      Assert.assertEquals(segmentsZKMetadata.size(), numOfflineSegments);
-      long expectedOfflineSegmentTimeMs = expectedWatermark - 86400000;
-      Assert.assertEquals(segmentsZKMetadata.get(i).getStartTimeMs(), expectedOfflineSegmentTimeMs);
-      Assert.assertEquals(segmentsZKMetadata.get(i).getEndTimeMs(), expectedOfflineSegmentTimeMs);
+      Assert.assertEquals(segmentsZKMetadata.size(), (numOfflineSegmentsPerTask * (i + 1)));
 
+      long expectedOfflineSegmentTimeMs = expectedWatermark - 86400000;
+      for (int j = (numOfflineSegmentsPerTask * i); j < segmentsZKMetadata.size(); j++) {
+        SegmentZKMetadata segmentZKMetadata = segmentsZKMetadata.get(j);
+        Assert.assertEquals(segmentZKMetadata.getStartTimeMs(), expectedOfflineSegmentTimeMs);
+        Assert.assertEquals(segmentZKMetadata.getEndTimeMs(), expectedOfflineSegmentTimeMs);
+        if (segmentPartitionConfig != null) {
+          Assert.assertEquals(segmentZKMetadata.getPartitionMetadata().getColumnPartitionMap().keySet(),
+              segmentPartitionConfig.getColumnPartitionMap().keySet());
+          for (String partitionColumn : segmentPartitionConfig.getColumnPartitionMap().keySet()) {
+            Assert.assertEquals(segmentZKMetadata.getPartitionMetadata().getPartitions(partitionColumn).size(), 1);
+          }
+        }
+      }
       expectedWatermark += 86400000;
     }
     this.testHardcodedQueries();
@@ -128,6 +149,17 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
 
     // Check if the metadata is cleaned up on table deletion
     verifyTableDelete(_realtimeTableName);
+  }
+
+  @Nullable
+  @Override
+  protected SegmentPartitionConfig getSegmentPartitionConfig() {
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
+    ColumnPartitionConfig columnOneConfig = new ColumnPartitionConfig("murmur", 3);
+    columnPartitionConfigMap.put("AirlineID", columnOneConfig);
+    ColumnPartitionConfig columnTwoConfig = new ColumnPartitionConfig("hashcode", 2);
+    columnPartitionConfigMap.put("OriginAirportID", columnTwoConfig);
+    return new SegmentPartitionConfig(columnPartitionConfigMap);
   }
 
   protected void verifyTableDelete(String tableNameWithType) {

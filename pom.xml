@@ -56,6 +56,7 @@
     <module>pinot-connectors</module>
     <module>pinot-segment-local</module>
     <module>pinot-compatibility-verifier</module>
+    <module>contrib/pinot-fmpp-maven-plugin</module>
   </modules>
 
   <licenses>
@@ -145,12 +146,12 @@
     <dropwizard-metrics.version>4.2.2</dropwizard-metrics.version>
     <snappy-java.version>1.1.8.2</snappy-java.version>
     <zstd-jni.version>1.4.9-5</zstd-jni.version>
-    <lz4-java.version>1.7.1</lz4-java.version>
+    <lz4-java.version>1.8.0</lz4-java.version>
     <log4j.version>2.17.1</log4j.version>
     <netty.version>4.1.74.Final</netty.version>
     <reactivestreams.version>1.0.3</reactivestreams.version>
     <jts.version>1.16.1</jts.version>
-    <h3.version>3.0.3</h3.version>
+    <h3.version>3.7.0</h3.version>
     <jmh.version>1.26</jmh.version>
     <audienceannotations.version>0.13.0</audienceannotations.version>
 
@@ -171,30 +172,6 @@
   </properties>
 
   <profiles>
-    <profile>
-      <id>kafka-0.9</id>
-      <activation>
-        <property>
-          <name>kafka.version</name>
-          <value>0.9</value>
-        </property>
-      </activation>
-      <properties>
-        <kafka.version>0.9</kafka.version>
-      </properties>
-    </profile>
-    <profile>
-      <id>kafka-2.0</id>
-      <activation>
-        <property>
-          <name>kafka.version</name>
-          <value>2.0</value>
-        </property>
-      </activation>
-      <properties>
-        <kafka.version>2.0</kafka.version>
-      </properties>
-    </profile>
     <profile>
       <id>github-actions</id>
       <activation>
@@ -1525,7 +1502,9 @@
             <phase>site</phase>
             <configuration>
               <!-- Specific configuration for the aggregate report -->
-              <excludePackageNames>org.apache.pinot.pql.parsers:org.apache.pinot.common.response</excludePackageNames>
+              <excludePackageNames>
+                org.apache.pinot.common.request:org.apache.pinot.common.response
+              </excludePackageNames>
               <skip>false</skip>
             </configuration>
           </execution>
@@ -1662,9 +1641,10 @@
             <config>SCRIPT_STYLE</config>
             <queries>SCRIPT_STYLE</queries>
             <results>SCRIPT_STYLE</results>
+            <fmpp>SCRIPT_STYLE</fmpp>
+            <ftl>FTL_STYLE</ftl>
             <MockMaker>SCRIPT_STYLE</MockMaker>
             <appAssemblerScriptTemplate>SCRIPT_STYLE</appAssemblerScriptTemplate>
-            <pql>SCRIPT_STYLE</pql>
             <sql>SCRIPT_STYLE</sql>
             <conf>DOUBLESLASH_STYLE</conf>
             <cfg>DOUBLESLASH_STYLE</cfg>
@@ -1824,6 +1804,28 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>3.3.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>javacc-maven-plugin</artifactId>
+        <version>2.6</version>
+        <dependencies>
+          <dependency>
+            <groupId>net.java.dev.javacc</groupId>
+            <artifactId>javacc</artifactId>
+            <version>7.0.10</version>
+          </dependency>
+        </dependencies>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-plugin-plugin</artifactId>
+        <version>3.6.0</version>
+      </plugin>
     </plugins>
   </build>
   <reporting>
@@ -1852,7 +1854,9 @@
             <id>non-aggregate</id>
             <configuration>
               <!-- Specific configuration for the non aggregate report -->
-              <excludePackageNames>org.apache.pinot.pql.parsers:org.apache.pinot.common.response</excludePackageNames>
+              <excludePackageNames>
+                org.apache.pinot.common.request:org.apache.pinot.common.response
+              </excludePackageNames>
               <skip>true</skip>
             </configuration>
             <reports>
@@ -1862,7 +1866,9 @@
           <reportSet>
             <id>aggregate</id>
             <configuration>
-              <excludePackageNames>org.apache.pinot.pql.parsers:org.apache.pinot.common.response</excludePackageNames>
+              <excludePackageNames>
+                org.apache.pinot.common.request:org.apache.pinot.common.response
+              </excludePackageNames>
               <skip>true</skip>
             </configuration>
             <reports>

@@ -72,10 +72,8 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    DistinctTable distinctTable = buildResult();
-
     return new IntermediateResultsBlock(new AggregationFunction[]{_distinctAggregationFunction},
-        Collections.singletonList(distinctTable), false);
+        Collections.singletonList(buildResult()));
   }
 
   /**
@@ -135,7 +133,6 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
 
     return new DistinctTable(dataSchema, records);
   }
-
 
   @Override
   public String toExplainString() {

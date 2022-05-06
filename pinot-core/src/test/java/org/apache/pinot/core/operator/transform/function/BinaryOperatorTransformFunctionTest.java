@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -42,14 +43,16 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
 
   abstract int getExpectedValue(double value, double toCompare);
 
+  abstract int getExpectedValue(BigDecimal value, BigDecimal toCompare);
+
   abstract int getExpectedValue(String value, String toCompare);
 
   abstract String getFuncName();
 
   @Test
   public void testBinaryOperatorTransformFunction() {
-    ExpressionContext expression = RequestContextUtils
-        .getExpressionFromSQL(String.format("%s(%s, %d)", getFuncName(), INT_SV_COLUMN, _intSVValues[0]));
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("%s(%s, %d)", getFuncName(), INT_SV_COLUMN, _intSVValues[0]));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertEquals(transformFunction.getName(), getFuncName().toLowerCase());
     int[] expectedIntValues = new int[NUM_ROWS];
@@ -58,8 +61,8 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     }
     testTransformFunction(transformFunction, expectedIntValues);
 
-    expression = RequestContextUtils
-        .getExpressionFromSQL(String.format("%s(%s, %d)", getFuncName(), LONG_SV_COLUMN, _longSVValues[0]));
+    expression =
+        RequestContextUtils.getExpression(String.format("%s(%s, %d)", getFuncName(), LONG_SV_COLUMN, _longSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedLongValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -67,8 +70,8 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     }
     testTransformFunction(transformFunction, expectedLongValues);
 
-    expression = RequestContextUtils
-        .getExpressionFromSQL(String.format("%s(%s, %f)", getFuncName(), FLOAT_SV_COLUMN, _floatSVValues[0]));
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(%s, %f)", getFuncName(), FLOAT_SV_COLUMN, _floatSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedFloatValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -76,8 +79,8 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     }
     testTransformFunction(transformFunction, expectedFloatValues);
 
-    expression = RequestContextUtils
-        .getExpressionFromSQL(String.format("%s(%s, %.20f)", getFuncName(), DOUBLE_SV_COLUMN, _doubleSVValues[0]));
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(%s, %.20f)", getFuncName(), DOUBLE_SV_COLUMN, _doubleSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedDoubleValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -85,19 +88,29 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     }
     testTransformFunction(transformFunction, expectedDoubleValues);
 
-    expression = RequestContextUtils
-        .getExpressionFromSQL(String.format("%s(%s, '%s')", getFuncName(), STRING_SV_COLUMN, _stringSVValues[0]));
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(%s, '%s')", getFuncName(), STRING_SV_COLUMN, _stringSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedStringValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedStringValues[i] = getExpectedValue(_stringSVValues[i], _stringSVValues[0]);
     }
     testTransformFunction(transformFunction, expectedStringValues);
+
+    // Note: defining decimal literals within quotes ('%s') preserves precision.
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(%s, '%s')", getFuncName(), BIG_DECIMAL_SV_COLUMN, _bigDecimalSVValues[0]));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    int[] expectedBigDecimalValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedBigDecimalValues[i] = getExpectedValue(_bigDecimalSVValues[i], _bigDecimalSVValues[0]);
+    }
+    testTransformFunction(transformFunction, expectedBigDecimalValues);
   }
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

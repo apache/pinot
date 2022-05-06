@@ -42,7 +42,6 @@ private[pinot] class PinotServerDataFetcher(
     pinotSplit: PinotSplit,
     dataSourceOptions: PinotDataSourceReadOptions)
   extends Logging {
-  private val sqlCompiler = new CalciteSqlCompiler()
   private val brokerId = "apache_spark"
   private val metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry
   private val brokerMetrics = new BrokerMetrics(metricsRegistry)
@@ -56,15 +55,15 @@ private[pinot] class PinotServerDataFetcher(
     val pinotServerAsyncQueryResponse = pinotSplit.serverAndSegments.serverType match {
       case TableType.REALTIME =>
         val realtimeBrokerRequest =
-          sqlCompiler.compileToBrokerRequest(pinotSplit.generatedSQLs.realtimeSelectQuery)
+          CalciteSqlCompiler.compileToBrokerRequest(pinotSplit.generatedSQLs.realtimeSelectQuery)
         submitRequestToPinotServer(null, null, realtimeBrokerRequest, routingTableForRequest)
       case TableType.OFFLINE =>
         val offlineBrokerRequest =
-          sqlCompiler.compileToBrokerRequest(pinotSplit.generatedSQLs.offlineSelectQuery)
+          CalciteSqlCompiler.compileToBrokerRequest(pinotSplit.generatedSQLs.offlineSelectQuery)
         submitRequestToPinotServer(offlineBrokerRequest, routingTableForRequest, null, null)
     }
 
-    val pinotServerResponse = pinotServerAsyncQueryResponse.getResponse.values().asScala.toList
+    val pinotServerResponse = pinotServerAsyncQueryResponse.getFinalResponses.values().asScala.toList
     logInfo(s"Pinot server total response time in millis: ${System.nanoTime() - requestStartTime}")
 
     closePinotServerConnection()
@@ -95,7 +94,7 @@ private[pinot] class PinotServerDataFetcher(
     val instanceConfig = new InstanceConfig(nullZkId)
     instanceConfig.setHostName(pinotSplit.serverAndSegments.serverHost)
     instanceConfig.setPort(pinotSplit.serverAndSegments.serverPort)
-    // TODO: support grpc and netty-sec
+    // TODO: support netty-sec
     val serverInstance = new ServerInstance(instanceConfig)
     Map(
       serverInstance -> pinotSplit.serverAndSegments.segments.asJava

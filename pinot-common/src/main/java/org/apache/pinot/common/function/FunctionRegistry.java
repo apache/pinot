@@ -20,6 +20,7 @@ package org.apache.pinot.common.function;
 
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -59,6 +60,9 @@ public class FunctionRegistry {
             .setScanners(new MethodAnnotationsScanner()));
     Set<Method> methodSet = reflections.getMethodsAnnotatedWith(ScalarFunction.class);
     for (Method method : methodSet) {
+      if (!Modifier.isPublic(method.getModifiers())) {
+        continue;
+      }
       ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
       if (scalarFunction.enabled()) {
         // Annotated function names

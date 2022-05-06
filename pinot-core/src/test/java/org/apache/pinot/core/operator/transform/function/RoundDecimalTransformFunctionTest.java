@@ -31,13 +31,13 @@ public class RoundDecimalTransformFunctionTest extends BaseTransformFunctionTest
   @Test
   public void testRoundDecimalTransformFunction() {
     ExpressionContext expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("round_decimal(%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("round_decimal(%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof RoundDecimalTransformFunction);
     Assert.assertEquals(transformFunction.getName(), RoundDecimalTransformFunction.FUNCTION_NAME);
     double[] expectedValues = new double[NUM_ROWS];
 
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("round_decimal(%s,2)", DOUBLE_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("round_decimal(%s,2)", DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof RoundDecimalTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -45,7 +45,7 @@ public class RoundDecimalTransformFunctionTest extends BaseTransformFunctionTest
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("round_decimal(%s, -2)", DOUBLE_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("round_decimal(%s, -2)", DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof RoundDecimalTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -53,7 +53,7 @@ public class RoundDecimalTransformFunctionTest extends BaseTransformFunctionTest
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("round_decimal(%s)", DOUBLE_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("round_decimal(%s)", DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof RoundDecimalTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {

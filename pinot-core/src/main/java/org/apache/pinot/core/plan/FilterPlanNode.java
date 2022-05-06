@@ -31,6 +31,7 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -38,24 +39,29 @@ import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
+import org.apache.pinot.core.operator.filter.H3InclusionIndexFilterOperator;
 import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
 import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
+import org.apache.pinot.core.operator.filter.TextContainsFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class FilterPlanNode implements PlanNode {
+
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
   private final FilterContext _filter;
@@ -106,7 +112,7 @@ public class FilterPlanNode implements PlanNode {
   }
 
   /**
-   * H3 index can be applied iff:
+   * H3 index can be applied on ST_Distance iff:
    * <ul>
    *   <li>Predicate is of type RANGE</li>
    *   <li>Left-hand-side of the predicate is an ST_Distance function</li>
@@ -114,7 +120,7 @@ public class FilterPlanNode implements PlanNode {
    *   <li>The identifier column has H3 index</li>
    * </ul>
    */
-  private boolean canApplyH3Index(Predicate predicate, FunctionContext function) {
+  private boolean canApplyH3IndexForDistanceCheck(Predicate predicate, FunctionContext function) {
     if (predicate.getType() != Predicate.Type.RANGE) {
       return false;
     }
@@ -137,6 +143,46 @@ public class FilterPlanNode implements PlanNode {
       }
     }
     return columnName != null && _indexSegment.getDataSource(columnName).getH3Index() != null && findLiteral;
+  }
+
+  /**
+   * H3 index can be applied for inclusion check iff:
+   * <ul>
+   *   <li>Predicate is of type EQ</li>
+   *   <li>Left-hand-side of the predicate is an ST_Within or ST_Contains function</li>
+   *   <li>For ST_Within, the first argument is an identifier, the second argument is literal</li>
+   *   <li>For ST_Contains function the first argument is literal, the second argument is an identifier</li>
+   *   <li>The identifier column has H3 index</li>
+   * </ul>
+   */
+  private boolean canApplyH3IndexForInclusionCheck(Predicate predicate, FunctionContext function) {
+    if (predicate.getType() != Predicate.Type.EQ) {
+      return false;
+    }
+    String functionName = function.getFunctionName();
+    if (!functionName.equals("stwithin") && !functionName.equals("stcontains")) {
+      return false;
+    }
+    List<ExpressionContext> arguments = function.getArguments();
+    if (arguments.size() != 2) {
+      throw new BadQueryRequestException("Expect 2 arguments for function: " + functionName);
+    }
+    // TODO: handle nested geography/geometry conversion functions
+    if (functionName.equals("stwithin")) {
+      if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER
+          && arguments.get(1).getType() == ExpressionContext.Type.LITERAL) {
+        String columnName = arguments.get(0).getIdentifier();
+        return _indexSegment.getDataSource(columnName).getH3Index() != null;
+      }
+      return false;
+    } else {
+      if (arguments.get(1).getType() == ExpressionContext.Type.IDENTIFIER
+          && arguments.get(0).getType() == ExpressionContext.Type.LITERAL) {
+        String columnName = arguments.get(1).getIdentifier();
+        return _indexSegment.getDataSource(columnName).getH3Index() != null;
+      }
+      return false;
+    }
   }
 
   /**
@@ -181,12 +227,15 @@ public class FilterPlanNode implements PlanNode {
         Predicate predicate = filter.getPredicate();
         ExpressionContext lhs = predicate.getLhs();
         if (lhs.getType() == ExpressionContext.Type.FUNCTION) {
-          if (canApplyH3Index(predicate, lhs.getFunction())) {
-            return new H3IndexFilterOperator(_indexSegment, predicate, numDocs);
+          if (canApplyH3IndexForDistanceCheck(predicate, lhs.getFunction())) {
+              return new H3IndexFilterOperator(_indexSegment, predicate, numDocs);
+          } else if (canApplyH3IndexForInclusionCheck(predicate, lhs.getFunction())) {
+            return new H3InclusionIndexFilterOperator(_indexSegment, predicate, numDocs);
+          } else {
+            // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
+            //       IS_NOT_NULL, TEXT_MATCH)
+            return new ExpressionFilterOperator(_indexSegment, predicate, numDocs);
           }
-          // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
-          //       IS_NOT_NULL, TEXT_MATCH)
-          return new ExpressionFilterOperator(_indexSegment, predicate, numDocs);
         } else {
           String column = lhs.getIdentifier();
           DataSource dataSource = _indexSegment.getDataSource(column);
@@ -195,8 +244,19 @@ public class FilterPlanNode implements PlanNode {
             return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
           }
           switch (predicate.getType()) {
+            case TEXT_CONTAINS:
+              TextIndexReader textIndexReader = dataSource.getTextIndex();
+              if (!(textIndexReader instanceof NativeTextIndexReader)) {
+                throw new UnsupportedOperationException("TEXT_CONTAINS is supported only on native text index");
+              }
+              return new TextContainsFilterOperator(textIndexReader, (TextContainsPredicate) predicate, numDocs);
             case TEXT_MATCH:
-              return new TextMatchFilterOperator(dataSource.getTextIndex(), (TextMatchPredicate) predicate, numDocs);
+              textIndexReader = dataSource.getTextIndex();
+              // We could check for real time and segment Lucene reader, but easier to check the other way round
+              if (textIndexReader instanceof NativeTextIndexReader) {
+                throw new UnsupportedOperationException("TEXT_MATCH is not supported on native text index");
+              }
+              return new TextMatchFilterOperator(textIndexReader, (TextMatchPredicate) predicate, numDocs);
             case REGEXP_LIKE:
               // FST Index is available only for rolled out segments. So, we use different evaluator for rolled out and
               // consuming segments.

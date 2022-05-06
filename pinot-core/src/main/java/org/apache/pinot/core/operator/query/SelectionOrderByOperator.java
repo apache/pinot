@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -160,6 +161,9 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
             break;
           case DOUBLE:
             result = ((Double) v1).compareTo((Double) v2);
+            break;
+          case BIG_DECIMAL:
+            result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
             break;
           case STRING:
             result = ((String) v1).compareTo((String) v2);

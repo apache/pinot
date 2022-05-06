@@ -35,7 +35,7 @@ public class RegexpTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testRegexpExtractLegalArguments")
   public void testRegexpExtractLegalArguments(String expressionStr, int group, String defaultValue) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     String[] actualValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -59,7 +59,7 @@ public class RegexpTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testRegexpExtractIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testRegexpExtractIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

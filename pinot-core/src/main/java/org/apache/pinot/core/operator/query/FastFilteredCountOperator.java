@@ -65,13 +65,12 @@ public class FastFilteredCountOperator extends BaseOperator<IntermediateResultsB
     List<Object> aggregates = new ArrayList<>(1);
     aggregates.add(count);
     _docsCounted += count;
-    return new IntermediateResultsBlock(_aggregationFunctions, aggregates, false);
+    return new IntermediateResultsBlock(_aggregationFunctions, aggregates);
   }
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
     // fabricate the number of docs scanned to keep compatibility tests happy for now, but this should be set to zero
-    return new ExecutionStatistics(_docsCounted, 0, 0,
-        _segmentMetadata.getTotalDocs());
+    return new ExecutionStatistics(_docsCounted, 0, 0, _segmentMetadata.getTotalDocs());
   }
 }

@@ -41,8 +41,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * Supports serialization via JSON.
  */
 @JsonPropertyOrder({
-    "selectionResults", "aggregationResults", "resultTable", "exceptions", "numServersQueried", "numServersResponded",
-    "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numDocsScanned",
+    "resultTable", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried",
+    "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numDocsScanned",
     "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs",
     "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
     "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
@@ -82,8 +82,6 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _offlineTotalCpuTimeNs = 0L;
   private long _realtimeTotalCpuTimeNs = 0L;
   private int _numRowsResultSet = 0;
-  private SelectionResults _selectionResults;
-  private List<AggregationResult> _aggregationResults;
   private ResultTable _resultTable;
   private Map<String, String> _traceInfo = new HashMap<>();
   private List<QueryProcessingException> _processingExceptions = new ArrayList<>();
@@ -217,28 +215,6 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public void setRealtimeTotalCpuTimeNs(long realtimeTotalCpuTimeNs) {
     _realtimeTotalCpuTimeNs = realtimeTotalCpuTimeNs;
-  }
-
-  @JsonProperty("selectionResults")
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  public SelectionResults getSelectionResults() {
-    return _selectionResults;
-  }
-
-  @JsonProperty("selectionResults")
-  public void setSelectionResults(SelectionResults selectionResults) {
-    _selectionResults = selectionResults;
-  }
-
-  @JsonProperty("aggregationResults")
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  public List<AggregationResult> getAggregationResults() {
-    return _aggregationResults;
-  }
-
-  @JsonProperty("aggregationResults")
-  public void setAggregationResults(List<AggregationResult> aggregationResults) {
-    _aggregationResults = aggregationResults;
   }
 
   @JsonProperty("resultTable")

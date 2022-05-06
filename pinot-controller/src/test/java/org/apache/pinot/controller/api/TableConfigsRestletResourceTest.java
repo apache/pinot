@@ -19,6 +19,8 @@
 package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.List;
@@ -554,13 +556,48 @@ public class TableConfigsRestletResourceTest {
     Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
 
     // delete & check
-    ControllerTestUtils
-        .sendDeleteRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    ControllerTestUtils.sendDeleteRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
     getResponse =
         ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsList());
     configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
     });
     Assert.assertEquals(configs.size(), 0);
+  }
+
+  @Test
+  public void testUnrecognizedProperties()
+      throws IOException {
+    String tableName = "testUnrecognized1";
+    TableConfig offlineTableConfig = getOfflineTableConfig(tableName);
+    Schema schema = getSchema(tableName);
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+    ObjectNode tableConfigsJson = JsonUtils.objectToJsonNode(tableConfigs).deepCopy();
+    tableConfigsJson.put("illegalKey1", 1);
+
+    // Validate
+    ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsValidate();
+    String response = ControllerTestUtils.sendPostRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsValidate(),
+        tableConfigsJson.toPrettyString());
+    JsonNode responseJson = JsonUtils.stringToJsonNode(response);
+    Assert.assertTrue(responseJson.has("unrecognizedProperties"));
+    Assert.assertTrue(responseJson.get("unrecognizedProperties").has("/illegalKey1"));
+
+    // Create
+    response = ControllerTestUtils.sendPostRequest(_createTableConfigsUrl, tableConfigsJson.toPrettyString());
+    Assert.assertEquals(response, "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"TableConfigs "
+        + "testUnrecognized1 successfully added\"}");
+
+    // Update
+    response = ControllerTestUtils.sendPutRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName),
+        tableConfigsJson.toPrettyString());
+    Assert.assertEquals(response,
+        "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"TableConfigs updated for testUnrecognized1\"}");
+    // Delete
+    ControllerTestUtils.sendDeleteRequest(
+        ControllerTestUtils.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
   }
 
   @AfterClass

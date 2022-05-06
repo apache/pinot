@@ -417,7 +417,7 @@ org.json4s:json4s-ast_2.11:3.5.3
 org.json4s:json4s-core_2.11:3.5.3
 org.json4s:json4s-jackson_2.11:3.5.3
 org.json4s:json4s-scalap_2.11:3.5.3
-org.lz4:lz4-java:1.7.1
+org.lz4:lz4-java:1.8.0
 org.quartz-scheduler:quartz:2.3.2
 org.roaringbitmap:RoaringBitmap:0.9.26
 org.roaringbitmap:shims:0.9.26

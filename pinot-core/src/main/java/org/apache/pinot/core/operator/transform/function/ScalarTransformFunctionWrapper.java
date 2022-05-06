@@ -362,6 +362,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case DOUBLE:
           _nonLiteralValues[i] = ArrayUtils.toObject(transformFunction.transformToDoubleValuesSV(projectionBlock));
           break;
+        case BIG_DECIMAL:
+          _nonLiteralValues[i] = transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+          break;
         case BOOLEAN: {
           int[] intValues = transformFunction.transformToIntValuesSV(projectionBlock);
           int numValues = intValues.length;

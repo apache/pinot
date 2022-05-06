@@ -21,8 +21,8 @@
 
 image:
   repository: apachepinot/pinot
-  tag: latest-jdk11 # release-0.7.1
-  pullPolicy: IfNotPresent
+  tag: latest # release-0.10.0
+  pullPolicy: Always # Use IfNotPresent when you pinged a version of image tag
 
 cluster:
   name: pinot-quickstart
@@ -341,8 +341,8 @@ minion:
 
   probes:
     endpoint: "/health"
-    livenessEnabled: false
-    readinessEnabled: false
+    livenessEnabled: true
+    readinessEnabled: true
 
   dataDir: /var/pinot/minion/data
   jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"

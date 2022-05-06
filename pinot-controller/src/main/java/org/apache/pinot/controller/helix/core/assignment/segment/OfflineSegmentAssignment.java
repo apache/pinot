@@ -35,12 +35,12 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.tier.Tier;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -281,22 +281,24 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       segmentZKMetadataMap.put(segmentZKMetadata.getSegmentName(), segmentZKMetadata);
     }
-    Map<Integer, List<String>> partitionIdToSegmentsMap = new HashMap<>();
+    int numPartitions = instancePartitions.getNumPartitions();
+    Map<Integer, List<String>> instancePartitionIdToSegmentsMap = new HashMap<>();
     for (String segmentName : currentAssignment.keySet()) {
       int partitionId = getPartitionId(segmentZKMetadataMap.get(segmentName));
-      partitionIdToSegmentsMap.computeIfAbsent(partitionId, k -> new ArrayList<>()).add(segmentName);
+      int instancePartitionId = partitionId % numPartitions;
+      instancePartitionIdToSegmentsMap.computeIfAbsent(instancePartitionId, k -> new ArrayList<>()).add(segmentName);
     }
 
     // NOTE: Shuffle the segments within the current assignment to avoid moving only new segments to the new added
     //       servers, which might cause hotspot servers because queries tend to hit the new segments. Use the table
     //       name hash as the random seed for the shuffle so that the result is deterministic.
     Random random = new Random(_offlineTableName.hashCode());
-    for (List<String> segments : partitionIdToSegmentsMap.values()) {
+    for (List<String> segments : instancePartitionIdToSegmentsMap.values()) {
       Collections.shuffle(segments, random);
     }
 
     return SegmentAssignmentUtils
-        .rebalanceReplicaGroupBasedTable(currentAssignment, instancePartitions, partitionIdToSegmentsMap);
+        .rebalanceReplicaGroupBasedTable(currentAssignment, instancePartitions, instancePartitionIdToSegmentsMap);
   }
 
   private int getPartitionId(SegmentZKMetadata segmentZKMetadata) {

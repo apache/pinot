@@ -1,0 +1,55 @@
+{
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "generationNumber"
+    },
+    {
+      "dataType": "STRING",
+      "name": "stringDimSV1"
+    },
+    {
+      "dataType": "STRING",
+      "name": "stringDimSV2"
+    },
+    {
+      "dataType": "LONG",
+      "name": "longDimSV1"
+    },
+    {
+      "dataType": "DOUBLE",
+      "name": "doubleDimSV1"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "intMetric1"
+    },
+    {
+      "dataType": "LONG",
+      "name": "longMetric1"
+    },
+    {
+      "dataType": "FLOAT",
+      "name": "floatMetric1"
+    },
+    {
+      "dataType": "DOUBLE",
+      "name": "doubleMetric1"
+    },
+    {
+      "dataType": "BYTES",
+      "name": "bytesMetric1"
+    }
+  ],
+  "dateTimeFieldSpecs" : [
+    {
+      "name" : "HoursSinceEpoch",
+      "dataType" : "INT",
+      "format" : "1:HOURS:EPOCH",
+      "granularity": "1:HOURS"
+    }
+  ],
+  "schemaName": "FeatureTest3"
+}

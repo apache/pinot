@@ -57,7 +57,6 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.api.AccessControlTest;
 import org.apache.pinot.controller.helix.ControllerRequestClient;
-import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -67,6 +66,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -212,9 +212,9 @@ public abstract class ControllerTestUtils {
       default:
         break;
     }
-    //enable case insensitive pql for test cases.
+    // Enable case-insensitive for test cases.
     configAccessor.set(scope, CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
-    //Set hyperloglog log2m value to 12.
+    // Set hyperloglog log2m value to 12.
     configAccessor.set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
   }
 
@@ -471,6 +471,12 @@ public abstract class ControllerTestUtils {
     return schema;
   }
 
+  public static Schema createDummySchemaForUpsertTable(String tableName) {
+    Schema schema = createDummySchema(tableName);
+    schema.setPrimaryKeyColumns(Collections.singletonList("dimA"));
+    return schema;
+  }
+
   public static void addDummySchema(String tableName)
       throws IOException {
     addSchema(createDummySchema(tableName));
@@ -522,8 +528,8 @@ public abstract class ControllerTestUtils {
   public static String sendGetRequest(String urlString)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(
-          new URL(urlString).toURI()));
+      SimpleHttpResponse resp =
+          HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(urlString).toURI()));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
@@ -543,8 +549,8 @@ public abstract class ControllerTestUtils {
   public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendJsonPostRequest(
-          new URL(urlString).toURI(), payload, headers));
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(
+          getHttpClient().sendJsonPostRequest(new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
@@ -564,8 +570,8 @@ public abstract class ControllerTestUtils {
   public static String sendPutRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendJsonPutRequest(
-          new URL(urlString).toURI(), payload, headers));
+      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(
+          getHttpClient().sendJsonPutRequest(new URL(urlString).toURI(), payload, headers));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);
@@ -575,8 +581,8 @@ public abstract class ControllerTestUtils {
   public static String sendDeleteRequest(String urlString)
       throws IOException {
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(getHttpClient().sendDeleteRequest(
-          new URL(urlString).toURI()));
+      SimpleHttpResponse resp =
+          HttpClient.wrapAndThrowHttpException(getHttpClient().sendDeleteRequest(new URL(urlString).toURI()));
       return constructResponse(resp);
     } catch (URISyntaxException | HttpErrorStatusException e) {
       throw new IOException(e);

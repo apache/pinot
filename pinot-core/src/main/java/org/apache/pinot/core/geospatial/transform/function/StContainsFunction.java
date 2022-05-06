@@ -49,9 +49,10 @@ public class StContainsFunction extends BaseBinaryGeoTransformFunction {
 
   @Override
   public int transformGeometryToInt(Geometry firstGeometry, Geometry secondGeometry) {
-    if (GeometryUtils.isGeography(firstGeometry) || GeometryUtils.isGeography(secondGeometry)) {
-      throw new RuntimeException(String.format("%s is available for Geometry objects only", FUNCTION_NAME));
+    if (GeometryUtils.isGeography(firstGeometry) != GeometryUtils.isGeography(secondGeometry)) {
+      throw new RuntimeException("The first and second arguments shall either all be geometry or all geography");
     }
+    // TODO: to fully support Geography contains operation.
     return firstGeometry.contains(secondGeometry) ? 1 : 0;
   }
 }

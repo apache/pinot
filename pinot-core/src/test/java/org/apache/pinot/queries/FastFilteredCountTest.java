@@ -64,12 +64,14 @@ public class FastFilteredCountTest extends BaseQueriesTest {
   private static final String CLASSIFICATION_COLUMN = "class";
   private static final String TEXT_COLUMN = "textCol";
   private static final String JSON_COLUMN = "jsonCol";
+  private static final String INT_RANGE_COLUMN = "intRangeCol";
 
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
       .addSingleValueDimension(SORTED_COLUMN, FieldSpec.DataType.INT)
       .addSingleValueDimension(CLASSIFICATION_COLUMN, FieldSpec.DataType.INT)
       .addSingleValueDimension(TEXT_COLUMN, FieldSpec.DataType.STRING)
       .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.JSON)
+      .addSingleValueDimension(INT_RANGE_COLUMN, FieldSpec.DataType.INT)
       .build();
 
   private static final TableConfig TABLE_CONFIG =
@@ -108,6 +110,7 @@ public class FastFilteredCountTest extends BaseQueriesTest {
       record.putValue(SORTED_COLUMN, i);
       record.putValue(TEXT_COLUMN, "text" + (i % BUCKET_SIZE));
       record.putValue(JSON_COLUMN, "{\"field\":" + (i % BUCKET_SIZE) + "}");
+      record.putValue(INT_RANGE_COLUMN, NUM_RECORDS - i);
       records.add(record);
     }
 
@@ -124,6 +127,7 @@ public class FastFilteredCountTest extends BaseQueriesTest {
     indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(Arrays.asList(CLASSIFICATION_COLUMN, SORTED_COLUMN)));
     indexLoadingConfig.setTextIndexColumns(Collections.singleton(TEXT_COLUMN));
     indexLoadingConfig.setJsonIndexColumns(Collections.singleton(JSON_COLUMN));
+    indexLoadingConfig.setRangeIndexColumns(Collections.singleton(INT_RANGE_COLUMN));
 
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME),
         indexLoadingConfig);
@@ -284,13 +288,26 @@ public class FastFilteredCountTest extends BaseQueriesTest {
             + " where " + SORTED_COLUMN + " >= 500"
             + " and " + CLASSIFICATION_COLUMN + " <> 0"
             + " and not JSON_MATCH(" + JSON_COLUMN + ", '\"$.field\"=0')"
-            + " and not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')", bucketCountComplement / 2 + 1}
+            + " and not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')", bucketCountComplement / 2 + 1},
+        {"select count(*) from " + RAW_TABLE_NAME
+            + " where " + INT_RANGE_COLUMN + " >= " + min
+            + " and " + INT_RANGE_COLUMN + " < " + max, max - min},
+        {"select count(*) from " + RAW_TABLE_NAME
+            + " where " + INT_RANGE_COLUMN + " < " + max, max - 1},
+        {"select count(*) from " + RAW_TABLE_NAME
+            + " where " + INT_RANGE_COLUMN + " not between " + min + " and " + max, NUM_RECORDS - max + min - 1},
+        {"select count(*) from " + RAW_TABLE_NAME
+            + " where " + INT_RANGE_COLUMN + " between " + min + " and " + max
+            + " and " + CLASSIFICATION_COLUMN + " = 0", bucketCount - (min + NUM_RECORDS - max) / BUCKET_SIZE},
+        {"select count(*) from " + RAW_TABLE_NAME
+            + " where " + INT_RANGE_COLUMN + " not between " + min + " and " + max
+            + " and " + CLASSIFICATION_COLUMN + " = 0", (min + NUM_RECORDS - max) / BUCKET_SIZE}
     };
   }
 
   @Test(dataProvider = "testCases")
   public void test(String query, int expectedCount) {
-    Operator<?> operator = getOperatorForSqlQuery(query);
+    Operator<?> operator = getOperator(query);
     assertTrue(operator instanceof FastFilteredCountOperator);
     List<Object> aggregationResult = ((FastFilteredCountOperator) operator).nextBlock().getAggregationResult();
     assertNotNull(aggregationResult);

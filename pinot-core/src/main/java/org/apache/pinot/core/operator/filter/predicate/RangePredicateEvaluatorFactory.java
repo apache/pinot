@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import it.unimi.dsi.fastutil.ints.IntSet;
+import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -85,6 +86,10 @@ public class RangePredicateEvaluatorFactory {
         return new DoubleRawValueBasedRangePredicateEvaluator(rangePredicate,
             lowerUnbounded ? Double.NEGATIVE_INFINITY : Double.parseDouble(lowerBound),
             upperUnbounded ? Double.POSITIVE_INFINITY : Double.parseDouble(upperBound), lowerInclusive, upperInclusive);
+      case BIG_DECIMAL:
+        return new BigDecimalRawValueBasedRangePredicateEvaluator(rangePredicate,
+            lowerUnbounded ? null : new BigDecimal(lowerBound),
+            upperUnbounded ? null : new BigDecimal(upperBound), lowerInclusive, upperInclusive);
       case BOOLEAN:
         return new IntRawValueBasedRangePredicateEvaluator(rangePredicate,
             lowerUnbounded ? Integer.MIN_VALUE : BooleanUtils.toInt(lowerBound),
@@ -280,7 +285,7 @@ public class RangePredicateEvaluatorFactory {
       _upperInclusive = upperInclusive;
     }
 
-    public int geLowerBound() {
+    public int getLowerBound() {
       return _lowerBound;
     }
 
@@ -325,7 +330,7 @@ public class RangePredicateEvaluatorFactory {
       _upperInclusive = upperInclusive;
     }
 
-    public long geLowerBound() {
+    public long getLowerBound() {
       return _lowerBound;
     }
 
@@ -370,7 +375,7 @@ public class RangePredicateEvaluatorFactory {
       _upperInclusive = upperInclusive;
     }
 
-    public float geLowerBound() {
+    public float getLowerBound() {
       return _lowerBound;
     }
 
@@ -415,7 +420,7 @@ public class RangePredicateEvaluatorFactory {
       _upperInclusive = upperInclusive;
     }
 
-    public double geLowerBound() {
+    public double getLowerBound() {
       return _lowerBound;
     }
 
@@ -440,6 +445,47 @@ public class RangePredicateEvaluatorFactory {
         result &= _upperBound >= value;
       } else {
         result &= _upperBound > value;
+      }
+      return result;
+    }
+  }
+
+  public static final class BigDecimalRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final BigDecimal _lowerBound;
+    final BigDecimal _upperBound;
+    final boolean _lowerInclusive;
+    final boolean _upperInclusive;
+
+    BigDecimalRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate, BigDecimal lowerBound,
+        BigDecimal upperBound, boolean lowerInclusive, boolean upperInclusive) {
+      super(rangePredicate);
+      _lowerBound = lowerBound;
+      _upperBound = upperBound;
+      _lowerInclusive = lowerInclusive;
+      _upperInclusive = upperInclusive;
+    }
+
+    public BigDecimal geLowerBound() {
+      return _lowerBound;
+    }
+
+    public BigDecimal getUpperBound() {
+      return _upperBound;
+    }
+
+    @Override
+    public DataType getDataType() {
+      return DataType.BIG_DECIMAL;
+    }
+
+    @Override
+    public boolean applySV(BigDecimal value) {
+      boolean result = true;
+      if (_lowerBound != null) {
+        result = _lowerInclusive ? _lowerBound.compareTo(value) <= 0 : _lowerBound.compareTo(value) < 0;
+      }
+      if (_upperBound != null) {
+        result &= _upperInclusive ? _upperBound.compareTo(value) >= 0 : _upperBound.compareTo(value) > 0;
       }
       return result;
     }

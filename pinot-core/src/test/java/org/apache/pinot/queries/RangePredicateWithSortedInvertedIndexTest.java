@@ -161,9 +161,8 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
     // test with sorted column without dictionary
     // FilterOperatorUtils code should correctly create scan operator for INT_COL_RAW
     // else this test will fail
-    query =
-        "SELECT STRING_COL, INT_COL FROM testTable WHERE INT_COL >= 20000 AND INT_COL <= 23666 AND INT_COL_RAW <= "
-            + "23666 LIMIT 100000";
+    query = "SELECT STRING_COL, INT_COL FROM testTable WHERE INT_COL >= 20000 AND INT_COL <= 23666 AND "
+        + "INT_COL_RAW <= 23666 LIMIT 100000";
     pair = new Pairs.IntPair(20000, 23666);
     runQuery(query, 3667, Lists.newArrayList(pair), 2);
 
@@ -223,7 +222,7 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
   }
 
   private void runQuery(String query, int count, List<Pairs.IntPair> intPairs, int numColumns) {
-    SelectionOnlyOperator operator = getOperatorForPqlQuery(query);
+    SelectionOnlyOperator operator = getOperator(query);
     IntermediateResultsBlock block = operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
     assertNotNull(rows, ERROR_MESSAGE);

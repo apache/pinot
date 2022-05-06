@@ -45,10 +45,11 @@ import org.glassfish.jersey.server.ResourceConfig;
 public class MinionAdminApiApplication extends ResourceConfig {
   private static final String RESOURCE_PACKAGE = "org.apache.pinot.minion.api.resources";
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
+  public static final String MINION_INSTANCE_ID = "minionInstanceId";
 
   private HttpServer _httpServer;
 
-  public MinionAdminApiApplication(PinotConfiguration minionConf) {
+  public MinionAdminApiApplication(String instanceId, PinotConfiguration minionConf) {
     packages(RESOURCE_PACKAGE);
     property(PINOT_CONFIGURATION, minionConf);
 
@@ -56,6 +57,7 @@ public class MinionAdminApiApplication extends ResourceConfig {
       @Override
       protected void configure() {
         // TODO: Add bindings as needed in future.
+        bind(instanceId).named(MINION_INSTANCE_ID);
       }
     });
 

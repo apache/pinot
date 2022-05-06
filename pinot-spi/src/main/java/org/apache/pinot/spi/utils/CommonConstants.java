@@ -231,8 +231,9 @@ public class CommonConstants {
 
     public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
 
+    public static final String CONTROLLER_URL = "pinot.broker.controller.url";
+
     public static class Request {
-      public static final String PQL = "pql";
       public static final String SQL = "sql";
       public static final String TRACE = "trace";
       public static final String DEBUG_OPTIONS = "debugOptions";
@@ -240,14 +241,46 @@ public class CommonConstants {
 
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
-        public static final String PRESERVE_TYPE = "preserveType";
-        public static final String RESPONSE_FORMAT = "responseFormat";
-        public static final String GROUP_BY_MODE = "groupByMode";
         public static final String SKIP_UPSERT = "skipUpsert";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
         public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
+        public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
+
+        // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
+        @Deprecated
+        public static final String PRESERVE_TYPE = "preserveType";
+        @Deprecated
+        public static final String RESPONSE_FORMAT = "responseFormat";
+        @Deprecated
+        public static final String GROUP_BY_MODE = "groupByMode";
       }
+    }
+
+    public static class FailureDetector {
+      public enum Type {
+        // Do not detect any failure
+        NO_OP,
+
+        // Detect connection failures
+        CONNECTION,
+
+        // Use the custom failure detector of the configured class name
+        CUSTOM
+      }
+
+      public static final String CONFIG_OF_TYPE = "pinot.broker.failure.detector.type";
+      public static final String DEFAULT_TYPE = Type.NO_OP.name();
+      public static final String CONFIG_OF_CLASS_NAME = "pinot.broker.failure.detector.class";
+
+      // Exponential backoff delay of retrying an unhealthy server when a failure is detected
+      public static final String CONFIG_OF_RETRY_INITIAL_DELAY_MS =
+          "pinot.broker.failure.detector.retry.initial.delay.ms";
+      public static final long DEFAULT_RETRY_INITIAL_DELAY_MS = 5_000L;
+      public static final String CONFIG_OF_RETRY_DELAY_FACTOR = "pinot.broker.failure.detector.retry.delay.factor";
+      public static final double DEFAULT_RETRY_DELAY_FACTOR = 2.0;
+      public static final String CONFIG_OF_MAX_RETRIES = "pinot.broker.failure.detector.max.retries";
+      public static final int DEFAULT_MAX_RETIRES = 10;
     }
   }
 
@@ -497,11 +530,9 @@ public class CommonConstants {
     public static class Realtime {
       public enum Status {
         // Means the segment is in CONSUMING state.
-        IN_PROGRESS,
-        // Means the segment is in ONLINE state (segment completed consuming and has been saved in
+        IN_PROGRESS, // Means the segment is in ONLINE state (segment completed consuming and has been saved in
         // segment store).
-        DONE,
-        // Means the segment is uploaded to a Pinot controller by an external party.
+        DONE, // Means the segment is uploaded to a Pinot controller by an external party.
         UPLOADED
       }
 
@@ -512,8 +543,7 @@ public class CommonConstants {
       public enum CompletionMode {
         // default behavior - if the in memory segment in the non-winner server is equivalent to the committed
         // segment, then build and replace, else download
-        DEFAULT,
-        // non-winner servers always download the segment, never build it
+        DEFAULT, // non-winner servers always download the segment, never build it
         DOWNLOAD
       }
 
@@ -586,7 +616,6 @@ public class CommonConstants {
         public static final String ENABLE_TRACE = "enableTrace";
         public static final String ENABLE_STREAMING = "enableStreaming";
         public static final String PAYLOAD_TYPE = "payloadType";
-        public static final String EXPLAIN = "explain";
       }
 
       public static class PayloadType {

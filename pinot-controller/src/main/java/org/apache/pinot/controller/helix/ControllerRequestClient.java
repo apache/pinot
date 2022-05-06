@@ -30,6 +30,7 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 
 
 /**
@@ -98,7 +99,7 @@ public class ControllerRequestClient {
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(new URL(
-          _controllerRequestURLBuilder.forUpdateTableConfig(tableConfig.getTableName())).toURI(),
+              _controllerRequestURLBuilder.forUpdateTableConfig(tableConfig.getTableName())).toURI(),
           tableConfig.toJsonString()));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
@@ -162,7 +163,7 @@ public class ControllerRequestClient {
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URL(
-          _controllerRequestURLBuilder.forSegmentDeleteAllAPI(tableName, tableType.toString())).toURI()));
+          _controllerRequestURLBuilder.forSegmentDeleteAll(tableName, tableType.toString())).toURI()));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -172,7 +173,7 @@ public class ControllerRequestClient {
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-          _controllerRequestURLBuilder.forTenantCreate()).toURI(),
+              _controllerRequestURLBuilder.forTenantCreate()).toURI(),
           getBrokerTenantRequestPayload(tenantName, numBrokers)));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
@@ -183,7 +184,7 @@ public class ControllerRequestClient {
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(new URL(
-          _controllerRequestURLBuilder.forTenantCreate()).toURI(),
+              _controllerRequestURLBuilder.forTenantCreate()).toURI(),
           getBrokerTenantRequestPayload(tenantName, numBrokers)));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
@@ -194,7 +195,7 @@ public class ControllerRequestClient {
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-          _controllerRequestURLBuilder.forTenantCreate()).toURI(),
+              _controllerRequestURLBuilder.forTenantCreate()).toURI(),
           getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers)));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
@@ -205,7 +206,7 @@ public class ControllerRequestClient {
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(new URL(
-          _controllerRequestURLBuilder.forTenantCreate()).toURI(),
+              _controllerRequestURLBuilder.forTenantCreate()).toURI(),
           getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers)));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);

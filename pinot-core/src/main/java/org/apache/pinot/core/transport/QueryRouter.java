@@ -31,7 +31,6 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.spi.config.table.TableType;
@@ -142,8 +141,24 @@ public class QueryRouter {
       AsyncQueryResponse asyncQueryResponse, Exception e) {
     LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId,
         serverRoutingInstance, e);
-    asyncQueryResponse.setBrokerRequestSendException(e);
-    asyncQueryResponse.markQueryFailed();
+    asyncQueryResponse.markQueryFailed(serverRoutingInstance, e);
+  }
+
+  /**
+   * Connects to the given server, returns {@code true} if the server is successfully connected.
+   */
+  public boolean connect(ServerInstance serverInstance) {
+    try {
+      if (_serverChannelsTls != null) {
+        _serverChannelsTls.connect(serverInstance.toServerRoutingInstance(TableType.OFFLINE, true));
+      } else {
+        _serverChannels.connect(serverInstance.toServerRoutingInstance(TableType.OFFLINE, false));
+      }
+      return true;
+    } catch (Exception e) {
+      LOGGER.debug("Failed to connect to server: {}", serverInstance, e);
+      return false;
+    }
   }
 
   public void shutDown() {
@@ -161,9 +176,9 @@ public class QueryRouter {
     }
   }
 
-  void markServerDown(ServerRoutingInstance serverRoutingInstance) {
+  void markServerDown(ServerRoutingInstance serverRoutingInstance, Exception exception) {
     for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
-      asyncQueryResponse.markServerDown(serverRoutingInstance);
+      asyncQueryResponse.markServerDown(serverRoutingInstance, exception);
     }
   }
 
@@ -175,9 +190,7 @@ public class QueryRouter {
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(requestId);
     instanceRequest.setQuery(brokerRequest);
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
-    Map<String, String> queryOptions =
-        pinotQuery != null ? pinotQuery.getQueryOptions() : brokerRequest.getQueryOptions();
+    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
     if (queryOptions != null) {
       instanceRequest.setEnableTrace(Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE)));
     }

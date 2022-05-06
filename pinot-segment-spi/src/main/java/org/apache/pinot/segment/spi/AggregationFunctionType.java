@@ -37,6 +37,7 @@ public enum AggregationFunctionType {
   SUMPRECISION("sumPrecision"),
   AVG("avg"),
   MODE("mode"),
+  FIRSTWITHTIME("firstWithTime"),
   LASTWITHTIME("lastWithTime"),
   MINMAXRANGE("minMaxRange"),
   DISTINCTCOUNT("distinctCount"),
@@ -53,6 +54,7 @@ public enum AggregationFunctionType {
   PERCENTILERAWEST("percentileRawEst"),
   PERCENTILETDIGEST("percentileTDigest"),
   PERCENTILERAWTDIGEST("percentileRawTDigest"),
+  PERCENTILESMARTTDIGEST("percentileSmartTDigest"),
   IDSET("idSet"),
 
   // Geo aggregation functions

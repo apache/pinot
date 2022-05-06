@@ -51,7 +51,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTO
 
 
 public class PinotScatterGatherQueryClient {
-  private static final CalciteSqlCompiler REQUEST_COMPILER = new CalciteSqlCompiler();
   private static final String PRESTO_HOST_PREFIX = "presto-pinot-";
 
   private final String _prestoHostId;
@@ -246,19 +245,18 @@ public class PinotScatterGatherQueryClient {
     return defaultBrokerId;
   }
 
-  public Map<ServerInstance, DataTable> queryPinotServerForDataTable(String pql, String serverHost,
+  public Map<ServerInstance, DataTable> queryPinotServerForDataTable(String query, String serverHost,
       List<String> segments, long connectionTimeoutInMillis, boolean ignoreEmptyResponses, int pinotRetryCount) {
     BrokerRequest brokerRequest;
     try {
-      brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pql);
+      brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
     } catch (Exception e) {
       throw new PinotException(ErrorCode.PINOT_INVALID_SQL_GENERATED,
           String.format("Parsing error with on %s, Error = %s", serverHost, e.getMessage()), e);
     }
 
-    Map<org.apache.pinot.core.transport.ServerInstance, List<String>> routingTable = new HashMap<>();
-    routingTable.put(new org.apache.pinot.core.transport.ServerInstance(new InstanceConfig(serverHost)),
-        new ArrayList<>(segments));
+    Map<ServerInstance, List<String>> routingTable = new HashMap<>();
+    routingTable.put(new ServerInstance(new InstanceConfig(serverHost)), new ArrayList<>(segments));
 
     // Unfortunately the retries will all hit the same server because the routing decision has already been made by
     // the pinot broker
@@ -309,10 +307,9 @@ public class PinotScatterGatherQueryClient {
   }
 
   private Map<ServerInstance, DataTable> gatherServerResponses(boolean ignoreEmptyResponses,
-      Map<org.apache.pinot.core.transport.ServerInstance, List<String>> routingTable,
-      AsyncQueryResponse asyncQueryResponse, String tableNameWithType) {
+      Map<ServerInstance, List<String>> routingTable, AsyncQueryResponse asyncQueryResponse, String tableNameWithType) {
     try {
-      Map<ServerRoutingInstance, ServerResponse> queryResponses = asyncQueryResponse.getResponse();
+      Map<ServerRoutingInstance, ServerResponse> queryResponses = asyncQueryResponse.getFinalResponses();
       if (!ignoreEmptyResponses) {
         if (queryResponses.size() != routingTable.size()) {
           Map<String, String> routingTableForLogging = new HashMap<>();
@@ -323,7 +320,8 @@ public class PinotScatterGatherQueryClient {
           });
           throw new PinotException(ErrorCode.PINOT_INSUFFICIENT_SERVER_RESPONSE,
               String.format("%d of %d servers responded with routing table servers: %s, query stats: %s",
-                  queryResponses.size(), routingTable.size(), routingTableForLogging, asyncQueryResponse.getStats()));
+                  queryResponses.size(), routingTable.size(), routingTableForLogging,
+                  asyncQueryResponse.getServerStats()));
         }
       }
       Map<ServerInstance, DataTable> serverResponseMap = new HashMap<>();

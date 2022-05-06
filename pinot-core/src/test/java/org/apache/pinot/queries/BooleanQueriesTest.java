@@ -134,7 +134,7 @@ public class BooleanQueriesTest extends BaseQueriesTest {
   public void testQueries() {
     {
       String query = "SELECT * FROM testTable";
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -149,7 +149,7 @@ public class BooleanQueriesTest extends BaseQueriesTest {
     }
     {
       String query = "SELECT booleanColumn FROM testTable WHERE booleanColumn = false";
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -163,8 +163,23 @@ public class BooleanQueriesTest extends BaseQueriesTest {
       }
     }
     {
+      String query = "SELECT booleanColumn FROM testTable WHERE booleanColumn";
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{"booleanColumn"}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 10);
+      for (int i = 0; i < 10; i++) {
+        Object[] row = rows.get(i);
+        assertEquals(row.length, 1);
+        assertEquals(row[0], true);
+      }
+    }
+    {
       String query = "SELECT * FROM testTable ORDER BY booleanColumn DESC LIMIT 20";
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -179,7 +194,7 @@ public class BooleanQueriesTest extends BaseQueriesTest {
     }
     {
       String query = "SELECT STARTS_WITH(CAST(booleanColumn AS STRING), 'fa') AS boolResult FROM testTable";
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -194,7 +209,7 @@ public class BooleanQueriesTest extends BaseQueriesTest {
     }
     {
       String query = "SELECT DISTINCT booleanColumn FROM testTable ORDER BY booleanColumn DESC";
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -211,7 +226,7 @@ public class BooleanQueriesTest extends BaseQueriesTest {
     {
       String query =
           "SELECT COUNT(*) AS count, booleanColumn FROM testTable GROUP BY booleanColumn ORDER BY booleanColumn";
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"count", "booleanColumn"},
@@ -231,7 +246,7 @@ public class BooleanQueriesTest extends BaseQueriesTest {
       String query =
           "SELECT MAX(booleanColumn) AS maxBoolean FROM testTable GROUP BY booleanColumn HAVING maxBoolean < 1 ORDER "
               + "BY booleanColumn";
-      BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"maxBoolean"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));

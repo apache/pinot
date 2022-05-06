@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -83,7 +84,7 @@ public class PerfBenchmarkDriver {
   private String _controllerAddress;
   private String _controllerDataDir;
 
-  private String _brokerBaseApiUrl;
+  private String _queryUrl;
 
   private String _serverInstanceDataDir;
   private String _serverInstanceSegmentTarDir;
@@ -144,7 +145,8 @@ public class PerfBenchmarkDriver {
     }
 
     // Init broker.
-    _brokerBaseApiUrl = "http://" + _conf.getBrokerHost() + ":" + _conf.getBrokerPort();
+    _queryUrl = StringUtils.isNotBlank(_conf.getBrokerURL()) ? _conf.getBrokerURL()
+        : "http://" + _conf.getBrokerHost() + ":" + _conf.getBrokerPort() + "/query/sql";
 
     // Init server.
     String serverInstanceName = _conf.getServerInstanceName();
@@ -363,8 +365,8 @@ public class PerfBenchmarkDriver {
     Set<String> tableAndBrokerResources = new HashSet<>();
     for (String resourceName : allResourcesInCluster) {
       // Only check table resources and broker resource
-      if (TableNameBuilder.isTableResource(resourceName) || resourceName
-          .equals(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
+      if (TableNameBuilder.isTableResource(resourceName) || resourceName.equals(
+          CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
         tableAndBrokerResources.add(resourceName);
       }
     }
@@ -404,31 +406,16 @@ public class PerfBenchmarkDriver {
 
   public JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(_conf.getDialect(), query);
+    return postQuery(query, Collections.emptyMap());
   }
 
   public JsonNode postQuery(String query, Map<String, String> headers)
       throws Exception {
-    return postQuery(_conf.getDialect(), query, headers);
-  }
-
-  public JsonNode postQuery(String dialect, String query)
-      throws Exception {
-    return postQuery(dialect, query, Collections.emptyMap());
-  }
-
-  public JsonNode postQuery(String dialect, String query, Map<String, String> headers)
-      throws Exception {
     ObjectNode requestJson = JsonUtils.newObjectNode();
-    requestJson.put(dialect, query);
+    requestJson.put("sql", query);
 
     long start = System.currentTimeMillis();
-    String queryUrl = _brokerBaseApiUrl + "/query";
-    if (!"pql".equals(dialect)) {
-      queryUrl = _brokerBaseApiUrl + "/query/" + dialect;
-    }
-
-    URLConnection conn = new URL(queryUrl).openConnection();
+    URLConnection conn = new URL(_queryUrl).openConnection();
     conn.setDoOutput(true);
     for (Map.Entry<String, String> header : headers.entrySet()) {
       conn.setRequestProperty(header.getKey(), header.getValue());
@@ -499,7 +486,7 @@ public class PerfBenchmarkDriver {
   public static void main(String[] args)
       throws Exception {
     PluginManager.get().init();
-    PerfBenchmarkDriverConf conf = (PerfBenchmarkDriverConf) new Yaml().load(new FileInputStream(args[0]));
+    PerfBenchmarkDriverConf conf = new Yaml().load(new FileInputStream(args[0]));
     PerfBenchmarkDriver perfBenchmarkDriver = new PerfBenchmarkDriver(conf);
     perfBenchmarkDriver.run();
   }

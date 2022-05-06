@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
+import org.apache.pinot.segment.local.segment.index.readers.BigDecimalDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.BytesDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.FloatDictionary;
@@ -123,6 +124,13 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _bloomFilter = null;
     }
 
+    if (loadRangeIndex && !metadata.isSorted()) {
+      PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.RANGE_INDEX);
+      _rangeIndex = indexReaderProvider.newRangeIndexReader(buffer, metadata);
+    } else {
+      _rangeIndex = null;
+    }
+
     PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
     if (metadata.hasDictionary()) {
       // Dictionary-based index
@@ -135,7 +143,6 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
           SortedIndexReader<?> sortedIndexReader = indexReaderProvider.newSortedIndexReader(fwdIndexBuffer, metadata);
           _forwardIndex = sortedIndexReader;
           _invertedIndex = sortedIndexReader;
-          _rangeIndex = null;
           _fstIndex = null;
           return;
         }
@@ -154,18 +161,10 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       } else {
         _fstIndex = null;
       }
-
-      if (loadRangeIndex) {
-        PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, ColumnIndexType.RANGE_INDEX);
-        _rangeIndex = indexReaderProvider.newRangeIndexReader(buffer, metadata);
-      } else {
-        _rangeIndex = null;
-      }
     } else {
       // Raw index
       _forwardIndex = indexReaderProvider.newForwardIndexReader(fwdIndexBuffer, metadata);
       _dictionary = null;
-      _rangeIndex = null;
       _invertedIndex = null;
       _fstIndex = null;
     }
@@ -248,8 +247,12 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         return (loadOnHeap) ? new OnHeapDoubleDictionary(dictionaryBuffer, length)
             : new DoubleDictionary(dictionaryBuffer, length);
 
-      case STRING:
+      case BIG_DECIMAL:
         int numBytesPerValue = metadata.getColumnMaxLength();
+        return new BigDecimalDictionary(dictionaryBuffer, length, numBytesPerValue);
+
+      case STRING:
+        numBytesPerValue = metadata.getColumnMaxLength();
         byte paddingByte = (byte) metadata.getPaddingCharacter();
         return loadOnHeap ? new OnHeapStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte)
             : new StringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);

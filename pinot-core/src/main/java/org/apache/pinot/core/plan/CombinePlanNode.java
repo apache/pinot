@@ -33,21 +33,23 @@ import org.apache.pinot.core.operator.combine.AggregationOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
 import org.apache.pinot.core.operator.combine.DistinctCombineOperator;
-import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
-import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.core.util.trace.TraceCallable;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.trace.InvocationRecording;
+import org.apache.pinot.spi.trace.InvocationScope;
+import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
  * The <code>CombinePlanNode</code> class provides the execution plan for combining results from multiple segments.
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class CombinePlanNode implements PlanNode {
   // Try to schedule 10 plans for each thread, or evenly distribute plans to all MAX_NUM_THREADS_PER_QUERY threads
   private static final int TARGET_NUM_PLANS_PER_THREAD = 10;
@@ -73,10 +75,17 @@ public class CombinePlanNode implements PlanNode {
     _streamObserver = streamObserver;
   }
 
-  @SuppressWarnings({"rawtypes", "unchecked"})
   @Override
   public BaseCombineOperator run() {
+    try (InvocationScope ignored = Tracing.getTracer().createScope(CombinePlanNode.class)) {
+      return getCombineOperator();
+    }
+  }
+
+  private BaseCombineOperator getCombineOperator() {
+    InvocationRecording recording = Tracing.activeRecording();
     int numPlanNodes = _planNodes.size();
+    recording.setNumChildren(numPlanNodes);
     List<Operator> operators = new ArrayList<>(numPlanNodes);
 
     if (numPlanNodes <= TARGET_NUM_PLANS_PER_THREAD) {
@@ -86,6 +95,8 @@ public class CombinePlanNode implements PlanNode {
       }
     } else {
       // Large number of plan nodes, run them in parallel
+      // NOTE: Even if we get single executor thread, still run it using a separate thread so that the timeout can be
+      //       honored
 
       int maxExecutionThreads = _queryContext.getMaxExecutionThreads();
       if (maxExecutionThreads <= 0) {
@@ -93,6 +104,7 @@ public class CombinePlanNode implements PlanNode {
       }
       int numTasks =
           Math.min((numPlanNodes + TARGET_NUM_PLANS_PER_THREAD - 1) / TARGET_NUM_PLANS_PER_THREAD, maxExecutionThreads);
+      recording.setNumTasks(numTasks);
 
       // Use a Phaser to ensure all the Futures are done (not scheduled, finished or interrupted) before the main thread
       // returns. We need to ensure no execution left before the main thread returning because the main thread holds the
@@ -167,10 +179,7 @@ public class CombinePlanNode implements PlanNode {
         return new AggregationOnlyCombineOperator(operators, _queryContext, _executorService);
       } else {
         // Aggregation group-by
-        if (QueryOptionsUtils.isGroupByModeSQL(_queryContext.getQueryOptions())) {
-          return new GroupByOrderByCombineOperator(operators, _queryContext, _executorService);
-        }
-        return new GroupByCombineOperator(operators, _queryContext, _executorService);
+        return new GroupByOrderByCombineOperator(operators, _queryContext, _executorService);
       }
     } else if (QueryContextUtils.isSelectionQuery(_queryContext)) {
       if (_queryContext.getLimit() == 0 || _queryContext.getOrderByExpressions() == null) {

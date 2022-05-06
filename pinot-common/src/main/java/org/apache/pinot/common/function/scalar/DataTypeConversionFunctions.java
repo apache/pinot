@@ -18,11 +18,18 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.Base64;
+import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+
+import static org.apache.pinot.common.utils.PinotDataType.DOUBLE;
+import static org.apache.pinot.common.utils.PinotDataType.INTEGER;
+import static org.apache.pinot.common.utils.PinotDataType.LONG;
+import static org.apache.pinot.common.utils.PinotDataType.STRING;
 
 
 /**
@@ -30,6 +37,33 @@ import org.apache.pinot.spi.utils.BytesUtils;
  */
 public class DataTypeConversionFunctions {
   private DataTypeConversionFunctions() {
+  }
+
+  @ScalarFunction
+  public static Object cast(Object value, String targetTypeLiteral) {
+    try {
+      Class<?> clazz = value.getClass();
+      Preconditions.checkArgument(!clazz.isArray() | clazz == byte[].class, "%s must not be an array type", clazz);
+      PinotDataType sourceType = PinotDataType.getSingleValueType(clazz);
+      String transformed = targetTypeLiteral.toUpperCase();
+      PinotDataType targetDataType;
+      if ("INT".equals(transformed)) {
+        targetDataType = INTEGER;
+      } else if ("VARCHAR".equals(transformed)) {
+        targetDataType = STRING;
+      } else {
+        targetDataType = PinotDataType.valueOf(transformed);
+      }
+      if (sourceType == STRING && (targetDataType == INTEGER || targetDataType == LONG)) {
+        if (String.valueOf(value).contains(".")) {
+          // convert integers via double to avoid parse errors
+          return targetDataType.convert(DOUBLE.convert(value, sourceType), DOUBLE);
+        }
+      }
+      return targetDataType.convert(value, sourceType);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("Unknown data type: " + targetTypeLiteral);
+    }
   }
 
   /**
