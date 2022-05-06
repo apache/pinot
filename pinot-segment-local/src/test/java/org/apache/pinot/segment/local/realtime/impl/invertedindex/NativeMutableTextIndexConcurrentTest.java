@@ -147,61 +147,6 @@ public class NativeMutableTextIndexConcurrentTest {
   }
 
   @Test
-  public void testConcurrentReadWithMultipleThreads()
-      throws InterruptedException, IOException {
-    List<String> firstThreadWords = new ArrayList<>();
-    List<String> secondThreadWords = new ArrayList<>();
-    List<String> mergedThreadWords = new ArrayList<>();
-    CountDownLatch countDownLatch = new CountDownLatch(3);
-    firstThreadWords.add("ab");
-    firstThreadWords.add("abba");
-    firstThreadWords.add("aba");
-    secondThreadWords.add("bab");
-    secondThreadWords.add("cdd");
-    secondThreadWords.add("efg");
-
-    mergedThreadWords.addAll(firstThreadWords);
-    mergedThreadWords.addAll(secondThreadWords);
-
-    try (NativeMutableTextIndex textIndex = new NativeMutableTextIndex("testFSTColumn")) {
-      _threadPool.submit(() -> {
-        try {
-          performReads(textIndex, firstThreadWords, 20, 500, countDownLatch);
-        } catch (InterruptedException e) {
-          e.printStackTrace();
-        }
-      });
-
-      _threadPool.submit(() -> {
-        try {
-          performWrites(textIndex, mergedThreadWords, 10, countDownLatch);
-        } catch (InterruptedException e) {
-          e.printStackTrace();
-        }
-      });
-
-      _threadPool.submit(() -> {
-        try {
-          performReads(textIndex, secondThreadWords, 20, 500, countDownLatch);
-        } catch (InterruptedException e) {
-          e.printStackTrace();
-        }
-      });
-
-      countDownLatch.await();
-    }
-
-    assertEquals(_resultSet.size(), mergedThreadWords.size());
-
-    assertTrue(_resultSet.contains("ab"), "ab not found in result set");
-    assertTrue(_resultSet.contains("abba"), "abba not found in result set");
-    assertTrue(_resultSet.contains("aba"), "aba not found in result set");
-    assertTrue(_resultSet.contains("bab"), "bab not found in result set");
-    assertTrue(_resultSet.contains("cdd"), "cdd not found in result set");
-    assertTrue(_resultSet.contains("efg"), "efg not found in result set");
-  }
-
-  @Test
   public void testMayhem()
       throws InterruptedException, IOException {
     List<String> firstThreadWords = new ArrayList<>();
