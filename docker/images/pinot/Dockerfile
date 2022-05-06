@@ -93,8 +93,8 @@ RUN wget -O ${PINOT_HOME}/etc/jmx_prometheus_javaagent/jmx_prometheus_javaagent-
 RUN wget -O ${PINOT_HOME}/etc/jmx_prometheus_javaagent/jmx_prometheus_javaagent-0.16.1.jar https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.16.1/jmx_prometheus_javaagent-0.16.1.jar && \
     ln -s ${PINOT_HOME}/etc/jmx_prometheus_javaagent/jmx_prometheus_javaagent-0.16.1.jar ${PINOT_HOME}/etc/jmx_prometheus_javaagent/jmx_prometheus_javaagent.jar
 
-# expose ports for controller/broker/server/admin
-EXPOSE 9000 8099 8098 8097 8096
+# expose ports for controller/broker/server/admin/minion admin
+EXPOSE 9000 8099 8098 8097 8096 6500
 
 WORKDIR ${PINOT_HOME}
 
