@@ -193,7 +193,10 @@ public class TestGcsPinotFS {
     // Test listFiles()
     // Check that all the files are there
     assertEquals(listFilesToStream(_dataDir).collect(toSet()), expectedElements);
-    // listFiles() using only the bucket "gs://bucket" contain the same elements
+    // listFiles() using only the bucket "gs://bucket" contain the same set of elements
+    // Check containsAll but not equal because the bucket people used to run this test
+    // might also contain other directories. We cannot make the assumption that it's
+    // dedicated for this test.
     assertTrue(
         listFilesToStream(createGcsUri(_dataDir.getBucketName(), "")).collect(toSet()).containsAll(expectedElements));
     // Check that the non-empty file has the expected contents
