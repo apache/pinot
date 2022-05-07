@@ -81,7 +81,6 @@ public class CSVMessageDecoderTest {
     String incomingRecord = "#Alice,18,F";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
-
   }
 
   @Test
