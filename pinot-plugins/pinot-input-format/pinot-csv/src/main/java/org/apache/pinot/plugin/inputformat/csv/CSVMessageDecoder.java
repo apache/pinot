@@ -19,12 +19,12 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 
 public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
 
-  private static final String CONFIG_FILE_FORMAT = "csvFileFormat";
-  private static final String CONFIG_HEADER = "csvHeader";
-  private static final String CONFIG_DELIMITER = "csvDelimiter";
-  private static final String CONFIG_COMMENT_MARKER = "csvCommentMarker";
-  private static final String CONFIG_CSV_ESCAPE_CHARACTER = "csvEscapeCharacter";
-  private static final String CONFIG_CSV_MULTI_VALUE_DELIMITER = "csvMultiValueDelimiter";
+  private static final String CONFIG_FILE_FORMAT = "csv.fileFmt";
+  private static final String CONFIG_HEADER = "csv.hdr";
+  private static final String CONFIG_DELIMITER = "csv.delim";
+  private static final String CONFIG_COMMENT_MARKER = "csv.commentMarker";
+  private static final String CONFIG_CSV_ESCAPE_CHARACTER = "csv.EscChar";
+  private static final String CONFIG_CSV_MULTI_VALUE_DELIMITER = "csv.multiValDelim";
 
   private CSVFormat _format;
   private CSVRecordExtractor _recordExtractor;
