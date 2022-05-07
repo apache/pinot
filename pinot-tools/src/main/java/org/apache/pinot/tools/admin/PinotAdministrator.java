@@ -33,6 +33,7 @@ import org.apache.pinot.tools.admin.command.ChangeNumReplicasCommand;
 import org.apache.pinot.tools.admin.command.ChangeTableState;
 import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
 import org.apache.pinot.tools.admin.command.DeleteClusterCommand;
+import org.apache.pinot.tools.admin.command.FileSystemCommand;
 import org.apache.pinot.tools.admin.command.GenerateDataCommand;
 import org.apache.pinot.tools.admin.command.GitHubEventsQuickStartCommand;
 import org.apache.pinot.tools.admin.command.ImportDataCommand;
@@ -128,6 +129,7 @@ public class PinotAdministrator {
     SUBCOMMAND_MAP.put("StreamGitHubEvents", new StreamGitHubEventsCommand());
     SUBCOMMAND_MAP.put("BootstrapTable", new BootstrapTableCommand());
     SUBCOMMAND_MAP.put("SegmentProcessorFramework", new SegmentProcessorFrameworkCommand());
+    SUBCOMMAND_MAP.put("FileSystem", new FileSystemCommand());
   }
 
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false,
