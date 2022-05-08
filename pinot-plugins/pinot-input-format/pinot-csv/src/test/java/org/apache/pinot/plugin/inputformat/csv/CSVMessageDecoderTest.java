@@ -19,10 +19,10 @@
 
 package org.apache.pinot.plugin.inputformat.csv;
 
+import com.google.common.collect.ImmutableSet;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -35,7 +35,7 @@ public class CSVMessageDecoderTest {
       throws Exception {
     Map<String, String> decoderProps = getStandardDecoderProps();
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
-    messageDecoder.init(decoderProps, Set.of("name", "age", "gender"), "");
+    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender"), "");
     String incomingRecord = "Alice;18;F";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
@@ -54,7 +54,7 @@ public class CSVMessageDecoderTest {
     Map<String, String> decoderProps = getStandardDecoderProps();
     decoderProps.put("csv.hdr", "name;age;gender;subjects");
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
-    messageDecoder.init(decoderProps, Set.of("name", "age", "gender", "subjects"), "");
+    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "");
     String incomingRecord = "Alice;18;F;maths,German,history";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
@@ -77,7 +77,7 @@ public class CSVMessageDecoderTest {
     decoderProps.put("csv.delim", ",");
     decoderProps.put("csv.commentMarker", "#");
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
-    messageDecoder.init(decoderProps, Set.of("name", "age", "gender"), "");
+    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender"), "");
     String incomingRecord = "#Alice,18,F";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
@@ -90,7 +90,7 @@ public class CSVMessageDecoderTest {
     decoderProps.remove("csv.hdr");
     decoderProps.put("csv.delim", ",");
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
-    messageDecoder.init(decoderProps, Set.of("name", "age", "gender"), "");
+    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender"), "");
     String incomingRecord = "name,age,gender\nAlice,18,F";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
@@ -111,7 +111,7 @@ public class CSVMessageDecoderTest {
     decoderProps.put("csv.hdr", "name;age;gender;subjects");
     decoderProps.put("csv.delim", ";");
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
-    messageDecoder.init(decoderProps, Set.of("name", "age", "gender", "subjects"), "");
+    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "");
     String incomingRecord = "Alice;18;F;mat\\;hs";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
