@@ -19,7 +19,7 @@
 
 package org.apache.pinot.plugin.inputformat.csv;
 
-import com.google.common.collect.Sets;
+import com.google.common.collect.ImmutableSet;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -52,7 +52,6 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
       throws Exception {
     String csvFormat = props.get(CONFIG_FILE_FORMAT);
-    String csvDelimiter = props.get(CONFIG_DELIMITER);
     CSVFormat format;
     if (csvFormat == null) {
       format = CSVFormat.DEFAULT;
@@ -76,7 +75,10 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
       }
     }
 
-    format = format.withDelimiter(csvDelimiter.charAt(0));
+    String csvDelimiter = props.get(CONFIG_DELIMITER);
+    if (csvDelimiter != null) {
+      format = format.withDelimiter(csvDelimiter.charAt(0));
+    }
     String csvHeader = props.get(CONFIG_HEADER);
     if (csvHeader == null) {
       //parse the header automatically from the input
@@ -102,7 +104,7 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
 
     CSVRecordExtractorConfig recordExtractorConfig = new CSVRecordExtractorConfig();
     recordExtractorConfig.setMultiValueDelimiter(multiValueDelimiter);
-    recordExtractorConfig.setColumnNames(Sets.newHashSet(
+    recordExtractorConfig.setColumnNames(ImmutableSet.copyOf(
         Objects.requireNonNull(_format.getHeader())));
     _recordExtractor.init(fieldsToRead, recordExtractorConfig);
   }

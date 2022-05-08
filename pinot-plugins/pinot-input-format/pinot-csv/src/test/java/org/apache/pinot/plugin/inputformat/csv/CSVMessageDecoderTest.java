@@ -19,6 +19,7 @@
 
 package org.apache.pinot.plugin.inputformat.csv;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -124,6 +125,28 @@ public class CSVMessageDecoderTest {
     Assert.assertEquals(destination.getValue("age"), "18");
     Assert.assertEquals(destination.getValue("gender"), "F");
     Assert.assertEquals(destination.getValue("subjects"), "mat;hs");
+  }
+
+  @Test
+  public void testDefaultProps()
+      throws Exception {
+    Map<String, String> decoderProps = ImmutableMap.of();
+    CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
+    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "");
+    String incomingRecord = "name,age,gender,subjects\nAlice,18,F,maths";
+    GenericRow destination = new GenericRow();
+    messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
+
+    Assert.assertEquals(destination.getValue("name"), "Alice");
+    Assert.assertEquals(destination.getValue("age"), "18");
+    Assert.assertEquals(destination.getValue("gender"), "F");
+    Assert.assertEquals(destination.getValue("subjects"), "maths");
+  }
+
+  @Test
+  public void testExcel()
+      throws Exception {
+
   }
 
   private static Map<String, String> getStandardDecoderProps() {
