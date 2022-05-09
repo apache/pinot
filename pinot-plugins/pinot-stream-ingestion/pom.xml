@@ -44,6 +44,7 @@
     <module>pinot-kafka-2.0</module>
     <module>pinot-kinesis</module>
     <module>pinot-pulsar</module>
+    <module>pinot-rocketmq</module>
   </modules>
 
 </project>
