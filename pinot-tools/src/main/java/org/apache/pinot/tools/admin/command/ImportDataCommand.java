@@ -379,6 +379,9 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
 
   private String getRecordReaderConfigClass(FileFormat format) {
     switch (format) {
+      case AVRO:
+      case GZIPPED_AVRO:
+        return "org.apache.pinot.plugin.inputformat.avro.AvroRecordReaderConfig";
       case CSV:
         return "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig";
       case PROTO:
@@ -387,8 +390,6 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
         return "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReaderConfig";
       case ORC:
       case JSON:
-      case AVRO:
-      case GZIPPED_AVRO:
       case PARQUET:
         return null;
       default:

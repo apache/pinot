@@ -16,14 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.data.readers;
+package org.apache.pinot.plugin.inputformat.avro;
 
-import java.util.Map;
-
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 /**
- * Interface for configs of {@link RecordExtractor}
+ * Config for {@link AvroRecordReader}
  */
-public interface RecordExtractorConfig {
-  default void init(Map<String, String> props) { }
+public class AvroRecordReaderConfig implements RecordReaderConfig {
+  private boolean _enableLogicalTypes;
+
+  public boolean isEnableLogicalTypes() {
+    return _enableLogicalTypes;
+  }
+
+  public void setEnableLogicalTypes(boolean enableLogicalTypes) {
+    _enableLogicalTypes = enableLogicalTypes;
+  }
 }
