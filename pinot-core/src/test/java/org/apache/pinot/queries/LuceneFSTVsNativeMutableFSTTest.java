@@ -33,7 +33,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class RealTimeNativeVsLuceneTest extends BaseQueriesTest {
+public class LuceneFSTVsNativeMutableFSTTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "RealTimeNativeVsLuceneTest");
   private static final String TEXT_COLUMN_NAME = "testColumnName";
 

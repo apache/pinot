@@ -66,7 +66,7 @@ public class NativeMutableTextIndexConcurrentTest {
         try {
           performReads(textIndex, words, 20, 200, countDownLatch);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          throw new RuntimeException(e);
         }
       });
 
@@ -74,7 +74,7 @@ public class NativeMutableTextIndexConcurrentTest {
         try {
           performWrites(textIndex, words, 10, countDownLatch);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          throw new RuntimeException(e);
         }
       });
 
@@ -113,7 +113,7 @@ public class NativeMutableTextIndexConcurrentTest {
         try {
           performReads(textIndex, mergedThreadWords, 20, 200, countDownLatch);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          throw new RuntimeException(e);
         }
       });
 
@@ -121,7 +121,7 @@ public class NativeMutableTextIndexConcurrentTest {
         try {
           performWrites(textIndex, firstThreadWords, 10, countDownLatch);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          throw new RuntimeException(e);
         }
       });
 
@@ -129,7 +129,7 @@ public class NativeMutableTextIndexConcurrentTest {
         try {
           performWrites(textIndex, secondThreadWords, 10, countDownLatch);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          throw new RuntimeException(e);
         }
       });
 
@@ -168,7 +168,7 @@ public class NativeMutableTextIndexConcurrentTest {
         try {
           performReads(textIndex, firstThreadWords, 20, 200, countDownLatch);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          throw new RuntimeException(e);
         }
       });
 
@@ -176,7 +176,7 @@ public class NativeMutableTextIndexConcurrentTest {
         try {
           performWrites(textIndex, secondThreadWords, 10, countDownLatch);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          throw new RuntimeException(e);
         }
       });
 
@@ -184,7 +184,7 @@ public class NativeMutableTextIndexConcurrentTest {
         try {
           performReads(textIndex, secondThreadWords, 20, 200, countDownLatch);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          throw new RuntimeException(e);
         }
       });
 
@@ -192,7 +192,7 @@ public class NativeMutableTextIndexConcurrentTest {
         try {
           performWrites(textIndex, firstThreadWords, 10, countDownLatch);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          throw new RuntimeException(e);
         }
       });
 

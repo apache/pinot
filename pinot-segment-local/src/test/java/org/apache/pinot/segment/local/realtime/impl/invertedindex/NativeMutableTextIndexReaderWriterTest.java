@@ -19,8 +19,9 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.IOException;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class NativeMutableTextIndexReaderWriterTest {
@@ -40,23 +41,23 @@ public class NativeMutableTextIndexReaderWriterTest {
       }
 
       int[] matchedDocIds = textIndex.getDocIds("hello.*").toArray();
-      Assert.assertEquals(2, matchedDocIds.length);
-      Assert.assertEquals(0, matchedDocIds[0]);
-      Assert.assertEquals(1, matchedDocIds[1]);
+      assertEquals(2, matchedDocIds.length);
+      assertEquals(0, matchedDocIds[0]);
+      assertEquals(1, matchedDocIds[1]);
 
       matchedDocIds = textIndex.getDocIds(".*llo").toArray();
-      Assert.assertEquals(2, matchedDocIds.length);
-      Assert.assertEquals(0, matchedDocIds[0]);
-      Assert.assertEquals(1, matchedDocIds[1]);
+      assertEquals(2, matchedDocIds.length);
+      assertEquals(0, matchedDocIds[0]);
+      assertEquals(1, matchedDocIds[1]);
 
       matchedDocIds = textIndex.getDocIds("wor.*").toArray();
-      Assert.assertEquals(2, matchedDocIds.length);
-      Assert.assertEquals(0, matchedDocIds[0]);
-      Assert.assertEquals(1, matchedDocIds[1]);
+      assertEquals(2, matchedDocIds.length);
+      assertEquals(0, matchedDocIds[0]);
+      assertEquals(1, matchedDocIds[1]);
 
       matchedDocIds = textIndex.getDocIds("zoo.*").toArray();
-      Assert.assertEquals(1, matchedDocIds.length);
-      Assert.assertEquals(3, matchedDocIds[0]);
+      assertEquals(1, matchedDocIds.length);
+      assertEquals(3, matchedDocIds[0]);
     }
   }
 }

@@ -20,13 +20,8 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.text.TermsParser;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFST;
