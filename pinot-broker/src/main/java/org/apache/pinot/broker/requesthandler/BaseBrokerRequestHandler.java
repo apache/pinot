@@ -119,6 +119,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final AtomicInteger _numDroppedLog;
 
   private final boolean _disableGroovy;
+  private final boolean _useApproximateFunction;
   private final int _defaultHllLog2m;
   private final boolean _enableQueryLimitOverride;
   private final boolean _enableDistinctCountBitmapOverride;
@@ -133,6 +134,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _tableCache = tableCache;
     _brokerMetrics = brokerMetrics;
     _disableGroovy = _config.getProperty(CommonConstants.Broker.DISABLE_GROOVY, false);
+    _useApproximateFunction = _config.getProperty(Broker.USE_APPROXIMATE_FUNCTION, false);
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
         CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
     _enableQueryLimitOverride = _config.getProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
@@ -325,7 +327,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     TableConfig realtimeTableConfig =
         _tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
 
-    if ((offlineTableName == null) && (realtimeTableName == null)) {
+    if (offlineTableName == null && realtimeTableName == null) {
       // No table matches the request
       if (realtimeTableConfig == null && offlineTableConfig == null) {
         LOGGER.info("Table not found for request {}: {}", requestId, query);
@@ -338,9 +340,19 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return BrokerResponseNative.NO_TABLE_RESULT;
     }
 
-    if (isDisableGroovy(offlineTableName != null ? offlineTableConfig : null,
-        realtimeTableName != null ? realtimeTableConfig : null)) {
+    // Handle query rewrite that can be overridden by the table configs
+    if (offlineTableName == null) {
+      offlineTableConfig = null;
+    }
+    if (realtimeTableName == null) {
+      realtimeTableConfig = null;
+    }
+    HandlerContext handlerContext = getHandlerContext(offlineTableConfig, realtimeTableConfig);
+    if (handlerContext._disableGroovy) {
       rejectGroovyQuery(serverPinotQuery);
+    }
+    if (handlerContext._useApproximateFunction) {
+      handleApproximateFunctionOverride(serverPinotQuery);
     }
 
     // Validate QPS quota
@@ -860,70 +872,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
   }
 
-  private boolean isDisableGroovy(@Nullable TableConfig offlineTableConfig, @Nullable TableConfig realtimeTableConfig) {
-    Boolean offlineTableDisableGroovyQuery = null;
-    if (offlineTableConfig != null && offlineTableConfig.getQueryConfig() != null) {
-      offlineTableDisableGroovyQuery = offlineTableConfig.getQueryConfig().getDisableGroovy();
-    }
-
-    Boolean realtimeTableDisableGroovyQuery = null;
-    if (realtimeTableConfig != null && realtimeTableConfig.getQueryConfig() != null) {
-      realtimeTableDisableGroovyQuery = realtimeTableConfig.getQueryConfig().getDisableGroovy();
-    }
-
-    if (offlineTableDisableGroovyQuery == null && realtimeTableDisableGroovyQuery == null) {
-      return _disableGroovy;
-    }
-
-    // If offline or online table config disables Groovy, then Groovy should be disabled
-    return Boolean.TRUE.equals(offlineTableDisableGroovyQuery) || Boolean.TRUE.equals(realtimeTableDisableGroovyQuery);
-  }
-
-  /**
-   * Verifies that no groovy is present in the PinotQuery when disabled.
-   */
-  @VisibleForTesting
-  static void rejectGroovyQuery(PinotQuery pinotQuery) {
-    List<Expression> selectList = pinotQuery.getSelectList();
-    for (Expression expression : selectList) {
-      rejectGroovyQuery(expression);
-    }
-    List<Expression> orderByList = pinotQuery.getOrderByList();
-    if (orderByList != null) {
-      for (Expression expression : orderByList) {
-        // NOTE: Order-by is always a Function with the ordering of the Expression
-        rejectGroovyQuery(expression.getFunctionCall().getOperands().get(0));
-      }
-    }
-    Expression havingExpression = pinotQuery.getHavingExpression();
-    if (havingExpression != null) {
-      rejectGroovyQuery(havingExpression);
-    }
-    Expression filterExpression = pinotQuery.getFilterExpression();
-    if (filterExpression != null) {
-      rejectGroovyQuery(filterExpression);
-    }
-    List<Expression> groupByList = pinotQuery.getGroupByList();
-    if (groupByList != null) {
-      for (Expression expression : groupByList) {
-        rejectGroovyQuery(expression);
-      }
-    }
-  }
-
-  private static void rejectGroovyQuery(Expression expression) {
-    Function function = expression.getFunctionCall();
-    if (function == null) {
-      return;
-    }
-    if (function.getOperator().equals("groovy")) {
-      throw new BadQueryRequestException("Groovy transform functions are disabled for queries");
-    }
-    for (Expression operandExpression : function.getOperands()) {
-      rejectGroovyQuery(operandExpression);
-    }
-  }
-
   /**
    * Sets HyperLogLog log2m for DistinctCountHLL functions if not explicitly set for the given expression.
    */
@@ -1040,6 +988,158 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     } else {
       for (Expression operand : function.getOperands()) {
         handleDistinctCountBitmapOverride(operand);
+      }
+    }
+  }
+
+  private HandlerContext getHandlerContext(@Nullable TableConfig offlineTableConfig,
+      @Nullable TableConfig realtimeTableConfig) {
+    boolean offlineTableDisableGroovyQuery = _disableGroovy;
+    boolean offlineTableUseApproximateFunction = _useApproximateFunction;
+    if (offlineTableConfig != null && offlineTableConfig.getQueryConfig() != null) {
+      Boolean disableGroovyOverride = offlineTableConfig.getQueryConfig().getDisableGroovy();
+      if (disableGroovyOverride != null) {
+        offlineTableDisableGroovyQuery = disableGroovyOverride;
+      }
+      Boolean useApproximateFunctionOverride = offlineTableConfig.getQueryConfig().getUseApproximateFunction();
+      if (useApproximateFunctionOverride != null) {
+        offlineTableUseApproximateFunction = useApproximateFunctionOverride;
+      }
+    }
+
+    boolean realtimeTableDisableGroovyQuery = _disableGroovy;
+    boolean realtimeTableUseApproximateFunction = _useApproximateFunction;
+    if (realtimeTableConfig != null && realtimeTableConfig.getQueryConfig() != null) {
+      Boolean disableGroovyOverride = realtimeTableConfig.getQueryConfig().getDisableGroovy();
+      if (disableGroovyOverride != null) {
+        realtimeTableDisableGroovyQuery = disableGroovyOverride;
+      }
+      Boolean useApproximateFunctionOverride = realtimeTableConfig.getQueryConfig().getUseApproximateFunction();
+      if (useApproximateFunctionOverride != null) {
+        realtimeTableUseApproximateFunction = useApproximateFunctionOverride;
+      }
+    }
+
+    // Disable Groovy if either offline or realtime table config disables Groovy
+    boolean disableGroovy = offlineTableDisableGroovyQuery | realtimeTableDisableGroovyQuery;
+    // Use approximate function if both offline and realtime table config uses approximate function
+    boolean useApproximateFunction = offlineTableUseApproximateFunction & realtimeTableUseApproximateFunction;
+
+    return new HandlerContext(disableGroovy, useApproximateFunction);
+  }
+
+  private static class HandlerContext {
+    final boolean _disableGroovy;
+    final boolean _useApproximateFunction;
+
+    HandlerContext(boolean disableGroovy, boolean useApproximateFunction) {
+      _disableGroovy = disableGroovy;
+      _useApproximateFunction = useApproximateFunction;
+    }
+  }
+
+  /**
+   * Verifies that no groovy is present in the PinotQuery when disabled.
+   */
+  @VisibleForTesting
+  static void rejectGroovyQuery(PinotQuery pinotQuery) {
+    List<Expression> selectList = pinotQuery.getSelectList();
+    for (Expression expression : selectList) {
+      rejectGroovyQuery(expression);
+    }
+    List<Expression> orderByList = pinotQuery.getOrderByList();
+    if (orderByList != null) {
+      for (Expression expression : orderByList) {
+        // NOTE: Order-by is always a Function with the ordering of the Expression
+        rejectGroovyQuery(expression.getFunctionCall().getOperands().get(0));
+      }
+    }
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      rejectGroovyQuery(havingExpression);
+    }
+    Expression filterExpression = pinotQuery.getFilterExpression();
+    if (filterExpression != null) {
+      rejectGroovyQuery(filterExpression);
+    }
+    List<Expression> groupByList = pinotQuery.getGroupByList();
+    if (groupByList != null) {
+      for (Expression expression : groupByList) {
+        rejectGroovyQuery(expression);
+      }
+    }
+  }
+
+  private static void rejectGroovyQuery(Expression expression) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
+      return;
+    }
+    if (function.getOperator().equals("groovy")) {
+      throw new BadQueryRequestException("Groovy transform functions are disabled for queries");
+    }
+    for (Expression operandExpression : function.getOperands()) {
+      rejectGroovyQuery(operandExpression);
+    }
+  }
+
+  /**
+   * Rewrites potential expensive functions to their approximation counterparts.
+   * - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
+   * - PERCENTILE -> PERCENTILE_SMART_TDIGEST
+   */
+  @VisibleForTesting
+  static void handleApproximateFunctionOverride(PinotQuery pinotQuery) {
+    for (Expression expression : pinotQuery.getSelectList()) {
+      handleApproximateFunctionOverride(expression);
+    }
+    List<Expression> orderByExpressions = pinotQuery.getOrderByList();
+    if (orderByExpressions != null) {
+      for (Expression expression : orderByExpressions) {
+        // NOTE: Order-by is always a Function with the ordering of the Expression
+        handleApproximateFunctionOverride(expression.getFunctionCall().getOperands().get(0));
+      }
+    }
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      handleApproximateFunctionOverride(havingExpression);
+    }
+  }
+
+  private static void handleApproximateFunctionOverride(Expression expression) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
+      return;
+    }
+    String functionName = function.getOperator();
+    if (functionName.equals("distinctcount") || functionName.equals("distinctcountmv")) {
+      function.setOperator("distinctcountsmarthll");
+    } else if (functionName.startsWith("percentile")) {
+      String remainingFunctionName = functionName.substring(10);
+      if (remainingFunctionName.isEmpty() || remainingFunctionName.equals("mv")) {
+        function.setOperator("percentilesmarttdigest");
+      } else if (remainingFunctionName.matches("\\d+")) {
+        try {
+          int percentile = Integer.parseInt(remainingFunctionName);
+          function.setOperator("percentilesmarttdigest");
+          function.setOperands(
+              Arrays.asList(function.getOperands().get(0), RequestUtils.getLiteralExpression(percentile)));
+        } catch (Exception e) {
+          throw new BadQueryRequestException("Illegal function name: " + functionName);
+        }
+      } else if (remainingFunctionName.matches("\\d+mv")) {
+        try {
+          int percentile = Integer.parseInt(remainingFunctionName.substring(0, remainingFunctionName.length() - 2));
+          function.setOperator("percentilesmarttdigest");
+          function.setOperands(
+              Arrays.asList(function.getOperands().get(0), RequestUtils.getLiteralExpression(percentile)));
+        } catch (Exception e) {
+          throw new BadQueryRequestException("Illegal function name: " + functionName);
+        }
+      }
+    } else {
+      for (Expression operand : function.getOperands()) {
+        handleApproximateFunctionOverride(operand);
       }
     }
   }

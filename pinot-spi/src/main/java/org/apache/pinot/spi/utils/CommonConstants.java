@@ -231,6 +231,11 @@ public class CommonConstants {
 
     public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
 
+    // Rewrite potential expensive functions to their approximation counterparts
+    // - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
+    // - PERCENTILE -> PERCENTILE_SMART_TDIGEST
+    public static final String USE_APPROXIMATE_FUNCTION = "pinot.broker.use.approximate.function";
+
     public static final String CONTROLLER_URL = "pinot.broker.controller.url";
 
     public static class Request {
