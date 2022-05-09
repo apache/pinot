@@ -697,7 +697,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @Nullable
-  private SegmentPartitionMetadata getPartitionMetadataFromTableConfig(TableConfig tableConfig, int partitionId) {
+  public static SegmentPartitionMetadata getPartitionMetadataFromTableConfig(TableConfig tableConfig, int partitionId) {
     SegmentPartitionConfig partitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     if (partitionConfig == null) {
       return null;
@@ -1262,7 +1262,7 @@ public class PinotLLCRealtimeSegmentManager {
     return System.currentTimeMillis();
   }
 
-  private int getNumReplicas(TableConfig tableConfig, InstancePartitions instancePartitions) {
+  public static int getNumReplicas(TableConfig tableConfig, InstancePartitions instancePartitions) {
     if (instancePartitions.getNumReplicaGroups() == 1) {
       // Non-replica-group based
       return tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
