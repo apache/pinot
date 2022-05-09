@@ -28,6 +28,7 @@ import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.text.TermsParser;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFST;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFSTImpl;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RealTimeRegexpMatcher;
@@ -44,6 +45,7 @@ public class NativeMutableTextIndex implements MutableTextIndex {
   private final Object2IntOpenHashMap<String> _termToDictIdMapping;
   private final ReentrantReadWriteLock.ReadLock _readLock;
   private final ReentrantReadWriteLock.WriteLock _writeLock;
+  private final TermsParser _termsParser;
 
   private int _nextDocId = 0;
   private int _nextDictId = 0;
@@ -57,17 +59,14 @@ public class NativeMutableTextIndex implements MutableTextIndex {
     ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
     _readLock = readWriteLock.readLock();
     _writeLock = readWriteLock.writeLock();
+    _termsParser = new TermsParser(new StandardAnalyzer(LuceneTextIndexCreator.ENGLISH_STOP_WORDS_SET), _column);
   }
 
   @Override
   public void add(String document) {
-    List<String> tokens;
-    try {
-      tokens = analyze(document, new StandardAnalyzer(LuceneTextIndexCreator.ENGLISH_STOP_WORDS_SET));
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    Iterable<String> tokens;
 
+    tokens = _termsParser.parse(document);
     _writeLock.lock();
     try {
       for (String token : tokens) {
@@ -105,17 +104,5 @@ public class NativeMutableTextIndex implements MutableTextIndex {
   @Override
   public void close()
       throws IOException {
-  }
-
-  public List<String> analyze(String text, Analyzer analyzer)
-      throws IOException {
-    List<String> result = new ArrayList<>();
-    TokenStream tokenStream = analyzer.tokenStream(_column, text);
-    CharTermAttribute attr = tokenStream.addAttribute(CharTermAttribute.class);
-    tokenStream.reset();
-    while (tokenStream.incrementToken()) {
-      result.add(attr.toString());
-    }
-    return result;
   }
 }
