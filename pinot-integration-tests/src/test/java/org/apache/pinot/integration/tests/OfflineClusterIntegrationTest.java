@@ -184,13 +184,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     File tarDir2 = new File(_tempDir, "tarDir2");
     FileUtils.copyDirectory(_tarDir, tarDir2);
 
-    List<File> tarDirPaths = new ArrayList<>();
-    tarDirPaths.add(_tarDir);
-    tarDirPaths.add(tarDir2);
-
-    // TODO: Move this block to a separate method.
+    List<File> tarDirs = new ArrayList<>();
+    tarDirs.add(_tarDir);
+    tarDirs.add(tarDir2);
     try {
-      uploadSegments(getTableName(), tarDirPaths, TableType.OFFLINE, true);
+      uploadSegments(getTableName(), TableType.OFFLINE, tarDirs);
     } catch (Exception e) {
       // If enableParallelPushProtection is enabled and the same segment is uploaded concurrently, we could get one
       // of the two exception - 409 conflict of the second call enters ProcessExistingSegment ; segmentZkMetadata
