@@ -76,7 +76,8 @@ public class RealtimeSegmentConfig {
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
       int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
       UpsertConfig.Mode upsertMode, String upsertComparisonColumn, UpsertConfig.HashFunction hashFunction,
-      PartitionUpsertMetadataManager partitionUpsertMetadataManager, List<FieldConfig> fieldConfigList, List<AggregationConfig> ingestionAggregationConfigs) {
+      PartitionUpsertMetadataManager partitionUpsertMetadataManager, List<FieldConfig> fieldConfigList,
+      List<AggregationConfig> ingestionAggregationConfigs) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;

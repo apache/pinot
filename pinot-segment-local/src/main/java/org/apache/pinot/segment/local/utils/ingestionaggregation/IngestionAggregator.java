@@ -48,7 +48,7 @@ public class IngestionAggregator {
     Map<String, ValueAggregator> destColumnToValueAggregators = new HashMap<>();
 
     for (AggregationConfig config : segmentConfig.getIngestionAggregationConfigs()) {
-      ExpressionContext expressionContext = RequestContextUtils.getExpressionFromSQL(config.getAggregationFunction());
+      ExpressionContext expressionContext = RequestContextUtils.getExpression(config.getAggregationFunction());
 
       // validation is also done when the table is created, this is just a sanity check.
       Preconditions.checkState(!segmentConfig.aggregateMetrics(),

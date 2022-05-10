@@ -22,12 +22,17 @@ import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -443,7 +448,8 @@ public class ComplexTypeTransformerTest {
   public void getComplexTypeTransformerTest() {
     ComplexTypeConfig complexTypeConfigWithNullFields = new ComplexTypeConfig(null, null, null, null);
 
-    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, null, null, complexTypeConfigWithNullFields);
+    IngestionConfig ingestionConfig =
+        new IngestionConfig(null, null, null, null, null, complexTypeConfigWithNullFields);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test_null").setIngestionConfig(ingestionConfig).build();
 
