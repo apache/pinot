@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
@@ -38,7 +39,7 @@ import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
-import org.apache.pinot.spi.auth.AuthContext;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -188,13 +189,14 @@ public final class IngestionUtils {
    * @param tableNameWithType name of the table to upload the segment
    * @param batchConfig batchConfig with details about push such as controllerURI, pushAttempts, pushParallelism, etc
    * @param segmentTarURIs list of URI for the segment tar files
-   * @param authContext auth details required to upload the Pinot segment to controller
+   * @param authProvider auth provider
    */
   public static void uploadSegment(String tableNameWithType, BatchConfig batchConfig, List<URI> segmentTarURIs,
-      @Nullable AuthContext authContext)
+      @Nullable AuthProvider authProvider)
       throws Exception {
 
-    SegmentGenerationJobSpec segmentUploadSpec = generateSegmentUploadSpec(tableNameWithType, batchConfig, authContext);
+    SegmentGenerationJobSpec segmentUploadSpec = generateSegmentUploadSpec(tableNameWithType, batchConfig,
+        authProvider);
 
     List<String> segmentTarURIStrs = segmentTarURIs.stream().map(URI::toString).collect(Collectors.toList());
     String pushMode = batchConfig.getPushMode();
@@ -249,7 +251,7 @@ public final class IngestionUtils {
   }
 
   private static SegmentGenerationJobSpec generateSegmentUploadSpec(String tableName, BatchConfig batchConfig,
-      @Nullable AuthContext authContext) {
+      @Nullable AuthProvider authProvider) {
 
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(tableName);
@@ -269,9 +271,8 @@ public final class IngestionUtils {
     spec.setPushJobSpec(pushJobSpec);
     spec.setTableSpec(tableSpec);
     spec.setPinotClusterSpecs(pinotClusterSpecs);
-    if (authContext != null && StringUtils.isNotBlank(authContext.getAuthToken())) {
-      spec.setAuthToken(authContext.getAuthToken());
-    }
+    spec.setAuthToken(AuthProviderUtils.toStaticToken(authProvider));
+
     return spec;
   }
 

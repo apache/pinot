@@ -124,6 +124,12 @@ public class SegmentGenerationJobSpec implements Serializable {
 
   /**
    * Controller auth token
+   *
+   * <br/>NOTE: jobs MUST NOT allow references to external tokens via URL or path to prevent:
+   * (a) file system crawling
+   * (b) unauthorized injection of system tokens from the server's local file system.
+   *
+   * Instead, resolve tokens right when the job command is run. This allows injection of client-local credentials.
    */
   private String _authToken;
 

@@ -38,6 +38,7 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -124,13 +125,14 @@ public class SegmentConversionUtils {
   }
 
   public static String startSegmentReplace(String tableNameWithType, String uploadURL,
-      StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Nullable String authToken)
+      StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Nullable AuthProvider authProvider)
       throws Exception {
-    return startSegmentReplace(tableNameWithType, uploadURL, startReplaceSegmentsRequest, authToken, true);
+    return startSegmentReplace(tableNameWithType, uploadURL, startReplaceSegmentsRequest, authProvider, true);
   }
 
   public static String startSegmentReplace(String tableNameWithType, String uploadURL,
-      StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Nullable String authToken, boolean forceCleanup)
+      StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Nullable AuthProvider authProvider,
+      boolean forceCleanup)
       throws Exception {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -139,17 +141,18 @@ public class SegmentConversionUtils {
       URI uri = FileUploadDownloadClient
           .getStartReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(), forceCleanup);
       SimpleHttpResponse response =
-          fileUploadDownloadClient.startReplaceSegments(uri, startReplaceSegmentsRequest, authToken);
+          fileUploadDownloadClient.startReplaceSegments(uri, startReplaceSegmentsRequest, authProvider);
       String responseString = response.getResponse();
       LOGGER.info(
-          "Got response {}: {} while sending start replace segment request for table: {}, uploadURL: {}, request: {}",
+          "Got response {}: {} while sending start replace segment reBaseSingleSegmentConversionExecutorquest for "
+              + "table: {}, uploadURL: {}, request: {}",
           response.getStatusCode(), responseString, tableNameWithType, uploadURL, startReplaceSegmentsRequest);
       return JsonUtils.stringToJsonNode(responseString).get("segmentLineageEntryId").asText();
     }
   }
 
   public static void endSegmentReplace(String tableNameWithType, String uploadURL, String segmentLineageEntryId,
-      int socketTimeoutMs, @Nullable String authToken)
+      int socketTimeoutMs, @Nullable AuthProvider authProvider)
       throws Exception {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -157,7 +160,7 @@ public class SegmentConversionUtils {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
       URI uri = FileUploadDownloadClient
           .getEndReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(), segmentLineageEntryId);
-      SimpleHttpResponse response = fileUploadDownloadClient.endReplaceSegments(uri, socketTimeoutMs, authToken);
+      SimpleHttpResponse response = fileUploadDownloadClient.endReplaceSegments(uri, socketTimeoutMs, authProvider);
       LOGGER.info("Got response {}: {} while sending end replace segment request for table: {}, uploadURL: {}",
           response.getStatusCode(), response.getResponse(), tableNameWithType, uploadURL);
     }

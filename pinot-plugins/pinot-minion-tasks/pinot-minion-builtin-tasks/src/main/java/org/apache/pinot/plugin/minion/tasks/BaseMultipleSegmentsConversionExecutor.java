@@ -33,16 +33,17 @@ import org.apache.http.Header;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
-import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.exception.TaskCancelledException;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -105,7 +106,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
               .collect(Collectors.toList());
       String lineageEntryId =
           SegmentConversionUtils.startSegmentReplace(context.getTableNameWithType(), context.getUploadURL(),
-              new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo), context.getAuthToken());
+              new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo), context.getAuthProvider());
       context.setCustomContext(CUSTOM_SEGMENT_UPLOAD_CONTEXT_LINEAGE_ENTRY_ID, lineageEntryId);
     }
   }
@@ -116,7 +117,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     if (context.isReplaceSegmentsEnabled()) {
       String lineageEntryId = (String) context.getCustomContext(CUSTOM_SEGMENT_UPLOAD_CONTEXT_LINEAGE_ENTRY_ID);
       SegmentConversionUtils.endSegmentReplace(context.getTableNameWithType(), context.getUploadURL(), lineageEntryId,
-          _minionConf.getEndReplaceSegmentsTimeoutMs(), context.getAuthToken());
+          _minionConf.getEndReplaceSegmentsTimeoutMs(), context.getAuthProvider());
     }
   }
 
@@ -132,7 +133,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     String downloadURLString = configs.get(MinionConstants.DOWNLOAD_URL_KEY);
     String[] downloadURLs = downloadURLString.split(MinionConstants.URL_SEPARATOR);
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
-    String authToken = configs.get(MinionConstants.AUTH_TOKEN);
+    AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(configs.get(MinionConstants.AUTH_TOKEN));
 
     LOGGER.info("Start executing {} on table: {}, input segments: {} with downloadURLs: {}, uploadURL: {}", taskType,
         tableNameWithType, inputSegmentNames, downloadURLString, uploadURL);
@@ -215,7 +216,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
         List<Header> httpHeaders = new ArrayList<>();
         httpHeaders.add(segmentZKMetadataCustomMapModifierHeader);
-        httpHeaders.addAll(HttpClient.makeAuthHeader(authToken));
+        httpHeaders.addAll(AuthProviderUtils.toRequestHeaders(authProvider));
 
         // Set parameters for upload request
         NameValuePair enableParallelPushProtectionParameter =
@@ -255,7 +256,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
     private final String _tableNameWithType;
     private final String _uploadURL;
-    private final String _authToken;
+    private final AuthProvider _authProvider;
     private final String _inputSegmentNames;
     private final boolean _replaceSegmentsEnabled;
     private final Map<String, Object> _customMap;
@@ -268,7 +269,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       Map<String, String> configs = pinotTaskConfig.getConfigs();
       _tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
       _uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
-      _authToken = configs.get(MinionConstants.AUTH_TOKEN);
+      _authProvider = AuthProviderUtils.makeAuthProvider(configs.get(MinionConstants.AUTH_TOKEN));
       _inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
       String replaceSegmentsString = configs.get(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY);
       _replaceSegmentsEnabled = Boolean.parseBoolean(replaceSegmentsString);
@@ -291,8 +292,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       return _uploadURL;
     }
 
-    public String getAuthToken() {
-      return _authToken;
+    public AuthProvider getAuthProvider() {
+      return _authProvider;
     }
 
     public String getInputSegmentNames() {

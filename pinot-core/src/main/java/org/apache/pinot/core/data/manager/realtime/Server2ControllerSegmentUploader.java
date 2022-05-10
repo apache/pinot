@@ -21,13 +21,14 @@ package org.apache.pinot.core.data.manager.realtime;
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.slf4j.Logger;
 
 
@@ -40,11 +41,11 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
   private final String _segmentName;
   private final int _segmentUploadRequestTimeoutMs;
   private final ServerMetrics _serverMetrics;
-  private final String _authToken;
+  private final AuthProvider _authProvider;
 
   public Server2ControllerSegmentUploader(Logger segmentLogger, FileUploadDownloadClient fileUploadDownloadClient,
       String controllerSegmentUploadCommitUrl, String segmentName, int segmentUploadRequestTimeoutMs,
-      ServerMetrics serverMetrics, String authToken)
+      ServerMetrics serverMetrics, AuthProvider authProvider)
       throws URISyntaxException {
     _segmentLogger = segmentLogger;
     _fileUploadDownloadClient = fileUploadDownloadClient;
@@ -52,7 +53,7 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
     _segmentName = segmentName;
     _segmentUploadRequestTimeoutMs = segmentUploadRequestTimeoutMs;
     _serverMetrics = serverMetrics;
-    _authToken = authToken;
+    _authProvider = authProvider;
   }
 
   @Override
@@ -73,7 +74,7 @@ public class Server2ControllerSegmentUploader implements SegmentUploader {
     try {
       String responseStr = _fileUploadDownloadClient
           .uploadSegment(_controllerSegmentUploadCommitUrl, _segmentName, segmentFile,
-              HttpClient.makeAuthHeader(_authToken), null, _segmentUploadRequestTimeoutMs).getResponse();
+              AuthProviderUtils.toRequestHeaders(_authProvider), null, _segmentUploadRequestTimeoutMs).getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       _segmentLogger.info("Controller response {} for {}", response.toJsonString(), _controllerSegmentUploadCommitUrl);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {

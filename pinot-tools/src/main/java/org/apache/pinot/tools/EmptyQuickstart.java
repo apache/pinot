@@ -22,6 +22,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
@@ -32,7 +33,7 @@ public class EmptyQuickstart extends QuickStartBase {
     return Arrays.asList("EMPTY", "DEFAULT");
   }
 
-  public String getAuthToken() {
+  public AuthProvider getAuthProvider() {
     return null;
   }
 
@@ -48,7 +49,7 @@ public class EmptyQuickstart extends QuickStartBase {
 
     QuickstartRunner runner =
         new QuickstartRunner(new ArrayList<>(), 1, 1, 1, 1,
-            dataDir, true, getAuthToken(), getConfigOverrides(), _zkExternalAddress, false);
+            dataDir, true, getAuthProvider(), getConfigOverrides(), _zkExternalAddress, false);
 
     if (_zkExternalAddress != null) {
       printStatus(Quickstart.Color.CYAN, "***** Starting controller, broker and server *****");

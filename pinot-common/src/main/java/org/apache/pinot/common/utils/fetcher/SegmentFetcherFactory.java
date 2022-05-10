@@ -24,7 +24,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.auth.AuthConfig;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -38,8 +39,8 @@ public class SegmentFetcherFactory {
 
   static final String SEGMENT_FETCHER_CLASS_KEY_SUFFIX = ".class";
   private static final String PROTOCOLS_KEY = "protocols";
-  private static final String AUTH_TOKEN_KEY = CommonConstants.KEY_OF_AUTH_TOKEN;
   private static final String ENCODED_SUFFIX = ".enc";
+  private static final String AUTH_KEY = CommonConstants.KEY_OF_AUTH;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherFactory.class);
 
@@ -90,10 +91,14 @@ public class SegmentFetcherFactory {
         segmentFetcher = (SegmentFetcher) Class.forName(segmentFetcherClassName).newInstance();
       }
 
-      String authToken = config.getProperty(AUTH_TOKEN_KEY);
+      AuthConfig authConfig = AuthProviderUtils.extractAuthConfig(config, AUTH_KEY);
+
+      PinotConfiguration subConfig = config.subset(protocol);
+      AuthConfig subAuthConfig = AuthProviderUtils.extractAuthConfig(subConfig, AUTH_KEY);
+
       Map<String, Object> subConfigMap = config.subset(protocol).toMap();
-      if (!subConfigMap.containsKey(AUTH_TOKEN_KEY) && StringUtils.isNotBlank(authToken)) {
-        subConfigMap.put(AUTH_TOKEN_KEY, authToken);
+      if (subAuthConfig.getProperties().isEmpty() && !authConfig.getProperties().isEmpty()) {
+        authConfig.getProperties().forEach((key, value) -> subConfigMap.put(AUTH_KEY + "." + key, value));
       }
 
       segmentFetcher.init(new PinotConfiguration(subConfigMap));

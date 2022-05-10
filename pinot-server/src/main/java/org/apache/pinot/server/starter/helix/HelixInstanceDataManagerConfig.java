@@ -62,8 +62,6 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
   // Key of whether to enable reloading consuming segments
   public static final String INSTANCE_RELOAD_CONSUMING_SEGMENT = "reload.consumingSegment";
-  // Key of the auth token
-  public static final String AUTH_TOKEN = "auth.token";
   // Key of segment directory loader
   public static final String SEGMENT_DIRECTORY_LOADER = "segment.directory.loader";
 
@@ -224,12 +222,6 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
         DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS);
   }
 
-  @Override
-  public String getAuthToken() {
-    return _instanceDataManagerConfiguration.getProperty(AUTH_TOKEN);
-  }
-
-  @Override
   public String getSegmentDirectoryLoader() {
     return _instanceDataManagerConfiguration.getProperty(SEGMENT_DIRECTORY_LOADER,
         SegmentDirectoryLoaderRegistry.DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME);
