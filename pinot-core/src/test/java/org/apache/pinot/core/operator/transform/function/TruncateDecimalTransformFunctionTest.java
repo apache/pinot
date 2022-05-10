@@ -31,13 +31,13 @@ public class TruncateDecimalTransformFunctionTest extends BaseTransformFunctionT
   @Test
   public void testTruncateDecimalTransformFunction() {
     ExpressionContext expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("truncate(%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("truncate(%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof TruncateDecimalTransformFunction);
     Assert.assertEquals(transformFunction.getName(), TruncateDecimalTransformFunction.FUNCTION_NAME);
     double[] expectedValues = new double[NUM_ROWS];
 
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("truncate(%s,2)", DOUBLE_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("truncate(%s,2)", DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof TruncateDecimalTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -45,7 +45,7 @@ public class TruncateDecimalTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("truncate(%s, -2)", DOUBLE_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("truncate(%s, -2)", DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof TruncateDecimalTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -53,7 +53,7 @@ public class TruncateDecimalTransformFunctionTest extends BaseTransformFunctionT
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpressionFromSQL(String.format("truncate(%s)", DOUBLE_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("truncate(%s)", DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof TruncateDecimalTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {

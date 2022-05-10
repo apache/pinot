@@ -35,7 +35,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -58,7 +58,8 @@ public class StreamingReduceService extends BaseReduceService {
 
   public BrokerResponseNative reduceOnStreamResponse(BrokerRequest brokerRequest,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
-      @Nullable BrokerMetrics brokerMetrics) throws IOException {
+      @Nullable BrokerMetrics brokerMetrics)
+      throws IOException {
     if (serverResponseMap.isEmpty()) {
       // Empty response.
       return BrokerResponseNative.empty();
@@ -66,14 +67,12 @@ public class StreamingReduceService extends BaseReduceService {
 
     // prepare contextual info for reduce.
     PinotQuery pinotQuery = brokerRequest.getPinotQuery();
-    Map<String, String> queryOptions =
-        pinotQuery != null ? pinotQuery.getQueryOptions() : brokerRequest.getQueryOptions();
+    Map<String, String> queryOptions = pinotQuery.getQueryOptions();
     boolean enableTrace =
         queryOptions != null && Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE));
 
-    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
-
-    String tableName = brokerRequest.getQuerySource().getTableName();
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+    String tableName = queryContext.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
     // initialize empty response.

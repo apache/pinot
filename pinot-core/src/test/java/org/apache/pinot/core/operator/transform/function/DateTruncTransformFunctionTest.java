@@ -110,7 +110,7 @@ public class DateTruncTransformFunctionTest {
       ProjectionBlock projectionBlock = new ProjectionOperator(dataSourceMap,
           new DocIdSetOperator(new MatchAllFilterOperator(rows.size()), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
 
-      ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(
+      ExpressionContext expression = RequestContextUtils.getExpression(
           String.format("dateTrunc('%s', \"%s\", '%s', '%s')", unit, TIME_COLUMN, TimeUnit.MILLISECONDS, tz));
       TransformFunction transformFunction = TransformFunctionFactory.get(expression, dataSourceMap);
       Assert.assertTrue(transformFunction instanceof DateTruncTransformFunction);

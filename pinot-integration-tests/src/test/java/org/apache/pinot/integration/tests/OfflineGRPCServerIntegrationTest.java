@@ -30,11 +30,11 @@ import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -93,7 +93,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
       throws Exception {
     GrpcQueryClient queryClient = getGrpcQueryClient();
     String sql = "SELECT * FROM mytable_OFFLINE LIMIT 1000000";
-    BrokerRequest brokerRequest = new Pql2Compiler().compileToBrokerRequest(sql);
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(sql);
     List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", false);
 
     GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSegments(segments);

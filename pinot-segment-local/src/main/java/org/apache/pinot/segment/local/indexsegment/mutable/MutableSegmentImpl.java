@@ -46,6 +46,7 @@ import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLucene
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
@@ -136,6 +137,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Collection<MetricFieldSpec> _physicalMetricFieldSpecs;
   private final Collection<String> _physicalTimeColumnNames;
 
+  private final List<FieldConfig> _fieldConfigList;
+
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
@@ -165,6 +168,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _segmentName = config.getSegmentName();
     _schema = config.getSchema();
     _timeColumnName = config.getTimeColumnName();
+    _fieldConfigList = config.getFieldConfigList();
     _capacity = config.getCapacity();
     SegmentZKMetadata segmentZKMetadata = config.getSegmentZKMetadata();
     _segmentMetadata = new SegmentMetadataImpl(TableNameBuilder.extractRawTableName(_realtimeTableName),
@@ -281,16 +285,35 @@ public class MutableSegmentImpl implements MutableSegment {
           invertedIndexColumns.contains(column) ? indexProvider.newInvertedIndex(context.forInvertedIndex()) : null;
 
       // Text index
-      RealtimeLuceneTextIndex textIndex;
+      MutableTextIndex textIndex;
       if (textIndexColumns.contains(column)) {
+        boolean useNativeTextIndex = false;
+        if (_fieldConfigList != null) {
+          for (FieldConfig fieldConfig : _fieldConfigList) {
+            if (fieldConfig.getName().equals(column)) {
+              Map<String, String> properties = fieldConfig.getProperties();
+              if (TextIndexUtils.isFstTypeNative(properties)) {
+                useNativeTextIndex = true;
+              }
+            }
+          }
+        }
+
+        if (useNativeTextIndex) {
+          // TODO: Add native text index support
+          _logger.warn("Mutable native text index is not supported, falling back to the Lucene text index");
+        }
+
         // TODO - this logic is in the wrong place and belongs in a Lucene-specific submodule,
         //  it is beyond the scope of realtime index pluggability to do this refactoring, so realtime
         //  text indexes remain statically defined. Revisit this after this refactoring has been done.
-        textIndex = new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName);
+        RealtimeLuceneTextIndex luceneTextIndex =
+            new RealtimeLuceneTextIndex(column, new File(config.getConsumerDir()), _segmentName);
         if (_realtimeLuceneReaders == null) {
           _realtimeLuceneReaders = new RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders(_segmentName);
         }
-        _realtimeLuceneReaders.addReader(textIndex);
+        _realtimeLuceneReaders.addReader(luceneTextIndex);
+        textIndex = luceneTextIndex;
       } else {
         textIndex = null;
       }
@@ -1100,8 +1123,7 @@ public class MutableSegmentImpl implements MutableSegment {
         @Nullable Set<Integer> partitions, NumValuesInfo numValuesInfo, MutableForwardIndex forwardIndex,
         @Nullable MutableDictionary dictionary, @Nullable MutableInvertedIndex invertedIndex,
         @Nullable RangeIndexReader rangeIndex, @Nullable MutableTextIndex textIndex,
-        @Nullable MutableJsonIndex jsonIndex, @Nullable MutableH3Index h3Index,
-        @Nullable BloomFilterReader bloomFilter,
+        @Nullable MutableJsonIndex jsonIndex, @Nullable MutableH3Index h3Index, @Nullable BloomFilterReader bloomFilter,
         @Nullable MutableNullValueVector nullValueVector) {
       _fieldSpec = fieldSpec;
       _partitionFunction = partitionFunction;

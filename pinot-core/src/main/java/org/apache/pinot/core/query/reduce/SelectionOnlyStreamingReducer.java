@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -30,36 +28,21 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.core.util.QueryOptionsUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class SelectionOnlyStreamingReducer implements StreamingReducer {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOnlyStreamingReducer.class);
-
   private final QueryContext _queryContext;
-  private final boolean _preserveType;
-  private final int _limit;
 
   private DataSchema _dataSchema;
-  private DataTableReducerContext _dataTableReducerContext;
   private List<Object[]> _rows;
 
   public SelectionOnlyStreamingReducer(QueryContext queryContext) {
     _queryContext = queryContext;
-    _limit = _queryContext.getLimit();
-    Map<String, String> queryOptions = queryContext.getQueryOptions();
-    Preconditions.checkState(QueryOptionsUtils.isResponseFormatSQL(queryOptions), "only SQL response is supported");
-
-    _preserveType = QueryOptionsUtils.isPreserveType(queryOptions);
-    _dataSchema = null;
   }
 
   @Override
   public void init(DataTableReducerContext dataTableReducerContext) {
-    _dataTableReducerContext = dataTableReducerContext;
-    _rows = new ArrayList<>(Math.min(_limit, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
+    _rows = new ArrayList<>(Math.min(_queryContext.getLimit(), SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
   }
 
   @Override
@@ -67,7 +50,7 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
     // get dataSchema
     _dataSchema = _dataSchema == null ? dataTable.getDataSchema() : _dataSchema;
     // TODO: For data table map with more than one data tables, remove conflicting data tables
-    reduceWithoutOrdering(dataTable, _limit);
+    reduceWithoutOrdering(dataTable, _queryContext.getLimit());
   }
 
   private void reduceWithoutOrdering(DataTable dataTable, int limit) {

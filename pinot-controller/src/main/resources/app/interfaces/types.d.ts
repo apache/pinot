@@ -161,4 +161,21 @@ declare module 'Models' {
     BASIC = 'BASIC',
     OIDC = 'OIDC',
   }
+
+  export type TableList = {
+    tables: Array<string>
+  }
+
+  export type UserObject = {
+    username: string,
+    password: string,
+    component: string,
+    role: string,
+    tables: Array<string>,
+    permissions: Array<string>
+  }
+
+  export type UserList = {
+    users: UserObject
+  }
 }

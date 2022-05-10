@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Joiner;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IntSummaryStatistics;
@@ -148,13 +149,24 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
     }
     inputs.add(new Object[]{groovyTransformFunction, FieldSpec.DataType.INT, true, expectedResult10});
 
+    // Operations between a BigDecimal, and a double (returns SV BIG_DECIMAL)
+    groovyTransformFunction = String.format(
+        "groovy('{\"returnType\":\"BIG_DECIMAL\", \"isSingleValue\":true}', "
+            + "'arg0.min(BigDecimal.valueOf(arg1)).subtract(BigDecimal.ONE)', %s, %s)",
+        BIG_DECIMAL_SV_COLUMN, DOUBLE_SV_COLUMN);
+    BigDecimal[] expectedResult11 = new BigDecimal[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedResult11[i] = _bigDecimalSVValues[i].min(BigDecimal.valueOf(_doubleSVValues[i])).subtract(BigDecimal.ONE);
+    }
+    inputs.add(new Object[]{groovyTransformFunction, FieldSpec.DataType.BIG_DECIMAL, true, expectedResult11});
+
     return inputs.toArray(new Object[0][]);
   }
 
   @Test(dataProvider = "groovyFunctionDataProvider")
   public void testGroovyTransformFunctions(String expressionStr, FieldSpec.DataType resultType,
       boolean isResultSingleValue, Object expectedResult) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof GroovyTransformFunction);
     Assert.assertEquals(transformFunction.getName(), GroovyTransformFunction.FUNCTION_NAME);
@@ -190,6 +202,13 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
           double[] expectedDoubles = (double[]) expectedResult;
           for (int i = 0; i < NUM_ROWS; i++) {
             Assert.assertEquals(doubleResults[i], expectedDoubles[i]);
+          }
+          break;
+        case BIG_DECIMAL:
+          BigDecimal[] bigDecimalResults = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+          BigDecimal[] expectedBigDecimals = (BigDecimal[]) expectedResult;
+          for (int i = 0; i < NUM_ROWS; i++) {
+            Assert.assertEquals(bigDecimalResults[i].compareTo(expectedBigDecimals[i]), 0);
           }
           break;
         case STRING:
@@ -248,7 +267,7 @@ public class GroovyTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

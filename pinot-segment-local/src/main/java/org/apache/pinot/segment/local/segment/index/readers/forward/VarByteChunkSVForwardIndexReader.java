@@ -18,18 +18,20 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
  * Chunk-based single-value raw (non-dictionary-encoded) forward index reader for values of variable length data type
- * (STRING, BYTES).
+ * (BIG_DECIMAL, STRING, BYTES).
  * <p>For data layout, please refer to the documentation for {@link VarByteChunkSVForwardIndexWriter}
  */
 public final class VarByteChunkSVForwardIndexReader extends BaseChunkSVForwardIndexReader {
@@ -53,6 +55,11 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkSVForwardIn
     } else {
       return null;
     }
+  }
+
+  @Override
+  public BigDecimal getBigDecimal(int docId, ChunkReaderContext context) {
+    return BigDecimalUtils.deserialize(getBytes(docId, context));
   }
 
   @Override

@@ -35,7 +35,7 @@ import org.testng.annotations.Test;
 
 public class CombinePlanNodeTest {
   private final QueryContext _queryContext =
-      QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable");
+      QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
   private final ExecutorService _executorService = Executors.newFixedThreadPool(10);
 
   /**

@@ -167,7 +167,7 @@ public class ColumnValueSegmentPrunerTest {
   }
 
   private boolean runPruner(IndexSegment indexSegment, String query) {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     return PRUNER.prune(Collections.singletonList(indexSegment), queryContext).isEmpty();
   }
 }

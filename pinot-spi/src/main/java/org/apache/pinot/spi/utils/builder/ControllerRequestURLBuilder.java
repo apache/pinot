@@ -90,8 +90,29 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tenants");
   }
 
+  public String forUserCreate() {
+    return StringUtil.join("/", _baseUrl, "users");
+  }
+
   public String forTenantGet() {
     return StringUtil.join("/", _baseUrl, "tenants");
+  }
+
+  public String forUserGet(String username, String componentTypeStr) {
+    StringBuilder params = new StringBuilder();
+    if (StringUtils.isNotBlank(username)) {
+      params.append("?component=" + componentTypeStr);
+    }
+    return StringUtil.join("/", _baseUrl, "users", username, params.toString());
+  }
+
+  public String forUpdateUserConfig(String username, String componentTypeStr, boolean passwordChanged) {
+    StringBuilder params = new StringBuilder();
+    if (StringUtils.isNotBlank(username)) {
+      params.append("?component=" + componentTypeStr);
+    }
+    params.append(String.format("&&passwordChanged=%s", passwordChanged));
+    return StringUtil.join("/", _baseUrl, "users", username, params.toString());
   }
 
   public String forTenantGet(String tenantName) {
@@ -140,6 +161,10 @@ public class ControllerRequestURLBuilder {
       return StringUtil.join("/", _baseUrl, "brokers", "tables");
     }
     return StringUtil.join("/", _baseUrl, "brokers", "tables", "?state=" + state);
+  }
+
+  public String forLiveBrokerTablesGet() {
+    return StringUtil.join("/", _baseUrl, "tables", "livebrokers");
   }
 
   public String forBrokerTableGet(String table, String tableType, String state) {
@@ -419,6 +444,11 @@ public class ControllerRequestURLBuilder {
 
   public String forZkGetChildren(String path) {
     return StringUtil.join("/", _baseUrl, "zk/getChildren", "?path=" + path);
+  }
+
+  public String forUpsertTableHeapEstimation(long cardinality, int primaryKeySize, int numPartitions) {
+    return StringUtil.join("/", _baseUrl, "upsert/estimateHeapUsage",
+        "?cardinality=" + cardinality + "&primaryKeySize=" + primaryKeySize + "&numPartitions=" + numPartitions);
   }
 
   private static String encode(String s) {

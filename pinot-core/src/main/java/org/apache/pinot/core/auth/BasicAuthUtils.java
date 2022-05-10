@@ -23,10 +23,13 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.BcryptUtils;
+import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -61,21 +64,43 @@ public final class BasicAuthUtils {
    * @return list of BasicAuthPrincipals
    */
   public static List<BasicAuthPrincipal> extractBasicAuthPrincipals(PinotConfiguration configuration, String prefix) {
-    String principalNames = configuration.getProperty(prefix);
-    Preconditions.checkArgument(StringUtils.isNotBlank(principalNames), "must provide principals");
+      String principalNames = configuration.getProperty(prefix);
+      Preconditions.checkArgument(StringUtils.isNotBlank(principalNames), "must provide principals");
 
-    return Arrays.stream(principalNames.split(",")).map(rawName -> {
-      String name = rawName.trim();
-      Preconditions.checkArgument(StringUtils.isNotBlank(name), "%s is not a valid name", name);
+      return Arrays.stream(principalNames.split(",")).map(rawName -> {
+          String name = rawName.trim();
+          Preconditions.checkArgument(StringUtils.isNotBlank(name), "%s is not a valid name", name);
 
-      String password = configuration.getProperty(String.format("%s.%s.%s", prefix, name, PASSWORD));
-      Preconditions.checkArgument(StringUtils.isNotBlank(password), "must provide a password for %s", name);
+          String password = configuration.getProperty(String.format("%s.%s.%s", prefix, name, PASSWORD));
+          Preconditions.checkArgument(StringUtils.isNotBlank(password), "must provide a password for %s", name);
 
-      Set<String> tables = extractSet(configuration, String.format("%s.%s.%s", prefix, name, TABLES));
-      Set<String> permissions = extractSet(configuration, String.format("%s.%s.%s", prefix, name, PERMISSIONS));
+          Set<String> tables = extractSet(configuration, String.format("%s.%s.%s", prefix, name, TABLES));
+          Set<String> permissions = extractSet(configuration, String.format("%s.%s.%s", prefix, name, PERMISSIONS));
 
-      return new BasicAuthPrincipal(name, toBasicAuthToken(name, password), tables, permissions);
-    }).collect(Collectors.toList());
+          return new BasicAuthPrincipal(name, toBasicAuthToken(name, password), tables, permissions);
+      }).collect(Collectors.toList());
+  }
+
+  public static List<ZkBasicAuthPrincipal> extractBasicAuthPrincipals(List<UserConfig> userConfigList) {
+    return userConfigList.stream()
+        .map(user -> {
+          String name = user.getUserName().trim();
+          Preconditions.checkArgument(StringUtils.isNotBlank(name), "%s is not a valid username", name);
+          String password = user.getPassword().trim();
+          Preconditions.checkArgument(StringUtils.isNotBlank(password), "must provide a password for %s", name);
+          String component = user.getComponentType().toString();
+          String role = user.getRoleType().toString();
+
+          Set<String> tables = Optional.ofNullable(user.getTables())
+              .orElseGet(() -> Collections.emptyList())
+              .stream().collect(Collectors.toSet());
+          Set<String> permissions = Optional.ofNullable(user.getPermissios())
+              .orElseGet(() -> Collections.emptyList())
+              .stream().map(x -> x.toString())
+              .collect(Collectors.toSet());
+          return new ZkBasicAuthPrincipal(name, toBasicAuthToken(name, password), password,
+              component, role, tables, permissions);
+        }).collect(Collectors.toList());
   }
 
   private static Set<String> extractSet(PinotConfiguration configuration, String key) {
@@ -100,6 +125,46 @@ public final class BasicAuthUtils {
     }
     String identifier = String.format("%s:%s", name, password);
     return normalizeBase64Token(String.format("Basic %s", Base64.getEncoder().encodeToString(identifier.getBytes())));
+  }
+
+  public static String decodeBasicAuthToken(String auth) {
+    if (StringUtils.isBlank(auth)) {
+      return null;
+    }
+    String replacedAuth = StringUtils.replace(auth, "Basic ", "");
+    byte[] decodedBytes = Base64.getDecoder().decode(replacedAuth);
+    String decodedString = new String(decodedBytes);
+    return decodedString;
+  }
+
+  public static String extractUsername(String auth) {
+    String decodedString = decodeBasicAuthToken(auth);
+    return StringUtils.split(decodedString, ":")[0];
+  }
+
+  public static String extractPassword(String auth) {
+    String decodedString = decodeBasicAuthToken(auth);
+    return StringUtils.split(decodedString, ":")[1];
+  }
+
+  /**
+   * Convert http header-compliant base64 encoded token to password-encrypted base64 token
+   *
+   * @param auth http base64 token
+   * @return base64 encoded basic auth token
+   */
+  public static String toEncryptBasicAuthToken(String auth) {
+    if (StringUtils.isBlank(auth)) {
+      return null;
+    }
+    String replacedAuth = StringUtils.replace(auth, "Basic ", "");
+    byte[] decodedBytes = Base64.getDecoder().decode(replacedAuth);
+    String decodedString = new String(decodedBytes);
+    String[] cretential = StringUtils.split(decodedString, ":");
+    String rawUsername = cretential[0];
+    String rawPassword = cretential[1];
+    String encryptedPassword = BcryptUtils.encrypt(rawPassword);
+    return toBasicAuthToken(rawUsername, encryptedPassword);
   }
 
   /**

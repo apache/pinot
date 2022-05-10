@@ -1314,7 +1314,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
             .setHashFunction(tableConfig.getHashFunction())
-            .setUpsertComparisonColumn(tableConfig.getUpsertComparisonColumn());
+            .setUpsertComparisonColumn(tableConfig.getUpsertComparisonColumn())
+            .setFieldConfigList(tableConfig.getFieldConfigList());
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);

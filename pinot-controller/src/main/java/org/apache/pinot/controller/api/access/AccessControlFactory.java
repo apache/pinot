@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.controller.api.access;
 
+import java.io.IOException;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -28,6 +30,19 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 public interface AccessControlFactory {
   default void init(PinotConfiguration pinotConfiguration) {
     // left blank
+  }
+  /**
+   * Extend the original init method to support Zookeeper BasicAuthAccessControlFactory.
+   * Because ZKBasicAuthAccessControlFactory needs to acquire users' info from HelixPropertyStore.
+   * The reason why passed helixResourceManager param other than HelixPropertyStore is that
+   * we need to init UserACLConfig via helixResourceManager.
+   *
+   * @param configuration pinot configuration
+   * @param helixResourceManager Helix resource manager
+   */
+  default void init(PinotConfiguration configuration, PinotHelixResourceManager helixResourceManager)
+    throws IOException {
+    init(configuration);
   }
 
   AccessControl create();

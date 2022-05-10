@@ -192,7 +192,6 @@ const QueryPage = () => {
 
   const [checked, setChecked] = React.useState({
     tracing: queryParam.get('tracing') === 'true',
-    querySyntaxPQL: queryParam.get('pqlSyntax') === 'true',
     showResultJSON: false,
   });
 
@@ -268,31 +267,20 @@ const QueryPage = () => {
   const handleRunNow = async (query?: string) => {
     setQueryLoader(true);
     queryExecuted.current = true;
-    let url;
     let params;
     let timeoutStr = '';
     if(queryTimeout){
       timeoutStr = ` option(timeoutMs=${queryTimeout})`
     }
     const finalQuery = `${query || inputQuery.trim()}`;
-    if (checked.querySyntaxPQL) {
-      url = 'pql';
-      params = JSON.stringify({
-        pql: `${finalQuery}${timeoutStr}`,
-        trace: checked.tracing,
-      });
-    } else {
-      url = 'sql';
-      params = JSON.stringify({
-        sql: `${finalQuery}${timeoutStr}`,
-        trace: checked.tracing,
-      });
-    }
+    params = JSON.stringify({
+      sql: `${finalQuery}${timeoutStr}`,
+      trace: checked.tracing,
+    });
 
     if(finalQuery !== ''){
       queryParam.set('query', finalQuery);
       queryParam.set('tracing', checked.tracing.toString());
-      queryParam.set('pqlSyntax', checked.querySyntaxPQL.toString());
       if(queryTimeout !== undefined && queryTimeout !== ''){
         queryParam.set('timeout', queryTimeout.toString());
       }
@@ -302,11 +290,7 @@ const QueryPage = () => {
       })
     }
 
-    const results = await PinotMethodUtils.getQueryResults(
-      params,
-      url,
-      checked
-    );
+    const results = await PinotMethodUtils.getQueryResults(params, checked);
     setResultError(results.error || '');
     setResultData(results.result || { columns: [], records: [] });
     setQueryStats(results.queryStats || { columns: responseStatCols, records: [] });
@@ -379,7 +363,6 @@ const QueryPage = () => {
       setInputQuery(query);
       setChecked({
         tracing: queryParam.get('tracing') === 'true',
-        querySyntaxPQL: queryParam.get('pqlSyntax') === 'true',
         showResultJSON: checked.showResultJSON,
       });
       setQueryTimeout(Number(queryParam.get('timeout') || '') || '');
@@ -493,16 +476,6 @@ const QueryPage = () => {
                   checked={checked.tracing}
                 />
                 Tracing
-              </Grid>
-
-              <Grid item xs={2}>
-                <Checkbox
-                  name="querySyntaxPQL"
-                  color="primary"
-                  onChange={handleChange}
-                  checked={checked.querySyntaxPQL}
-                />
-                Query Syntax: PQL
               </Grid>
 
               <Grid item xs={3}>

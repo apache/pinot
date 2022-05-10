@@ -37,6 +37,7 @@ public enum AggregationFunctionType {
   SUMPRECISION("sumPrecision"),
   AVG("avg"),
   MODE("mode"),
+  FIRSTWITHTIME("firstWithTime"),
   LASTWITHTIME("lastWithTime"),
   MINMAXRANGE("minMaxRange"),
   DISTINCTCOUNT("distinctCount"),

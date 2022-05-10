@@ -42,7 +42,6 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
  */
 @SuppressWarnings("rawtypes")
 public class FilteredAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
-
   private static final String EXPLAIN_NAME = "AGGREGATE_FILTERED";
 
   private final AggregationFunction[] _aggregationFunctions;
@@ -90,9 +89,8 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
       _numEntriesScannedInFilter += transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * transformOperator.getNumColumnsProjected();
     }
-    return new IntermediateResultsBlock(_aggregationFunctions, Arrays.asList(result), false);
+    return new IntermediateResultsBlock(_aggregationFunctions, Arrays.asList(result));
   }
-
 
   @Override
   public List<Operator> getChildOperators() {

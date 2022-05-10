@@ -23,12 +23,9 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -155,9 +152,8 @@ public class GapfillUtils {
       } else if (queryContext.getSubquery().getSubquery() == null) {
         gapfillType = GapfillType.GAP_FILL_AGGREGATE;
       } else {
-        Preconditions
-            .checkArgument(queryContext.getSubquery().getSubquery().getAggregationFunctions() != null,
-                "Select cannot happen before gapfill.");
+        Preconditions.checkArgument(queryContext.getSubquery().getSubquery().getAggregationFunctions() != null,
+            "Select cannot happen before gapfill.");
         gapfillType = GapfillType.AGGREGATE_GAP_FILL_AGGREGATE;
       }
     }
@@ -176,8 +172,7 @@ public class GapfillUtils {
         "The second argument of Gapfill should be TimeFormatter.");
     Preconditions.checkArgument(args.get(2).getLiteral() != null,
         "The third argument of Gapfill should be start time.");
-    Preconditions.checkArgument(args.get(3).getLiteral() != null,
-        "The fourth argument of Gapfill should be end time.");
+    Preconditions.checkArgument(args.get(3).getLiteral() != null, "The fourth argument of Gapfill should be end time.");
     Preconditions.checkArgument(args.get(4).getLiteral() != null,
         "The fifth argument of Gapfill should be time bucket size.");
 
@@ -240,8 +235,7 @@ public class GapfillUtils {
   }
 
   public static int findTimeBucketColumnIndex(QueryContext queryContext, GapfillType gapfillType) {
-    if (gapfillType == GapfillType.GAP_FILL_AGGREGATE
-        || gapfillType == GapfillType.GAP_FILL_SELECT
+    if (gapfillType == GapfillType.GAP_FILL_AGGREGATE || gapfillType == GapfillType.GAP_FILL_SELECT
         || gapfillType == GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
       queryContext = queryContext.getSubquery();
     }
@@ -276,16 +270,13 @@ public class GapfillUtils {
     return fillExpressions;
   }
 
-  public static BrokerRequest stripGapfill(BrokerRequest brokerRequest) {
-    if (brokerRequest.getPinotQuery().getDataSource() == null) {
-      return brokerRequest;
-    }
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
-    if (pinotQuery.getDataSource().getSubquery() == null && !hasGapfill(pinotQuery)) {
-      return brokerRequest;
+  public static PinotQuery stripGapfill(PinotQuery pinotQuery) {
+    if (pinotQuery.getDataSource() == null || (pinotQuery.getDataSource().getSubquery() == null && !hasGapfill(
+        pinotQuery))) {
+      return pinotQuery;
     }
 
-    // carry over the query options from original query to server query.
+    // Carry over the query and debug options from the original query
     Map<String, String> queryOptions = pinotQuery.getQueryOptions();
     Map<String, String> debugOptions = pinotQuery.getDebugOptions();
 
@@ -293,10 +284,41 @@ public class GapfillUtils {
       pinotQuery = pinotQuery.getDataSource().getSubquery();
     }
 
-    BrokerRequest strippedBrokerRequest = stripGapfill(pinotQuery);
-    strippedBrokerRequest.getPinotQuery().setQueryOptions(queryOptions);
-    strippedBrokerRequest.getPinotQuery().setDebugOptions(debugOptions);
-    return strippedBrokerRequest;
+    PinotQuery strippedPinotQuery = new PinotQuery(pinotQuery);
+    List<Expression> selectList = strippedPinotQuery.getSelectList();
+    for (int i = 0; i < selectList.size(); i++) {
+      Expression select = selectList.get(i);
+      if (select.getType() != ExpressionType.FUNCTION) {
+        continue;
+      }
+      if (GAP_FILL.equals(select.getFunctionCall().getOperator())) {
+        selectList.set(i, select.getFunctionCall().getOperands().get(0));
+        break;
+      }
+      if (AS.equals(select.getFunctionCall().getOperator())
+          && select.getFunctionCall().getOperands().get(0).getType() == ExpressionType.FUNCTION && GAP_FILL.equals(
+          select.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator())) {
+        select.getFunctionCall().getOperands()
+            .set(0, select.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0));
+        break;
+      }
+    }
+
+    for (Expression orderBy : strippedPinotQuery.getOrderByList()) {
+      if (orderBy.getType() != ExpressionType.FUNCTION) {
+        continue;
+      }
+      if (orderBy.getFunctionCall().getOperands().get(0).getType() == ExpressionType.FUNCTION && GAP_FILL.equals(
+          orderBy.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator())) {
+        orderBy.getFunctionCall().getOperands()
+            .set(0, orderBy.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0));
+        break;
+      }
+    }
+
+    strippedPinotQuery.setQueryOptions(queryOptions);
+    strippedPinotQuery.setDebugOptions(debugOptions);
+    return strippedPinotQuery;
   }
 
   private static boolean hasGapfill(PinotQuery pinotQuery) {
@@ -308,57 +330,12 @@ public class GapfillUtils {
         return true;
       }
       if (AS.equals(select.getFunctionCall().getOperator())
-          && select.getFunctionCall().getOperands().get(0).getType() == ExpressionType.FUNCTION
-          && GAP_FILL.equals(select.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator())) {
+          && select.getFunctionCall().getOperands().get(0).getType() == ExpressionType.FUNCTION && GAP_FILL.equals(
+          select.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator())) {
         return true;
       }
     }
     return false;
-  }
-
-  private static BrokerRequest stripGapfill(PinotQuery pinotQuery) {
-    PinotQuery copy = new PinotQuery(pinotQuery);
-    BrokerRequest brokerRequest = new BrokerRequest();
-    brokerRequest.setPinotQuery(copy);
-    // Set table name in broker request because it is used for access control, query routing etc.
-    DataSource dataSource = copy.getDataSource();
-    if (dataSource != null) {
-      QuerySource querySource = new QuerySource();
-      querySource.setTableName(dataSource.getTableName());
-      brokerRequest.setQuerySource(querySource);
-    }
-    List<Expression> selectList = copy.getSelectList();
-    for (int i = 0; i < selectList.size(); i++) {
-      Expression select = selectList.get(i);
-      if (select.getType() != ExpressionType.FUNCTION) {
-        continue;
-      }
-      if (GAP_FILL.equals(select.getFunctionCall().getOperator())) {
-        selectList.set(i, select.getFunctionCall().getOperands().get(0));
-        break;
-      }
-      if (AS.equals(select.getFunctionCall().getOperator())
-          && select.getFunctionCall().getOperands().get(0).getType() == ExpressionType.FUNCTION
-          && GAP_FILL.equals(select.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator())) {
-        select.getFunctionCall().getOperands().set(0,
-            select.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0));
-        break;
-      }
-    }
-
-    for (Expression orderBy : copy.getOrderByList()) {
-      if (orderBy.getType() != ExpressionType.FUNCTION) {
-        continue;
-      }
-      if (orderBy.getFunctionCall().getOperands().get(0).getType() == ExpressionType.FUNCTION
-          && GAP_FILL.equals(
-              orderBy.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator())) {
-        orderBy.getFunctionCall().getOperands().set(0,
-            orderBy.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0));
-        break;
-      }
-    }
-    return brokerRequest;
   }
 
   public enum GapfillType {

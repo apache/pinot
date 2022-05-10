@@ -20,21 +20,18 @@ package org.apache.pinot.core.query.optimizer.filter;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
-import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.sql.FilterKind;
 
 
 /**
@@ -45,78 +42,6 @@ import org.apache.pinot.spi.data.Schema;
  *       flattened.
  */
 public class MergeRangeFilterOptimizer implements FilterOptimizer {
-
-  @Override
-  public FilterQueryTree optimize(FilterQueryTree filterQueryTree, @Nullable Schema schema) {
-    if (schema == null) {
-      return filterQueryTree;
-    }
-    FilterOperator operator = filterQueryTree.getOperator();
-    if (operator == FilterOperator.AND) {
-      List<FilterQueryTree> children = filterQueryTree.getChildren();
-      Map<String, Range> rangeMap = new HashMap<>();
-      List<FilterQueryTree> newChildren = new ArrayList<>();
-      boolean recreateFilter = false;
-
-      // Iterate over all the child filters to create and merge ranges
-      for (FilterQueryTree child : children) {
-        FilterOperator childOperator = child.getOperator();
-        assert childOperator != FilterOperator.AND;
-        if (childOperator == FilterOperator.OR) {
-          child.getChildren().replaceAll(c -> optimize(c, schema));
-          newChildren.add(child);
-        } else if (childOperator == FilterOperator.RANGE) {
-          String column = child.getColumn();
-          FieldSpec fieldSpec = schema.getFieldSpecFor(column);
-          if (fieldSpec == null || !fieldSpec.isSingleValueField()) {
-            // Skip optimizing transform expression and multi-value column
-            // NOTE: We cannot optimize multi-value column because [0, 10] will match filter "col < 1 AND col > 9", but
-            //       not the merged one.
-            newChildren.add(child);
-            continue;
-          }
-          // Create a range and merge with current range if exists
-          Range range = Range.getRange(child.getValue().get(0), fieldSpec.getDataType());
-          Range currentRange = rangeMap.get(column);
-          if (currentRange == null) {
-            rangeMap.put(column, range);
-          } else {
-            currentRange.intersect(range);
-            recreateFilter = true;
-          }
-        } else {
-          newChildren.add(child);
-        }
-      }
-
-      if (recreateFilter) {
-        if (newChildren.isEmpty() && rangeMap.size() == 1) {
-          // Single range without other filters
-          Map.Entry<String, Range> entry = rangeMap.entrySet().iterator().next();
-          return getRangeFilterQueryTree(entry.getKey(), entry.getValue());
-        } else {
-          for (Map.Entry<String, Range> entry : rangeMap.entrySet()) {
-            newChildren.add(getRangeFilterQueryTree(entry.getKey(), entry.getValue()));
-          }
-          return new FilterQueryTree(null, null, FilterOperator.AND, newChildren);
-        }
-      } else {
-        return filterQueryTree;
-      }
-    } else if (operator == FilterOperator.OR) {
-      filterQueryTree.getChildren().replaceAll(c -> optimize(c, schema));
-      return filterQueryTree;
-    } else {
-      return filterQueryTree;
-    }
-  }
-
-  /**
-   * Helper method to construct a RANGE predicate FilterQueryTree from the given column and range.
-   */
-  private static FilterQueryTree getRangeFilterQueryTree(String column, Range range) {
-    return new FilterQueryTree(column, Collections.singletonList(range.getRangeString()), FilterOperator.RANGE, null);
-  }
 
   @Override
   public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
@@ -230,7 +155,7 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
    */
   private static Expression getRangeFilterExpression(String column, Range range) {
     Expression rangeFilter = RequestUtils.getFunctionExpression(FilterKind.RANGE.name());
-    rangeFilter.getFunctionCall().setOperands(Arrays.asList(RequestUtils.createIdentifierExpression(column),
+    rangeFilter.getFunctionCall().setOperands(Arrays.asList(RequestUtils.getIdentifierExpression(column),
         RequestUtils.getLiteralExpression(range.getRangeString())));
     return rangeFilter;
   }

@@ -58,7 +58,7 @@ public class KinesisDataProducer implements StreamDataProducer {
   public static final String RETRY_DELAY_MILLIS = "retry_delay_millis";
 
   public static final String DEFAULT_ENDPOINT = "http://localhost:4566";
-  public static final String DEFAULT_RETRY_DELAY_MILLIS = "10000L";
+  public static final String DEFAULT_RETRY_DELAY_MILLIS = "10000";
   public static final String DEFAULT_NUM_RETRIES = "0";
 
   private KinesisClient _kinesisClient;

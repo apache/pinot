@@ -26,11 +26,13 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeSet;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
@@ -210,6 +212,37 @@ public class NoDictionaryInPredicateEvaluatorTest {
 
     Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
     Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+  }
+
+  @Test
+  public void testBigDecimalPredicateEvaluators() {
+    List<String> stringValues = new ArrayList<>(NUM_PREDICATE_VALUES);
+    TreeSet<BigDecimal> valueSet = new TreeSet<>();
+
+    for (int i = 0; i < 100; i++) {
+      BigDecimal value = BigDecimal.valueOf(_random.nextDouble());
+      stringValues.add(value.toPlainString());
+      valueSet.add(value);
+    }
+
+    InPredicate inPredicate = new InPredicate(COLUMN_EXPRESSION, stringValues);
+    PredicateEvaluator inPredicateEvaluator =
+        InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.BIG_DECIMAL);
+
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_EXPRESSION, stringValues);
+    PredicateEvaluator notInPredicateEvaluator =
+        NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.BIG_DECIMAL);
+
+    for (BigDecimal value : valueSet) {
+      Assert.assertTrue(inPredicateEvaluator.applySV(value));
+      Assert.assertFalse(notInPredicateEvaluator.applySV(value));
+    }
+
+    for (int i = 0; i < 100; i++) {
+      BigDecimal value = BigDecimal.valueOf(_random.nextDouble());
+      Assert.assertEquals(inPredicateEvaluator.applySV(value), valueSet.contains(value));
+      Assert.assertEquals(notInPredicateEvaluator.applySV(value), !valueSet.contains(value));
+    }
   }
 
   @Test

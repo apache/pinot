@@ -80,7 +80,7 @@ public class DateTimeTransformFunctionTest extends BaseTransformFunctionTest {
   @Test(dataProvider = "testCasesUTC")
   public void testUTC(String function, LongToIntFunction expected, Class<? extends TransformFunction> expectedClass) {
     ExpressionContext expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("%s(%s)", function, TIMESTAMP_COLUMN));
+        RequestContextUtils.getExpression(String.format("%s(%s)", function, TIMESTAMP_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(expectedClass.isInstance(transformFunction));
     int[] values = transformFunction.transformToIntValuesSV(_projectionBlock);
@@ -93,7 +93,7 @@ public class DateTimeTransformFunctionTest extends BaseTransformFunctionTest {
   public void testZoned(String function, ZonedTimeFunction expected, Class<? extends TransformFunction> expectedClass) {
     for (String zone : new String[]{"Europe/Berlin", "America/New_York", "Asia/Katmandu"}) {
       ExpressionContext expression =
-          RequestContextUtils.getExpressionFromSQL(String.format("%s(%s, '%s')", function, TIMESTAMP_COLUMN, zone));
+          RequestContextUtils.getExpression(String.format("%s(%s, '%s')", function, TIMESTAMP_COLUMN, zone));
       TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
       Assert.assertTrue(expectedClass.isInstance(transformFunction));
       int[] values = transformFunction.transformToIntValuesSV(_projectionBlock);

@@ -216,6 +216,8 @@ public class ControllerConf extends PinotConfiguration {
   private static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
   private static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
   public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
+  public static final String ACCESS_CONTROL_USERNAME = "access.control.init.username";
+  public static final String ACCESS_CONTROL_PASSWORD = "access.control.init.password";
   // Amount of the time the segment can take from the beginning of upload to the end of upload. Used when parallel push
   // protection is enabled. If the upload does not finish within the timeout, next upload can override the previous one.
   private static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
@@ -240,6 +242,8 @@ public class ControllerConf extends PinotConfiguration {
   private static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
   private static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
       "org.apache.pinot.controller.api.access.AllowAllAccessFactory";
+  private static final String DEFAULT_ACCESS_CONTROL_USERNAME = "admin";
+  private static final String DEFAULT_ACCESS_CONTROL_PASSWORD = "admin";
   private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
@@ -709,9 +713,26 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(JERSEY_ADMIN_API_PORT, String.valueOf(DEFAULT_JERSEY_ADMIN_PORT));
   }
 
+  public void setInitAccessControlUsername(String username) {
+    setProperty(ACCESS_CONTROL_USERNAME, username);
+  }
+
+  public void setInitAccessControlPassword(String password) {
+    setProperty(ACCESS_CONTROL_PASSWORD, password);
+  }
+
+  public String getInitAccessControlUsername() {
+    return getProperty(ACCESS_CONTROL_USERNAME, DEFAULT_ACCESS_CONTROL_USERNAME);
+  }
+
+  public String getInitAccessControlPassword() {
+    return getProperty(ACCESS_CONTROL_PASSWORD, DEFAULT_ACCESS_CONTROL_PASSWORD);
+  }
+
   public String getAccessControlFactoryClass() {
     return getProperty(ACCESS_CONTROL_FACTORY_CLASS, DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
   }
+
 
   public void setAccessControlFactoryClass(String accessControlFactoryClass) {
     setProperty(ACCESS_CONTROL_FACTORY_CLASS, accessControlFactoryClass);

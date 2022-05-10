@@ -22,11 +22,9 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.sql.FilterKind;
 
 
 /**
@@ -34,30 +32,6 @@ import org.apache.pinot.spi.data.Schema;
  * be flattened to AND(a, b, c).
  */
 public class FlattenAndOrFilterOptimizer implements FilterOptimizer {
-
-  @Override
-  public FilterQueryTree optimize(FilterQueryTree filterQueryTree, @Nullable Schema schema) {
-    return optimize(filterQueryTree);
-  }
-
-  private FilterQueryTree optimize(FilterQueryTree filterQueryTree) {
-    FilterOperator operator = filterQueryTree.getOperator();
-    if (operator != FilterOperator.AND && operator != FilterOperator.OR) {
-      return filterQueryTree;
-    }
-    List<FilterQueryTree> children = filterQueryTree.getChildren();
-    assert children != null;
-    List<FilterQueryTree> newChildren = new ArrayList<>();
-    for (FilterQueryTree child : children) {
-      FilterQueryTree optimizedChild = optimize(child);
-      if (optimizedChild.getOperator() == operator) {
-        newChildren.addAll(optimizedChild.getChildren());
-      } else {
-        newChildren.add(optimizedChild);
-      }
-    }
-    return new FilterQueryTree(null, null, operator, newChildren);
-  }
 
   @Override
   public Expression optimize(Expression filterExpression, @Nullable Schema schema) {

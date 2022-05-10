@@ -173,7 +173,7 @@ public class NullHandlingTransformFunctionTest {
 
   public void testIsNullTransformFunction(String columnName)
       throws Exception {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(String.format("%s IS NULL", columnName));
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format("%s IS NULL", columnName));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof IsNullTransformFunction);
     Assert.assertEquals(transformFunction.getName(), TransformFunctionType.IS_NULL.getName());
@@ -200,7 +200,7 @@ public class NullHandlingTransformFunctionTest {
   public void testIsNotNullTransformFunction(String columnName)
       throws Exception {
     ExpressionContext expression =
-        RequestContextUtils.getExpressionFromSQL(String.format("%s IS NOT NULL", columnName));
+        RequestContextUtils.getExpression(String.format("%s IS NOT NULL", columnName));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof IsNotNullTransformFunction);
     Assert.assertEquals(transformFunction.getName(), TransformFunctionType.IS_NOT_NULL.getName());

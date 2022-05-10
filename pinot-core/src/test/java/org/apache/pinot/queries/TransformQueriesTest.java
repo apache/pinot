@@ -197,27 +197,26 @@ public class TransformQueriesTest extends BaseQueriesTest {
     String query =
         "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('week', ADD(SUB(DIV(T, 1000), INT_COL2), INT_COL2), "
             + "'SECONDS', 'Europe/Berlin')";
-    verifyDateTruncationResult(query, "95295600");
+    verifyDateTruncationResult(query, new Object[]{95295600L});
 
     query =
         "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('week', DIV(MULT(DIV(ADD(SUB(T, 5), 5), 1000), INT_COL2), "
             + "INT_COL2), 'SECONDS', 'Europe/Berlin', 'MILLISECONDS')";
-    verifyDateTruncationResult(query, "95295600000");
+    verifyDateTruncationResult(query, new Object[]{95295600000L});
 
     query = "SELECT COUNT(*) FROM testTable GROUP BY DATETRUNC('quarter', T, 'MILLISECONDS')";
-    verifyDateTruncationResult(query, "94694400000");
+    verifyDateTruncationResult(query, new Object[]{94694400000L});
   }
 
-  private void verifyDateTruncationResult(String query, String expectedStringKey) {
+  private void verifyDateTruncationResult(String query, Object[] expectedGroupKey) {
     AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
     IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
-    List<GroupKeyGenerator.StringGroupKey> groupKeys =
-        ImmutableList.copyOf(aggregationGroupByResult.getStringGroupKeyIterator());
+    List<GroupKeyGenerator.GroupKey> groupKeys = ImmutableList.copyOf(aggregationGroupByResult.getGroupKeyIterator());
     assertEquals(groupKeys.size(), 1);
-    assertEquals(groupKeys.get(0)._stringKey, expectedStringKey);
-    Object resultForKey = aggregationGroupByResult.getResultForKey(groupKeys.get(0), 0);
+    assertEquals(groupKeys.get(0)._keys, expectedGroupKey);
+    Object resultForKey = aggregationGroupByResult.getResultForGroupId(groupKeys.get(0)._groupId, 0);
     assertEquals(resultForKey, (long) NUM_ROWS);
   }
 

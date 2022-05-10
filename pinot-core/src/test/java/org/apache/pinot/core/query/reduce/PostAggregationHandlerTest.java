@@ -33,7 +33,7 @@ public class PostAggregationHandlerTest {
   public void testPostAggregation() {
     // Regular aggregation only
     {
-      QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT SUM(m1) FROM testTable");
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT SUM(m1) FROM testTable");
       DataSchema dataSchema = new DataSchema(new String[]{"sum(m1)"}, new ColumnDataType[]{ColumnDataType.DOUBLE});
       PostAggregationHandler handler = new PostAggregationHandler(queryContext, dataSchema);
       assertEquals(handler.getResultDataSchema(), dataSchema);
@@ -44,7 +44,7 @@ public class PostAggregationHandlerTest {
     // Regular aggregation group-by
     {
       QueryContext queryContext =
-          QueryContextConverterUtils.getQueryContextFromSQL("SELECT d1, SUM(m1) FROM testTable GROUP BY d1");
+          QueryContextConverterUtils.getQueryContext("SELECT d1, SUM(m1) FROM testTable GROUP BY d1");
       DataSchema dataSchema = new DataSchema(new String[]{"d1", "sum(m1)"},
           new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.DOUBLE});
       PostAggregationHandler handler = new PostAggregationHandler(queryContext, dataSchema);
@@ -56,7 +56,7 @@ public class PostAggregationHandlerTest {
     // Aggregation group-by with partial columns selected
     {
       QueryContext queryContext =
-          QueryContextConverterUtils.getQueryContextFromSQL("SELECT SUM(m1), d2 FROM testTable GROUP BY d1, d2");
+          QueryContextConverterUtils.getQueryContext("SELECT SUM(m1), d2 FROM testTable GROUP BY d1, d2");
       DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)"},
           new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.DOUBLE});
       PostAggregationHandler handler = new PostAggregationHandler(queryContext, dataSchema);
@@ -72,7 +72,7 @@ public class PostAggregationHandlerTest {
     // Aggregation group-by with order-by
     {
       QueryContext queryContext = QueryContextConverterUtils
-          .getQueryContextFromSQL("SELECT SUM(m1), d2 FROM testTable GROUP BY d1, d2 ORDER BY MAX(m1)");
+          .getQueryContext("SELECT SUM(m1), d2 FROM testTable GROUP BY d1, d2 ORDER BY MAX(m1)");
       DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m1)"},
           new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
       PostAggregationHandler handler = new PostAggregationHandler(queryContext, dataSchema);
@@ -88,7 +88,7 @@ public class PostAggregationHandlerTest {
     // Post aggregation
     {
       QueryContext queryContext =
-          QueryContextConverterUtils.getQueryContextFromSQL("SELECT SUM(m1) + MAX(m2) FROM testTable");
+          QueryContextConverterUtils.getQueryContext("SELECT SUM(m1) + MAX(m2) FROM testTable");
       DataSchema dataSchema = new DataSchema(new String[]{"sum(m1)", "max(m2)"},
           new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
       PostAggregationHandler handler = new PostAggregationHandler(queryContext, dataSchema);
@@ -102,7 +102,7 @@ public class PostAggregationHandlerTest {
 
     // Post aggregation with group-by and order-by
     {
-      QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
           "SELECT (SUM(m1) + MAX(m2) - d1) / 2, d2 FROM testTable GROUP BY d1, d2 ORDER BY MAX(m1)");
       DataSchema dataSchema =
           new DataSchema(new String[]{"d1", "d2", "sum(m1)", "max(m2)", "max(m1)"}, new ColumnDataType[]{

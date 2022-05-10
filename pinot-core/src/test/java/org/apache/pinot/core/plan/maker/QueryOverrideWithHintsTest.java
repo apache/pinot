@@ -26,8 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -35,14 +35,14 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.BrokerRequestToQueryContextConverter;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -50,9 +50,8 @@ import static org.testng.Assert.assertNotEquals;
 
 
 public class QueryOverrideWithHintsTest {
-  private static CalciteSqlCompiler _sqlCompiler = new CalciteSqlCompiler();
 
-  private IndexSegment _indexSegment = new IndexSegment() {
+  private final IndexSegment _indexSegment = new IndexSegment() {
     @Override
     public String getSegmentName() {
       return null;
@@ -199,16 +198,14 @@ public class QueryOverrideWithHintsTest {
 
   @Test
   public void testRewriteExpressionsWithHints() {
-    BrokerRequest brokerRequest =
-        _sqlCompiler.compileToBrokerRequest(
-            "SELECT datetrunc('MONTH', ts), count(*), sum(abc) from myTable group by datetrunc('MONTH', ts) ");
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT datetrunc('MONTH', ts), count(*), sum(abc) from myTable group by datetrunc('MONTH', ts) ");
     Expression dateTruncFunctionExpr = RequestUtils.getFunctionExpression("datetrunc");
     dateTruncFunctionExpr.getFunctionCall().setOperands(new ArrayList<>(
         ImmutableList.of(RequestUtils.getLiteralExpression("MONTH"), RequestUtils.getIdentifierExpression("ts"))));
     Expression timestampIndexColumn = RequestUtils.getIdentifierExpression("$ts$MONTH");
-    brokerRequest.getPinotQuery()
-        .setExpressionOverrideHints(ImmutableMap.of(dateTruncFunctionExpr, timestampIndexColumn));
-    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+    pinotQuery.setExpressionOverrideHints(ImmutableMap.of(dateTruncFunctionExpr, timestampIndexColumn));
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
     InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, _indexSegment);
     assertEquals(queryContext.getSelectExpressions().get(0).getIdentifier(), "$ts$MONTH");
     assertEquals(queryContext.getGroupByExpressions().get(0).getIdentifier(), "$ts$MONTH");
@@ -216,16 +213,14 @@ public class QueryOverrideWithHintsTest {
 
   @Test
   public void testNotRewriteExpressionsWithHints() {
-    BrokerRequest brokerRequest =
-        _sqlCompiler.compileToBrokerRequest(
-            "SELECT datetrunc('DAY', ts), count(*), sum(abc) from myTable group by datetrunc('DAY', ts)");
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT datetrunc('DAY', ts), count(*), sum(abc) from myTable group by datetrunc('DAY', ts)");
     Expression dateTruncFunctionExpr = RequestUtils.getFunctionExpression("datetrunc");
     dateTruncFunctionExpr.getFunctionCall().setOperands(new ArrayList<>(
         ImmutableList.of(RequestUtils.getLiteralExpression("DAY"), RequestUtils.getIdentifierExpression("ts"))));
     Expression timestampIndexColumn = RequestUtils.getIdentifierExpression("$ts$DAY");
-    brokerRequest.getPinotQuery()
-        .setExpressionOverrideHints(ImmutableMap.of(dateTruncFunctionExpr, timestampIndexColumn));
-    QueryContext queryContext = BrokerRequestToQueryContextConverter.convert(brokerRequest);
+    pinotQuery.setExpressionOverrideHints(ImmutableMap.of(dateTruncFunctionExpr, timestampIndexColumn));
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
     InstancePlanMakerImplV2.rewriteQueryContextWithHints(queryContext, _indexSegment);
     assertEquals(queryContext.getSelectExpressions().get(0).getFunction(),
         queryContext.getExpressionOverrideHints().keySet().iterator().next().getFunction());

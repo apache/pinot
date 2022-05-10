@@ -57,6 +57,7 @@ import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.minion.BaseMinionStarter;
 import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
+import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractorConfig;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
@@ -417,8 +418,10 @@ public abstract class ClusterTest extends ControllerTest {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(_avroFile)) {
         _avroSchema = reader.getSchema();
       }
+      AvroRecordExtractorConfig config = new AvroRecordExtractorConfig();
+      config.init(props);
       _recordExtractor = new AvroRecordExtractor();
-      _recordExtractor.init(fieldsToRead, null);
+      _recordExtractor.init(fieldsToRead, config);
       _reader = new GenericDatumReader<>(_avroSchema);
     }
 
@@ -468,8 +471,6 @@ public abstract class ClusterTest extends ControllerTest {
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
-    payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
-
     return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString(), headers));
   }
 
@@ -496,7 +497,6 @@ public abstract class ClusterTest extends ControllerTest {
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
-    payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
     return JsonUtils.stringToJsonNode(
         sendPostRequest(controllerBaseApiUrl + "/sql", JsonUtils.objectToString(payload), headers));
   }

@@ -40,8 +40,6 @@ import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.parsers.QueryCompiler;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -61,7 +59,6 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.mockito.Mockito;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -255,17 +252,12 @@ public class SegmentPrunerTest extends ControllerTest {
     assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
   }
 
-  @DataProvider
-  public static Object[][] compilerProvider() {
-    return new Object[][]{new Object[]{new CalciteSqlCompiler()}, new Object[]{new Pql2Compiler()}};
-  }
-
-  @Test(dataProvider = "compilerProvider")
-  public void testPartitionAwareSegmentPruner(QueryCompiler compiler) {
-    BrokerRequest brokerRequest1 = compiler.compileToBrokerRequest(QUERY_1);
-    BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(QUERY_2);
-    BrokerRequest brokerRequest3 = compiler.compileToBrokerRequest(QUERY_3);
-    BrokerRequest brokerRequest4 = compiler.compileToBrokerRequest(QUERY_4);
+  @Test
+  public void testPartitionAwareSegmentPruner() {
+    BrokerRequest brokerRequest1 = CalciteSqlCompiler.compileToBrokerRequest(QUERY_1);
+    BrokerRequest brokerRequest2 = CalciteSqlCompiler.compileToBrokerRequest(QUERY_2);
+    BrokerRequest brokerRequest3 = CalciteSqlCompiler.compileToBrokerRequest(QUERY_3);
+    BrokerRequest brokerRequest4 = CalciteSqlCompiler.compileToBrokerRequest(QUERY_4);
     // NOTE: Ideal state and external view are not used in the current implementation
     IdealState idealState = Mockito.mock(IdealState.class);
     ExternalView externalView = Mockito.mock(ExternalView.class);
@@ -392,15 +384,15 @@ public class SegmentPrunerTest extends ControllerTest {
         new HashSet<>(Arrays.asList(segment0, segment1, segment2))), new HashSet<>(Arrays.asList(segment1, segment2)));
   }
 
-  @Test(dataProvider = "compilerProvider")
-  public void testTimeSegmentPruner(QueryCompiler compiler) {
-    BrokerRequest brokerRequest1 = compiler.compileToBrokerRequest(QUERY_1);
-    BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(TIME_QUERY_1);
-    BrokerRequest brokerRequest3 = compiler.compileToBrokerRequest(TIME_QUERY_2);
-    BrokerRequest brokerRequest4 = compiler.compileToBrokerRequest(TIME_QUERY_3);
-    BrokerRequest brokerRequest5 = compiler.compileToBrokerRequest(TIME_QUERY_4);
-    BrokerRequest brokerRequest6 = compiler.compileToBrokerRequest(TIME_QUERY_5);
-    BrokerRequest brokerRequest7 = compiler.compileToBrokerRequest(TIME_QUERY_6);
+  @Test
+  public void testTimeSegmentPruner() {
+    BrokerRequest brokerRequest1 = CalciteSqlCompiler.compileToBrokerRequest(QUERY_1);
+    BrokerRequest brokerRequest2 = CalciteSqlCompiler.compileToBrokerRequest(TIME_QUERY_1);
+    BrokerRequest brokerRequest3 = CalciteSqlCompiler.compileToBrokerRequest(TIME_QUERY_2);
+    BrokerRequest brokerRequest4 = CalciteSqlCompiler.compileToBrokerRequest(TIME_QUERY_3);
+    BrokerRequest brokerRequest5 = CalciteSqlCompiler.compileToBrokerRequest(TIME_QUERY_4);
+    BrokerRequest brokerRequest6 = CalciteSqlCompiler.compileToBrokerRequest(TIME_QUERY_5);
+    BrokerRequest brokerRequest7 = CalciteSqlCompiler.compileToBrokerRequest(TIME_QUERY_6);
     // NOTE: Ideal state and external view are not used in the current implementation
     IdealState idealState = Mockito.mock(IdealState.class);
     ExternalView externalView = Mockito.mock(ExternalView.class);
@@ -535,13 +527,13 @@ public class SegmentPrunerTest extends ControllerTest {
         Collections.emptySet());
   }
 
-  @Test(dataProvider = "compilerProvider")
-  public void testTimeSegmentPrunerSimpleDateFormat(QueryCompiler compiler) {
-    BrokerRequest brokerRequest1 = compiler.compileToBrokerRequest(SDF_QUERY_1);
-    BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(SDF_QUERY_2);
-    BrokerRequest brokerRequest3 = compiler.compileToBrokerRequest(SDF_QUERY_3);
-    BrokerRequest brokerRequest4 = compiler.compileToBrokerRequest(SDF_QUERY_4);
-    BrokerRequest brokerRequest5 = compiler.compileToBrokerRequest(SDF_QUERY_5);
+  @Test
+  public void testTimeSegmentPrunerSimpleDateFormat() {
+    BrokerRequest brokerRequest1 = CalciteSqlCompiler.compileToBrokerRequest(SDF_QUERY_1);
+    BrokerRequest brokerRequest2 = CalciteSqlCompiler.compileToBrokerRequest(SDF_QUERY_2);
+    BrokerRequest brokerRequest3 = CalciteSqlCompiler.compileToBrokerRequest(SDF_QUERY_3);
+    BrokerRequest brokerRequest4 = CalciteSqlCompiler.compileToBrokerRequest(SDF_QUERY_4);
+    BrokerRequest brokerRequest5 = CalciteSqlCompiler.compileToBrokerRequest(SDF_QUERY_5);
     // NOTE: Ideal state and external view are not used in the current implementation
     IdealState idealState = Mockito.mock(IdealState.class);
     ExternalView externalView = Mockito.mock(ExternalView.class);
@@ -581,9 +573,8 @@ public class SegmentPrunerTest extends ControllerTest {
 
   @Test
   public void testTimeSegmentPrunerSql() {
-    CalciteSqlCompiler compiler = new CalciteSqlCompiler();
-    BrokerRequest brokerRequest1 = compiler.compileToBrokerRequest(SQL_TIME_QUERY_1);
-    BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(SQL_TIME_QUERY_2);
+    BrokerRequest brokerRequest1 = CalciteSqlCompiler.compileToBrokerRequest(SQL_TIME_QUERY_1);
+    BrokerRequest brokerRequest2 = CalciteSqlCompiler.compileToBrokerRequest(SQL_TIME_QUERY_2);
     // NOTE: Ideal state and external view are not used in the current implementation
     IdealState idealState = Mockito.mock(IdealState.class);
     ExternalView externalView = Mockito.mock(ExternalView.class);
@@ -608,11 +599,11 @@ public class SegmentPrunerTest extends ControllerTest {
     assertEquals(segmentPruner.prune(brokerRequest2, onlineSegments), new HashSet<>(Arrays.asList(segment0, segment1)));
   }
 
-  @Test(dataProvider = "compilerProvider")
-  public void testEmptySegmentPruner(QueryCompiler compiler) {
-    BrokerRequest brokerRequest1 = compiler.compileToBrokerRequest(QUERY_1);
-    BrokerRequest brokerRequest2 = compiler.compileToBrokerRequest(QUERY_2);
-    BrokerRequest brokerRequest3 = compiler.compileToBrokerRequest(QUERY_3);
+  @Test
+  public void testEmptySegmentPruner() {
+    BrokerRequest brokerRequest1 = CalciteSqlCompiler.compileToBrokerRequest(QUERY_1);
+    BrokerRequest brokerRequest2 = CalciteSqlCompiler.compileToBrokerRequest(QUERY_2);
+    BrokerRequest brokerRequest3 = CalciteSqlCompiler.compileToBrokerRequest(QUERY_3);
     // NOTE: Ideal state and external view are not used in the current implementation
     IdealState idealState = Mockito.mock(IdealState.class);
     ExternalView externalView = Mockito.mock(ExternalView.class);

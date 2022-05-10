@@ -31,7 +31,7 @@ public class TimeConversionTransformFunctionTest extends BaseTransformFunctionTe
 
   @Test(dataProvider = "testTimeConversionTransformFunction")
   public void testTimeConversionTransformFunction(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof TimeConversionTransformFunction);
     Assert.assertEquals(transformFunction.getName(), TimeConversionTransformFunction.FUNCTION_NAME);
@@ -65,7 +65,7 @@ public class TimeConversionTransformFunctionTest extends BaseTransformFunctionTe
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 

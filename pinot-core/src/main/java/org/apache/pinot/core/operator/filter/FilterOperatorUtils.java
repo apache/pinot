@@ -169,7 +169,8 @@ public class FilterOperatorUtils {
         if (filterOperator instanceof BitmapBasedFilterOperator) {
           return 1;
         }
-        if (filterOperator instanceof RangeIndexBasedFilterOperator || filterOperator instanceof TextMatchFilterOperator
+        if (filterOperator instanceof RangeIndexBasedFilterOperator
+            || filterOperator instanceof TextContainsFilterOperator || filterOperator instanceof TextMatchFilterOperator
             || filterOperator instanceof JsonMatchFilterOperator || filterOperator instanceof H3IndexFilterOperator) {
           return 2;
         }
