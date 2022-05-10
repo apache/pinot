@@ -308,11 +308,16 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     }
 
     // Check min/max value
+    boolean someInRange = false;
     for (String value : values) {
       Comparable inValue = convertValue(value, dataSourceMetadata.getDataType());
       if (checkMinMaxRange(dataSourceMetadata, inValue)) {
-        return false;
+        someInRange = true;
+        break;
       }
+    }
+    if (!someInRange) {
+      return true;
     }
 
     // Check bloom filter
