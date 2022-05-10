@@ -156,7 +156,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     }
   }
 
-  SearcherManager getSearcherManager() {
+  public SearcherManager getSearcherManager() {
     return _searcherManager;
   }
 }
