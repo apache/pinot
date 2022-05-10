@@ -55,7 +55,7 @@ public class CSVMessageDecoderTest {
   public void testMultivalue()
       throws Exception {
     Map<String, String> decoderProps = getStandardDecoderProps();
-    decoderProps.put("  header", "name;age;gender;subjects");
+    decoderProps.put("header", "name;age;gender;subjects");
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
     messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "");
     String incomingRecord = "Alice;18;F;maths,German,history";
