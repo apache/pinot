@@ -178,7 +178,6 @@ public class BigDecimalOffHeapMutableDictionary extends BaseOffHeapMutableDictio
   @Override
   public int indexOf(String stringValue) {
     BigDecimal bigDecimalValue = new BigDecimal(stringValue);
-    // todo: is it necessary to serialize bigDecimalValue, or should you just send null?
     return getDictId(bigDecimalValue, BigDecimalUtils.serialize(bigDecimalValue));
   }
 

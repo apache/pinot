@@ -195,9 +195,10 @@ public class MutableDictionaryTest {
     // Test sorted values.
     Collections.sort(expectedSortedValues);
     Object sortedValues = dictionary.getSortedValues();
-    List<Comparable> actualSortedValues =
-        (dataType.equals(FieldSpec.DataType.STRING) || dataType.equals(FieldSpec.DataType.BYTES) || dataType.equals(FieldSpec.DataType.BIG_DECIMAL)) ? Arrays
-            .asList((Comparable[]) dictionary.getSortedValues()) : primitiveArrayToList(dataType, sortedValues);
+    List<Comparable> actualSortedValues = (dataType.equals(FieldSpec.DataType.STRING)
+        || dataType.equals(FieldSpec.DataType.BYTES) || dataType.equals(FieldSpec.DataType.BIG_DECIMAL))
+        ? Arrays.asList((Comparable[]) dictionary.getSortedValues())
+        : primitiveArrayToList(dataType, sortedValues);
     Assert.assertEquals(actualSortedValues, expectedSortedValues);
 
     Assert.assertEquals(dictionary.getDictIdsInRange(expectedMin.toString(), expectedMax.toString(), true, true).size(),
@@ -216,7 +217,8 @@ public class MutableDictionaryTest {
       case DOUBLE:
         return new DoubleOffHeapMutableDictionary(estCardinality, maxOverflowSize, _memoryManager, "doubleColumn");
       case BIG_DECIMAL:
-        return new BigDecimalOffHeapMutableDictionary(estCardinality, maxOverflowSize, _memoryManager, "bigDecimalColumn", 32);
+        return new BigDecimalOffHeapMutableDictionary(estCardinality, maxOverflowSize, _memoryManager,
+            "bigDecimalColumn", 32);
       case STRING:
         return new StringOffHeapMutableDictionary(estCardinality, maxOverflowSize, _memoryManager, "stringColumn", 32);
       case BYTES:
