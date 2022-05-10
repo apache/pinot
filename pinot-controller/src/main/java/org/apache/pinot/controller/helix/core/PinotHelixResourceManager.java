@@ -1716,7 +1716,7 @@ public class PinotHelixResourceManager {
       throws IOException {
     String usernameWithComponent = userConfig.getUsernameWithComponent();
     ZKMetadataProvider.setUserConfig(_propertyStore, usernameWithComponent,
-      AccessControlUserConfigUtils.toZNRecord(userConfig));
+        AccessControlUserConfigUtils.toZNRecord(userConfig));
   }
 
   /**
@@ -3084,16 +3084,18 @@ public class PinotHelixResourceManager {
                 .disjoint(segmentsFrom, lineageEntry.getSegmentsFrom()) || !Collections
                 .disjoint(segmentsTo, lineageEntry.getSegmentsTo()))) {
               LOGGER.info(
-                  "Detected the incomplete lineage entry with the same 'segmentsFrom' or 'segmentsTo'. Reverting the "
-                      + "lineage entry to unblock the new segment protocol. tableNameWithType={}, entryId={}, "
-                      + "segmentsFrom={}, segmentsTo={}", tableNameWithType, entryId, lineageEntry.getSegmentsFrom(),
-                  lineageEntry.getSegmentsTo());
+                  "Detected the incomplete lineage entry with overlapped 'segmentsFrom' or 'segmentsTo'. Deleting or "
+                      + "reverting the lineage entry to unblock the new segment protocol. tableNameWithType={}, "
+                      + "entryId={}, segmentsFrom={}, segmentsTo={}", tableNameWithType, entryId,
+                  lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo());
 
-              // Update segment lineage entry to 'REVERTED'
-              updateSegmentLineageEntryToReverted(tableNameWithType, segmentLineage, entryId, lineageEntry);
+              // Delete the 'IN_PROGRESS' entry or update it to 'REVERTED'
+              List<String> segmentsToForRevertedEntry =
+                  deleteOrUpdateSegmentLineageEntryToReverted(tableNameWithType, segmentLineage, entryId, lineageEntry,
+                      segmentsTo);
 
               // Add segments for proactive clean-up.
-              segmentsToCleanUp.addAll(lineageEntry.getSegmentsTo());
+              segmentsToCleanUp.addAll(segmentsToForRevertedEntry);
             } else if (lineageEntry.getState() == LineageEntryState.COMPLETED && IngestionConfigUtils
                 .getBatchSegmentIngestionType(tableConfig).equalsIgnoreCase("REFRESH") && CollectionUtils
                 .isEqualCollection(segmentsFrom, lineageEntry.getSegmentsTo())) {
@@ -3343,17 +3345,46 @@ public class PinotHelixResourceManager {
 
   private void updateSegmentLineageEntryToReverted(String tableNameWithType, SegmentLineage segmentLineage,
       String segmentLineageEntryId, LineageEntry lineageEntry) {
-    // Check that all segments from 'segmentsFrom' are in ONLINE state in the external view.
-    Set<String> onlineSegments = getOnlineSegmentsFromExternalView(tableNameWithType);
-    Preconditions.checkArgument(onlineSegments.containsAll(lineageEntry.getSegmentsFrom()), String.format(
-        "Failed to update the lineage to be 'REVERTED'. Not all segments from 'segmentFrom' are in ONLINE state "
-            + "in the external view. (tableName = '%s', segmentsFrom = '%s', onlineSegments = '%s'", tableNameWithType,
-        lineageEntry.getSegmentsFrom(), onlineSegments));
+    if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
+      // Check that all segments from 'segmentsFrom' are in ONLINE state in the external view.
+      Set<String> onlineSegments = getOnlineSegmentsFromExternalView(tableNameWithType);
+      Preconditions.checkArgument(onlineSegments.containsAll(lineageEntry.getSegmentsFrom()), String.format(
+          "Failed to update the lineage to be 'REVERTED'. Not all segments from 'segmentFrom' are in ONLINE state "
+              + "in the external view. (tableName = '%s', segmentsFrom = '%s', onlineSegments = '%s'",
+          tableNameWithType, lineageEntry.getSegmentsFrom(), onlineSegments));
+    }
 
     // Update lineage entry
     segmentLineage.updateLineageEntry(segmentLineageEntryId,
         new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.REVERTED,
             System.currentTimeMillis()));
+  }
+
+  private List<String> deleteOrUpdateSegmentLineageEntryToReverted(String tableNameWithType,
+      SegmentLineage segmentLineage, String segmentLineageEntryId, LineageEntry lineageEntry,
+      List<String> newSegments) {
+    // Delete or update segmentsTo of the entry to revert to handle the case of rerunning the protocol:
+    // Initial state:
+    //   Entry1: { segmentsFrom: [s1, s2], segmentsTo: [s3, s4], status: IN_PROGRESS}
+    // 1. Rerunning the protocol with s4 and s5, s4 should not be deleted to avoid race conditions of concurrent data
+    // pushes and deletions:
+    //   Entry1: { segmentsFrom: [s1, s2], segmentsTo: [s3], status: REVERTED}
+    //   Entry2: { segmentsFrom: [s1, s2], segmentsTo: [s4, s5], status: IN_PROGRESS}
+    // 2. Rerunning the protocol with s3 and s4, we can simply remove the 'IN_PROGRESS' entry:
+    //   Entry2: { segmentsFrom: [s1, s2], segmentsTo: [s3, s4], status: IN_PROGRESS}
+    List<String> segmentsToForEntryToRevert = new ArrayList<>(lineageEntry.getSegmentsTo());
+    segmentsToForEntryToRevert.removeAll(newSegments);
+
+    if (segmentsToForEntryToRevert.isEmpty()) {
+      // Delete 'IN_PROGRESS' entry if the segmentsTo is empty
+      segmentLineage.deleteLineageEntry(segmentLineageEntryId);
+    } else {
+      // Update the lineage entry to 'REVERTED'
+      segmentLineage.updateLineageEntry(segmentLineageEntryId,
+          new LineageEntry(lineageEntry.getSegmentsFrom(), segmentsToForEntryToRevert, LineageEntryState.REVERTED,
+              System.currentTimeMillis()));
+    }
+    return segmentsToForEntryToRevert;
   }
 
   private void waitForSegmentsBecomeOnline(String tableNameWithType, Set<String> segmentsToCheck)
