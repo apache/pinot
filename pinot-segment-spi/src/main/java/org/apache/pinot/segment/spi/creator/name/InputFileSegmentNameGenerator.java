@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.segment.spi.creator.name;
 
+import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * Segment name generator that supports defining the segment name based on the input file name and path, via a pattern
@@ -39,16 +42,28 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
 
   private static final String PARAMETER_TEMPLATE = "${filePathPattern:\\%d}";
 
-  private Pattern _filePathPattern;
-  private String _segmentNameTemplate;
-  private URI _inputFileUri;
-  private String _segmentName;
+  private final Pattern _filePathPattern;
+  private final String _segmentNameTemplate;
+  private final URI _inputFileUri;
+  private final String _segmentName;
 
-  public InputFileSegmentNameGenerator(String filePathPattern, String segmentNameTemplate,
-      String inputFileUri) throws URISyntaxException {
-    _filePathPattern = Pattern.compile(filePathPattern);
+  public InputFileSegmentNameGenerator(String filePathPattern, String segmentNameTemplate, String inputFileUri) {
+    Preconditions.checkArgument(filePathPattern != null, "Missing filePathPattern for InputFileSegmentNameGenerator");
+    try {
+      _filePathPattern = Pattern.compile(filePathPattern);
+    } catch (PatternSyntaxException e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid filePathPattern: %s for InputFileSegmentNameGenerator", filePathPattern), e);
+    }
+    Preconditions
+        .checkArgument(segmentNameTemplate != null, "Missing segmentNameTemplate for InputFileSegmentNameGenerator");
     _segmentNameTemplate = segmentNameTemplate;
-    _inputFileUri = new URI(inputFileUri);
+    try {
+      _inputFileUri = new URI(inputFileUri);
+    } catch (URISyntaxException e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid inputFileUri: %s for InputFileSegmentNameGenerator", inputFileUri), e);
+    }
     _segmentName = makeSegmentName();
   }
 

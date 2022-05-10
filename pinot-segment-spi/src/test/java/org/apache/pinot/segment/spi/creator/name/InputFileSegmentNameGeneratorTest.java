@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.spi.creator.name;
 
-import java.net.URISyntaxException;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -57,7 +56,7 @@ public class InputFileSegmentNameGeneratorTest {
           "InputFileSegmentNameGenerator: filePathPattern=%s, segmentNameTemplate=%s, inputFileUri=%s, segmentName=%s",
           pattern, template, inputFileUriAsStr, segmentName);
       assertEquals(segmentNameGenerator.toString(), msg);
-    } catch (URISyntaxException e) {
+    } catch (IllegalArgumentException e) {
       fail("Exception thrown while creating URI for " + inputFileUriAsStr);
     }
   }
