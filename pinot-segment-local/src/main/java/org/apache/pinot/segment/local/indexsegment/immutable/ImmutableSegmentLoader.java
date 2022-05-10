@@ -161,6 +161,8 @@ public class ImmutableSegmentLoader {
     // Remove columns not in schema from the metadata
     Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
     if (schema != null) {
+      schema = SegmentGeneratorConfig.updateSchemaWithTimestampIndexes(schema,
+          SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(indexLoadingConfig.getTableConfig()));
       Set<String> columnsInMetadata = new HashSet<>(columnMetadataMap.keySet());
       columnsInMetadata.removeIf(schema::hasColumn);
       if (!columnsInMetadata.isEmpty()) {
