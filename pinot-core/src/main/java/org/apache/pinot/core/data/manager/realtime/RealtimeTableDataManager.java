@@ -68,6 +68,7 @@ import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -198,6 +199,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _primaryKeyColumns = schema.getPrimaryKeyColumns();
       Preconditions.checkState(!CollectionUtils.isEmpty(_primaryKeyColumns),
           "Primary key columns must be configured for upsert");
+
       String comparisonColumn = upsertConfig.getComparisonColumn();
       _upsertComparisonColumn =
           comparisonColumn != null ? comparisonColumn : tableConfig.getValidationConfig().getTimeColumnName();
@@ -211,7 +213,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
       _tableUpsertMetadataManager =
           new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics, partialUpsertHandler,
-              upsertConfig.getHashFunction());
+              upsertConfig.getHashFunction(), _primaryKeyColumns);
     }
   }
 
@@ -332,8 +334,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           throw new RuntimeException("Failed to find local copy for committed HLC segment: " + segmentName);
         }
       }
+
       // Local segment doesn't exist or cannot load, download a new copy
       downloadAndReplaceSegment(segmentName, segmentZKMetadata, indexLoadingConfig, tableConfig);
+
+    } else if (segmentZKMetadata.getStatus() == Status.UPLOADED) {
+      // The segment is uploaded to an upsert enabled realtime table. Download the segment and load.
+      String downloadUrl = segmentZKMetadata.getDownloadUrl();
+      Preconditions.checkNotNull(downloadUrl, "Upload segment metadata has no download url");
+      downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, downloadUrl);
+      _logger.info("Downloaded, untarred and add segment {} of table {} from {}", segmentName,
+          tableConfig.getTableName(), downloadUrl);
       return;
     } else {
       // Metadata has not been committed, delete the local segment if exists
@@ -355,6 +366,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       PartitionUpsertMetadataManager partitionUpsertMetadataManager =
           _tableUpsertMetadataManager != null ? _tableUpsertMetadataManager.getOrCreatePartitionManager(
               partitionGroupId) : null;
+
       PartitionDedupMetadataManager partitionDedupMetadataManager =
           _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
               : null;
@@ -369,6 +381,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           }
         }
       }
+
       segmentDataManager =
           new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
               indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,

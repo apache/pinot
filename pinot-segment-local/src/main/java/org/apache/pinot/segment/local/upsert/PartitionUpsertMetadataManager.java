@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +36,8 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.roaringbitmap.PeekableIntIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,6 +78,7 @@ public class PartitionUpsertMetadataManager {
   private final ServerMetrics _serverMetrics;
   private final PartialUpsertHandler _partialUpsertHandler;
   private final HashFunction _hashFunction;
+  private final List<String> _primaryKeyColumns;
 
   // TODO(upsert): consider an off-heap KV store to persist this mapping to improve the recovery speed.
   @VisibleForTesting
@@ -87,12 +91,14 @@ public class PartitionUpsertMetadataManager {
   private int _numOutOfOrderEvents = 0;
 
   public PartitionUpsertMetadataManager(String tableNameWithType, int partitionId, ServerMetrics serverMetrics,
-      @Nullable PartialUpsertHandler partialUpsertHandler, HashFunction hashFunction) {
+      @Nullable PartialUpsertHandler partialUpsertHandler, HashFunction hashFunction,
+      List<String> primaryKeyColumns) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
     _partialUpsertHandler = partialUpsertHandler;
     _hashFunction = hashFunction;
+    _primaryKeyColumns = primaryKeyColumns;
   }
 
   /**
@@ -249,13 +255,18 @@ public class PartitionUpsertMetadataManager {
     LOGGER.info("Removing upsert metadata for segment: {}", segmentName);
 
     if (!Objects.requireNonNull(segment.getValidDocIds()).getMutableRoaringBitmap().isEmpty()) {
-      // Remove all the record locations that point to the removed segment
-      _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
-        if (recordLocation.getSegment() == segment) {
-          // Check and remove to prevent removing the key that is just updated
-          _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
+      PeekableIntIterator iterator = segment.getValidDocIds().getMutableRoaringBitmap().getIntIterator();
+      while (iterator.hasNext()) {
+        _reuse.clear();
+        int docId = iterator.next();
+        GenericRow record = segment.getRecord(docId, _reuse);
+        PrimaryKey primaryKey = record.getPrimaryKey(_primaryKeyColumns);
+        if (_primaryKeyToRecordLocationMap.containsKey(primaryKey)
+            && _primaryKeyToRecordLocationMap.get(primaryKey).getSegment() == segment
+            && _primaryKeyToRecordLocationMap.get(primaryKey).getDocId() == docId) {
+          _primaryKeyToRecordLocationMap.remove(primaryKey);
         }
-      });
+      }
     }
     // Update metrics
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
