@@ -67,8 +67,6 @@ public class DataImportDryRunCommand extends AbstractBaseAdminCommand implements
     TransformPipeline transformPipeline =
         new TransformPipeline(statsCollectorConfig.getTableConfig(), statsCollectorConfig.getSchema());
 
-
-    // Gather the stats
     GenericRow reuse = new GenericRow();
     TransformPipeline.Result reusedResult = new TransformPipeline.Result();
     while (jsonRecordReader.hasNext()) {

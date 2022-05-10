@@ -136,6 +136,7 @@ public class StringFunctions {
    * @return trim the characters from both/leading/trailing end of the string
    */
   @ScalarFunction
+    
   public static String trim(String end, String characters, String value) {
     int length = value.length();
     int startIndex = 0;
