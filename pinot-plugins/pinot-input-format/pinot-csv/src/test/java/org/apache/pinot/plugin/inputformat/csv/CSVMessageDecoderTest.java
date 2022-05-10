@@ -25,8 +25,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 public class CSVMessageDecoderTest {
@@ -40,43 +42,43 @@ public class CSVMessageDecoderTest {
     String incomingRecord = "Alice;18;F";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
-    Assert.assertNotNull(destination.getValue("name"));
-    Assert.assertNotNull(destination.getValue("age"));
-    Assert.assertNotNull(destination.getValue("gender"));
+    assertNotNull(destination.getValue("name"));
+    assertNotNull(destination.getValue("age"));
+    assertNotNull(destination.getValue("gender"));
 
-    Assert.assertEquals(destination.getValue("name"), "Alice");
-    Assert.assertEquals(destination.getValue("age"), "18");
-    Assert.assertEquals(destination.getValue("gender"), "F");
+    assertEquals(destination.getValue("name"), "Alice");
+    assertEquals(destination.getValue("age"), "18");
+    assertEquals(destination.getValue("gender"), "F");
   }
 
   @Test
   public void testMultivalue()
       throws Exception {
     Map<String, String> decoderProps = getStandardDecoderProps();
-    decoderProps.put("csv.hdr", "name;age;gender;subjects");
+    decoderProps.put("  header", "name;age;gender;subjects");
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
     messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "");
     String incomingRecord = "Alice;18;F;maths,German,history";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
-    Assert.assertNotNull(destination.getValue("name"));
-    Assert.assertNotNull(destination.getValue("age"));
-    Assert.assertNotNull(destination.getValue("gender"));
-    Assert.assertNotNull(destination.getValue("subjects"));
+    assertNotNull(destination.getValue("name"));
+    assertNotNull(destination.getValue("age"));
+    assertNotNull(destination.getValue("gender"));
+    assertNotNull(destination.getValue("subjects"));
 
-    Assert.assertEquals(destination.getValue("name"), "Alice");
-    Assert.assertEquals(destination.getValue("age"), "18");
-    Assert.assertEquals(destination.getValue("gender"), "F");
-    Assert.assertEquals(destination.getValue("subjects"), new String[]{"maths", "German", "history"});
+    assertEquals(destination.getValue("name"), "Alice");
+    assertEquals(destination.getValue("age"), "18");
+    assertEquals(destination.getValue("gender"), "F");
+    assertEquals(destination.getValue("subjects"), new String[]{"maths", "German", "history"});
   }
 
   @Test(expectedExceptions = java.util.NoSuchElementException.class)
   public void testCommentMarker()
       throws Exception {
     Map<String, String> decoderProps = getStandardDecoderProps();
-    decoderProps.put("csv.hdr", "name,age,gender");
-    decoderProps.put("csv.delim", ",");
-    decoderProps.put("csv.commentMarker", "#");
+    decoderProps.put("header", "name,age,gender");
+    decoderProps.put("delimiter", ",");
+    decoderProps.put("commentMarker", "#");
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
     messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender"), "");
     String incomingRecord = "#Alice,18,F";
@@ -88,43 +90,43 @@ public class CSVMessageDecoderTest {
   public void testHeaderFromRecord()
       throws Exception {
     Map<String, String> decoderProps = getStandardDecoderProps();
-    decoderProps.remove("csv.hdr");
-    decoderProps.put("csv.delim", ",");
+    decoderProps.remove("header");
+    decoderProps.put("delimiter", ",");
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
     messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender"), "");
     String incomingRecord = "name,age,gender\nAlice,18,F";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
 
-    Assert.assertNotNull(destination.getValue("name"));
-    Assert.assertNotNull(destination.getValue("age"));
-    Assert.assertNotNull(destination.getValue("gender"));
+    assertNotNull(destination.getValue("name"));
+    assertNotNull(destination.getValue("age"));
+    assertNotNull(destination.getValue("gender"));
 
-    Assert.assertEquals(destination.getValue("name"), "Alice");
-    Assert.assertEquals(destination.getValue("age"), "18");
-    Assert.assertEquals(destination.getValue("gender"), "F");
+    assertEquals(destination.getValue("name"), "Alice");
+    assertEquals(destination.getValue("age"), "18");
+    assertEquals(destination.getValue("gender"), "F");
   }
 
   @Test
   public void testEscapeCharacter()
       throws Exception {
     Map<String, String> decoderProps = getStandardDecoderProps();
-    decoderProps.put("csv.hdr", "name;age;gender;subjects");
-    decoderProps.put("csv.delim", ";");
+    decoderProps.put("header", "name;age;gender;subjects");
+    decoderProps.put("delimiter", ";");
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
     messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "");
     String incomingRecord = "Alice;18;F;mat\\;hs";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
-    Assert.assertNotNull(destination.getValue("name"));
-    Assert.assertNotNull(destination.getValue("age"));
-    Assert.assertNotNull(destination.getValue("gender"));
-    Assert.assertNotNull(destination.getValue("subjects"));
+    assertNotNull(destination.getValue("name"));
+    assertNotNull(destination.getValue("age"));
+    assertNotNull(destination.getValue("gender"));
+    assertNotNull(destination.getValue("subjects"));
 
-    Assert.assertEquals(destination.getValue("name"), "Alice");
-    Assert.assertEquals(destination.getValue("age"), "18");
-    Assert.assertEquals(destination.getValue("gender"), "F");
-    Assert.assertEquals(destination.getValue("subjects"), "mat;hs");
+    assertEquals(destination.getValue("name"), "Alice");
+    assertEquals(destination.getValue("age"), "18");
+    assertEquals(destination.getValue("gender"), "F");
+    assertEquals(destination.getValue("subjects"), "mat;hs");
   }
 
   @Test
@@ -137,10 +139,10 @@ public class CSVMessageDecoderTest {
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
 
-    Assert.assertEquals(destination.getValue("name"), "Alice");
-    Assert.assertEquals(destination.getValue("age"), "18");
-    Assert.assertEquals(destination.getValue("gender"), "F");
-    Assert.assertEquals(destination.getValue("subjects"), "maths");
+    assertEquals(destination.getValue("name"), "Alice");
+    assertEquals(destination.getValue("age"), "18");
+    assertEquals(destination.getValue("gender"), "F");
+    assertEquals(destination.getValue("subjects"), "maths");
   }
 
   @Test
@@ -152,10 +154,10 @@ public class CSVMessageDecoderTest {
   private static Map<String, String> getStandardDecoderProps() {
     //setup
     Map<String, String> props = new HashMap<>();
-    props.put("csv.hdr", "name;age;gender");
-    props.put("csv.delim", ";");
-    props.put("csv.multiValDelim", ",");
-    props.put("csv.EscChar", "\\");
+    props.put("header", "name;age;gender");
+    props.put("delimiter", ";");
+    props.put("multiValueDelimiter", ",");
+    props.put("escapeCharacter", "\\");
     return props;
   }
 }

@@ -34,16 +34,20 @@ import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
 
-  private static final String CONFIG_FILE_FORMAT = "csv.fileFmt";
-  private static final String CONFIG_HEADER = "csv.hdr";
-  private static final String CONFIG_DELIMITER = "csv.delim";
-  private static final String CONFIG_COMMENT_MARKER = "csv.commentMarker";
-  private static final String CONFIG_CSV_ESCAPE_CHARACTER = "csv.EscChar";
-  private static final String CONFIG_CSV_MULTI_VALUE_DELIMITER = "csv.multiValDelim";
+  private static final Logger LOGGER = LoggerFactory.getLogger(CSVMessageDecoder.class);
+
+  private static final String CONFIG_FILE_FORMAT = "fileFormat";
+  private static final String CONFIG_HEADER = "header";
+  private static final String CONFIG_DELIMITER = "delimiter";
+  private static final String CONFIG_COMMENT_MARKER = "commentMarker";
+  private static final String CONFIG_CSV_ESCAPE_CHARACTER = "escapeCharacter";
+  private static final String CONFIG_CSV_MULTI_VALUE_DELIMITER = "multiValueDelimiter";
 
   private CSVFormat _format;
   private CSVRecordExtractor _recordExtractor;
@@ -70,6 +74,8 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
           format = CSVFormat.TDF;
           break;
         default:
+          LOGGER.info("Could not recognise the configured CSV file format: {}, falling back to DEFAULT format",
+              csvFormat);
           format = CSVFormat.DEFAULT;
           break;
       }
