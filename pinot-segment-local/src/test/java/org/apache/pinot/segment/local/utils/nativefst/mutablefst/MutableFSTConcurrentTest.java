@@ -76,7 +76,7 @@ public class MutableFSTConcurrentTest {
       try {
         performReads(mutableFST, words, 10, 200, countDownLatch);
       } catch (InterruptedException e) {
-        e.printStackTrace();
+        throw new RuntimeException(e);
       }
     });
 
@@ -84,7 +84,7 @@ public class MutableFSTConcurrentTest {
       try {
         performWrites(mutableFST, wordsWithMetadata, 10, countDownLatch);
       } catch (InterruptedException e) {
-        e.printStackTrace();
+        throw new RuntimeException(e);
       }
     });
 
@@ -124,7 +124,7 @@ public class MutableFSTConcurrentTest {
       try {
         performReads(mutableFST, words, 10, 10, countDownLatch);
       } catch (InterruptedException e) {
-        e.printStackTrace();
+        throw new RuntimeException(e);
       }
     });
 
@@ -132,7 +132,7 @@ public class MutableFSTConcurrentTest {
       try {
         performWrites(mutableFST, wordsWithMetadata, 0, countDownLatch);
       } catch (InterruptedException e) {
-        e.printStackTrace();
+        throw new RuntimeException(e);
       }
     });
 

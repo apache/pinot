@@ -20,10 +20,14 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.text.TermsParser;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFST;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFSTImpl;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RealTimeRegexpMatcher;
@@ -40,7 +44,7 @@ public class NativeMutableTextIndex implements MutableTextIndex {
   private final Object2IntOpenHashMap<String> _termToDictIdMapping;
   private final ReentrantReadWriteLock.ReadLock _readLock;
   private final ReentrantReadWriteLock.WriteLock _writeLock;
-  private final TermsParser _termsParser;
+  private final Analyzer _analyzer;
 
   private int _nextDocId = 0;
   private int _nextDictId = 0;
@@ -54,14 +58,14 @@ public class NativeMutableTextIndex implements MutableTextIndex {
     ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
     _readLock = readWriteLock.readLock();
     _writeLock = readWriteLock.writeLock();
-    _termsParser = new TermsParser(new StandardAnalyzer(LuceneTextIndexCreator.ENGLISH_STOP_WORDS_SET), _column);
+    _analyzer = new StandardAnalyzer(LuceneTextIndexCreator.ENGLISH_STOP_WORDS_SET);
   }
 
   @Override
   public void add(String document) {
     Iterable<String> tokens;
 
-    tokens = _termsParser.parse(document);
+    tokens = analyze(document);
     _writeLock.lock();
     try {
       for (String token : tokens) {
@@ -99,5 +103,21 @@ public class NativeMutableTextIndex implements MutableTextIndex {
   @Override
   public void close()
       throws IOException {
+    _analyzer.close();
+  }
+
+  private List<String> analyze(String document) {
+    List<String> tokens = new ArrayList<>();
+    try (TokenStream tokenStream = _analyzer.tokenStream(_column, document)) {
+      tokenStream.reset();
+      CharTermAttribute attribute = tokenStream.getAttribute(CharTermAttribute.class);
+      while (tokenStream.incrementToken()) {
+        tokens.add(attribute.toString());
+      }
+      tokenStream.end();
+    } catch (IOException e) {
+      throw new RuntimeException("Caught exception while tokenizing the document for column: " + _column, e);
+    }
+    return tokens;
   }
 }

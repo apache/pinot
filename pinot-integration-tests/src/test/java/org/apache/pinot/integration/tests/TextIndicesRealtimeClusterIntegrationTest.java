@@ -37,7 +37,6 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -239,11 +238,7 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
       Thread.sleep(100);
     }
 
-    try {
-      Assert.assertTrue(getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY_NATIVE) == NUM_MATCHING_RECORDS_NATIVE);
-    } catch (Exception e) {
-      fail("Caught exception while getting text column query result");
-    }
+    assertTrue(getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY_NATIVE) == NUM_MATCHING_RECORDS_NATIVE);
   }
 
   private long getTextColumnQueryResult(String query)

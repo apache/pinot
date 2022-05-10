@@ -16,24 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.queries;
+package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.search.SearcherManager;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableTextIndex;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
-import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 
-public class LuceneFSTVsNativeMutableFSTTest extends BaseQueriesTest {
+
+public class NativeAndLuceneMutableTextIndexTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "RealTimeNativeVsLuceneTest");
   private static final String TEXT_COLUMN_NAME = "testColumnName";
 
@@ -68,26 +66,13 @@ public class LuceneFSTVsNativeMutableFSTTest extends BaseQueriesTest {
     try {
       searcherManager.maybeRefresh();
     } catch (Exception e) {
-      // we should never be here since the locking semantics between MutableSegmentImpl::destroy()
-      // and this code along with volatile state "isSegmentDestroyed" protect against the cases
-      // where this thread might attempt to refresh a realtime lucene reader after it has already
-      // been closed duing segment destroy.
+      throw new RuntimeException(e);
     }
   }
 
-  @Override
-  protected String getFilter() {
-    return null;
-  }
-
-  @Override
-  protected IndexSegment getIndexSegment() {
-    return null;
-  }
-
-  @Override
-  protected List<IndexSegment> getIndexSegments() {
-    return null;
+  @AfterClass
+  public void tearDown() {
+    _realtimeLuceneTextIndex.close();
   }
 
   @Test
@@ -115,18 +100,8 @@ public class LuceneFSTVsNativeMutableFSTTest extends BaseQueriesTest {
 
   private void testSelectionResults(String nativeQuery, String luceneQuery) {
     MutableRoaringBitmap resultset = _realtimeLuceneTextIndex.getDocIds(luceneQuery);
-    Assert.assertNotNull(resultset);
-
     MutableRoaringBitmap resultset2 = _nativeMutableTextIndex.getDocIds(nativeQuery);
-    Assert.assertNotNull(resultset2);
 
-    Assert.assertEquals(resultset.getCardinality(), resultset2.getCardinality());
-
-    PeekableIntIterator intIterator = resultset.getIntIterator();
-
-    while (intIterator.hasNext()) {
-      int firstDocId = intIterator.next();
-      Assert.assertTrue(resultset2.contains(firstDocId));
-    }
+    assertEquals(_nativeMutableTextIndex.getDocIds(nativeQuery), _realtimeLuceneTextIndex.getDocIds(luceneQuery));
   }
 }
