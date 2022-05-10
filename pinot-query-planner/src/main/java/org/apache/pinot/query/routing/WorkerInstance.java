@@ -41,7 +41,7 @@ public class WorkerInstance extends ServerInstance {
   }
 
   private static InstanceConfig toInstanceConfig(String hostname, int serverPort, int mailboxPort) {
-    String server = String.format("%s_%d", hostname, serverPort);
+    String server = String.format("%s%s_%d", CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE, hostname, serverPort);
     InstanceConfig instanceConfig = InstanceConfig.toInstanceConfig(server);
     ZNRecord znRecord = instanceConfig.getRecord();
     Map<String, String> simpleFields = znRecord.getSimpleFields();
