@@ -23,7 +23,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
@@ -82,9 +81,7 @@ public class ZKMetadataUtils {
 
     // Set partition metadata
     Map<String, ColumnPartitionMetadata> columnPartitionMap = new HashMap<>();
-    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
-      String column = entry.getKey();
-      ColumnMetadata columnMetadata = entry.getValue();
+    segmentMetadata.getColumnMetadataMap().forEach((column, columnMetadata) -> {
       PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
       if (partitionFunction != null) {
         ColumnPartitionMetadata columnPartitionMetadata =
@@ -92,7 +89,7 @@ public class ZKMetadataUtils {
                 columnMetadata.getPartitions(), partitionFunction.getFunctionConfig());
         columnPartitionMap.put(column, columnPartitionMetadata);
       }
-    }
+    });
     if (!columnPartitionMap.isEmpty()) {
       segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(columnPartitionMap));
     } else {
@@ -113,7 +110,9 @@ public class ZKMetadataUtils {
     if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
       segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOADED);
 
-      // NOTE: Keep offset as is if it is not explicitly set in the segment metadata
+      // NOTE:
+      // - If start/end offset is available in the uploaded segment, update them in the segment ZK metadata
+      // - If not, keep the existing start/end offset in the segment ZK metadata unchanged
       if (segmentMetadata.getStartOffset() != null) {
         segmentZKMetadata.setStartOffset(segmentMetadata.getStartOffset());
       }
