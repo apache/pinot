@@ -23,6 +23,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
+import java.util.Random;
 import org.apache.http.client.utils.URIBuilder;
 
 
@@ -33,7 +34,7 @@ import org.apache.http.client.utils.URIBuilder;
 public class RoundRobinURIProvider {
 
   private final URI[] _uris;
-  private int _index = 0;
+  private int _index;
 
   public RoundRobinURIProvider(URI originalUri)
       throws UnknownHostException, URISyntaxException {
@@ -50,6 +51,7 @@ public class RoundRobinURIProvider {
         _uris[i] = uriBuilder.setHost(ip).build();
       }
     }
+    _index = new Random().nextInt(_uris.length);
   }
 
   public int numAddresses() {
