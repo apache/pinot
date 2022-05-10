@@ -45,6 +45,8 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
+import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
@@ -339,18 +341,118 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     DataTableBuilder dataTableBuilder = new DataTableBuilder(DataSchema.EXPLAIN_RESULT_SCHEMA);
     Operator root = queryPlan.getPlanNode().run().getChildOperators().get(0);
     int[] idArray = {1};
+    int[] numEmptyFilterSegments = {0};
+    int[] numMatchAllFilterSegments = {0};
 
     try {
-      addOperatorToTable(dataTableBuilder, root, idArray, 0);
+      int finalSegmentIdxToUse = getSegmentWithMaxNumOperators(root, numEmptyFilterSegments, numMatchAllFilterSegments);
+      if (finalSegmentIdxToUse >= 0) {
+        addOperatorToTable(dataTableBuilder, root, idArray, 0, true, finalSegmentIdxToUse);
+      }
     } catch (IOException ioe) {
       LOGGER.error("Unable to create EXPLAIN PLAN result table.", ioe);
     }
-    return dataTableBuilder.build();
+
+    DataTable dataTable = dataTableBuilder.build();
+    dataTable.getMetadata().put(MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName(),
+        String.valueOf(numEmptyFilterSegments[0]));
+    dataTable.getMetadata().put(MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName(),
+        String.valueOf(numMatchAllFilterSegments[0]));
+    return dataTable;
   }
 
-  /** Create EXPLAIN query result {@link DataTable} by recursively stepping through the {@link Operator} tree. */
-  public static void addOperatorToTable(DataTableBuilder dataTableBuilder, Operator node, int[] globalId, int parentId)
-      throws IOException {
+  /**
+   * Find and return the segment to use with the maximum number of operators. Also remove segments with the
+   * {@link EmptyFilterOperator} or {@link MatchAllFilterOperator} if segments with other operator types are available.
+   * If all segments contain either {@link EmptyFilterOperator} or {@link MatchAllFilterOperator}, return the deepest
+   * of that type.
+   */
+  private static int getSegmentWithMaxNumOperators(Operator root, int[] numEmptyFilterSegments,
+      int[] numMatchAllFilterSegments) {
+    if (root == null || root.getChildOperators().isEmpty()) {
+      return -1;
+    }
+
+    List<Operator> children = root.getChildOperators();
+    // Only one segment available, create the EXPLAIN plan for this single segment
+    if (children.size() == 1) {
+      return 0;
+    }
+
+    // Find the depth of each segment's operator tree. Also track which segments use an EmptyFilter or MatchAllFilter
+    int maxDepthEmpty = -1;
+    int maxDepthEmptyIdx = -1;
+    int maxDepthMatchAll = -1;
+    int maxDepthMatchAllIdx = -1;
+    int maxDepthOther = -1;
+    int maxDepthOtherIdx = -1;
+    for (int i = 0; i < children.size(); ++i) {
+      int[] numOperators = {0};
+      boolean[] isEmptyFilter = {false};
+      boolean[] isMatchAllFilter = {false};
+
+      getNumSegmentOperators(children.get(i), numOperators, isEmptyFilter, isMatchAllFilter);
+      if (isEmptyFilter[0]) {
+        numEmptyFilterSegments[0]++;
+        if (numOperators[0] > maxDepthEmpty) {
+          maxDepthEmpty = numOperators[0];
+          maxDepthEmptyIdx = i;
+        }
+      } else if (isMatchAllFilter[0]) {
+        numMatchAllFilterSegments[0]++;
+        if (numOperators[0] > maxDepthMatchAll) {
+          maxDepthMatchAll = numOperators[0];
+          maxDepthMatchAllIdx = i;
+        }
+      } else {
+        if (numOperators[0] > maxDepthOther) {
+          maxDepthOther = numOperators[0];
+          maxDepthOtherIdx = i;
+        }
+      }
+    }
+
+    // Precedence: Other segment > MatchAllFilter segment > EmptyFilter segment
+    int segmentIdxForExplainPlanQuery = -1;
+    if (maxDepthOther > -1) {
+      segmentIdxForExplainPlanQuery = maxDepthOtherIdx;
+    } else if (maxDepthMatchAll > -1) {
+      segmentIdxForExplainPlanQuery = maxDepthMatchAllIdx;
+    } else if (maxDepthEmpty > -1){
+      segmentIdxForExplainPlanQuery = maxDepthEmptyIdx;
+    }
+
+    return segmentIdxForExplainPlanQuery;
+  }
+
+  /**
+   * Get a single segment's {@link Operator} total number of operators by traversing through the {@link Operator} tree
+   */
+  private static void getNumSegmentOperators(Operator node, int[] numOperators, boolean[] isEmptyFilter,
+      boolean[] isMatchAllFilter) {
+    if (node == null) {
+      return;
+    }
+
+    numOperators[0]++;
+    List<Operator> children = node.getChildOperators();
+    for (Operator child : children) {
+      if (child instanceof EmptyFilterOperator) {
+        isEmptyFilter[0] = true;
+      }
+      if (child instanceof MatchAllFilterOperator) {
+        isMatchAllFilter[0] = true;
+      }
+      getNumSegmentOperators(child, numOperators, isEmptyFilter, isMatchAllFilter);
+    }
+  }
+
+  /**
+   * Create EXPLAIN query result {@link DataTable} by recursively stepping through the {@link Operator} tree.
+   * The segmentIdx decides which segment to create the EXPLAIN query plan for if multiple segments are available.
+   */
+  public static void addOperatorToTable(DataTableBuilder dataTableBuilder, Operator node, int[] globalId, int parentId,
+      boolean isRoot, int segmentIdx) throws IOException {
     if (node == null) {
       return;
     }
@@ -367,8 +469,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     List<Operator> children = node.getChildOperators();
-    for (Operator child : children) {
-      addOperatorToTable(dataTableBuilder, child, globalId, parentId);
+    if (isRoot) {
+      addOperatorToTable(dataTableBuilder, children.get(segmentIdx), globalId, parentId, false, segmentIdx);
+    } else {
+      for (Operator child : children) {
+        addOperatorToTable(dataTableBuilder, child, globalId, parentId, false, segmentIdx);
+      }
     }
   }
 

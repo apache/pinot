@@ -535,14 +535,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Execute the query
     ServerStats serverStats = new ServerStats();
     if (serverPinotQuery.isExplain()) {
-      // Update routing tables to only send request to 1 server (& generate the plan for 1 segment).
+      // Update routing tables to only send request to offline servers for OFFLINE and HYBRID tables.
       if (offlineRoutingTable != null) {
-        setRoutingToOneSegment(offlineRoutingTable);
         // For OFFLINE and HYBRID tables, don't send EXPLAIN query to realtime servers.
         realtimeBrokerRequest = null;
         realtimeRoutingTable = null;
-      } else {
-        setRoutingToOneSegment(realtimeRoutingTable);
       }
     }
     // TODO: Modify processBrokerRequest() to directly take PinotQuery
@@ -624,15 +621,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     function.getOperands()
         .forEach(operand -> setTimestampIndexExpressionOverrideHints(operand, timestampIndexColumns, pinotQuery));
-  }
-
-  /** Set EXPLAIN PLAN query to route to only one segment on one server. */
-  private void setRoutingToOneSegment(Map<ServerInstance, List<String>> routingTable) {
-    Set<Map.Entry<ServerInstance, List<String>>> servers = routingTable.entrySet();
-    // only send request to 1 server
-    Map.Entry<ServerInstance, List<String>> server = servers.iterator().next();
-    routingTable.clear();
-    routingTable.put(server.getKey(), Collections.singletonList(server.getValue().get(0)));
   }
 
   /** Given a {@link PinotQuery}, check if the WHERE clause will always evaluate to false. */

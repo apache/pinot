@@ -49,7 +49,9 @@ import org.testng.annotations.Test;
 public class ExplainPlanQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ExplainPlanQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
-  private static final String SEGMENT_NAME = "testSegment";
+  private static final String SEGMENT_NAME_1 = "testSegment1";
+  private static final String SEGMENT_NAME_2 = "testSegment2";
+  private static final String SEGMENT_NAME_3 = "testSegment3";
   private static final int NUM_RECORDS = 10;
 
   private final static String COL1_NO_INDEX = "noIndexCol1";
@@ -133,19 +135,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     return record;
   }
 
-  @BeforeClass
-  public void setUp()
+  IndexLoadingConfig createIndexLoadingConfig(List<GenericRow> records, String segmentName)
       throws Exception {
-    FileUtils.deleteDirectory(INDEX_DIR);
-
-    List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
-    records.add(createMockRecord(1, 2, 3, true, 1.1, 2, "daffy", 10.1, 20, 30, 100.1,
-        "{\"first\": \"daffy\", \"last\": " + "\"duck\"}", "daffy"));
-    records.add(createMockRecord(0, 1, 2, false, 0.1, 1, "mickey", 0.1, 10, 20, 100.2,
-        "{\"first\": \"mickey\", \"last\": " + "\"mouse\"}", "mickey"));
-    records.add(createMockRecord(3, 4, 5, true, 2.1, 3, "mickey", 20.1, 30, 40, 100.3,
-        "{\"first\": \"mickey\", \"last\": " + "\"mouse\"}", "mickey"));
-
     IndexingConfig indexingConfig = TABLE_CONFIG.getIndexingConfig();
 
     List<String> invertedIndexColumns = Arrays.asList(COL1_INVERTED_INDEX, COL2_INVERTED_INDEX, COL3_INVERTED_INDEX);
@@ -162,7 +153,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
-    segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
+    segmentGeneratorConfig.setSegmentName(segmentName);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -176,10 +167,49 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     indexLoadingConfig.setJsonIndexColumns(new HashSet<String>(jsonIndexColumns));
     indexLoadingConfig.setReadMode(ReadMode.mmap);
 
-    ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
-    _indexSegment = immutableSegment;
-    _indexSegments = Arrays.asList(immutableSegment);
+    return indexLoadingConfig;
+  }
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    FileUtils.deleteDirectory(INDEX_DIR);
+
+    List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
+    records.add(createMockRecord(1, 2, 3, true, 1.1, 2, "daffy", 10.1, 20, 30, 100.1,
+        "{\"first\": \"daffy\", \"last\": " + "\"duck\"}", "daffy"));
+    records.add(createMockRecord(0, 1, 2, false, 0.1, 1, "mickey", 0.1, 10, 20, 100.2,
+        "{\"first\": \"mickey\", \"last\": " + "\"mouse\"}", "mickey"));
+    records.add(createMockRecord(3, 4, 5, true, 2.1, 3, "mickey", 20.1, 30, 40, 100.3,
+        "{\"first\": \"mickey\", \"last\": " + "\"mouse\"}", "mickey"));
+    IndexLoadingConfig indexLoadingConfig1 = createIndexLoadingConfig(records, SEGMENT_NAME_1);
+
+    List<GenericRow> records2 = new ArrayList<>(NUM_RECORDS);
+    records2.add(createMockRecord(5, 2, 3, true, 1.1, 2, "pluto", 10.1, 20, 30, 100.1,
+        "{\"first\": \"pluto\", \"last\": " + "\"dog\"}", "pluto"));
+    records2.add(createMockRecord(6, 1, 2, false, 0.1, 1, "pluto", 0.1, 10, 20, 100.2,
+        "{\"first\": \"pluto\", \"last\": " + "\"dog\"}", "pluto"));
+    records2.add(createMockRecord(7, 4, 5, true, 2.1, 3, "pluto", 20.1, 30, 40, 100.3,
+        "{\"first\": \"pluto\", \"last\": " + "\"dog\"}", "pluto"));
+    IndexLoadingConfig indexLoadingConfig2 = createIndexLoadingConfig(records2, SEGMENT_NAME_2);
+
+    List<GenericRow> records3 = new ArrayList<>(NUM_RECORDS);
+    records3.add(createMockRecord(5, 2, 3, true, 1.5, 2, "donald", 10.1, 20, 30, 100.1,
+        "{\"first\": \"donald\", \"last\": " + "\"duck\"}", "donald"));
+    records3.add(createMockRecord(6, 1, 2, false, 0.1, 1, "goofy", 0.1, 10, 20, 100.2,
+        "{\"first\": \"goofy\", \"last\": " + "\"dog\"}", "goofy"));
+    records3.add(createMockRecord(7, 4, 5, true, 2.1, 3, "minnie", 20.1, 30, 40, 100.3,
+        "{\"first\": \"minnie\", \"last\": " + "\"mouse\"}", "minnie"));
+    IndexLoadingConfig indexLoadingConfig3 = createIndexLoadingConfig(records3, SEGMENT_NAME_3);
+
+    ImmutableSegment immutableSegment1 =
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_1), indexLoadingConfig1);
+    ImmutableSegment immutableSegment2 =
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_2), indexLoadingConfig2);
+    ImmutableSegment immutableSegment3 =
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_3), indexLoadingConfig3);
+    _indexSegment = immutableSegment1;
+    _indexSegments = Arrays.asList(immutableSegment1, immutableSegment2, immutableSegment3);
   }
 
   /** Checks the correctness of EXPLAIN PLAN output. */
@@ -642,6 +672,52 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,"
         + "predicate:invertedIndexCol1 = '1.1')", 8, 6});
     check(query4, new ResultTable(DATA_SCHEMA, result4));
+
+    // Only one segment has a non-EmptyFilterOperator plan for this query, ensure we get that plan
+    String query5 =
+        "EXPLAIN PLAN FOR SELECT count(*) FROM testTable WHERE invertedIndexCol1 = 1.5 LIMIT 100";
+    List<Object[]> result5 = new ArrayList<>();
+    result5.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
+    result5.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
+    result5.add(new Object[]{"FAST_FILTERED_COUNT", 2, 1});
+    result5.add(new Object[]{"FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:"
+        +"invertedIndexCol1 = '1.5')", 3, 2});
+    check(query5, new ResultTable(DATA_SCHEMA, result5));
+
+    // All segments have a EmptyFilterOperator plan for this query, ensure we get that plan
+    String query6 =
+        "EXPLAIN PLAN FOR SELECT count(*) FROM testTable WHERE invertedIndexCol1 = 1.7 LIMIT 100";
+    List<Object[]> result6 = new ArrayList<>();
+    result6.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
+    result6.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
+    result6.add(new Object[]{"FAST_FILTERED_COUNT", 2, 1});
+    result6.add(new Object[]{"FILTER_EMPTY", 3, 2});
+    check(query6, new ResultTable(DATA_SCHEMA, result6));
+
+    // One segment has a EmptyFilterOperator plan for this query while the others have a MatchAllFilterOperator,
+    // ensure we get the MatchAll plan as it has precedence
+    String query7 =
+        "EXPLAIN PLAN FOR SELECT count(*) FROM testTable WHERE invertedIndexCol3 = 'pluto' LIMIT 100";
+    List<Object[]> result7 = new ArrayList<>();
+    result7.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
+    result7.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
+    result7.add(new Object[]{"FAST_FILTERED_COUNT", 2, 1});
+    result7.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 3, 2});
+    check(query7, new ResultTable(DATA_SCHEMA, result7));
+
+    // One segment has a MatchAllFilterOperator plan for this query, another has an EmptyFilterOperator, while a third
+    // uses an inverted index. Ensure we get the one with the inverted index plan.
+    String query8 =
+        "EXPLAIN PLAN FOR SELECT count(*) FROM testTable WHERE invertedIndexCol3 = 'pluto' OR "
+            +"invertedIndexCol3 = 'minnie' LIMIT 100";
+    List<Object[]> result8 = new ArrayList<>();
+    result8.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
+    result8.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
+    result8.add(new Object[]{"FAST_FILTERED_COUNT", 2, 1});
+    result8.add(
+        new Object[]{"FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol3 = 'minnie')",
+            3, 2});
+    check(query8, new ResultTable(DATA_SCHEMA, result8));
   }
 
   @Test
