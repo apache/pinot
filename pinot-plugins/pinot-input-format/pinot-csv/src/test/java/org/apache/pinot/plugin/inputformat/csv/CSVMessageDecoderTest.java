@@ -145,12 +145,6 @@ public class CSVMessageDecoderTest {
     assertEquals(destination.getValue("subjects"), "maths");
   }
 
-  @Test
-  public void testExcel()
-      throws Exception {
-
-  }
-
   private static Map<String, String> getStandardDecoderProps() {
     //setup
     Map<String, String> props = new HashMap<>();
