@@ -230,6 +230,10 @@
       <artifactId>hk2-locator</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.glassfish.hk2</groupId>
+      <artifactId>hk2-metadata-generator</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-server</artifactId>
       <version>${project.version}</version>
@@ -372,11 +376,6 @@
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.glassfish.hk2</groupId>
-      <artifactId>hk2-metadata-generator</artifactId>
-      <version>${hk2.version}</version>
     </dependency>
   </dependencies>
 </project>
