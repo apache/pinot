@@ -60,6 +60,7 @@ class ScalableGapfillProcessorForCount extends ScalableGapfillProcessor {
         break;
       }
       updateCounter(row);
+      rowIndex++;
     }
 
     List<Object[]> result = new ArrayList<>();
