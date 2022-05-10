@@ -19,7 +19,6 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
-import java.util.Collections;
 import java.util.TreeMap;
 import org.apache.pinot.plugin.inputformat.json.JSONRecordReader;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
@@ -77,7 +76,8 @@ public class DataImportDryRunCommand extends AbstractBaseAdminCommand implements
       reuse = jsonRecordReader.next(reuse);
       transformPipeline.processRow(reuse, reusedResult);
       for (GenericRow row : reusedResult.getTransformedRows()) {
-        System.out.println("Available Fields: " + JsonUtils.objectToPrettyString(new TreeMap<>(row.getFieldToValueMap())));
+        System.out.println("Available Fields: " + JsonUtils.objectToPrettyString(
+            new TreeMap<>(row.getFieldToValueMap())));
       }
     }
 
