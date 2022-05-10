@@ -24,14 +24,15 @@ import java.util.HashMap;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
-import org.apache.pinot.query.runtime.blocks.DataTableBlock;
-import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.BaseDataBlock;
+import org.apache.pinot.query.runtime.blocks.DataBlockBuilder;
+import org.apache.pinot.query.runtime.blocks.DataBlockUtils;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 
 
 /**
@@ -42,12 +43,12 @@ import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
  *
  * <p>For each of the data block received from the left table, it will generate a joint data block.
  */
-public class HashJoinOperator extends BaseOperator<DataTableBlock> {
+public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "BROADCAST_JOIN";
 
   private final HashMap<Object, List<Object[]>> _broadcastHashTable;
-  private final BaseOperator<DataTableBlock> _leftTableOperator;
-  private final BaseOperator<DataTableBlock> _rightTableOperator;
+  private final BaseOperator<TransferableBlock> _leftTableOperator;
+  private final BaseOperator<TransferableBlock> _rightTableOperator;
 
   private DataSchema _leftTableSchema;
   private DataSchema _rightTableSchema;
@@ -56,8 +57,8 @@ public class HashJoinOperator extends BaseOperator<DataTableBlock> {
   private KeySelector<Object[], Object> _leftKeySelector;
   private KeySelector<Object[], Object> _rightKeySelector;
 
-  public HashJoinOperator(BaseOperator<DataTableBlock> leftTableOperator,
-      BaseOperator<DataTableBlock> rightTableOperator, List<JoinNode.JoinClause> criteria) {
+  public HashJoinOperator(BaseOperator<TransferableBlock> leftTableOperator,
+      BaseOperator<TransferableBlock> rightTableOperator, List<JoinNode.JoinClause> criteria) {
     // TODO: this assumes right table is broadcast.
     _leftKeySelector = criteria.get(0).getLeftJoinKeySelector();
     _rightKeySelector = criteria.get(0).getRightJoinKeySelector();
@@ -80,25 +81,25 @@ public class HashJoinOperator extends BaseOperator<DataTableBlock> {
   }
 
   @Override
-  protected DataTableBlock getNextBlock() {
+  protected TransferableBlock getNextBlock() {
     buildBroadcastHashTable();
     try {
-      return new DataTableBlock(buildJoinedDataTable(_leftTableOperator.nextBlock()));
+      return new TransferableBlock(buildJoinedDataBlock(_leftTableOperator.nextBlock()));
     } catch (Exception e) {
-      return DataTableBlockUtils.getErrorDatatableBlock(e);
+      return DataBlockUtils.getErrorTransferableBlock(e);
     }
   }
 
   private void buildBroadcastHashTable() {
     if (!_isHashTableBuilt) {
-      DataTableBlock rightBlock = _rightTableOperator.nextBlock();
-      while (!DataTableBlockUtils.isEndOfStream(rightBlock)) {
-        DataTable dataTable = rightBlock.getDataTable();
-        _rightTableSchema = dataTable.getDataSchema();
-        int numRows = dataTable.getNumberOfRows();
+      TransferableBlock rightBlock = _rightTableOperator.nextBlock();
+      while (!DataBlockUtils.isEndOfStream(rightBlock)) {
+        BaseDataBlock dataBlock = rightBlock.getDataBlock();
+        _rightTableSchema = dataBlock.getDataSchema();
+        int numRows = dataBlock.getNumberOfRows();
         // put all the rows into corresponding hash collections keyed by the key selector function.
         for (int rowId = 0; rowId < numRows; rowId++) {
-          Object[] objects = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+          Object[] objects = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
           List<Object[]> hashCollection =
               _broadcastHashTable.computeIfAbsent(_rightKeySelector.getKey(objects), k -> new ArrayList<>());
           hashCollection.add(objects);
@@ -109,25 +110,25 @@ public class HashJoinOperator extends BaseOperator<DataTableBlock> {
     }
   }
 
-  private DataTable buildJoinedDataTable(DataTableBlock block)
+  private BaseDataBlock buildJoinedDataBlock(TransferableBlock block)
       throws Exception {
-    if (DataTableBlockUtils.isEndOfStream(block)) {
-      return DataTableBlockUtils.getEndOfStreamDataTable();
+    if (DataBlockUtils.isEndOfStream(block)) {
+      return DataBlockUtils.getEndOfStreamDataBlock();
     }
     List<Object[]> rows = new ArrayList<>();
-    DataTable dataTable = block.getDataTable();
-    _leftTableSchema = dataTable.getDataSchema();
+    BaseDataBlock dataBlock = block.getDataBlock();
+    _leftTableSchema = dataBlock.getDataSchema();
     _resultRowSize = _leftTableSchema.size() + _rightTableSchema.size();
-    int numRows = dataTable.getNumberOfRows();
+    int numRows = dataBlock.getNumberOfRows();
     for (int rowId = 0; rowId < numRows; rowId++) {
-      Object[] leftRow = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+      Object[] leftRow = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
       List<Object[]> hashCollection =
           _broadcastHashTable.getOrDefault(_leftKeySelector.getKey(leftRow), Collections.emptyList());
       for (Object[] rightRow : hashCollection) {
         rows.add(joinRow(leftRow, rightRow));
       }
     }
-    return SelectionOperatorUtils.getDataTableFromRows(rows, computeSchema());
+    return DataBlockBuilder.buildFromRows(rows, computeSchema());
   }
 
   private Object[] joinRow(Object[] leftRow, Object[] rightRow) {

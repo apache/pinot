@@ -33,8 +33,9 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.runtime.blocks.DataTableBlock;
-import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.BaseDataBlock;
+import org.apache.pinot.query.runtime.blocks.DataBlockUtils;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
@@ -58,24 +59,13 @@ public class QueryDispatcher {
       throws Exception {
     // submit all the distributed stages.
     int reduceStageId = submit(requestId, queryPlan);
-
-    // run reduce stage.
+    // run reduce stage and return result.
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
         queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
         requestId, reduceNode.getSenderStageId(), mailboxService.getHostname(),
         mailboxService.getMailboxPort());
-
-    List<DataTable> queryResults = new ArrayList<>();
-    long timeoutWatermark = System.nanoTime() + timeoutNano;
-    while (System.nanoTime() < timeoutWatermark) {
-      DataTableBlock dataTableBlock = mailboxReceiveOperator.nextBlock();
-      queryResults.add(dataTableBlock.getDataTable());
-      if (DataTableBlockUtils.isEndOfStream(dataTableBlock)) {
-        break;
-      }
-    }
-    return queryResults;
+    return reduceMailboxReceive(mailboxReceiveOperator);
   }
 
   public int submit(long requestId, QueryPlan queryPlan)
@@ -109,12 +99,9 @@ public class QueryDispatcher {
     return reduceStageId;
   }
 
-  protected MailboxReceiveOperator createReduceStageOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
-      List<ServerInstance> sendingInstances, long jobId, int stageId, String hostname, int port) {
-    MailboxReceiveOperator mailboxReceiveOperator =
-        new MailboxReceiveOperator(mailboxService, RelDistribution.Type.ANY, sendingInstances, hostname, port, jobId,
-            stageId);
-    return mailboxReceiveOperator;
+  private DispatchClient getOrCreateDispatchClient(String host, int port) {
+    String key = String.format("%s_%d", host, port);
+    return _dispatchClientMap.computeIfAbsent(key, k -> new DispatchClient(host, port));
   }
 
   public static DistributedStagePlan constructDistributedStagePlan(QueryPlan queryPlan, int stageId,
@@ -123,9 +110,28 @@ public class QueryDispatcher {
         queryPlan.getStageMetadataMap());
   }
 
-  private DispatchClient getOrCreateDispatchClient(String host, int port) {
-    String key = String.format("%s_%d", host, port);
-    return _dispatchClientMap.computeIfAbsent(key, k -> new DispatchClient(host, port));
+  public static List<DataTable> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator) {
+    List<DataTable> resultDataBlocks = new ArrayList<>();
+    TransferableBlock transferableBlock;
+    while (true) {
+      transferableBlock = mailboxReceiveOperator.nextBlock();
+      if (DataBlockUtils.isEndOfStream(transferableBlock)) {
+        break;
+      }
+      if (transferableBlock.getDataBlock() != null) {
+        BaseDataBlock dataTable = transferableBlock.getDataBlock();
+        resultDataBlocks.add(dataTable);
+      }
+    }
+    return resultDataBlocks;
+  }
+
+  public static MailboxReceiveOperator createReduceStageOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
+      List<ServerInstance> sendingInstances, long jobId, int stageId, String hostname, int port) {
+    MailboxReceiveOperator mailboxReceiveOperator =
+        new MailboxReceiveOperator(mailboxService, RelDistribution.Type.ANY, sendingInstances, hostname, port, jobId,
+            stageId);
+    return mailboxReceiveOperator;
   }
 
   public static class DispatchClient {
