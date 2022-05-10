@@ -590,8 +590,9 @@ public class SegmentPreProcessorTest {
   public void testV1UpdateDefaultColumns()
       throws Exception {
     constructV1Segment();
-    _tableConfig.setIngestionConfig(new IngestionConfig(null, null, null, null,
-        Collections.singletonList(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)")), null));
+    _tableConfig.setIngestionConfig(new IngestionConfig(null, null, null,
+        Collections.singletonList(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)")), null,
+        null));
     _indexLoadingConfig.getInvertedIndexColumns().add(NEW_COLUMN_INVERTED_INDEX);
     checkUpdateDefaultColumns();
 
@@ -635,8 +636,9 @@ public class SegmentPreProcessorTest {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
     assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
 
-    _tableConfig.setIngestionConfig(new IngestionConfig(null, null, null, null,
-        Collections.singletonList(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)")), null));
+    _tableConfig.setIngestionConfig(new IngestionConfig(null, null, null,
+        Collections.singletonList(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)")), null,
+        null));
     _indexLoadingConfig.getInvertedIndexColumns().add(NEW_COLUMN_INVERTED_INDEX);
     checkUpdateDefaultColumns();
 

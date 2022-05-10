@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import org.apache.pinot.spi.config.table.AggregationConfig;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -105,19 +105,19 @@ public class MutableSegmentImplIngestionAggregationTest {
     String m2 = "sum2";
 
     Schema schema =
-        getSchemaBuilder().addMetric(m1, FieldSpec.DataType.DOUBLE).addMetric(m2, FieldSpec.DataType.DOUBLE).build();
+        getSchemaBuilder().addMetric(m1, FieldSpec.DataType.INT).addMetric(m2, FieldSpec.DataType.LONG).build();
     MutableSegmentImpl mutableSegmentImpl =
         MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(m2, m1)),
             VAR_LENGTH_SET, INVERTED_INDEX_SET,
             Arrays.asList(new AggregationConfig(m1, "SUM(metric)"), new AggregationConfig(m2, "SUM(metric_2)")));
 
-    Map<String, Double> expectedSum1 = new HashMap<>();
-    Map<String, Double> expectedSum2 = new HashMap<>();
+    Map<String, Integer> expectedSum1 = new HashMap<>();
+    Map<String, Long> expectedSum2 = new HashMap<>();
     for (List<Metric> metrics : addRows(2, mutableSegmentImpl)) {
       expectedSum1.put(metrics.get(0).getKey(),
-          expectedSum1.getOrDefault(metrics.get(0).getKey(), 0.0) + metrics.get(0).getValue());
+          expectedSum1.getOrDefault(metrics.get(0).getKey(), 0) + metrics.get(0).getValue());
       expectedSum2.put(metrics.get(1).getKey(),
-          expectedSum2.getOrDefault(metrics.get(1).getKey(), 0.0) + metrics.get(1).getValue());
+          expectedSum2.getOrDefault(metrics.get(1).getKey(), 0L) + metrics.get(1).getValue().longValue());
     }
 
     GenericRow reuse = new GenericRow();
@@ -205,9 +205,9 @@ public class MutableSegmentImplIngestionAggregationTest {
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
 
     for (int i = 0; i < NUM_ROWS; i++) {
-      // Generate random int to prevent overflow
       GenericRow row = getRow(random);
-      Integer metricValue = random.nextInt();
+      // This needs to be relatively low since it will tend to overflow with the Int-to-Double conversion.
+      Integer metricValue = random.nextInt(10000);
       Integer metric2Value = random.nextInt();
       row.putValue(METRIC, metricValue);
       row.putValue(METRIC_2, metric2Value);

@@ -28,7 +28,6 @@ import java.util.Map;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
-import org.apache.pinot.spi.config.table.AggregationConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -39,6 +38,7 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
@@ -273,13 +273,13 @@ public class TableConfigUtilsTest {
 
     // empty transform configs
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setIngestionConfig(new IngestionConfig(null, null, null, null, Collections.emptyList(), null)).build();
+        .setIngestionConfig(new IngestionConfig(null, null, null, Collections.emptyList(), null, null)).build();
     TableConfigUtils.validate(tableConfig, schema);
 
     // transformed column not in schema
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, null,
-            Lists.newArrayList(new TransformConfig("myCol", "reverse(anotherCol)")), null)).build();
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "reverse(anotherCol)")),
+            null, null)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for transformedColumn not present in schema");
@@ -289,10 +289,10 @@ public class TableConfigUtilsTest {
 
     // using a transformation column in an aggregation
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("mySumCol", FieldSpec.DataType.STRING).build();
+        .addMetric("twiceSum", FieldSpec.DataType.DOUBLE).build();
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, Lists.newArrayList((new AggregationConfig("mySumCol", "SUM(myCol)"))),
-            Lists.newArrayList(new TransformConfig("myCol", "reverse(anotherCol)")), null)).build();
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("twice", "col * 2")),
+            null, Lists.newArrayList((new AggregationConfig("twiceSum", "SUM(twice)"))))).build();
     TableConfigUtils.validate(tableConfig, schema);
 
     schema =
@@ -300,8 +300,8 @@ public class TableConfigUtilsTest {
             .build();
     // valid transform configs
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, null,
-            Lists.newArrayList(new TransformConfig("myCol", "reverse(anotherCol)")), null)).build();
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "reverse(anotherCol)")),
+            null, null)).build();
     TableConfigUtils.validate(tableConfig, schema);
 
     schema =
@@ -309,9 +309,8 @@ public class TableConfigUtilsTest {
             .addMetric("transformedCol", FieldSpec.DataType.LONG).build();
     // valid transform configs
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, null,
-            Lists.newArrayList(new TransformConfig("myCol", "reverse(anotherCol)"),
-                new TransformConfig("transformedCol", "Groovy({x+y}, x, y)")), null)).build();
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "reverse(anotherCol)"),
+            new TransformConfig("transformedCol", "Groovy({x+y}, x, y)")), null, null)).build();
     TableConfigUtils.validate(tableConfig, schema);
 
     // invalid transform config since Groovy is disabled
@@ -335,8 +334,8 @@ public class TableConfigUtilsTest {
 
     // null transform column name
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, null,
-            Lists.newArrayList(new TransformConfig(null, "reverse(anotherCol)")), null)).build();
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig(null, "reverse(anotherCol)")),
+            null, null)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for null column name in transform config");
@@ -346,7 +345,7 @@ public class TableConfigUtilsTest {
 
     // null transform function string
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-            new IngestionConfig(null, null, null, null, Lists.newArrayList(new TransformConfig("myCol", null)), null))
+            new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", null)), null, null))
         .build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -357,8 +356,8 @@ public class TableConfigUtilsTest {
 
     // invalid function
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, null,
-            Lists.newArrayList(new TransformConfig("myCol", "fakeFunction(col)")), null)).build();
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "fakeFunction(col)")),
+            null, null)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for invalid transform function in transform config");
@@ -368,7 +367,7 @@ public class TableConfigUtilsTest {
 
     // invalid function
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, null, Lists.newArrayList(new TransformConfig("myCol", "Groovy(badExpr)")),
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "Groovy(badExpr)")), null,
             null)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -379,7 +378,7 @@ public class TableConfigUtilsTest {
 
     // input field name used as destination field
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, null, Lists.newArrayList(new TransformConfig("myCol", "reverse(myCol)")),
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("myCol", "reverse(myCol)")), null,
             null)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -390,8 +389,9 @@ public class TableConfigUtilsTest {
 
     // input field name used as destination field
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, null,
-            Lists.newArrayList(new TransformConfig("myCol", "Groovy({x + y + myCol}, x, myCol, y)")), null)).build();
+            new IngestionConfig(null, null, null,
+                Lists.newArrayList(new TransformConfig("myCol", "Groovy({x + y + myCol}, x, myCol, y)")), null, null))
+        .build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail due to use of myCol as arguments and columnName");
@@ -401,9 +401,9 @@ public class TableConfigUtilsTest {
 
     // duplicate transform config
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, null,
+        new IngestionConfig(null, null, null,
             Lists.newArrayList(new TransformConfig("myCol", "reverse(x)"), new TransformConfig("myCol", "lower(y)")),
-            null)).build();
+            null, null)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail due to duplicate transform config");
@@ -413,9 +413,8 @@ public class TableConfigUtilsTest {
 
     // derived columns - should pass
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, null,
-            Lists.newArrayList(new TransformConfig("transformedCol", "reverse(x)"),
-                new TransformConfig("myCol", "lower(transformedCol)")), null)).build();
+        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("transformedCol", "reverse(x)"),
+            new TransformConfig("myCol", "lower(transformedCol)")), null, null)).build();
     TableConfigUtils.validate(tableConfig, schema);
 
     // invalid field name in schema with matching prefix from complexConfigType's prefixesToRename
@@ -423,7 +422,7 @@ public class TableConfigUtilsTest {
     prefixesToRename.put("after.", "");
     ComplexTypeConfig complexConfig = new ComplexTypeConfig(null, ".", null, prefixesToRename);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setIngestionConfig(new IngestionConfig(null, null, null, null, null, complexConfig)).build();
+        .setIngestionConfig(new IngestionConfig(null, null, null, null, complexConfig, null)).build();
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
             .addMultiValueDimension("after.test", FieldSpec.DataType.STRING).build();
     try {
@@ -438,8 +437,7 @@ public class TableConfigUtilsTest {
   public void ingestionAggregationConfigsTest() {
     List<AggregationConfig> aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "SUM(s1)"));
     IngestionConfig ingestionConfig =
-        new IngestionConfig(null, null, null,
-            aggregationConfigs, null, null);
+        new IngestionConfig(null, null, null, null, null, aggregationConfigs);
 
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("d1", FieldSpec.DataType.DOUBLE).build();
@@ -465,11 +463,27 @@ public class TableConfigUtilsTest {
       // expected
     }
 
+    schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("d1", FieldSpec.DataType.DOUBLE)
+            .build();
+    aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "SUM(s1)"));
+    ingestionConfig =
+        new IngestionConfig(null, null, null, null, null, aggregationConfigs);
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfig).build();
+
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      Assert.fail("Should fail due to aggregation column being a dimension");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("d1", FieldSpec.DataType.DOUBLE).build();
     aggregationConfigs = Arrays.asList(new AggregationConfig(null, null));
     ingestionConfig =
-        new IngestionConfig(null, null, null,
-            aggregationConfigs, null, null);
+        new IngestionConfig(null, null, null, null, null, aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
             .setIngestionConfig(ingestionConfig).build();
@@ -483,8 +497,7 @@ public class TableConfigUtilsTest {
 
     aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "SUM(s1)"), new AggregationConfig("d1", "SUM(s2)"));
     ingestionConfig =
-        new IngestionConfig(null, null, null,
-            aggregationConfigs, null, null);
+        new IngestionConfig(null, null, null, null, null, aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
             .setIngestionConfig(ingestionConfig).build();
@@ -498,8 +511,7 @@ public class TableConfigUtilsTest {
 
     aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "SUM s1"));
     ingestionConfig =
-        new IngestionConfig(null, null, null,
-            aggregationConfigs, null, null);
+        new IngestionConfig(null, null, null, null, null, aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
             .setIngestionConfig(ingestionConfig).build();
@@ -513,8 +525,7 @@ public class TableConfigUtilsTest {
 
     aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "DISTINCTCOUNTHLL(s1)"));
     ingestionConfig =
-        new IngestionConfig(null, null, null,
-            aggregationConfigs, null, null);
+        new IngestionConfig(null, null, null, null, null, aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
             .setIngestionConfig(ingestionConfig).build();
@@ -528,8 +539,7 @@ public class TableConfigUtilsTest {
 
     aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "s1 + s2"));
     ingestionConfig =
-        new IngestionConfig(null, null, null,
-            aggregationConfigs, null, null);
+        new IngestionConfig(null, null, null, null, null, aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
             .setIngestionConfig(ingestionConfig).build();
@@ -543,8 +553,7 @@ public class TableConfigUtilsTest {
 
     aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "SUM(s1 - s2)"));
     ingestionConfig =
-        new IngestionConfig(null, null, null,
-            aggregationConfigs, null, null);
+        new IngestionConfig(null, null, null, null, null, aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
             .setIngestionConfig(ingestionConfig).build();
@@ -556,28 +565,37 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("s1", FieldSpec.DataType.DOUBLE)
-        .addMetric("d1", FieldSpec.DataType.DOUBLE).build();
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("d1", FieldSpec.DataType.DOUBLE).build();
+    aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "SUM(d1)"));
+    ingestionConfig =
+        new IngestionConfig(null, null, null, null, null, aggregationConfigs);
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfig).build();
+
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("d1", FieldSpec.DataType.DOUBLE)
+        .addMetric("d2", FieldSpec.DataType.DOUBLE).build();
     aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "SUM(s1)"));
     ingestionConfig =
-        new IngestionConfig(null, null, null,
-            aggregationConfigs, null, null);
+        new IngestionConfig(null, null, null, null, null, aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
             .setIngestionConfig(ingestionConfig).build();
 
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, schema);
-      Assert.fail("Should fail due to source column being in schema");
+      Assert.fail("Should fail due to one metric column not being aggregated");
     } catch (IllegalStateException e) {
       // expected
     }
 
+
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("d1", FieldSpec.DataType.DOUBLE).build();
     aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "SUM(s1)"));
     ingestionConfig =
-        new IngestionConfig(null, null, null,
-            aggregationConfigs, null, null);
+        new IngestionConfig(null, null, null, null, null, aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
             .setIngestionConfig(ingestionConfig).build();

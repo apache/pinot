@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.spi.config.table.AggregationConfig;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -153,14 +153,14 @@ public class IngestionUtilsTest {
     schema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING).build();
     List<TransformConfig> transformConfigs =
         Lists.newArrayList(new TransformConfig("d1", "Groovy({function}, argument1, argument2)"));
-    ingestionConfig = new IngestionConfig(null, null, null, null, transformConfigs, null);
+    ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null, null);
     List<String> extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 3);
     Assert.assertTrue(extract.containsAll(Arrays.asList("d1", "argument1", "argument2")));
 
     // groovy function, no arguments
     transformConfigs = Lists.newArrayList(new TransformConfig("d1", "Groovy({function})"));
-    ingestionConfig = new IngestionConfig(null, null, null, null, transformConfigs, null);
+    ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null, null);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 1);
     Assert.assertTrue(extract.contains("d1"));
@@ -168,7 +168,7 @@ public class IngestionUtilsTest {
     // inbuilt functions
     schema = new Schema.SchemaBuilder().addSingleValueDimension("hoursSinceEpoch", FieldSpec.DataType.LONG).build();
     transformConfigs = Lists.newArrayList(new TransformConfig("hoursSinceEpoch", "toEpochHours(timestampColumn)"));
-    ingestionConfig = new IngestionConfig(null, null, null, null, transformConfigs, null);
+    ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null, null);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Arrays.asList("timestampColumn", "hoursSinceEpoch")));
@@ -178,7 +178,7 @@ public class IngestionUtilsTest {
         new Schema.SchemaBuilder().addSingleValueDimension("tenMinutesSinceEpoch", FieldSpec.DataType.LONG).build();
     transformConfigs =
         Lists.newArrayList(new TransformConfig("tenMinutesSinceEpoch", "toEpochMinutesBucket(timestampColumn, 10)"));
-    ingestionConfig = new IngestionConfig(null, null, null, null, transformConfigs, null);
+    ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null, null);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("tenMinutesSinceEpoch", "timestampColumn")));
@@ -188,7 +188,7 @@ public class IngestionUtilsTest {
         .addDateTime("dateColumn", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS").build();
     transformConfigs =
         Lists.newArrayList(new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')"));
-    ingestionConfig = new IngestionConfig(null, null, null, null, transformConfigs, null);
+    ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null, null);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("dateColumn", "timestampColumn")));
@@ -201,7 +201,7 @@ public class IngestionUtilsTest {
     transformConfigs =
         Lists.newArrayList(new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')"));
     ingestionConfig =
-        new IngestionConfig(null, null, new FilterConfig("Groovy({d1 == \"10\"}, d1)"), null, transformConfigs, null);
+        new IngestionConfig(null, null, new FilterConfig("Groovy({d1 == \"10\"}, d1)"), transformConfigs, null, null);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 6);
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("d1", "d2", "m1", "dateColumn", "xy", "timestampColumn")));
@@ -221,7 +221,7 @@ public class IngestionUtilsTest {
     ComplexTypeConfig complexTypeConfigs = new ComplexTypeConfig(fieldsToUnnest, ".",
             ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE, prefixesToRename);
     FilterConfig filterConfig = new FilterConfig("Groovy({d1 == \"10\"}, d1)");
-    ingestionConfig = new IngestionConfig(null, null, filterConfig, null, transformConfigs, complexTypeConfigs);
+    ingestionConfig = new IngestionConfig(null, null, filterConfig, transformConfigs, complexTypeConfigs, null);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 8);
     List<String> expectedColumns =
@@ -234,35 +234,35 @@ public class IngestionUtilsTest {
     Schema schema = new Schema();
 
     List<AggregationConfig> aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "SUM(s1)"));
-    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, aggregationConfigs, null, null);
+    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, null, null, aggregationConfigs);
 
     Set<String> fields = IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema);
     Assert.assertEquals(fields.size(), 1);
     Assert.assertTrue(fields.containsAll(Sets.newHashSet("s1")));
 
     aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "MIN(s1)"));
-    ingestionConfig = new IngestionConfig(null, null, null, aggregationConfigs, null, null);
+    ingestionConfig = new IngestionConfig(null, null, null, null, null, aggregationConfigs);
 
     fields = IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema);
     Assert.assertEquals(fields.size(), 1);
     Assert.assertTrue(fields.containsAll(Sets.newHashSet("s1")));
 
     aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "MAX(s1)"));
-    ingestionConfig = new IngestionConfig(null, null, null, aggregationConfigs, null, null);
+    ingestionConfig = new IngestionConfig(null, null, null, null, null, aggregationConfigs);
 
     fields = IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema);
     Assert.assertEquals(fields.size(), 1);
     Assert.assertTrue(fields.containsAll(Sets.newHashSet("s1")));
 
     aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "COUNT(*)"));
-    ingestionConfig = new IngestionConfig(null, null, null, aggregationConfigs, null, null);
+    ingestionConfig = new IngestionConfig(null, null, null, null, null, aggregationConfigs);
 
     fields = IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema);
     Assert.assertEquals(fields.size(), 1);
     Assert.assertTrue(fields.containsAll(Sets.newHashSet("*")));
 
     aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "COUNT(s1)"));
-    ingestionConfig = new IngestionConfig(null, null, null, aggregationConfigs, null, null);
+    ingestionConfig = new IngestionConfig(null, null, null, null, null, aggregationConfigs);
 
     fields = IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema);
     Assert.assertEquals(fields.size(), 1);

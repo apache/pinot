@@ -69,7 +69,7 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
 
     List<Map<String, String>> streamConfigMaps = new ArrayList<>();
     streamConfigMaps.add(getStreamConfigMap());
-    return new IngestionConfig(null, new StreamIngestionConfig(streamConfigMaps), filterConfig, null, transformConfigs,
+    return new IngestionConfig(null, new StreamIngestionConfig(streamConfigMaps), filterConfig, transformConfigs, null,
         null);
   }
 

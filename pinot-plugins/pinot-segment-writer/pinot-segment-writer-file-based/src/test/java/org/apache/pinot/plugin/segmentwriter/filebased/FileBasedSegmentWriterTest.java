@@ -76,7 +76,7 @@ public class FileBasedSegmentWriterTest {
     batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, _outputDir.getAbsolutePath());
     _ingestionConfig =
         new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap), "APPEND", "HOURLY"), null,
-            null, null, transformConfigs, null);
+            null, transformConfigs, null, null);
     _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(_ingestionConfig)
             .setTimeColumnName(TIME_COLUMN_NAME).build();
@@ -254,8 +254,8 @@ public class FileBasedSegmentWriterTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
             .setIngestionConfig(new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMapOverride),
                 _ingestionConfig.getBatchIngestionConfig().getSegmentIngestionType(),
-                _ingestionConfig.getBatchIngestionConfig().getSegmentIngestionFrequency()), null, null, null,
-                _ingestionConfig.getTransformConfigs(), null)).build();
+                _ingestionConfig.getBatchIngestionConfig().getSegmentIngestionFrequency()), null, null,
+                _ingestionConfig.getTransformConfigs(), null, null)).build();
 
     SegmentWriter segmentWriter = new FileBasedSegmentWriter();
     segmentWriter.init(tableConfig, _schema);
@@ -280,8 +280,8 @@ public class FileBasedSegmentWriterTest {
     tableConfig.setIngestionConfig(new IngestionConfig(
         new BatchIngestionConfig(Lists.newArrayList(batchConfigMapOverride),
             _ingestionConfig.getBatchIngestionConfig().getSegmentIngestionType(),
-            _ingestionConfig.getBatchIngestionConfig().getSegmentIngestionFrequency()), null, null, null,
-        _ingestionConfig.getTransformConfigs(), null));
+            _ingestionConfig.getBatchIngestionConfig().getSegmentIngestionFrequency()), null, null,
+        _ingestionConfig.getTransformConfigs(), null, null));
     segmentWriter.init(tableConfig, _schema);
 
     // write 2 records
@@ -304,8 +304,8 @@ public class FileBasedSegmentWriterTest {
     tableConfig.setIngestionConfig(new IngestionConfig(
         new BatchIngestionConfig(Lists.newArrayList(batchConfigMapOverride),
             _ingestionConfig.getBatchIngestionConfig().getSegmentIngestionType(),
-            _ingestionConfig.getBatchIngestionConfig().getSegmentIngestionFrequency()), null, null, null,
-        _ingestionConfig.getTransformConfigs(), null));
+            _ingestionConfig.getBatchIngestionConfig().getSegmentIngestionFrequency()), null, null,
+        _ingestionConfig.getTransformConfigs(), null, null));
     segmentWriter.init(tableConfig, _schema);
 
     // write 2 records
@@ -337,8 +337,8 @@ public class FileBasedSegmentWriterTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
             .setIngestionConfig(new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMapOverride),
                 _ingestionConfig.getBatchIngestionConfig().getSegmentIngestionType(),
-                _ingestionConfig.getBatchIngestionConfig().getSegmentIngestionFrequency()), null, null, null,
-                _ingestionConfig.getTransformConfigs(), null)).build();
+                _ingestionConfig.getBatchIngestionConfig().getSegmentIngestionFrequency()), null, null,
+                _ingestionConfig.getTransformConfigs(), null, null)).build();
     segmentWriter.init(tableConfig, _schema);
 
     // write 3 records with same timestamp

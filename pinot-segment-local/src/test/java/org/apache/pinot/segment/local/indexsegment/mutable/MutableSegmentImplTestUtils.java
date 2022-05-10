@@ -27,8 +27,8 @@ import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.spi.config.table.AggregationConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.Schema;
 
 import static org.mockito.Mockito.anyString;
@@ -47,18 +47,8 @@ public class MutableSegmentImplTestUtils {
   public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, Set<String> noDictionaryColumns,
       Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns,
       List<AggregationConfig> preAggregationConfigs) {
-    RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
-    when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
-    when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
-
-    RealtimeSegmentConfig realtimeSegmentConfig =
-        new RealtimeSegmentConfig.Builder().setTableNameWithType(TABLE_NAME_WITH_TYPE).setSegmentName(SEGMENT_NAME)
-            .setStreamName(STREAM_NAME).setSchema(schema).setCapacity(100000).setAvgNumMultiValues(2)
-            .setNoDictionaryColumns(noDictionaryColumns).setVarLengthDictionaryColumns(varLengthDictionaryColumns)
-            .setInvertedIndexColumns(invertedIndexColumns).setSegmentZKMetadata(new SegmentZKMetadata(SEGMENT_NAME))
-            .setMemoryManager(new DirectMemoryManager(SEGMENT_NAME)).setStatsHistory(statsHistory)
-            .setIngestionAggregationConfigs(preAggregationConfigs).build();
-    return new MutableSegmentImpl(realtimeSegmentConfig, null);
+    return createMutableSegmentImpl(schema, noDictionaryColumns, varLengthDictionaryColumns, invertedIndexColumns,
+        Collections.emptySet(), false, false, null, null, null, null, preAggregationConfigs);
   }
 
   public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, Set<String> noDictionaryColumns,
@@ -80,20 +70,22 @@ public class MutableSegmentImplTestUtils {
       PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     return createMutableSegmentImpl(schema, noDictionaryColumns, varLengthDictionaryColumns, invertedIndexColumns,
         Collections.emptySet(), aggregateMetrics, nullHandlingEnabled, upsertConfig, timeColumnName,
-        partitionUpsertMetadataManager, null);
+        partitionUpsertMetadataManager, null, Collections.emptyList());
   }
 
   public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, Set<String> noDictionaryColumns,
       Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns, Set<String> jsonIndexColumns,
       ServerMetrics serverMetrics) {
     return createMutableSegmentImpl(schema, noDictionaryColumns, varLengthDictionaryColumns, invertedIndexColumns,
-        jsonIndexColumns, false, true, null, null, null, serverMetrics);
+        jsonIndexColumns, false, true, null, null, null, serverMetrics, Collections.emptyList());
   }
 
   public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, Set<String> noDictionaryColumns,
       Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns, Set<String> jsonIndexColumns,
       boolean aggregateMetrics, boolean nullHandlingEnabled, UpsertConfig upsertConfig, String timeColumnName,
-      PartitionUpsertMetadataManager partitionUpsertMetadataManager, ServerMetrics serverMetrics) {
+      PartitionUpsertMetadataManager partitionUpsertMetadataManager, ServerMetrics serverMetrics,
+      List<AggregationConfig> aggregationConfigs) {
+
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
     when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
     when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
@@ -111,7 +103,8 @@ public class MutableSegmentImplTestUtils {
             .setMemoryManager(new DirectMemoryManager(SEGMENT_NAME)).setStatsHistory(statsHistory)
             .setAggregateMetrics(aggregateMetrics).setNullHandlingEnabled(nullHandlingEnabled).setUpsertMode(upsertMode)
             .setUpsertComparisonColumn(comparisonColumn).setHashFunction(hashFunction)
-            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager).build();
+            .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
+            .setIngestionAggregationConfigs(aggregationConfigs).build();
     return new MutableSegmentImpl(realtimeSegmentConfig, serverMetrics);
   }
 }

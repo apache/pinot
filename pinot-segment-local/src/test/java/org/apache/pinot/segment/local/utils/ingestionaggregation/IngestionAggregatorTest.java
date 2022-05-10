@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.utils.ingestionaggregation;
 import java.util.Arrays;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.config.table.AggregationConfig;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

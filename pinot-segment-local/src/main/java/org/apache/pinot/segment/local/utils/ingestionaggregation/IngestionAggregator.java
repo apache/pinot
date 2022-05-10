@@ -19,9 +19,12 @@
 package org.apache.pinot.segment.local.utils.ingestionaggregation;
 
 import com.google.common.base.Preconditions;
+import groovy.lang.Tuple2;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -30,29 +33,42 @@ import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.config.table.AggregationConfig;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 
 
 public class IngestionAggregator {
-  private final Map<String, String> _aggregatorColumnNameToMetricColumnName;
-  private final Map<String, ValueAggregator> _aggregatorColumnNameToValueAggregator;
-  private boolean _disabled;
+  private final Map<String, Tuple2<String, ValueAggregator>> _columnNameToAggregator;
 
   public static IngestionAggregator fromRealtimeSegmentConfig(RealtimeSegmentConfig segmentConfig) {
-    if (segmentConfig == null || segmentConfig.getIngestionAggregationConfigs() == null
-        || segmentConfig.getIngestionAggregationConfigs().size() == 0) {
-      return new IngestionAggregator(new HashMap<>(), new HashMap<>());
+    if (segmentConfig.aggregateMetrics()) {
+      return fromAggregateMetrics(segmentConfig);
+    } else if (!CollectionUtils.isEmpty(segmentConfig.getIngestionAggregationConfigs())) {
+      return fromAggregationConfig(segmentConfig);
+    } else {
+      return new IngestionAggregator(Collections.emptyMap());
     }
+  }
 
-    Map<String, String> destColumnToSrcColumn = new HashMap<>();
-    Map<String, ValueAggregator> destColumnToValueAggregators = new HashMap<>();
+  public static IngestionAggregator fromAggregateMetrics(RealtimeSegmentConfig segmentConfig) {
+    Preconditions.checkState(CollectionUtils.isEmpty(segmentConfig.getIngestionAggregationConfigs()),
+        "aggregateMetrics cannot be enabled if AggregationConfig is set");
 
+    Map<String, Tuple2<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
+    for (String metricName : segmentConfig.getSchema().getMetricNames()) {
+      columnNameToAggregator.put(metricName,
+          new Tuple2(metricName, ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM)));
+    }
+    return new IngestionAggregator(columnNameToAggregator);
+  }
+
+  public static IngestionAggregator fromAggregationConfig(RealtimeSegmentConfig segmentConfig) {
+    Map<String, Tuple2<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
+
+    Preconditions.checkState(!segmentConfig.aggregateMetrics(),
+        "aggregateMetrics cannot be enabled if AggregationConfig is set");
     for (AggregationConfig config : segmentConfig.getIngestionAggregationConfigs()) {
       ExpressionContext expressionContext = RequestContextUtils.getExpression(config.getAggregationFunction());
-
       // validation is also done when the table is created, this is just a sanity check.
-      Preconditions.checkState(!segmentConfig.aggregateMetrics(),
-          "aggregateMetrics cannot be enabled if AggregationConfig is set: %s", config);
       Preconditions.checkState(expressionContext.getType() == ExpressionContext.Type.FUNCTION,
           "aggregation function must be a function: %s", config);
       FunctionContext functionContext = expressionContext.getFunction();
@@ -66,38 +82,37 @@ public class IngestionAggregator {
       AggregationFunctionType functionType =
           AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
 
-      destColumnToSrcColumn.put(config.getColumnName(), argument.getLiteral());
-      destColumnToValueAggregators.put(config.getColumnName(), ValueAggregatorFactory.getValueAggregator(functionType));
+      columnNameToAggregator.put(config.getColumnName(),
+          new Tuple2(argument.getLiteral(), ValueAggregatorFactory.getValueAggregator(functionType)));
     }
 
-    return new IngestionAggregator(destColumnToSrcColumn, destColumnToValueAggregators);
+    return new IngestionAggregator(columnNameToAggregator);
   }
 
-  private IngestionAggregator(Map<String, String> aggregatorColumnNameToMetricColumnName,
-      Map<String, ValueAggregator> aggregatorColumnNameToValueAggregator) {
-    _aggregatorColumnNameToMetricColumnName = aggregatorColumnNameToMetricColumnName;
-    _aggregatorColumnNameToValueAggregator = aggregatorColumnNameToValueAggregator;
+  private IngestionAggregator(Map<String, Tuple2<String, ValueAggregator>> columnNameToAggregator) {
+    _columnNameToAggregator = columnNameToAggregator;
   }
 
   public String getMetricName(String aggregatedColumnName) {
-    return _aggregatorColumnNameToMetricColumnName.getOrDefault(aggregatedColumnName, aggregatedColumnName);
+    Tuple2<String, ValueAggregator> result = _columnNameToAggregator.get(aggregatedColumnName);
+    if (result != null) {
+      return result.getFirst();
+    } else {
+      return aggregatedColumnName;
+    }
   }
 
   @Nullable
   public ValueAggregator getAggregator(String aggregatedColumnName) {
-    return _aggregatorColumnNameToValueAggregator.getOrDefault(aggregatedColumnName, null);
-  }
-
-  private boolean isConfigValidAndNonEmpty() {
-    return _aggregatorColumnNameToValueAggregator.size() > 0
-        && _aggregatorColumnNameToMetricColumnName.size() == _aggregatorColumnNameToValueAggregator.size();
+    Tuple2<String, ValueAggregator> result = _columnNameToAggregator.get(aggregatedColumnName);
+    if (result != null) {
+      return result.getSecond();
+    } else {
+      return null;
+    }
   }
 
   public boolean isEnabled() {
-    return !_disabled && isConfigValidAndNonEmpty();
-  }
-
-  public void setDisabled() {
-    _disabled = true;
+    return !_columnNameToAggregator.isEmpty();
   }
 }

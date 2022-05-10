@@ -129,7 +129,6 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
 
   private final IdMap<FixedIntArray> _recordIdMap;
-  private boolean _aggregateMetrics;
   private final IngestionAggregator _ingestionAggregator;
 
   private volatile int _numDocsIndexed = 0;
@@ -199,7 +198,6 @@ public class MutableSegmentImpl implements MutableSegment {
     _partitionColumn = config.getPartitionColumn();
     _partitionFunction = config.getPartitionFunction();
     _nullHandlingEnabled = config.isNullHandlingEnabled();
-    _aggregateMetrics = config.aggregateMetrics();
     _ingestionAggregator = IngestionAggregator.fromRealtimeSegmentConfig(config);
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
@@ -605,24 +603,19 @@ public class MutableSegmentImpl implements MutableSegment {
 
           // Update forward index
           DataType dataType = fieldSpec.getDataType();
-          ValueAggregator valueAggregator = _ingestionAggregator.getAggregator(entry.getKey());
-          if (valueAggregator != null) {
-            dataType = valueAggregator.getAggregatedValueType();
-            value = valueAggregator.getInitialAggregatedValue(value);
-          }
-
+          value = column.equals("*") ? 1 : value;
           switch (dataType.getStoredType()) {
             case INT:
-              forwardIndex.setInt(docId, (Integer) value);
+              forwardIndex.setInt(docId, ((Number) value).intValue());
               break;
             case LONG:
-              forwardIndex.setLong(docId, (Long) value);
+              forwardIndex.setLong(docId, ((Number) value).longValue());
               break;
             case FLOAT:
-              forwardIndex.setFloat(docId, (Float) value);
+              forwardIndex.setFloat(docId, ((Number) value).floatValue());
               break;
             case DOUBLE:
-              forwardIndex.setDouble(docId, (Double) value);
+              forwardIndex.setDouble(docId, ((Number) value).doubleValue());
               break;
             case STRING:
               forwardIndex.setString(docId, (String) value);
@@ -633,6 +626,10 @@ public class MutableSegmentImpl implements MutableSegment {
             default:
               throw new UnsupportedOperationException(
                   "Unsupported data type: " + dataType + " for no-dictionary column: " + column);
+          }
+
+          if (column.equals("*")) {
+           continue;
           }
 
           // Update min/max value from raw value
@@ -737,37 +734,68 @@ public class MutableSegmentImpl implements MutableSegment {
       DataType dataType = metricFieldSpec.getDataType();
       ValueAggregator valueAggregator = _ingestionAggregator.getAggregator(metricFieldSpec.getName());
 
-      if (valueAggregator != null) {
-        switch (valueAggregator.getAggregatedValueType()) {
-          case DOUBLE:
-            forwardIndex.setDouble(docId, (Double) valueAggregator.applyRawValue(forwardIndex.getDouble(docId), value));
-            break;
-          case LONG:
-            forwardIndex.setLong(docId, (Long) valueAggregator.applyRawValue(forwardIndex.getLong(docId), value));
-            break;
-          default:
-            throw new UnsupportedOperationException(
-                String.format("Aggregation type %s of %s not supported", valueAggregator.getAggregatedValueType(),
-                    valueAggregator.getAggregationType()));
-        }
-      } else {
-        switch (dataType) {
-          case INT:
-            forwardIndex.setInt(docId, (Integer) value + forwardIndex.getInt(docId));
-            break;
-          case LONG:
-            forwardIndex.setLong(docId, (Long) value + forwardIndex.getLong(docId));
-            break;
-          case FLOAT:
-            forwardIndex.setFloat(docId, (Float) value + forwardIndex.getFloat(docId));
-            break;
-          case DOUBLE:
-            forwardIndex.setDouble(docId, (Double) value + forwardIndex.getDouble(docId));
-            break;
-          default:
-            throw new UnsupportedOperationException(
-                "Unsupported data type: " + dataType + " for aggregate metric column: " + column);
-        }
+      Double oldDoubleValue;
+      Double newDoubleValue;
+      Long oldLongValue;
+      Long newLongValue;
+      switch (valueAggregator.getAggregatedValueType()) {
+        case DOUBLE:
+          switch (dataType) {
+            case INT:
+              oldDoubleValue = ((Integer) forwardIndex.getInt(docId)).doubleValue();
+              newDoubleValue = (Double) valueAggregator.applyRawValue(oldDoubleValue, value);
+              forwardIndex.setInt(docId, newDoubleValue.intValue());
+              break;
+            case LONG:
+              oldDoubleValue = ((Long) forwardIndex.getLong(docId)).doubleValue();
+              newDoubleValue = (Double) valueAggregator.applyRawValue(oldDoubleValue, value);
+              forwardIndex.setLong(docId, newDoubleValue.longValue());
+              break;
+            case FLOAT:
+              oldDoubleValue = ((Float) forwardIndex.getFloat(docId)).doubleValue();
+              newDoubleValue = (Double) valueAggregator.applyRawValue(oldDoubleValue, value);
+              forwardIndex.setFloat(docId, newDoubleValue.floatValue());
+              break;
+            case DOUBLE:
+              oldDoubleValue = forwardIndex.getDouble(docId);
+              newDoubleValue = (Double) valueAggregator.applyRawValue(oldDoubleValue, value);
+              forwardIndex.setDouble(docId, newDoubleValue);
+              break;
+            default:
+              throw new UnsupportedOperationException(String.format("Aggregation type %s of %s not supported for %s",
+                  valueAggregator.getAggregatedValueType(), valueAggregator.getAggregationType(), dataType));
+          }
+          break;
+        case LONG:
+          switch (dataType) {
+            case INT:
+              oldLongValue = ((Integer) forwardIndex.getInt(docId)).longValue();
+              newLongValue = (Long) valueAggregator.applyRawValue(oldLongValue, value);
+              forwardIndex.setInt(docId, newLongValue.intValue());
+              break;
+            case LONG:
+             oldLongValue = forwardIndex.getLong(docId);
+              newLongValue = (Long) valueAggregator.applyRawValue(oldLongValue, value);
+              forwardIndex.setLong(docId, newLongValue);
+              break;
+            case FLOAT:
+              oldLongValue = ((Float) forwardIndex.getFloat(docId)).longValue();
+              newLongValue = (Long) valueAggregator.applyRawValue(oldLongValue, value);
+              forwardIndex.setFloat(docId, newLongValue.floatValue());
+              break;
+            case DOUBLE:
+              oldLongValue = ((Double) forwardIndex.getDouble(docId)).longValue();
+              newLongValue = (Long) valueAggregator.applyRawValue(oldLongValue, value);
+              forwardIndex.setDouble(docId, newLongValue.doubleValue());
+              break;
+            default:
+              throw new UnsupportedOperationException(String.format("Aggregation type %s of %s not supported for %s",
+                  valueAggregator.getAggregatedValueType(), valueAggregator.getAggregationType(), dataType));
+          }
+          break;
+        default:
+          throw new UnsupportedOperationException(String.format("Aggregation type %s of %s not supported for %s",
+              valueAggregator.getAggregatedValueType(), valueAggregator.getAggregationType(), dataType));
       }
     }
   }
@@ -1047,7 +1075,7 @@ public class MutableSegmentImpl implements MutableSegment {
    */
   private IdMap<FixedIntArray> enableMetricsAggregationIfPossible(RealtimeSegmentConfig config,
       Set<String> noDictionaryColumns) {
-    if (!isAggregateMetricsEnabled()) {
+    if (!_ingestionAggregator.isEnabled()) {
       _logger.info("Metrics aggregation is disabled.");
       return null;
     }
@@ -1059,17 +1087,13 @@ public class MutableSegmentImpl implements MutableSegment {
       if (!noDictionaryColumns.contains(metric)) {
         _logger.warn("Metrics aggregation cannot be turned ON in presence of dictionary encoded metrics, eg: {}",
             metric);
-        _aggregateMetrics = false;
-        _ingestionAggregator.setDisabled();
-        break;
+        return null;
       }
 
       if (!fieldSpec.isSingleValueField()) {
         _logger.warn("Metrics aggregation cannot be turned ON in presence of multi-value metric columns, eg: {}",
             metric);
-        _aggregateMetrics = false;
-        _ingestionAggregator.setDisabled();
-        break;
+        return null;
       }
     }
 
@@ -1080,17 +1104,13 @@ public class MutableSegmentImpl implements MutableSegment {
       if (noDictionaryColumns.contains(dimension)) {
         _logger.warn("Metrics aggregation cannot be turned ON in presence of no-dictionary dimensions, eg: {}",
             dimension);
-        _aggregateMetrics = false;
-        _ingestionAggregator.setDisabled();
-        break;
+        return null;
       }
 
       if (!fieldSpec.isSingleValueField()) {
         _logger.warn("Metrics aggregation cannot be turned ON in presence of multi-value dimension columns, eg: {}",
             dimension);
-        _aggregateMetrics = false;
-        _ingestionAggregator.setDisabled();
-        break;
+        return null;
       }
     }
 
@@ -1100,14 +1120,8 @@ public class MutableSegmentImpl implements MutableSegment {
         _logger.warn(
             "Metrics aggregation cannot be turned ON in presence of no-dictionary datetime/time columns, eg: {}",
             timeColumnName);
-        _aggregateMetrics = false;
-        _ingestionAggregator.setDisabled();
-        break;
+        return null;
       }
-    }
-
-    if (!isAggregateMetricsEnabled()) {
-      return null;
     }
 
     int estimatedRowsToIndex;
@@ -1130,7 +1144,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private boolean isAggregateMetricsEnabled() {
-    return _aggregateMetrics || _ingestionAggregator.isEnabled();
+    return _recordIdMap != null;
   }
 
   // NOTE: Okay for single-writer

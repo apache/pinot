@@ -43,7 +43,6 @@ import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
-import org.apache.pinot.spi.config.table.AggregationConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
@@ -55,6 +54,7 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
@@ -316,14 +316,17 @@ public final class TableConfigUtils {
       Set<String> aggregationSourceColumns = new HashSet<>();
       if (aggregationConfigs != null) {
         Preconditions.checkState(
-            tableConfig.getIndexingConfig() == null || !tableConfig.getIndexingConfig().isAggregateMetrics(),
+            !tableConfig.getIndexingConfig().isAggregateMetrics(),
             "aggregateMetrics cannot be set with AggregationConfig");
         Set<String> aggregationColumns = new HashSet<>();
         for (AggregationConfig aggregationConfig : aggregationConfigs) {
           String columnName = aggregationConfig.getColumnName();
           if (schema != null) {
-            Preconditions.checkState(schema.getFieldSpecFor(columnName) != null, "The destination column '" + columnName
+            FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+            Preconditions.checkState(fieldSpec != null, "The destination column '" + columnName
                 + "' of the aggregation function must be present in the schema");
+            Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
+                "The destination column '" + columnName + "' of the aggregation function must be a metric column");
           }
           String aggregationFunction = aggregationConfig.getAggregationFunction();
           if (columnName == null || aggregationFunction == null) {
@@ -353,10 +356,11 @@ public final class TableConfigUtils {
           Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
               "aggregator function argument must be a identifier: %s", aggregationConfig);
 
-          Preconditions.checkState(schema.getFieldSpecFor(argument.getIdentifier()) == null,
-              "source column %s cannot be in the schema: %s", argument.getIdentifier(), aggregationConfig);
-
           aggregationSourceColumns.add(argument.getIdentifier());
+        }
+        if (schema != null) {
+          Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),
+              "all metric columns must be aggregated");
         }
       }
 
@@ -420,14 +424,14 @@ public final class TableConfigUtils {
     }
   }
 
-  static public void validateIngestionAggregation(String name) {
-    /**
-     * Currently only, ValueAggregators with fixed width types are allowed, so MIN, MAX, SUM, and COUNT. The reason
-     * is that only the {@link org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex}
-     * supports random inserts and lookups. The
-     * {@link org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex only supports
-     * sequential inserts.
-     */
+  /**
+   * Currently only, ValueAggregators with fixed width types are allowed, so MIN, MAX, SUM, and COUNT. The reason
+   * is that only the {@link org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex}
+   * supports random inserts and lookups. The
+   * {@link org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex only supports
+   * sequential inserts.
+   */
+  public static void validateIngestionAggregation(String name) {
     List<AggregationFunctionType> allowed =
         Arrays.asList(AggregationFunctionType.SUM, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
             AggregationFunctionType.COUNT);
