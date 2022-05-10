@@ -19,31 +19,39 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import java.io.IOException;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
- * A {@code DataTableBlock} is a row-based data block backed by a {@link DataTable}.
+ * A {@code TransferableBlock} is a wrapper around {@link BaseDataBlock} for transferring data using
+ * {@link org.apache.pinot.common.proto.Mailbox}.
  */
-public class DataTableBlock implements Block {
-  private static final Logger LOGGER = LoggerFactory.getLogger(InstanceResponseBlock.class);
+public class TransferableBlock implements Block {
 
-  private DataTable _dataTable;
+  private BaseDataBlock _dataBlock;
+  private BaseDataBlock.Type _type;
 
-  public DataTableBlock(DataTable dataTable) {
-    _dataTable = dataTable;
+  public TransferableBlock(BaseDataBlock dataBlock) {
+    _dataBlock = dataBlock;
+    _type = dataBlock instanceof ColumnarDataBlock ? BaseDataBlock.Type.COLUMNAR
+        : dataBlock instanceof RowDataBlock ? BaseDataBlock.Type.ROW : BaseDataBlock.Type.METADATA;
   }
 
-  public DataTable getDataTable() {
-    return _dataTable;
+  public BaseDataBlock getDataBlock() {
+    return _dataBlock;
+  }
+
+  public BaseDataBlock.Type getType() {
+    return _type;
+  }
+
+  public byte[] toBytes()
+      throws IOException {
+    return _dataBlock.toBytes();
   }
 
   @Override
@@ -64,10 +72,5 @@ public class DataTableBlock implements Block {
   @Override
   public BlockMetadata getMetadata() {
     throw new UnsupportedOperationException();
-  }
-
-  public byte[] toBytes()
-      throws IOException {
-    return _dataTable.toBytes();
   }
 }
