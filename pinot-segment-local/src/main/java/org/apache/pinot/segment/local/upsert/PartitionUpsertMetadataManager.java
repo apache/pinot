@@ -261,11 +261,12 @@ public class PartitionUpsertMetadataManager {
         int docId = iterator.next();
         GenericRow record = segment.getRecord(docId, _reuse);
         PrimaryKey primaryKey = record.getPrimaryKey(_primaryKeyColumns);
-        if (_primaryKeyToRecordLocationMap.containsKey(primaryKey)
-            && _primaryKeyToRecordLocationMap.get(primaryKey).getSegment() == segment
-            && _primaryKeyToRecordLocationMap.get(primaryKey).getDocId() == docId) {
-          _primaryKeyToRecordLocationMap.remove(primaryKey);
-        }
+        _primaryKeyToRecordLocationMap.computeIfPresent(primaryKey, (pk, recordLocation) -> {
+          if (recordLocation.getSegment() == segment) {
+            return null;
+          }
+          return recordLocation;
+        });
       }
     }
     // Update metrics
