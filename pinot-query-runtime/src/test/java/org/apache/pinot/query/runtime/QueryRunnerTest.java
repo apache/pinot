@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import org.apache.calcite.rel.RelDistribution;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -38,8 +37,6 @@ import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.routing.WorkerInstance;
-import org.apache.pinot.query.runtime.blocks.DataTableBlock;
-import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.service.QueryConfig;
@@ -84,8 +81,8 @@ public class QueryRunnerTest {
     _mailboxService = new GrpcMailboxService(_reducerHostname, _reducerGrpcPort);
     _mailboxService.start();
 
-    _queryEnvironment =
-        QueryEnvironmentTestUtils.getQueryEnvironment(_reducerGrpcPort, server1.getPort(), server2.getPort());
+    _queryEnvironment = QueryEnvironmentTestUtils.getQueryEnvironment(_reducerGrpcPort, server1.getPort(),
+        server2.getPort());
     server1.start();
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
@@ -111,9 +108,10 @@ public class QueryRunnerTest {
     for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
       if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
         MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
-        mailboxReceiveOperator = createReduceStageOperator(
+        mailboxReceiveOperator = QueryDispatcher.createReduceStageOperator(_mailboxService,
             queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
-            Long.parseLong(requestMetadataMap.get("REQUEST_ID")), reduceNode.getSenderStageId(), _reducerGrpcPort);
+            Long.parseLong(requestMetadataMap.get("REQUEST_ID")), reduceNode.getSenderStageId(), "localhost",
+            _reducerGrpcPort);
       } else {
         for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
           DistributedStagePlan distributedStagePlan =
@@ -124,8 +122,19 @@ public class QueryRunnerTest {
     }
     Preconditions.checkNotNull(mailboxReceiveOperator);
 
-    List<Object[]> resultRows = reduceMailboxReceive(mailboxReceiveOperator);
+    List<Object[]> resultRows = toRows(QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator));
     Assert.assertEquals(resultRows.size(), expectedRowCount);
+  }
+
+  private static List<Object[]> toRows(List<DataTable> dataTables) {
+    List<Object[]> resultRows = new ArrayList<>();
+    for (DataTable dataTable : dataTables) {
+      int numRows = dataTable.getNumberOfRows();
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        resultRows.add(extractRowFromDataTable(dataTable, rowId));
+      }
+    }
+    return resultRows;
   }
 
   @DataProvider(name = "testDataWithSqlToFinalRowCount")
@@ -151,32 +160,5 @@ public class QueryRunnerTest {
         new Object[]{"SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
             + " WHERE a.col3 >= 0 AND a.col2 = 'foo' AND b.col3 >= 0", 3},
     };
-  }
-
-  protected static List<Object[]> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator) {
-    List<Object[]> resultRows = new ArrayList<>();
-    DataTableBlock dataTableBlock;
-    while (true) {
-      dataTableBlock = mailboxReceiveOperator.nextBlock();
-      if (DataTableBlockUtils.isEndOfStream(dataTableBlock)) {
-        break;
-      }
-      if (dataTableBlock.getDataTable() != null) {
-        DataTable dataTable = dataTableBlock.getDataTable();
-        int numRows = dataTable.getNumberOfRows();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          resultRows.add(extractRowFromDataTable(dataTable, rowId));
-        }
-      }
-    }
-    return resultRows;
-  }
-
-  protected MailboxReceiveOperator createReduceStageOperator(List<ServerInstance> sendingInstances, long jobId,
-      int stageId, int port) {
-    MailboxReceiveOperator mailboxReceiveOperator =
-        new MailboxReceiveOperator(_mailboxService, RelDistribution.Type.ANY, sendingInstances, "localhost", port,
-            jobId, stageId);
-    return mailboxReceiveOperator;
   }
 }

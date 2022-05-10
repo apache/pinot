@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query.runtime;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -32,6 +34,8 @@ import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
+import org.apache.pinot.query.runtime.blocks.BaseDataBlock;
+import org.apache.pinot.query.runtime.blocks.DataBlockUtils;
 import org.apache.pinot.query.runtime.executor.WorkerQueryExecutor;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -94,12 +98,19 @@ public class QueryRunner {
           ServerRequestUtils.constructServerQueryRequest(distributedStagePlan, requestMetadataMap);
 
       // send the data table via mailbox in one-off fashion (e.g. no block-level split, one data table/partition key)
-      DataTable dataTable = _serverExecutor.processQuery(serverQueryRequest, executorService, null);
+      BaseDataBlock dataBlock;
+      try {
+        DataTable dataTable = _serverExecutor.processQuery(serverQueryRequest, executorService, null);
+        // this works because default DataTableImplV3 will have ordinal 0, which maps to ROW(0)
+        dataBlock = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTable.toBytes()));
+      } catch (IOException e) {
+        throw new RuntimeException("Unable to convert byte buffer", e);
+      }
 
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
       MailboxSendOperator mailboxSendOperator =
-          new MailboxSendOperator(_mailboxService, dataTable, receivingStageMetadata.getServerInstances(),
+          new MailboxSendOperator(_mailboxService, dataBlock, receivingStageMetadata.getServerInstances(),
               sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), _hostname, _port,
               serverQueryRequest.getRequestId(), sendNode.getStageId());
       mailboxSendOperator.nextBlock();

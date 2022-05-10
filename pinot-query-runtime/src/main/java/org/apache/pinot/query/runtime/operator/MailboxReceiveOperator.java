@@ -24,16 +24,15 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
-import org.apache.pinot.query.runtime.blocks.DataTableBlock;
-import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.BaseDataBlock;
+import org.apache.pinot.query.runtime.blocks.DataBlockUtils;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +41,7 @@ import org.slf4j.LoggerFactory;
  * This {@code MailboxReceiveOperator} receives data from a {@link ReceivingMailbox} and serve it out from the
  * {@link BaseOperator#getNextBlock()} API.
  */
-public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
+public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_RECEIVE";
   private static final long DEFAULT_TIMEOUT_NANO = 10_000_000_000L;
@@ -80,7 +79,7 @@ public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
   }
 
   @Override
-  protected DataTableBlock getNextBlock() {
+  protected TransferableBlock getNextBlock() {
     // TODO: do a round robin check against all MailboxContentStreamObservers and find which one that has data.
     boolean hasOpenedMailbox = true;
     DataSchema dataSchema = null;
@@ -99,10 +98,10 @@ public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
             if (mailboxContent != null) {
               ByteBuffer byteBuffer = mailboxContent.getPayload().asReadOnlyByteBuffer();
               if (byteBuffer.hasRemaining()) {
-                DataTable dataTable = DataTableFactory.getDataTable(byteBuffer);
-                if (dataTable.getNumberOfRows() > 0) {
+                BaseDataBlock dataBlock = DataBlockUtils.getDataBlock(byteBuffer);
+                if (dataBlock.getNumberOfRows() > 0) {
                   // here we only return data table block when it is not empty.
-                  return new DataTableBlock(dataTable);
+                  return new TransferableBlock(dataBlock);
                 }
               }
             }
@@ -117,7 +116,7 @@ public class MailboxReceiveOperator extends BaseOperator<DataTableBlock> {
     }
     // TODO: we need to at least return one data table with schema if there's no error.
     // we need to condition this on whether there's already things being returned or not.
-    return DataTableBlockUtils.getEndOfStreamDataTableBlock();
+    return DataBlockUtils.getEndOfStreamTransferableBlock();
   }
 
   public RelDistribution.Type getExchangeType() {
