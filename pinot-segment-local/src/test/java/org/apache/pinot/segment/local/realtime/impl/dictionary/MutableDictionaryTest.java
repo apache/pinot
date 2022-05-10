@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.dictionary;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -51,7 +52,7 @@ public class MutableDictionaryTest {
   private static final int NUM_READERS = 3;
   private static final FieldSpec.DataType[] DATA_TYPES = {
       FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE,
-      FieldSpec.DataType.STRING, FieldSpec.DataType.BYTES
+      FieldSpec.DataType.BIG_DECIMAL, FieldSpec.DataType.STRING, FieldSpec.DataType.BYTES
   };
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
@@ -195,7 +196,7 @@ public class MutableDictionaryTest {
     Collections.sort(expectedSortedValues);
     Object sortedValues = dictionary.getSortedValues();
     List<Comparable> actualSortedValues =
-        (dataType.equals(FieldSpec.DataType.STRING) || dataType.equals(FieldSpec.DataType.BYTES)) ? Arrays
+        (dataType.equals(FieldSpec.DataType.STRING) || dataType.equals(FieldSpec.DataType.BYTES) || dataType.equals(FieldSpec.DataType.BIG_DECIMAL)) ? Arrays
             .asList((Comparable[]) dictionary.getSortedValues()) : primitiveArrayToList(dataType, sortedValues);
     Assert.assertEquals(actualSortedValues, expectedSortedValues);
 
@@ -214,6 +215,8 @@ public class MutableDictionaryTest {
         return new FloatOffHeapMutableDictionary(estCardinality, maxOverflowSize, _memoryManager, "floatColumn");
       case DOUBLE:
         return new DoubleOffHeapMutableDictionary(estCardinality, maxOverflowSize, _memoryManager, "doubleColumn");
+      case BIG_DECIMAL:
+        return new BigDecimalOffHeapMutableDictionary(estCardinality, maxOverflowSize, _memoryManager, "bigDecimalColumn", 32);
       case STRING:
         return new StringOffHeapMutableDictionary(estCardinality, maxOverflowSize, _memoryManager, "stringColumn", 32);
       case BYTES:
@@ -233,6 +236,8 @@ public class MutableDictionaryTest {
         return RANDOM.nextFloat();
       case DOUBLE:
         return RANDOM.nextDouble();
+      case BIG_DECIMAL:
+        return BigDecimal.valueOf(RANDOM.nextDouble());
       case STRING:
         return RandomStringUtils.randomAscii(RANDOM.nextInt(1024));
       case BYTES:
