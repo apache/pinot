@@ -53,92 +53,22 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-@Api(tags = Constants.SEGMENT_TAG)
+@Api(tags = Constants.TABLE_TAG)
 @Path("/")
 public class PinotSegmentStateResource {
-
   @Inject
-  PinotHelixResourceManager _pinotHelixResourceManager;
-
-  // TODO add support for choosing default offset for other partitions
-  private static class RealtimeSegmentResumeConfig {
-    private Map<Integer, Long> _partitionIdToOffsetMap;
-
-    public Map<Integer, Long> getPartitionIdToOffsetMap() {
-      return _partitionIdToOffsetMap;
-    }
-
-    public void setPartitionIdToOffsetMap(Map<Integer, Long> partitionIdToOffsetMap) {
-      _partitionIdToOffsetMap = partitionIdToOffsetMap;
-    }
-  }
+  PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
 
   @POST
-  @Path("/segmentState/{tableName}/resumeRealtimeTable")
+  @Path("/tables/{tableName}/resumeConsumption")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Resume a realtime table", notes = "Resume a segment")
-  public String resumeRealtimeTable(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      RealtimeSegmentResumeConfig realtimeSegmentResumeConfig) {
-    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName, TableType.REALTIME);
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    InstancePartitions instancePartitions =
-        InstancePartitionsUtils.fetchOrComputeInstancePartitions(_pinotHelixResourceManager.getHelixZkManager(),
-            tableConfig, InstancePartitionsType.CONSUMING);
-    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
-
-    IdealState idealState =
-        HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), realtimeTableName);
-    int numReplicas = PinotLLCRealtimeSegmentManager.getNumReplicas(tableConfig, instancePartitions);
-    Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
-
-    for (Map.Entry<Integer, Long> partitionOffset : realtimeSegmentResumeConfig.getPartitionIdToOffsetMap()
-        .entrySet()) {
-      int partitionId = partitionOffset.getKey();
-      Long offset = partitionOffset.getValue();
-
-      // Step 1: Create PROPERTYSTORE nodes for each partitionId (IN_PROGRESS)
-      long newSegmentCreationTimeMs = System.currentTimeMillis();
-
-      // TODO(saurabh) Get the sequence number from ideal state (largest seq # + 1)
-      int seqNumber = Math.abs(new Random().nextInt());
-
-      LLCSegmentName newLLCSegment = new LLCSegmentName(tableName, partitionId, seqNumber, newSegmentCreationTimeMs);
-
-      SegmentZKMetadata newSegmentZKMetadata = new SegmentZKMetadata(newLLCSegment.getSegmentName());
-      newSegmentZKMetadata.setCreationTime(newLLCSegment.getCreationTimeMs());
-      newSegmentZKMetadata.setStartOffset(offset.toString());
-      newSegmentZKMetadata.setNumReplicas(numReplicas);
-      newSegmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
-      SegmentPartitionMetadata segmentPartitionMetadata =
-          PinotLLCRealtimeSegmentManager.getPartitionMetadataFromTableConfig(tableConfig, partitionId);
-      if (segmentPartitionMetadata != null) {
-        newSegmentZKMetadata.setPartitionMetadata(segmentPartitionMetadata);
-      }
-
-      // TODO(saurabh) should we be updating flushThresholds for this segment?
-
-      _pinotHelixResourceManager.getPropertyStore().set(
-          ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, newLLCSegment.getSegmentName()),
-          newSegmentZKMetadata.toZNRecord(), -1, AccessOption.PERSISTENT);
-
-      // Step 2: Update IDEALSTATE
-      SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_pinotHelixResourceManager.getHelixZkManager(), tableConfig);
-      List<String> instancesAssigned =
-          segmentAssignment.assignSegment(newLLCSegment.getSegmentName(), instanceStatesMap, instancePartitionsMap);
-      instanceStatesMap.put(newLLCSegment.getSegmentName(),
-          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned,
-              CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING));
-    }
-
-    // TODO should we commit the state for each partition instead?
-    _pinotHelixResourceManager.getHelixAdmin()
-        .setResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), realtimeTableName, idealState);
-
-    // TODO change this
-    return null;
+  @ApiOperation(value = "Resume the consumption of a realtime table",
+      notes = "Resume the consumption of a realtime table")
+  public String resumeRealtimeTableConsumption(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+    _pinotLLCRealtimeSegmentManager.resumeRealtimeTableConsumption(tableName);
+    // TODO(saurabh): Change this
+    return "{\"status\": \"SUCCESS\"}";
   }
 }

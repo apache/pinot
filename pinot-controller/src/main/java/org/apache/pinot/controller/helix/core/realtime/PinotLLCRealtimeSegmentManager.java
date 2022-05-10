@@ -77,6 +77,7 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -1380,5 +1381,79 @@ public class PinotLLCRealtimeSegmentManager {
         LOGGER.error("Failed to upload segment {} to deep store", segmentName, e);
       }
     }
+  }
+
+  /**
+   * Creates PROPERTYSTORE and IDEALSTATE entries for each partitionGroup to resume realtime table consumption
+   * @param tableName
+   */
+  public void resumeRealtimeTableConsumption(String tableName) {
+    TableConfig tableConfig = _helixResourceManager.getTableConfig(tableName, TableType.REALTIME);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+
+    InstancePartitions instancePartitions =
+        InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixResourceManager.getHelixZkManager(), tableConfig,
+            InstancePartitionsType.CONSUMING);
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
+    IdealState idealState =
+        HelixHelper.getTableIdealState(_helixResourceManager.getHelixZkManager(), realtimeTableName);
+    int numReplicas = PinotLLCRealtimeSegmentManager.getNumReplicas(tableConfig, instancePartitions);
+    Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
+
+    PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
+        IngestionConfigUtils.getStreamConfigMap(tableConfig));
+    List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
+        getPartitionGroupConsumptionStatusList(idealState, streamConfig);
+    List<PartitionGroupMetadata> newPartitionGroupMetadataList =
+        getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
+
+    Map<Integer, SegmentZKMetadata> partitionToLatestSegment = getLatestSegmentZKMetadataMap(realtimeTableName);
+    for (PartitionGroupMetadata partitionGroupMetadata : newPartitionGroupMetadataList) {
+      int partitionId = partitionGroupMetadata.getPartitionGroupId();
+      if (partitionToLatestSegment.containsKey(partitionId) && Status.IN_PROGRESS.equals(
+          partitionToLatestSegment.get(partitionId).getStatus())) {
+        // IN_PROGRESS segment already exists, NO-OP
+        LOGGER.info("Skipping partitionGroupId {}, IN_PROGRESS segment already exists", partitionId);
+      } else {
+        // Step 1: Create PROPERTYSTORE nodes for each partitionId (IN_PROGRESS)
+        String offset = partitionGroupMetadata.getStartOffset().toString();
+        long newSegmentCreationTimeMs = System.currentTimeMillis();
+
+        SegmentZKMetadata latestSegmentMeta = partitionToLatestSegment.get(partitionId);
+        int seqNumber = latestSegmentMeta == null ? STARTING_SEQUENCE_NUMBER
+            : new LLCSegmentName(latestSegmentMeta.getSegmentName()).getSequenceNumber() + 1;
+
+        LLCSegmentName newLLCSegment = new LLCSegmentName(tableName, partitionId, seqNumber, newSegmentCreationTimeMs);
+        SegmentZKMetadata newSegmentZKMetadata = new SegmentZKMetadata(newLLCSegment.getSegmentName());
+        newSegmentZKMetadata.setCreationTime(newLLCSegment.getCreationTimeMs());
+        newSegmentZKMetadata.setStartOffset(offset);
+        newSegmentZKMetadata.setNumReplicas(numReplicas);
+        newSegmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+        SegmentPartitionMetadata segmentPartitionMetadata =
+            PinotLLCRealtimeSegmentManager.getPartitionMetadataFromTableConfig(tableConfig, partitionId);
+        if (segmentPartitionMetadata != null) {
+          newSegmentZKMetadata.setPartitionMetadata(segmentPartitionMetadata);
+        }
+
+        // TODO(saurabh) should we be updating flushThresholds for this segment?
+
+        _helixResourceManager.getPropertyStore().set(
+            ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, newLLCSegment.getSegmentName()),
+            newSegmentZKMetadata.toZNRecord(), -1, AccessOption.PERSISTENT);
+
+        // Step 2: Update IDEALSTATE
+        SegmentAssignment segmentAssignment =
+            SegmentAssignmentFactory.getSegmentAssignment(_helixResourceManager.getHelixZkManager(), tableConfig);
+        List<String> instancesAssigned =
+            segmentAssignment.assignSegment(newLLCSegment.getSegmentName(), instanceStatesMap, instancePartitionsMap);
+        instanceStatesMap.put(newLLCSegment.getSegmentName(),
+            SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned,
+                CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING));
+      }
+    }
+
+    _helixResourceManager.getHelixAdmin()
+        .setResourceIdealState(_helixResourceManager.getHelixClusterName(), realtimeTableName, idealState);
   }
 }
