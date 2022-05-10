@@ -37,16 +37,18 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
-import org.apache.pinot.query.runtime.blocks.DataTableBlock;
-import org.apache.pinot.query.runtime.blocks.DataTableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.BaseDataBlock;
+import org.apache.pinot.query.runtime.blocks.DataBlockBuilder;
+import org.apache.pinot.query.runtime.blocks.DataBlockUtils;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * This {@code MailboxSendOperator} is created to send {@link DataTableBlock}s to the receiving end.
+ * This {@code MailboxSendOperator} is created to send {@link TransferableBlock}s to the receiving end.
  */
-public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
+public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_SEND";
   private static final Set<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPE =
@@ -61,11 +63,11 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
   private final long _jobId;
   private final int _stageId;
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
-  private BaseOperator<DataTableBlock> _dataTableBlockBaseOperator;
-  private DataTable _dataTable;
+  private BaseOperator<TransferableBlock> _dataTableBlockBaseOperator;
+  private BaseDataBlock _dataTable;
 
   public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
-      BaseOperator<DataTableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
+      BaseOperator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object> keySelector, String hostName, int port,
       long jobId, int stageId) {
     _mailboxService = mailboxService;
@@ -86,7 +88,7 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
    * we create a {@link org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl} that can handle the
    * creation of MailboxSendOperator we should not use this API.
    */
-  public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService, DataTable dataTable,
+  public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService, BaseDataBlock dataTable,
       List<ServerInstance> receivingStageInstances, RelDistribution.Type exchangeType,
       KeySelector<Object[], Object> keySelector, String hostName, int port, long jobId, int stageId) {
     _mailboxService = mailboxService;
@@ -113,14 +115,14 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
   }
 
   @Override
-  protected DataTableBlock getNextBlock() {
-    DataTable dataTable;
-    DataTableBlock dataTableBlock = null;
+  protected TransferableBlock getNextBlock() {
+    BaseDataBlock dataTable;
+    TransferableBlock transferableBlock = null;
     boolean isEndOfStream;
     if (_dataTableBlockBaseOperator != null) {
-      dataTableBlock = _dataTableBlockBaseOperator.nextBlock();
-      dataTable = dataTableBlock.getDataTable();
-      isEndOfStream = DataTableBlockUtils.isEndOfStream(dataTableBlock);
+      transferableBlock = _dataTableBlockBaseOperator.nextBlock();
+      dataTable = transferableBlock.getDataBlock();
+      isEndOfStream = DataBlockUtils.isEndOfStream(transferableBlock);
     } else {
       dataTable = _dataTable;
       isEndOfStream = true;
@@ -137,7 +139,7 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
             // we no longer need to send data to the rest of the receiving instances, but we still need to transfer
             // the dataTable over indicating that we are a potential sender. thus next time a random server is selected
             // it might still be useful.
-            dataTable = DataTableBlockUtils.getEmptyDataTable(dataTable.getDataSchema());
+            dataTable = DataBlockUtils.getEmptyDataBlock(dataTable.getDataSchema());
           }
           break;
         case BROADCAST_DISTRIBUTED:
@@ -147,7 +149,7 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
           break;
         case HASH_DISTRIBUTED:
           // TODO: ensure that server instance list is sorted using same function in sender.
-          List<DataTable> dataTableList = constructPartitionedDataBlock(dataTable, _keySelector,
+          List<BaseDataBlock> dataTableList = constructPartitionedDataBlock(dataTable, _keySelector,
               _receivingStageInstances.size());
           for (int i = 0; i < _receivingStageInstances.size(); i++) {
             sendDataTableBlock(_receivingStageInstances.get(i), dataTableList.get(i), isEndOfStream);
@@ -162,10 +164,10 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
     } catch (Exception e) {
       LOGGER.error("Exception occur while sending data via mailbox", e);
     }
-    return dataTableBlock;
+    return transferableBlock;
   }
 
-  private static List<DataTable> constructPartitionedDataBlock(DataTable dataTable,
+  private static List<BaseDataBlock> constructPartitionedDataBlock(DataTable dataTable,
       KeySelector<Object[], Object> keySelector, int partitionSize)
       throws Exception {
     List<List<Object[]>> temporaryRows = new ArrayList<>(partitionSize);
@@ -178,10 +180,10 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
       // TODO: support other partitioning algorithm
       temporaryRows.get(hashToIndex(key, partitionSize)).add(row);
     }
-    List<DataTable> dataTableList = new ArrayList<>(partitionSize);
+    List<BaseDataBlock> dataTableList = new ArrayList<>(partitionSize);
     for (int i = 0; i < partitionSize; i++) {
       List<Object[]> objects = temporaryRows.get(i);
-      dataTableList.add(SelectionOperatorUtils.getDataTableFromRows(objects, dataTable.getDataSchema()));
+      dataTableList.add(DataBlockBuilder.buildFromRows(objects, dataTable.getDataSchema()));
     }
     return dataTableList;
   }
@@ -190,7 +192,7 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
     return (key.hashCode()) % partitionSize;
   }
 
-  private void sendDataTableBlock(ServerInstance serverInstance, DataTable dataTable, boolean isEndOfStream)
+  private void sendDataTableBlock(ServerInstance serverInstance, BaseDataBlock dataTable, boolean isEndOfStream)
       throws IOException {
     String mailboxId = toMailboxId(serverInstance);
     SendingMailbox<Mailbox.MailboxContent> sendingMailbox = _mailboxService.getSendingMailbox(mailboxId);
@@ -201,10 +203,10 @@ public class MailboxSendOperator extends BaseOperator<DataTableBlock> {
     }
   }
 
-  private Mailbox.MailboxContent toMailboxContent(String mailboxId, DataTable dataTable, boolean isEndOfStream)
+  private Mailbox.MailboxContent toMailboxContent(String mailboxId, BaseDataBlock dataTable, boolean isEndOfStream)
       throws IOException {
     Mailbox.MailboxContent.Builder builder = Mailbox.MailboxContent.newBuilder().setMailboxId(mailboxId)
-        .setPayload(ByteString.copyFrom(new DataTableBlock(dataTable).toBytes()));
+        .setPayload(ByteString.copyFrom(new TransferableBlock(dataTable).toBytes()));
     if (isEndOfStream) {
       builder.putMetadata("finished", "true");
     }
