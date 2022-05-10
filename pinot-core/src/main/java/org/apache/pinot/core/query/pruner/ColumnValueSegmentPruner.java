@@ -322,14 +322,14 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
 
     // Check bloom filter
     BloomFilterReader bloomFilter = dataSource.getBloomFilter();
-    if (bloomFilter != null) {
-      for (String value : values) {
-        if (bloomFilter.mightContain(value)) {
-          return false;
-        }
+    if (bloomFilter == null) {
+      return false;
+    }
+    for (String value : values) {
+      if (bloomFilter.mightContain(value)) {
+        return false;
       }
     }
-
     return true;
   }
 
