@@ -75,7 +75,7 @@ public class ExpressionTransformer implements RecordTransformer {
             expressionEvaluators.put(
                 TimestampIndexGranularity.getColumnNameWithGranularity(fieldConfig.getName(), granularity),
                 FunctionEvaluatorFactory.getExpressionEvaluator(
-                    String.format("dateTrunc(\'" + granularity + "\', " + fieldConfig.getName() + ")")));
+                    TimestampIndexGranularity.getTransformExpression(fieldConfig.getName(), granularity)));
           }
         }
       }

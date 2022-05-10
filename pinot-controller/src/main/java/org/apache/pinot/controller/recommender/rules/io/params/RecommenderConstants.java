@@ -111,7 +111,6 @@ public class RecommenderConstants {
     public static final double INDEX_OVERHEAD_RATIO_FOR_SEGMENT_SIZE = 1.2;
   }
 
-  public static final String PQL = "pql";
   public static final String SQL = "sql";
   public static final String OFFLINE = "offline";
   public static final String REALTIME = "realtime";

@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.tools.anonymizer;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -32,7 +30,6 @@ import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -42,28 +39,9 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang.RandomStringUtils;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
-import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.BetweenPredicateAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.BooleanOperatorAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.ComparisonPredicateAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.GroupByAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.InPredicateAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.OrderByAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.OrderByExpressionAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.OutputColumnAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.OutputColumnListAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.PredicateAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.PredicateListAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.PredicateParenthesisGroupAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.SelectAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.StarColumnListAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.StarExpressionAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.WhereAstNode;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -709,447 +687,458 @@ public class PinotDataAndQueryAnonymizer {
    * and user provided us with the set of time columns.
    */
 
-  public static class QueryGenerator {
-    private static final String GENERATED_QUERIES_FILE_NAME = "queries.generated";
-
-    String _outputDir;
-    String _queryDir;
-    String _queryFileName;
-    String _tableName;
-    private final Set<String> _globalDictionaryColumns;
-    private final Set<String> _columnsNotAnonymized;
-    // query generator builds these maps by reading files in outputDir
-    // these must have been written out earlier during global dictionary
-    // building phase
-    private final Map<String, Map<Object, Object>> _origToDerivedValueMap;
-    private final Map<String, String> _origToDerivedColumnsMap;
-
-    private final Stopwatch _generateQueryWatch = Stopwatch.createUnstarted();
-
-    public QueryGenerator(String outputDir, String queryDir, String queryFile, String tableName,
-        Set<String> filterColumns, Set<String> columnsNotAnonymized)
-        throws Exception {
-      _outputDir = outputDir;
-      _queryDir = queryDir;
-      _queryFileName = queryFile;
-      _tableName = tableName;
-      _origToDerivedValueMap = new HashMap<>();
-      _origToDerivedColumnsMap = new HashMap<>();
-      _globalDictionaryColumns = filterColumns;
-      _columnsNotAnonymized = columnsNotAnonymized;
-      for (String column : columnsNotAnonymized) {
-        _globalDictionaryColumns.remove(column);
-      }
-      loadGlobalDictionariesAndColumnMapping();
-    }
-
-    public void generateQueries()
-        throws Exception {
-      _generateQueryWatch.start();
-      File queryFile = new File(_queryDir + "/" + _queryFileName);
-      InputStream inputStream = new FileInputStream(queryFile);
-      BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-      String query;
-      PrintWriter out =
-          new PrintWriter(new BufferedWriter(new FileWriter(_queryDir + "/" + GENERATED_QUERIES_FILE_NAME)));
-      int count = 0;
-      while ((query = reader.readLine()) != null) {
-        try {
-          generateQuery(query, out);
-        } catch (PredicateValueNotFoundException e) {
-          // log the error and continue
-          LOGGER
-              .error("Unable to generate query for original query: {} . exception {}, original predicate not found {}",
-                  query, e, e._origValue);
-        }
-        count++;
-      }
-      _generateQueryWatch.stop();
-      LOGGER.info("Finished generating {} queries. Time taken {}secs. Please see generated query file in {}", count,
-          _generateQueryWatch.elapsed(TimeUnit.SECONDS), _queryDir);
-      out.flush();
-    }
-
-    @VisibleForTesting
-    public String generateQuery(String origQuery, PrintWriter out)
-        throws Exception {
-      AstNode root = Pql2Compiler.buildAst(origQuery);
-      StringBuilder genQuery = new StringBuilder();
-      genQuery.append("SELECT ");
-      SelectAstNode selectAstNode = (SelectAstNode) root;
-      List<? extends AstNode> selectChildren = selectAstNode.getChildren();
-      boolean rewrittenSelectList = false;
-      boolean rewrittenWhere = false;
-      for (AstNode child : selectChildren) {
-        if (child instanceof OutputColumnListAstNode) {
-          // handle select list
-          Preconditions.checkState(!rewrittenSelectList, "Select list already rewritten");
-          String selectList = rewriteSelectList((OutputColumnListAstNode) child);
-          genQuery.append(selectList);
-          // handle FROM clause right after rewriting the select list
-          genQuery.append(" FROM ").append(_tableName).append(" ");
-          rewrittenSelectList = true;
-        } else if (child instanceof WhereAstNode) {
-          // handle where
-          Preconditions
-              .checkState(rewrittenSelectList, "Select list should have been rewritten before rewriting WHERE");
-          Preconditions.checkState(!rewrittenWhere, "WHERE already rewritten");
-          // should have already rewritten the select list by now
-          String filter = rewriteFilter((WhereAstNode) child);
-          genQuery.append(filter).append(" ");
-          rewrittenWhere = true;
-        } else if (child instanceof GroupByAstNode) {
-          // handle group by
-          String groupBy = rewriteGroupBy((GroupByAstNode) child);
-          genQuery.append(groupBy).append(" ");
-        } else if (child instanceof StarColumnListAstNode) {
-          // handle SELECT * ....
-          genQuery.append("* FROM ").append(_tableName).append(" ");
-          rewrittenSelectList = true;
-        } else if (child instanceof OrderByAstNode) {
-          String orderBy = rewriteOrderBy((OrderByAstNode) child);
-          genQuery.append(orderBy).append(" ");
-        }
-      }
-
-      if (selectAstNode.isHasLimitClause()) {
-        genQuery.append("LIMIT ").append(selectAstNode.getRecordLimit());
-      } else if (selectAstNode.isHasTopClause()) {
-        genQuery.append("TOP ").append(selectAstNode.getTopN());
-      }
-
-      String result = genQuery.toString().trim();
-
-      if (out != null) {
-        out.println(result);
-      }
-
-      return result;
-    }
-
-    private String rewriteGroupBy(GroupByAstNode groupByAstNode) {
-      StringBuilder groupBy = new StringBuilder();
-      groupBy.append("GROUP BY ");
-      List<? extends AstNode> children = groupByAstNode.getChildren();
-      int count = 0;
-      for (AstNode groupByChild : children) {
-        Preconditions
-            .checkState(groupByChild instanceof IdentifierAstNode, "Expecting identifier as child node of group by");
-        String column = ((IdentifierAstNode) groupByChild).getName();
-        String derivedColumn = getAnonymousColumnName(column);
-        if (count > 0) {
-          groupBy.append(", ");
-        }
-        groupBy.append(derivedColumn);
-        count++;
-      }
-      return groupBy.toString();
-    }
-
-    private String rewriteOrderBy(OrderByAstNode orderByAstNode) {
-      StringBuilder orderBy = new StringBuilder();
-      orderBy.append("ORDER BY ");
-      List<? extends AstNode> children = orderByAstNode.getChildren();
-      int count = 0;
-      for (AstNode orderByChild : children) {
-        if (count > 0) {
-          orderBy.append(", ");
-        }
-        OrderByExpressionAstNode orderByExpr = (OrderByExpressionAstNode) orderByChild;
-        String origColumn = orderByExpr.getColumn();
-        String derivedColumn = getAnonymousColumnName(origColumn);
-        orderBy.append(derivedColumn).append(" ").append(orderByExpr.getOrdering());
-        count++;
-      }
-      return orderBy.toString();
-    }
-
-    private String rewriteSelectList(OutputColumnListAstNode outputColumnListAstNode) {
-      StringBuilder selectList = new StringBuilder();
-      List<? extends AstNode> outputChildren = outputColumnListAstNode.getChildren();
-      int numOutputColumns = outputChildren.size();
-      int columnIndex = 0;
-      for (AstNode outputChild : outputChildren) {
-        if (outputChild instanceof OutputColumnAstNode) {
-          // handle SELECT COL1, COL2 ....
-          List<? extends AstNode> children = outputChild.getChildren();
-          // OutputColumnAstNode represents an output column in the select list
-          // the actual output column is represented by the child node of OutputColumnAstNode
-          // and there can only be 1 such child
-          Preconditions.checkState(children.size() == 1, "Invalid number of children for output column ast node");
-          // handle the exact type of output column -- identifier or a function
-          rewriteSelectListColumn(children.get(0), selectList, null, columnIndex, numOutputColumns);
-        } else {
-          throw new UnsupportedOperationException("Invalid type of child node for OuptutColumnListAstNode");
-        }
-        columnIndex++;
-      }
-      return selectList.toString();
-    }
-
-    private void rewriteSelectListColumn(AstNode output, StringBuilder selectList, AstNode parent, int columnIndex,
-        int numOutputColumns) {
-      if (output instanceof IdentifierAstNode) {
-        // OUTPUT COLUMN is identifier (column name)
-        IdentifierAstNode identifier = (IdentifierAstNode) output;
-        String columnName = identifier.getName();
-        String derivedColumnName = getAnonymousColumnName(columnName);
-        if (parent instanceof FunctionCallAstNode) {
-          // this column is part of a parent function expression in the select list
-          selectList.append(derivedColumnName);
-        } else {
-          // this column is a standalone column in the select list
-          // so simply add the derived column name to select list
-          if (columnIndex <= numOutputColumns - 2) {
-            // multi column select list then separate with comma and space
-            selectList.append(derivedColumnName).append(", ");
-          } else {
-            // single column select list or last column in the select list
-            selectList.append(derivedColumnName);
-          }
-        }
-      } else if (output instanceof FunctionCallAstNode) {
-        // OUTPUT COLUMN is function
-        // handle function nesting by recursing and build the expression incrementally
-        // e.g1 SUM(C1)
-        // 1. SUM(
-        // 2. recurse for C1
-        // 3. SUM(DERIVED_C1
-        // 4. recursion over
-        // 5. SUM(DERIVED_C1)
-        //
-        // e.g2 SUM(ADD(C1,C2))
-        // 1. SUM(
-        // 2. recurse for ADD(C1,C2)
-        // 3. SUM(ADD(
-        // 4. recurse for C1
-        // 5. SUM(ADD(DERIVED_C1
-        // 6. append "," -> SUM(ADD(DERIVED_C1,
-        // 7. recurse for C2
-        // 8. SUM(ADD(DERIVED_C1,DERIVED_C2
-        // 9. recursion for add's operands finishes
-        // 10. finish add expression -> SUM(ADD(DERIVED_C1,DERIVED_C2)
-        // 11. recursion for sum's operands finishes
-        // 12. finish sum expression -> SUM(ADD(DERIVED_C1,DERIVED_C2))
-        // 13. DONE
-        FunctionCallAstNode function = (FunctionCallAstNode) output;
-        List<? extends AstNode> functionOperands = function.getChildren();
-        String name = function.getName();
-        selectList.append(name).append("(");
-        int count = 0;
-        for (AstNode functionOperand : functionOperands) {
-          if (count > 0) {
-            // add "," before handling the next operand
-            selectList.append(",");
-          }
-          rewriteSelectListColumn(functionOperand, selectList, function, columnIndex, numOutputColumns);
-          count++;
-        }
-        // finish this function expression at the end of recursion
-        if (!(parent instanceof FunctionCallAstNode)) {
-          if (columnIndex <= numOutputColumns - 2) {
-            selectList.append("), ");
-          } else {
-            selectList.append(")");
-          }
-        } else {
-          selectList.append(")");
-        }
-      } else if (output instanceof StarExpressionAstNode) {
-        // COUNT(*)
-        selectList.append("*");
-      } else {
-        throw new UnsupportedOperationException("Literals are not supported in output columns");
-      }
-    }
-
-    private String rewriteFilter(WhereAstNode whereAstNode)
-        throws Exception {
-      StringBuilder filter = new StringBuilder();
-      filter.append("WHERE ");
-      PredicateListAstNode predicateListAstNode = (PredicateListAstNode) whereAstNode.getChildren().get(0);
-
-      // The predicate may be PredicateParenthesisGroupAstNode.
-      parsePredicate(predicateListAstNode, filter);
-
-      return filter.toString();
-    }
-
-    private void rewriteBooleanOperator(BooleanOperatorAstNode operatorAstNode, StringBuilder filter) {
-      if (operatorAstNode.name().equalsIgnoreCase("AND")) {
-        filter.append(" AND ");
-      } else {
-        filter.append(" OR ");
-      }
-    }
-
-    private void rewritePredicate(PredicateAstNode predicateAstNode, StringBuilder filter)
-        throws Exception {
-      /// get column name participating in the predicate
-      String columnName = predicateAstNode.getIdentifier();
-      String derivedColumn = null;
-      if (columnName != null) {
-        derivedColumn = getAnonymousColumnName(columnName);
-      }
-      LiteralAstNode literal;
-      if (predicateAstNode instanceof ComparisonPredicateAstNode) {
-        // handle COMPARISON
-        ComparisonPredicateAstNode comparisonPredicate = (ComparisonPredicateAstNode) predicateAstNode;
-        // get operator: <, >, <=, >=, != ....
-        String operator = comparisonPredicate.getOperand();
-        // get right hand side literal
-        literal = comparisonPredicate.getLiteral();
-        // build comparison predicate using the column name, operator and literal
-        // e.g id <= 2000
-        filter.append(derivedColumn).append(" ").append(operator).append(" ");
-        rewriteLiteral(columnName, literal, filter);
-      } else if (predicateAstNode instanceof BetweenPredicateAstNode) {
-        // handle BETWEEN
-        List<? extends AstNode> betweenChildren = predicateAstNode.getChildren();
-        int numChildren = betweenChildren.size();
-        // append column name for BETWEEN and BETWEEN operator itself
-        filter.append(derivedColumn).append(" ").append("BETWEEN ");
-        int count = 0;
-        for (AstNode betweenChild : betweenChildren) {
-          Preconditions.checkState(betweenChild instanceof LiteralAstNode, "Child of BetweenAstNode should be literal");
-          literal = (LiteralAstNode) betweenChild;
-          if (count > 0) {
-            // separate two operands for BETWEEN with AND
-            // e.g timestamp BETWEEN 1000 AND 1001
-            filter.append(" AND ");
-          }
-          rewriteLiteral(columnName, literal, filter);
-          count++;
-        }
-      } else if (predicateAstNode instanceof InPredicateAstNode) {
-        // handle IN
-        List<? extends AstNode> inChildren = predicateAstNode.getChildren();
-        // append column name for IN and IN operator itself
-        if (((InPredicateAstNode) predicateAstNode).isNotInClause()) {
-          filter.append(derivedColumn).append(" NOT IN ").append("(");
-        } else {
-          filter.append(derivedColumn).append(" IN ").append("(");
-        }
-        int numChildren = inChildren.size();
-        int count = 0;
-        for (AstNode betweenChild : inChildren) {
-          Preconditions.checkState(betweenChild instanceof LiteralAstNode, "Child of InAstNode should be literal");
-          literal = (LiteralAstNode) betweenChild;
-          //String derivedValue = (String)getGeneratedValueForActualValue(columnName, literal);
-          if (count > 0) {
-            // separate two operands for IN with ","
-            // e.g timestamp IN (a,b,c,d)
-            filter.append(",");
-          }
-          rewriteLiteral(columnName, literal, filter);
-          count++;
-        }
-        // finish the IN predicate
-        filter.append(")");
-      } else if (predicateAstNode instanceof PredicateParenthesisGroupAstNode) {
-        filter.append("(");
-        parsePredicate((PredicateListAstNode) predicateAstNode.getChildren().get(0), filter);
-        filter.append(")");
-      } else {
-        // TODO: handle parenthesised predicate
-        // for now throw exception as opposed to generating incorrect query
-        throw new UnsupportedOperationException(
-            "predicate ast node: " + predicateAstNode.getClass() + " not supported");
-      }
-    }
-
-    private void parsePredicate(PredicateListAstNode predicateListAstNode, StringBuilder filter)
-        throws Exception {
-      int numChildren = predicateListAstNode.getChildren().size();
-      List<? extends AstNode> predicateList = predicateListAstNode.getChildren();
-      for (int i = 0; i < numChildren; i += 2) {
-        PredicateAstNode predicate = (PredicateAstNode) predicateList.get(i);
-        rewritePredicate(predicate, filter);
-        BooleanOperatorAstNode nextOperator;
-        if (i + 1 < numChildren) {
-          nextOperator = (BooleanOperatorAstNode) predicateList.get(i + 1);
-          rewriteBooleanOperator(nextOperator, filter);
-        }
-      }
-    }
-
-    private void rewriteLiteral(String columnName, LiteralAstNode literalAstNode, StringBuilder sb)
-        throws Exception {
-      String literalValue = literalAstNode.getValueAsString();
-      String derivedValue = (String) getGeneratedValueForOrigValue(columnName, literalValue);
-      if (literalAstNode instanceof StringLiteralAstNode) {
-        // quote string literals
-        sb.append("\"").append(derivedValue).append("\"");
-      } else {
-        // numeric literals
-        sb.append(derivedValue);
-      }
-    }
-
-    private void loadGlobalDictionariesAndColumnMapping()
-        throws Exception {
-      // load column name mapping
-      File mappingFile = new File(_outputDir + "/" + COLUMN_MAPPING_FILE_KEY);
-      InputStream inputStream = new FileInputStream(mappingFile);
-      BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-      String line;
-      while ((line = reader.readLine()) != null) {
-        String[] names = line.split(COLUMN_MAPPING_SEPARATOR);
-        _origToDerivedColumnsMap.put(names[0], names[1]);
-      }
-
-      // load global dictionaries
-      for (String column : _globalDictionaryColumns) {
-        Map<Object, Object> origToDerived = new HashMap<>();
-        _origToDerivedValueMap.put(column, origToDerived);
-        File dictionaryFile = new File(_outputDir + "/" + column + GlobalDictionaries.DICT_FILE_EXTENSION);
-        inputStream = new FileInputStream(dictionaryFile);
-        reader = new BufferedReader(new InputStreamReader(inputStream));
-        String line1;
-        while ((line1 = reader.readLine()) != null) {
-          String line2 = reader.readLine();
-          origToDerived.put(line1, line2);
-        }
-      }
-    }
-
-    private Object getGeneratedValueForOrigValue(String column, Object origValue)
-        throws Exception {
-      // we use this method for only those columns during query generation that are
-      // actually occurring in predicates
-      // Two kinds of columns are supported in predicates by query generator
-      // (1) columns that are participating in filter (and thus we built global
-      //     dictionary for them containing 1-1 mapping between original and
-      //     generated value
-      // (2) columns that we retained the data for as is.
-      if (_columnsNotAnonymized.contains(column)) {
-        // if we retained the value, simply return the original value
-        return origValue;
-      } else if (_globalDictionaryColumns.contains(column)) {
-        // if we built global dictionary, then get the generated value from global dictionary
-        Map<Object, Object> origToDerived = _origToDerivedValueMap.get(column);
-        // we should have generated global dictionary for this column
-        Preconditions.checkState(origToDerived != null);
-        // if the user worked with partial dataset, then every original value
-        // from the dictionary of original dataset won't be present in the
-        // global dictionary -- we just return appropriate exception such that
-        // query generator code can continue after ignoring this query
-        if (!origToDerived.containsKey(origValue)) {
-          throw new PredicateValueNotFoundException(origValue);
-        }
-        return origToDerived.get(origValue);
-      } else {
-        // based on the current implementation, we should not come here since
-        // we preprocess the queries to identify the filter columns and the columns
-        // we retain the data for
-        throw new IllegalStateException("Encountered an invalid filter column: " + column);
-      }
-    }
-
-    private String getAnonymousColumnName(String column) {
-      return _origToDerivedColumnsMap.get(column);
-    }
-  }
+  // TODO: Re-implement query generator using SQL. Keep the PQL query generator for reference
+//  public static class QueryGenerator {
+//    private static final String GENERATED_QUERIES_FILE_NAME = "queries.generated";
+//
+//    String _outputDir;
+//    String _queryDir;
+//    String _queryFileName;
+//    String _tableName;
+//    private final Set<String> _globalDictionaryColumns;
+//    private final Set<String> _columnsNotAnonymized;
+//    // query generator builds these maps by reading files in outputDir
+//    // these must have been written out earlier during global dictionary
+//    // building phase
+//    private final Map<String, Map<Object, Object>> _origToDerivedValueMap;
+//    private final Map<String, String> _origToDerivedColumnsMap;
+//
+//    private final Stopwatch _generateQueryWatch = Stopwatch.createUnstarted();
+//
+//    public QueryGenerator(String outputDir, String queryDir, String queryFile, String tableName,
+//        Set<String> filterColumns, Set<String> columnsNotAnonymized)
+//        throws Exception {
+//      _outputDir = outputDir;
+//      _queryDir = queryDir;
+//      _queryFileName = queryFile;
+//      _tableName = tableName;
+//      _origToDerivedValueMap = new HashMap<>();
+//      _origToDerivedColumnsMap = new HashMap<>();
+//      _globalDictionaryColumns = filterColumns;
+//      _columnsNotAnonymized = columnsNotAnonymized;
+//      for (String column : columnsNotAnonymized) {
+//        _globalDictionaryColumns.remove(column);
+//      }
+//      loadGlobalDictionariesAndColumnMapping();
+//    }
+//
+//    public void generateQueries()
+//        throws Exception {
+//      _generateQueryWatch.start();
+//      File queryFile = new File(_queryDir + "/" + _queryFileName);
+//      InputStream inputStream = new FileInputStream(queryFile);
+//      BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+//      String query;
+//      PrintWriter out =
+//          new PrintWriter(new BufferedWriter(new FileWriter(_queryDir + "/" + GENERATED_QUERIES_FILE_NAME)));
+//      int count = 0;
+//      while ((query = reader.readLine()) != null) {
+//        try {
+//          generateQuery(query, out);
+//        } catch (PredicateValueNotFoundException e) {
+//          // log the error and continue
+//          LOGGER
+//              .error("Unable to generate query for original query: {} . exception {}, original predicate not found
+//              {}",
+//                  query, e, e._origValue);
+//        }
+//        count++;
+//      }
+//      _generateQueryWatch.stop();
+//      LOGGER.info("Finished generating {} queries. Time taken {}secs. Please see generated query file in {}", count,
+//          _generateQueryWatch.elapsed(TimeUnit.SECONDS), _queryDir);
+//      out.flush();
+//    }
+//
+//    @VisibleForTesting
+//    public String generateQuery(String origQuery, PrintWriter out)
+//        throws Exception {
+//      AstNode root = Pql2Compiler.buildAst(origQuery);
+//      StringBuilder genQuery = new StringBuilder();
+//      genQuery.append("SELECT ");
+//      SelectAstNode selectAstNode = (SelectAstNode) root;
+//      List<? extends AstNode> selectChildren = selectAstNode.getChildren();
+//      boolean rewrittenSelectList = false;
+//      boolean rewrittenWhere = false;
+//      for (AstNode child : selectChildren) {
+//        if (child instanceof OutputColumnListAstNode) {
+//          // handle select list
+//          Preconditions.checkState(!rewrittenSelectList, "Select list already rewritten");
+//          String selectList = rewriteSelectList((OutputColumnListAstNode) child);
+//          genQuery.append(selectList);
+//          // handle FROM clause right after rewriting the select list
+//          genQuery.append(" FROM ").append(_tableName).append(" ");
+//          rewrittenSelectList = true;
+//        } else if (child instanceof WhereAstNode) {
+//          // handle where
+//          Preconditions
+//              .checkState(rewrittenSelectList, "Select list should have been rewritten before rewriting WHERE");
+//          Preconditions.checkState(!rewrittenWhere, "WHERE already rewritten");
+//          // should have already rewritten the select list by now
+//          String filter = rewriteFilter((WhereAstNode) child);
+//          genQuery.append(filter).append(" ");
+//          rewrittenWhere = true;
+//        } else if (child instanceof GroupByAstNode) {
+//          // handle group by
+//          String groupBy = rewriteGroupBy((GroupByAstNode) child);
+//          genQuery.append(groupBy).append(" ");
+//        } else if (child instanceof StarColumnListAstNode) {
+//          // handle SELECT * ....
+//          genQuery.append("* FROM ").append(_tableName).append(" ");
+//          rewrittenSelectList = true;
+//        } else if (child instanceof OrderByAstNode) {
+//          String orderBy = rewriteOrderBy((OrderByAstNode) child);
+//          genQuery.append(orderBy).append(" ");
+//        }
+//      }
+//
+//      if (selectAstNode.isHasLimitClause()) {
+//        genQuery.append("LIMIT ").append(selectAstNode.getRecordLimit());
+//      } else if (selectAstNode.isHasTopClause()) {
+//        genQuery.append("TOP ").append(selectAstNode.getTopN());
+//      }
+//
+//      String result = genQuery.toString().trim();
+//
+//      if (out != null) {
+//        out.println(result);
+//      }
+//
+//      return result;
+//    }
+//
+//    private String rewriteGroupBy(GroupByAstNode groupByAstNode) {
+//      StringBuilder groupBy = new StringBuilder();
+//      groupBy.append("GROUP BY ");
+//      List<? extends AstNode> children = groupByAstNode.getChildren();
+//      int count = 0;
+//      for (AstNode groupByChild : children) {
+//        Preconditions
+//            .checkState(groupByChild instanceof IdentifierAstNode, "Expecting identifier as child node of group by");
+//        String column = ((IdentifierAstNode) groupByChild).getName();
+//        String derivedColumn = getAnonymousColumnName(column);
+//        if (count > 0) {
+//          groupBy.append(", ");
+//        }
+//        groupBy.append(derivedColumn);
+//        count++;
+//      }
+//      return groupBy.toString();
+//    }
+//
+//    private String rewriteOrderBy(OrderByAstNode orderByAstNode) {
+//      StringBuilder orderBy = new StringBuilder();
+//      orderBy.append("ORDER BY ");
+//      List<? extends AstNode> children = orderByAstNode.getChildren();
+//      int count = 0;
+//      for (AstNode orderByChild : children) {
+//        if (count > 0) {
+//          orderBy.append(", ");
+//        }
+//        OrderByExpressionAstNode orderByExpr = (OrderByExpressionAstNode) orderByChild;
+//        String origColumn = orderByExpr.getColumn();
+//        String derivedColumn = getAnonymousColumnName(origColumn);
+//        orderBy.append(derivedColumn).append(" ").append(orderByExpr.getOrdering());
+//        count++;
+//      }
+//      return orderBy.toString();
+//    }
+//
+//    private String rewriteSelectList(OutputColumnListAstNode outputColumnListAstNode) {
+//      StringBuilder selectList = new StringBuilder();
+//      List<? extends AstNode> outputChildren = outputColumnListAstNode.getChildren();
+//      int numOutputColumns = outputChildren.size();
+//      int columnIndex = 0;
+//      for (AstNode outputChild : outputChildren) {
+//        if (outputChild instanceof OutputColumnAstNode) {
+//          // handle SELECT COL1, COL2 ....
+//          List<? extends AstNode> children = outputChild.getChildren();
+//          // OutputColumnAstNode represents an output column in the select list
+//          // the actual output column is represented by the child node of OutputColumnAstNode
+//          // and there can only be 1 such child
+//          Preconditions.checkState(children.size() == 1, "Invalid number of children for output column ast node");
+//          // handle the exact type of output column -- identifier or a function
+//          rewriteSelectListColumn(children.get(0), selectList, null, columnIndex, numOutputColumns);
+//        } else {
+//          throw new UnsupportedOperationException("Invalid type of child node for OuptutColumnListAstNode");
+//        }
+//        columnIndex++;
+//      }
+//      return selectList.toString();
+//    }
+//
+//    private void rewriteSelectListColumn(AstNode output, StringBuilder selectList, AstNode parent, int columnIndex,
+//        int numOutputColumns) {
+//      if (output instanceof IdentifierAstNode) {
+//        // OUTPUT COLUMN is identifier (column name)
+//        IdentifierAstNode identifier = (IdentifierAstNode) output;
+//        String columnName = identifier.getName();
+//        String derivedColumnName = getAnonymousColumnName(columnName);
+//        if (parent instanceof FunctionCallAstNode) {
+//          // this column is part of a parent function expression in the select list
+//          selectList.append(derivedColumnName);
+//        } else {
+//          // this column is a standalone column in the select list
+//          // so simply add the derived column name to select list
+//          if (columnIndex <= numOutputColumns - 2) {
+//            // multi column select list then separate with comma and space
+//            selectList.append(derivedColumnName).append(", ");
+//          } else {
+//            // single column select list or last column in the select list
+//            selectList.append(derivedColumnName);
+//          }
+//        }
+//      } else if (output instanceof FunctionCallAstNode) {
+//        // OUTPUT COLUMN is function
+//        // handle function nesting by recursing and build the expression incrementally
+//        // e.g1 SUM(C1)
+//        // 1. SUM(
+//        // 2. recurse for C1
+//        // 3. SUM(DERIVED_C1
+//        // 4. recursion over
+//        // 5. SUM(DERIVED_C1)
+//        //
+//        // e.g2 SUM(ADD(C1,C2))
+//        // 1. SUM(
+//        // 2. recurse for ADD(C1,C2)
+//        // 3. SUM(ADD(
+//        // 4. recurse for C1
+//        // 5. SUM(ADD(DERIVED_C1
+//        // 6. append "," -> SUM(ADD(DERIVED_C1,
+//        // 7. recurse for C2
+//        // 8. SUM(ADD(DERIVED_C1,DERIVED_C2
+//        // 9. recursion for add's operands finishes
+//        // 10. finish add expression -> SUM(ADD(DERIVED_C1,DERIVED_C2)
+//        // 11. recursion for sum's operands finishes
+//        // 12. finish sum expression -> SUM(ADD(DERIVED_C1,DERIVED_C2))
+//        // 13. DONE
+//        FunctionCallAstNode function = (FunctionCallAstNode) output;
+//        List<? extends AstNode> functionOperands = function.getChildren();
+//        String name = function.getName();
+//        selectList.append(name).append("(");
+//        int count = 0;
+//        for (AstNode functionOperand : functionOperands) {
+//          if (count > 0) {
+//            // add "," before handling the next operand
+//            selectList.append(",");
+//          }
+//          rewriteSelectListColumn(functionOperand, selectList, function, columnIndex, numOutputColumns);
+//          count++;
+//        }
+//        // finish this function expression at the end of recursion
+//        if (!(parent instanceof FunctionCallAstNode)) {
+//          if (columnIndex <= numOutputColumns - 2) {
+//            selectList.append("), ");
+//          } else {
+//            selectList.append(")");
+//          }
+//        } else {
+//          selectList.append(")");
+//        }
+//      } else if (output instanceof StarExpressionAstNode) {
+//        // COUNT(*)
+//        selectList.append("*");
+//      } else {
+//        throw new UnsupportedOperationException("Literals are not supported in output columns");
+//      }
+//    }
+//
+//    private String rewriteFilter(WhereAstNode whereAstNode)
+//        throws Exception {
+//      StringBuilder filter = new StringBuilder();
+//      filter.append("WHERE ");
+//      PredicateListAstNode predicateListAstNode = (PredicateListAstNode) whereAstNode.getChildren().get(0);
+//
+//      // The predicate may be PredicateParenthesisGroupAstNode.
+//      parsePredicate(predicateListAstNode, filter);
+//
+//      return filter.toString();
+//    }
+//
+//    private void rewriteBooleanOperator(BooleanOperatorAstNode operatorAstNode, StringBuilder filter) {
+//      if (operatorAstNode.name().equalsIgnoreCase("AND")) {
+//        filter.append(" AND ");
+//      } else {
+//        filter.append(" OR ");
+//      }
+//    }
+//
+//    private void rewritePredicate(PredicateAstNode predicateAstNode, StringBuilder filter)
+//        throws Exception {
+//      /// get column name participating in the predicate
+//      String columnName = predicateAstNode.getIdentifier();
+//      String derivedColumn = null;
+//      if (columnName != null) {
+//        derivedColumn = getAnonymousColumnName(columnName);
+//      }
+//      LiteralAstNode literal;
+//      if (predicateAstNode instanceof ComparisonPredicateAstNode) {
+//        // handle COMPARISON
+//        ComparisonPredicateAstNode comparisonPredicate = (ComparisonPredicateAstNode) predicateAstNode;
+//        // get operator: <, >, <=, >=, != ....
+//        String operator = comparisonPredicate.getOperand();
+//        // get right hand side literal
+//        literal = comparisonPredicate.getLiteral();
+//        // build comparison predicate using the column name, operator and literal
+//        // e.g id <= 2000
+//        filter.append(derivedColumn).append(" ").append(operator).append(" ");
+//        rewriteLiteral(columnName, literal, filter);
+//      } else if (predicateAstNode instanceof BetweenPredicateAstNode) {
+//        // handle BETWEEN
+//        List<? extends AstNode> betweenChildren = predicateAstNode.getChildren();
+//        int numChildren = betweenChildren.size();
+//        // append column name for BETWEEN and BETWEEN operator itself
+//        filter.append(derivedColumn).append(" ").append("BETWEEN ");
+//        int count = 0;
+//        for (AstNode betweenChild : betweenChildren) {
+//          Preconditions.checkState(betweenChild instanceof LiteralAstNode, "Child of BetweenAstNode should be
+//          literal");
+//          literal = (LiteralAstNode) betweenChild;
+//          if (count > 0) {
+//            // separate two operands for BETWEEN with AND
+//            // e.g timestamp BETWEEN 1000 AND 1001
+//            filter.append(" AND ");
+//          }
+//          rewriteLiteral(columnName, literal, filter);
+//          count++;
+//        }
+//      } else if (predicateAstNode instanceof InPredicateAstNode) {
+//        // handle IN
+//        List<? extends AstNode> inChildren = predicateAstNode.getChildren();
+//        // append column name for IN and IN operator itself
+//        if (((InPredicateAstNode) predicateAstNode).isNotInClause()) {
+//          filter.append(derivedColumn).append(" NOT IN ").append("(");
+//        } else {
+//          filter.append(derivedColumn).append(" IN ").append("(");
+//        }
+//        int numChildren = inChildren.size();
+//        int count = 0;
+//        for (AstNode betweenChild : inChildren) {
+//          Preconditions.checkState(betweenChild instanceof LiteralAstNode, "Child of InAstNode should be literal");
+//          literal = (LiteralAstNode) betweenChild;
+//          //String derivedValue = (String)getGeneratedValueForActualValue(columnName, literal);
+//          if (count > 0) {
+//            // separate two operands for IN with ","
+//            // e.g timestamp IN (a,b,c,d)
+//            filter.append(",");
+//          }
+//          rewriteLiteral(columnName, literal, filter);
+//          count++;
+//        }
+//        // finish the IN predicate
+//        filter.append(")");
+//      } else if (predicateAstNode instanceof PredicateParenthesisGroupAstNode) {
+//        filter.append("(");
+//        parsePredicate((PredicateListAstNode) predicateAstNode.getChildren().get(0), filter);
+//        filter.append(")");
+//      } else {
+//        // TODO: handle parenthesised predicate
+//        // for now throw exception as opposed to generating incorrect query
+//        throw new UnsupportedOperationException(
+//            "predicate ast node: " + predicateAstNode.getClass() + " not supported");
+//      }
+//    }
+//
+//    private void parsePredicate(PredicateListAstNode predicateListAstNode, StringBuilder filter)
+//        throws Exception {
+//      int numChildren = predicateListAstNode.getChildren().size();
+//      List<? extends AstNode> predicateList = predicateListAstNode.getChildren();
+//      for (int i = 0; i < numChildren; i += 2) {
+//        PredicateAstNode predicate = (PredicateAstNode) predicateList.get(i);
+//        rewritePredicate(predicate, filter);
+//        BooleanOperatorAstNode nextOperator;
+//        if (i + 1 < numChildren) {
+//          nextOperator = (BooleanOperatorAstNode) predicateList.get(i + 1);
+//          rewriteBooleanOperator(nextOperator, filter);
+//        }
+//      }
+//    }
+//
+//    private void rewriteLiteral(String columnName, LiteralAstNode literalAstNode, StringBuilder sb)
+//        throws Exception {
+//      String literalValue = literalAstNode.getValueAsString();
+//      String derivedValue = (String) getGeneratedValueForOrigValue(columnName, literalValue);
+//      if (literalAstNode instanceof StringLiteralAstNode) {
+//        // quote string literals
+//        sb.append("\"").append(derivedValue).append("\"");
+//      } else {
+//        // numeric literals
+//        sb.append(derivedValue);
+//      }
+//    }
+//
+//    private void loadGlobalDictionariesAndColumnMapping()
+//        throws Exception {
+//      // load column name mapping
+//      File mappingFile = new File(_outputDir + "/" + COLUMN_MAPPING_FILE_KEY);
+//      InputStream inputStream = new FileInputStream(mappingFile);
+//      BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+//      String line;
+//      while ((line = reader.readLine()) != null) {
+//        String[] names = line.split(COLUMN_MAPPING_SEPARATOR);
+//        _origToDerivedColumnsMap.put(names[0], names[1]);
+//      }
+//
+//      // load global dictionaries
+//      for (String column : _globalDictionaryColumns) {
+//        Map<Object, Object> origToDerived = new HashMap<>();
+//        _origToDerivedValueMap.put(column, origToDerived);
+//        File dictionaryFile = new File(_outputDir + "/" + column + GlobalDictionaries.DICT_FILE_EXTENSION);
+//        inputStream = new FileInputStream(dictionaryFile);
+//        reader = new BufferedReader(new InputStreamReader(inputStream));
+//        String line1;
+//        while ((line1 = reader.readLine()) != null) {
+//          String line2 = reader.readLine();
+//          origToDerived.put(line1, line2);
+//        }
+//      }
+//    }
+//
+//    private Object getGeneratedValueForOrigValue(String column, Object origValue)
+//        throws Exception {
+//      // we use this method for only those columns during query generation that are
+//      // actually occurring in predicates
+//      // Two kinds of columns are supported in predicates by query generator
+//      // (1) columns that are participating in filter (and thus we built global
+//      //     dictionary for them containing 1-1 mapping between original and
+//      //     generated value
+//      // (2) columns that we retained the data for as is.
+//      if (_columnsNotAnonymized.contains(column)) {
+//        // if we retained the value, simply return the original value
+//        return origValue;
+//      } else if (_globalDictionaryColumns.contains(column)) {
+//        // if we built global dictionary, then get the generated value from global dictionary
+//        Map<Object, Object> origToDerived = _origToDerivedValueMap.get(column);
+//        // we should have generated global dictionary for this column
+//        Preconditions.checkState(origToDerived != null);
+//        // if the user worked with partial dataset, then every original value
+//        // from the dictionary of original dataset won't be present in the
+//        // global dictionary -- we just return appropriate exception such that
+//        // query generator code can continue after ignoring this query
+//        if (!origToDerived.containsKey(origValue)) {
+//          throw new PredicateValueNotFoundException(origValue);
+//        }
+//        return origToDerived.get(origValue);
+//      } else {
+//        // based on the current implementation, we should not come here since
+//        // we preprocess the queries to identify the filter columns and the columns
+//        // we retain the data for
+//        throw new IllegalStateException("Encountered an invalid filter column: " + column);
+//      }
+//    }
+//
+//    private String getAnonymousColumnName(String column) {
+//      return _origToDerivedColumnsMap.get(column);
+//    }
+//  }
+//
+//  private static class PredicateValueNotFoundException extends Exception {
+//    final Object _origValue;
+//
+//    PredicateValueNotFoundException(Object value) {
+//      _origValue = value;
+//    }
+//  }
 
   /*****************************************************
    *                                                   *
@@ -1173,38 +1162,11 @@ public class PinotDataAndQueryAnonymizer {
     }
 
     private static void examineWhereClause(String query, Set<String> filterColumns) {
-      AstNode root = Pql2Compiler.buildAst(query);
-      SelectAstNode selectAstNode = (SelectAstNode) root;
-      List<? extends AstNode> selectChildren = selectAstNode.getChildren();
-      for (AstNode child : selectChildren) {
-        if (child instanceof WhereAstNode) {
-          WhereAstNode whereAstNode = (WhereAstNode) child;
-          PredicateListAstNode predicateListAstNode = (PredicateListAstNode) whereAstNode.getChildren().get(0);
-          // The predicate may be PredicateParenthesisGroupAstNode.
-          parsePredicate(predicateListAstNode, filterColumns);
-        }
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      FilterContext filter = queryContext.getFilter();
+      if (filter != null) {
+        filter.getColumns(filterColumns);
       }
-    }
-
-    private static void parsePredicate(PredicateListAstNode predicateListAstNode, Set<String> filterColumns) {
-      int numChildren = predicateListAstNode.getChildren().size();
-      List<? extends AstNode> predicateList = predicateListAstNode.getChildren();
-      for (int i = 0; i < numChildren; i += 2) {
-        PredicateAstNode predicate = (PredicateAstNode) predicateList.get(i);
-        if (predicate instanceof PredicateParenthesisGroupAstNode) {
-          parsePredicate((PredicateListAstNode) predicate.getChildren().get(0), filterColumns);
-        } else {
-          filterColumns.add(predicate.getIdentifier());
-        }
-      }
-    }
-  }
-
-  private static class PredicateValueNotFoundException extends Exception {
-    final Object _origValue;
-
-    PredicateValueNotFoundException(Object value) {
-      _origValue = value;
     }
   }
 }

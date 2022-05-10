@@ -42,6 +42,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonI
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OnHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.text.NativeTextIndexCreator;
 import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexCreator;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -143,8 +144,12 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
     } else {
       Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING,
           "Text index is currently only supported on STRING type columns");
-      return new LuceneTextIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(),
-          context.isCommitOnClose());
+      if (context.getFstType() == FSTType.NATIVE) {
+        return new NativeTextIndexCreator(context.getFieldSpec().getName(), context.getIndexDir());
+      } else {
+        return new LuceneTextIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(),
+                context.isCommitOnClose());
+      }
     }
   }
 
@@ -206,6 +211,7 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
       case DOUBLE:
         return new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, dataType,
             writerVersion);
+      case BIG_DECIMAL:
       case STRING:
       case BYTES:
         return new SingleValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, dataType,

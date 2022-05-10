@@ -33,7 +33,7 @@ import static org.testng.Assert.assertTrue;
 public class AggregationFunctionFactoryTest {
   private static final String ARGUMENT = "(column)";
   private static final QueryContext DUMMY_QUERY_CONTEXT =
-      QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable");
+      QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
 
   @Test
   public void testGetAggregationFunction() {
@@ -85,6 +85,48 @@ public class AggregationFunctionFactoryTest {
     assertTrue(aggregationFunction instanceof ModeAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.MODE);
     assertEquals(aggregationFunction.getColumnName(), "mode_column");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("FiRsTwItHtImE", "(column,timeColumn,'BOOLEAN')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof FirstIntValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.FIRSTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "firstWithTime_column_timeColumn_BOOLEAN");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("FiRsTwItHtImE", "(column,timeColumn,'INT')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof FirstIntValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.FIRSTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "firstWithTime_column_timeColumn_INT");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("FiRsTwItHtImE", "(column,timeColumn,'LONG')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof FirstLongValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.FIRSTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "firstWithTime_column_timeColumn_LONG");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("FiRsTwItHtImE", "(column,timeColumn,'FLOAT')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof FirstFloatValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.FIRSTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "firstWithTime_column_timeColumn_FLOAT");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("FiRsTwItHtImE", "(column,timeColumn,'DOUBLE')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof FirstDoubleValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.FIRSTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "firstWithTime_column_timeColumn_DOUBLE");
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("FiRsTwItHtImE", "(column,timeColumn,'STRING')");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
+    assertTrue(aggregationFunction instanceof FirstStringValueWithTimeAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.FIRSTWITHTIME);
+    assertEquals(aggregationFunction.getColumnName(), "firstWithTime_column_timeColumn_STRING");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
     function = getFunction("LaStWiThTiMe", "(column,timeColumn,'BOOLEAN')");
@@ -408,13 +450,13 @@ public class AggregationFunctionFactoryTest {
   }
 
   private FunctionContext getFunction(String functionName, String args) {
-    return RequestContextUtils.getExpressionFromSQL(functionName + args).getFunction();
+    return RequestContextUtils.getExpression(functionName + args).getFunction();
   }
 
   @Test
   public void testAggregationFunctionWithMultipleArgs() {
     QueryContext queryContext =
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT DISTINCT column1, column2, column3 FROM testTable");
+        QueryContextConverterUtils.getQueryContext("SELECT DISTINCT column1, column2, column3 FROM testTable");
     AggregationFunction aggregationFunction = AggregationFunctionFactory
         .getAggregationFunction(queryContext.getSelectExpressions().get(0).getFunction(), queryContext);
     assertTrue(aggregationFunction instanceof DistinctAggregationFunction);

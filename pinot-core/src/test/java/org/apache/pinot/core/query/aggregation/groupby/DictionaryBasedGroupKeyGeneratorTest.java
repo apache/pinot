@@ -139,10 +139,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     int docId1 = _random.nextInt(50);
     int docId2 = docId1 + 1 + _random.nextInt(50);
     // NOTE: put all columns into group-by so that transform operator has expressions for all columns
-    String query = String
-        .format("SELECT COUNT(*) FROM testTable WHERE %s IN (%d, %d) GROUP BY %s, %s", FILTER_COLUMN, docId1, docId2,
-            StringUtils.join(SV_COLUMNS, ", "), StringUtils.join(MV_COLUMNS, ", "));
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
+    String query =
+        String.format("SELECT COUNT(*) FROM testTable WHERE %s IN (%d, %d) GROUP BY %s, %s", FILTER_COLUMN, docId1,
+            docId2, StringUtils.join(SV_COLUMNS, ", "), StringUtils.join(MV_COLUMNS, ", "));
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
 
     List<ExpressionContext> expressions = new ArrayList<>();
     for (String column : SV_COLUMNS) {
@@ -174,7 +174,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, SV_GROUP_KEY_BUFFER);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
     compareSingleValueBuffer();
-    testGetStringGroupKeys(dictionaryBasedGroupKeyGenerator.getStringGroupKeys(), 2);
+    testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), 2);
   }
 
   @Test
@@ -195,7 +195,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, SV_GROUP_KEY_BUFFER);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
-    testGetStringGroupKeys(dictionaryBasedGroupKeyGenerator.getStringGroupKeys(), 2);
+    testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), 2);
   }
 
   @Test
@@ -216,7 +216,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, SV_GROUP_KEY_BUFFER);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
-    testGetStringGroupKeys(dictionaryBasedGroupKeyGenerator.getStringGroupKeys(), 2);
+    testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), 2);
   }
 
   @Test
@@ -237,7 +237,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, SV_GROUP_KEY_BUFFER);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
-    testGetStringGroupKeys(dictionaryBasedGroupKeyGenerator.getStringGroupKeys(), 2);
+    testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), 2);
   }
 
   /**
@@ -272,7 +272,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     int numUniqueKeys = MV_GROUP_KEY_BUFFER[0].length + MV_GROUP_KEY_BUFFER[1].length;
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
     compareMultiValueBuffer();
-    testGetStringGroupKeys(dictionaryBasedGroupKeyGenerator.getStringGroupKeys(), numUniqueKeys);
+    testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), numUniqueKeys);
   }
 
   @Test
@@ -294,7 +294,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     int numUniqueKeys = MV_GROUP_KEY_BUFFER[0].length + MV_GROUP_KEY_BUFFER[1].length;
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();
-    testGetStringGroupKeys(dictionaryBasedGroupKeyGenerator.getStringGroupKeys(), numUniqueKeys);
+    testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), numUniqueKeys);
   }
 
   @Test
@@ -317,7 +317,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     int numUniqueKeys = MV_GROUP_KEY_BUFFER[0].length + MV_GROUP_KEY_BUFFER[1].length;
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();
-    testGetStringGroupKeys(dictionaryBasedGroupKeyGenerator.getStringGroupKeys(), numUniqueKeys);
+    testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), numUniqueKeys);
   }
 
   @Test
@@ -339,7 +339,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     int numUniqueKeys = MV_GROUP_KEY_BUFFER[0].length + MV_GROUP_KEY_BUFFER[1].length;
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();
-    testGetStringGroupKeys(dictionaryBasedGroupKeyGenerator.getStringGroupKeys(), numUniqueKeys);
+    testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), numUniqueKeys);
   }
 
   @Test
@@ -373,7 +373,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
       assertEquals(MV_GROUP_KEY_BUFFER[i], MV_GROUP_KEY_BUFFER[0], _errorMessage);
       assertEquals(MV_GROUP_KEY_BUFFER[i + 1], MV_GROUP_KEY_BUFFER[1], _errorMessage);
     }
-    testGetStringGroupKeys(dictionaryBasedGroupKeyGenerator.getStringGroupKeys(), numGroupsLimit);
+    testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), numGroupsLimit);
   }
 
   private static ExpressionContext[] getExpressions(String[] columns) {
@@ -400,21 +400,21 @@ public class DictionaryBasedGroupKeyGeneratorTest {
   }
 
   /**
-   * Helper method to test the group key iterator returned by getStringGroupKeys().
+   * Helper method to test the group key iterator returned by getGroupKeys().
    *
    * @param groupKeyIterator group key iterator.
    * @param numUniqueKeys number of unique keys.
    */
-  private void testGetStringGroupKeys(Iterator<GroupKeyGenerator.StringGroupKey> groupKeyIterator, int numUniqueKeys) {
+  private void testGetGroupKeys(Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator, int numUniqueKeys) {
     int count = 0;
     Set<Integer> idSet = new HashSet<>();
-    Set<String> groupKeySet = new HashSet<>();
+    Set<List<Object>> groupKeySet = new HashSet<>();
 
     while (groupKeyIterator.hasNext()) {
       count++;
-      GroupKeyGenerator.StringGroupKey groupKey = groupKeyIterator.next();
+      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
       idSet.add(groupKey._groupId);
-      groupKeySet.add(groupKey._stringKey);
+      groupKeySet.add(Arrays.asList(groupKey._keys));
     }
 
     assertEquals(count, numUniqueKeys, _errorMessage);

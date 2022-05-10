@@ -20,7 +20,9 @@ package org.apache.pinot.controller.api.resources;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response.Status;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.user.ComponentType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,6 +35,7 @@ public class Constants {
 
   public static final String CLUSTER_TAG = "Cluster";
   public static final String TABLE_TAG = "Table";
+  public static final String USER_TAG = "User";
   public static final String VERSION_TAG = "Version";
   public static final String HEALTH_TAG = "Health";
   public static final String INSTANCE_TAG = "Instance";
@@ -46,9 +49,10 @@ public class Constants {
   public static final String ZOOKEEPER = "Zookeeper";
   public static final String APP_CONFIGS = "AppConfigs";
   public static final String PERIODIC_TASK_TAG = "PeriodicTask";
+  public static final String UPSERT_RESOURCE_TAG = "Upsert";
 
   public static TableType validateTableType(String tableTypeStr) {
-    if (tableTypeStr == null || tableTypeStr.isEmpty()) {
+    if (StringUtils.isBlank(tableTypeStr)) {
       return null;
     }
     try {
@@ -59,8 +63,20 @@ public class Constants {
     }
   }
 
+  public static ComponentType validateComponentType(String componentTypeStr) {
+    if (StringUtils.isBlank(componentTypeStr)) {
+      return null;
+    }
+    try {
+      return ComponentType.valueOf(componentTypeStr.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      LOGGER.info("Illegal table type '{}'", componentTypeStr);
+      throw new WebApplicationException("Illegal table type '" + componentTypeStr + "'", Status.BAD_REQUEST);
+    }
+  }
+
   public static StateType validateState(String stateStr) {
-    if (stateStr == null) {
+    if (StringUtils.isBlank(stateStr)) {
       return null;
     }
     try {

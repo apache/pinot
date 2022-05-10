@@ -67,6 +67,10 @@ public interface AccessControl {
     return true;
   }
 
+  default boolean hasAccess(HttpHeaders httpHeaders) {
+    return true;
+  }
+
   /**
    * Determine whether authentication is required for annotated (controller) endpoints only
    *

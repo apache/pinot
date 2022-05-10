@@ -59,6 +59,37 @@ public class ConnectionFactory {
   }
 
   /**
+   * Creates a connection to Pinot cluster, given its Controller URL
+   *
+   * @param scheme controller URL scheme
+   * @param controllerHost controller host
+   * @param controllerPort controller port
+   * @return A connection that connects to brokers as per the given controller
+   */
+  public static Connection fromController(String scheme, String controllerHost, int controllerPort) {
+    return fromController(scheme, controllerHost, controllerPort, 1000);
+  }
+
+  /**
+   *
+   * @param scheme controller URL scheme
+   * @param controllerHost controller host
+   * @param controllerPort controller port
+   * @param brokerUpdateFreqInMillis frequency of broker data refresh using controller APIs
+   * @return A connection that connects to brokers as per the given controller
+   */
+  public static Connection fromController(String scheme, String controllerHost, int controllerPort,
+      long brokerUpdateFreqInMillis) {
+    try {
+      return new Connection(new Properties(),
+          new ControllerBasedBrokerSelector(scheme, controllerHost, controllerPort, brokerUpdateFreqInMillis),
+          getDefault());
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  /**
    * Creates a connection to a Pinot cluster, given its Zookeeper URL
    *
    * @param properties The Pinot connection properties

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.List;
+import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
@@ -137,6 +138,11 @@ public class ControllerAdminApiApplication extends ResourceConfig {
         ContainerResponseContext containerResponseContext)
         throws IOException {
       containerResponseContext.getHeaders().add("Access-Control-Allow-Origin", "*");
+      containerResponseContext.getHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS, DELETE");
+      containerResponseContext.getHeaders().add("Access-Control-Allow-Headers", "*");
+      if (containerRequestContext.getMethod().equals("OPTIONS")) {
+        containerResponseContext.setStatus(HttpServletResponse.SC_OK);
+      }
     }
   }
 }

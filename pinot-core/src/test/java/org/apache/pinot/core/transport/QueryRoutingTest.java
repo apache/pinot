@@ -29,8 +29,8 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -52,7 +52,7 @@ public class QueryRoutingTest {
   private static final ServerRoutingInstance REALTIME_SERVER_ROUTING_INSTANCE =
       SERVER_INSTANCE.toServerRoutingInstance(TableType.REALTIME, ServerInstance.RoutingType.NETTY);
   private static final BrokerRequest BROKER_REQUEST =
-      new Pql2Compiler().compileToBrokerRequest("SELECT * FROM testTable");
+      CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable");
   private static final Map<ServerInstance, List<String>> ROUTING_TABLE =
       Collections.singletonMap(SERVER_INSTANCE, Collections.emptyList());
 

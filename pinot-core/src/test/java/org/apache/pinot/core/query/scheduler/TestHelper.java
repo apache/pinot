@@ -18,15 +18,12 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.common.request.QuerySource;
-import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
 
 public class TestHelper {
@@ -40,14 +37,8 @@ public class TestHelper {
     request.setEnableTrace(false);
     request.setRequestId(1);
     request.setSearchSegments(Arrays.asList("segment1", "segment2"));
-    BrokerRequest br = new BrokerRequest();
-    QuerySource qs = new QuerySource();
-    qs.setTableName(table);
-    br.setQuerySource(qs);
-    Selection selection = new Selection();
-    selection.setSelectionColumns(new ArrayList<>(Collections.singletonList("*")));
-    br.setSelections(selection);
-    request.setQuery(br);
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM \"" + table + "\"");
+    request.setQuery(brokerRequest);
     return new ServerQueryRequest(request, metrics, queryArrivalTimeMs);
   }
 

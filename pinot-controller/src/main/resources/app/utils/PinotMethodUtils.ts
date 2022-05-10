@@ -67,7 +67,12 @@ import {
   getState,
   getInfo,
   authenticateUser,
-  getSegmentDebugInfo
+  getSegmentDebugInfo,
+  requestTable,
+  requestUserList,
+  requestAddUser,
+  requestDeleteUser,
+  requestUpdateUser
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
@@ -234,10 +239,9 @@ const getAsObject = (str: SQLResult) => {
 // This method is used to display query output in tabular format as well as JSON format on query page
 // API: /:urlName (Eg: sql or pql)
 // Expected Output: {columns: [], records: []}
-const getQueryResults = (params, url, checkedOptions) => {
-  return getQueryResult(params, url).then(({ data }) => {
-    let queryResponse = null;
-    queryResponse = getAsObject(data);
+const getQueryResults = (params, checkedOptions) => {
+  return getQueryResult(params).then(({ data }) => {
+    let queryResponse = getAsObject(data);
 
     let errorStr = '';
     let dataArray = [];
@@ -888,6 +892,36 @@ const getURLWithoutAccessToken = (fallbackUrl = '/'): string => {
   return `${prefix}${url}`;
 };
 
+const getTable = ()=>{
+  return requestTable().then(response=>{
+    return response.data;
+  })
+};
+
+const getUserList = ()=>{
+  return requestUserList().then(response=>{
+    return response.data;
+  })
+};
+
+const addUser = (userObject)=>{
+  return requestAddUser(userObject).then(response=>{
+    return response.data;
+  })
+};
+
+const deleteUser = (userObject)=>{
+  return requestDeleteUser(userObject).then(response=>{
+    return response.data;
+  })
+};
+
+const updateUser = (userObject, passwordChanged) =>{
+  return requestUpdateUser(userObject, passwordChanged).then(response=>{
+    return response.data;
+  })
+}
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -941,5 +975,10 @@ export default {
   getWellKnownOpenIdConfiguration,
   verifyAuth,
   getAccessTokenFromHashParams,
-  getURLWithoutAccessToken
+  getURLWithoutAccessToken,
+  getTable,
+  getUserList,
+  addUser,
+  deleteUser,
+  updateUser
 };

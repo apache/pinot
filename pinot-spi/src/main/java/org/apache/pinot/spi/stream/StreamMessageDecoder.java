@@ -34,6 +34,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 public interface StreamMessageDecoder<T> {
 
   String RECORD_EXTRACTOR_CONFIG_KEY = "recordExtractorClass";
+  String RECORD_EXTRACTOR_CONFIG_CONFIG_KEY = "recordExtractorConfigClass";
 
   /**
    * Initializes the decoder.

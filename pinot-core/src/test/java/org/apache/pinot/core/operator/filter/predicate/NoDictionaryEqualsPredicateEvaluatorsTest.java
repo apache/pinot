@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import java.math.BigDecimal;
 import java.util.Random;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.RandomStringUtils;
@@ -186,6 +187,29 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
           ArrayUtils.contains(randomDoubles, doubleValue));
       Assert.assertEquals(neqPredicateEvaluator.applyMV(randomDoubles, NUM_MULTI_VALUES),
           !ArrayUtils.contains(randomDoubles, doubleValue));
+    }
+  }
+
+  @Test
+  public void testBigDecimalPredicateEvaluators() {
+    BigDecimal bigDecimalValue = BigDecimal.valueOf(_random.nextDouble());
+    String stringValue = bigDecimalValue.toPlainString();
+
+    EqPredicate eqPredicate = new EqPredicate(COLUMN_EXPRESSION, stringValue);
+    PredicateEvaluator eqPredicateEvaluator =
+        EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.BIG_DECIMAL);
+
+    NotEqPredicate notEqPredicate = new NotEqPredicate(COLUMN_EXPRESSION, stringValue);
+    PredicateEvaluator neqPredicateEvaluator =
+        NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(notEqPredicate, FieldSpec.DataType.BIG_DECIMAL);
+
+    Assert.assertTrue(eqPredicateEvaluator.applySV(bigDecimalValue));
+    Assert.assertFalse(neqPredicateEvaluator.applySV(bigDecimalValue));
+
+    for (int i = 0; i < 100; i++) {
+      BigDecimal random = BigDecimal.valueOf(_random.nextDouble());
+      Assert.assertEquals(eqPredicateEvaluator.applySV(random), (random.compareTo(bigDecimalValue) == 0));
+      Assert.assertEquals(neqPredicateEvaluator.applySV(random), (random.compareTo(bigDecimalValue) != 0));
     }
   }
 

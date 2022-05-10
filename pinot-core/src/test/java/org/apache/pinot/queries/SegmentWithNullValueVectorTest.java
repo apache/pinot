@@ -44,7 +44,6 @@ import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -64,6 +63,7 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -97,7 +97,6 @@ public class SegmentWithNullValueVectorTest {
   Map<String, boolean[]> _actualNullVectorMap = new HashMap<>();
 
   // Required for subsequent queries
-  private static final Pql2Compiler COMPILER = new Pql2Compiler();
   private final List<String> _segmentNames = new ArrayList<>();
   private InstanceDataManager _instanceDataManager;
   private ServerMetrics _serverMetrics;
@@ -143,9 +142,10 @@ public class SegmentWithNullValueVectorTest {
     Mockito.when(tableDataManagerConfig.getTableName()).thenReturn(TABLE_NAME);
     Mockito.when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
     @SuppressWarnings("unchecked")
-    TableDataManager tableDataManager = TableDataManagerProvider
-        .getTableDataManager(tableDataManagerConfig, "testInstance", Mockito.mock(ZkHelixPropertyStore.class),
-            Mockito.mock(ServerMetrics.class), Mockito.mock(HelixManager.class), null);
+    TableDataManager tableDataManager =
+        TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, "testInstance",
+            Mockito.mock(ZkHelixPropertyStore.class), Mockito.mock(ServerMetrics.class),
+            Mockito.mock(HelixManager.class), null);
     tableDataManager.start();
     tableDataManager.addSegment(_segment);
     _instanceDataManager = Mockito.mock(InstanceDataManager.class);
@@ -250,7 +250,7 @@ public class SegmentWithNullValueVectorTest {
   @Test
   public void testNotNullPredicate() {
     String query = "SELECT COUNT(*) FROM " + TABLE_NAME + " where " + INT_COLUMN + " IS NOT NULL";
-    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getLong(0, 0), NUM_ROWS - _nullIntKeyCount);
@@ -259,7 +259,7 @@ public class SegmentWithNullValueVectorTest {
   @Test
   public void testNullPredicate() {
     String query = "SELECT COUNT(*) FROM " + TABLE_NAME + " where " + INT_COLUMN + " IS NULL";
-    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getLong(0, 0), _nullIntKeyCount);
@@ -270,7 +270,7 @@ public class SegmentWithNullValueVectorTest {
     String query =
         "SELECT COUNT(*) FROM " + TABLE_NAME + " where " + INT_COLUMN + " IS NOT NULL and " + LONG_COLUMN + " > "
             + LONG_VALUE_THRESHOLD;
-    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getLong(0, 0), _longKeyCount);

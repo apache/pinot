@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.selection;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -27,7 +26,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -94,7 +92,7 @@ public class SelectionOperatorServiceTest {
 
   @BeforeClass
   public void setUp() {
-    _queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+    _queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT " + String.join(", ", _columnNames) + " FROM testTable ORDER BY int DESC LIMIT 1, 2");
   }
 
@@ -104,8 +102,8 @@ public class SelectionOperatorServiceTest {
     when(indexSegment.getColumnNames()).thenReturn(new HashSet<>(Arrays.asList("foo", "bar", "foobar")));
 
     // For non 'SELECT *' select only queries, should return deduplicated selection expressions
-    QueryContext queryContext = QueryContextConverterUtils
-        .getQueryContextFromSQL("SELECT add(foo, 1), foo, sub(bar, 2 ), bar, foo, foobar, bar FROM testTable");
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT add(foo, 1), foo, sub(bar, 2 ), bar, foo, foobar, bar FROM testTable");
     List<ExpressionContext> expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
     assertEquals(expressions.size(), 5);
     assertEquals(expressions.get(0).toString(), "add(foo,'1')");
@@ -115,7 +113,7 @@ public class SelectionOperatorServiceTest {
     assertEquals(expressions.get(4).toString(), "foobar");
 
     // For 'SELECT *' select only queries, should return all physical columns in alphabetical order
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable");
+    queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
     expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
     assertEquals(expressions.size(), 3);
     assertEquals(expressions.get(0).toString(), "bar");
@@ -124,7 +122,7 @@ public class SelectionOperatorServiceTest {
 
     // For non 'SELECT *' select order-by queries, should return deduplicated order-by expressions followed by selection
     // expressions
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+    queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT add(foo, 1), foo, sub(bar, 2 ), bar, foo, foobar, bar FROM testTable ORDER BY foo, sub(bar, 2)");
     expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
     assertEquals(expressions.size(), 5);
@@ -136,8 +134,7 @@ public class SelectionOperatorServiceTest {
 
     // For 'SELECT *' select order-by queries, should return deduplicated order-by expressions followed by all physical
     // columns in alphabetical order
-    queryContext =
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable ORDER BY foo, sub(bar, 2)");
+    queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY foo, sub(bar, 2)");
     expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
     assertEquals(expressions.size(), 4);
     assertEquals(expressions.get(0).toString(), "foo");
@@ -151,20 +148,21 @@ public class SelectionOperatorServiceTest {
     // For non 'SELECT *', should return selection columns as is
     DataSchema dataSchema = mock(DataSchema.class);
     List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT add(foo, 1), sub(bar, 2), foobar FROM testTable"),
+        QueryContextConverterUtils.getQueryContext("SELECT add(foo, 1), sub(bar, 2), foobar FROM testTable"),
         dataSchema);
     assertEquals(selectionColumns, Arrays.asList("add(foo,'1')", "sub(bar,'2')", "foobar"));
 
     // 'SELECT *' should return columns (no transform expressions) in alphabetical order
     when(dataSchema.getColumnNames()).thenReturn(new String[]{"add(foo,'1')", "sub(bar,'2')", "foo", "bar", "foobar"});
-    selectionColumns = SelectionOperatorUtils.getSelectionColumns(QueryContextConverterUtils
-        .getQueryContextFromSQL("SELECT * FROM testTable ORDER BY add(foo, 1), sub(bar, 2), foo"), dataSchema);
+    selectionColumns = SelectionOperatorUtils.getSelectionColumns(
+        QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY add(foo, 1), sub(bar, 2), foo"),
+        dataSchema);
     assertEquals(selectionColumns, Arrays.asList("bar", "foo", "foobar"));
 
     // Test data schema from DataTableBuilder.buildEmptyDataTable()
     when(dataSchema.getColumnNames()).thenReturn(new String[]{"*"});
-    selectionColumns = SelectionOperatorUtils
-        .getSelectionColumns(QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable"), dataSchema);
+    selectionColumns = SelectionOperatorUtils.getSelectionColumns(
+        QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable"), dataSchema);
     assertEquals(selectionColumns, new ArrayList<>(Collections.singletonList("*")));
   }
 
@@ -223,79 +221,5 @@ public class SelectionOperatorServiceTest {
     };
     assertTrue(Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 0), expectedRow1));
     assertTrue(Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 1), expectedCompatibleRow1));
-  }
-
-  @Test
-  public void testCompatibleRowsRenderSelectionResultsWithoutOrdering() {
-    List<Object[]> rows = new ArrayList<>(2);
-    rows.add(_row1);
-    rows.add(_compatibleRow1);
-    SelectionResults selectionResults = SelectionOperatorUtils
-        .renderSelectionResultsWithoutOrdering(rows, _upgradedDataSchema, Arrays.asList(_columnNames), true);
-    List<Serializable[]> resultRows = selectionResults.getRows();
-    Serializable[] expectedRow1 = {
-        0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0},
-        new String[]{"9"}, "1020"
-    };
-    Serializable[] expectedRow2 = {
-        1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0},
-        new String[]{"10"}, "5060"
-    };
-    assertTrue(Arrays.deepEquals(resultRows.get(0), expectedRow1));
-    assertTrue(Arrays.deepEquals(resultRows.get(1), expectedRow2));
-
-    selectionResults = SelectionOperatorUtils
-        .renderSelectionResultsWithoutOrdering(rows, _upgradedDataSchema, Arrays.asList(_columnNames), false);
-    resultRows = selectionResults.getRows();
-    Serializable[] expectedFormattedRow1 = {
-        "0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"},
-        new String[]{"9"}, "1020"
-    };
-    Serializable[] expectedFormattedRow2 = {
-        "1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"},
-        new String[]{"10"}, "5060"
-    };
-    assertTrue(Arrays.deepEquals(resultRows.get(0), expectedFormattedRow1));
-    assertTrue(Arrays.deepEquals(resultRows.get(1), expectedFormattedRow2));
-  }
-
-  @Test
-  public void testCompatibleRowsRenderSelectionResultsWithOrdering() {
-    SelectionOperatorService selectionOperatorService =
-        new SelectionOperatorService(_queryContext, _upgradedDataSchema);
-    PriorityQueue<Object[]> rows = selectionOperatorService.getRows();
-    rows.offer(_row1);
-    rows.offer(_compatibleRow1);
-    rows.offer(_compatibleRow2);
-    SelectionResults selectionResults = selectionOperatorService.renderSelectionResultsWithOrdering(true);
-    List<Serializable[]> resultRows = selectionResults.getRows();
-    Serializable[] expectedRow1 = {
-        1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0},
-        new String[]{"10"}, "5060"
-    };
-    Serializable[] expectedRow2 = {
-        0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0},
-        new String[]{"9"}, "1020"
-    };
-    assertTrue(Arrays.deepEquals(resultRows.get(0), expectedRow1));
-    assertTrue(Arrays.deepEquals(resultRows.get(1), expectedRow2));
-
-    selectionOperatorService = new SelectionOperatorService(_queryContext, _upgradedDataSchema);
-    rows = selectionOperatorService.getRows();
-    rows.offer(_row1);
-    rows.offer(_compatibleRow1);
-    rows.offer(_compatibleRow2);
-    selectionResults = selectionOperatorService.renderSelectionResultsWithOrdering(false);
-    resultRows = selectionResults.getRows();
-    Serializable[] expectedFormattedRow1 = {
-        "1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"},
-        new String[]{"10"}, "5060"
-    };
-    Serializable[] expectedFormattedRow2 = {
-        "0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"},
-        new String[]{"9"}, "1020"
-    };
-    assertTrue(Arrays.deepEquals(resultRows.get(0), expectedFormattedRow1));
-    assertTrue(Arrays.deepEquals(resultRows.get(1), expectedFormattedRow2));
   }
 }

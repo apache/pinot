@@ -281,7 +281,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     // Set timeout as 5ms so that query will timeout
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(5L));
+    tableConfig.setQueryConfig(new QueryConfig(5L, null, null, null));
     updateTableConfig(tableConfig);
 
     // Wait for at most 1 minute for broker to receive and process the table config refresh message
@@ -910,7 +910,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String groovyQuery = "SELECT GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
         + "'arg0 + arg1', FlightNum, Origin) FROM myTable";
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(true));
+    tableConfig.setQueryConfig(new QueryConfig(null, true, null, null));
     updateTableConfig(tableConfig);
 
     TestUtils.waitForCondition(aVoid -> {
@@ -1157,7 +1157,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Add expression override
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(
+    tableConfig.setQueryConfig(new QueryConfig(null, null, null,
         Collections.singletonMap("times(times(DaysSinceEpoch, 24), 3600)", "NewAddedDerivedSecondsSinceEpoch")));
     updateTableConfig(tableConfig);
 

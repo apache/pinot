@@ -82,12 +82,17 @@ public class GcsUri {
   /**
    * Get gcs search prefix.
    *
-   * The path must end with the delimiter to ensure
-   * searches do not return false positive matches.
+   * The prefix should not be the delimiter alone if there is no directory;
+   * otherwise, listFiles will return no matches.
+   * The prefix should end with the delimiter if there are directories, which
+   * ensures searches do not return false positive matches.
    * Prefixes must not be absolute.
    *
-   * Example: gs://bucket/dir/subdir should have a prefix of
-   * dir/subdir/ otherwise listFiles will return matches for
+   * Examples:
+   * gs://bucket/ should have a prefix of "" but not "/",
+   * otherwise listFiles will return no matches.
+   * gs://bucket/dir/subdir should have a prefix of
+   * dir/subdir/, otherwise listFiles will return matches for
    * objects with paths like dir/subdirA/file1, file2, etc.
    *
    * @return the path as a prefix
@@ -98,6 +103,9 @@ public class GcsUri {
 
   private String calculatePrefix() {
     String prefix = getPath();
+    if (Strings.isNullOrEmpty(prefix) || prefix.equals(DELIMITER)) {
+      return "";
+    }
     if (prefix.endsWith(DELIMITER)) {
       return prefix;
     }

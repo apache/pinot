@@ -138,13 +138,16 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
     }
 
     if (_action.equalsIgnoreCase("generateQueries")) {
-      // generate queries from prebuilt global dictionaries
-      PinotDataAndQueryAnonymizer.QueryGenerator queryGenerator =
-          new PinotDataAndQueryAnonymizer.QueryGenerator(_outputDir, _queryDir, _originalQueryFile, _tableName,
-              filterColumns, columnsToRetainDataFor);
-      queryGenerator.generateQueries();
+      throw new UnsupportedOperationException("generateQueries action not supported yet");
 
-      return true;
+      // TODO: Uncomment after re-implementing the SQL query generator
+//      // generate queries from prebuilt global dictionaries
+//      PinotDataAndQueryAnonymizer.QueryGenerator queryGenerator =
+//          new PinotDataAndQueryAnonymizer.QueryGenerator(_outputDir, _queryDir, _originalQueryFile, _tableName,
+//              filterColumns, columnsToRetainDataFor);
+//      queryGenerator.generateQueries();
+//
+//      return true;
     }
 
     throw new RuntimeException(
@@ -181,10 +184,9 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
         .append("\n\nsh pinot-admin.sh AnonymizeData -inputSegmentsDir /home/user/pinotTable/segmentDir -outputDir "
             + "/home/user/outputDir -avroFileNamePrefix Foo -filterColumns col1:100000 col2:50000 -action "
             + "generateData").append(
-        "\n\nSTEP 3 - Generate queries. The global dictionaries built in STEP 2 will now be used to generate "
-            + "PQL/SQL queries").append(
-        "\non anonymized data. The use of global dictionaries helps to preserve the query patterns. The tool will"
-            + " parse").append(
+        "\n\nSTEP 3 - Generate queries. The global dictionaries built in STEP 2 will now be used to generate queries")
+        .append("\non anonymized data. The use of global dictionaries helps to preserve the query patterns. The tool "
+            + "will parse").append(
         "\nthe original query file in queryDir and write a file with name queries.generated in the same directory.")
         .append(
             "\nThe global dictionaries will help in rewriting the predicates by substituting the original value with "

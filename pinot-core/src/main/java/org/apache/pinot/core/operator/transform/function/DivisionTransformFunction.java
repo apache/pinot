@@ -18,22 +18,28 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
 
 public class DivisionTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "div";
 
-  private double _firstLiteral;
+  private DataType _resultDataType;
+  private double[] _doubleLiterals;
+  private BigDecimal[] _bigDecimalLiterals;
   private TransformFunction _firstTransformFunction;
-  private double _secondLiteral;
   private TransformFunction _secondTransformFunction;
-  private double[] _quotients;
+  private double[] _doubleQuotients;
+  private BigDecimal[] _bigDecimalQuotients;
 
   @Override
   public String getName() {
@@ -47,29 +53,46 @@ public class DivisionTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("Exactly 2 arguments are required for DIV transform function");
     }
 
-    TransformFunction firstArgument = arguments.get(0);
-    if (firstArgument instanceof LiteralTransformFunction) {
-      _firstLiteral = Double.parseDouble(((LiteralTransformFunction) firstArgument).getLiteral());
-    } else {
-      if (!firstArgument.getResultMetadata().isSingleValue()) {
-        throw new IllegalArgumentException("First argument of DIV transform function must be single-valued");
+    _resultDataType = DataType.DOUBLE;
+    for (TransformFunction argument : arguments) {
+      if (argument.getResultMetadata().getDataType() == DataType.BIG_DECIMAL) {
+        _resultDataType = DataType.BIG_DECIMAL;
+        break;
       }
-      _firstTransformFunction = firstArgument;
+    }
+    if (_resultDataType == DataType.BIG_DECIMAL) {
+      _bigDecimalLiterals = new BigDecimal[2];
+    } else {
+      _doubleLiterals = new double[2];
     }
 
-    TransformFunction secondArgument = arguments.get(1);
-    if (secondArgument instanceof LiteralTransformFunction) {
-      _secondLiteral = Double.parseDouble(((LiteralTransformFunction) secondArgument).getLiteral());
-    } else {
-      if (!secondArgument.getResultMetadata().isSingleValue()) {
-        throw new IllegalArgumentException("Second argument of DIV transform function must be single-valued");
+    for (int i = 0; i < arguments.size(); i++) {
+      TransformFunction argument = arguments.get(i);
+      if (argument instanceof LiteralTransformFunction) {
+        LiteralTransformFunction literalTransformFunction = (LiteralTransformFunction) argument;
+        if (_resultDataType == DataType.BIG_DECIMAL) {
+          _bigDecimalLiterals[i] = new BigDecimal(literalTransformFunction.getLiteral());
+        } else {
+          _doubleLiterals[i] = Double.parseDouble(((LiteralTransformFunction) argument).getLiteral());
+        }
+      } else {
+        if (!argument.getResultMetadata().isSingleValue()) {
+          throw new IllegalArgumentException("every argument of DIV transform function must be single-valued");
+        }
+        if (i == 0) {
+          _firstTransformFunction = argument;
+        } else {
+          _secondTransformFunction = argument;
+        }
       }
-      _secondTransformFunction = secondArgument;
     }
   }
 
   @Override
   public TransformResultMetadata getResultMetadata() {
+    if (_resultDataType == DataType.BIG_DECIMAL) {
+      return BIG_DECIMAL_SV_NO_DICTIONARY_METADATA;
+    }
     return DOUBLE_SV_NO_DICTIONARY_METADATA;
   }
 
@@ -78,28 +101,64 @@ public class DivisionTransformFunction extends BaseTransformFunction {
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
 
-    if (_quotients == null || _quotients.length < length) {
-      _quotients = new double[length];
+    if (_doubleQuotients == null || _doubleQuotients.length < length) {
+      _doubleQuotients = new double[length];
     }
 
-    if (_firstTransformFunction == null) {
-      Arrays.fill(_quotients, 0, length, _firstLiteral);
+    if (_resultDataType == DataType.BIG_DECIMAL) {
+      BigDecimal[] values = transformToBigDecimalValuesSV(projectionBlock);
+      ArrayCopyUtils.copy(values, _doubleQuotients, length);
     } else {
-      double[] values = _firstTransformFunction.transformToDoubleValuesSV(projectionBlock);
-      System.arraycopy(values, 0, _quotients, 0, length);
+      if (_firstTransformFunction == null) {
+        Arrays.fill(_doubleQuotients, 0, length, _doubleLiterals[0]);
+      } else {
+        double[] values = _firstTransformFunction.transformToDoubleValuesSV(projectionBlock);
+        System.arraycopy(values, 0, _doubleQuotients, 0, length);
+      }
+      if (_secondTransformFunction == null) {
+        for (int i = 0; i < length; i++) {
+          _doubleQuotients[i] /= _doubleLiterals[1];
+        }
+      } else {
+        double[] values = _secondTransformFunction.transformToDoubleValuesSV(projectionBlock);
+        for (int i = 0; i < length; i++) {
+          _doubleQuotients[i] /= values[i];
+        }
+      }
+    }
+    return _doubleQuotients;
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    if (_bigDecimalQuotients == null || _bigDecimalQuotients.length < length) {
+      _bigDecimalQuotients = new BigDecimal[length];
     }
 
-    if (_secondTransformFunction == null) {
-      for (int i = 0; i < length; i++) {
-        _quotients[i] /= _secondLiteral;
-      }
+    if (_resultDataType == DataType.DOUBLE) {
+      double[] values = transformToDoubleValuesSV(projectionBlock);
+      ArrayCopyUtils.copy(values, _bigDecimalQuotients, length);
     } else {
-      double[] values = _secondTransformFunction.transformToDoubleValuesSV(projectionBlock);
-      for (int i = 0; i < length; i++) {
-        _quotients[i] /= values[i];
+      if (_firstTransformFunction == null) {
+        Arrays.fill(_bigDecimalQuotients, 0, length, _bigDecimalLiterals[0]);
+      } else {
+        BigDecimal[] values = _firstTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+        System.arraycopy(values, 0, _bigDecimalQuotients, 0, length);
+      }
+      if (_secondTransformFunction == null) {
+        for (int i = 0; i < length; i++) {
+          // todo: expose roundingMode/mathContext as parameter in DivisionTransformFunction.
+          _bigDecimalQuotients[i] = _bigDecimalQuotients[i].divide(_bigDecimalLiterals[1], RoundingMode.HALF_EVEN);
+        }
+      } else {
+        BigDecimal[] values = _secondTransformFunction.transformToBigDecimalValuesSV(projectionBlock);
+        for (int i = 0; i < length; i++) {
+          // todo: expose roundingMode/mathContext as parameter in DivisionTransformFunction.
+          _bigDecimalQuotients[i] = _bigDecimalQuotients[i].divide(values[i], RoundingMode.HALF_EVEN);
+        }
       }
     }
-
-    return _quotients;
+    return _bigDecimalQuotients;
   }
 }

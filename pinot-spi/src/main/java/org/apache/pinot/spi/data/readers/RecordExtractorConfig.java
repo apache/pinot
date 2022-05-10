@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import java.util.Map;
+
+
 /**
  * Interface for configs of {@link RecordExtractor}
  */
 public interface RecordExtractorConfig {
+  default void init(Map<String, String> props) { }
 }

@@ -58,7 +58,8 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/tables': 'Tables',
   '/query': 'Query Console',
   '/cluster': 'Cluster Manager',
-  '/zookeeper': 'Zookeeper Browser'
+  '/zookeeper': 'Zookeeper Browser',
+  '/user': 'User Console'
 };
 
 const BreadcrumbsComponent = ({ ...props }) => {

@@ -348,9 +348,14 @@ public abstract class BaseTransformFunction implements TransformFunction {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
       dictionary.readBytesValues(dictIds, length, _byteValuesSV);
     } else {
-      Preconditions.checkState(getResultMetadata().getDataType().getStoredType() == DataType.STRING);
-      String[] stringValues = transformToStringValuesSV(projectionBlock);
-      ArrayCopyUtils.copy(stringValues, _byteValuesSV, length);
+      if (getResultMetadata().getDataType().getStoredType() == DataType.BIG_DECIMAL) {
+        BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+        ArrayCopyUtils.copy(bigDecimalValues, _byteValuesSV, length);
+      } else {
+        Preconditions.checkState(getResultMetadata().getDataType().getStoredType() == DataType.STRING);
+        String[] stringValues = transformToStringValuesSV(projectionBlock);
+        ArrayCopyUtils.copy(stringValues, _byteValuesSV, length);
+      }
     }
     return _byteValuesSV;
   }

@@ -83,6 +83,18 @@ public class SegmentDirectoryPaths {
     return findFormatFile(indexDir, luceneIndexDirectory);
   }
 
+  /**
+   * Find native text index file in top-level segment index directory
+   * @param indexDir top-level segment index directory
+   * @param column text column name
+   * @return text index directory (if existst), null if index file does not exit
+   */
+  @Nullable
+  public static File findNativeTextIndexIndexFile(File indexDir, String column) {
+    String nativeIndexDirectory = column + V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION;
+    return findFormatFile(indexDir, nativeIndexDirectory);
+  }
+
   public static File findFSTIndexIndexFile(File indexDir, String column) {
     String luceneIndexDirectory = column + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
     return findFormatFile(indexDir, luceneIndexDirectory);

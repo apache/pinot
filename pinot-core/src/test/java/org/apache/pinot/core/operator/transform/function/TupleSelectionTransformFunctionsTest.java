@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -159,6 +160,30 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(doubleValues[i], _doubleSVValues[i]);
+    }
+  }
+
+  @Test
+  public void testLeastTransformFunctionNumericTypes1() {
+    TransformFunction transformFunction = testLeastPreconditions(
+        String.format("least(%s, %s, %s)", LONG_SV_COLUMN, FLOAT_SV_COLUMN, BIG_DECIMAL_SV_COLUMN));
+    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.BIG_DECIMAL);
+    BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(bigDecimalValues[i], (BigDecimal.valueOf(_longSVValues[i])).min(
+          BigDecimal.valueOf(_floatSVValues[i]).min(_bigDecimalSVValues[i])));
+    }
+  }
+
+  @Test
+  public void testLeastTransformFunctionNumericTypes2() {
+    TransformFunction transformFunction = testLeastPreconditions(
+        String.format("least(%s, %s, %s)", INT_SV_COLUMN, FLOAT_SV_COLUMN, LONG_SV_COLUMN));
+    // Note: In the current code, least return type is DOUBLE if there is a float input, but output values are float!
+    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.DOUBLE);
+    float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(floatValues[i], Math.min(_intSVValues[i], Math.min(_floatSVValues[i], _longSVValues[i])));
     }
   }
 
@@ -308,6 +333,29 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
   }
 
   @Test
+  public void testGreatestTransformFunctionUnaryBigDecimal() {
+    TransformFunction transformFunction = testGreatestPreconditions(
+        String.format("greatest(%s)", BIG_DECIMAL_SV_COLUMN));
+    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.BIG_DECIMAL);
+    BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(bigDecimalValues[i], _bigDecimalSVValues[i]);
+    }
+  }
+
+  @Test
+  public void testGreatestTransformFunctionNumericTypes() {
+    TransformFunction transformFunction = testGreatestPreconditions(
+        String.format("greatest(%s, %s, %s)", INT_SV_COLUMN, DOUBLE_SV_COLUMN, BIG_DECIMAL_SV_COLUMN));
+    assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.BIG_DECIMAL);
+    BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(bigDecimalValues[i], (BigDecimal.valueOf(_intSVValues[i])).max(
+          _bigDecimalSVValues[i].max(BigDecimal.valueOf(_doubleSVValues[i]))));
+    }
+  }
+
+  @Test
   public void testGreatestTransformFunctionTime() {
     TransformFunction transformFunction = testGreatestPreconditions(
         String.format("greatest(%s, cast(%s AS TIMESTAMP))", TIMESTAMP_COLUMN, LONG_SV_COLUMN));
@@ -335,7 +383,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
   }
 
   private TransformFunction testLeastPreconditions(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof LeastTransformFunction);
     assertEquals(transformFunction.getName(), TransformFunctionType.LEAST.getName());
@@ -343,7 +391,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
   }
 
   private TransformFunction testGreatestPreconditions(String expressionStr) {
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof GreatestTransformFunction);
     assertEquals(transformFunction.getName(), TransformFunctionType.GREATEST.getName());

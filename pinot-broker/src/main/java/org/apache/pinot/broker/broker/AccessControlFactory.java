@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.broker.broker;
 
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
@@ -28,11 +30,24 @@ public abstract class AccessControlFactory {
   public static final Logger LOGGER = LoggerFactory.getLogger(AccessControlFactory.class);
   public static final String ACCESS_CONTROL_CLASS_CONFIG = "class";
 
-  public abstract void init(PinotConfiguration confguration);
+  public void init(PinotConfiguration configuration) {
+  };
+
+  /**
+   * Extend original init method inorder to support Zookeeper BasicAuthAccessControlFactory
+   * Because ZKBasicAuthAccessControlFactory need to acquire users info from HelixPropertyStore
+   *
+   * @param configuration pinot configuration
+   * @param propertyStore Helix PropertyStore
+   */
+  public void init(PinotConfiguration configuration, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+     init(configuration);
+  }
 
   public abstract AccessControl create();
 
-  public static AccessControlFactory loadFactory(PinotConfiguration configuration) {
+  public static AccessControlFactory loadFactory(PinotConfiguration configuration,
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
     AccessControlFactory accessControlFactory;
     String accessControlFactoryClassName = configuration.getProperty(ACCESS_CONTROL_CLASS_CONFIG);
     if (accessControlFactoryClassName == null) {
@@ -42,7 +57,7 @@ public abstract class AccessControlFactory {
       LOGGER.info("Instantiating Access control factory class {}", accessControlFactoryClassName);
       accessControlFactory = (AccessControlFactory) Class.forName(accessControlFactoryClassName).newInstance();
       LOGGER.info("Initializing Access control factory class {}", accessControlFactoryClassName);
-      accessControlFactory.init(configuration);
+      accessControlFactory.init(configuration, propertyStore);
       return accessControlFactory;
     } catch (Exception e) {
       throw new RuntimeException(e);

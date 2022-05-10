@@ -30,8 +30,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 public abstract class SelectTupleElementTransformFunction extends BaseTransformFunction {
 
   private static final EnumSet<FieldSpec.DataType> SUPPORTED_DATATYPES = EnumSet.of(FieldSpec.DataType.INT,
-      FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.TIMESTAMP,
-      FieldSpec.DataType.STRING);
+      FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.BIG_DECIMAL,
+      FieldSpec.DataType.TIMESTAMP, FieldSpec.DataType.STRING);
 
   private static final EnumMap<FieldSpec.DataType, EnumSet<FieldSpec.DataType>> ACCEPTABLE_COMBINATIONS =
       createAcceptableCombinations();
@@ -88,17 +88,20 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
     if (left == null || left == right) {
       return right;
     }
-    if ((right == FieldSpec.DataType.INT && left == FieldSpec.DataType.LONG)
-        || (left == FieldSpec.DataType.INT && right == FieldSpec.DataType.LONG)) {
-      return FieldSpec.DataType.LONG;
+    if (left == FieldSpec.DataType.BIG_DECIMAL || right == FieldSpec.DataType.BIG_DECIMAL) {
+      return FieldSpec.DataType.BIG_DECIMAL;
     }
-    return FieldSpec.DataType.DOUBLE;
+    if (left == FieldSpec.DataType.DOUBLE || left == FieldSpec.DataType.FLOAT || right == FieldSpec.DataType.DOUBLE
+        || right == FieldSpec.DataType.FLOAT) {
+      return FieldSpec.DataType.DOUBLE;
+    }
+    return FieldSpec.DataType.LONG;
   }
 
   private static EnumMap<FieldSpec.DataType, EnumSet<FieldSpec.DataType>> createAcceptableCombinations() {
     EnumMap<FieldSpec.DataType, EnumSet<FieldSpec.DataType>> combinations = new EnumMap<>(FieldSpec.DataType.class);
     EnumSet<FieldSpec.DataType> numericTypes = EnumSet.of(FieldSpec.DataType.INT, FieldSpec.DataType.LONG,
-        FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE);
+        FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.BIG_DECIMAL);
     for (FieldSpec.DataType numericType : numericTypes) {
       combinations.put(numericType, numericTypes);
     }

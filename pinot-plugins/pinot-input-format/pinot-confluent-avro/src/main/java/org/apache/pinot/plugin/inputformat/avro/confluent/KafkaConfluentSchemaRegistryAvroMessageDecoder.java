@@ -33,6 +33,7 @@ import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.config.types.Password;
 import org.apache.kafka.common.security.ssl.DefaultSslEngineFactory;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
+import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractorConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -94,8 +95,10 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
     _deserializer = new KafkaAvroDeserializer(schemaRegistryClient);
     Preconditions.checkNotNull(topicName, "Topic must be provided");
     _topicName = topicName;
+    AvroRecordExtractorConfig config = new AvroRecordExtractorConfig();
+    config.init(props);
     _avroRecordExtractor = PluginManager.get().createInstance(AvroRecordExtractor.class.getName());
-    _avroRecordExtractor.init(fieldsToRead, null);
+    _avroRecordExtractor.init(fieldsToRead, config);
   }
 
   @Override

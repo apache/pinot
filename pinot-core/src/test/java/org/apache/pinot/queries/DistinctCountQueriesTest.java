@@ -435,7 +435,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
 
     // Test legacy parameters
     query = "SELECT DISTINCTCOUNTSMARTHLL(intColumn, 'hllConversionThreshold=10;hllLog2m=8') FROM testTable";
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     assertNotNull(queryContext.getAggregationFunctions());
     DistinctCountSmartHLLAggregationFunction function =
         (DistinctCountSmartHLLAggregationFunction) queryContext.getAggregationFunctions()[0];
