@@ -31,7 +31,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
@@ -371,12 +370,7 @@ public final class IngestionUtils {
         for (AggregationConfig aggregationConfig : aggregationConfigs) {
           ExpressionContext expressionContext =
               RequestContextUtils.getExpression(aggregationConfig.getAggregationFunction());
-          FunctionContext functionContext = expressionContext.getFunction();
-          if (functionContext != null) {
-            for (ExpressionContext argument : functionContext.getArguments()) {
-              fields.add(argument.getIdentifier());
-            }
-          }
+          expressionContext.getColumns(fields);
         }
       }
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();

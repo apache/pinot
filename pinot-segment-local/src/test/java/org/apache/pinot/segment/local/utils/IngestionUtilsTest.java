@@ -253,19 +253,5 @@ public class IngestionUtilsTest {
     fields = IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema);
     Assert.assertEquals(fields.size(), 1);
     Assert.assertTrue(fields.containsAll(Sets.newHashSet("s1")));
-
-    aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "COUNT(*)"));
-    ingestionConfig = new IngestionConfig(null, null, null, null, null, aggregationConfigs);
-
-    fields = IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema);
-    Assert.assertEquals(fields.size(), 1);
-    Assert.assertTrue(fields.containsAll(Sets.newHashSet("*")));
-
-    aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "COUNT(s1)"));
-    ingestionConfig = new IngestionConfig(null, null, null, null, null, aggregationConfigs);
-
-    fields = IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema);
-    Assert.assertEquals(fields.size(), 1);
-    Assert.assertTrue(fields.containsAll(Sets.newHashSet("*")));
   }
 }
