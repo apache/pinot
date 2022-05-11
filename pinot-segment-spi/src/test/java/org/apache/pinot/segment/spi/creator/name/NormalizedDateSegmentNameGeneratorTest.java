@@ -232,16 +232,16 @@ public class NormalizedDateSegmentNameGeneratorTest {
       // Expected
     }
     try {
-      new NormalizedDateSegmentNameGenerator(
-          TABLE_NAME, MALFORMED_SEGMENT_NAME_PREFIX, false, APPEND_PUSH_TYPE, DAILY_PUSH_FREQUENCY,
+      new NormalizedDateSegmentNameGenerator(TABLE_NAME, MALFORMED_SEGMENT_NAME_PREFIX, false, APPEND_PUSH_TYPE,
+          DAILY_PUSH_FREQUENCY,
           new DateTimeFormatSpec(1, TimeUnit.DAYS.toString(), SIMPLE_DATE_TIME_FORMAT, STRING_SLASH_DATE_FORMAT), null);
       Assert.fail();
     } catch (IllegalArgumentException e) {
       // Expected
     }
     try {
-      new NormalizedDateSegmentNameGenerator(
-          TABLE_NAME, SEGMENT_NAME_PREFIX, false, APPEND_PUSH_TYPE, DAILY_PUSH_FREQUENCY,
+      new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEGMENT_NAME_PREFIX, false, APPEND_PUSH_TYPE,
+          DAILY_PUSH_FREQUENCY,
           new DateTimeFormatSpec(1, TimeUnit.DAYS.toString(), SIMPLE_DATE_TIME_FORMAT, STRING_SLASH_DATE_FORMAT),
           MALFORMED_SEGMENT_NAME_POSTFIX);
       Assert.fail();
@@ -250,19 +250,20 @@ public class NormalizedDateSegmentNameGeneratorTest {
     }
   }
 
-  @Test
+  @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "Missing minTimeValue"
+      + " for NormalizedDateSegmentNameGenerator")
   public void testMalFormedDateFormatAndTimeValue() {
     SegmentNameGenerator segmentNameGenerator =
         new NormalizedDateSegmentNameGenerator(TABLE_NAME, null, false, APPEND_PUSH_TYPE, DAILY_PUSH_FREQUENCY,
             new DateTimeFormatSpec(1, TimeUnit.DAYS.toString(), SIMPLE_DATE_TIME_FORMAT, STRING_SLASH_DATE_FORMAT),
             null);
-    assertEquals(segmentNameGenerator.toString(),
-        "NormalizedDateSegmentNameGenerator: segmentNamePrefix=myTable, "
-            + "appendPushType=true, outputSDF=yyyy-MM-dd, inputSDF=yyyy/MM/dd");
+    assertEquals(segmentNameGenerator.toString(), "NormalizedDateSegmentNameGenerator: segmentNamePrefix=myTable, "
+        + "appendPushType=true, outputSDF=yyyy-MM-dd, inputSDF=yyyy/MM/dd");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, "1970/01/02", "1970/01/04"),
         "myTable_1970-01-02_1970-01-04");
     assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, "1970/01/02", "1970/01/04"),
         "myTable_1970-01-02_1970-01-04_1");
+    segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, null, "1970/01/04");
   }
 
   @Test
