@@ -698,7 +698,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @Nullable
-  public static SegmentPartitionMetadata getPartitionMetadataFromTableConfig(TableConfig tableConfig, int partitionId) {
+  private SegmentPartitionMetadata getPartitionMetadataFromTableConfig(TableConfig tableConfig, int partitionId) {
     SegmentPartitionConfig partitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     if (partitionConfig == null) {
       return null;
@@ -1263,7 +1263,7 @@ public class PinotLLCRealtimeSegmentManager {
     return System.currentTimeMillis();
   }
 
-  public static int getNumReplicas(TableConfig tableConfig, InstancePartitions instancePartitions) {
+  private int getNumReplicas(TableConfig tableConfig, InstancePartitions instancePartitions) {
     if (instancePartitions.getNumReplicaGroups() == 1) {
       // Non-replica-group based
       return tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
@@ -1398,7 +1398,7 @@ public class PinotLLCRealtimeSegmentManager {
         Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
     IdealState idealState =
         HelixHelper.getTableIdealState(_helixResourceManager.getHelixZkManager(), realtimeTableName);
-    int numReplicas = PinotLLCRealtimeSegmentManager.getNumReplicas(tableConfig, instancePartitions);
+    int numReplicas = getNumReplicas(tableConfig, instancePartitions);
     Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
 
     PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
@@ -1431,7 +1431,7 @@ public class PinotLLCRealtimeSegmentManager {
         newSegmentZKMetadata.setNumReplicas(numReplicas);
         newSegmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
         SegmentPartitionMetadata segmentPartitionMetadata =
-            PinotLLCRealtimeSegmentManager.getPartitionMetadataFromTableConfig(tableConfig, partitionId);
+            getPartitionMetadataFromTableConfig(tableConfig, partitionId);
         if (segmentPartitionMetadata != null) {
           newSegmentZKMetadata.setPartitionMetadata(segmentPartitionMetadata);
         }
