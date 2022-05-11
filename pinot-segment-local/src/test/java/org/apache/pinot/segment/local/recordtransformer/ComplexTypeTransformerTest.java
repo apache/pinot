@@ -22,17 +22,12 @@ import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -442,28 +437,5 @@ public class ComplexTypeTransformerTest {
     Assert.assertEquals(genericRow.getValue("im1.aa"), 2);
     Assert.assertEquals(genericRow.getValue("im1.bb"), "u");
     Assert.assertEquals(genericRow.getValue("test.c"), 3);
-  }
-
-  @Test
-  public void getComplexTypeTransformerTest() {
-    ComplexTypeConfig complexTypeConfigWithNullFields = new ComplexTypeConfig(null, null, null, null);
-
-    IngestionConfig ingestionConfig =
-        new IngestionConfig(null, null, null, null, complexTypeConfigWithNullFields, null);
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test_null").setIngestionConfig(ingestionConfig).build();
-
-    ComplexTypeTransformer complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
-    Assert.assertNull(complexTypeTransformer);
-
-    List<String> fieldToUnnest = Collections.singletonList("foo_bar");
-    ComplexTypeConfig complexTypeConfigWithNonNullField =
-        new ComplexTypeConfig(fieldToUnnest, null, null, null);
-    ingestionConfig = new IngestionConfig(null, null, null, null, complexTypeConfigWithNonNullField, null);
-    tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test_non_null").setIngestionConfig(ingestionConfig)
-            .build();
-    complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
-    Assert.assertNotNull(complexTypeTransformer);
   }
 }
