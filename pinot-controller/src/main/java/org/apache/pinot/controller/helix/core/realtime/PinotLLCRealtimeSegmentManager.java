@@ -1405,14 +1405,20 @@ public class PinotLLCRealtimeSegmentManager {
         IngestionConfigUtils.getStreamConfigMap(tableConfig));
     List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
         getPartitionGroupConsumptionStatusList(idealState, streamConfig);
+    // Read the smallest offset when a new partition is detected
+    OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
+    streamConfig.setOffsetCriteria(OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
     List<PartitionGroupMetadata> newPartitionGroupMetadataList =
         getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
+    streamConfig.setOffsetCriteria(originalOffsetCriteria);
 
+    int numPartitionGroups = newPartitionGroupMetadataList.size();
     Map<Integer, SegmentZKMetadata> partitionToLatestSegment = getLatestSegmentZKMetadataMap(realtimeTableName);
     for (PartitionGroupMetadata partitionGroupMetadata : newPartitionGroupMetadataList) {
       int partitionId = partitionGroupMetadata.getPartitionGroupId();
-      if (partitionToLatestSegment.containsKey(partitionId) && Status.IN_PROGRESS.equals(
-          partitionToLatestSegment.get(partitionId).getStatus())) {
+      if (partitionToLatestSegment.containsKey(partitionId)
+          && idealState.getInstanceStateMap(partitionToLatestSegment.get(partitionId).getSegmentName())
+              .containsValue(SegmentStateModel.CONSUMING)) {
         // IN_PROGRESS segment already exists, NO-OP
         LOGGER.info("Skipping partitionGroupId {}, IN_PROGRESS segment already exists", partitionId);
       } else {
@@ -1436,7 +1442,13 @@ public class PinotLLCRealtimeSegmentManager {
           newSegmentZKMetadata.setPartitionMetadata(segmentPartitionMetadata);
         }
 
-        // TODO(saurabh) should we be updating flushThresholds for this segment?
+        FlushThresholdUpdater flushThresholdUpdater = _flushThresholdUpdateManager
+            .getFlushThresholdUpdater(streamConfig);
+        CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null, offset, 0);
+        flushThresholdUpdater.updateFlushThreshold(streamConfig,
+            newSegmentZKMetadata, committingSegmentDescriptor, null,
+            getMaxNumPartitionsPerInstance(instancePartitions, numPartitionGroups, numReplicas),
+            newPartitionGroupMetadataList);
 
         _helixResourceManager.getPropertyStore().set(
             ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, newLLCSegment.getSegmentName()),
@@ -1448,8 +1460,7 @@ public class PinotLLCRealtimeSegmentManager {
         List<String> instancesAssigned =
             segmentAssignment.assignSegment(newLLCSegment.getSegmentName(), instanceStatesMap, instancePartitionsMap);
         instanceStatesMap.put(newLLCSegment.getSegmentName(),
-            SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned,
-                CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING));
+            SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
       }
     }
 
