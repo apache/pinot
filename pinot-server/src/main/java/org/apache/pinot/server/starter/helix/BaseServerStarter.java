@@ -19,6 +19,7 @@
 package org.apache.pinot.server.starter.helix;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -88,6 +89,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.Instance;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -155,6 +157,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
       //   - Force all instances to have the same prefix in order to derive the instance type based on the instance id
       //   - Only log a warning instead of throw exception here for backward-compatibility
       if (!_instanceId.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+        Preconditions.checkState(InstanceTypeUtils.isServer(_instanceId), "Invalid instance id '%s' for server",
+            _instanceId);
         LOGGER.warn("Instance id '{}' does not have prefix '{}'", _instanceId, Helix.PREFIX_OF_SERVER_INSTANCE);
       }
     } else {

@@ -61,6 +61,7 @@ import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -307,12 +308,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
   private static boolean isEnabledServer(ZNRecord instanceConfigZNRecord) {
     String instanceId = instanceConfigZNRecord.getId();
-    if (!instanceId.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
-      // NOTE: Some legacy configs might not contain the instance type prefix
-      if (instanceId.startsWith(Helix.PREFIX_OF_CONTROLLER_INSTANCE) || instanceId.startsWith(
-          Helix.PREFIX_OF_BROKER_INSTANCE) || instanceId.startsWith(Helix.PREFIX_OF_MINION_INSTANCE)) {
-        return false;
-      }
+    if (!InstanceTypeUtils.isServer(instanceId)) {
+      return false;
     }
     if ("false".equalsIgnoreCase(
         instanceConfigZNRecord.getSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name()))) {

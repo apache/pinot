@@ -148,6 +148,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourc
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -432,7 +433,7 @@ public class PinotHelixResourceManager {
     // Update broker resource if necessary
     boolean shouldUpdateBrokerResource = false;
     List<String> newBrokerTags = null;
-    if (instanceId.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE) && updateBrokerResource) {
+    if (InstanceTypeUtils.isBroker(instanceId) && updateBrokerResource) {
       List<String> newTags = instance.getTags();
       if (CollectionUtils.isNotEmpty(newTags)) {
         newBrokerTags = newTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
@@ -472,7 +473,7 @@ public class PinotHelixResourceManager {
     // Update broker resource if necessary
     boolean shouldUpdateBrokerResource = false;
     List<String> newBrokerTags = null;
-    if (instanceId.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE) && updateBrokerResource) {
+    if (InstanceTypeUtils.isBroker(instanceId) && updateBrokerResource) {
       newBrokerTags =
           newTags != null ? newTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList())
               : Collections.emptyList();
@@ -515,7 +516,7 @@ public class PinotHelixResourceManager {
     // Update broker resource if necessary
     boolean shouldUpdateBrokerResource = false;
     List<String> newBrokerTags = null;
-    if (instanceId.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE) && updateBrokerResource) {
+    if (InstanceTypeUtils.isBroker(instanceId) && updateBrokerResource) {
       newBrokerTags = newTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
       List<String> oldBrokerTags =
           oldTags.stream().filter(TagNameUtils::isBrokerTag).sorted().collect(Collectors.toList());
@@ -542,7 +543,7 @@ public class PinotHelixResourceManager {
    * NOTE: This method will read all the table configs, so can be costly.
    */
   public PinotResourceManagerResponse updateBrokerResource(String instanceId) {
-    if (!instanceId.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE)) {
+    if (!InstanceTypeUtils.isBroker(instanceId)) {
       throw new BadRequestException("Cannot update broker resource for non-broker instance: " + instanceId);
     }
     InstanceConfig instanceConfig = getHelixInstanceConfig(instanceId);

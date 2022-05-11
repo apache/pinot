@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
@@ -462,7 +463,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     // Check on each server instance
     for (String instance : instances) {
-      if (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      if (!InstanceTypeUtils.isServer(instance)) {
         continue;
       }
 

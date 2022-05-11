@@ -58,6 +58,7 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,8 +96,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     _instanceId = _config.getInstanceId();
     if (_instanceId != null) {
       // NOTE: Force all instances to have the same prefix in order to derive the instance type based on the instance id
-      Preconditions.checkState(_instanceId.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE),
-          "Instance id must have prefix '%s', got '%s'", CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE, _instanceId);
+      Preconditions.checkState(InstanceTypeUtils.isMinion(_instanceId), "Instance id must have prefix '%s', got '%s'",
+          CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE, _instanceId);
     } else {
       _instanceId = CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + _hostname + "_" + _port;
     }

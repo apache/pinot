@@ -52,6 +52,7 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -61,6 +62,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -227,8 +229,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private void registerCallbackHandlers() {
     List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
     instances.removeIf(
-        instance -> (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) && !instance.startsWith(
-            CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)));
+        instanceId -> !InstanceTypeUtils.isBroker(instanceId) && !InstanceTypeUtils.isServer(instanceId));
     List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(getHelixClusterName());
     resourcesInCluster.removeIf(resource -> (!TableNameBuilder.isTableResource(resource)
         && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE.equals(resource)));
@@ -1729,11 +1730,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String serverName = null;
     String brokerName = null;
     for (int i = 0; i < numInstances; i++) {
-      String instanceName = instanceList.get(i).asText();
-      if (instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        serverName = instanceName;
-      } else if (instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
-        brokerName = instanceName;
+      String instanceId = instanceList.get(i).asText();
+      InstanceType instanceType = InstanceTypeUtils.getInstanceType(instanceId);
+      if (instanceType == InstanceType.SERVER) {
+        serverName = instanceId;
+      } else if (instanceType == InstanceType.BROKER) {
+        brokerName = instanceId;
       }
     }
 
