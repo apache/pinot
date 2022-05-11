@@ -24,8 +24,14 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.net.ssl.SSLContext;
+import org.apache.commons.configuration.MapConfiguration;
+import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,12 +40,19 @@ public class DriverUtils {
   public static final String SCHEME = "jdbc";
   public static final String DRIVER = "pinot";
   public static final Logger LOG = LoggerFactory.getLogger(DriverUtils.class);
-  public static final String QUERY_SEPERATOR = "&";
-  public static final String PARAM_SEPERATOR = "=";
-  public static final String CONTROLLER = "controller";
   private static final String LIMIT_STATEMENT_REGEX = "\\s(limit)\\s";
 
+  // SSL Properties
+  public static final String PINOT_JDBC_TLS_PREFIX = "pinot.jdbc.tls";
+
   private DriverUtils() {
+  }
+
+  public static SSLContext getSSLContextFromJDBCProps(Properties properties) {
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(
+        new PinotConfiguration(new MapConfiguration(properties)), PINOT_JDBC_TLS_PREFIX);
+    TlsUtils.installDefaultSSLSocketFactory(tlsConfig);
+    return TlsUtils.getSslContext();
   }
 
   public static List<String> getBrokersFromURL(String url) {

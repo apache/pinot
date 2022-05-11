@@ -24,10 +24,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.stream.Collectors;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -44,6 +47,7 @@ import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
+import org.apache.pinot.client.PinotDriver;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -494,6 +498,53 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
           sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
               > 200000); // download segment
     }
+  }
+
+  @Test
+  public void testJDBCClient()
+      throws Exception {
+    String query = "SELECT count(*) FROM " + getTableName();
+    java.sql.Connection connection = getValidJDBCConnection(DEFAULT_CONTROLLER_PORT);
+    Statement statement = connection.createStatement();
+    ResultSet resultSet = statement.executeQuery(query);
+    resultSet.first();
+    Assert.assertTrue(resultSet.getLong(1) > 0);
+
+    try {
+      java.sql.Connection invalidConnection = getInValidJDBCConnection(DEFAULT_CONTROLLER_PORT);
+      statement = invalidConnection.createStatement();
+      resultSet = statement.executeQuery(query);
+      Assert.fail("Should not allow queries with invalid TLS configuration");
+    } catch (Exception e) {
+      // this should fail
+    }
+  }
+
+  private java.sql.Connection getValidJDBCConnection(int controllerPort) throws Exception {
+    SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
+    sslContextBuilder.setKeyStoreType(PKCS_12);
+    sslContextBuilder.loadKeyMaterial(_tlsStorePKCS12, PASSWORD_CHAR, PASSWORD_CHAR);
+    sslContextBuilder.loadTrustMaterial(_tlsStorePKCS12, PASSWORD_CHAR);
+
+    PinotDriver pinotDriver = new PinotDriver(sslContextBuilder.build());
+    Properties jdbcProps = new Properties();
+    jdbcProps.setProperty(PinotDriver.INFO_SCHEME, CommonConstants.HTTPS_PROTOCOL);
+    jdbcProps.setProperty(PinotDriver.INFO_HEADERS + "." + CLIENT_HEADER.getName(), CLIENT_HEADER.getValue());
+    return pinotDriver.connect("jdbc:pinot://localhost:" + controllerPort, jdbcProps);
+  }
+
+  private java.sql.Connection getInValidJDBCConnection(int controllerPort) throws Exception {
+    SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
+    sslContextBuilder.setKeyStoreType(PKCS_12);
+    sslContextBuilder.loadKeyMaterial(_tlsStoreEmptyPKCS12, PASSWORD_CHAR, PASSWORD_CHAR);
+    sslContextBuilder.loadTrustMaterial(_tlsStorePKCS12, PASSWORD_CHAR);
+
+    PinotDriver pinotDriver = new PinotDriver(sslContextBuilder.build());
+    Properties jdbcProps = new Properties();
+
+    jdbcProps.setProperty(PinotDriver.INFO_SCHEME, CommonConstants.HTTPS_PROTOCOL);
+    jdbcProps.setProperty(PinotDriver.INFO_HEADERS + "." + CLIENT_HEADER.getName(), CLIENT_HEADER.getValue());
+    return pinotDriver.connect("jdbc:pinot://localhost:" + controllerPort, jdbcProps);
   }
 
   private static CloseableHttpClient makeClient(String keyStoreType, URL keyStoreUrl, URL trustStoreUrl) {
