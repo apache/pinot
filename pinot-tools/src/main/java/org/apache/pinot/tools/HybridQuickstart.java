@@ -124,7 +124,7 @@ public class HybridQuickstart extends QuickStartBase {
     Preconditions.checkState(dataDir.mkdirs());
     QuickstartTableRequest bootstrapTableRequest = prepareTableRequest(baseDir);
     final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(bootstrapTableRequest),
-        1, 1, 1, 0, dataDir, getConfigOverrides());
+        1, 1, 1, 1, dataDir, getConfigOverrides());
     printStatus(Color.YELLOW, "***** Starting Kafka  *****");
     startKafka();
     printStatus(Color.YELLOW, "***** Starting airline data stream and publishing to Kafka *****");

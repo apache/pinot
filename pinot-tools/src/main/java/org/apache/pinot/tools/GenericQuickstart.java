@@ -98,7 +98,7 @@ public class GenericQuickstart extends QuickStartBase {
     Preconditions.checkState(tempDir.mkdirs());
     QuickstartTableRequest request = new QuickstartTableRequest(_tableDirectory.getAbsolutePath());
     final QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 0, tempDir, getConfigOverrides());
+        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1, tempDir, getConfigOverrides());
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
     startKafka();
