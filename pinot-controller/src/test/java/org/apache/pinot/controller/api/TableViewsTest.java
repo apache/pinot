@@ -29,7 +29,7 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -126,7 +126,7 @@ public class TableViewsTest {
     Assert.assertNotNull(serverMap);
     Assert.assertEquals(serverMap.size(), 2);
     for (Map.Entry<String, String> serverMapEntry : serverMap.entrySet()) {
-      Assert.assertTrue(serverMapEntry.getKey().startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE));
+      Assert.assertTrue(InstanceTypeUtils.isServer(serverMapEntry.getKey()));
       Assert.assertEquals(serverMapEntry.getValue(), "ONLINE");
     }
   }
@@ -163,9 +163,8 @@ public class TableViewsTest {
 
   private TableViews.TableView getTableView(String tableName, String view, String tableType)
       throws Exception {
-    return JsonUtils.stringToObject(ControllerTestUtils
-            .sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableView(tableName, view,
-                tableType)),
+    return JsonUtils.stringToObject(ControllerTestUtils.sendGetRequest(
+            ControllerTestUtils.getControllerRequestURLBuilder().forTableView(tableName, view, tableType)),
         TableViews.TableView.class);
   }
 

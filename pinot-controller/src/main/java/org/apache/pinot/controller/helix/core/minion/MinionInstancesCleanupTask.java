@@ -28,7 +28,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +72,7 @@ public class MinionInstancesCleanupTask extends BasePeriodicTask {
       // "/INSTANCES/<instance_id>/HISTORY" needs to be checked. If the value is "-1", that means the instance is
       // ONLINE;
       // if the value is a timestamp, that means the instance starts to be OFFLINE since that time.
-      if (offlineInstance.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE)) {
+      if (InstanceTypeUtils.isMinion(offlineInstance)) {
         // Drop the minion instance if it has been offline for more than a period of this task.
         if (_pinotHelixResourceManager.isInstanceOfflineFor(offlineInstance,
             _minionInstanceCleanupTaskMinOfflineTimeBeforeDeletionInMilliseconds)) {
