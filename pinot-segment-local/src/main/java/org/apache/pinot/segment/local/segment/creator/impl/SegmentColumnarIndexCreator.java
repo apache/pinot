@@ -64,7 +64,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -285,8 +284,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     // Do not create dictionary if index size with dictionary is going to be larger than index size without dictionary
     // This is done to reduce the cost of dictionary for high cardinality columns
     // Off by default and needs optimizeDictionaryEnabled to be set to true
-    if (config.isOptimizeDictionaryForMetrics() && spec.getFieldType() == FieldType.METRIC
-        && spec.isSingleValueField() && spec.getDataType().isFixedWidth()) {
+    if (config.isOptimizeDictionaryForMetrics() && spec.getFieldType() == FieldType.METRIC && spec.isSingleValueField()
+        && spec.getDataType().isFixedWidth()) {
       long dictionarySize = info.getDistinctValueCount() * spec.getDataType().size();
       long forwardIndexSize =
           ((long) info.getTotalNumberOfEntries() * PinotDataBitSet.getNumBitsPerValue(info.getDistinctValueCount() - 1)
@@ -663,8 +662,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     SegmentZKPropsConfig segmentZKPropsConfig = _config.getSegmentZKPropsConfig();
     if (segmentZKPropsConfig != null) {
-      properties.setProperty(CommonConstants.Segment.Realtime.START_OFFSET, segmentZKPropsConfig.getStartOffset());
-      properties.setProperty(CommonConstants.Segment.Realtime.END_OFFSET, segmentZKPropsConfig.getEndOffset());
+      properties.setProperty(Realtime.START_OFFSET, segmentZKPropsConfig.getStartOffset());
+      properties.setProperty(Realtime.END_OFFSET, segmentZKPropsConfig.getEndOffset());
     }
 
     properties.save();

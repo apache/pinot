@@ -23,7 +23,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.PinotMetricUtils;
@@ -33,16 +35,12 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
-import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.joda.time.Duration;
-import org.joda.time.Interval;
 import org.mockito.ArgumentMatchers;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -66,18 +64,14 @@ public class RetentionManagerTest {
     final int numOlderSegments = 10;
     List<String> removedSegments = new ArrayList<>();
     for (int i = 0; i < numOlderSegments; i++) {
-      SegmentMetadata segmentMetadata = mockSegmentMetadata(pastTimeStamp, pastTimeStamp, timeUnit);
-      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
-      ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
+      SegmentZKMetadata segmentZKMetadata = mockSegmentZKMetadata(pastTimeStamp, pastTimeStamp, timeUnit);
       segmentsZKMetadata.add(segmentZKMetadata);
       removedSegments.add(segmentZKMetadata.getSegmentName());
     }
     // Create metadata for 5 segments that will not be removed.
     for (int i = 0; i < 5; i++) {
-      SegmentMetadata segmentMetadata =
-          mockSegmentMetadata(dayAfterTomorrowTimeStamp, dayAfterTomorrowTimeStamp, timeUnit);
-      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
-      ZKMetadataUtils.updateSegmentMetadata(segmentZKMetadata, segmentMetadata);
+      SegmentZKMetadata segmentZKMetadata =
+          mockSegmentZKMetadata(dayAfterTomorrowTimeStamp, dayAfterTomorrowTimeStamp, timeUnit);
       segmentsZKMetadata.add(segmentZKMetadata);
     }
     final TableConfig tableConfig = createOfflineTableConfig();
@@ -166,6 +160,9 @@ public class RetentionManagerTest {
       PinotHelixResourceManager resourceManager) {
     final String tableNameWithType = tableConfig.getTableName();
     when(resourceManager.getAllTables()).thenReturn(Collections.singletonList(tableNameWithType));
+
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
 
     SegmentDeletionManager deletionManager = mock(SegmentDeletionManager.class);
     // Ignore the call to SegmentDeletionManager.removeAgedDeletedSegments. we only test that the call is made once per
@@ -308,18 +305,13 @@ public class RetentionManagerTest {
     return segmentMetadata;
   }
 
-  private SegmentMetadata mockSegmentMetadata(long startTime, long endTime, TimeUnit timeUnit) {
+  private SegmentZKMetadata mockSegmentZKMetadata(long startTime, long endTime, TimeUnit timeUnit) {
     long creationTime = System.currentTimeMillis();
-    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(segmentMetadata.getName()).thenReturn(TEST_TABLE_NAME + creationTime);
-    when(segmentMetadata.getIndexCreationTime()).thenReturn(creationTime);
-    when(segmentMetadata.getCrc()).thenReturn(Long.toString(creationTime));
-    when(segmentMetadata.getStartTime()).thenReturn(startTime);
-    when(segmentMetadata.getEndTime()).thenReturn(endTime);
-    when(segmentMetadata.getTimeUnit()).thenReturn(timeUnit);
-    when(segmentMetadata.getTimeInterval())
-        .thenReturn(new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime)));
-    when(segmentMetadata.getTimeGranularity()).thenReturn(new Duration(timeUnit.toMillis(1)));
-    return segmentMetadata;
+    SegmentZKMetadata segmentZKMetadata = mock(SegmentZKMetadata.class);
+    when(segmentZKMetadata.getSegmentName()).thenReturn(TEST_TABLE_NAME + creationTime);
+    when(segmentZKMetadata.getCreationTime()).thenReturn(creationTime);
+    when(segmentZKMetadata.getStartTimeMs()).thenReturn(timeUnit.toMillis(startTime));
+    when(segmentZKMetadata.getEndTimeMs()).thenReturn(timeUnit.toMillis(endTime));
+    return segmentZKMetadata;
   }
 }
