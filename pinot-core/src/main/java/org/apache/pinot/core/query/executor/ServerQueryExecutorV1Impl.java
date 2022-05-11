@@ -386,7 +386,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     int maxDepthMatchAllIdx = -1;
     int maxDepthOther = -1;
     int maxDepthOtherIdx = -1;
-    for (int i = 0; i < children.size(); ++i) {
+    for (int i = 0; i < children.size(); i++) {
       int[] numOperators = {0};
       boolean[] isEmptyFilter = {false};
       boolean[] isMatchAllFilter = {false};
@@ -418,7 +418,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       segmentIdxForExplainPlanQuery = maxDepthOtherIdx;
     } else if (maxDepthMatchAll > -1) {
       segmentIdxForExplainPlanQuery = maxDepthMatchAllIdx;
-    } else if (maxDepthEmpty > -1){
+    } else if (maxDepthEmpty > -1) {
       segmentIdxForExplainPlanQuery = maxDepthEmptyIdx;
     }
 

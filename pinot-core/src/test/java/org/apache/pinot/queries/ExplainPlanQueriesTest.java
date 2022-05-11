@@ -681,7 +681,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result5.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
     result5.add(new Object[]{"FAST_FILTERED_COUNT", 2, 1});
     result5.add(new Object[]{"FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:"
-        +"invertedIndexCol1 = '1.5')", 3, 2});
+        + "invertedIndexCol1 = '1.5')", 3, 2});
     check(query5, new ResultTable(DATA_SCHEMA, result5));
 
     // All segments have a EmptyFilterOperator plan for this query, ensure we get that plan
@@ -709,7 +709,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     // uses an inverted index. Ensure we get the one with the inverted index plan.
     String query8 =
         "EXPLAIN PLAN FOR SELECT count(*) FROM testTable WHERE invertedIndexCol3 = 'pluto' OR "
-            +"invertedIndexCol3 = 'minnie' LIMIT 100";
+            + "invertedIndexCol3 = 'minnie' LIMIT 100";
     List<Object[]> result8 = new ArrayList<>();
     result8.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
     result8.add(new Object[]{"COMBINE_AGGREGATE", 1, 0});
