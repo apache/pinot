@@ -381,16 +381,29 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Prepare OFFLINE and REALTIME requests
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
+    TimeBoundaryInfo timeBoundaryInfo = null;
     Schema schema = _tableCache.getSchema(rawTableName);
     if (offlineTableName != null && realtimeTableName != null) {
+      // Time boundary info might be null when there is no segment in the offline table, query real-time side only
+      timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);
+      if (timeBoundaryInfo == null) {
+        LOGGER.debug("No time boundary info found for hybrid table: {}", rawTableName);
+        offlineTableName = null;
+      }
+    }
+    if (offlineTableName != null && realtimeTableName != null) {
       // Hybrid
-      PinotQuery offlinePinotQuery = getOfflinePinotQuery(serverPinotQuery);
+      PinotQuery offlinePinotQuery = serverPinotQuery.deepCopy();
+      offlinePinotQuery.getDataSource().setTableName(offlineTableName);
+      attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
       handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
       handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
       _queryOptimizer.optimize(offlinePinotQuery, offlineTableConfig, schema);
       offlineBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(offlinePinotQuery);
 
-      PinotQuery realtimePinotQuery = getRealtimePinotQuery(serverPinotQuery);
+      PinotQuery realtimePinotQuery = serverPinotQuery.deepCopy();
+      realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
+      attachTimeBoundary(realtimePinotQuery, timeBoundaryInfo, false);
       handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
       handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig);
       _queryOptimizer.optimize(realtimePinotQuery, realtimeTableConfig, schema);
@@ -1563,42 +1576,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /**
-   * Helper method to create an OFFLINE query from the given hybrid query.
-   * <p>This step will attach the time boundary to the request.
+   * Helper method to attach the time boundary to the given PinotQuery.
    */
-  private PinotQuery getOfflinePinotQuery(PinotQuery hybridPinotQuery) {
-    PinotQuery offlinePinotQuery = hybridPinotQuery.deepCopy();
-    String rawTableName = hybridPinotQuery.getDataSource().getTableName();
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
-    offlinePinotQuery.getDataSource().setTableName(offlineTableName);
-    attachTimeBoundary(rawTableName, offlinePinotQuery, true);
-    return offlinePinotQuery;
-  }
-
-  /**
-   * Helper method to create a REALTIME query from the given hybrid query.
-   * <p>This step will attach the time boundary to the request.
-   */
-  private PinotQuery getRealtimePinotQuery(PinotQuery hybridPinotQuery) {
-    PinotQuery realtimePinotQuery = hybridPinotQuery.deepCopy();
-    String rawTableName = hybridPinotQuery.getDataSource().getTableName();
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
-    realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
-    attachTimeBoundary(rawTableName, realtimePinotQuery, false);
-    return realtimePinotQuery;
-  }
-
-  /**
-   * Helper method to attach the time boundary to the given broker request.
-   */
-  private void attachTimeBoundary(String rawTableName, PinotQuery pinotQuery, boolean isOfflineRequest) {
-    TimeBoundaryInfo timeBoundaryInfo =
-        _routingManager.getTimeBoundaryInfo(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
-    if (timeBoundaryInfo == null) {
-      LOGGER.warn("Failed to find time boundary info for hybrid table: {}", rawTableName);
-      return;
-    }
-
+  private static void attachTimeBoundary(PinotQuery pinotQuery, TimeBoundaryInfo timeBoundaryInfo,
+      boolean isOfflineRequest) {
     String timeColumn = timeBoundaryInfo.getTimeColumn();
     String timeValue = timeBoundaryInfo.getTimeValue();
     Expression timeFilterExpression = RequestUtils.getFunctionExpression(
