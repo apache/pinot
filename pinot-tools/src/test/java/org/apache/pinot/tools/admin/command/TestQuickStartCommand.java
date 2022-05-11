@@ -19,7 +19,6 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.lang.reflect.InvocationTargetException;
-import org.apache.pinot.tools.BatchQuickstartWithMinion;
 import org.apache.pinot.tools.EmptyQuickstart;
 import org.apache.pinot.tools.HybridQuickstart;
 import org.apache.pinot.tools.JoinQuickStart;
@@ -31,89 +30,91 @@ import org.apache.pinot.tools.RealtimeComplexTypeHandlingQuickStart;
 import org.apache.pinot.tools.RealtimeJsonIndexQuickStart;
 import org.apache.pinot.tools.RealtimeQuickStart;
 import org.apache.pinot.tools.RealtimeQuickStartWithMinion;
+import org.apache.pinot.tools.TimestampIndexQuickstart;
 import org.apache.pinot.tools.UpsertJsonQuickStart;
 import org.apache.pinot.tools.UpsertQuickStart;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 public class TestQuickStartCommand {
 
-    @Test(expectedExceptions = UnsupportedOperationException.class,
-            expectedExceptionsMessageRegExp = "^No QuickStart type provided. Valid types are: \\[.*\\]$")
-    public void testNoArg() throws Exception {
-        QuickStartCommand quickStartCommand = new QuickStartCommand();
-        quickStartCommand.execute();
-    }
+  @Test(expectedExceptions = UnsupportedOperationException.class,
+      expectedExceptionsMessageRegExp = "^No QuickStart type provided. Valid types are: \\[.*\\]$")
+  public void testNoArg()
+      throws Exception {
+    QuickStartCommand quickStartCommand = new QuickStartCommand();
+    quickStartCommand.execute();
+  }
 
-    @Test(expectedExceptions = UnsupportedOperationException.class,
-            expectedExceptionsMessageRegExp = "^Unsupported QuickStart type: foo. Valid types are: \\[.*\\]$")
-    public void testInvalidQuickStart() throws Exception {
-        QuickStartCommand quickStartCommand = new QuickStartCommand();
-        quickStartCommand.setType("foo");
-        quickStartCommand.execute();
-    }
+  @Test(expectedExceptions = UnsupportedOperationException.class,
+      expectedExceptionsMessageRegExp = "^Unsupported QuickStart type: foo. Valid types are: \\[.*\\]$")
+  public void testInvalidQuickStart()
+      throws Exception {
+    QuickStartCommand quickStartCommand = new QuickStartCommand();
+    quickStartCommand.setType("foo");
+    quickStartCommand.execute();
+  }
 
-    @Test
-    public void testMatchStringToCommand()
-            throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
-        Assert.assertEquals(quickStartClassFor("OFFLINE"), Quickstart.class);
-        Assert.assertEquals(quickStartClassFor("offline"), Quickstart.class);
-        Assert.assertEquals(quickStartClassFor("BATCH"), Quickstart.class);
+  @Test
+  public void testMatchStringToCommand()
+      throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    Assert.assertEquals(quickStartClassFor("OFFLINE"), Quickstart.class);
+    Assert.assertEquals(quickStartClassFor("offline"), Quickstart.class);
+    Assert.assertEquals(quickStartClassFor("BATCH"), Quickstart.class);
 
-        Assert.assertEquals(quickStartClassFor("EMPTY"), EmptyQuickstart.class);
-        Assert.assertEquals(quickStartClassFor("DEFAULT"), EmptyQuickstart.class);
+    Assert.assertEquals(quickStartClassFor("EMPTY"), EmptyQuickstart.class);
+    Assert.assertEquals(quickStartClassFor("DEFAULT"), EmptyQuickstart.class);
 
-        Assert.assertEquals(quickStartClassFor("OFFLINE_MINION"), BatchQuickstartWithMinion.class);
-        Assert.assertEquals(quickStartClassFor("BATCH_MINION"), BatchQuickstartWithMinion.class);
-        Assert.assertEquals(quickStartClassFor("OFFLINE-MINION"), BatchQuickstartWithMinion.class);
-        Assert.assertEquals(quickStartClassFor("BATCH-MINION"), BatchQuickstartWithMinion.class);
+    Assert.assertEquals(quickStartClassFor("REALTIME_MINION"), RealtimeQuickStartWithMinion.class);
+    Assert.assertEquals(quickStartClassFor("REALTIME-MINION"), RealtimeQuickStartWithMinion.class);
 
-        Assert.assertEquals(quickStartClassFor("REALTIME_MINION"), RealtimeQuickStartWithMinion.class);
-        Assert.assertEquals(quickStartClassFor("REALTIME-MINION"), RealtimeQuickStartWithMinion.class);
+    Assert.assertEquals(quickStartClassFor("REALTIME"), RealtimeQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("REALTIME"), RealtimeQuickStart.class);
 
-        Assert.assertEquals(quickStartClassFor("REALTIME"), RealtimeQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("REALTIME"), RealtimeQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("HYBRID"), HybridQuickstart.class);
 
-        Assert.assertEquals(quickStartClassFor("HYBRID"), HybridQuickstart.class);
+    Assert.assertEquals(quickStartClassFor("JOIN"), JoinQuickStart.class);
 
-        Assert.assertEquals(quickStartClassFor("JOIN"), JoinQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("UPSERT"), UpsertQuickStart.class);
 
-        Assert.assertEquals(quickStartClassFor("UPSERT"), UpsertQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("OFFLINE_JSON_INDEX"), JsonIndexQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("OFFLINE-JSON-INDEX"), JsonIndexQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("BATCH_JSON_INDEX"), JsonIndexQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("BATCH-JSON-INDEX"), JsonIndexQuickStart.class);
 
-        Assert.assertEquals(quickStartClassFor("OFFLINE_JSON_INDEX"), JsonIndexQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("OFFLINE-JSON-INDEX"), JsonIndexQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("BATCH_JSON_INDEX"), JsonIndexQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("BATCH-JSON-INDEX"), JsonIndexQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("REALTIME_JSON_INDEX"), RealtimeJsonIndexQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("REALTIME-JSON-INDEX"), RealtimeJsonIndexQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("STREAM_JSON_INDEX"), RealtimeJsonIndexQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("STREAM-JSON-INDEX"), RealtimeJsonIndexQuickStart.class);
 
-        Assert.assertEquals(quickStartClassFor("REALTIME_JSON_INDEX"), RealtimeJsonIndexQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("REALTIME-JSON-INDEX"), RealtimeJsonIndexQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("STREAM_JSON_INDEX"), RealtimeJsonIndexQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("STREAM-JSON-INDEX"), RealtimeJsonIndexQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("UPSERT_JSON_INDEX"), UpsertJsonQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("UPSERT-JSON-INDEX"), UpsertJsonQuickStart.class);
 
-        Assert.assertEquals(quickStartClassFor("UPSERT_JSON_INDEX"), UpsertJsonQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("UPSERT-JSON-INDEX"), UpsertJsonQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("OFFLINE_COMPLEX_TYPE"),
+        OfflineComplexTypeHandlingQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("OFFLINE-COMPLEX-TYPE"),
+        OfflineComplexTypeHandlingQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("BATCH_COMPLEX_TYPE"),
+        OfflineComplexTypeHandlingQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("BATCH-COMPLEX-TYPE"),
+        OfflineComplexTypeHandlingQuickStart.class);
 
-        Assert.assertEquals(quickStartClassFor("OFFLINE_COMPLEX_TYPE"),
-                OfflineComplexTypeHandlingQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("OFFLINE-COMPLEX-TYPE"),
-                OfflineComplexTypeHandlingQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("BATCH_COMPLEX_TYPE"),
-                OfflineComplexTypeHandlingQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("BATCH-COMPLEX-TYPE"),
-                OfflineComplexTypeHandlingQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("REALTIME_COMPLEX_TYPE"),
+        RealtimeComplexTypeHandlingQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("REALTIME-COMPLEX-TYPE"),
+        RealtimeComplexTypeHandlingQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("STREAM_COMPLEX_TYPE"),
+        RealtimeComplexTypeHandlingQuickStart.class);
+    Assert.assertEquals(quickStartClassFor("STREAM-COMPLEX-TYPE"),
+        RealtimeComplexTypeHandlingQuickStart.class);
 
-        Assert.assertEquals(quickStartClassFor("REALTIME_COMPLEX_TYPE"),
-                RealtimeComplexTypeHandlingQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("REALTIME-COMPLEX-TYPE"),
-                RealtimeComplexTypeHandlingQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("STREAM_COMPLEX_TYPE"),
-                RealtimeComplexTypeHandlingQuickStart.class);
-        Assert.assertEquals(quickStartClassFor("STREAM-COMPLEX-TYPE"),
-                RealtimeComplexTypeHandlingQuickStart.class);
-    }
+    Assert.assertEquals(quickStartClassFor("TIMESTAMP"),
+        TimestampIndexQuickstart.class);
+  }
 
-    private Class<? extends QuickStartBase> quickStartClassFor(String offline)
-            throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
-        return QuickStartCommand.selectQuickStart(offline).getClass();
-    }
+  private Class<? extends QuickStartBase> quickStartClassFor(String offline)
+      throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    return QuickStartCommand.selectQuickStart(offline).getClass();
+  }
 }

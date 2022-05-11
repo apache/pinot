@@ -75,7 +75,7 @@ public class UpsertJsonQuickStart extends QuickStartBase {
 
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
     QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 0, dataDir, getConfigOverrides());
+        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1, dataDir, getConfigOverrides());
 
     printStatus(Color.CYAN, "***** Starting Kafka *****");
     ZkStarter.ZookeeperInstance zookeeperInstance = ZkStarter.startLocalZkServer();
