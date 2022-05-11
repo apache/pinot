@@ -101,6 +101,10 @@ public class PartitionUpsertMetadataManager {
     _primaryKeyColumns = primaryKeyColumns;
   }
 
+  public List<String> getPrimaryKeyColumns() {
+    return _primaryKeyColumns;
+  }
+
   /**
    * Initializes the upsert metadata for the given immutable segment.
    */
@@ -255,12 +259,11 @@ public class PartitionUpsertMetadataManager {
     LOGGER.info("Removing upsert metadata for segment: {}", segmentName);
 
     if (!Objects.requireNonNull(segment.getValidDocIds()).getMutableRoaringBitmap().isEmpty()) {
+      PrimaryKey reuse = new PrimaryKey(new Object[]{});
       PeekableIntIterator iterator = segment.getValidDocIds().getMutableRoaringBitmap().getIntIterator();
       while (iterator.hasNext()) {
-        _reuse.clear();
         int docId = iterator.next();
-        GenericRow record = segment.getRecord(docId, _reuse);
-        PrimaryKey primaryKey = record.getPrimaryKey(_primaryKeyColumns);
+        PrimaryKey primaryKey = segment.getPrimaryKey(docId, reuse);
         _primaryKeyToRecordLocationMap.computeIfPresent(primaryKey, (pk, recordLocation) -> {
           if (recordLocation.getSegment() == segment) {
             return null;

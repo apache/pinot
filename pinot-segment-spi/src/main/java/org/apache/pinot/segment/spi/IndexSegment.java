@@ -26,6 +26,7 @@ import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
 @InterfaceAudience.Private
@@ -85,6 +86,15 @@ public interface IndexSegment {
    * @return Record for the given document Id
    */
   GenericRow getRecord(int docId, GenericRow reuse);
+
+  /**
+   * Returns the primaryKey for a given docId
+   *
+   * @param docId Document Id
+   * @param reuse Reusable buffer for the primary key
+   * @return Primary key for the given document Id
+   */
+  PrimaryKey getPrimaryKey(int docId, PrimaryKey reuse);
 
   /**
    * Hints the segment to begin prefetching buffers for specified columns.

@@ -44,6 +44,7 @@ import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -231,6 +232,20 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       return reuse;
     } catch (Exception e) {
       throw new RuntimeException("Failed to use PinotSegmentRecordReader to read immutable segment");
+    }
+  }
+
+  @Override
+  public PrimaryKey getPrimaryKey(int docId, PrimaryKey reuse) {
+    try {
+      if (_pinotSegmentRecordReader == null) {
+        _pinotSegmentRecordReader = new PinotSegmentRecordReader();
+        _pinotSegmentRecordReader.init(this);
+      }
+      return _pinotSegmentRecordReader.getPrimaryKey(docId, _partitionUpsertMetadataManager.getPrimaryKeyColumns());
+    } catch (Exception e) {
+      e.printStackTrace();
+      throw new RuntimeException("Failed to use PinotSegmentRecordReader to read primary key from immutable segment");
     }
   }
 }

@@ -33,6 +33,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
 /**
@@ -92,6 +93,11 @@ public class EmptyIndexSegment implements ImmutableSegment {
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
     throw new UnsupportedOperationException("Cannot read record from empty segment");
+  }
+
+  @Override
+  public PrimaryKey getPrimaryKey(int docId, PrimaryKey reuse) {
+    throw new UnsupportedOperationException("Cannot read primary key from empty segment");
   }
 
   @Override

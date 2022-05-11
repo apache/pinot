@@ -570,6 +570,20 @@ public class MutableSegmentImpl implements MutableSegment {
     return new RecordInfo(primaryKey, docId, null);
   }
 
+  @Override
+  public PrimaryKey getPrimaryKey(int docId, PrimaryKey reuse) {
+    int numPrimaryKeyColumns = _partitionUpsertMetadataManager.getPrimaryKeyColumns().size();
+    Object[] values = new Object[numPrimaryKeyColumns];;
+    for (int i = 0; i < numPrimaryKeyColumns; i++) {
+      IndexContainer indexContainer = _indexContainerMap.get(
+          _partitionUpsertMetadataManager.getPrimaryKeyColumns().get(i));
+      Object value = getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
+          indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
+      values[i] = value;
+    }
+    return new PrimaryKey(values);
+  }
+
   private void updateDictionary(GenericRow row) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
       IndexContainer indexContainer = entry.getValue();
