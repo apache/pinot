@@ -125,9 +125,9 @@
     <jackson.version>2.10.0</jackson.version>
     <zookeeper.version>3.5.8</zookeeper.version>
     <async-http-client.version>2.12.3</async-http-client.version>
-    <jersey.version>2.28</jersey.version>
+    <jersey.version>2.35</jersey.version>
     <grizzly.version>2.4.4</grizzly.version>
-    <hk2.version>2.5.0</hk2.version>
+    <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.5.16</swagger.version>
     <hadoop.version>2.10.1</hadoop.version>
     <antlr.version>4.6</antlr.version>
@@ -1080,6 +1080,31 @@
         <groupId>org.glassfish.hk2</groupId>
         <artifactId>hk2-locator</artifactId>
         <version>${hk2.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.glassfish.hk2</groupId>
+        <artifactId>hk2-metadata-generator</artifactId>
+        <version>${hk2.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.glassfish.jersey.media</groupId>
