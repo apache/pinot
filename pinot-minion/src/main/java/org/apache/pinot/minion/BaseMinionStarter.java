@@ -101,7 +101,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     } else {
       _instanceId = CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + _hostname + "_" + _port;
     }
-    _listenerConfigs = ListenerConfigUtil.buildMinionAdminConfigs(_config);
+    _listenerConfigs = ListenerConfigUtil.buildMinionConfigs(_config);
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
     MinionTaskZkMetadataManager minionTaskZkMetadataManager = new MinionTaskZkMetadataManager(_helixManager);
     _taskExecutorFactoryRegistry = new TaskExecutorFactoryRegistry(minionTaskZkMetadataManager, _config);
