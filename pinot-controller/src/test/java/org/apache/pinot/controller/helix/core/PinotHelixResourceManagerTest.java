@@ -692,13 +692,12 @@ public class PinotHelixResourceManagerTest {
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId5).getState(), LineageEntryState.IN_PROGRESS);
 
     // Assuming the replacement fails in the middle, rerunning the protocol with the same segmentsTo will go through,
-    // and revert the previous lineage entry.
+    // and remove the previous lineage entry.
     String lineageEntryId6 = ControllerTestUtils.getHelixResourceManager()
         .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, true);
     segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 6);
-    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId5).getState(), LineageEntryState.REVERTED);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 5);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId6).getSegmentsFrom(), segmentsFrom);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId6).getSegmentsTo(), segmentsTo);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId6).getState(), LineageEntryState.IN_PROGRESS);
@@ -728,7 +727,7 @@ public class PinotHelixResourceManagerTest {
         .endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId7);
     segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 7);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 6);
     Assert.assertTrue(segmentLineage.getLineageEntry(lineageEntryId7).getSegmentsFrom().isEmpty());
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId7).getSegmentsTo(), Arrays.asList("s9", "s10"));
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId7).getState(), LineageEntryState.COMPLETED);
@@ -741,7 +740,7 @@ public class PinotHelixResourceManagerTest {
         .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
     segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 8);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 7);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId8).getSegmentsFrom(), segmentsFrom);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId8).getSegmentsTo(), segmentsTo);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId8).getState(), LineageEntryState.IN_PROGRESS);
@@ -771,7 +770,7 @@ public class PinotHelixResourceManagerTest {
         .endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId9);
     segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 9);
+    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 8);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId9).getSegmentsFrom(), Arrays.asList("s0", "s9"));
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId9).getSegmentsTo(), Arrays.asList("s13", "s14"));
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId9).getState(), LineageEntryState.COMPLETED);
@@ -1038,7 +1037,7 @@ public class PinotHelixResourceManagerTest {
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId6).getSegmentsTo(), Arrays.asList("s17", "s18"));
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId6).getState(), LineageEntryState.COMPLETED);
 
-    // Check partial overlap reverts previous lineage
+    // Check partial overlap of segmentsFrom reverts previous lineage
     // Start a new segment replacement with non-empty segmentsFrom.
     segmentsFrom = Arrays.asList("s17", "s18");
     segmentsTo = Arrays.asList("s19", "s20");
@@ -1081,6 +1080,55 @@ public class PinotHelixResourceManagerTest {
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId8).getSegmentsFrom(), Arrays.asList("s14", "s17"));
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId8).getSegmentsTo(), Arrays.asList("s21", "s22"));
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId8).getState(), LineageEntryState.COMPLETED);
+
+    // Check partial overlap of segmentsTo reverts previous lineage
+    // Start a new segment replacement with non-empty segmentsFrom.
+    segmentsFrom = Arrays.asList("s21", "s22");
+    segmentsTo = Arrays.asList("s23", "s24");
+    String lineageEntryId9 = ControllerTestUtils.getHelixResourceManager()
+        .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, segmentsFrom, segmentsTo, false);
+    segmentLineage = SegmentLineageAccessHelper
+        .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId9).getSegmentsFrom(), segmentsFrom);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId9).getSegmentsTo(), segmentsTo);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId9).getState(), LineageEntryState.IN_PROGRESS);
+
+    // Upload data
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, "s23"),
+        "downloadUrl");
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, "s24"),
+        "downloadUrl");
+
+    // Start another new segment replacement with segmentsTo overlapping with previous lineage
+    // and check that previous lineages with overlapped segmentsTo are reverted.
+    segmentsFrom = Arrays.asList("s21", "s22");
+    segmentsTo = Arrays.asList("s24", "s25");
+    String lineageEntryId10 = ControllerTestUtils.getHelixResourceManager()
+        .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, segmentsFrom, segmentsTo, true);
+    segmentLineage = SegmentLineageAccessHelper
+        .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId9).getState(), LineageEntryState.REVERTED);
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId9).getSegmentsTo(), Arrays.asList("s23"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId10).getState(), LineageEntryState.IN_PROGRESS);
+
+    // Finish the replacement
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, "s24"),
+        "downloadUrl");
+    ControllerTestUtils.getHelixResourceManager().addNewSegment(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, "s25"),
+        "downloadUrl");
+
+    ControllerTestUtils.getHelixResourceManager()
+        .endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, lineageEntryId10);
+    segmentLineage = SegmentLineageAccessHelper
+        .getSegmentLineage(ControllerTestUtils.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME);
+    Assert
+        .assertEquals(segmentLineage.getLineageEntry(lineageEntryId10).getSegmentsFrom(), Arrays.asList("s21", "s22"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId10).getSegmentsTo(), Arrays.asList("s24", "s25"));
+    Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId10).getState(), LineageEntryState.COMPLETED);
   }
 
   private void waitForSegmentsToDelete(String tableNameWithType, int expectedNumSegmentsAfterDelete,
