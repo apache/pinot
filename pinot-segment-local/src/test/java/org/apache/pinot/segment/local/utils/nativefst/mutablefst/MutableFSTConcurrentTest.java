@@ -37,14 +37,11 @@ import static org.testng.AssertJUnit.assertTrue;
 
 public class MutableFSTConcurrentTest {
   private ExecutorService _threadPool;
-
-  private CountDownLatch _countDownLatch;
   private Set<String> _resultSet;
 
   @BeforeClass
   private void setup() {
-     _threadPool = Executors.newFixedThreadPool(2);
-    _countDownLatch = new CountDownLatch(2);
+    _threadPool = Executors.newFixedThreadPool(2);
     _resultSet = new HashSet<>();
   }
 
@@ -58,6 +55,7 @@ public class MutableFSTConcurrentTest {
       throws InterruptedException {
     MutableFST mutableFST = new MutableFSTImpl();
     List<String> words = new ArrayList<>();
+    CountDownLatch countDownLatch = new CountDownLatch(2);
 
     words.add("ab");
     words.add("abba");
@@ -76,21 +74,21 @@ public class MutableFSTConcurrentTest {
 
     _threadPool.submit(() -> {
       try {
-        performReads(mutableFST, words, 10, 200);
+        performReads(mutableFST, words, 10, 200, countDownLatch);
       } catch (InterruptedException e) {
-        e.printStackTrace();
+        throw new RuntimeException(e);
       }
     });
 
     _threadPool.submit(() -> {
       try {
-        performWrites(mutableFST, wordsWithMetadata, 10);
+        performWrites(mutableFST, wordsWithMetadata, 10, countDownLatch);
       } catch (InterruptedException e) {
-        e.printStackTrace();
+        throw new RuntimeException(e);
       }
     });
 
-    _countDownLatch.await();
+    countDownLatch.await();
 
     assertEquals(_resultSet.size(), words.size());
 
@@ -102,8 +100,54 @@ public class MutableFSTConcurrentTest {
     assertTrue("efg not found in result set", _resultSet.contains("efg"));
   }
 
-  private void performReads(MutableFST fst, List<String> words, int count,
-      long sleepTime)
+  @Test
+  public void testConcurrentLongWriteAndRead()
+      throws InterruptedException {
+    MutableFST mutableFST = new MutableFSTImpl();
+    List<String> words = new ArrayList<>();
+    CountDownLatch countDownLatch = new CountDownLatch(2);
+
+    mutableFST.addPath("ab", 1);
+
+    List<Pair<String, Integer>> wordsWithMetadata = new ArrayList<>();
+
+    // Add some write pressure
+    wordsWithMetadata.add(Pair.of("egegdgrbsbrsegzgzegzegegjntnmtj", 2));
+    wordsWithMetadata.add(Pair.of("hrwbwefweg4wreghrtbrassregfesfefefefzew4ere", 2));
+    wordsWithMetadata.add(Pair.of("easzegfegrertegbxzzez3erfezgzeddzdewstfefed", 2));
+    wordsWithMetadata.add(Pair.of("tjntrhndsrsgezgrsxzetgteszetgezfzezedrefzdzdzdzdz", 2));
+    wordsWithMetadata.add(Pair.of("abacxcvbnmlkjjhgfsaqwertyuioopzxcvbnmllkjshfgsfawieeiuefgeurfeoafa", 2));
+
+    words.add("abacxcvbnmlkjjhgfsaqwertyuioopzxcvbnmllkjshfgsfawieeiuefgeurfeoafa");
+
+    _threadPool.submit(() -> {
+      try {
+        performReads(mutableFST, words, 10, 10, countDownLatch);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    });
+
+    _threadPool.submit(() -> {
+      try {
+        performWrites(mutableFST, wordsWithMetadata, 0, countDownLatch);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    });
+
+    countDownLatch.await();
+
+    assertEquals(_resultSet.size(), words.size());
+
+    assertTrue("abacxcvbnmlkjjhgfsaqwertyuioopzxcvbnmllkjshfgsfawieeiuefgeurfeoafa not found in result set",
+        _resultSet.contains("abacxcvbnmlkjjhgfsaqwertyuioopzxcvbnmllkjshfgsfawieeiuefgeurfeoafa"));
+
+    _resultSet.clear();
+  }
+
+  private void performReads(MutableFST fst, List<String> words, int count, long sleepTime,
+      CountDownLatch countDownLatch)
       throws InterruptedException {
 
     for (int i = 0; i < count; i++) {
@@ -126,11 +170,11 @@ public class MutableFSTConcurrentTest {
       Thread.sleep(sleepTime);
     }
 
-    _countDownLatch.countDown();
+    countDownLatch.countDown();
   }
 
-  private void performWrites(MutableFST fst, List<Pair<String, Integer>> wordsAndMetadata,
-      long sleepTime)
+  private void performWrites(MutableFST fst, List<Pair<String, Integer>> wordsAndMetadata, long sleepTime,
+      CountDownLatch countDownLatch)
       throws InterruptedException {
 
     for (int i = 0; i < wordsAndMetadata.size(); i++) {
@@ -141,6 +185,6 @@ public class MutableFSTConcurrentTest {
       Thread.sleep(sleepTime);
     }
 
-    _countDownLatch.countDown();
+    countDownLatch.countDown();
   }
 }

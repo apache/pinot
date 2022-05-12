@@ -37,6 +37,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
@@ -110,6 +111,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
 
     // Check if the groups limit is reached
     boolean numGroupsLimitReached = groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsLimit();
+    Tracing.activeRecording().setNumGroups(_queryContext.getNumGroupsLimit(), groupByExecutor.getNumGroups());
 
     // Trim the groups when iff:
     // - Query has ORDER BY clause

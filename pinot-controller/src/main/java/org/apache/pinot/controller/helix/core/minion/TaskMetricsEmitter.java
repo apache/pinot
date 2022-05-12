@@ -28,7 +28,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager.TaskCount;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,14 +80,14 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
           accumulated.accumulate(taskCount);
         }
         // Emit metrics for taskType.
-        _controllerMetrics
-            .setValueOfGlobalGauge(ControllerGauge.NUM_MINION_TASKS_IN_PROGRESS, taskType, numRunningTasks);
-        _controllerMetrics
-            .setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_RUNNING, taskType, accumulated.getRunning());
-        _controllerMetrics
-            .setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_WAITING, taskType, accumulated.getWaiting());
-        _controllerMetrics
-            .setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_ERROR, taskType, accumulated.getError());
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_TASKS_IN_PROGRESS, taskType,
+            numRunningTasks);
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_RUNNING, taskType,
+            accumulated.getRunning());
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_WAITING, taskType,
+            accumulated.getWaiting());
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_ERROR, taskType,
+            accumulated.getError());
         int total = accumulated.getTotal();
         int percent = total != 0 ? (accumulated.getWaiting() + accumulated.getRunning()) * 100 / total : 0;
         _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE, taskType, percent);
@@ -102,7 +102,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
     List<String> onlineInstances = _pinotHelixResourceManager.getOnlineInstanceList();
     int onlineMinionInstanceCount = 0;
     for (String onlineInstance : onlineInstances) {
-      if (onlineInstance.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE)) {
+      if (InstanceTypeUtils.isMinion(onlineInstance)) {
         onlineMinionInstanceCount++;
       }
     }

@@ -277,6 +277,10 @@ public class DataSchema {
           return LONG;
         case JSON:
           return STRING;
+        case BOOLEAN_ARRAY:
+          return INT_ARRAY;
+        case TIMESTAMP_ARRAY:
+          return LONG_ARRAY;
         default:
           return this;
       }

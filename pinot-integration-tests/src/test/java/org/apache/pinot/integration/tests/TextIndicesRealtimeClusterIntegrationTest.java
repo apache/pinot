@@ -25,7 +25,9 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -46,18 +48,24 @@ import static org.testng.AssertJUnit.fail;
 
 
 /**
- * Cluster integration test for near realtime text search
+ * Cluster integration test for near realtime text search (lucene) and realtime text search (native).
  */
-public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
+public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String TEXT_COLUMN_NAME = "skills";
+  private static final String TEXT_COLUMN_NAME_NATIVE = "skills_native";
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
   private static final int NUM_SKILLS = 24;
   private static final int NUM_MATCHING_SKILLS = 4;
   private static final int NUM_RECORDS = NUM_SKILLS * 1000;
   private static final int NUM_MATCHING_RECORDS = NUM_MATCHING_SKILLS * 1000;
+  private static final int NUM_MATCHING_RECORDS_NATIVE = 7000;
 
   private static final String TEST_TEXT_COLUMN_QUERY =
       "SELECT COUNT(*) FROM mytable WHERE TEXT_MATCH(skills, '\"machine learning\" AND spark')";
+
+  private static final String TEST_TEXT_COLUMN_QUERY_NATIVE =
+      "SELECT COUNT(*) FROM mytable WHERE TEXT_CONTAINS(skills_native, 'm.*') AND TEXT_CONTAINS(skills_native, "
+          + "'spark')";
 
   @Override
   public String getTimeColumnName() {
@@ -79,7 +87,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
   @Nullable
   @Override
   protected List<String> getInvertedIndexColumns() {
-    return null;
+    return Collections.singletonList(TEXT_COLUMN_NAME_NATIVE);
   }
 
   @Override
@@ -101,8 +109,13 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
 
   @Override
   protected List<FieldConfig> getFieldConfigs() {
-    return Collections.singletonList(
-        new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null));
+    Map<String, String> propertiesMap = new HashMap<>();
+    propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
+
+    return Arrays.asList(
+        new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null),
+        new FieldConfig(TEXT_COLUMN_NAME_NATIVE, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null,
+            propertiesMap));
   }
 
   @BeforeClass
@@ -125,6 +138,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
     // Create and upload the schema and table config
     Schema schema = new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
         .addSingleValueDimension(TEXT_COLUMN_NAME, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(TEXT_COLUMN_NAME_NATIVE, FieldSpec.DataType.STRING)
         .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
     addSchema(schema);
     addTableConfig(createRealtimeTableConfig(avroFile));
@@ -172,6 +186,8 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     avroSchema.setFields(Arrays.asList(new org.apache.avro.Schema.Field(TEXT_COLUMN_NAME,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
+        new org.apache.avro.Schema.Field(TEXT_COLUMN_NAME_NATIVE,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
         new org.apache.avro.Schema.Field(TIME_COLUMN_NAME,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG), null, null)));
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
@@ -179,6 +195,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
       for (int i = 0; i < NUM_RECORDS; i++) {
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(TEXT_COLUMN_NAME, skills.get(i % NUM_SKILLS));
+        record.put(TEXT_COLUMN_NAME_NATIVE, skills.get(i % NUM_SKILLS));
         record.put(TIME_COLUMN_NAME, System.currentTimeMillis());
         fileWriter.append(record);
       }
@@ -192,7 +209,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
     // Keep posting queries until all records are consumed
     long previousResult = 0;
     while (getCurrentCountStarResult() < NUM_RECORDS) {
-      long result = getTextColumnQueryResult();
+      long result = getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY);
       assertTrue(result >= previousResult);
       previousResult = result;
       Thread.sleep(100);
@@ -201,7 +218,7 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
     //Lucene index on consuming segments to update the latest records
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return getTextColumnQueryResult() == NUM_MATCHING_RECORDS;
+        return getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY) == NUM_MATCHING_RECORDS;
       } catch (Exception e) {
         fail("Caught exception while getting text column query result");
         return false;
@@ -209,8 +226,23 @@ public class LuceneRealtimeClusterIntegrationTest extends BaseClusterIntegration
     }, 10_000L, "Failed to reach expected number of matching records");
   }
 
-  private long getTextColumnQueryResult()
+  @Test
+  public void testTextSearchCountQueryNative()
       throws Exception {
-    return postQuery(TEST_TEXT_COLUMN_QUERY).get("resultTable").get("rows").get(0).get(0).asLong();
+    // Keep posting queries until all records are consumed
+    long previousResult = 0;
+    while (getCurrentCountStarResult() < NUM_RECORDS) {
+      long result = getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY_NATIVE);
+      assertTrue(result >= previousResult);
+      previousResult = result;
+      Thread.sleep(100);
+    }
+
+    assertTrue(getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY_NATIVE) == NUM_MATCHING_RECORDS_NATIVE);
+  }
+
+  private long getTextColumnQueryResult(String query)
+      throws Exception {
+    return postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong();
   }
 }

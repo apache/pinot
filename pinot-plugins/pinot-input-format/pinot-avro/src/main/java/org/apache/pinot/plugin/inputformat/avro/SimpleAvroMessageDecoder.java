@@ -30,6 +30,7 @@ import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.slf4j.Logger;
@@ -59,12 +60,19 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     _avroSchema = new org.apache.avro.Schema.Parser().parse(props.get(SCHEMA));
     _datumReader = new GenericDatumReader<>(_avroSchema);
     String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
+    String recordExtractorConfigClass = props.get(RECORD_EXTRACTOR_CONFIG_CONFIG_KEY);
     // Backward compatibility to support Avro by default
     if (recordExtractorClass == null) {
       recordExtractorClass = AvroRecordExtractor.class.getName();
+      recordExtractorConfigClass = AvroRecordExtractorConfig.class.getName();
+    }
+    RecordExtractorConfig config = null;
+    if (recordExtractorConfigClass != null) {
+      config = PluginManager.get().createInstance(recordExtractorConfigClass);
+      config.init(props);
     }
     _avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
-    _avroRecordExtractor.init(fieldsToRead, null);
+    _avroRecordExtractor.init(fieldsToRead, config);
   }
 
   /**

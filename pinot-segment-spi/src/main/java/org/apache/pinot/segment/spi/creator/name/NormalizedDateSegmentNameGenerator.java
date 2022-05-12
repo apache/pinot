@@ -54,13 +54,15 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
       boolean excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency,
       @Nullable DateTimeFormatSpec dateTimeFormatSpec, @Nullable String segmentNamePostfix) {
     _segmentNamePrefix = segmentNamePrefix != null ? segmentNamePrefix.trim() : tableName;
-    Preconditions.checkArgument(
-        _segmentNamePrefix != null && isValidSegmentName(_segmentNamePrefix));
+    Preconditions
+        .checkArgument(_segmentNamePrefix != null, "Missing segmentNamePrefix for NormalizedDateSegmentNameGenerator");
+    Preconditions.checkArgument(isValidSegmentName(_segmentNamePrefix),
+        "Invalid segmentNamePrefix: %s for NormalizedDateSegmentNameGenerator", _segmentNamePrefix);
     _excludeSequenceId = excludeSequenceId;
     _appendPushType = "APPEND".equalsIgnoreCase(pushType);
     _segmentNamePostfix = segmentNamePostfix != null ? segmentNamePostfix.trim() : null;
-    Preconditions.checkArgument(
-        _segmentNamePostfix == null || isValidSegmentName(_segmentNamePostfix));
+    Preconditions.checkArgument(_segmentNamePostfix == null || isValidSegmentName(_segmentNamePostfix),
+        "Invalid segmentNamePostfix: %s for NormalizedDateSegmentNameGenerator", _segmentNamePostfix);
 
     // Include time info for APPEND push type
     if (_appendPushType) {
@@ -73,13 +75,15 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
       _outputSDF.setTimeZone(TimeZone.getTimeZone("UTC"));
 
       // Parse input time format: 'EPOCH'/'TIMESTAMP' or 'SIMPLE_DATE_FORMAT' using pattern
-      Preconditions.checkNotNull(dateTimeFormatSpec);
+      Preconditions.checkArgument(dateTimeFormatSpec != null,
+          "Must provide date time format spec for NormalizedDateSegmentNameGenerator");
       TimeFormat timeFormat = dateTimeFormatSpec.getTimeFormat();
       if (timeFormat == TimeFormat.EPOCH || timeFormat == TimeFormat.TIMESTAMP) {
         _inputTimeUnit = dateTimeFormatSpec.getColumnUnit();
         _inputSDF = null;
       } else {
-        Preconditions.checkNotNull(dateTimeFormatSpec.getSDFPattern(), "Must provide pattern for SIMPLE_DATE_FORMAT");
+        Preconditions.checkArgument(dateTimeFormatSpec.getSDFPattern() != null,
+            "Must provide pattern for SIMPLE_DATE_FORMAT for NormalizedDateSegmentNameGenerator");
         _inputTimeUnit = null;
         _inputSDF = new SimpleDateFormat(dateTimeFormatSpec.getSDFPattern());
         _inputSDF.setTimeZone(TimeZone.getTimeZone("UTC"));
@@ -97,8 +101,10 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
 
     // Include time value for APPEND push type
     if (_appendPushType) {
-      return JOINER.join(_segmentNamePrefix, getNormalizedDate(Preconditions.checkNotNull(minTimeValue)),
-          getNormalizedDate(Preconditions.checkNotNull(maxTimeValue)), _segmentNamePostfix, sequenceIdInSegmentName);
+      Preconditions.checkArgument(minTimeValue != null, "Missing minTimeValue for NormalizedDateSegmentNameGenerator");
+      Preconditions.checkArgument(maxTimeValue != null, "Missing maxTimeValue for NormalizedDateSegmentNameGenerator");
+      return JOINER.join(_segmentNamePrefix, getNormalizedDate(minTimeValue), getNormalizedDate(maxTimeValue),
+          _segmentNamePostfix, sequenceIdInSegmentName);
     } else {
       return JOINER.join(_segmentNamePrefix, _segmentNamePostfix, sequenceIdInSegmentName);
     }

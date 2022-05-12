@@ -24,6 +24,7 @@ import com.google.common.primitives.Longs;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Map;
@@ -57,13 +58,19 @@ public class DataTableSerDeTest {
   private static final long[] LONGS = new long[NUM_ROWS];
   private static final float[] FLOATS = new float[NUM_ROWS];
   private static final double[] DOUBLES = new double[NUM_ROWS];
+  private static final BigDecimal[] BIG_DECIMALS = new BigDecimal[NUM_ROWS];
+  private static final int[] BOOLEANS = new int[NUM_ROWS];
+  private static final long[] TIMESTAMPS = new long[NUM_ROWS];
   private static final String[] STRINGS = new String[NUM_ROWS];
+  private static final String[] JSONS = new String[NUM_ROWS];
   private static final byte[][] BYTES = new byte[NUM_ROWS][];
   private static final Object[] OBJECTS = new Object[NUM_ROWS];
   private static final int[][] INT_ARRAYS = new int[NUM_ROWS][];
   private static final long[][] LONG_ARRAYS = new long[NUM_ROWS][];
   private static final float[][] FLOAT_ARRAYS = new float[NUM_ROWS][];
   private static final double[][] DOUBLE_ARRAYS = new double[NUM_ROWS][];
+  private static final int[][] BOOLEAN_ARRAYS = new int[NUM_ROWS][];
+  private static final long[][] TIMESTAMP_ARRAYS = new long[NUM_ROWS][];
   private static final String[][] STRING_ARRAYS = new String[NUM_ROWS][];
   private static final Map<String, String> EXPECTED_METADATA =
       ImmutableMap.<String, String>builder().put(MetadataKey.NUM_DOCS_SCANNED.getName(), String.valueOf(20L))
@@ -417,9 +424,25 @@ public class DataTableSerDeTest {
             DOUBLES[rowId] = RANDOM.nextDouble();
             dataTableBuilder.setColumn(colId, DOUBLES[rowId]);
             break;
+          case BIG_DECIMAL:
+            BIG_DECIMALS[rowId] = BigDecimal.valueOf(RANDOM.nextDouble());
+            dataTableBuilder.setColumn(colId, BIG_DECIMALS[rowId]);
+            break;
+          case TIMESTAMP:
+            TIMESTAMPS[rowId] = RANDOM.nextLong();
+            dataTableBuilder.setColumn(colId, TIMESTAMPS[rowId]);
+            break;
+          case BOOLEAN:
+            BOOLEANS[rowId] = RANDOM.nextInt(2);
+            dataTableBuilder.setColumn(colId, BOOLEANS[rowId]);
+            break;
           case STRING:
             STRINGS[rowId] = RandomStringUtils.random(RANDOM.nextInt(20));
             dataTableBuilder.setColumn(colId, STRINGS[rowId]);
+            break;
+          case JSON:
+            JSONS[rowId] = "{\"key\": \"" + RandomStringUtils.random(RANDOM.nextInt(20)) + "\"}";
+            dataTableBuilder.setColumn(colId, JSONS[rowId]);
             break;
           case BYTES:
             BYTES[rowId] = RandomStringUtils.random(RANDOM.nextInt(20)).getBytes();
@@ -466,6 +489,27 @@ public class DataTableSerDeTest {
             DOUBLE_ARRAYS[rowId] = doubleArray;
             dataTableBuilder.setColumn(colId, doubleArray);
             break;
+          case BOOLEAN_ARRAY:
+            length = RANDOM.nextInt(2);
+            int[] booleanArray = new int[length];
+            for (int i = 0; i < length; i++) {
+              booleanArray[i] = RANDOM.nextInt();
+            }
+            BOOLEAN_ARRAYS[rowId] = booleanArray;
+            dataTableBuilder.setColumn(colId, booleanArray);
+            break;
+          case TIMESTAMP_ARRAY:
+            length = RANDOM.nextInt(20);
+            long[] timestampArray = new long[length];
+            for (int i = 0; i < length; i++) {
+              timestampArray[i] = RANDOM.nextLong();
+            }
+            TIMESTAMP_ARRAYS[rowId] = timestampArray;
+            dataTableBuilder.setColumn(colId, timestampArray);
+            break;
+          case BYTES_ARRAY:
+            // TODO: add once implementation of datatable bytes array support is added
+            break;
           case STRING_ARRAY:
             length = RANDOM.nextInt(20);
             String[] stringArray = new String[length];
@@ -476,7 +520,7 @@ public class DataTableSerDeTest {
             dataTableBuilder.setColumn(colId, stringArray);
             break;
           default:
-            break;
+            throw new UnsupportedOperationException("Unable to generate random data for: " + columnDataTypes[colId]);
         }
       }
       dataTableBuilder.finishRow();
@@ -499,8 +543,20 @@ public class DataTableSerDeTest {
           case DOUBLE:
             Assert.assertEquals(newDataTable.getDouble(rowId, colId), DOUBLES[rowId], ERROR_MESSAGE);
             break;
+          case BIG_DECIMAL:
+            Assert.assertEquals(newDataTable.getBigDecimal(rowId, colId), BIG_DECIMALS[rowId], ERROR_MESSAGE);
+            break;
+          case BOOLEAN:
+            Assert.assertEquals(newDataTable.getInt(rowId, colId), BOOLEANS[rowId], ERROR_MESSAGE);
+            break;
+          case TIMESTAMP:
+            Assert.assertEquals(newDataTable.getLong(rowId, colId), TIMESTAMPS[rowId], ERROR_MESSAGE);
+            break;
           case STRING:
             Assert.assertEquals(newDataTable.getString(rowId, colId), STRINGS[rowId], ERROR_MESSAGE);
+            break;
+          case JSON:
+            Assert.assertEquals(newDataTable.getString(rowId, colId), JSONS[rowId], ERROR_MESSAGE);
             break;
           case BYTES:
             Assert.assertEquals(newDataTable.getBytes(rowId, colId).getBytes(), BYTES[rowId], ERROR_MESSAGE);
@@ -512,8 +568,8 @@ public class DataTableSerDeTest {
             Assert.assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), INT_ARRAYS[rowId]), ERROR_MESSAGE);
             break;
           case LONG_ARRAY:
-            Assert
-                .assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), LONG_ARRAYS[rowId]), ERROR_MESSAGE);
+            Assert.assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), LONG_ARRAYS[rowId]),
+                ERROR_MESSAGE);
             break;
           case FLOAT_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getFloatArray(rowId, colId), FLOAT_ARRAYS[rowId]),
@@ -523,12 +579,23 @@ public class DataTableSerDeTest {
             Assert.assertTrue(Arrays.equals(newDataTable.getDoubleArray(rowId, colId), DOUBLE_ARRAYS[rowId]),
                 ERROR_MESSAGE);
             break;
+          case BOOLEAN_ARRAY:
+            Assert.assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), BOOLEAN_ARRAYS[rowId]),
+                ERROR_MESSAGE);
+            break;
+          case TIMESTAMP_ARRAY:
+            Assert.assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), TIMESTAMP_ARRAYS[rowId]),
+                ERROR_MESSAGE);
+            break;
+          case BYTES_ARRAY:
+            // TODO: add once implementation of datatable bytes array support is added
+            break;
           case STRING_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getStringArray(rowId, colId), STRING_ARRAYS[rowId]),
                 ERROR_MESSAGE);
             break;
           default:
-            break;
+            throw new UnsupportedOperationException("Unable to generate random data for: " + columnDataTypes[colId]);
         }
       }
     }

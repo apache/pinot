@@ -67,7 +67,12 @@ import {
   getState,
   getInfo,
   authenticateUser,
-  getSegmentDebugInfo
+  getSegmentDebugInfo,
+  requestTable,
+  requestUserList,
+  requestAddUser,
+  requestDeleteUser,
+  requestUpdateUser
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
@@ -887,6 +892,36 @@ const getURLWithoutAccessToken = (fallbackUrl = '/'): string => {
   return `${prefix}${url}`;
 };
 
+const getTable = ()=>{
+  return requestTable().then(response=>{
+    return response.data;
+  })
+};
+
+const getUserList = ()=>{
+  return requestUserList().then(response=>{
+    return response.data;
+  })
+};
+
+const addUser = (userObject)=>{
+  return requestAddUser(userObject).then(response=>{
+    return response.data;
+  })
+};
+
+const deleteUser = (userObject)=>{
+  return requestDeleteUser(userObject).then(response=>{
+    return response.data;
+  })
+};
+
+const updateUser = (userObject, passwordChanged) =>{
+  return requestUpdateUser(userObject, passwordChanged).then(response=>{
+    return response.data;
+  })
+}
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -940,5 +975,10 @@ export default {
   getWellKnownOpenIdConfiguration,
   verifyAuth,
   getAccessTokenFromHashParams,
-  getURLWithoutAccessToken
+  getURLWithoutAccessToken,
+  getTable,
+  getUserList,
+  addUser,
+  deleteUser,
+  updateUser
 };

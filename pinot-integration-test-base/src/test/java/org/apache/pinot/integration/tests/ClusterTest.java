@@ -57,6 +57,7 @@ import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.minion.BaseMinionStarter;
 import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
+import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractorConfig;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
@@ -66,6 +67,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Minion;
@@ -298,28 +300,47 @@ public abstract class ClusterTest extends ControllerTest {
 
   /**
    * Upload all segments inside the given directory to the cluster.
-   *
-   * @param tarDir Segment directory
    */
   protected void uploadSegments(String tableName, File tarDir)
       throws Exception {
-    File[] segmentTarFiles = tarDir.listFiles();
-    assertNotNull(segmentTarFiles);
-    int numSegments = segmentTarFiles.length;
+    uploadSegments(tableName, TableType.OFFLINE, tarDir);
+  }
+
+  /**
+   * Upload all segments inside the given directory to the cluster.
+   */
+  protected void uploadSegments(String tableName, TableType tableType, File tarDir)
+      throws Exception {
+    uploadSegments(tableName, tableType, Collections.singletonList(tarDir));
+  }
+
+  /**
+   * Upload all segments inside the given directories to the cluster.
+   */
+  protected void uploadSegments(String tableName, TableType tableType, List<File> tarDirs)
+      throws Exception {
+    List<File> segmentTarFiles = new ArrayList<>();
+    for (File tarDir : tarDirs) {
+      File[] tarFiles = tarDir.listFiles();
+      assertNotNull(tarFiles);
+      Collections.addAll(segmentTarFiles, tarFiles);
+    }
+    int numSegments = segmentTarFiles.size();
     assertTrue(numSegments > 0);
 
-    URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
+    URI uploadSegmentHttpURI =
+        FileUploadDownloadClient.getUploadSegmentURI(CommonConstants.HTTP_PROTOCOL, LOCAL_HOST, _controllerPort);
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       if (numSegments == 1) {
-        File segmentTarFile = segmentTarFiles[0];
+        File segmentTarFile = segmentTarFiles.get(0);
         if (System.currentTimeMillis() % 2 == 0) {
           assertEquals(
               fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
-                  tableName).getStatusCode(), HttpStatus.SC_OK);
+                  tableName, tableType).getStatusCode(), HttpStatus.SC_OK);
         } else {
           assertEquals(
-              uploadSegmentWithOnlyMetadata(tableName, uploadSegmentHttpURI, fileUploadDownloadClient, segmentTarFile),
-              HttpStatus.SC_OK);
+              uploadSegmentWithOnlyMetadata(tableName, tableType, uploadSegmentHttpURI, fileUploadDownloadClient,
+                  segmentTarFile), HttpStatus.SC_OK);
         }
       } else {
         // Upload all segments in parallel
@@ -329,9 +350,9 @@ public abstract class ClusterTest extends ControllerTest {
           futures.add(executorService.submit(() -> {
             if (System.currentTimeMillis() % 2 == 0) {
               return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(),
-                  segmentTarFile, tableName).getStatusCode();
+                  segmentTarFile, tableName, tableType).getStatusCode();
             } else {
-              return uploadSegmentWithOnlyMetadata(tableName, uploadSegmentHttpURI, fileUploadDownloadClient,
+              return uploadSegmentWithOnlyMetadata(tableName, tableType, uploadSegmentHttpURI, fileUploadDownloadClient,
                   segmentTarFile);
             }
           }));
@@ -344,60 +365,19 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  /**
-   * tarDirPaths contains a list of directories that contain segment files. API uploads all segments inside the given
-   * list of directories to the cluster.
-   *
-   * @param tarDirPaths List of directories containing segments
-   */
-  protected void uploadSegments(String tableName, List<File> tarDirPaths, TableType tableType,
-      boolean enableParallelPushProtection)
-      throws Exception {
-    List<File> segmentTarFiles = new ArrayList<>();
-
-    for (File tarDir : tarDirPaths) {
-      Collections.addAll(segmentTarFiles, tarDir.listFiles());
-    }
-    assertNotNull(segmentTarFiles);
-    int numSegments = segmentTarFiles.size();
-    assertTrue(numSegments > 0);
-
-    URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
-    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      if (numSegments == 1) {
-        File segmentTarFile = segmentTarFiles.get(0);
-        assertEquals(
-            fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
-                tableName, tableType.OFFLINE, enableParallelPushProtection, true).getStatusCode(), HttpStatus.SC_OK);
-      } else {
-        // Upload all segments in parallel
-        ExecutorService executorService = Executors.newFixedThreadPool(numSegments);
-        List<Future<Integer>> futures = new ArrayList<>(numSegments);
-        for (File segmentTarFile : segmentTarFiles) {
-          futures.add(executorService.submit(() -> {
-            return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(),
-                segmentTarFile, tableName, tableType.OFFLINE, enableParallelPushProtection, true).getStatusCode();
-          }));
-        }
-        executorService.shutdown();
-        for (Future<Integer> future : futures) {
-          assertEquals((int) future.get(), HttpStatus.SC_OK);
-        }
-      }
-    }
-  }
-
-  private int uploadSegmentWithOnlyMetadata(String tableName, URI uploadSegmentHttpURI,
+  private int uploadSegmentWithOnlyMetadata(String tableName, TableType tableType, URI uploadSegmentHttpURI,
       FileUploadDownloadClient fileUploadDownloadClient, File segmentTarFile)
       throws IOException, HttpErrorStatusException {
     List<Header> headers = ImmutableList.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
         "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/" + URLEncoder.encode(segmentTarFile.getName(),
             StandardCharsets.UTF_8.toString())), new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
         FileUploadDownloadClient.FileUploadType.METADATA.toString()));
-    // Add table name as a request parameter
+    // Add table name and table type as request parameters
     NameValuePair tableNameValuePair =
         new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, tableName);
-    List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
+    NameValuePair tableTypeValuePair =
+        new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE, tableType.name());
+    List<NameValuePair> parameters = Arrays.asList(tableNameValuePair, tableTypeValuePair);
     return fileUploadDownloadClient.uploadSegmentMetadata(uploadSegmentHttpURI, segmentTarFile.getName(),
         segmentTarFile, headers, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS).getStatusCode();
   }
@@ -417,8 +397,10 @@ public abstract class ClusterTest extends ControllerTest {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(_avroFile)) {
         _avroSchema = reader.getSchema();
       }
+      AvroRecordExtractorConfig config = new AvroRecordExtractorConfig();
+      config.init(props);
       _recordExtractor = new AvroRecordExtractor();
-      _recordExtractor.init(fieldsToRead, null);
+      _recordExtractor.init(fieldsToRead, config);
       _reader = new GenericDatumReader<>(_avroSchema);
     }
 

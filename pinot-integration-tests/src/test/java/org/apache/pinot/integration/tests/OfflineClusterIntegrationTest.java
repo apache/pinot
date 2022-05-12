@@ -52,6 +52,7 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -61,6 +62,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -184,13 +186,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     File tarDir2 = new File(_tempDir, "tarDir2");
     FileUtils.copyDirectory(_tarDir, tarDir2);
 
-    List<File> tarDirPaths = new ArrayList<>();
-    tarDirPaths.add(_tarDir);
-    tarDirPaths.add(tarDir2);
-
-    // TODO: Move this block to a separate method.
+    List<File> tarDirs = new ArrayList<>();
+    tarDirs.add(_tarDir);
+    tarDirs.add(tarDir2);
     try {
-      uploadSegments(getTableName(), tarDirPaths, TableType.OFFLINE, true);
+      uploadSegments(getTableName(), TableType.OFFLINE, tarDirs);
     } catch (Exception e) {
       // If enableParallelPushProtection is enabled and the same segment is uploaded concurrently, we could get one
       // of the two exception - 409 conflict of the second call enters ProcessExistingSegment ; segmentZkMetadata
@@ -229,8 +229,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private void registerCallbackHandlers() {
     List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
     instances.removeIf(
-        instance -> (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) && !instance.startsWith(
-            CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)));
+        instanceId -> !InstanceTypeUtils.isBroker(instanceId) && !InstanceTypeUtils.isServer(instanceId));
     List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(getHelixClusterName());
     resourcesInCluster.removeIf(resource -> (!TableNameBuilder.isTableResource(resource)
         && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE.equals(resource)));
@@ -281,7 +280,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     // Set timeout as 5ms so that query will timeout
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(5L));
+    tableConfig.setQueryConfig(new QueryConfig(5L, null, null, null));
     updateTableConfig(tableConfig);
 
     // Wait for at most 1 minute for broker to receive and process the table config refresh message
@@ -910,7 +909,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String groovyQuery = "SELECT GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
         + "'arg0 + arg1', FlightNum, Origin) FROM myTable";
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(true));
+    tableConfig.setQueryConfig(new QueryConfig(null, true, null, null));
     updateTableConfig(tableConfig);
 
     TestUtils.waitForCondition(aVoid -> {
@@ -1157,7 +1156,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Add expression override
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(
+    tableConfig.setQueryConfig(new QueryConfig(null, null, null,
         Collections.singletonMap("times(times(DaysSinceEpoch, 24), 3600)", "NewAddedDerivedSecondsSinceEpoch")));
     updateTableConfig(tableConfig);
 
@@ -1731,11 +1730,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String serverName = null;
     String brokerName = null;
     for (int i = 0; i < numInstances; i++) {
-      String instanceName = instanceList.get(i).asText();
-      if (instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        serverName = instanceName;
-      } else if (instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
-        brokerName = instanceName;
+      String instanceId = instanceList.get(i).asText();
+      InstanceType instanceType = InstanceTypeUtils.getInstanceType(instanceId);
+      if (instanceType == InstanceType.SERVER) {
+        serverName = instanceId;
+      } else if (instanceType == InstanceType.BROKER) {
+        brokerName = instanceId;
       }
     }
 

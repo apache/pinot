@@ -99,7 +99,7 @@ public class ServerInstance {
     NettyConfig nettyConfig =
         NettyConfig.extractNettyConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_NETTY_PREFIX);
     accessControlFactory.init(
-        serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL));
+      serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL), helixManager);
     _accessControl = accessControlFactory.create();
 
     if (serverConf.isNettyServerEnabled()) {

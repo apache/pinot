@@ -29,7 +29,7 @@ import static org.testng.Assert.assertThrows;
 
 public class TestGcsUri {
   @Test
-  public void testDifferentScheme() {
+  public void testCreateGcsUriUsingADifferentScheme() {
     URI uri = URI.create("file://bucket/file");
     GcsUri gcsUri = new GcsUri(uri);
     assertEquals(gcsUri.getUri().getScheme(), SCHEME);
@@ -39,7 +39,7 @@ public class TestGcsUri {
   public void testNonAbsolutePath() {
     // Relative path must be normalized to absolute path for gcs uri
     // This is because the URI must have an absolute path component,
-    // ex. new URI("gs", "bucket",
+    // ex. new URI("gs", "bucket", "/dir/file", null, null)
     GcsUri gcsUri = createGcsUri("bucket", "dir/file");
     assertEquals(gcsUri, createGcsUri("bucket", "/dir/file"));
   }
@@ -68,5 +68,21 @@ public class TestGcsUri {
     GcsUri gcsUri = new GcsUri(URI.create("gs://bucket_name/dir"));
     GcsUri subDir = gcsUri.resolve("subdir/file");
     assertEquals(new GcsUri(URI.create("gs://bucket_name/dir/subdir/file")), subDir);
+  }
+
+  @Test
+  public void testPrefix() {
+    // The prefix should be an empty string if no directory is provided.
+    // Otherwise, listFiles will return no matches.
+    GcsUri gcsUri = new GcsUri(URI.create("gs://bucket_name/"));
+    assertEquals("", gcsUri.getPrefix());
+    gcsUri = new GcsUri(URI.create("gs://bucket_name"));
+    assertEquals("", gcsUri.getPrefix());
+    // The prefix should end with the delimiter if there are directories, which
+    // ensures searches do not return false positive matches.
+    gcsUri = new GcsUri(URI.create("gs://bucket_name/dir/"));
+    assertEquals("dir/", gcsUri.getPrefix());
+    gcsUri = new GcsUri(URI.create("gs://bucket_name/dir"));
+    assertEquals("dir/", gcsUri.getPrefix());
   }
 }

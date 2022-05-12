@@ -41,6 +41,9 @@ public class MutableDictionaryFactory {
           return new FloatOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext);
         case DOUBLE:
           return new DoubleOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext);
+        case BIG_DECIMAL:
+          return new BigDecimalOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext,
+              avgLength);
         case STRING:
           return new StringOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext,
               avgLength);
@@ -61,6 +64,8 @@ public class MutableDictionaryFactory {
           return new FloatOnHeapMutableDictionary();
         case DOUBLE:
           return new DoubleOnHeapMutableDictionary();
+        case BIG_DECIMAL:
+          return new BigDecimalOnHeapMutableDictionary();
         case STRING:
           return new StringOnHeapMutableDictionary();
         case BYTES:

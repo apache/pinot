@@ -44,10 +44,16 @@ public class AvroRecordReader implements RecordReader {
   @Override
   public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
+    AvroRecordReaderConfig config = recordReaderConfig == null
+        ? new AvroRecordReaderConfig()
+        : (AvroRecordReaderConfig) recordReaderConfig;
     _dataFile = dataFile;
     _avroReader = AvroUtils.getAvroReader(dataFile);
+
+    AvroRecordExtractorConfig recordExtractorConfig = new AvroRecordExtractorConfig();
+    recordExtractorConfig.setEnableLogicalTypes(config.isEnableLogicalTypes());
     _recordExtractor = new AvroRecordExtractor();
-    _recordExtractor.init(fieldsToRead, null);
+    _recordExtractor.init(fieldsToRead, recordExtractorConfig);
   }
 
   @Override

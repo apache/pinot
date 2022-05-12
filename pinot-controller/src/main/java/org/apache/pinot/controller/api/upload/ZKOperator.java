@@ -31,10 +31,10 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
  * The ZKOperator is a util class that is used during segment upload to set relevant metadata fields in zk. It will
  * currently
  * also perform the data move. In the future when we introduce versioning, we will decouple these two steps.
+ * TODO: Merge it into PinotHelixResourceManager
  */
 public class ZKOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZKOperator.class);
@@ -69,6 +70,7 @@ public class ZKOperator {
     boolean refreshOnly =
         Boolean.parseBoolean(headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.REFRESH_ONLY));
     if (segmentMetadataZNRecord == null) {
+      // Add a new segment
       if (refreshOnly) {
         throw new ControllerApplicationException(LOGGER,
             "Cannot refresh non-existing segment, aborted uploading segment: " + segmentName + " of table: "
@@ -78,41 +80,30 @@ public class ZKOperator {
       processNewSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation, zkDownloadURI, headers,
           crypter, tableNameWithType, segmentName, moveSegmentToFinalLocation, enableParallelPushProtection,
           segmentSizeInBytes);
-      return;
+    } else {
+      // Refresh an existing segment
+      if (!allowRefresh) {
+        // We cannot perform this check up-front in UploadSegment API call. If a segment doesn't exist during the check
+        // done up-front but ends up getting created before the check here, we could incorrectly refresh an existing
+        // segment.
+        throw new ControllerApplicationException(LOGGER,
+            "Segment: " + segmentName + " already exists in table: " + tableNameWithType + ". Refresh not permitted.",
+            Response.Status.CONFLICT);
+      }
+      LOGGER.info("Segment {} from table {} already exists, refreshing if necessary", segmentName, tableNameWithType);
+      processExistingSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation,
+          enableParallelPushProtection, headers, zkDownloadURI, crypter, tableNameWithType, segmentName,
+          segmentMetadataZNRecord, moveSegmentToFinalLocation, segmentSizeInBytes);
     }
-
-    // We reach here if a segment with the same name already exists.
-
-    if (!allowRefresh) {
-      // We cannot perform this check up-front in UploadSegment API call. If a segment doesn't exist during the check
-      // done up-front but ends up getting created before the check here, we could incorrectly refresh an existing
-      // segment.
-      throw new ControllerApplicationException(LOGGER,
-          "Segment: " + segmentName + " already exists in table: " + tableNameWithType + ". Refresh not permitted.",
-          Response.Status.CONFLICT);
-    }
-
-    // TODO Allow segment refreshing for realtime tables.
-    if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-      throw new ControllerApplicationException(LOGGER,
-          "Refresh existing segment " + segmentName + " for realtime table " + tableNameWithType
-              + " is not yet supported ", Response.Status.NOT_IMPLEMENTED);
-    }
-
-    LOGGER.info("Segment {} from table {} already exists, refreshing if necessary", segmentName, tableNameWithType);
-    processExistingSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation,
-        enableParallelPushProtection, headers, zkDownloadURI, crypter, tableNameWithType, segmentName,
-        segmentMetadataZNRecord, moveSegmentToFinalLocation, segmentSizeInBytes);
   }
 
   private void processExistingSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
-      File currentSegmentLocation, boolean enableParallelPushProtection, HttpHeaders headers, String zkDownloadURI,
+      File currentSegmentLocation, boolean enableParallelPushProtection, HttpHeaders headers, String downloadUrl,
       String crypter, String tableNameWithType, String segmentName, ZNRecord znRecord,
       boolean moveSegmentToFinalLocation, long segmentSizeInBytes)
       throws Exception {
-
-    SegmentZKMetadata existingSegmentZKMetadata = new SegmentZKMetadata(znRecord);
-    long existingCrc = existingSegmentZKMetadata.getCrc();
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(znRecord);
+    long existingCrc = segmentZKMetadata.getCrc();
     int expectedVersion = znRecord.getVersion();
 
     // Check if CRC match when IF-MATCH header is set
@@ -121,7 +112,7 @@ public class ZKOperator {
     // Check segment upload start time when parallel push protection enabled
     if (enableParallelPushProtection) {
       // When segment upload start time is larger than 0, that means another upload is in progress
-      long segmentUploadStartTime = existingSegmentZKMetadata.getSegmentUploadStartTime();
+      long segmentUploadStartTime = segmentZKMetadata.getSegmentUploadStartTime();
       if (segmentUploadStartTime > 0) {
         if (System.currentTimeMillis() - segmentUploadStartTime > _controllerConf.getSegmentUploadTimeoutInMillis()) {
           // Last segment upload does not finish properly, replace the segment
@@ -137,9 +128,8 @@ public class ZKOperator {
       }
 
       // Lock the segment by setting the upload start time in ZK
-      existingSegmentZKMetadata.setSegmentUploadStartTime(System.currentTimeMillis());
-      if (!_pinotHelixResourceManager
-          .updateZkMetadata(tableNameWithType, existingSegmentZKMetadata, expectedVersion)) {
+      segmentZKMetadata.setSegmentUploadStartTime(System.currentTimeMillis());
+      if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, segmentZKMetadata, expectedVersion)) {
         throw new ControllerApplicationException(LOGGER,
             "Failed to lock the segment: " + segmentName + " of table: " + tableNameWithType + ", retry later",
             Response.Status.CONFLICT);
@@ -152,40 +142,37 @@ public class ZKOperator {
     // Reset segment upload start time to unlock the segment later
     // NOTE: reset this value even if parallel push protection is not enabled so that segment can recover in case
     // previous segment upload did not finish properly and the parallel push protection is turned off
-    existingSegmentZKMetadata.setSegmentUploadStartTime(-1);
+    segmentZKMetadata.setSegmentUploadStartTime(-1);
 
     try {
-      // Modify the custom map in segment ZK metadata
-      String segmentZKMetadataCustomMapModifierStr =
+      // Construct the segment ZK metadata custom map modifier
+      String customMapModifierStr =
           headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER);
-      SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier;
-      if (segmentZKMetadataCustomMapModifierStr != null) {
-        segmentZKMetadataCustomMapModifier =
-            new SegmentZKMetadataCustomMapModifier(segmentZKMetadataCustomMapModifierStr);
-      } else {
-        // By default, use REPLACE modify mode
-        segmentZKMetadataCustomMapModifier =
-            new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.REPLACE, null);
-      }
-      existingSegmentZKMetadata
-          .setCustomMap(segmentZKMetadataCustomMapModifier.modifyMap(existingSegmentZKMetadata.getCustomMap()));
+      SegmentZKMetadataCustomMapModifier customMapModifier =
+          customMapModifierStr != null ? new SegmentZKMetadataCustomMapModifier(customMapModifierStr) : null;
 
       // Update ZK metadata and refresh the segment if necessary
-      long newCrc = Long.valueOf(segmentMetadata.getCrc());
+      long newCrc = Long.parseLong(segmentMetadata.getCrc());
       if (newCrc == existingCrc) {
         LOGGER.info(
             "New segment crc '{}' is the same as existing segment crc for segment '{}'. Updating ZK metadata without "
                 + "refreshing the segment.", newCrc, segmentName);
-        // NOTE: even though we don't need to refresh the segment, we should still update creation time and refresh time
-        // (creation time is not included in the crc)
-        existingSegmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
-        existingSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
-        // NOTE: in rare cases the segment can be deleted before the metadata is updated and the expected version won't
-        // match, we should fail the request for such cases
-        if (!_pinotHelixResourceManager
-            .updateZkMetadata(tableNameWithType, existingSegmentZKMetadata, expectedVersion)) {
+        // NOTE: Even though we don't need to refresh the segment, we should still update the following fields:
+        // - Creation time (not included in the crc)
+        // - Refresh time
+        // - Custom map
+        segmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
+        segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
+        if (customMapModifier != null) {
+          segmentZKMetadata.setCustomMap(customMapModifier.modifyMap(segmentZKMetadata.getCustomMap()));
+        } else {
+          // If no modifier is provided, use the custom map from the segment metadata
+          segmentZKMetadata.setCustomMap(segmentMetadata.getCustomMap());
+        }
+        if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, segmentZKMetadata, expectedVersion)) {
           throw new RuntimeException(
-              "Failed to update ZK metadata for segment: " + segmentName + " of table: " + tableNameWithType);
+              String.format("Failed to update ZK metadata for segment: %s, table: %s, expected version: %d",
+                  segmentName, tableNameWithType, expectedVersion));
         }
       } else {
         // New segment is different with the existing one, update ZK metadata and refresh the segment
@@ -198,17 +185,38 @@ public class ZKOperator {
               currentSegmentLocation.getAbsolutePath(), finalSegmentLocationURI.getPath());
         } else {
           LOGGER.info("Skipping segment move, keeping segment {} from table {} at {}", segmentName, tableNameWithType,
-              zkDownloadURI);
+              downloadUrl);
         }
 
-        _pinotHelixResourceManager
-            .refreshSegment(tableNameWithType, segmentMetadata, existingSegmentZKMetadata, expectedVersion,
-                zkDownloadURI, crypter, segmentSizeInBytes);
+        // NOTE: Must first set the segment ZK metadata before trying to refresh because servers and brokers rely on
+        // segment ZK metadata to refresh the segment (server will compare the segment ZK metadata with the local
+        // metadata to decide whether to download the new segment; broker will update the segment partition info & time
+        // boundary based on the segment ZK metadata)
+        if (customMapModifier == null) {
+          // If no modifier is provided, use the custom map from the segment metadata
+          segmentZKMetadata.setCustomMap(null);
+          ZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl,
+              crypter, segmentSizeInBytes);
+        } else {
+          // If modifier is provided, first set the custom map from the segment metadata, then apply the modifier
+          ZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl,
+              crypter, segmentSizeInBytes);
+          segmentZKMetadata.setCustomMap(customMapModifier.modifyMap(segmentZKMetadata.getCustomMap()));
+        }
+        if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, segmentZKMetadata, expectedVersion)) {
+          throw new RuntimeException(
+              String.format("Failed to update ZK metadata for segment: %s, table: %s, expected version: %d",
+                  segmentName, tableNameWithType, expectedVersion));
+        }
+        LOGGER.info("Updated segment: {} of table: {} to property store", segmentName, tableNameWithType);
+
+        // Send a message to servers and brokers hosting the table to refresh the segment
+        _pinotHelixResourceManager.sendSegmentRefreshMessage(tableNameWithType, segmentName, true, true);
       }
     } catch (Exception e) {
-      if (!_pinotHelixResourceManager
-          .updateZkMetadata(tableNameWithType, existingSegmentZKMetadata, expectedVersion)) {
-        LOGGER.error("Failed to update ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
+      if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, segmentZKMetadata, expectedVersion)) {
+        LOGGER.error("Failed to update ZK metadata for segment: {}, table: {}, expected version: {}", segmentName,
+            tableNameWithType, expectedVersion);
       }
       throw e;
     }
@@ -239,8 +247,8 @@ public class ZKOperator {
       long segmentSizeInBytes)
       throws Exception {
     SegmentZKMetadata newSegmentZKMetadata =
-        _pinotHelixResourceManager.constructZkMetadataForNewSegment(tableNameWithType, segmentMetadata, zkDownloadURI,
-            crypter, segmentSizeInBytes);
+        ZKMetadataUtils.createSegmentZKMetadata(tableNameWithType, segmentMetadata, zkDownloadURI, crypter,
+            segmentSizeInBytes);
 
     // Lock if enableParallelPushProtection is true.
     if (enableParallelPushProtection) {
@@ -248,13 +256,13 @@ public class ZKOperator {
     }
 
     // Update zk metadata customer map
-    String segmentZKMetadataCustomMapModifierStr = headers != null ? headers
-        .getHeaderString(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER) : null;
+    String segmentZKMetadataCustomMapModifierStr = headers != null ? headers.getHeaderString(
+        FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER) : null;
     if (segmentZKMetadataCustomMapModifierStr != null) {
       SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
           new SegmentZKMetadataCustomMapModifier(segmentZKMetadataCustomMapModifierStr);
-      newSegmentZKMetadata
-          .setCustomMap(segmentZKMetadataCustomMapModifier.modifyMap(newSegmentZKMetadata.getCustomMap()));
+      newSegmentZKMetadata.setCustomMap(
+          segmentZKMetadataCustomMapModifier.modifyMap(newSegmentZKMetadata.getCustomMap()));
     }
     if (!_pinotHelixResourceManager.createSegmentZkMetadata(tableNameWithType, newSegmentZKMetadata)) {
       throw new RuntimeException(
@@ -265,13 +273,12 @@ public class ZKOperator {
     if (moveSegmentToFinalLocation) {
       try {
         moveSegmentToPermanentDirectory(currentSegmentLocation, finalSegmentLocationURI);
-        LOGGER
-            .info("Moved segment {} from temp location {} to {}", segmentName, currentSegmentLocation.getAbsolutePath(),
-                finalSegmentLocationURI.getPath());
+        LOGGER.info("Moved segment {} from temp location {} to {}", segmentName,
+            currentSegmentLocation.getAbsolutePath(), finalSegmentLocationURI.getPath());
       } catch (Exception e) {
         // Cleanup the Zk entry and the segment from the permanent directory if it exists.
-        LOGGER
-            .error("Could not move segment {} from table {} to permanent directory", segmentName, tableNameWithType, e);
+        LOGGER.error("Could not move segment {} from table {} to permanent directory", segmentName, tableNameWithType,
+            e);
         _pinotHelixResourceManager.deleteSegment(tableNameWithType, segmentName);
         LOGGER.info("Deleted zk entry and segment {} for table {}.", segmentName, tableNameWithType);
         throw e;
@@ -285,9 +292,8 @@ public class ZKOperator {
       _pinotHelixResourceManager.assignTableSegment(tableNameWithType, segmentMetadata.getName());
     } catch (Exception e) {
       // assignTableSegment removes the zk entry. Call deleteSegment to remove the segment from permanent location.
-      LOGGER
-          .error("Caught exception while calling assignTableSegment for adding segment: {} to table: {}", segmentName,
-              tableNameWithType, e);
+      LOGGER.error("Caught exception while calling assignTableSegment for adding segment: {} to table: {}", segmentName,
+          tableNameWithType, e);
       _pinotHelixResourceManager.deleteSegment(tableNameWithType, segmentName);
       LOGGER.info("Deleted zk entry and segment {} for table {}.", segmentName, tableNameWithType);
       throw e;

@@ -16,34 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.tools;
+package org.apache.pinot.tools.admin.command.filesystem;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import org.apache.pinot.tools.admin.PinotAdministrator;
+import java.net.URI;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 
 
-public class BatchQuickstartWithMinion extends Quickstart {
-  @Override
-  public List<String> types() {
-    return Arrays.asList("OFFLINE_MINION", "BATCH_MINION", "OFFLINE-MINION", "BATCH-MINION");
+public class Utils {
+  private Utils() {
   }
 
-  public String getBootstrapDataDir() {
-    return "examples/minions/batch/baseballStats";
+  public static String getScheme(URI uri) {
+    if (uri.getScheme() != null) {
+      return uri.getScheme();
+    }
+    return PinotFSFactory.LOCAL_PINOT_FS_SCHEME;
   }
 
-  @Override
-  public int getNumMinions() {
-    return 1;
-  }
-
-  public static void main(String[] args)
-      throws Exception {
-    List<String> arguments = new ArrayList<>();
-    arguments.addAll(Arrays.asList("QuickStart", "-type", "BATCH-MINION"));
-    arguments.addAll(Arrays.asList(args));
-    PinotAdministrator.main(arguments.toArray(new String[arguments.size()]));
+  public static PinotFS getPinotFS(URI uri) {
+    String scheme = getScheme(uri);
+    if (!PinotFSFactory.isSchemeSupported(scheme)) {
+      System.err.println("File scheme " + scheme + " is not supported.");
+      throw new RuntimeException("File scheme " + scheme + " is not supported.");
+    }
+    return PinotFSFactory.create(scheme);
   }
 }

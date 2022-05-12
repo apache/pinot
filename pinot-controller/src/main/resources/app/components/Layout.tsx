@@ -26,8 +26,9 @@ import SwaggerIcon from './SvgIcons/SwaggerIcon';
 import ClusterManagerIcon from './SvgIcons/ClusterManagerIcon';
 import ZookeeperIcon from './SvgIcons/ZookeeperIcon';
 import app_state from '../app_state';
+import AccountCircleOutlinedIcon from '@material-ui/icons/AccountCircleOutlined';
 
-const navigationItems = [
+let navigationItems = [
   { id: 1, name: 'Cluster Manager', link: '/', icon: <ClusterManagerIcon /> },
   { id: 2, name: 'Query Console', link: '/query', icon: <QueryConsoleIcon /> },
   { id: 3, name: 'Zookeeper Browser', link: '/zookeeper', icon: <ZookeeperIcon /> },
@@ -35,6 +36,15 @@ const navigationItems = [
 ];
 
 const Layout = (props) => {
+  const role = props.role;
+  if(role === 'ADMIN'){
+    if(navigationItems.length <5){
+      navigationItems = [
+        ...navigationItems,
+        {id: 5, name: "User Console", link: '/user', icon: <AccountCircleOutlinedIcon style={{ width: 24, height: 24, verticalAlign: 'sub' }}/>}
+      ]
+    }
+  }
   const hash = `/${window.location.hash.split('/')[1]}`;
   const routeObj = navigationItems.find((obj)=>{ return obj.link === hash;});
 

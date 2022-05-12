@@ -29,6 +29,15 @@ import org.apache.pinot.spi.data.FieldSpec;
 public interface InvocationRecording {
 
   /**
+   * Sets the upper bound for the number of groups in a group by evaluation, along with the actual number of groups.
+   * The ratio of these two quantities indicates how efficient the group by was, and if truncation has occurred.
+   * @param numGroupsLimit the upper bound for the number of groups
+   * @param numGroups the actual number of groups
+   */
+  default void setNumGroups(int numGroupsLimit, int numGroups) {
+  }
+
+  /**
    * Sets the number of docs scanned by the operator.
    * @param numDocsScanned how many docs were scanned.
    */

@@ -67,6 +67,7 @@ import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -133,8 +134,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _instanceId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY);
     if (_instanceId != null) {
       // NOTE: Force all instances to have the same prefix in order to derive the instance type based on the instance id
-      Preconditions.checkState(_instanceId.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE),
-          "Instance id must have prefix '%s', got '%s'", Helix.PREFIX_OF_BROKER_INSTANCE, _instanceId);
+      Preconditions.checkState(InstanceTypeUtils.isBroker(_instanceId), "Instance id must have prefix '%s', got '%s'",
+          Helix.PREFIX_OF_BROKER_INSTANCE, _instanceId);
     } else {
       _instanceId = Helix.PREFIX_OF_BROKER_INSTANCE + _hostname + "_" + _port;
     }
@@ -232,7 +233,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Set up request handling classes
     _routingManager = new BrokerRoutingManager(_brokerMetrics);
     _routingManager.init(_spectatorHelixManager);
-    _accessControlFactory = AccessControlFactory.loadFactory(_brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX));
+    _accessControlFactory =
+        AccessControlFactory.loadFactory(_brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX), _propertyStore);
     HelixExternalViewBasedQueryQuotaManager queryQuotaManager =
         new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics, _instanceId);
     queryQuotaManager.init(_spectatorHelixManager);
