@@ -31,10 +31,10 @@ import org.apache.pinot.core.util.GapfillUtils;
 /**
  * Helper class to reduce and set gap fill results into the BrokerResponseNative
  */
-class ScalableGapfillProcessorForCount extends ScalableGapfillProcessor {
+class CountGapfillProcessor extends BaseGapfillProcessor {
   protected final Set<Key> _filteredSet;
 
-  ScalableGapfillProcessorForCount(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
+  CountGapfillProcessor(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
     super(queryContext, gapfillType);
     _filteredSet = new HashSet<>();
   }

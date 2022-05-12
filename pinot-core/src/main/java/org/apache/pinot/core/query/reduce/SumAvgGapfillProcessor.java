@@ -31,7 +31,7 @@ import org.apache.pinot.core.util.GapfillUtils;
 /**
  * Helper class to reduce and set gap fill results into the BrokerResponseNative
  */
-class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
+class SumAvgGapfillProcessor extends BaseGapfillProcessor {
   private final double [] _sumes;
   private final int [] _columnTypes;
   private final int [] _sumArgIndexes;
@@ -40,7 +40,7 @@ class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
   protected Map<Integer, Integer> _filteredMap;
   protected final Map<Key, Integer> _groupByKeys;
 
-  ScalableGapfillProcessorForSumAvg(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
+  SumAvgGapfillProcessor(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
     super(queryContext, gapfillType);
     _groupByKeys = new HashMap<>();
     _columnTypes = new int[_queryContext.getSelectExpressions().size()];
@@ -177,8 +177,12 @@ class ScalableGapfillProcessorForSumAvg extends ScalableGapfillProcessor {
         Object[] aggregatedRow = new Object[_queryContext.getSelectExpressions().size()];
         for (int i = 0; i < _columnTypes.length; i++) {
           if (_columnTypes[i] == 0) {
-            aggregatedRow[i] = _dateTimeFormatter.fromMillisToFormat(
-                time - (_aggregationSize - 1) * _gapfillTimeBucketSize);
+            if (dataSchema.getColumnDataType(_timeBucketColumnIndex) == DataSchema.ColumnDataType.LONG) {
+              aggregatedRow[i] = time - (_aggregationSize - 1) * _gapfillTimeBucketSize;
+            } else {
+              aggregatedRow[i] = _dateTimeFormatter.fromMillisToFormat(
+                  time - (_aggregationSize - 1) * _gapfillTimeBucketSize);
+            }
           } else if (_columnTypes[i] == COLUMN_TYPE_SUM) {
             aggregatedRow[i] = aggregatedSum[i];
           } else { //COLUMN_TYPE_AVG

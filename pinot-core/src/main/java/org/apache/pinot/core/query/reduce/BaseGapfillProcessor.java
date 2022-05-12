@@ -41,7 +41,7 @@ import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 /**
  * Helper class to reduce and set gap fill results into the BrokerResponseNative
  */
-abstract class ScalableGapfillProcessor {
+abstract class BaseGapfillProcessor {
   protected final QueryContext _queryContext;
 
   protected final int _limitForAggregatedResult;
@@ -61,15 +61,27 @@ abstract class ScalableGapfillProcessor {
   protected GapfillFilterHandler _postGapfillFilterHandler = null;
   protected GapfillFilterHandler _postAggregateHavingFilterHandler = null;
   protected final int _aggregationSize;
+  protected final GapfillUtils.GapfillType _gapfillType;
+  protected int _limitForGapfilledResult;
+  protected boolean[] _isGroupBySelections;
+  protected ExpressionContext _gapFillSelection;
 
-  ScalableGapfillProcessor(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
+  BaseGapfillProcessor(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
     _queryContext = queryContext;
     _limitForAggregatedResult = queryContext.getLimit();
+    _gapfillType = gapfillType;
 
-    ExpressionContext gapFillSelection = GapfillUtils.getGapfillExpressionContext(queryContext, gapfillType);
+    if (_gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL
+        || _gapfillType == GapfillUtils.GapfillType.GAP_FILL) {
+      _limitForGapfilledResult = queryContext.getLimit();
+    } else {
+      _limitForGapfilledResult = queryContext.getSubquery().getLimit();
+    }
+
+    _gapFillSelection = GapfillUtils.getGapfillExpressionContext(queryContext, gapfillType);
     _timeBucketColumnIndex = GapfillUtils.findTimeBucketColumnIndex(queryContext, gapfillType);
 
-    List<ExpressionContext> args = gapFillSelection.getFunction().getArguments();
+    List<ExpressionContext> args = _gapFillSelection.getFunction().getArguments();
 
     _dateTimeFormatter = new DateTimeFormatSpec(args.get(1).getLiteral());
     _gapfillDateTimeGranularity = new DateTimeGranularitySpec(args.get(4).getLiteral());
@@ -91,7 +103,7 @@ abstract class ScalableGapfillProcessor {
     _previousByGroupKey = new HashMap<>();
     _groupByKeyIndexes = new ArrayList<>();
 
-    ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(gapFillSelection);
+    ExpressionContext timeseriesOn = GapfillUtils.getTimeSeriesOnExpressionContext(_gapFillSelection);
     _timeSeries = timeseriesOn.getFunction().getArguments();
   }
 
@@ -101,7 +113,13 @@ abstract class ScalableGapfillProcessor {
 
   protected void replaceColumnNameWithAlias(DataSchema dataSchema) {
     QueryContext queryContext;
-    queryContext = _queryContext.getSubquery().getSubquery();
+    if (_gapfillType == GapfillUtils.GapfillType.AGGREGATE_GAP_FILL_AGGREGATE) {
+      queryContext = _queryContext.getSubquery().getSubquery();
+    } else if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL) {
+      queryContext = _queryContext;
+    } else {
+      queryContext = _queryContext.getSubquery();
+    }
     List<String> aliasList = queryContext.getAliasList();
     Map<String, String> columnNameToAliasMap = new HashMap<>();
     for (int i = 0; i < aliasList.size(); i++) {
@@ -141,16 +159,16 @@ abstract class ScalableGapfillProcessor {
       indexes.put(columns[i], i);
     }
 
-    boolean[] isGroupBySelections = new boolean[dataSchema.getColumnDataTypes().length];
+    _isGroupBySelections = new boolean[dataSchema.getColumnDataTypes().length];
 
     // The first one argument of timeSeries is time column. The left ones are defining entity.
     for (ExpressionContext entityColum : _timeSeries) {
       int index = indexes.get(entityColum.getIdentifier());
-      isGroupBySelections[index] = true;
+      _isGroupBySelections[index] = true;
     }
 
-    for (int i = 0; i < isGroupBySelections.length; i++) {
-      if (isGroupBySelections[i]) {
+    for (int i = 0; i < _isGroupBySelections.length; i++) {
+      if (_isGroupBySelections[i]) {
         _groupByKeyIndexes.add(i);
       }
     }
@@ -164,7 +182,11 @@ abstract class ScalableGapfillProcessor {
   /**
    * Constructs the DataSchema for the ResultTable.
    */
-  private DataSchema getResultTableDataSchema(DataSchema dataSchema) {
+  protected DataSchema getResultTableDataSchema(DataSchema dataSchema) {
+    if (_gapfillType == GapfillUtils.GapfillType.GAP_FILL) {
+      return dataSchema;
+    }
+
     int numOfColumns = _queryContext.getSelectExpressions().size();
     String[] columnNames = new String[numOfColumns];
     ColumnDataType[] columnDataTypes = new ColumnDataType[numOfColumns];
@@ -195,11 +217,13 @@ abstract class ScalableGapfillProcessor {
     return new Key(groupKeys);
   }
 
-  private long truncate(long epoch) {
+  protected long truncate(long epoch) {
     int sz = _gapfillDateTimeGranularity.getSize();
     return epoch / sz * sz;
   }
 
-  abstract protected List<Object[]> gapFillAndAggregate(
-      List<Object[]> rows, DataSchema dataSchema, DataSchema resultTableSchema);
+  protected List<Object[]> gapFillAndAggregate(
+      List<Object[]> rows, DataSchema dataSchema, DataSchema resultTableSchema) {
+    throw new UnsupportedOperationException("Not supported");
+  }
 }

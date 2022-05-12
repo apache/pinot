@@ -441,8 +441,7 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
     start = dateTimeFormatter.fromFormatToMillis("1636243200000");
 
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length / 2; i++) {
-      String firstTimeCol = (String) gapFillRows1.get(i)[0];
-      long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
+      long timeStamp = (Long) gapFillRows1.get(i)[0];
       Assert.assertEquals(timeStamp, start);
       Assert.assertEquals(expectedOccupiedSlotsCounts1[i], gapFillRows1.get(i)[1]);
       Assert.assertEquals(1.0, gapFillRows1.get(i)[2]);
@@ -451,8 +450,7 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
 
     start = dateTimeFormatter.fromFormatToMillis("1636329600000");
     for (int i = expectedOccupiedSlotsCounts1.length / 2; i < expectedOccupiedSlotsCounts1.length; i++) {
-      String firstTimeCol = (String) gapFillRows1.get(i)[0];
-      long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
+      long timeStamp = (Long) gapFillRows1.get(i)[0];
       Assert.assertEquals(timeStamp, start);
       Assert.assertEquals(expectedOccupiedSlotsCounts1[i], gapFillRows1.get(i)[1]);
       Assert.assertEquals(1.0, gapFillRows1.get(i)[2]);
@@ -734,8 +732,7 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
     start = dateTimeFormatter.fromFormatToMillis("1636243200000");
 
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length / 2; i++) {
-      String firstTimeCol = (String) gapFillRows1.get(i)[0];
-      long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
+      long timeStamp = (Long) gapFillRows1.get(i)[0];
       Assert.assertEquals(timeStamp, start);
       Assert.assertEquals(expectedOccupiedSlotsCounts1[i], gapFillRows1.get(i)[1]);
       Assert.assertEquals(1.0, gapFillRows1.get(i)[2]);
@@ -744,8 +741,7 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
 
     start = dateTimeFormatter.fromFormatToMillis("1636329600000");
     for (int i = expectedOccupiedSlotsCounts1.length / 2; i < expectedOccupiedSlotsCounts1.length; i++) {
-      String firstTimeCol = (String) gapFillRows1.get(i)[0];
-      long timeStamp = dateTimeFormatter.fromFormatToMillis(firstTimeCol);
+      long timeStamp = (Long) gapFillRows1.get(i)[0];
       Assert.assertEquals(timeStamp, start);
       Assert.assertEquals(expectedOccupiedSlotsCounts1[i], gapFillRows1.get(i)[1]);
       Assert.assertEquals(1.0, gapFillRows1.get(i)[2]);
