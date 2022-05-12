@@ -20,21 +20,15 @@ package org.apache.pinot.query.planner.stage;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.common.proto.Plan;
-import org.apache.pinot.query.planner.serde.ProtoProperties;
 import org.apache.pinot.query.planner.serde.ProtoSerializable;
 import org.apache.pinot.query.planner.serde.ProtoSerializationUtils;
 
 
 public abstract class AbstractStageNode implements StageNode, ProtoSerializable {
 
-  @ProtoProperties
   protected final int _stageId;
-  @ProtoProperties
   protected final List<StageNode> _inputs;
-  @ProtoProperties
-  protected RelDataType _rowType;
 
   public AbstractStageNode(int stageId) {
     _stageId = stageId;
@@ -64,9 +58,5 @@ public abstract class AbstractStageNode implements StageNode, ProtoSerializable 
   @Override
   public Plan.ObjectField toObjectField() {
     return ProtoSerializationUtils.convertObjectToObjectField(this);
-  }
-
-  public RelDataType getRowType() {
-    return _rowType;
   }
 }

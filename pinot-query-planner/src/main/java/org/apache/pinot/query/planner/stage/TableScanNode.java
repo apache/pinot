@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.stage;
 
 import java.util.List;
-import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
@@ -33,9 +32,8 @@ public class TableScanNode extends AbstractStageNode {
     super(stageId);
   }
 
-  public TableScanNode(int stageId, RelDataType rowType, String tableName, List<String> tableScanColumns) {
+  public TableScanNode(int stageId, String tableName, List<String> tableScanColumns) {
     super(stageId);
-    super._rowType = rowType;
     _tableName = tableName;
     _tableScanColumns = tableScanColumns;
   }

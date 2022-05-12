@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -139,11 +138,7 @@ public class CalciteRexExpressionParser {
   }
 
   private static Expression rexLiteralToExpression(RexExpression.Literal rexLiteral) {
-    RelDataType type = rexLiteral.getDataType();
-    switch (type.getSqlTypeName()) {
-      default:
-        return RequestUtils.getLiteralExpression(rexLiteral.getValue());
-    }
+    return RequestUtils.getLiteralExpression(rexLiteral.getValue());
   }
 
   private static Expression inputRefToIdentifier(RexExpression.InputRef inputRef, PinotQuery pinotQuery) {

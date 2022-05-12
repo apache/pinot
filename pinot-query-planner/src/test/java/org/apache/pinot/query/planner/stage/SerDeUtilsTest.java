@@ -46,35 +46,41 @@ public class SerDeUtilsTest extends QueryEnvironmentTestBase {
   private boolean isObjectEqual(Object left, Object right)
       throws IllegalAccessException {
     Class<?> clazz = left.getClass();
-    for (Field field : clazz.getDeclaredFields()) {
-      if (field.isAnnotationPresent(ProtoProperties.class)) {
-        field.setAccessible(true);
-        Object l = field.get(left);
-        Object r = field.get(right);
-        if (l instanceof List) {
-          if (((List) l).size() != ((List) r).size()) {
-            return false;
-          }
-          for (int i = 0; i < ((List) l).size(); i++) {
-            if (!isObjectEqual(((List) l).get(i), ((List) r).get(i))) {
+    while (Object.class != clazz) {
+      for (Field field : clazz.getDeclaredFields()) {
+        if (field.isAnnotationPresent(ProtoProperties.class)) {
+          field.setAccessible(true);
+          Object l = field.get(left);
+          Object r = field.get(right);
+          if (l instanceof List) {
+            if (((List) l).size() != ((List) r).size()) {
               return false;
             }
-          }
-        } else if (l instanceof Map) {
-          if (((Map) l).size() != ((Map) r).size()) {
-            return false;
-          }
-          for (Object key : ((Map) l).keySet()) {
-            if (!isObjectEqual(((Map) l).get(key), ((Map) r).get(key))) {
+            for (int i = 0; i < ((List) l).size(); i++) {
+              if (!isObjectEqual(((List) l).get(i), ((List) r).get(i))) {
+                return false;
+              }
+            }
+          } else if (l instanceof Map) {
+            if (((Map) l).size() != ((Map) r).size()) {
               return false;
             }
-          }
-        } else {
-          if (!(l == null && r == null || l != null && l.equals(r) || isObjectEqual(l, r))) {
-            return false;
+            for (Object key : ((Map) l).keySet()) {
+              if (!isObjectEqual(((Map) l).get(key), ((Map) r).get(key))) {
+                return false;
+              }
+            }
+          } else {
+            if (l == null && r != null || l != null && r == null) {
+              return false;
+            }
+            if (!(l == null && r == null || l != null && l.equals(r) || isObjectEqual(l, r))) {
+              return false;
+            }
           }
         }
       }
+      clazz = clazz.getSuperclass();
     }
     return true;
   }
