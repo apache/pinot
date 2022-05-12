@@ -88,7 +88,8 @@ public class SegmentPushUtils implements Serializable {
         return fileURI;
       }
     }
-    return URI.create(String.format("%s%s%s", prefix, fileURI.getRawPath(), suffix));
+    return URI.create(
+        String.format("%s%s%s", (prefix != null) ? prefix : "", fileURI.getRawPath(), (suffix != null) ? suffix : ""));
   }
 
   public static void pushSegments(SegmentGenerationJobSpec spec, PinotFS fileSystem, List<String> tarFilePaths)
