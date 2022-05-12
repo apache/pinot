@@ -30,6 +30,13 @@ import org.apache.pinot.core.util.GapfillUtils;
 
 /**
  * Helper class to reduce and set gap fill results into the BrokerResponseNative
+ *
+ * {@link SumAvgGapfillProcessor} is only applying the sum and/or avg aggregation function on the gapfilled result for
+ * each time bucket.
+ *
+ * {@link SumAvgGapfillProcessor} is different from {@link GapfillProcessor} that {@link GapfillProcessor} will create
+ * the gapfilled entries, but {@link SumAvgGapfillProcessor} does not generate the gapfilled entries. It just updated
+ * the aggregated sum and/or avg counters as necessary.
  */
 class SumAvgGapfillProcessor extends BaseGapfillProcessor {
   private final double [] _sumes;
