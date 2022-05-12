@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.planner.stage;
 
-import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
@@ -32,9 +31,8 @@ public class FilterNode extends AbstractStageNode {
     super(stageId);
   }
 
-  public FilterNode(int currentStageId, RelDataType rowType, RexNode condition) {
+  public FilterNode(int currentStageId, RexNode condition) {
     super(currentStageId);
-    super._rowType = rowType;
     _condition = RexExpression.toRexExpression(condition);
   }
 

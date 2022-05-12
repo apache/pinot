@@ -30,72 +30,80 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.NlsString;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 
 /**
  * {@code RexExpression} is the serializable format of the {@link RexNode}.
  */
-public abstract class RexExpression {
-  @ProtoProperties
-  protected SqlKind _sqlKind;
-  @ProtoProperties
-  protected RelDataType _dataType;
+public interface RexExpression {
 
-  public SqlKind getKind() {
-    return _sqlKind;
-  }
+  SqlKind getKind();
 
-  public RelDataType getDataType() {
-    return _dataType;
-  }
+  FieldSpec.DataType getDataType();
 
-  public static RexExpression toRexExpression(RexNode rexNode) {
+  static RexExpression toRexExpression(RexNode rexNode) {
     if (rexNode instanceof RexInputRef) {
       return new RexExpression.InputRef(((RexInputRef) rexNode).getIndex());
     } else if (rexNode instanceof RexLiteral) {
       RexLiteral rexLiteral = ((RexLiteral) rexNode);
-      return new RexExpression.Literal(rexLiteral.getType(), rexLiteral.getTypeName(), rexLiteral.getValue());
+      FieldSpec.DataType dataType = toDataType(rexLiteral.getType());
+      return new RexExpression.Literal(dataType, rexLiteral.getTypeName(),
+          toRexValue(dataType, rexLiteral.getValue()));
     } else if (rexNode instanceof RexCall) {
       RexCall rexCall = (RexCall) rexNode;
       List<RexExpression> operands = rexCall.getOperands().stream().map(RexExpression::toRexExpression)
           .collect(Collectors.toList());
-      return new RexExpression.FunctionCall(rexCall.getKind(), rexCall.getType(), rexCall.getOperator().getName(),
-          operands);
+      return new RexExpression.FunctionCall(rexCall.getKind(), toDataType(rexCall.getType()),
+          rexCall.getOperator().getName(), operands);
     } else {
       throw new IllegalArgumentException("Unsupported RexNode type with SqlKind: " + rexNode.getKind());
     }
   }
 
-  private static Comparable convertLiteral(Comparable value, SqlTypeName sqlTypeName, RelDataType dataType) {
-    switch (sqlTypeName) {
-      case BOOLEAN:
-        return (boolean) value;
-      case DECIMAL:
-        switch (dataType.getSqlTypeName()) {
-          case INTEGER:
-            return ((BigDecimal) value).intValue();
-          case BIGINT:
-            return ((BigDecimal) value).longValue();
-          case FLOAT:
-            return ((BigDecimal) value).floatValue();
-          case DOUBLE:
-          default:
-            return ((BigDecimal) value).doubleValue();
-        }
-      case CHAR:
-        switch (dataType.getSqlTypeName()) {
-          case VARCHAR:
-            return ((NlsString) value).getValue();
-          default:
-            return value;
-        }
+  static Object toRexValue(FieldSpec.DataType dataType, Comparable value) {
+    switch (dataType) {
+      case INT:
+        return ((BigDecimal) value).intValue();
+      case LONG:
+        return ((BigDecimal) value).longValue();
+      case FLOAT:
+        return ((BigDecimal) value).floatValue();
+      case DOUBLE:
+        return ((BigDecimal) value).doubleValue();
+      case STRING:
+        return ((NlsString) value).getValue();
       default:
         return value;
     }
   }
 
-  public static class InputRef extends RexExpression {
+  static FieldSpec.DataType toDataType(RelDataType type) {
+    switch (type.getSqlTypeName()) {
+      case INTEGER:
+        return FieldSpec.DataType.INT;
+      case BIGINT:
+        return FieldSpec.DataType.LONG;
+      case FLOAT:
+        return FieldSpec.DataType.FLOAT;
+      case DOUBLE:
+        return FieldSpec.DataType.DOUBLE;
+      case VARCHAR:
+        return FieldSpec.DataType.STRING;
+      case BOOLEAN:
+        return FieldSpec.DataType.BOOLEAN;
+      default:
+        // TODO: do not assume byte type.
+        return FieldSpec.DataType.BYTES;
+    }
+  }
+
+  class InputRef implements RexExpression {
+    @ProtoProperties
+    private SqlKind _sqlKind;
+    @ProtoProperties
+    private FieldSpec.DataType _dataType;
     @ProtoProperties
     private int _index;
 
@@ -110,27 +118,51 @@ public abstract class RexExpression {
     public int getIndex() {
       return _index;
     }
+
+    public SqlKind getKind() {
+      return _sqlKind;
+    }
+
+    public FieldSpec.DataType getDataType() {
+      return _dataType;
+    }
   }
 
-  public static class Literal extends RexExpression {
+  class Literal implements RexExpression {
+    @ProtoProperties
+    private SqlKind _sqlKind;
+    @ProtoProperties
+    private FieldSpec.DataType _dataType;
     @ProtoProperties
     private Object _value;
 
     public Literal() {
     }
 
-    public Literal(RelDataType dataType, SqlTypeName sqlTypeName, @Nullable Comparable value) {
+    public Literal(FieldSpec.DataType dataType, SqlTypeName sqlTypeName, @Nullable Object value) {
       _sqlKind = SqlKind.LITERAL;
       _dataType = dataType;
-      _value = convertLiteral(value, sqlTypeName, dataType);
+      _value = value;
     }
 
     public Object getValue() {
       return _value;
     }
+
+    public SqlKind getKind() {
+      return _sqlKind;
+    }
+
+    public FieldSpec.DataType getDataType() {
+      return _dataType;
+    }
   }
 
-  public static class FunctionCall extends RexExpression {
+  class FunctionCall implements RexExpression {
+    @ProtoProperties
+    private SqlKind _sqlKind;
+    @ProtoProperties
+    private FieldSpec.DataType _dataType;
     @ProtoProperties
     private String _functionName;
     @ProtoProperties
@@ -139,7 +171,8 @@ public abstract class RexExpression {
     public FunctionCall() {
     }
 
-    public FunctionCall(SqlKind sqlKind, RelDataType type, String functionName, List<RexExpression> functionOperands) {
+    public FunctionCall(SqlKind sqlKind, FieldSpec.DataType type, String functionName,
+        List<RexExpression> functionOperands) {
       _sqlKind = sqlKind;
       _dataType = type;
       _functionName = functionName;
@@ -152,6 +185,14 @@ public abstract class RexExpression {
 
     public List<RexExpression> getFunctionOperands() {
       return _functionOperands;
+    }
+
+    public SqlKind getKind() {
+      return _sqlKind;
+    }
+
+    public FieldSpec.DataType getDataType() {
+      return _dataType;
     }
   }
 }
