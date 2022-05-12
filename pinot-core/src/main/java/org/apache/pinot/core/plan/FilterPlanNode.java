@@ -21,10 +21,9 @@ package org.apache.pinot.core.plan;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -68,7 +67,7 @@ public class FilterPlanNode implements PlanNode {
   private final FilterContext _filter;
 
   // Cache the predicate evaluators
-  private final Map<Predicate, PredicateEvaluator> _predicateEvaluatorMap = new HashMap<>();
+  private final List<Pair<Predicate, PredicateEvaluator>> _predicateEvaluators = new ArrayList<>(4);
 
   public FilterPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
     this(indexSegment, queryContext, null);
@@ -106,10 +105,10 @@ public class FilterPlanNode implements PlanNode {
   }
 
   /**
-   * Returns a map from predicates to their evaluators.
+   * Returns a mapping from predicates to their evaluators.
    */
-  public Map<Predicate, PredicateEvaluator> getPredicateEvaluatorMap() {
-    return _predicateEvaluatorMap;
+  public List<Pair<Predicate, PredicateEvaluator>> getPredicateEvaluators() {
+    return _predicateEvaluators;
   }
 
   /**
@@ -240,10 +239,7 @@ public class FilterPlanNode implements PlanNode {
         } else {
           String column = lhs.getIdentifier();
           DataSource dataSource = _indexSegment.getDataSource(column);
-          PredicateEvaluator predicateEvaluator = _predicateEvaluatorMap.get(predicate);
-          if (predicateEvaluator != null) {
-            return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
-          }
+          PredicateEvaluator predicateEvaluator;
           switch (predicate.getType()) {
             case TEXT_CONTAINS:
               TextIndexReader textIndexReader = dataSource.getTextIndex();
@@ -278,7 +274,7 @@ public class FilterPlanNode implements PlanNode {
                     PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
                         dataSource.getDataSourceMetadata().getDataType());
               }
-              _predicateEvaluatorMap.put(predicate, predicateEvaluator);
+              _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
             case JSON_MATCH:
               JsonIndexReader jsonIndex = dataSource.getJsonIndex();
@@ -303,7 +299,7 @@ public class FilterPlanNode implements PlanNode {
               predicateEvaluator =
                   PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
                       dataSource.getDataSourceMetadata().getDataType());
-              _predicateEvaluatorMap.put(predicate, predicateEvaluator);
+              _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
           }
         }
