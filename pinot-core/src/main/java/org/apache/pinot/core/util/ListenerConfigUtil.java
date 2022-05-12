@@ -152,7 +152,7 @@ public final class ListenerConfigUtil {
     return listeners;
   }
 
-  public static List<ListenerConfig> buildMinionAdminConfigs(PinotConfiguration minionConf) {
+  public static List<ListenerConfig> buildMinionConfigs(PinotConfiguration minionConf) {
     List<ListenerConfig> listeners = new ArrayList<>();
 
     int port = minionConf.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT,
