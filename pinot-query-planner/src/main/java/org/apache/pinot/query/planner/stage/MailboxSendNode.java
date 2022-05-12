@@ -20,9 +20,9 @@ package org.apache.pinot.query.planner.stage;
 
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class MailboxSendNode extends AbstractStageNode {
@@ -32,20 +32,23 @@ public class MailboxSendNode extends AbstractStageNode {
   private RelDistribution.Type _exchangeType;
   @ProtoProperties
   private KeySelector<Object[], Object> _partitionKeySelector;
+  @ProtoProperties
+  private FieldSpec.DataType _rowType;
 
   public MailboxSendNode(int stageId) {
     super(stageId);
   }
 
-  public MailboxSendNode(int stageId, RelDataType rowType, int receiverStageId, RelDistribution.Type exchangeType) {
+  public MailboxSendNode(int stageId, FieldSpec.DataType rowType, int receiverStageId,
+      RelDistribution.Type exchangeType) {
     // When exchangeType is not HASH_DISTRIBUTE, no partitionKeySelector is needed.
     this(stageId, rowType, receiverStageId, exchangeType, null);
   }
 
-  public MailboxSendNode(int stageId, RelDataType rowType, int receiverStageId, RelDistribution.Type exchangeType,
-      @Nullable KeySelector<Object[], Object> partitionKeySelector) {
+  public MailboxSendNode(int stageId, FieldSpec.DataType rowType, int receiverStageId,
+      RelDistribution.Type exchangeType, @Nullable KeySelector<Object[], Object> partitionKeySelector) {
     super(stageId);
-    super._rowType = rowType;
+    _rowType = rowType;
     _receiverStageId = receiverStageId;
     _exchangeType = exchangeType;
     _partitionKeySelector = partitionKeySelector;

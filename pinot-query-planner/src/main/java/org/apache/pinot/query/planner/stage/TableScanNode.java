@@ -19,8 +19,8 @@
 package org.apache.pinot.query.planner.stage;
 
 import java.util.List;
-import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class TableScanNode extends AbstractStageNode {
@@ -28,14 +28,16 @@ public class TableScanNode extends AbstractStageNode {
   private String _tableName;
   @ProtoProperties
   private List<String> _tableScanColumns;
+  @ProtoProperties
+  private FieldSpec.DataType _rowType;
 
   public TableScanNode(int stageId) {
     super(stageId);
   }
 
-  public TableScanNode(int stageId, RelDataType rowType, String tableName, List<String> tableScanColumns) {
+  public TableScanNode(int stageId, FieldSpec.DataType rowType, String tableName, List<String> tableScanColumns) {
     super(stageId);
-    super._rowType = rowType;
+    _rowType = rowType;
     _tableName = tableName;
     _tableScanColumns = tableScanColumns;
   }
