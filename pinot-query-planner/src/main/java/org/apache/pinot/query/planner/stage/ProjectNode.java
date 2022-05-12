@@ -23,21 +23,17 @@ import java.util.stream.Collectors;
 import org.apache.calcite.rex.RexNode;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
-import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class ProjectNode extends AbstractStageNode {
   @ProtoProperties
   private List<RexExpression> _projects;
-  @ProtoProperties
-  private FieldSpec.DataType _rowType;
 
   public ProjectNode(int stageId) {
     super(stageId);
   }
-  public ProjectNode(int currentStageId, FieldSpec.DataType rowType, List<RexNode> projects) {
+  public ProjectNode(int currentStageId, List<RexNode> projects) {
     super(currentStageId);
-    _rowType = rowType;
     _projects = projects.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
   }
 

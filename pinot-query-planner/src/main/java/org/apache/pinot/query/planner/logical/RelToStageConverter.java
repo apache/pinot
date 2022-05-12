@@ -73,18 +73,18 @@ public final class RelToStageConverter {
   }
 
   private static StageNode convertLogicalProject(LogicalProject node, int currentStageId) {
-    return new ProjectNode(currentStageId, RexExpression.toDataType(node.getRowType()), node.getProjects());
+    return new ProjectNode(currentStageId, node.getProjects());
   }
 
   private static StageNode convertLogicalFilter(LogicalFilter node, int currentStageId) {
-    return new FilterNode(currentStageId, RexExpression.toDataType(node.getRowType()), node.getCondition());
+    return new FilterNode(currentStageId, node.getCondition());
   }
 
   private static StageNode convertLogicalTableScan(LogicalTableScan node, int currentStageId) {
     String tableName = node.getTable().getQualifiedName().get(0);
     List<String> columnNames = node.getRowType().getFieldList().stream()
         .map(RelDataTypeField::getName).collect(Collectors.toList());
-    return new TableScanNode(currentStageId, RexExpression.toDataType(node.getRowType()), tableName, columnNames);
+    return new TableScanNode(currentStageId, tableName, columnNames);
   }
 
   private static StageNode convertLogicalJoin(LogicalJoin node, int currentStageId) {
@@ -102,8 +102,7 @@ public final class RelToStageConverter {
     FieldSelectionKeySelector leftFieldSelectionKeySelector = new FieldSelectionKeySelector(leftOperandIndex);
     FieldSelectionKeySelector rightFieldSelectionKeySelector =
           new FieldSelectionKeySelector(rightOperandIndex - leftRowType.getFieldNames().size());
-    return new JoinNode(currentStageId, RexExpression.toDataType(node.getRowType()), joinType,
-        Collections.singletonList(new JoinNode.JoinClause(
-            leftFieldSelectionKeySelector, rightFieldSelectionKeySelector)));
+    return new JoinNode(currentStageId, joinType, Collections.singletonList(new JoinNode.JoinClause(
+        leftFieldSelectionKeySelector, rightFieldSelectionKeySelector)));
   }
 }

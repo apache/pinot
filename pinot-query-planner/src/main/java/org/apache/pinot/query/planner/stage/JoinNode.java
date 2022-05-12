@@ -23,7 +23,6 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
-import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class JoinNode extends AbstractStageNode {
@@ -31,16 +30,13 @@ public class JoinNode extends AbstractStageNode {
   private JoinRelType _joinRelType;
   @ProtoProperties
   private List<JoinClause> _criteria;
-  @ProtoProperties
-  private FieldSpec.DataType _rowType;
 
   public JoinNode(int stageId) {
     super(stageId);
   }
 
-  public JoinNode(int stageId, FieldSpec.DataType rowType, JoinRelType joinRelType, List<JoinClause> criteria) {
+  public JoinNode(int stageId, JoinRelType joinRelType, List<JoinClause> criteria) {
     super(stageId);
-    _rowType = rowType;
     _joinRelType = joinRelType;
     _criteria = criteria;
   }
