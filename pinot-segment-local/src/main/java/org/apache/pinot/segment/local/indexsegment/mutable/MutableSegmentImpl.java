@@ -457,13 +457,12 @@ public class MutableSegmentImpl implements MutableSegment {
     if (isUpsertEnabled()) {
       PartitionUpsertMetadataManager.RecordInfo recordInfo = getRecordInfo(row, numDocsIndexed);
       GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
-      PartitionUpsertMetadataManager.RecordInfo updatedRecordInfo = getRecordInfo(updatedRow, numDocsIndexed);
       updateDictionary(updatedRow);
       addNewRow(numDocsIndexed, updatedRow);
       // Update number of documents indexed before handling the upsert metadata so that the record becomes queryable
       // once validated
       canTakeMore = numDocsIndexed++ < _capacity;
-      _partitionUpsertMetadataManager.addRecord(this, updatedRecordInfo);
+      _partitionUpsertMetadataManager.addRecord(this, recordInfo);
     } else {
       // Update dictionary first
       updateDictionary(row);
