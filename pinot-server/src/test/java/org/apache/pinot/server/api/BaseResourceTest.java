@@ -193,7 +193,7 @@ public abstract class BaseResourceTest {
     TableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager
         .init(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class), mock(ServerMetrics.class),
-            mock(HelixManager.class), null);
+            mock(HelixManager.class), null, 0);
     tableDataManager.start();
     _tableDataManagerMap.put(tableNameWithType, tableDataManager);
   }

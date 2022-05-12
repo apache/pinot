@@ -38,6 +38,7 @@ import org.apache.pinot.spi.utils.Pair;
  */
 public class TableDataManagerProvider {
   private static Semaphore _segmentBuildSemaphore;
+  private static int _maxParallelSegmentDownloads;
 
   private TableDataManagerProvider() {
   }
@@ -47,6 +48,7 @@ public class TableDataManagerProvider {
     if (maxParallelBuilds > 0) {
       _segmentBuildSemaphore = new Semaphore(maxParallelBuilds, true);
     }
+    _maxParallelSegmentDownloads = instanceDataManagerConfig.getMaxParallelSegmentDownloads();
   }
 
   public static TableDataManager getTableDataManager(TableDataManagerConfig tableDataManagerConfig, String instanceId,
@@ -67,7 +69,8 @@ public class TableDataManagerProvider {
       default:
         throw new IllegalStateException();
     }
-    tableDataManager.init(tableDataManagerConfig, instanceId, propertyStore, serverMetrics, helixManager, errorCache);
+    tableDataManager.init(tableDataManagerConfig, instanceId, propertyStore, serverMetrics, helixManager, errorCache,
+        _maxParallelSegmentDownloads);
     return tableDataManager;
   }
 }
