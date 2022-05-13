@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -72,6 +73,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDataManager.class);
 
   protected final ConcurrentHashMap<String, SegmentDataManager> _segmentDataManagerMap = new ConcurrentHashMap<>();
+  // Semaphore to restrict the maximum number of parallel segment downloads for a table.
+  private Semaphore _segmentDownloadSemaphore;
 
   protected TableDataManagerConfig _tableDataManagerConfig;
   protected String _instanceId;
@@ -92,7 +95,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
       ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
-      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache) {
+      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache, int maxParallelSegmentDownloads) {
     LOGGER.info("Initializing table data manager for table: {}", tableDataManagerConfig.getTableName());
 
     _tableDataManagerConfig = tableDataManagerConfig;
@@ -119,6 +122,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _resourceTmpDir);
     }
     _errorCache = errorCache;
+    if (maxParallelSegmentDownloads > 0) {
+      LOGGER.info(
+          "Construct segment download semaphore for Table: {}. Maximum number of parallel segment downloads: {}",
+          _tableNameWithType, maxParallelSegmentDownloads);
+      _segmentDownloadSemaphore = new Semaphore(maxParallelSegmentDownloads, true);
+    } else {
+      _segmentDownloadSemaphore = null;
+    }
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
 
     doInit();
@@ -403,6 +414,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
     File tarFile = new File(tempRootDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
     String uri = zkMetadata.getDownloadUrl();
     try {
+      if (_segmentDownloadSemaphore != null) {
+        long startTime = System.currentTimeMillis();
+        LOGGER.info("Trying to acquire segment download semaphore for: {}. queue-length: {} ", segmentName,
+            _segmentDownloadSemaphore.getQueueLength());
+        _segmentDownloadSemaphore.acquire();
+        LOGGER.info("Acquired segment download semaphore for: {} (lock-time={}ms, queue-length={}).", segmentName,
+            System.currentTimeMillis() - startTime, _segmentDownloadSemaphore.getQueueLength());
+      }
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(uri, tarFile, zkMetadata.getCrypterName());
       LOGGER.info("Downloaded tarred segment: {} for table: {} from: {} to: {}, file length: {}", segmentName,
           _tableNameWithType, uri, tarFile, tarFile.length());
@@ -412,6 +431,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _tableNameWithType, uri, tarFile);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FAILURES, 1L);
       throw e;
+    } finally {
+      if (_segmentDownloadSemaphore != null) {
+        _segmentDownloadSemaphore.release();
+      }
     }
   }
 

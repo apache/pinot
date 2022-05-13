@@ -119,7 +119,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
       when(config.getDataDir()).thenReturn(_tmpDir.getAbsolutePath());
     }
     tableDataManager.init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null);
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null, 0);
     tableDataManager.start();
     Field segsMapField = BaseTableDataManager.class.getDeclaredField("_segmentDataManagerMap");
     segsMapField.setAccessible(true);

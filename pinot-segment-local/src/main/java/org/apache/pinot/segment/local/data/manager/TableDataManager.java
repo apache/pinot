@@ -49,7 +49,7 @@ public interface TableDataManager {
    */
   void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
       ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
-      LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache);
+      LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache, int maxParallelSegmentDownloads);
 
   /**
    * Starts the table data manager. Should be called only once after table data manager gets initialized but before
