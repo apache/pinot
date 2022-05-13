@@ -180,7 +180,7 @@ public class SegmentCompletionTest {
 
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
-        .withSegmentName(_segmentNameStr);
+        .withSegmentName(_segmentNameStr).withSegmentLocation("location");
     response = _segmentCompletionMgr
         .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
@@ -257,7 +257,7 @@ public class SegmentCompletionTest {
 
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
-        .withSegmentName(_segmentNameStr);
+        .withSegmentName(_segmentNameStr).withSegmentLocation("location");
     response = _segmentCompletionMgr
         .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
@@ -614,7 +614,7 @@ public class SegmentCompletionTest {
 
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
-        .withSegmentName(_segmentNameStr);
+        .withSegmentName(_segmentNameStr).withSegmentLocation("location");
     response = _segmentCompletionMgr
         .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
@@ -690,7 +690,7 @@ public class SegmentCompletionTest {
 
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(_s1Offset.toString())
-        .withSegmentName(_segmentNameStr);
+        .withSegmentName(_segmentNameStr).withSegmentLocation("location");
     response = _segmentCompletionMgr
         .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
@@ -977,7 +977,7 @@ public class SegmentCompletionTest {
     // Commit in 15s
     _segmentCompletionMgr._seconds += 15;
     params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
-        .withSegmentName(_segmentNameStr);
+        .withSegmentName(_segmentNameStr).withSegmentLocation("location");
     response = _segmentCompletionMgr.segmentCommitStart(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
     long commitTimeMs = (_segmentCompletionMgr._seconds - startTime) * 1000;

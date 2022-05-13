@@ -34,11 +34,9 @@ public class URIUtils {
   }
 
   /**
-   * Returns the URI for the given base path and optional parts, appends the local (file) scheme to the URI if no
-   * scheme exists. All the parts will be appended to the base path with the file separator.
+   * Returns the URI for the given path, appends the local (file) scheme to the URI if no scheme exists.
    */
-  public static URI getUri(String basePath, String... parts) {
-    String path = getPath(basePath, parts);
+  public static URI getUri(String path) {
     try {
       URI uri = new URI(path);
       if (uri.getScheme() != null) {
@@ -49,6 +47,14 @@ public class URIUtils {
     } catch (URISyntaxException e) {
       throw new IllegalArgumentException("Illegal URI path: " + path, e);
     }
+  }
+
+  /**
+   * Returns the URI for the given base path and optional parts, appends the local (file) scheme to the URI if no
+   * scheme exists. All the parts will be appended to the base path with the file separator.
+   */
+  public static URI getUri(String basePath, String... parts) {
+    return getUri(getPath(basePath, parts));
   }
 
   /**
