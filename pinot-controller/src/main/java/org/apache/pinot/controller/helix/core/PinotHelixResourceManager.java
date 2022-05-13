@@ -127,6 +127,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -1997,21 +1998,9 @@ public class PinotHelixResourceManager {
     try {
       TableConfig tableConfig = getTableConfig(tableNameWithType);
       Preconditions.checkState(tableConfig != null, "Failed to find table config for table: " + tableNameWithType);
-      InstancePartitionsType instancePartitionsType;
-      if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-        if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE) {
-          instancePartitionsType = InstancePartitionsType.COMPLETED;
-        } else {
-          instancePartitionsType = InstancePartitionsType.CONSUMING;
-        }
-      } else {
-        instancePartitionsType = InstancePartitionsType.OFFLINE;
-      }
-      SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = Collections
-          .singletonMap(instancePartitionsType, InstancePartitionsUtils
-              .fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, instancePartitionsType));
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+          fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
+      SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
       synchronized (getTableUpdaterLock(tableNameWithType)) {
         HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
           assert idealState != null;
@@ -2043,6 +2032,39 @@ public class PinotHelixResourceManager {
       }
       throw e;
     }
+  }
+
+  private Map<InstancePartitionsType, InstancePartitions> fetchOrComputeInstancePartitions(String tableNameWithType,
+      TableConfig tableConfig) {
+    boolean isOfflineTable = !TableNameBuilder.isRealtimeTableResource(tableNameWithType);
+    boolean isUpsertTable = !isOfflineTable && tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE;
+    InstancePartitionsType instancePartitionsType = null;
+    if (isOfflineTable) {
+      instancePartitionsType = InstancePartitionsType.OFFLINE;
+    } else if (isUpsertTable) {
+      // In an upsert enabled LLC realtime table, all segments of the same partition are collocated on the same server
+      // -- consuming or completed. So it is fine to use CONSUMING as the InstancePartitionsType.
+      instancePartitionsType = InstancePartitionsType.CONSUMING;
+    }
+    if (isOfflineTable || isUpsertTable) {
+      return Collections.singletonMap(instancePartitionsType, InstancePartitionsUtils
+          .fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, instancePartitionsType));
+    }
+    // for non-upsert realtime tables, if COMPLETED instance partitions is available or tag override for
+    // completed segments is provided in the tenant config, COMPLETED instance partitions type is used
+    // otherwise CONSUMING instance partitions type is used.
+    instancePartitionsType = InstancePartitionsType.COMPLETED;
+    InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
+        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
+    if (instancePartitions != null) {
+      return Collections.singletonMap(instancePartitionsType, instancePartitions);
+    }
+    TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();
+    if (tagOverrideConfig == null || tagOverrideConfig.getRealtimeCompleted() == null) {
+      instancePartitionsType = InstancePartitionsType.CONSUMING;
+    }
+    return Collections.singletonMap(instancePartitionsType,
+        InstancePartitionsUtils.computeDefaultInstancePartitions(_helixZkManager, tableConfig, instancePartitionsType));
   }
 
   public boolean isUpsertTable(String tableName) {

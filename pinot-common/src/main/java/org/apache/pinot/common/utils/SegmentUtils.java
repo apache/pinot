@@ -35,8 +35,9 @@ public class SegmentUtils {
   // Returns the partition id of a realtime segment based segment name and segment metadata info retrieved via Helix.
   // Important: The method is costly because it may read data from zookeeper. Do not use it in any query execution
   // path.
-  public static @Nullable
-  Integer getRealtimeSegmentPartitionId(String segmentName, String realtimeTableName, HelixManager helixManager,
+  @Nullable
+  public static Integer getRealtimeSegmentPartitionId(String segmentName, String realtimeTableName,
+      HelixManager helixManager,
       String partitionColumn) {
     // A fast path if the segmentName is a LLC segment name and we can get the partition id from the name directly.
     if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {

@@ -167,7 +167,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     // Add an uploaded ONLINE segment to the consuming instances (i.e. no separation between consuming & completed)
     List<String> uploadedSegmentNames = ImmutableList.of("UploadedSegment1", "UploadedSegment2");
     onlyConsumingInstancePartitionMap =
-        ImmutableMap.of(InstancePartitionsType.COMPLETED, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
+        ImmutableMap.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
     for (String uploadedSegName : uploadedSegmentNames) {
       List<String> instancesAssigned =
           _segmentAssignment.assignSegment(uploadedSegName, currentAssignment, onlyConsumingInstancePartitionMap);
@@ -272,6 +272,28 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
         assertEquals(instanceStateMap, currentAssignment.get(segmentName));
       }
     }
+  }
+
+  @Test
+  public void testAssignSegmentForUploadedSegments() {
+    // CONSUMING instance partition has been tested in previous method, only test COMPLETED here
+    Map<InstancePartitionsType, InstancePartitions> onlyCompletedInstancePartitionMap =
+        ImmutableMap.of(InstancePartitionsType.COMPLETED, _instancePartitionsMap.get(InstancePartitionsType.COMPLETED));
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    Map<String, List<String>> expectedUploadedSegmentToInstances = ImmutableMap.of(
+        "uploadedSegment_0", ImmutableList.of("completedInstance_0", "completedInstance_1", "completedInstance_2"),
+        "uploadedSegment_1", ImmutableList.of("completedInstance_3", "completedInstance_4", "completedInstance_5"),
+        "uploadedSegment_2", ImmutableList.of("completedInstance_6", "completedInstance_7", "completedInstance_8"),
+        "uploadedSegment_3", ImmutableList.of("completedInstance_9", "completedInstance_0", "completedInstance_1"),
+        "uploadedSegment_4", ImmutableList.of("completedInstance_2", "completedInstance_3", "completedInstance_4")
+    );
+    expectedUploadedSegmentToInstances.forEach((segmentName, expectedInstances) -> {
+      List<String> actualInstances =
+          _segmentAssignment.assignSegment(segmentName, currentAssignment, onlyCompletedInstancePartitionMap);
+      assertEquals(actualInstances, expectedInstances);
+      currentAssignment
+          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(actualInstances, SegmentStateModel.ONLINE));
+    });
   }
 
   private void addToAssignment(Map<String, Map<String, String>> currentAssignment, int segmentId,

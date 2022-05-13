@@ -105,14 +105,19 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
     Preconditions.checkState(instancePartitionsMap.size() == 1, "One instance partition type should be provided");
-    InstancePartitions instancePartitions = instancePartitionsMap.entrySet().iterator().next().getValue();
+    Map.Entry<InstancePartitionsType, InstancePartitions> typeToInstancePartitions =
+        instancePartitionsMap.entrySet().iterator().next();
+    InstancePartitionsType instancePartitionsType = typeToInstancePartitions.getKey();
+    InstancePartitions instancePartitions = typeToInstancePartitions.getValue();
     Preconditions
         .checkState(instancePartitions.getNumPartitions() == 1, "Instance partitions: %s should contain 1 partition",
             instancePartitions.getInstancePartitionsName());
     LOGGER.info("Assigning segment: {} with instance partitions: {} for table: {}", segmentName, instancePartitions,
         _realtimeTableName);
     checkReplication(instancePartitions);
-    List<String> instancesAssigned = assignConsumingSegment(segmentName, instancePartitions);
+    List<String> instancesAssigned = instancePartitionsType == InstancePartitionsType.CONSUMING
+        ? assignConsumingSegment(segmentName, instancePartitions)
+        : assignCompletedSegment(segmentName, currentAssignment, instancePartitions);
     LOGGER.info("Assigned segment: {} to instances: {} for table: {}", segmentName, instancesAssigned,
         _realtimeTableName);
     return instancesAssigned;
