@@ -135,33 +135,53 @@ public class RangeQueriesTest extends BaseQueriesTest {
   @DataProvider
   public static Object[][] selectionTestCases() {
     return new Object[][]{
-        {buildSelectionQuery(DICTIONARIZED_INT_COL, 250, 500), 250, 500},
-        {buildSelectionQuery(RAW_INT_COL, 250, 500), 250, 500},
-        {buildSelectionQuery(RAW_LONG_COL, 250, 500), 250, 500},
-        {buildSelectionQuery(RAW_FLOAT_COL, 250, 500), 250, 500},
-        {buildSelectionQuery(RAW_DOUBLE_COL, 250, 500), 250, 500},
+        {buildSelectionQuery(DICTIONARIZED_INT_COL, 250, 500, true), 250, 500, true},
+        {buildSelectionQuery(RAW_INT_COL, 250, 500, true), 250, 500, true},
+        {buildSelectionQuery(RAW_LONG_COL, 250, 500, true), 250, 500, true},
+        {buildSelectionQuery(RAW_FLOAT_COL, 250, 500, true), 250, 500, true},
+        {buildSelectionQuery(RAW_DOUBLE_COL, 250, 500, true), 250, 500, true},
+        {buildSelectionQuery(DICTIONARIZED_INT_COL, 250, 500, false), 250, 500, false},
+        {buildSelectionQuery(RAW_INT_COL, 250, 500, false), 250, 500, false},
+        {buildSelectionQuery(RAW_LONG_COL, 250, 500, false), 250, 500, false},
+        {buildSelectionQuery(RAW_FLOAT_COL, 250, 500, false), 250, 500, true},
+        {buildSelectionQuery(RAW_DOUBLE_COL, 250, 500, false), 250, 500, true},
     };
   }
 
-  private static String buildSelectionQuery(String filterCol, Number min, Number max) {
-    return "select " + RAW_INT_COL + " from " + RAW_TABLE_NAME + " where " + filterCol + " between "
-        + buildFilter(filterCol, min, max);
+  private static String buildSelectionQuery(String filterCol, Number min, Number max, boolean inclusive) {
+    if (inclusive) {
+      return "select " + RAW_INT_COL + " from " + RAW_TABLE_NAME + " where " + filterCol + " between "
+          + buildFilter(filterCol, min, max);
+    } else {
+      return "select " + RAW_INT_COL + " from " + RAW_TABLE_NAME + " where " + filterCol + " > "
+          + formatValue(filterCol, min) + " and " + filterCol + " < " + formatValue(filterCol, max);
+    }
   }
 
   @DataProvider
   public static Object[][] countTestCases() {
     return new Object[][]{
-        {buildCountQuery(DICTIONARIZED_INT_COL, 250, 500), 3},
-        {buildCountQuery(RAW_INT_COL, 250, 500), 3},
-        {buildCountQuery(RAW_LONG_COL, 250, 500), 3},
-        {buildCountQuery(RAW_FLOAT_COL, 250, 500), 3},
-        {buildCountQuery(RAW_DOUBLE_COL, 250, 500), 3},
+        {buildCountQuery(DICTIONARIZED_INT_COL, 250, 500, true), 3},
+        {buildCountQuery(RAW_INT_COL, 250, 500, true), 3},
+        {buildCountQuery(RAW_LONG_COL, 250, 500, true), 3},
+        {buildCountQuery(RAW_FLOAT_COL, 250, 500, true), 3},
+        {buildCountQuery(RAW_DOUBLE_COL, 250, 500, true), 3},
+        {buildCountQuery(DICTIONARIZED_INT_COL, 250, 500, false), 2},
+        {buildCountQuery(RAW_INT_COL, 250, 500, false), 2},
+        {buildCountQuery(RAW_LONG_COL, 250, 500, false), 2},
+        {buildCountQuery(RAW_FLOAT_COL, 250, 500, false), 3},
+        {buildCountQuery(RAW_DOUBLE_COL, 250, 500, false), 3},
     };
   }
 
-  private static String buildCountQuery(String filterCol, Number min, Number max) {
-    return "select count(*) from " + RAW_TABLE_NAME + " where " + filterCol + " between "
-        + buildFilter(filterCol, min, max);
+  private static String buildCountQuery(String filterCol, Number min, Number max, boolean inclusive) {
+    if (inclusive) {
+      return "select count(*) from " + RAW_TABLE_NAME + " where " + filterCol + " between "
+          + buildFilter(filterCol, min, max);
+    } else {
+      return "select count(*) from " + RAW_TABLE_NAME + " where " + filterCol + " > "
+          + formatValue(filterCol, min) + " and " + filterCol + " < " + formatValue(filterCol, max);
+    }
   }
 
   private static String buildFilter(String filterCol, Number min, Number max) {
@@ -178,14 +198,28 @@ public class RangeQueriesTest extends BaseQueriesTest {
     }
   }
 
+  private static String formatValue(String filterCol, Number threshold) {
+    switch (filterCol) {
+      case DICTIONARIZED_INT_COL:
+      case RAW_INT_COL:
+      case RAW_LONG_COL:
+        return "" + threshold.intValue();
+      case RAW_FLOAT_COL:
+      case RAW_DOUBLE_COL:
+        return "" + threshold.doubleValue();
+      default:
+        throw new AssertionError("unexpected column: " + filterCol);
+    }
+  }
+
   @Test(dataProvider = "selectionTestCases")
-  public void testSelectionOverRangeFilter(String query, int min, int max) {
+  public void testSelectionOverRangeFilter(String query, int min, int max, boolean inclusive) {
     Operator<?> operator = getOperator(query);
     assertTrue(operator instanceof SelectionOnlyOperator);
     for (Object[] row : Objects.requireNonNull(((SelectionOnlyOperator) operator).nextBlock().getSelectionResult())) {
       int value = (int) row[0];
-      assertTrue(value >= min);
-      assertTrue(value <= max);
+      assertTrue(inclusive ? value >= min : value > min);
+      assertTrue(inclusive ? value <= max : value < max);
     }
   }
 

@@ -286,11 +286,11 @@ public class RangePredicateEvaluatorFactory {
     }
 
     public int getLowerBound() {
-      return _lowerBound;
+      return _lowerInclusive ? _lowerBound : _lowerBound + 1;
     }
 
     public int getUpperBound() {
-      return _upperBound;
+      return _upperInclusive ? _upperBound : _upperBound - 1;
     }
 
     @Override
@@ -331,11 +331,11 @@ public class RangePredicateEvaluatorFactory {
     }
 
     public long getLowerBound() {
-      return _lowerBound;
+      return _lowerInclusive ? _lowerBound : _lowerBound + 1;
     }
 
     public long getUpperBound() {
-      return _upperBound;
+      return _upperInclusive ? _upperBound : _upperBound - 1;
     }
 
     @Override
@@ -376,11 +376,11 @@ public class RangePredicateEvaluatorFactory {
     }
 
     public float getLowerBound() {
-      return _lowerBound;
+      return _lowerInclusive ? _lowerBound : _lowerBound + Float.MIN_VALUE;
     }
 
     public float getUpperBound() {
-      return _upperBound;
+      return _upperInclusive ? _upperBound : _upperBound - Float.MIN_VALUE;
     }
 
     @Override
@@ -421,11 +421,11 @@ public class RangePredicateEvaluatorFactory {
     }
 
     public double getLowerBound() {
-      return _lowerBound;
+      return _lowerInclusive ? _lowerBound : _lowerBound + Double.MIN_VALUE;
     }
 
     public double getUpperBound() {
-      return _upperBound;
+      return _upperInclusive ? _upperBound : _upperBound - Double.MIN_VALUE;
     }
 
     @Override
