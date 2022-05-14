@@ -54,6 +54,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
@@ -527,6 +528,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     recoverReloadFailureQuietly(_tableNameWithType, segmentName, indexDir);
 
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    schema = SegmentGeneratorConfig.updateSchemaWithTimestampIndexes(schema,
+        SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(indexLoadingConfig.getTableConfig()));
+
     // Creates the SegmentDirectory object to access the segment metadata.
     // The metadata is null if the segment doesn't exist yet.
     SegmentDirectory segmentDirectory =
