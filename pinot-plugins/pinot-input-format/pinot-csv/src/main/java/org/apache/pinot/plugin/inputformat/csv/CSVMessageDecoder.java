@@ -73,18 +73,24 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
         case "TDF":
           format = CSVFormat.TDF;
           break;
+        case "DEFAULT":
+          format = CSVFormat.DEFAULT;
+          break;
         default:
-          LOGGER.info("Could not recognise the configured CSV file format: {}, falling back to DEFAULT format",
+          LOGGER.warn("Could not recognise the configured CSV file format: {}, falling back to DEFAULT format",
               csvFormat);
           format = CSVFormat.DEFAULT;
           break;
       }
     }
 
+    //delimiter
     String csvDelimiter = props.get(CONFIG_DELIMITER);
     if (csvDelimiter != null) {
       format = format.withDelimiter(csvDelimiter.charAt(0));
     }
+
+    //header
     String csvHeader = props.get(CONFIG_HEADER);
     if (csvHeader == null) {
       //parse the header automatically from the input
@@ -92,24 +98,31 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
     } else {
       format = format.withHeader(StringUtils.split(csvHeader, csvDelimiter));
     }
-    if (props.containsKey(CONFIG_COMMENT_MARKER)) {
-      Character commentMarker = props.get(CONFIG_COMMENT_MARKER).charAt(0);
-      format = format.withCommentMarker(commentMarker);
+
+    //comment marker
+    String commentMarker = props.get(CONFIG_COMMENT_MARKER);
+    if (commentMarker != null) {
+      format = format.withCommentMarker(commentMarker.charAt(0));
     }
 
-    if (props.containsKey(CONFIG_CSV_ESCAPE_CHARACTER)) {
+    //escape char
+    String escapeChar = props.get(CONFIG_CSV_ESCAPE_CHARACTER);
+    if (escapeChar != null) {
       format = format.withEscape(props.get(CONFIG_CSV_ESCAPE_CHARACTER).charAt(0));
     }
+
     _format = format;
-    Character multiValueDelimiter = null;
-    if (props.containsKey(CONFIG_CSV_MULTI_VALUE_DELIMITER)) {
-      multiValueDelimiter = props.get(CONFIG_CSV_MULTI_VALUE_DELIMITER).charAt(0);
-    }
 
     _recordExtractor = new CSVRecordExtractor();
 
     CSVRecordExtractorConfig recordExtractorConfig = new CSVRecordExtractorConfig();
-    recordExtractorConfig.setMultiValueDelimiter(multiValueDelimiter);
+
+    //multi-value delimiter
+    String multiValueDelimiter = props.get(CONFIG_CSV_MULTI_VALUE_DELIMITER);
+    if (multiValueDelimiter != null) {
+      recordExtractorConfig.setMultiValueDelimiter(multiValueDelimiter.charAt(0));
+    }
+
     recordExtractorConfig.setColumnNames(ImmutableSet.copyOf(
         Objects.requireNonNull(_format.getHeader())));
     _recordExtractor.init(fieldsToRead, recordExtractorConfig);
