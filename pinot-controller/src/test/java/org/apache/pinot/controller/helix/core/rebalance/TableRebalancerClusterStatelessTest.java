@@ -86,7 +86,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
    * 4. Migrate back to non-replica-group based segment assignment and rebalance
    * 5. Remove (disable) servers and rebalance
    */
-  @Test
+  @Test(groups = "stateless")
   public void testRebalance()
       throws Exception {
     int numServers = 3;
@@ -326,7 +326,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
    * 2. add nodes for tiers and run rebalance - should see no change
    * 3. add tier config and run rebalance - should see changed assignment
    */
-  @Test
+  @Test(groups = "stateless")
   public void testRebalanceWithTiers()
       throws Exception {
     int numServers = 3;

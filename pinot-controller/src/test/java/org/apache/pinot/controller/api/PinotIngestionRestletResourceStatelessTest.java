@@ -81,7 +81,7 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
     }
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testIngestEndpoint()
       throws Exception {
 

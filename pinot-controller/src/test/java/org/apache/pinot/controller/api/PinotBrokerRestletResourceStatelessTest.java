@@ -132,7 +132,7 @@ public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
     }
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testGetBrokers()
       throws Exception {
     addFakeBrokerInstancesToAutoJoinHelixCluster(10, true);

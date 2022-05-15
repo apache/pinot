@@ -51,7 +51,7 @@ public class ControllerTenantStatelessTest extends ControllerTest {
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, false);
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testBrokerTenant()
       throws IOException {
     // Create broker tenants
@@ -111,7 +111,7 @@ public class ControllerTenantStatelessTest extends ControllerTest {
     }
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testEmptyServerTenant() {
     try {
       sendGetRequest(_controllerRequestURLBuilder.forServerTenantGet("doesn't_exist"));
@@ -120,7 +120,7 @@ public class ControllerTenantStatelessTest extends ControllerTest {
     }
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testServerTenant()
       throws IOException {
     // Create server tenants

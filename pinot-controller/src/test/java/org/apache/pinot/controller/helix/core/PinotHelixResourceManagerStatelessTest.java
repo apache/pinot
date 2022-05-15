@@ -78,7 +78,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     enableResourceConfigForLeadControllerResource(true);
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testValidateDimTableTenantConfig() {
     // Create broker tenant on 3 Brokers
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 3, 0, 0);
@@ -101,7 +101,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     _helixResourceManager.validateTableTenantConfig(dimTableConfig);
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testValidateTenantConfig() {
     // Create broker tenant on 3 Brokers
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 3, 0, 0);
@@ -201,7 +201,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     }
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testUpdateBrokerResource()
       throws Exception {
     // Create broker tenant on 3 brokers

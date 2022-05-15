@@ -59,7 +59,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     startZk();
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testDefaultPinotTaskManagerNoScheduler()
       throws Exception {
     startController();
@@ -68,7 +68,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     stopController();
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testPinotTaskManagerSchedulerWithUpdate()
       throws Exception {
     Map<String, Object> properties = getDefaultControllerConfiguration();
@@ -133,7 +133,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     stopController();
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testPinotTaskManagerSchedulerWithRestart()
       throws Exception {
     Map<String, Object> properties = getDefaultControllerConfiguration();

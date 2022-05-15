@@ -56,7 +56,7 @@ public class ValidationManagerStatelessTest extends ControllerTest {
     _helixResourceManager.addTable(_offlineTableConfig);
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testRebuildBrokerResourceWhenBrokerAdded()
       throws Exception {
     // Check that the first table we added doesn't need to be rebuilt(case where ideal state brokers and brokers in

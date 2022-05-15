@@ -44,7 +44,7 @@ public class ControllerStarterStatelessTest extends ControllerTest {
     return defaultConfig;
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testHostnamePortOverride()
       throws Exception {
     _configOverride.clear();
@@ -67,7 +67,7 @@ public class ControllerStarterStatelessTest extends ControllerTest {
     stopZk();
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testInvalidInstanceId()
       throws Exception {
     _configOverride.clear();
@@ -86,7 +86,7 @@ public class ControllerStarterStatelessTest extends ControllerTest {
     }
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testDefaultInstanceId()
       throws Exception {
     _configOverride.clear();

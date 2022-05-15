@@ -37,7 +37,7 @@ public class MinionInstancesCleanupTaskStatelessTest extends ControllerTest {
     startController();
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testMinionInstancesCleanupTask()
       throws Exception {
     MinionInstancesCleanupTask minionInstancesCleanupTask = _controllerStarter.getMinionInstancesCleanupTask();

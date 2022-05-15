@@ -52,7 +52,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     startZk();
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testHelixOnlyController()
       throws Exception {
     // Start a Helix-only controller
@@ -66,7 +66,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     stopController();
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testDualModeController()
       throws Exception {
     // Start the first dual-mode controller
@@ -201,7 +201,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     thirdDualModeController.stop();
   }
 
-  @Test
+  @Test(groups = "stateless")
   public void testPinotOnlyController()
       throws Exception {
     Map<String, Object> properties = getDefaultControllerConfiguration();
