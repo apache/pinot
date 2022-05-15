@@ -180,7 +180,7 @@ public class PulsarConsumerTest {
         }
         producer.flush();
       }
-      waitForCondition(input -> validatePartitionMessageCount(partition, NUM_RECORDS_PER_PARTITION), 15 * 1000L,
+      waitForCondition(input -> validatePartitionMessageCount(partition, NUM_RECORDS_PER_PARTITION), 1 * 1000L,
           5 * 60 * 1000L, "Failed to consume " + NUM_RECORDS_PER_PARTITION + " messages from partition " + partition,
           true);
     }
@@ -213,7 +213,7 @@ public class PulsarConsumerTest {
         }
         producer.flush();
       }
-      waitForCondition(input -> validatePartitionMessageCount(partition, NUM_RECORDS_PER_PARTITION), 15 * 1000L,
+      waitForCondition(input -> validatePartitionMessageCount(partition, NUM_RECORDS_PER_PARTITION), 1 * 1000L,
           5 * 60 * 1000L, "Failed to consume " + NUM_RECORDS_PER_PARTITION + " messages from partition " + partition,
           true);
     }
