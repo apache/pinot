@@ -127,7 +127,8 @@ public class BaseBrokerRequestHandlerTest {
     when(tableCache.getActualTableName("test_table")).thenReturn(null);
 
     Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("test_table", tableCache, routingManager, configuration), "test_table");
+        BaseBrokerRequestHandler.getActualTableName("test_table", tableCache, routingManager, configuration),
+        "test_table");
     Assert.assertEquals(
         BaseBrokerRequestHandler.getActualTableName("mytable", tableCache, routingManager, configuration), "mytable");
 
