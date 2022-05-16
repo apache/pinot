@@ -84,39 +84,33 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
     LongSet fullyCoverH3Cells = fullCoverAndPotentialCoverCells.getLeft();
     LongSet potentialCoverH3Cells = fullCoverAndPotentialCoverCells.getRight();
 
-    // have list of h3 cell ids for polygon provided
-    // return filtered num_docs
-    ImmutableRoaringBitmap[] potentialMatchDocIds = new ImmutableRoaringBitmap[potentialCoverH3Cells.size()];
     int i = 0;
-    LongIterator potentialCoverH3CellsIterator = potentialCoverH3Cells.iterator();
-    while (potentialCoverH3CellsIterator.hasNext()) {
-      potentialMatchDocIds[i++] = _h3IndexReader.getDocIds(potentialCoverH3CellsIterator.nextLong());
+    ImmutableRoaringBitmap[] fullMatchDocIds = new ImmutableRoaringBitmap[fullyCoverH3Cells.size()];
+    LongIterator fullyCoverH3CellsIterator = fullyCoverH3Cells.iterator();
+    while (fullyCoverH3CellsIterator.hasNext()) {
+      fullMatchDocIds[i++] = _h3IndexReader.getDocIds(fullyCoverH3CellsIterator.nextLong());
     }
-    MutableRoaringBitmap potentialMatchMutableRoaringBitmap = BufferFastAggregation.or(potentialMatchDocIds);
+    MutableRoaringBitmap fullMatch = BufferFastAggregation.or(fullMatchDocIds);
+
+    // remove full match from potential match to get potential not match cells.
+    i = 0;
+    potentialCoverH3Cells.removeAll(fullyCoverH3Cells);
+    ImmutableRoaringBitmap[] potentialNotMatchDocIds = new ImmutableRoaringBitmap[potentialCoverH3Cells.size()];
+    LongIterator potentialNotMatchH3CellsIterator = potentialCoverH3Cells.iterator();
+    while (potentialNotMatchH3CellsIterator.hasNext()) {
+      potentialNotMatchDocIds[i++] = _h3IndexReader.getDocIds(potentialNotMatchH3CellsIterator.nextLong());
+    }
+    MutableRoaringBitmap potentialMatch = BufferFastAggregation.or(potentialNotMatchDocIds);
+
     if (_isPositiveCheck) {
-      ImmutableRoaringBitmap[] fullMatchDocIds = new ImmutableRoaringBitmap[fullyCoverH3Cells.size()];
-      i = 0;
-      LongIterator fullyCoverH3CellsIterator = fullyCoverH3Cells.iterator();
-      while (fullyCoverH3CellsIterator.hasNext()) {
-        fullMatchDocIds[i++] = _h3IndexReader.getDocIds(fullyCoverH3CellsIterator.nextLong());
-      }
-      MutableRoaringBitmap fullMatchMutableRoaringBitmap = BufferFastAggregation.or(fullMatchDocIds);
-      return getFilterBlock(fullMatchMutableRoaringBitmap, potentialMatchMutableRoaringBitmap);
+      return getFilterBlock(fullMatch, potentialMatch);
     } else {
-      i = 0;
-      // remove full match from potential match to get potential not match cells.
-      potentialCoverH3Cells.removeAll(fullyCoverH3Cells);
-      ImmutableRoaringBitmap[] potentialNotMatchMutableRoaringBitmap =
-          new ImmutableRoaringBitmap[potentialCoverH3Cells.size()];
-      LongIterator potentialNotMatchH3CellsIterator = potentialCoverH3Cells.iterator();
-      while (potentialNotMatchH3CellsIterator.hasNext()) {
-        potentialNotMatchMutableRoaringBitmap[i++] =
-            _h3IndexReader.getDocIds(potentialNotMatchH3CellsIterator.nextLong());
-      }
-      MutableRoaringBitmap potentialNotMatch = BufferFastAggregation.or(potentialNotMatchMutableRoaringBitmap);
-      // flip potential match bit map to get exactly not match bitmap.
-      potentialMatchMutableRoaringBitmap.flip(0L, _numDocs);
-      return getFilterBlock(potentialMatchMutableRoaringBitmap, potentialNotMatch);
+      // potentialMatch also include potential not match docs.
+      // full not match is first flip potentialMatch, then andNot full match.
+      MutableRoaringBitmap fullNotMatch = potentialMatch.clone();
+      fullNotMatch.flip(0L, _numDocs);
+      fullNotMatch.andNot(fullMatch);
+      return getFilterBlock(fullNotMatch, potentialMatch);
     }
   }
 
