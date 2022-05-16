@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.common.request.Expression;
@@ -39,7 +40,6 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.Pair;
 import org.apache.pinot.sql.FilterKind;
 
 
@@ -127,11 +127,11 @@ public class JsonStatementOptimizer implements StatementOptimizer {
     for (Expression expression : expressions) {
       Pair<String, Boolean> result = optimizeJsonIdentifier(expression, schema, DataSchema.ColumnDataType.STRING);
       if (expression.getType() == ExpressionType.FUNCTION && !expression.getFunctionCall().getOperator().equals("AS")
-          && result.getSecond()) {
+          && result.getRight()) {
         // Since this is not an AS function (user-specified alias) and the function or its arguments contain json path
         // expression, set an alias for the expression after replacing json path expression with JSON_EXTRACT_SCALAR
         // function.
-        Function aliasFunction = getAliasFunction(result.getFirst(), expression.getFunctionCall());
+        Function aliasFunction = getAliasFunction(result.getLeft(), expression.getFunctionCall());
         expression.setFunctionCall(aliasFunction);
       }
     }
@@ -179,7 +179,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
       DataSchema.ColumnDataType outputDataType) {
     switch (expression.getType()) {
       case LITERAL:
-        return new Pair<>(getLiteralSQL(expression.getLiteral(), true), false);
+        return Pair.of(getLiteralSQL(expression.getLiteral(), true), false);
       case IDENTIFIER: {
         boolean hasJsonPathExpression = false;
         String columnName = expression.getIdentifier().getName();
@@ -195,7 +195,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
             hasJsonPathExpression = true;
           }
         }
-        return new Pair<>(columnName, hasJsonPathExpression);
+        return Pair.of(columnName, hasJsonPathExpression);
       }
       case FUNCTION: {
         Function function = expression.getFunctionCall();
@@ -205,7 +205,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
         StringBuffer alias = new StringBuffer();
         if (function.getOperator().toUpperCase().equals("AS")) {
           // We don't need to compute an alias for AS function since AS function defines its own alias.
-          hasJsonPathExpression = optimizeJsonIdentifier(operands.get(0), schema, outputDataType).getSecond();
+          hasJsonPathExpression = optimizeJsonIdentifier(operands.get(0), schema, outputDataType).getRight();
           alias.append(function.getOperands().get(1).getIdentifier().getName());
         } else {
           // For all functions besides AS function, process the operands and compute the alias.
@@ -218,22 +218,22 @@ public class JsonStatementOptimizer implements StatementOptimizer {
           for (int i = 0; i < operands.size(); i++) {
             // recursively check to see if there is a <json-column>.<json-path> identifier in this expression.
             Pair<String, Boolean> operandResult = optimizeJsonIdentifier(operands.get(i), schema, outputDataType);
-            hasJsonPathExpression |= operandResult.getSecond();
+            hasJsonPathExpression |= operandResult.getRight();
             if (i > 0) {
               alias.append(",");
             }
-            alias.append(operandResult.getFirst());
+            alias.append(operandResult.getLeft());
           }
           alias.append(")");
         }
 
-        return new Pair<>(alias.toString(), hasJsonPathExpression);
+        return Pair.of(alias.toString(), hasJsonPathExpression);
       }
       default:
         break;
     }
 
-    return new Pair<>("", false);
+    return Pair.of("", false);
   }
 
   /**

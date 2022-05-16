@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -62,7 +63,6 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.Pair;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -286,7 +286,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public void addSegmentError(String segmentName, SegmentErrorInfo segmentErrorInfo) {
-    _errorCache.put(new Pair<>(_tableNameWithType, segmentName), segmentErrorInfo);
+    _errorCache.put(Pair.of(_tableNameWithType, segmentName), segmentErrorInfo);
   }
 
   @Override
@@ -295,8 +295,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return Collections.emptyMap();
     } else {
       // Filter out entries that match the table name.
-      return _errorCache.asMap().entrySet().stream().filter(map -> map.getKey().getFirst().equals(_tableNameWithType))
-          .collect(Collectors.toMap(map -> map.getKey().getSecond(), Map.Entry::getValue));
+      return _errorCache.asMap().entrySet().stream().filter(map -> map.getKey().getLeft().equals(_tableNameWithType))
+          .collect(Collectors.toMap(map -> map.getKey().getRight(), Map.Entry::getValue));
     }
   }
 
