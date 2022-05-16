@@ -43,7 +43,7 @@ public class ValidationManagerStatelessTest extends ControllerTest {
 
   private TableConfig _offlineTableConfig;
 
-  @BeforeClass
+  @BeforeClass(groups = "stateless")
   public void setUp()
       throws Exception {
     startZk();
@@ -96,7 +96,7 @@ public class ValidationManagerStatelessTest extends ControllerTest {
         .equals(_helixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME)));
   }
 
-  @AfterClass
+  @AfterClass(groups = "stateless")
   public void tearDown() {
     stopFakeInstances();
     stopController();

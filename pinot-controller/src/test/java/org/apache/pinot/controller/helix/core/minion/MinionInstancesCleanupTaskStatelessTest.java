@@ -30,7 +30,7 @@ import org.testng.annotations.Test;
 
 
 public class MinionInstancesCleanupTaskStatelessTest extends ControllerTest {
-  @BeforeClass
+  @BeforeClass(groups = "stateless")
   public void setup()
       throws Exception {
     startZk();
@@ -73,7 +73,7 @@ public class MinionInstancesCleanupTaskStatelessTest extends ControllerTest {
     return properties;
   }
 
-  @AfterClass
+  @AfterClass(groups = "stateless")
   public void teardown() {
     stopController();
     stopZk();

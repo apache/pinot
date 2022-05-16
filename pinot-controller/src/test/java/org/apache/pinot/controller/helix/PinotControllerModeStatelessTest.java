@@ -47,7 +47,7 @@ import org.testng.annotations.Test;
 public class PinotControllerModeStatelessTest extends ControllerTest {
   private static final long TIMEOUT_IN_MS = 10_000L;
 
-  @BeforeClass
+  @BeforeClass(groups = "stateless")
   public void setUp() {
     startZk();
   }
@@ -295,7 +295,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     }, TIMEOUT_IN_MS, "Failed to pick only one instance as: " + expectedInstanceState);
   }
 
-  @AfterMethod
+  @AfterMethod(groups = "stateless")
   public void cleanUpCluster() {
     ZkClient zkClient = new ZkClient(getZkUrl());
     if (zkClient.exists("/" + getHelixClusterName())) {
@@ -304,7 +304,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     zkClient.close();
   }
 
-  @AfterClass
+  @AfterClass(groups = "stateless")
   public void tearDown() {
     stopZk();
   }

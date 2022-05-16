@@ -26,12 +26,12 @@
       the test suite to run faster becuase individual test cases don't have to waste time setting up
       and destroying their own individual state.
   -->
-  <groups>
-    <run>
-      <exclude name="stateless"/>
-    </run>
-  </groups>
   <test name="testng.suite.controller.statefull">
+    <groups>
+      <run>
+        <exclude name="stateless"/>
+      </run>
+    </groups>
     <packages>
       <package name="org.apache.pinot.controller.*"/>
     </packages>

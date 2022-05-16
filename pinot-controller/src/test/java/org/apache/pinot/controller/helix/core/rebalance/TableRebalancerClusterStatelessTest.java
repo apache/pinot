@@ -69,7 +69,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   private static final String TIER_B_NAME = "tierB";
   private static final String TIER_FIXED_NAME = "tierFixed";
 
-  @BeforeClass
+  @BeforeClass(groups = "stateless")
   public void setUp()
       throws Exception {
     startZk();
@@ -417,7 +417,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(TIERED_TABLE_NAME);
   }
 
-  @AfterClass
+  @AfterClass(groups = "stateless")
   public void tearDown() {
     stopFakeInstances();
     stopController();

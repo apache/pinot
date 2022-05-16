@@ -59,7 +59,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
 
-  @BeforeClass
+  @BeforeClass(groups = "stateless")
   public void setUp()
       throws Exception {
     startZk();
@@ -271,7 +271,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(instanceStateMap.keySet(), new HashSet<>(expectedBrokers));
   }
 
-  @AfterClass
+  @AfterClass(groups = "stateless")
   public void tearDown() {
     stopFakeInstances();
     stopController();

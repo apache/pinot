@@ -28,12 +28,12 @@
       here only if your test cases can not use the shared state that is setup in the testng-stateful.xml
       suite.
   -->
-  <groups>
-    <run>
-      <include name="stateless"/>
-    </run>
-  </groups>
   <test name="testng.suite.controller.stateless">
+    <groups>
+      <run>
+        <include name="stateless"/>
+      </run>
+    </groups>
     <packages>
       <package name="org.apache.pinot.controller.*"/>
     </packages>

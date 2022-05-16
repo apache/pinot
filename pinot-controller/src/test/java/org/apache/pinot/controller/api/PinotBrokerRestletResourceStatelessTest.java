@@ -35,7 +35,7 @@ public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
   private static final String TABLE_NAME_1 = "testTable1";
   private static final String TABLE_NAME_2 = "testTable2";
 
-  @BeforeClass
+  @BeforeClass(groups = "stateless")
   public void setUp()
       throws Exception {
     startZk();
@@ -162,7 +162,7 @@ public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
     }
   }
 
-  @AfterClass
+  @AfterClass(groups = "stateless")
   public void tearDown() {
     stopFakeInstances();
     stopController();

@@ -41,7 +41,7 @@ public class ControllerTenantStatelessTest extends ControllerTest {
   private static final int NUM_REALTIME_SERVERS_PER_TAG = 1;
   private static final int NUM_SERVERS_PER_TAG = NUM_OFFLINE_SERVERS_PER_TAG + NUM_REALTIME_SERVERS_PER_TAG;
 
-  @BeforeClass
+  @BeforeClass(groups = "stateless")
   public void setUp()
       throws Exception {
     startZk();
@@ -187,7 +187,7 @@ public class ControllerTenantStatelessTest extends ControllerTest {
     }
   }
 
-  @AfterClass
+  @AfterClass(groups = "stateless")
   public void tearDown() {
     stopFakeInstances();
     stopController();

@@ -55,7 +55,7 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
   private static final String TABLE_NAME_WITH_TYPE = "testTable_OFFLINE";
   private File _inputFile;
 
-  @BeforeClass
+  @BeforeClass(groups = "stateless")
   public void setUp()
       throws Exception {
     startZk();
@@ -115,7 +115,7 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
     Assert.assertEquals(statusCode, 200);
   }
 
-  @AfterClass
+  @AfterClass(groups = "stateless")
   public void tearDown() {
     FileUtils.deleteQuietly(_inputFile);
     stopFakeInstances();

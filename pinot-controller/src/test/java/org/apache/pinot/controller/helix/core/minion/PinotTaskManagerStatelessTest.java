@@ -53,7 +53,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final long TIMEOUT_IN_MS = 10_000L;
 
-  @BeforeClass
+  @BeforeClass(groups = "stateless")
   public void setUp()
       throws Exception {
     startZk();
@@ -244,7 +244,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     assertEquals(((CronTrigger) trigger).getCronExpression(), cronExpression);
   }
 
-  @AfterClass
+  @AfterClass(groups = "stateless")
   public void tearDown() {
     stopZk();
   }
