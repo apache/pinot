@@ -161,7 +161,8 @@ public abstract class ControllerTest {
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
     properties.put(ControllerConf.ZK_STR, getZkUrl());
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
-
+    // Enable groovy on the controller
+    properties.put(ControllerConf.DISABLE_GROOVY, false);
     return properties;
   }
 
