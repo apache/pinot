@@ -33,10 +33,10 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.Pair;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -283,12 +283,12 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
     for (int i = 0; i < _numValues; i++) {
       if (i > start + boundary) {
         if (comparator.compare(i, i - 1) != 0) {
-          ranges.add(new Pair(start, i - 1));
+          ranges.add(Pair.of(start, i - 1));
           start = i;
         }
       }
     }
-    ranges.add(new Pair(start, _numValues - 1));
+    ranges.add(Pair.of(start, _numValues - 1));
 
     //Dump ranges
     if (TRACE) {
@@ -337,12 +337,12 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
 
       //write the range start values
       for (Pair<Integer, Integer> range : ranges) {
-        Number rangeStart = _numberValueBuffer.get(range.getFirst());
+        Number rangeStart = _numberValueBuffer.get(range.getLeft());
         writeNumberToHeader(header, rangeStart);
       }
       bytesWritten += ranges.size() * _valueType.size(); // Range start values
 
-      Number lastRangeEnd = _numberValueBuffer.get(ranges.get(ranges.size() - 1).getSecond());
+      Number lastRangeEnd = _numberValueBuffer.get(ranges.get(ranges.size() - 1).getRight());
       writeNumberToHeader(header, lastRangeEnd);
       bytesWritten += _valueType.size(); // Last range end value
 
@@ -358,7 +358,7 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
       for (int i = 0; i < ranges.size(); i++) {
         Pair<Integer, Integer> range = ranges.get(i);
         MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
-        for (int index = range.getFirst(); index <= range.getSecond(); index++) {
+        for (int index = range.getLeft(); index <= range.getRight(); index++) {
           bitmap.add(_docIdBuffer.get(index).intValue());
         }
         // Write offset and bitmap into file
@@ -409,9 +409,9 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
     StringBuilder rangeOffsets = new StringBuilder("[ ");
     StringBuilder rangeValues = new StringBuilder("[ ");
     for (Pair<Integer, Integer> range : ranges) {
-      rangeOffsets.append("(").append(range.getFirst()).append(",").append(range.getSecond()).append(") ,");
-      rangeValues.append("(").append(_numberValueBuffer.get(range.getFirst())).append(",")
-          .append(_numberValueBuffer.get(range.getSecond())).append(") ,");
+      rangeOffsets.append("(").append(range.getLeft()).append(",").append(range.getRight()).append(") ,");
+      rangeValues.append("(").append(_numberValueBuffer.get(range.getLeft())).append(",")
+          .append(_numberValueBuffer.get(range.getRight())).append(") ,");
     }
     rangeOffsets.append(" ]");
     rangeValues.append(" ]");

@@ -20,6 +20,7 @@ package org.apache.pinot.server.realtime;
 
 import java.util.Map;
 import java.util.TreeMap;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -31,7 +32,6 @@ import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.Pair;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -181,11 +181,11 @@ public class ControllerLeaderLocatorTest {
     FakeControllerLeaderLocator.create(helixManager);
     ControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
 
-    Pair<String, Integer> expectedLeaderLocation = new Pair<>(leaderHost, leaderPort);
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getFirst(),
-        expectedLeaderLocation.getFirst());
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getSecond(),
-        expectedLeaderLocation.getSecond());
+    Pair<String, Integer> expectedLeaderLocation = Pair.of(leaderHost, leaderPort);
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getLeft(),
+        expectedLeaderLocation.getLeft());
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getRight(),
+        expectedLeaderLocation.getRight());
   }
 
   @Test
@@ -219,13 +219,13 @@ public class ControllerLeaderLocatorTest {
     // Create Controller Leader Locator
     FakeControllerLeaderLocator.create(helixManager);
     FakeControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
-    Pair<String, Integer> expectedLeaderLocation = new Pair<>(leaderHost, leaderPort);
+    Pair<String, Integer> expectedLeaderLocation = Pair.of(leaderHost, leaderPort);
 
     // Before enabling lead controller resource config, the helix leader should be used.
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getFirst(),
-        expectedLeaderLocation.getFirst());
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getSecond(),
-        expectedLeaderLocation.getSecond());
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getLeft(),
+        expectedLeaderLocation.getLeft());
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getRight(),
+        expectedLeaderLocation.getRight());
 
     // Mock the behavior that 40 seconds have passed.
     controllerLeaderLocator.setCurrentTimeMs(controllerLeaderLocator.getCurrentTimeMs() + 40_000L);
@@ -262,10 +262,10 @@ public class ControllerLeaderLocatorTest {
       externalView.setStateMap(LeadControllerUtils.generatePartitionName(i), instanceStateMap);
     }
 
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getFirst(),
-        expectedLeaderLocation.getFirst());
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getSecond(),
-        expectedLeaderLocation.getSecond());
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getLeft(),
+        expectedLeaderLocation.getLeft());
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(TEST_TABLE).getRight(),
+        expectedLeaderLocation.getRight());
 
     // The participant host is in offline state, should return null.
     instanceStateMap.put(participantInstanceId, "OFFLINE");
