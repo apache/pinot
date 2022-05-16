@@ -172,6 +172,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_PINOT_BROKER_STARTABLE_CLASS = "pinot.broker.startable.class";
     public static final String CONFIG_OF_PINOT_SERVER_STARTABLE_CLASS = "pinot.server.startable.class";
     public static final String CONFIG_OF_PINOT_MINION_STARTABLE_CLASS = "pinot.minion.startable.class";
+    public static final String CONFIG_OF_ALLOW_TABLE_NAME_DOTS = "pinot.table.name.dots.enabled";
+    public static final boolean DEFAULT_ALLOW_TABLE_NAME_DOTS = false;
   }
 
   public static class Broker {

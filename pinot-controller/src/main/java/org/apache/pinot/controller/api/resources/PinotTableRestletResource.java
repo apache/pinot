@@ -183,7 +183,7 @@ public class PinotTableRestletResource {
       TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
       // TableConfigUtils.validateTableName(...) checks table name rules.
       // So it won't effect already created tables.
-      TableConfigUtils.validateTableName(tableConfig);
+      TableConfigUtils.validateTableName(tableConfig, _controllerConf);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
