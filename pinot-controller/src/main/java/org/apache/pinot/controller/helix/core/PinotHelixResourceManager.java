@@ -690,18 +690,6 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Returns the crypter class name defined in the table config for the given table.
-   *
-   * @param tableNameWithType Table name with type suffix
-   * @return crypter class name
-   */
-  public String getCrypterClassNameFromTableConfig(String tableNameWithType) {
-    TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
-    Preconditions.checkNotNull(tableConfig, "Table config is not available for table '%s'", tableNameWithType);
-    return tableConfig.getValidationConfig().getCrypterClassName();
-  }
-
-  /**
    * Table related APIs
    */
   // TODO: move table related APIs here
