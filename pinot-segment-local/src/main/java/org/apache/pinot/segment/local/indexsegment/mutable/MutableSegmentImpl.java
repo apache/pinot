@@ -490,7 +490,12 @@ public class MutableSegmentImpl implements MutableSegment {
     boolean canTakeMore;
     int numDocsIndexed = _numDocsIndexed;
 
-    RecordInfo recordInfo = getRecordInfo(row, numDocsIndexed);
+    RecordInfo recordInfo = null;
+
+    if (_dedupEnabled || isUpsertEnabled()) {
+      recordInfo = getRecordInfo(row, numDocsIndexed);
+    }
+
     if (_dedupEnabled && _partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo)) {
       return numDocsIndexed < _capacity;
     }
@@ -539,10 +544,15 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private RecordInfo getRecordInfo(GenericRow row, int docId) {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
-    Object upsertComparisonValue = row.getValue(_upsertComparisonColumn);
-    Preconditions.checkState(upsertComparisonValue instanceof Comparable,
-        "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
-    return new RecordInfo(primaryKey, docId, (Comparable) upsertComparisonValue);
+
+    if (isUpsertEnabled()) {
+      Object upsertComparisonValue = row.getValue(_upsertComparisonColumn);
+      Preconditions.checkState(upsertComparisonValue instanceof Comparable,
+          "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
+      return new RecordInfo(primaryKey, docId, (Comparable) upsertComparisonValue);
+    }
+
+    return new RecordInfo(primaryKey, docId, null);
   }
 
   private void updateDictionary(GenericRow row) {

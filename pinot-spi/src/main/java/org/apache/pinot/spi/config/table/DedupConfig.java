@@ -31,7 +31,7 @@ public class DedupConfig extends BaseJsonConfig {
       @JsonProperty(value = "hashFunction") final HashFunction hashFunction
   ) {
     _dedupEnabled = dedupEnabled;
-    _hashFunction = hashFunction;
+    _hashFunction = hashFunction == null ? HashFunction.NONE : hashFunction;
   }
 
   public HashFunction getHashFunction() {
