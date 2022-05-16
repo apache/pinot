@@ -96,9 +96,9 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
     i = 0;
     potentialCoverH3Cells.removeAll(fullyCoverH3Cells);
     ImmutableRoaringBitmap[] potentialNotMatchDocIds = new ImmutableRoaringBitmap[potentialCoverH3Cells.size()];
-    LongIterator potentialNotMatchH3CellsIterator = potentialCoverH3Cells.iterator();
-    while (potentialNotMatchH3CellsIterator.hasNext()) {
-      potentialNotMatchDocIds[i++] = _h3IndexReader.getDocIds(potentialNotMatchH3CellsIterator.nextLong());
+    LongIterator potentialMatchH3CellsIterator = potentialCoverH3Cells.iterator();
+    while (potentialMatchH3CellsIterator.hasNext()) {
+      potentialNotMatchDocIds[i++] = _h3IndexReader.getDocIds(potentialMatchH3CellsIterator.nextLong());
     }
     MutableRoaringBitmap potentialMatch = BufferFastAggregation.or(potentialNotMatchDocIds);
 
