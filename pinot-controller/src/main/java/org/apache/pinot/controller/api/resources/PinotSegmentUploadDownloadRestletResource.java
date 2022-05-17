@@ -289,7 +289,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       } else {
         // TODO: remove this when we completely deprecate the table name from segment metadata
         rawTableName = segmentMetadata.getTableName();
-        LOGGER.warn("Table name is not provided when uploading segment: {} for table: {}", segmentName, rawTableName);
+        LOGGER.warn("Table name is not provided as request query parameter when uploading segment: {} for table: {}",
+            segmentName, rawTableName);
       }
       String tableNameWithType;
       if (tableType == TableType.OFFLINE) {
