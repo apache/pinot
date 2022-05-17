@@ -97,8 +97,8 @@ public class ServerConf {
   }
 
   public boolean isMultiStageServerEnabled() {
-    return _serverConf.getProperty(Server.CONFIG_OF_MULTI_STAGE_SERVER_ENABLED,
-        Server.DEFAULT_MULTI_STAGE_SERVER_ENABLED);
+    return _serverConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED,
+        Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED);
   }
 
   public boolean isEnableSwagger() {

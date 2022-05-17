@@ -215,6 +215,6 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
 
   private String toMailboxId(ServerInstance serverInstance) {
     return new StringMailboxIdentifier(String.format("%s_%s", _jobId, _stageId), _serverHostName, _serverPort,
-        serverInstance.getHostname(), serverInstance.getGrpcPort()).toString();
+        serverInstance.getHostname(), serverInstance.getQueryMailboxPort()).toString();
   }
 }

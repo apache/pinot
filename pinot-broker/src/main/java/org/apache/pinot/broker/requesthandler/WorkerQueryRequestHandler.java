@@ -198,6 +198,7 @@ public class WorkerQueryRequestHandler extends BaseBrokerRequestHandler {
 
   @Override
   public void shutDown() {
-    // no-op
+    _queryDispatcher.shutdown();
+    _mailboxService.shutdown();
   }
 }

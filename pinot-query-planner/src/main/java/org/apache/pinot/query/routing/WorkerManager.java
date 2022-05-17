@@ -66,7 +66,7 @@ public class WorkerManager {
     } else if (PlannerUtils.isRootStage(stageId)) {
       // ROOT stage doesn't have a QueryServer as it is strictly only reducing results.
       // here we simply assign the worker instance with identical server/mailbox port number.
-      stageMetadata.setServerInstances(Lists.newArrayList(new WorkerInstance(_hostName, _port, _port)));
+      stageMetadata.setServerInstances(Lists.newArrayList(new WorkerInstance(_hostName, _port, _port, _port, _port)));
     } else {
       stageMetadata.setServerInstances(filterServers(_routingManager.getEnabledServerInstanceMap().values()));
     }
@@ -76,9 +76,10 @@ public class WorkerManager {
     List<ServerInstance> serverInstances = new ArrayList<>();
     for (ServerInstance server : servers) {
       String hostname = server.getHostname();
-      if (!hostname.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) && !hostname.startsWith(
-          CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE) && !hostname.startsWith(
-          CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE) && server.getGrpcPort() > 0) {
+      if (server.getQueryServicePort() > 0 && server.getQueryMailboxPort() > 0
+          && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)
+          && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE)
+          && !hostname.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE)) {
         serverInstances.add(server);
       }
     }

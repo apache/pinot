@@ -113,6 +113,8 @@ public class PinotInstanceRestletResource {
     response.set("pools", JsonUtils.objectToJsonNode(instanceConfig.getRecord().getMapField(InstanceUtils.POOL_KEY)));
     response.put("grpcPort", getGrpcPort(instanceConfig));
     response.put("adminPort", getAdminPort(instanceConfig));
+    response.put("queryServicePort", getQueryServicePort(instanceConfig));
+    response.put("queryMailboxPort", getQueryMailboxPort(instanceConfig));
     String queriesDisabled = instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED);
     if ("true".equalsIgnoreCase(queriesDisabled)) {
       response.put(CommonConstants.Helix.QUERIES_DISABLED, "true");
@@ -143,6 +145,32 @@ public class PinotInstanceRestletResource {
       }
     }
     return Instance.NOT_SET_ADMIN_PORT_VALUE;
+  }
+
+  private int getQueryServicePort(InstanceConfig instanceConfig) {
+    String queryServicePortStr = instanceConfig.getRecord().getSimpleField(
+        CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY);
+    if (queryServicePortStr != null) {
+      try {
+        return Integer.parseInt(queryServicePortStr);
+      } catch (Exception e) {
+        LOGGER.warn("Illegal service port: {} for instance: {}", queryServicePortStr, instanceConfig.getInstanceName());
+      }
+    }
+    return Instance.NOT_SET_GRPC_PORT_VALUE;
+  }
+
+  private int getQueryMailboxPort(InstanceConfig instanceConfig) {
+    String queryMailboxPortStr = instanceConfig.getRecord().getSimpleField(
+        CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY);
+    if (queryMailboxPortStr != null) {
+      try {
+        return Integer.parseInt(queryMailboxPortStr);
+      } catch (Exception e) {
+        LOGGER.warn("Illegal mailbox port: {} for instance: {}", queryMailboxPortStr, instanceConfig.getInstanceName());
+      }
+    }
+    return Instance.NOT_SET_GRPC_PORT_VALUE;
   }
 
   private Map<String, String> getSystemResourceInfo(InstanceConfig instanceConfig) {

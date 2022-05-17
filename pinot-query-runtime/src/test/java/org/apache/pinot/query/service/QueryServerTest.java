@@ -70,7 +70,8 @@ public class QueryServerTest {
       _queryRunnerMap.put(availablePort, queryRunner);
       // this only test the QueryServer functionality so the server port can be the same as the mailbox port.
       // this is only use for test identifier purpose.
-      _queryServerInstanceMap.put(availablePort, new WorkerInstance("localhost", availablePort, availablePort));
+      _queryServerInstanceMap.put(availablePort, new WorkerInstance("localhost", availablePort, availablePort,
+          availablePort, availablePort));
     }
 
     List<Integer> portList = Lists.newArrayList(_queryServerMap.keySet());
