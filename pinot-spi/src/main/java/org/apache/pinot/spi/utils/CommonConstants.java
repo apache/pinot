@@ -78,6 +78,8 @@ public class CommonConstants {
     public static final String LEAD_CONTROLLER_RESOURCE_ENABLED_KEY = "RESOURCE_ENABLED";
 
     public static final String ENABLE_CASE_INSENSITIVE_KEY = "enable.case.insensitive";
+    public static final String CONFIG_OF_ALLOW_TABLE_NAME_DOTS = "allow.table.name.dots";
+    public static final boolean DEFAULT_ALLOW_TABLE_NAME_DOTS = false;
     @Deprecated
     public static final String DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY = "enable.case.insensitive.pql";
 
@@ -172,8 +174,6 @@ public class CommonConstants {
     public static final String CONFIG_OF_PINOT_BROKER_STARTABLE_CLASS = "pinot.broker.startable.class";
     public static final String CONFIG_OF_PINOT_SERVER_STARTABLE_CLASS = "pinot.server.startable.class";
     public static final String CONFIG_OF_PINOT_MINION_STARTABLE_CLASS = "pinot.minion.startable.class";
-    public static final String CONFIG_OF_ALLOW_TABLE_NAME_DOTS = "pinot.table.name.dots.enabled";
-    public static final boolean DEFAULT_ALLOW_TABLE_NAME_DOTS = false;
   }
 
   public static class Broker {

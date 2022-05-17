@@ -761,10 +761,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * Resolves the actual table name for:
    * - Case-insensitive cluster
-   * - Table name in the format of [database_name].[namespace].[table_name]
+   * - Table name in the format of [database_name].[table_name]
    *
    * If the PinotConfiguration does not allow dots in table name, will do the below:
-   * Drop the prefix part for the format of [database_name].[namespace].[table_name], keep only [table_name].
+   * Drop the prefix part for the format of [database_name].[table_name], keep only [table_name].
    * If the PinotConfiguration allows dots in table name, we will not do the split
    * @param tableName the table name in the query
    * @param tableCache the table case-sensitive cache
@@ -832,7 +832,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   static String[] splitTableNameByConfig(String tableName, PinotConfiguration config) {
     if (!config.getProperty(CommonConstants.Helix.CONFIG_OF_ALLOW_TABLE_NAME_DOTS,
         CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_DOTS)) {
-      return splitByLastDot(tableName);
+      return StringUtils.split(tableName, ".", 2);
     }
     return new String[]{tableName};
   }

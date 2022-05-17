@@ -106,9 +106,6 @@ public class BaseBrokerRequestHandlerTest {
     Assert.assertEquals(
         BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache, routingManager, configuration),
         "mytable");
-    Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("db.namespace.mytable", tableCache, routingManager, configuration),
-        "mytable");
   }
 
   @Test
@@ -154,8 +151,8 @@ public class BaseBrokerRequestHandlerTest {
   public void testSplitTableNameByConfig() {
     PinotConfiguration configuration = new PinotConfiguration();
     configuration.setProperty(CommonConstants.Helix.CONFIG_OF_ALLOW_TABLE_NAME_DOTS, false);
-    String[] split = BaseBrokerRequestHandler.splitTableNameByConfig("db.schema.table", configuration);
-    Assert.assertEquals(split, new String[]{"db.schema", "table"});
+    String[] split = BaseBrokerRequestHandler.splitTableNameByConfig("db.table", configuration);
+    Assert.assertEquals(split, new String[]{"db", "table"});
 
     configuration.setProperty(CommonConstants.Helix.CONFIG_OF_ALLOW_TABLE_NAME_DOTS, true);
     split = BaseBrokerRequestHandler.splitTableNameByConfig("db.schema.table", configuration);
