@@ -255,7 +255,9 @@ public class ControllerConf extends PinotConfiguration {
   private static final String DEFAULT_DIM_TABLE_MAX_SIZE = "200M";
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
-  private static final String DISABLE_GROOVY = "controller.disable.ingestion.groovy";
+
+  public static final String DISABLE_GROOVY = "controller.disable.ingestion.groovy";
+  public static final boolean DEFAULT_DISABLE_GROOVY = true;
 
   public ControllerConf() {
     super(new HashMap<>());
@@ -867,7 +869,7 @@ public class ControllerConf extends PinotConfiguration {
    * @return true if Groovy functions are disabled in controller config, otherwise returns false.
    */
   public boolean isDisableIngestionGroovy() {
-    return getProperty(DISABLE_GROOVY, false);
+    return getProperty(DISABLE_GROOVY, DEFAULT_DISABLE_GROOVY);
   }
 
   private long convertPeriodToUnit(String period, TimeUnit timeUnitToConvertTo) {

@@ -230,6 +230,7 @@ public class CommonConstants {
     public static final String BROKER_SERVICE_AUTO_DISCOVERY = "pinot.broker.service.auto.discovery";
 
     public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
+    public static final boolean DEFAULT_DISABLE_GROOVY = true;
 
     // Rewrite potential expensive functions to their approximation counterparts
     // - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
