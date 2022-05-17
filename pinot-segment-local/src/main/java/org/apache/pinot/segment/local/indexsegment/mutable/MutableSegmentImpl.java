@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
-import groovy.lang.Tuple2;
 import it.unimi.dsi.fastutil.ints.IntArrays;
 import java.io.Closeable;
 import java.io.File;
@@ -36,6 +35,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -249,9 +249,9 @@ public class MutableSegmentImpl implements MutableSegment {
     // and no metrics have dictionary. If not enabled, the map returned is null.
     _recordIdMap = enableMetricsAggregationIfPossible(config, noDictionaryColumns);
 
-    Map<String, Tuple2<String, ValueAggregator>> metricsAggregators = Collections.emptyMap();
+    Map<String, Pair<String, ValueAggregator>> metricsAggregators = Collections.emptyMap();
     if (_recordIdMap != null) {
-      metricsAggregators = IngestionAggregator.fromRealtimeSegmentConfig(config);
+      metricsAggregators = getMetricsAggregators(config);
     }
 
     // Initialize for each column
@@ -353,9 +353,10 @@ public class MutableSegmentImpl implements MutableSegment {
       // Null value vector
       MutableNullValueVector nullValueVector = _nullHandlingEnabled ? new MutableNullValueVector() : null;
 
-      String sourceColumn = metricsAggregators.containsKey(column) ? metricsAggregators.get(column).getFirst() : column;
-      ValueAggregator valueAggregator =
-          metricsAggregators.containsKey(column) ? metricsAggregators.get(column).getSecond() : null;
+      Pair<String, ValueAggregator> columnAggregatorPair =
+          metricsAggregators.getOrDefault(column, Pair.of(column, null));
+      String sourceColumn = columnAggregatorPair.getLeft();
+      ValueAggregator valueAggregator = columnAggregatorPair.getRight();
 
       // TODO: Support range index and bloom filter for mutable segment
       _indexContainerMap.put(column,
@@ -585,6 +586,7 @@ public class MutableSegmentImpl implements MutableSegment {
             throw new UnsupportedOperationException(
                 "Unsupported data type: " + dataType + " for aggregation: " + column);
         }
+        continue;
       }
 
       // Update the null value vector even if a null value is somehow produced
@@ -662,10 +664,6 @@ public class MutableSegmentImpl implements MutableSegment {
             default:
               throw new UnsupportedOperationException(
                   "Unsupported data type: " + dataType + " for no-dictionary column: " + column);
-          }
-
-          if (column.equals("*")) {
-            continue;
           }
 
           // Update min/max value from raw value
@@ -1200,59 +1198,54 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  static class IngestionAggregator {
-    public static Map<String, Tuple2<String, ValueAggregator>> fromRealtimeSegmentConfig(
-        RealtimeSegmentConfig segmentConfig) {
-      if (segmentConfig.aggregateMetrics()) {
-        return fromAggregateMetrics(segmentConfig);
-      } else if (!CollectionUtils.isEmpty(segmentConfig.getIngestionAggregationConfigs())) {
-        return fromAggregationConfig(segmentConfig);
-      } else {
-        return Collections.emptyMap();
-      }
+  private static Map<String, Pair<String, ValueAggregator>> getMetricsAggregators(RealtimeSegmentConfig segmentConfig) {
+    if (segmentConfig.aggregateMetrics()) {
+      return fromAggregateMetrics(segmentConfig);
+    } else if (!CollectionUtils.isEmpty(segmentConfig.getIngestionAggregationConfigs())) {
+      return fromAggregationConfig(segmentConfig);
+    } else {
+      return Collections.emptyMap();
+    }
+  }
+
+  private static Map<String, Pair<String, ValueAggregator>> fromAggregateMetrics(RealtimeSegmentConfig segmentConfig) {
+    Preconditions.checkState(CollectionUtils.isEmpty(segmentConfig.getIngestionAggregationConfigs()),
+        "aggregateMetrics cannot be enabled if AggregationConfig is set");
+
+    Map<String, Pair<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
+    for (String metricName : segmentConfig.getSchema().getMetricNames()) {
+      columnNameToAggregator.put(metricName,
+          Pair.of(metricName, ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM)));
+    }
+    return columnNameToAggregator;
+  }
+
+  private static Map<String, Pair<String, ValueAggregator>> fromAggregationConfig(RealtimeSegmentConfig segmentConfig) {
+    Map<String, Pair<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
+
+    Preconditions.checkState(!segmentConfig.aggregateMetrics(),
+        "aggregateMetrics cannot be enabled if AggregationConfig is set");
+    for (AggregationConfig config : segmentConfig.getIngestionAggregationConfigs()) {
+      ExpressionContext expressionContext = RequestContextUtils.getExpression(config.getAggregationFunction());
+      // validation is also done when the table is created, this is just a sanity check.
+      Preconditions.checkState(expressionContext.getType() == ExpressionContext.Type.FUNCTION,
+          "aggregation function must be a function: %s", config);
+      FunctionContext functionContext = expressionContext.getFunction();
+      TableConfigUtils.validateIngestionAggregation(functionContext.getFunctionName());
+      Preconditions.checkState(functionContext.getArguments().size() == 1,
+          "aggregation function can only have one argument: %s", config);
+      ExpressionContext argument = functionContext.getArguments().get(0);
+      Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
+          "aggregator function argument must be a identifier: %s", config);
+
+      AggregationFunctionType functionType =
+          AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
+
+      columnNameToAggregator.put(config.getColumnName(),
+          Pair.of(argument.getLiteral(), ValueAggregatorFactory.getValueAggregator(functionType)));
     }
 
-    private static Map<String, Tuple2<String, ValueAggregator>> fromAggregateMetrics(
-        RealtimeSegmentConfig segmentConfig) {
-      Preconditions.checkState(CollectionUtils.isEmpty(segmentConfig.getIngestionAggregationConfigs()),
-          "aggregateMetrics cannot be enabled if AggregationConfig is set");
-
-      Map<String, Tuple2<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
-      for (String metricName : segmentConfig.getSchema().getMetricNames()) {
-        columnNameToAggregator.put(metricName,
-            new Tuple2(metricName, ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM)));
-      }
-      return columnNameToAggregator;
-    }
-
-    private static Map<String, Tuple2<String, ValueAggregator>> fromAggregationConfig(
-        RealtimeSegmentConfig segmentConfig) {
-      Map<String, Tuple2<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
-
-      Preconditions.checkState(!segmentConfig.aggregateMetrics(),
-          "aggregateMetrics cannot be enabled if AggregationConfig is set");
-      for (AggregationConfig config : segmentConfig.getIngestionAggregationConfigs()) {
-        ExpressionContext expressionContext = RequestContextUtils.getExpression(config.getAggregationFunction());
-        // validation is also done when the table is created, this is just a sanity check.
-        Preconditions.checkState(expressionContext.getType() == ExpressionContext.Type.FUNCTION,
-            "aggregation function must be a function: %s", config);
-        FunctionContext functionContext = expressionContext.getFunction();
-        TableConfigUtils.validateIngestionAggregation(functionContext.getFunctionName());
-        Preconditions.checkState(functionContext.getArguments().size() == 1,
-            "aggregation function can only have one argument: %s", config);
-        ExpressionContext argument = functionContext.getArguments().get(0);
-        Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
-            "aggregator function argument must be a identifier: %s", config);
-
-        AggregationFunctionType functionType =
-            AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
-
-        columnNameToAggregator.put(config.getColumnName(),
-            new Tuple2(argument.getLiteral(), ValueAggregatorFactory.getValueAggregator(functionType)));
-      }
-
-      return columnNameToAggregator;
-    }
+    return columnNameToAggregator;
   }
 
   private class IndexContainer implements Closeable {
@@ -1284,7 +1277,7 @@ public class MutableSegmentImpl implements MutableSegment {
         @Nullable MutableDictionary dictionary, @Nullable MutableInvertedIndex invertedIndex,
         @Nullable RangeIndexReader rangeIndex, @Nullable MutableTextIndex textIndex,
         @Nullable MutableJsonIndex jsonIndex, @Nullable MutableH3Index h3Index, @Nullable BloomFilterReader bloomFilter,
-        @Nullable MutableNullValueVector nullValueVector, String sourceColumn,
+        @Nullable MutableNullValueVector nullValueVector, @Nullable String sourceColumn,
         @Nullable ValueAggregator valueAggregator) {
       _fieldSpec = fieldSpec;
       _partitionFunction = partitionFunction;

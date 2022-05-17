@@ -24,6 +24,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -94,6 +95,9 @@ public final class TableConfigUtils {
   // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
   private static final String KINESIS_STREAM_TYPE = "kinesis";
+  private static final EnumSet<AggregationFunctionType> SUPPORTED_INGESTION_AGGREGATIONS =
+      EnumSet.of(AggregationFunctionType.SUM, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
+          AggregationFunctionType.COUNT);
 
   /**
    * @see TableConfigUtils#validate(TableConfig, Schema, String, boolean)
@@ -314,7 +318,7 @@ public final class TableConfigUtils {
       // Aggregation configs
       List<AggregationConfig> aggregationConfigs = ingestionConfig.getAggregationConfigs();
       Set<String> aggregationSourceColumns = new HashSet<>();
-      if (aggregationConfigs != null) {
+      if (CollectionUtils.isEmpty(aggregationConfigs)) {
         Preconditions.checkState(
             !tableConfig.getIndexingConfig().isAggregateMetrics(),
             "aggregateMetrics cannot be set with AggregationConfig");
@@ -432,15 +436,13 @@ public final class TableConfigUtils {
    * sequential inserts.
    */
   public static void validateIngestionAggregation(String name) {
-    List<AggregationFunctionType> allowed =
-        Arrays.asList(AggregationFunctionType.SUM, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
-            AggregationFunctionType.COUNT);
-    for (AggregationFunctionType functionType : allowed) {
+    for (AggregationFunctionType functionType : SUPPORTED_INGESTION_AGGREGATIONS) {
       if (functionType.getName().equals(name)) {
         return;
       }
     }
-    throw new IllegalStateException(String.format("aggregation function %s must be one of %s", name, allowed));
+    throw new IllegalStateException(
+        String.format("aggregation function %s must be one of %s", name, SUPPORTED_INGESTION_AGGREGATIONS));
   }
 
   @VisibleForTesting
