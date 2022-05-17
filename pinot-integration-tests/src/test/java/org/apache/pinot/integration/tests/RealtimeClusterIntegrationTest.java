@@ -65,7 +65,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     // Push data into Kafka
     pushAvroIntoKafka(avroFiles);
 
-    // create segment and upload it to controller
+    // create segments and upload them to controller
     createSegmentsAndUpload(avroFiles, schema, tableConfig);
 
     // Set up the H2 connection

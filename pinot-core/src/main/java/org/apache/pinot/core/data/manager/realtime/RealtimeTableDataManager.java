@@ -371,7 +371,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     String segmentName = immutableSegment.getSegmentName();
     Integer partitionGroupId = SegmentUtils
         .getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, _primaryKeyColumns.get(0));
-    Preconditions.checkNotNull(String
+    Preconditions.checkNotNull(partitionGroupId, String
         .format("PartitionGroupId is not available for segment: '%s' (upsert-enabled table: %s)", segmentName,
             _tableNameWithType));
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
