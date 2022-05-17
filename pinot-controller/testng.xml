@@ -20,14 +20,22 @@
     under the License.
 
 -->
-<suite name="testng.suite.controller.stateless">
+<suite name="testng.suite.controller.statefull">
   <!--
-      These test cases take extra time to run because they have to spend time setting up and destroying
-      their individual state. When possible add new test cases to the testng-stateful.xml suite, so that
-      time is not wasted setting up and destroying state and test cases can run faster. Add test cases
-      here only if your test cases can not use the shared state that is setup in the testng-stateful.xml
-      suite.
+      Test cases listed here share state with each other (see ControllerTestSetup.java). This allows
+      the test suite to run faster becuase individual test cases don't have to waste time setting up
+      and destroying their own individual state.
   -->
+  <test name="testng.suite.controller.statefull">
+    <groups>
+      <run>
+        <exclude name="stateless"/>
+      </run>
+    </groups>
+    <packages>
+      <package name="org.apache.pinot.controller.*"/>
+    </packages>
+  </test>
   <test name="testng.suite.controller.stateless">
     <groups>
       <run>
