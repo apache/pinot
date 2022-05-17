@@ -120,7 +120,6 @@ public class SegmentGeneratorConfig implements Serializable {
 
   private SegmentZKPropsConfig _segmentZKPropsConfig;
 
-  // These segments are only created if _createAllIndexedDuringSegmentGeneration is set to true
   private final List<String> _bloomFilterCreationColumns = new ArrayList<>();
 
   public List<String> getBloomFilterCreationColumns() {
