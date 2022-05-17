@@ -143,8 +143,8 @@ public class RangeQueriesTest extends BaseQueriesTest {
         {buildSelectionQuery(DICTIONARIZED_INT_COL, 250, 500, false), 250, 500, false},
         {buildSelectionQuery(RAW_INT_COL, 250, 500, false), 250, 500, false},
         {buildSelectionQuery(RAW_LONG_COL, 250, 500, false), 250, 500, false},
-        {buildSelectionQuery(RAW_FLOAT_COL, 250, 500, false), 250, 500, true},
-        {buildSelectionQuery(RAW_DOUBLE_COL, 250, 500, false), 250, 500, true},
+        {buildSelectionQuery(RAW_FLOAT_COL, 250, 500, false), 250, 500, false},
+        {buildSelectionQuery(RAW_DOUBLE_COL, 250, 500, false), 250, 500, false},
     };
   }
 
@@ -169,8 +169,8 @@ public class RangeQueriesTest extends BaseQueriesTest {
         {buildCountQuery(DICTIONARIZED_INT_COL, 250, 500, false), 2},
         {buildCountQuery(RAW_INT_COL, 250, 500, false), 2},
         {buildCountQuery(RAW_LONG_COL, 250, 500, false), 2},
-        {buildCountQuery(RAW_FLOAT_COL, 250, 500, false), 3},
-        {buildCountQuery(RAW_DOUBLE_COL, 250, 500, false), 3},
+        {buildCountQuery(RAW_FLOAT_COL, 250, 500, false), 2},
+        {buildCountQuery(RAW_DOUBLE_COL, 250, 500, false), 2},
     };
   }
 
