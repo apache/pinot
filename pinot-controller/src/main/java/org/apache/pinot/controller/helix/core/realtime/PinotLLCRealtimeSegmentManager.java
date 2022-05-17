@@ -1160,7 +1160,7 @@ public class PinotLLCRealtimeSegmentManager {
 
               if (enforcedByAdmin) {
                 LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
-                StreamPartitionMsgOffset startOffset = offsetFactory.create(latestSegmentZKMetadata.getStartOffset());
+                StreamPartitionMsgOffset startOffset = offsetFactory.create(latestSegmentZKMetadata.getEndOffset());
                 StreamPartitionMsgOffset partitionGroupSmallestOffset =
                     getPartitionGroupSmallestOffset(streamConfig, partitionGroupId);
 
