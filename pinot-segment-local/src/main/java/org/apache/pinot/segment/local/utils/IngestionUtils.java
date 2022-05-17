@@ -42,7 +42,6 @@ import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenera
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.spi.auth.AuthProvider;
-import org.apache.pinot.spi.config.table.AggregationConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
