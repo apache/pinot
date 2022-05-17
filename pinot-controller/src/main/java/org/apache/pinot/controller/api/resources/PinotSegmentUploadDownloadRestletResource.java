@@ -292,16 +292,9 @@ public class PinotSegmentUploadDownloadRestletResource {
         LOGGER.warn("Table name is not provided as request query parameter when uploading segment: {} for table: {}",
             segmentName, rawTableName);
       }
-      String tableNameWithType;
-      if (tableType == TableType.OFFLINE) {
-        tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
-      } else {
-        tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
-        if (!_pinotHelixResourceManager.isUpsertTable(tableNameWithType)) {
-          throw new ControllerApplicationException(LOGGER,
-              "Cannot upload segment to non-upsert real-time table: " + tableNameWithType, Response.Status.FORBIDDEN);
-        }
-      }
+      String tableNameWithType = tableType == TableType.OFFLINE
+          ? TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)
+          : TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
 
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
       LOGGER.info("Processing upload request for segment: {} of table: {} with upload type: {} from client: {}, "

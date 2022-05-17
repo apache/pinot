@@ -133,6 +133,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -167,7 +168,7 @@ public class PinotHelixResourceManager {
 
   // TODO: make this configurable
   public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
-  public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 secondL
+  public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
 
   private static final SimpleDateFormat SIMPLE_DATE_FORMAT = new SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'");
 
@@ -1997,26 +1998,14 @@ public class PinotHelixResourceManager {
   public void assignTableSegment(String tableNameWithType, String segmentName) {
     String segmentZKMetadataPath =
         ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
-    InstancePartitionsType instancePartitionsType;
-    if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-      // In an upsert enabled LLC realtime table, all segments of the same partition are collocated on the same server
-      // -- consuming or completed. So it is fine to use CONSUMING as the InstancePartitionsType.
-      // TODO When upload segments is open to all realtime tables, we should change the type to COMPLETED instead.
-      // In addition, RealtimeSegmentAssignment.assignSegment(..) method should be updated so that the method does not
-      // assign segments to CONSUMING instance partition only.
-      instancePartitionsType = InstancePartitionsType.CONSUMING;
-    } else {
-      instancePartitionsType = InstancePartitionsType.OFFLINE;
-    }
 
     // Assign instances for the segment and add it into IdealState
     try {
       TableConfig tableConfig = getTableConfig(tableNameWithType);
       Preconditions.checkState(tableConfig != null, "Failed to find table config for table: " + tableNameWithType);
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+          fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
       SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = Collections
-          .singletonMap(instancePartitionsType, InstancePartitionsUtils
-              .fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, instancePartitionsType));
       synchronized (getTableUpdaterLock(tableNameWithType)) {
         HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
           assert idealState != null;
@@ -2048,6 +2037,35 @@ public class PinotHelixResourceManager {
       }
       throw e;
     }
+  }
+
+  private Map<InstancePartitionsType, InstancePartitions> fetchOrComputeInstancePartitions(String tableNameWithType,
+      TableConfig tableConfig) {
+    if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+      return Collections.singletonMap(InstancePartitionsType.OFFLINE, InstancePartitionsUtils
+          .fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, InstancePartitionsType.OFFLINE));
+    }
+    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE) {
+      // In an upsert enabled LLC realtime table, all segments of the same partition are collocated on the same server
+      // -- consuming or completed. So it is fine to use CONSUMING as the InstancePartitionsType.
+      return Collections.singletonMap(InstancePartitionsType.CONSUMING, InstancePartitionsUtils
+          .fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, InstancePartitionsType.CONSUMING));
+    }
+    // for non-upsert realtime tables, if COMPLETED instance partitions is available or tag override for
+    // completed segments is provided in the tenant config, COMPLETED instance partitions type is used
+    // otherwise CONSUMING instance partitions type is used.
+    InstancePartitionsType instancePartitionsType = InstancePartitionsType.COMPLETED;
+    InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
+        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
+    if (instancePartitions != null) {
+      return Collections.singletonMap(instancePartitionsType, instancePartitions);
+    }
+    TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();
+    if (tagOverrideConfig == null || tagOverrideConfig.getRealtimeCompleted() == null) {
+      instancePartitionsType = InstancePartitionsType.CONSUMING;
+    }
+    return Collections.singletonMap(instancePartitionsType,
+        InstancePartitionsUtils.computeDefaultInstancePartitions(_helixZkManager, tableConfig, instancePartitionsType));
   }
 
   public boolean isUpsertTable(String tableName) {

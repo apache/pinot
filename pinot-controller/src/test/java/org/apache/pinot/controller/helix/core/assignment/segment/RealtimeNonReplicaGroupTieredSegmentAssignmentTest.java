@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -162,11 +163,13 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
 
   @Test
   public void testRelocateCompletedSegments() {
+    Map<InstancePartitionsType, InstancePartitions> onlyConsumingInstancePartitionMap =
+        ImmutableMap.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       String segmentName = _segments.get(segmentId);
       List<String> instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
+          _segmentAssignment.assignSegment(segmentName, currentAssignment, onlyConsumingInstancePartitionMap);
       addToAssignment(currentAssignment, segmentId, instancesAssigned);
     }
 

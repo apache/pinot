@@ -23,6 +23,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -55,11 +57,16 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     List<File> avroFiles = unpackAvroData(_tempDir);
 
     // Create and upload the schema and table config
-    addSchema(createSchema());
-    addTableConfig(createRealtimeTableConfig(avroFiles.get(0)));
+    Schema schema = createSchema();
+    addSchema(schema);
+    TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
+    addTableConfig(tableConfig);
 
     // Push data into Kafka
     pushAvroIntoKafka(avroFiles);
+
+    // create segments and upload them to controller
+    createSegmentsAndUpload(avroFiles, schema, tableConfig);
 
     // Set up the H2 connection
     setUpH2Connection(avroFiles);
@@ -69,6 +76,11 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+  }
+
+  protected void createSegmentsAndUpload(List<File> avroFile, Schema schema, TableConfig tableConfig)
+      throws Exception {
+    // Do nothing. This is specific to LLC use cases for now.
   }
 
   @Override

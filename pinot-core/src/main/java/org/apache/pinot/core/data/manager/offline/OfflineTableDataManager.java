@@ -18,13 +18,8 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
-import java.io.File;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
-import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.spi.data.Schema;
 
 
 /**
@@ -43,12 +38,5 @@ public class OfflineTableDataManager extends BaseTableDataManager {
 
   @Override
   protected void doShutdown() {
-  }
-
-  @Override
-  public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
-      throws Exception {
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
   }
 }
