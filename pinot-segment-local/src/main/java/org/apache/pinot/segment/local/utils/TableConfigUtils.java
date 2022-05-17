@@ -325,17 +325,18 @@ public final class TableConfigUtils {
         Set<String> aggregationColumns = new HashSet<>();
         for (AggregationConfig aggregationConfig : aggregationConfigs) {
           String columnName = aggregationConfig.getColumnName();
+          String aggregationFunction = aggregationConfig.getAggregationFunction();
+          if (columnName == null || aggregationFunction == null) {
+            throw new IllegalStateException(
+                "columnName/aggregationFunction cannot be null in AggregationConfig " + aggregationConfig);
+          }
+
           if (schema != null) {
             FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
             Preconditions.checkState(fieldSpec != null, "The destination column '" + columnName
                 + "' of the aggregation function must be present in the schema");
             Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
                 "The destination column '" + columnName + "' of the aggregation function must be a metric column");
-          }
-          String aggregationFunction = aggregationConfig.getAggregationFunction();
-          if (columnName == null || aggregationFunction == null) {
-            throw new IllegalStateException(
-                "columnName/aggregationFunction cannot be null in AggregationConfig " + aggregationConfig);
           }
 
           if (!aggregationColumns.add(columnName)) {
