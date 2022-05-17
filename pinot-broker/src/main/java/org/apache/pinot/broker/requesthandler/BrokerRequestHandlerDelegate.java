@@ -34,6 +34,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
  */
 public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
+  private String _defaultBrokerRequestHandlerType;
   @Nullable
   private SingleConnectionBrokerRequestHandler _singleConnectionBrokerRequestHandler;
   @Nullable
@@ -41,11 +42,13 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   @Nullable
   private WorkerQueryRequestHandler _multiStageWorkerRequestHandler;
 
-  public BrokerRequestHandlerDelegate(
+  public BrokerRequestHandlerDelegate(@Nullable String defaultBrokerRequestHandlerType,
       @Nullable SingleConnectionBrokerRequestHandler singleConnectionBrokerRequestHandler,
       @Nullable GrpcBrokerRequestHandler grpcBrokerRequestHandler,
       @Nullable WorkerQueryRequestHandler multiStageWorkerRequestHandler
   ) {
+    _defaultBrokerRequestHandlerType = defaultBrokerRequestHandlerType != null ? defaultBrokerRequestHandlerType
+        : CommonConstants.Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE;
     _singleConnectionBrokerRequestHandler = singleConnectionBrokerRequestHandler;
     _grpcBrokerRequestHandler = grpcBrokerRequestHandler;
     _multiStageWorkerRequestHandler = multiStageWorkerRequestHandler;
@@ -82,7 +85,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       RequestContext requestContext)
       throws Exception {
     JsonNode node = request.get(CommonConstants.Broker.BROKER_REQUEST_HANDLER_TYPE_JSON_OVERRIDE_KEY);
-    String handlerType = node == null ? CommonConstants.Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE : node.asText();
+    String handlerType = node == null ? _defaultBrokerRequestHandlerType : node.asText();
     switch (handlerType) {
       case CommonConstants.Broker.NETTY_BROKER_REQUEST_HANDLER_TYPE:
         if (_singleConnectionBrokerRequestHandler != null) {

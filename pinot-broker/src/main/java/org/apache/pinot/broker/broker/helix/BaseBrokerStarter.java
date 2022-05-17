@@ -287,8 +287,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               tableCache, _brokerMetrics, null);
     }
 
-    _brokerRequestHandler = new BrokerRequestHandlerDelegate(nettyBrokerRequestHandler, grpcBrokerRequestHandler,
-        multiStageQueryRequestHandler);
+    _brokerRequestHandler = new BrokerRequestHandlerDelegate(brokerRequestHandlerType, nettyBrokerRequestHandler,
+        grpcBrokerRequestHandler, multiStageQueryRequestHandler);
     _brokerRequestHandler.start();
     String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
     if (controllerUrl != null) {

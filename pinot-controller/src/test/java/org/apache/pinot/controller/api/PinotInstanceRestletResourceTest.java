@@ -84,10 +84,11 @@ public class PinotInstanceRestletResourceTest {
 
     // Create untagged broker and server instances
     String createInstanceUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forInstanceCreate();
-    Instance brokerInstance = new Instance("1.2.3.4", 1234, InstanceType.BROKER, null, null, 0, 0, false);
+    Instance brokerInstance = new Instance("1.2.3.4", 1234, InstanceType.BROKER, null, null, 0, 0, 0, 0, false);
     ControllerTest.sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
 
-    Instance serverInstance = new Instance("1.2.3.4", 2345, InstanceType.SERVER, null, null, 8090, 8091, false);
+    Instance serverInstance = new Instance("1.2.3.4", 2345, InstanceType.SERVER, null, null, 8090, 8091, 8092, 8093,
+        false);
     ControllerTest.sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
 
     // Check that we have added two more instances
@@ -95,7 +96,8 @@ public class PinotInstanceRestletResourceTest {
 
     // Create broker and server instances with tags and pools
     brokerInstance =
-        new Instance("2.3.4.5", 1234, InstanceType.BROKER, Collections.singletonList("tag_BROKER"), null, 0, 0, false);
+        new Instance("2.3.4.5", 1234, InstanceType.BROKER, Collections.singletonList("tag_BROKER"), null, 0, 0, 0, 0,
+            false);
     ControllerTest.sendPostRequest(createInstanceUrl, brokerInstance.toJsonString());
 
     Map<String, Integer> serverPools = new TreeMap<>();
@@ -103,7 +105,7 @@ public class PinotInstanceRestletResourceTest {
     serverPools.put("tag_REALTIME", 1);
     serverInstance =
         new Instance("2.3.4.5", 2345, InstanceType.SERVER, Arrays.asList("tag_OFFLINE", "tag_REALTIME"), serverPools,
-            18090, 18091, false);
+            18090, 18091, 18092, 18093, false);
     ControllerTest.sendPostRequest(createInstanceUrl, serverInstance.toJsonString());
 
     // Check that we have added four instances so far
@@ -137,7 +139,8 @@ public class PinotInstanceRestletResourceTest {
     // Test PUT Instance API
     String newBrokerTag = "new-broker-tag";
     Instance newBrokerInstance =
-        new Instance("1.2.3.4", 1234, InstanceType.BROKER, Collections.singletonList(newBrokerTag), null, 0, 0, false);
+        new Instance("1.2.3.4", 1234, InstanceType.BROKER, Collections.singletonList(newBrokerTag), null, 0, 0, 0, 0,
+            false);
     String brokerInstanceId = "Broker_1.2.3.4_1234";
     String brokerInstanceUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forInstance(brokerInstanceId);
     ControllerTest.sendPutRequest(brokerInstanceUrl, newBrokerInstance.toJsonString());
@@ -145,7 +148,7 @@ public class PinotInstanceRestletResourceTest {
     String newServerTag = "new-server-tag";
     Instance newServerInstance =
         new Instance("1.2.3.4", 2345, InstanceType.SERVER, Collections.singletonList(newServerTag), null, 28090, 28091,
-            true);
+            28092, 28093, true);
     String serverInstanceId = "Server_1.2.3.4_2345";
     String serverInstanceUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forInstance(serverInstanceId);
     ControllerTest.sendPutRequest(serverInstanceUrl, newServerInstance.toJsonString());
