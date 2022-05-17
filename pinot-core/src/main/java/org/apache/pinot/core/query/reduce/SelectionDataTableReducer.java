@@ -29,14 +29,12 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,20 +47,13 @@ public class SelectionDataTableReducer implements DataTableReducer {
   private static final Logger LOGGER = LoggerFactory.getLogger(SelectionDataTableReducer.class);
 
   private final QueryContext _queryContext;
-  private final boolean _preserveType;
-  private final boolean _responseFormatSql;
 
   SelectionDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
-    Map<String, String> queryOptions = queryContext.getQueryOptions();
-    _preserveType = QueryOptionsUtils.isPreserveType(queryOptions);
-    _responseFormatSql = QueryOptionsUtils.isResponseFormatSQL(queryOptions);
   }
 
   /**
-   * Reduces data tables and sets selection results into
-   * 1. ResultTable if _responseFormatSql is true
-   * 2. SelectionResults by default
+   * Reduces data tables and sets selection results into ResultTable.
    */
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
@@ -71,12 +62,8 @@ public class SelectionDataTableReducer implements DataTableReducer {
     if (dataTableMap.isEmpty()) {
       // For empty data table map, construct empty result using the cached data schema for selection query
       List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
-      if (_responseFormatSql) {
-        DataSchema selectionDataSchema = SelectionOperatorUtils.getResultTableDataSchema(dataSchema, selectionColumns);
-        brokerResponseNative.setResultTable(new ResultTable(selectionDataSchema, Collections.emptyList()));
-      } else {
-        brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, Collections.emptyList()));
-      }
+      DataSchema selectionDataSchema = SelectionOperatorUtils.getResultTableDataSchema(dataSchema, selectionColumns);
+      brokerResponseNative.setResultTable(new ResultTable(selectionDataSchema, Collections.emptyList()));
     } else {
       // For data table map with more than one data tables, remove conflicting data tables
       if (dataTableMap.size() > 1) {
@@ -99,23 +86,13 @@ public class SelectionDataTableReducer implements DataTableReducer {
         // Selection order-by
         SelectionOperatorService selectionService = new SelectionOperatorService(_queryContext, dataSchema);
         selectionService.reduceWithOrdering(dataTableMap.values());
-        if (_responseFormatSql) {
-          brokerResponseNative.setResultTable(selectionService.renderResultTableWithOrdering());
-        } else {
-          brokerResponseNative.setSelectionResults(selectionService.renderSelectionResultsWithOrdering(_preserveType));
-        }
+        brokerResponseNative.setResultTable(selectionService.renderResultTableWithOrdering());
       } else {
         // Selection only
         List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
         List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), limit);
-        if (_responseFormatSql) {
-          brokerResponseNative.setResultTable(
-              SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, dataSchema, selectionColumns));
-        } else {
-          brokerResponseNative.setSelectionResults(
-              SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(reducedRows, dataSchema, selectionColumns,
-                  _preserveType));
-        }
+        brokerResponseNative.setResultTable(
+            SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, dataSchema, selectionColumns));
       }
     }
   }

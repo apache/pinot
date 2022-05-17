@@ -40,7 +40,7 @@ public class Quickstart extends QuickStartBase {
 
   private static final String TAB = "\t\t";
   private static final String NEW_LINE = "\n";
-  private static final String DEFAULT_BOOTSTRAP_DIRECTORY = "examples/batch/baseballStats";
+  private static final String DEFAULT_BOOTSTRAP_DIRECTORY = "examples/minions/batch/baseballStats";
 
   public enum Color {
     RESET("\u001B[0m"), GREEN("\u001B[32m"), YELLOW("\u001B[33m"), CYAN("\u001B[36m");
@@ -54,10 +54,6 @@ public class Quickstart extends QuickStartBase {
     Color(String code) {
       _code = code;
     }
-  }
-
-  public int getNumMinions() {
-    return 0;
   }
 
   public String getAuthToken() {
@@ -103,8 +99,7 @@ public class Quickstart extends QuickStartBase {
 
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
     QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1,
-            getNumMinions(), dataDir, true, getAuthToken(),
+        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1, dataDir, true, getAuthToken(),
             getConfigOverrides(), null, true);
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");

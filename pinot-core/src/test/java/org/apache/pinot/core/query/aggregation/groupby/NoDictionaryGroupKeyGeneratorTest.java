@@ -76,8 +76,9 @@ public class NoDictionaryGroupKeyGeneratorTest {
   private static final String STRING_COLUMN = "stringColumn";
   private static final String BYTES_COLUMN = "bytesColumn";
   private static final String BYTES_DICT_COLUMN = "bytesDictColumn";
-  private static final List<String> COLUMNS = Arrays
-      .asList(INT_COLUMN, LONG_COLUMN, FLOAT_COLUMN, DOUBLE_COLUMN, STRING_COLUMN, BYTES_COLUMN, BYTES_DICT_COLUMN);
+  private static final List<String> COLUMNS =
+      Arrays.asList(INT_COLUMN, LONG_COLUMN, FLOAT_COLUMN, DOUBLE_COLUMN, STRING_COLUMN, BYTES_COLUMN,
+          BYTES_DICT_COLUMN);
   private static final int NUM_COLUMNS = COLUMNS.size();
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setNoDictionaryColumns(COLUMNS.subList(0, NUM_COLUMNS - 1)).build();
@@ -148,7 +149,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
     // Create transform operator and block
     // NOTE: put all columns into group-by so that transform operator has expressions for all columns
     String query = "SELECT COUNT(*) FROM testTable GROUP BY " + StringUtils.join(COLUMNS, ", ");
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     List<ExpressionContext> expressions = new ArrayList<>();
     for (String column : COLUMNS) {
       expressions.add(ExpressionContext.forIdentifier(column));
@@ -215,10 +216,10 @@ public class NoDictionaryGroupKeyGeneratorTest {
         "Number of group keys mis-match.");
 
     // Assert all group key values are as expected
-    Iterator<GroupKeyGenerator.StringGroupKey> stringGroupKeys = groupKeyGenerator.getStringGroupKeys();
-    while (stringGroupKeys.hasNext()) {
-      GroupKeyGenerator.StringGroupKey groupKey = stringGroupKeys.next();
-      assertTrue(expectedGroupKeys.contains(groupKey._stringKey), "Unexpected group key: " + groupKey._stringKey);
+    Iterator<GroupKeyGenerator.GroupKey> groupKeys = groupKeyGenerator.getGroupKeys();
+    while (groupKeys.hasNext()) {
+      GroupKeyGenerator.GroupKey groupKey = groupKeys.next();
+      assertTrue(expectedGroupKeys.contains(getActualGroupKey(groupKey._keys)));
     }
   }
 
@@ -238,6 +239,17 @@ public class NoDictionaryGroupKeyGeneratorTest {
       groupKeys.add(stringBuilder.toString());
     }
     return groupKeys;
+  }
+
+  private String getActualGroupKey(Object[] groupKeys) {
+    StringBuilder stringBuilder = new StringBuilder();
+    for (int i = 0; i < groupKeys.length; i++) {
+      if (i > 0) {
+        stringBuilder.append(GroupKeyGenerator.DELIMITER);
+      }
+      stringBuilder.append(groupKeys[i]);
+    }
+    return stringBuilder.toString();
   }
 
   @AfterClass

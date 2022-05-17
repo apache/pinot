@@ -39,13 +39,13 @@ public class IngestionConfig extends BaseJsonConfig {
   private StreamIngestionConfig _streamIngestionConfig;
 
   @JsonPropertyDescription("Config related to filtering records during ingestion")
-  private final FilterConfig _filterConfig;
+  private FilterConfig _filterConfig;
 
   @JsonPropertyDescription("Configs related to record transformation functions applied during ingestion")
-  private final List<TransformConfig> _transformConfigs;
+  private List<TransformConfig> _transformConfigs;
 
   @JsonPropertyDescription("Config related to handling complex type")
-  private final ComplexTypeConfig _complexTypeConfig;
+  private ComplexTypeConfig _complexTypeConfig;
 
   @JsonCreator
   public IngestionConfig(@JsonProperty("batchIngestionConfig") @Nullable BatchIngestionConfig batchIngestionConfig,
@@ -58,6 +58,9 @@ public class IngestionConfig extends BaseJsonConfig {
     _filterConfig = filterConfig;
     _transformConfigs = transformConfigs;
     _complexTypeConfig = complexTypeConfig;
+  }
+
+  public IngestionConfig() {
   }
 
   @Nullable
@@ -91,5 +94,17 @@ public class IngestionConfig extends BaseJsonConfig {
 
   public void setStreamIngestionConfig(StreamIngestionConfig streamIngestionConfig) {
     _streamIngestionConfig = streamIngestionConfig;
+  }
+
+  public void setFilterConfig(FilterConfig filterConfig) {
+    _filterConfig = filterConfig;
+  }
+
+  public void setTransformConfigs(List<TransformConfig> transformConfigs) {
+    _transformConfigs = transformConfigs;
+  }
+
+  public void setComplexTypeConfig(ComplexTypeConfig complexTypeConfig) {
+    _complexTypeConfig = complexTypeConfig;
   }
 }

@@ -40,8 +40,8 @@ public class RecordReaderFactoryTest {
 
   @Test
   public void testGetRecordReaderConfigClassName() {
-    assertNull(getRecordReaderConfigClassName("avro"));
-    assertNull(getRecordReaderConfigClassName("gzipped_avro"));
+    assertEquals(getRecordReaderConfigClassName("avro"), DEFAULT_AVRO_RECORD_READER_CONFIG_CLASS);
+    assertEquals(getRecordReaderConfigClassName("gzipped_avro"), DEFAULT_AVRO_RECORD_READER_CONFIG_CLASS);
     assertEquals(getRecordReaderConfigClassName("csv"), DEFAULT_CSV_RECORD_READER_CONFIG_CLASS);
     assertNull(getRecordReaderConfigClassName("json"));
     assertEquals(getRecordReaderConfigClassName("thrift"), DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS);

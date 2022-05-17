@@ -65,7 +65,7 @@ public class CombineSlowOperatorsTest {
   @Test
   public void testSelectionOnlyCombineOperator() {
     List<Operator> operators = getOperators();
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable");
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
     queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
     SelectionOnlyCombineOperator combineOperator =
         new SelectionOnlyCombineOperator(operators, queryContext, _executorService);
@@ -78,7 +78,7 @@ public class CombineSlowOperatorsTest {
   @Test
   public void testAggregationOnlyCombineOperator() {
     List<Operator> operators = getOperators();
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT COUNT(*) FROM testTable");
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT COUNT(*) FROM testTable");
     queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
     AggregationOnlyCombineOperator combineOperator =
         new AggregationOnlyCombineOperator(operators, queryContext, _executorService);
@@ -86,20 +86,10 @@ public class CombineSlowOperatorsTest {
   }
 
   @Test
-  public void testGroupByCombineOperator() {
-    List<Operator> operators = getOperators();
-    QueryContext queryContext =
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT COUNT(*) FROM testTable GROUP BY column");
-    queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
-    GroupByCombineOperator combineOperator = new GroupByCombineOperator(operators, queryContext, _executorService);
-    testCombineOperator(operators, combineOperator);
-  }
-
-  @Test
   public void testGroupByOrderByCombineOperator() {
     List<Operator> operators = getOperators();
     QueryContext queryContext =
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT COUNT(*) FROM testTable GROUP BY column");
+        QueryContextConverterUtils.getQueryContext("SELECT COUNT(*) FROM testTable GROUP BY column");
     queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
     GroupByOrderByCombineOperator combineOperator =
         new GroupByOrderByCombineOperator(operators, queryContext, _executorService);

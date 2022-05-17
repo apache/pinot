@@ -156,18 +156,48 @@ public class ColumnValueSegmentPrunerTest {
     when(bloomFilterReader.mightContain("1")).thenReturn(true);
     when(bloomFilterReader.mightContain("2")).thenReturn(true);
     when(bloomFilterReader.mightContain("3")).thenReturn(true);
+    when(bloomFilterReader.mightContain("5")).thenReturn(true);
+    when(bloomFilterReader.mightContain("7")).thenReturn(true);
+    when(bloomFilterReader.mightContain("21")).thenReturn(true);
     when(dataSourceMetadata.getMinValue()).thenReturn(5);
     when(dataSourceMetadata.getMaxValue()).thenReturn(10);
 
+    // all out the bloom filter and out of range
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0)"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0, 1, 2)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0, 3, 4)"));
+
+    // some in the bloom filter but all out of range
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 1"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (1)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (21)"));
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (21, 30)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21 AND column = 30"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21 OR column = 30"));
+
+    // all out the bloom filter but some in range
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 6"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (6)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 OR column = 6"));
+
+    // all in the bloom filter and in range
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (5)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5 OR column = 7"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (5, 7)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5 AND column = 7"));
+
+    // some in the bloom filter and in range
     assertFalse(
         runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5 OR column = 0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5 AND column = 0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (8, 10)"));
   }
 
   private boolean runPruner(IndexSegment indexSegment, String query) {
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(query);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     return PRUNER.prune(Collections.singletonList(indexSegment), queryContext).isEmpty();
   }
 }

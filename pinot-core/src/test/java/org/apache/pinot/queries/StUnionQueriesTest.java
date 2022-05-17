@@ -22,15 +22,14 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -38,7 +37,7 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.geospatial.transform.function.ScalarFunctions;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -61,7 +60,6 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -157,7 +155,7 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     String query = "SELECT ST_UNION(pointColumn) FROM testTable";
 
     // Inner segment
-    Operator operator = getOperatorForPqlQuery(query);
+    Operator operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
     IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, NUM_RECORDS,
@@ -168,11 +166,9 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     assertEquals(aggregationResult.get(0), _intermediateResult);
 
     // Inter segments
-    String[] expectedResults = new String[1];
-    expectedResults[0] = BytesUtils.toHexString(_expectedResults);
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
+    Object[] expectedResults = new Object[]{BytesUtils.toHexString(_expectedResults)};
     QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 4 * NUM_RECORDS, 0, 4 * NUM_RECORDS, 4 * NUM_RECORDS,
+        .testInterSegmentsResult(getBrokerResponse(query), 4 * NUM_RECORDS, 0, 4 * NUM_RECORDS, 4 * NUM_RECORDS,
             expectedResults);
   }
 
@@ -190,11 +186,10 @@ public class StUnionQueriesTest extends BaseQueriesTest {
         + "FROM testTable";
 
     // Inner segment
-    Operator operator = getOperatorForPqlQuery(query);
-    assertTrue(operator instanceof AggregationOperator);
-    IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, NUM_RECORDS,
-        NUM_RECORDS);
+    AggregationOperator aggregationOperator = getOperator(query);
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS, NUM_RECORDS);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 8);
@@ -203,8 +198,6 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     }
 
     // Inter segment
-    BrokerResponseNative brokerResponse = getBrokerResponseForSqlQuery(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
     DataSchema expectedDataSchema = new DataSchema(new String[]{
         "stastext(stunion(pointColumn))",
         "stasbinary(stunion(pointColumn))",
@@ -224,10 +217,7 @@ public class StUnionQueriesTest extends BaseQueriesTest {
         ColumnDataType.BYTES,
         ColumnDataType.BYTES
     });
-    assertEquals(resultTable.getDataSchema(), expectedDataSchema);
-    List<Object[]> rows = resultTable.getRows();
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0), new Object[]{
+    List<Object[]> expectedRows = Collections.singletonList(new Object[]{
         ScalarFunctions.stAsText(_expectedResults),
         BytesUtils.toHexString(ScalarFunctions.stAsBinary(_expectedResults)),
         BytesUtils.toHexString(ScalarFunctions.toGeometry(_expectedResults)),
@@ -237,6 +227,8 @@ public class StUnionQueriesTest extends BaseQueriesTest {
         BytesUtils.toHexString(ScalarFunctions.toGeometry(_expectedResults)),
         BytesUtils.toHexString(ScalarFunctions.toSphericalGeography(_expectedResults))
     });
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query),
+        new ResultTable(expectedDataSchema, expectedRows));
   }
 
   @Test
@@ -244,7 +236,7 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     String query = "SELECT ST_UNION(pointColumn) FROM testTable where intColumn=-1";
 
     // Inner segment
-    Operator operator = getOperatorForPqlQuery(query);
+    Operator operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
     IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), 0, 0, 0, NUM_RECORDS);
@@ -254,23 +246,20 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     assertEquals(aggregationResult.get(0), GeometryUtils.EMPTY_POINT);
 
     // Inter segments
-    String[] expectedResults = new String[1];
-    expectedResults[0] = BytesUtils.toHexString(GeometrySerializer.serialize(GeometryUtils.EMPTY_POINT));
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 0, 0, 0, 4 * NUM_RECORDS, expectedResults);
+    Object[] expectedResults =
+        new Object[]{BytesUtils.toHexString(GeometrySerializer.serialize(GeometryUtils.EMPTY_POINT))};
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query), 0, 0, 0, 4 * NUM_RECORDS, expectedResults);
   }
 
   @Test
   public void testAggregationGroupBy() {
-    String query = "SELECT ST_UNION(pointColumn) FROM testTable GROUP BY intColumn";
+    String query = "SELECT intColumn, ST_UNION(pointColumn) FROM testTable GROUP BY intColumn";
 
     // Inner segment
-    Operator operator = getOperatorForPqlQuery(query);
-    assertTrue(operator instanceof AggregationGroupByOperator);
-    IntermediateResultsBlock resultsBlock = ((AggregationGroupByOperator) operator).nextBlock();
-    QueriesTestUtils
-        .testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, 2 * NUM_RECORDS,
-            NUM_RECORDS);
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
+    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
+        2 * NUM_RECORDS, NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
     int numGroups = 0;
@@ -284,28 +273,19 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     assertEquals(numGroups, _values.size());
 
     // Inter segments
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(query);
-    Assert.assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
-    Assert.assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 2 * NUM_RECORDS);
-    Assert.assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
-    // size of this array will be equal to number of aggregation functions since
-    // we return each aggregation function separately
-    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-    int numAggregationColumns = aggregationResults.size();
-    Assert.assertEquals(numAggregationColumns, 1);
-    for (AggregationResult aggregationResult : aggregationResults) {
-      Assert.assertNull(aggregationResult.getValue());
-      List<GroupByResult> groupByResults = aggregationResult.getGroupByResult();
-      numGroups = groupByResults.size();
-      for (int i = 0; i < numGroups; i++) {
-        GroupByResult groupByResult = groupByResults.get(i);
-        List<String> group = groupByResult.getGroup();
-        assertEquals(group.size(), 1);
-        int key = Integer.parseInt(group.get(0));
-        assertTrue(_values.containsKey(key));
-        assertEquals(groupByResult.getValue(), BytesUtils.toHexString(GeometrySerializer.serialize(_values.get(key))));
-      }
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
+    assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
+    assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 2 * NUM_RECORDS);
+    assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
+    List<Object[]> rows = brokerResponse.getResultTable().getRows();
+    assertEquals(rows.size(), 10);
+    for (Object[] row : rows) {
+      assertEquals(row.length, 2);
+      Integer key = (Integer) row[0];
+      Geometry geometry = _values.get(key);
+      assertNotNull(geometry);
+      assertEquals(row[1], BytesUtils.toHexString(GeometrySerializer.serialize(geometry)));
     }
   }
 

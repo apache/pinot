@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -43,7 +42,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -57,6 +55,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
   private final static String COL1_NO_INDEX = "noIndexCol1";
   private final static String COL2_NO_INDEX = "noIndexCol2";
   private final static String COL3_NO_INDEX = "noIndexCol3";
+  private final static String COL4_NO_INDEX = "noIndexCol4";
   private final static String COL1_INVERTED_INDEX = "invertedIndexCol1";
   private final static String COL2_INVERTED_INDEX = "invertedIndexCol2";
   private final static String COL3_INVERTED_INDEX = "invertedIndexCol3";
@@ -71,6 +70,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
       .addSingleValueDimension(COL1_NO_INDEX, FieldSpec.DataType.INT)
       .addSingleValueDimension(COL2_NO_INDEX, FieldSpec.DataType.INT)
       .addSingleValueDimension(COL3_NO_INDEX, FieldSpec.DataType.INT)
+      .addSingleValueDimension(COL4_NO_INDEX, FieldSpec.DataType.BOOLEAN)
       .addSingleValueDimension(COL1_INVERTED_INDEX, FieldSpec.DataType.DOUBLE)
       .addSingleValueDimension(COL2_INVERTED_INDEX, FieldSpec.DataType.INT)
       .addSingleValueDimension(COL3_INVERTED_INDEX, FieldSpec.DataType.STRING)
@@ -106,14 +106,16 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     return _indexSegments;
   }
 
-  GenericRow createMockRecord(int noIndexCol1, int noIndexCol2, int noIndexCol3, double invertedIndexCol1,
-      int invertedIndexCol2, String intervedIndexCol3, double rangeIndexCol1, int rangeIndexCol2, int rangeIndexCol3,
-      double sortedIndexCol1, String jsonIndexCol1, String textIndexCol1) {
+  GenericRow createMockRecord(int noIndexCol1, int noIndexCol2, int noIndexCol3,
+      boolean noIndexCol4, double invertedIndexCol1, int invertedIndexCol2, String intervedIndexCol3,
+      double rangeIndexCol1, int rangeIndexCol2, int rangeIndexCol3, double sortedIndexCol1, String jsonIndexCol1,
+      String textIndexCol1) {
 
     GenericRow record = new GenericRow();
     record.putValue(COL1_NO_INDEX, noIndexCol1);
     record.putValue(COL2_NO_INDEX, noIndexCol2);
     record.putValue(COL3_NO_INDEX, noIndexCol3);
+    record.putValue(COL4_NO_INDEX, noIndexCol4);
 
     record.putValue(COL1_INVERTED_INDEX, invertedIndexCol1);
     record.putValue(COL2_INVERTED_INDEX, invertedIndexCol2);
@@ -137,11 +139,11 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     FileUtils.deleteDirectory(INDEX_DIR);
 
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
-    records.add(createMockRecord(1, 2, 3, 1.1, 2, "daffy", 10.1, 20, 30, 100.1,
+    records.add(createMockRecord(1, 2, 3, true, 1.1, 2, "daffy", 10.1, 20, 30, 100.1,
         "{\"first\": \"daffy\", \"last\": " + "\"duck\"}", "daffy"));
-    records.add(createMockRecord(0, 1, 2, 0.1, 1, "mickey", 0.1, 10, 20, 100.2,
+    records.add(createMockRecord(0, 1, 2, false, 0.1, 1, "mickey", 0.1, 10, 20, 100.2,
         "{\"first\": \"mickey\", \"last\": " + "\"mouse\"}", "mickey"));
-    records.add(createMockRecord(3, 4, 5, 2.1, 3, "mickey", 20.1, 30, 40, 100.3,
+    records.add(createMockRecord(3, 4, 5, true, 2.1, 3, "mickey", 20.1, 30, 40, 100.3,
         "{\"first\": \"mickey\", \"last\": " + "\"mouse\"}", "mickey"));
 
     IndexingConfig indexingConfig = TABLE_CONFIG.getIndexingConfig();
@@ -182,39 +184,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
   /** Checks the correctness of EXPLAIN PLAN output. */
   private void check(String query, ResultTable expected) {
-    BrokerResponseNative response = getBrokerResponseForSqlQuery(query);
-    ResultTable actual = response.getResultTable();
-
-    System.out.println(resultTableToString("Expected", expected));
-    System.out.println(resultTableToString("Actual", actual));
-
-    Assert.assertEquals(actual.getDataSchema(), expected.getDataSchema());
-    Assert.assertEquals(actual.getRows().size(), expected.getRows().size());
-
-    List<Object[]> expectedRows = expected.getRows();
-    List<Object[]> actualRows = actual.getRows();
-    for (int i = 0; i < expectedRows.size(); i++) {
-      Object[] expectedRow = expectedRows.get(i);
-      Object[] actualRow = actualRows.get(i);
-      Assert.assertEquals(actualRow.length, expectedRow.length);
-
-      for (int j = 0; j < actualRow.length; j++) {
-        Assert.assertEquals(actualRow[j], expectedRow[j]);
-      }
-    }
-  }
-
-  /** This function is used to generated expected results while creating test cases; otherwise, not used. */
-  private static String resultTableToString(String tag, ResultTable table) {
-    System.out.println("\n" + tag + ":");
-    List<Object[]> rows = table.getRows();
-
-    StringBuffer buffer = new StringBuffer();
-    for (Object[] row : rows) {
-      buffer.append("result.add(new Object[]{\"" + row[0] + "\", " + row[1] + ", " + row[2] + "});\n");
-    }
-
-    return buffer.toString();
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query), expected);
   }
 
   @Test
@@ -225,14 +195,14 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"COMBINE_SELECT", 1, 0});
     result1.add(new Object[]{
         "SELECT(selectList:invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, jsonIndexCol1, "
-            + "noIndexCol1, noIndexCol2, noIndexCol3, rangeIndexCol1, rangeIndexCol2, rangeIndexCol3, "
+            + "noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, rangeIndexCol1, rangeIndexCol2, rangeIndexCol3, "
             + "sortedIndexCol1, textIndexCol1)", 2, 1});
     result1.add(new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, invertedIndexCol2, invertedIndexCol3, "
-        + "jsonIndexCol1, noIndexCol1, noIndexCol2, noIndexCol3, rangeIndexCol1, rangeIndexCol2, rangeIndexCol3, "
-        + "sortedIndexCol1, textIndexCol1)", 3, 2});
-    result1.add(new Object[]{"PROJECT(sortedIndexCol1, noIndexCol3, rangeIndexCol1, rangeIndexCol2, jsonIndexCol1, "
-        + "invertedIndexCol1, noIndexCol2, invertedIndexCol2, noIndexCol1, invertedIndexCol3, rangeIndexCol3, "
-        + "textIndexCol1)", 4, 3});
+        + "jsonIndexCol1, noIndexCol1, noIndexCol2, noIndexCol3, noIndexCol4, rangeIndexCol1, rangeIndexCol2, "
+        + "rangeIndexCol3, sortedIndexCol1, textIndexCol1)", 3, 2});
+    result1.add(new Object[]{"PROJECT(noIndexCol4, sortedIndexCol1, noIndexCol3, rangeIndexCol1, rangeIndexCol2, "
+        + "invertedIndexCol1, noIndexCol2, invertedIndexCol2, noIndexCol1, rangeIndexCol3, textIndexCol1, "
+        + "jsonIndexCol1, invertedIndexCol3)", 4, 3});
     result1.add(new Object[]{"DOC_ID_SET", 5, 4});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
     check(query1, new ResultTable(DATA_SCHEMA, result1));
@@ -371,6 +341,47 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"FILTER_FULL_SCAN(operator:RANGE,predicate:noIndexCol1 > '1')", 7, 6});
     result3.add(new Object[]{"FILTER_FULL_SCAN(operator:RANGE,predicate:noIndexCol2 BETWEEN '2' AND '101')", 8, 6});
     check(query3, new ResultTable(DATA_SCHEMA, result3));
+
+    String query4 = "EXPLAIN PLAN FOR SELECT invertedIndexCol1, noIndexCol1 FROM testTable WHERE noIndexCol1 > 1 OR "
+        + "contains(textIndexCol1, 'daff') OR noIndexCol2 BETWEEN 2 AND 101 LIMIT 100";
+    List<Object[]> result4 = new ArrayList<>();
+    result4.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
+    result4.add(new Object[]{"COMBINE_SELECT", 1, 0});
+    result4.add(new Object[]{"SELECT(selectList:invertedIndexCol1, noIndexCol1)", 2, 1});
+    result4.add(new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, noIndexCol1)", 3, 2});
+    result4.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
+    result4.add(new Object[]{"DOC_ID_SET", 5, 4});
+    result4.add(new Object[]{"FILTER_OR", 6, 5});
+    result4.add(new Object[]{"FILTER_FULL_SCAN(operator:RANGE,predicate:noIndexCol1 > '1')", 7, 6});
+    result4.add(new Object[]{"FILTER_EXPRESSION(operator:EQ,predicate:contains(textIndexCol1,'daff') = 'true')", 8, 6});
+    result4.add(new Object[]{"FILTER_FULL_SCAN(operator:RANGE,predicate:noIndexCol2 BETWEEN '2' AND '101')", 9, 6});
+    check(query4, new ResultTable(DATA_SCHEMA, result4));
+
+    String query5 = "EXPLAIN PLAN FOR SELECT invertedIndexCol1, noIndexCol1 FROM testTable WHERE noIndexCol4 LIMIT 100";
+    List<Object[]> result5 = new ArrayList<>();
+    result5.add(new Object[]{"BROKER_REDUCE(limit:100)", 0, -1});
+    result5.add(new Object[]{"COMBINE_SELECT", 1, 0});
+    result5.add(new Object[]{"SELECT(selectList:invertedIndexCol1, noIndexCol1)", 2, 1});
+    result5.add(new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, noIndexCol1)", 3, 2});
+    result5.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
+    result5.add(new Object[]{"DOC_ID_SET", 5, 4});
+    result5.add(new Object[]{"FILTER_FULL_SCAN(operator:EQ,predicate:noIndexCol4 = 'true')", 6, 5});
+    check(query5, new ResultTable(DATA_SCHEMA, result5));
+
+    String query6 = "EXPLAIN PLAN FOR SELECT invertedIndexCol1, noIndexCol1 FROM testTable WHERE startsWith "
+        + "(textIndexCol1, 'daff') AND noIndexCol4";
+    List<Object[]> result6 = new ArrayList<>();
+    result6.add(new Object[]{"BROKER_REDUCE(limit:10)", 0, -1});
+    result6.add(new Object[]{"COMBINE_SELECT", 1, 0});
+    result6.add(new Object[]{"SELECT(selectList:invertedIndexCol1, noIndexCol1)", 2, 1});
+    result6.add(new Object[]{"TRANSFORM_PASSTHROUGH(invertedIndexCol1, noIndexCol1)", 3, 2});
+    result6.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
+    result6.add(new Object[]{"DOC_ID_SET", 5, 4});
+    result6.add(new Object[]{"FILTER_AND", 6, 5});
+    result6.add(new Object[]{"FILTER_FULL_SCAN(operator:EQ,predicate:noIndexCol4 = 'true')", 7, 6});
+    result6.add(new Object[]{"FILTER_EXPRESSION(operator:EQ,predicate:startswith(textIndexCol1,'daff') = 'true')", 8,
+        6});
+    check(query6, new ResultTable(DATA_SCHEMA, result6));
   }
 
   /** Test case for SQL statements with filter that involves inverted or sorted index access. */

@@ -88,6 +88,7 @@ import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
+import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
@@ -97,6 +98,7 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -137,6 +139,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected HelixManager _helixParticipantManager;
   protected PinotMetricsRegistry _metricsRegistry;
   protected ControllerMetrics _controllerMetrics;
+  protected SqlQueryExecutor _sqlQueryExecutor;
   // Can only be constructed after resource manager getting started
   protected OfflineSegmentIntervalChecker _offlineSegmentIntervalChecker;
   protected RealtimeSegmentValidationManager _realtimeSegmentValidationManager;
@@ -178,10 +181,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _helixParticipantInstanceId = _config.getInstanceId();
     if (_helixParticipantInstanceId != null) {
       // NOTE: Force all instances to have the same prefix in order to derive the instance type based on the instance id
-      Preconditions
-          .checkState(_helixParticipantInstanceId.startsWith(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE),
-              "Instance id must have prefix '%s', got '%s'", CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE,
-              _helixParticipantInstanceId);
+      Preconditions.checkState(InstanceTypeUtils.isController(_helixParticipantInstanceId),
+          "Instance id must have prefix '%s', got '%s'", CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE,
+          _helixParticipantInstanceId);
     } else {
       _helixParticipantInstanceId = LeadControllerUtils.generateParticipantInstanceId(_hostname, _port);
     }
@@ -414,6 +416,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       LOGGER.info("Realtime tables with High Level consumers will NOT be supported");
       _realtimeSegmentsManager = null;
     }
+    _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
@@ -432,7 +435,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     final AccessControlFactory accessControlFactory;
     try {
       accessControlFactory = (AccessControlFactory) Class.forName(accessControlFactoryClass).newInstance();
-      accessControlFactory.init(_config);
+      accessControlFactory.init(_config, _helixResourceManager);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while creating new AccessControlFactory instance", e);
     }
@@ -461,6 +464,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(metadataEventNotifierFactory).to(MetadataEventNotifierFactory.class);
         bind(_leadControllerManager).to(LeadControllerManager.class);
         bind(_periodicTaskScheduler).to(PeriodicTaskScheduler.class);
+        bind(_sqlQueryExecutor).to(SqlQueryExecutor.class);
       }
     });
 

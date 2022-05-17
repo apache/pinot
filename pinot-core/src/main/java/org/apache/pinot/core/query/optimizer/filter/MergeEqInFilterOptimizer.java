@@ -28,12 +28,10 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
-import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.sql.FilterKind;
 
 
 /**
@@ -50,104 +48,6 @@ import org.apache.pinot.spi.data.Schema;
  *       flattened.
  */
 public class MergeEqInFilterOptimizer implements FilterOptimizer {
-
-  @Override
-  public FilterQueryTree optimize(FilterQueryTree filterQueryTree, @Nullable Schema schema) {
-    return optimize(filterQueryTree);
-  }
-
-  private FilterQueryTree optimize(FilterQueryTree filterQueryTree) {
-    FilterOperator operator = filterQueryTree.getOperator();
-    if (operator == FilterOperator.OR) {
-      List<FilterQueryTree> children = filterQueryTree.getChildren();
-      Map<String, Set<String>> valuesMap = new HashMap<>();
-      List<FilterQueryTree> newChildren = new ArrayList<>();
-      boolean recreateFilter = false;
-
-      // Iterate over all the child filters to merge EQ and IN predicates
-      for (FilterQueryTree child : children) {
-        FilterOperator childOperator = child.getOperator();
-        assert childOperator != FilterOperator.OR;
-        if (childOperator == FilterOperator.AND) {
-          child.getChildren().replaceAll(this::optimize);
-          newChildren.add(child);
-        } else if (childOperator == FilterOperator.EQUALITY) {
-          String column = child.getColumn();
-          String value = child.getValue().get(0);
-          Set<String> values = valuesMap.get(column);
-          if (values == null) {
-            values = new HashSet<>();
-            values.add(value);
-            valuesMap.put(column, values);
-          } else {
-            values.add(value);
-            // Recreate filter when multiple predicates can be merged
-            recreateFilter = true;
-          }
-        } else if (childOperator == FilterOperator.IN) {
-          String column = child.getColumn();
-          List<String> inPredicateValuesList = child.getValue();
-          Set<String> inPredicateValuesSet = new HashSet<>(inPredicateValuesList);
-          int numUniqueValues = inPredicateValuesSet.size();
-          if (numUniqueValues == 1 || numUniqueValues != inPredicateValuesList.size()) {
-            // Recreate filter when the IN predicate contains only 1 value (can be rewritten to EQ predicate), or values
-            // can be de-duplicated
-            recreateFilter = true;
-          }
-          Set<String> values = valuesMap.get(column);
-          if (values == null) {
-            valuesMap.put(column, inPredicateValuesSet);
-          } else {
-            values.addAll(inPredicateValuesSet);
-            // Recreate filter when multiple predicates can be merged
-            recreateFilter = true;
-          }
-        } else {
-          newChildren.add(child);
-        }
-      }
-
-      if (recreateFilter) {
-        if (newChildren.isEmpty() && valuesMap.size() == 1) {
-          // Single predicate without other filters
-          Map.Entry<String, Set<String>> entry = valuesMap.entrySet().iterator().next();
-          return getFilterQueryTree(entry.getKey(), entry.getValue());
-        } else {
-          for (Map.Entry<String, Set<String>> entry : valuesMap.entrySet()) {
-            newChildren.add(getFilterQueryTree(entry.getKey(), entry.getValue()));
-          }
-          return new FilterQueryTree(null, null, FilterOperator.OR, newChildren);
-        }
-      } else {
-        return filterQueryTree;
-      }
-    } else if (operator == FilterOperator.AND) {
-      filterQueryTree.getChildren().replaceAll(this::optimize);
-      return filterQueryTree;
-    } else if (operator == FilterOperator.IN) {
-      String column = filterQueryTree.getColumn();
-      List<String> valuesList = filterQueryTree.getValue();
-      Set<String> values = new HashSet<>(valuesList);
-      int numUniqueValues = values.size();
-      if (numUniqueValues == 1 || numUniqueValues != valuesList.size()) {
-        // Recreate filter when the IN predicate contains only 1 value (can be rewritten to EQ predicate), or values
-        // can be de-duplicated
-        return getFilterQueryTree(column, values);
-      } else {
-        return filterQueryTree;
-      }
-    } else {
-      return filterQueryTree;
-    }
-  }
-
-  /**
-   * Helper method to construct a EQ or IN predicate FilterQueryTree from the given column and values.
-   */
-  private static FilterQueryTree getFilterQueryTree(String column, Set<String> values) {
-    return new FilterQueryTree(column, new ArrayList<>(values),
-        values.size() == 1 ? FilterOperator.EQUALITY : FilterOperator.IN, null);
-  }
 
   @Override
   public Expression optimize(Expression filterExpression, @Nullable Schema schema) {

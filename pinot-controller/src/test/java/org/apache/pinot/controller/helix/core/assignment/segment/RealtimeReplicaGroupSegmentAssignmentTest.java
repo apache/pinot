@@ -318,7 +318,6 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
       currentAssignment
           .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(actualInstances, SegmentStateModel.ONLINE));
     });
-
   }
 
   private void addToAssignment(Map<String, Map<String, String>> currentAssignment, int segmentId,

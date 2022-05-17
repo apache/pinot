@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.startree;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -94,13 +94,13 @@ public class StarTreeUtils {
    */
   @Nullable
   public static Map<String, List<CompositePredicateEvaluator>> extractPredicateEvaluatorsMap(IndexSegment indexSegment,
-      @Nullable FilterContext filter, Map<Predicate, PredicateEvaluator> predicateEvaluatorMap) {
+      @Nullable FilterContext filter, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluatorMapping) {
     if (filter == null) {
       return Collections.emptyMap();
     }
 
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap = new HashMap<>();
-    Queue<FilterContext> queue = new LinkedList<>();
+    Queue<FilterContext> queue = new ArrayDeque<>();
     queue.add(filter);
     FilterContext filterNode;
     while ((filterNode = queue.poll()) != null) {
@@ -110,7 +110,7 @@ public class StarTreeUtils {
           break;
         case OR:
           Pair<String, List<PredicateEvaluator>> pair =
-              isOrClauseValidForStarTree(indexSegment, filterNode, predicateEvaluatorMap);
+              isOrClauseValidForStarTree(indexSegment, filterNode, predicateEvaluatorMapping);
           if (pair == null) {
             return null;
           }
@@ -126,7 +126,8 @@ public class StarTreeUtils {
           return null;
         case PREDICATE:
           Predicate predicate = filterNode.getPredicate();
-          PredicateEvaluator predicateEvaluator = getPredicateEvaluator(indexSegment, predicate, predicateEvaluatorMap);
+          PredicateEvaluator predicateEvaluator = getPredicateEvaluator(indexSegment, predicate,
+              predicateEvaluatorMapping);
           if (predicateEvaluator == null) {
             // The predicate cannot be solved with star-tree
             return null;
@@ -187,7 +188,7 @@ public class StarTreeUtils {
    */
   @Nullable
   private static Pair<String, List<PredicateEvaluator>> isOrClauseValidForStarTree(IndexSegment indexSegment,
-      FilterContext filter, Map<Predicate, PredicateEvaluator> predicateEvaluatorMap) {
+      FilterContext filter, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluatorMapping) {
     assert filter.getType() == FilterContext.Type.OR;
 
     List<Predicate> predicates = new ArrayList<>();
@@ -198,7 +199,7 @@ public class StarTreeUtils {
     String identifier = null;
     List<PredicateEvaluator> predicateEvaluators = new ArrayList<>();
     for (Predicate predicate : predicates) {
-      PredicateEvaluator predicateEvaluator = getPredicateEvaluator(indexSegment, predicate, predicateEvaluatorMap);
+      PredicateEvaluator predicateEvaluator = getPredicateEvaluator(indexSegment, predicate, predicateEvaluatorMapping);
       if (predicateEvaluator == null) {
         // The predicate cannot be solved with star-tree
         return null;
@@ -258,7 +259,7 @@ public class StarTreeUtils {
    */
   @Nullable
   private static PredicateEvaluator getPredicateEvaluator(IndexSegment indexSegment, Predicate predicate,
-      Map<Predicate, PredicateEvaluator> predicateEvaluatorMap) {
+      List<Pair<Predicate, PredicateEvaluator>> predicatesEvaluatorMapping) {
     ExpressionContext lhs = predicate.getLhs();
     if (lhs.getType() != ExpressionContext.Type.IDENTIFIER) {
       // Star-tree does not support non-identifier expression
@@ -283,6 +284,11 @@ public class StarTreeUtils {
       default:
         break;
     }
-    return predicateEvaluatorMap.get(predicate);
+    for (Pair<Predicate, PredicateEvaluator> pair : predicatesEvaluatorMapping) {
+      if (pair.getKey().equals(predicate)) {
+        return pair.getValue();
+      }
+    }
+    return null;
   }
 }

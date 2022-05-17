@@ -74,6 +74,13 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final String MAX_PARALLEL_SEGMENT_BUILDS = "realtime.max.parallel.segment.builds";
   private static final int DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS = 4;
 
+  // Key of how many parallel segment downloads can be made per table.
+  // A value of <= 0 indicates unlimited.
+  // Unlimited parallel downloads can make Pinot controllers receive high burst of download requests,
+  // causing controllers unavailable for that period of time.
+  private static final String MAX_PARALLEL_SEGMENT_DOWNLOADS = "table.level.max.parallel.segment.downloads";
+  private static final int DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS = -1;
+
   // Key of whether to enable split commit
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
   // Key of whether to enable split commit end with segment metadata files.
@@ -209,6 +216,12 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public int getMaxParallelSegmentBuilds() {
     return _instanceDataManagerConfiguration
         .getProperty(MAX_PARALLEL_SEGMENT_BUILDS, DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS);
+  }
+
+  @Override
+  public int getMaxParallelSegmentDownloads() {
+    return _instanceDataManagerConfiguration.getProperty(MAX_PARALLEL_SEGMENT_DOWNLOADS,
+        DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS);
   }
 
   @Override

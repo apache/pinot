@@ -20,11 +20,13 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -45,12 +47,14 @@ public class LiteralTransformFunction implements TransformFunction {
   private final long _longLiteral;
   private final float _floatLiteral;
   private final double _doubleLiteral;
+  private final BigDecimal _bigDecimalLiteral;
 
   // literals may be shared but values are intentionally not volatile as assignment races are benign
   private int[] _intResult;
   private long[] _longResult;
   private float[] _floatResult;
   private double[] _doubleResult;
+  private BigDecimal[] _bigDecimalResult;
   private String[] _stringResult;
   private byte[][] _bytesResult;
 
@@ -58,17 +62,21 @@ public class LiteralTransformFunction implements TransformFunction {
     _literal = literal;
     _dataType = inferLiteralDataType(literal);
     if (_dataType.isNumeric()) {
-      BigDecimal bigDecimal = new BigDecimal(_literal);
-      _intLiteral = bigDecimal.intValue();
-      _longLiteral = bigDecimal.longValue();
-      _floatLiteral = bigDecimal.floatValue();
-      _doubleLiteral = bigDecimal.doubleValue();
+      _bigDecimalLiteral = new BigDecimal(_literal);
+    } else if (_dataType == DataType.BOOLEAN) {
+      _bigDecimalLiteral = PinotDataType.BOOLEAN.toBigDecimal(Boolean.valueOf(literal));
+    } else if (_dataType == DataType.TIMESTAMP) {
+      // inferLiteralDataType successfully interpreted the literal as TIMESTAMP. _bigDecimalLiteral is populated and
+      // assigned to _longLiteral.
+      _bigDecimalLiteral = PinotDataType.TIMESTAMP.toBigDecimal(Timestamp.valueOf(literal));
     } else {
-      _intLiteral = 0;
-      _longLiteral = 0L;
-      _floatLiteral = 0F;
-      _doubleLiteral = 0D;
+      _bigDecimalLiteral = BigDecimal.ZERO;
     }
+
+    _intLiteral = _bigDecimalLiteral.intValue();
+    _longLiteral = _bigDecimalLiteral.longValue();
+    _floatLiteral = _bigDecimalLiteral.floatValue();
+    _doubleLiteral = _bigDecimalLiteral.doubleValue();
   }
 
   @VisibleForTesting
@@ -84,6 +92,8 @@ public class LiteralTransformFunction implements TransformFunction {
         return DataType.FLOAT;
       } else if (number instanceof Double) {
         return DataType.DOUBLE;
+      } else if (number instanceof BigDecimal | number instanceof BigInteger) {
+        return DataType.BIG_DECIMAL;
       } else {
         return DataType.STRING;
       }
@@ -204,6 +214,18 @@ public class LiteralTransformFunction implements TransformFunction {
       _doubleResult = doubleResult;
     }
     return doubleResult;
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    int numDocs = projectionBlock.getNumDocs();
+    BigDecimal[] bigDecimalResult = _bigDecimalResult;
+    if (bigDecimalResult == null || bigDecimalResult.length < numDocs) {
+      bigDecimalResult = new BigDecimal[numDocs];
+      Arrays.fill(bigDecimalResult, _bigDecimalLiteral);
+      _bigDecimalResult = bigDecimalResult;
+    }
+    return bigDecimalResult;
   }
 
   @Override

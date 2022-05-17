@@ -37,6 +37,7 @@ public class BasicAuthAccessFactory implements AccessControlFactory {
 
   private AccessControl _accessControl;
 
+  @Override
   public void init(PinotConfiguration configuration) {
     _accessControl = new BasicAuthAccessControl(BasicAuthUtils.extractBasicAuthPrincipals(configuration, PREFIX));
   }

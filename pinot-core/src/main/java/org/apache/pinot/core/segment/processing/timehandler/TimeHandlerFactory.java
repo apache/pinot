@@ -48,8 +48,8 @@ public class TimeHandlerFactory {
         Preconditions.checkState(dateTimeFieldSpec != null,
             "Time column: %s is not configured as DateTimeField within the schema", timeColumn);
         return new EpochTimeHandler(dateTimeFieldSpec, timeHandlerConfig.getStartTimeMs(),
-            timeHandlerConfig.getEndTimeMs(), timeHandlerConfig.getRoundBucketMs(),
-            timeHandlerConfig.getPartitionBucketMs());
+            timeHandlerConfig.getEndTimeMs(), timeHandlerConfig.isNegateWindowFilter(),
+            timeHandlerConfig.getRoundBucketMs(), timeHandlerConfig.getPartitionBucketMs());
       default:
         throw new IllegalStateException("Unsupported time handler type: " + type);
     }

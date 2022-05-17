@@ -94,6 +94,10 @@ public interface SegmentMetadata {
 
   Map<String, String> getCustomMap();
 
+  String getStartOffset();
+
+  String getEndOffset();
+
   default Set<String> getAllColumns() {
     return getSchema().getColumnNames();
   }

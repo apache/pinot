@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -35,21 +36,23 @@ import static org.testng.Assert.fail;
 
 public class PinotDataTypeTest {
   private static final PinotDataType[] SOURCE_TYPES = {
-      BYTE, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, STRING, JSON, BYTE_ARRAY, CHARACTER_ARRAY, SHORT_ARRAY,
-      INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY
+      BYTE, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, BIG_DECIMAL, STRING, JSON,
+      BYTE_ARRAY, CHARACTER_ARRAY, SHORT_ARRAY, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY
   };
   private static final Object[] SOURCE_VALUES = {
-      (byte) 123, (char) 123, (short) 123, 123, 123L, 123f, 123d, " 123", "123 ", new Object[]{(byte) 123},
-      new Object[]{(char) 123}, new Object[]{(short) 123}, new Object[]{123}, new Object[]{123L}, new Object[]{123f},
-      new Object[]{123d}, new Object[]{" 123"}
+      (byte) 123, (char) 123, (short) 123, 123, 123L, 123f, 123d, BigDecimal.valueOf(123), " 123", "123 ",
+      new Object[]{(byte) 123}, new Object[]{(char) 123}, new Object[]{(short) 123}, new Object[]{123},
+      new Object[]{123L}, new Object[]{123f}, new Object[]{123d}, new Object[]{" 123"}
   };
   private static final PinotDataType[] DEST_TYPES =
-      {INTEGER, LONG, FLOAT, DOUBLE, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
+      {INTEGER, LONG, FLOAT, DOUBLE, BIG_DECIMAL, INTEGER_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY};
   private static final Object[] EXPECTED_DEST_VALUES =
-      {123, 123L, 123f, 123d, new Object[]{123}, new Object[]{123L}, new Object[]{123f}, new Object[]{123d}};
+      {123, 123L, 123f, 123d, BigDecimal.valueOf(123), new Object[]{123}, new Object[]{123L}, new Object[]{123f},
+          new Object[]{123d}};
   private static final String[] EXPECTED_STRING_VALUES = {
       Byte.toString((byte) 123), Character.toString((char) 123), Short.toString((short) 123), Integer.toString(123),
-      Long.toString(123L), Float.toString(123f), Double.toString(123d), " 123", "123 ", Byte.toString((byte) 123),
+      Long.toString(123L), Float.toString(123f), Double.toString(123d),
+      (BigDecimal.valueOf(123)).toPlainString(), " 123", "123 ", Byte.toString((byte) 123),
       Character.toString((char) 123), Short.toString((short) 123), Integer.toString(123), Long.toString(123L),
       Float.toString(123f), Double.toString(123d), " 123"
   };
@@ -83,7 +86,15 @@ public class PinotDataTypeTest {
       int numSourceTypes = SOURCE_TYPES.length;
       for (int j = 0; j < numSourceTypes; j++) {
         Object actualDestValue = destType.convert(SOURCE_VALUES[j], SOURCE_TYPES[j]);
-        assertEquals(actualDestValue, expectedDestValue);
+        if (expectedDestValue.getClass().equals(BigDecimal.class)
+            || actualDestValue.getClass().equals(BigDecimal.class)) {
+          // Note: Unlike compareTo() method, BigDecimal equals() method considers two BigDecimal objects equal only
+          // if they are equal in value and scale, (thus 123.0 is not equal to 123 when compared by this method).
+          assertTrue(actualDestValue.equals(expectedDestValue)
+              || ((Comparable) expectedDestValue).compareTo(actualDestValue) == 0);
+        } else {
+          assertEquals(actualDestValue, expectedDestValue);
+        }
       }
     }
   }
@@ -241,6 +252,7 @@ public class PinotDataTypeTest {
     testCases.put(Long.class, LONG);
     testCases.put(Float.class, FLOAT);
     testCases.put(Double.class, DOUBLE);
+    testCases.put(BigDecimal.class, BIG_DECIMAL);
     testCases.put(Timestamp.class, TIMESTAMP);
     testCases.put(String.class, STRING);
     testCases.put(byte[].class, BYTES);
@@ -291,7 +303,8 @@ public class PinotDataTypeTest {
   @Test
   public void testInvalidConversion() {
     for (PinotDataType sourceType : values()) {
-      if (sourceType.isSingleValue() && sourceType != STRING && sourceType != BYTES && sourceType != JSON) {
+      if (sourceType.isSingleValue() && sourceType != STRING && sourceType != BYTES && sourceType != JSON
+          && sourceType != BIG_DECIMAL) {
         assertInvalidConversion(null, sourceType, BYTES, UnsupportedOperationException.class);
       }
     }
@@ -309,7 +322,6 @@ public class PinotDataTypeTest {
       assertInvalidConversion(null, sourceType, BYTE, UnsupportedOperationException.class);
       assertInvalidConversion(null, sourceType, CHARACTER, UnsupportedOperationException.class);
       assertInvalidConversion(null, sourceType, SHORT, UnsupportedOperationException.class);
-      assertInvalidConversion(null, sourceType, OBJECT, UnsupportedOperationException.class);
       assertInvalidConversion(null, sourceType, BYTE_ARRAY, UnsupportedOperationException.class);
       assertInvalidConversion(null, sourceType, CHARACTER_ARRAY, UnsupportedOperationException.class);
       assertInvalidConversion(null, sourceType, SHORT_ARRAY, UnsupportedOperationException.class);

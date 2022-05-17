@@ -20,31 +20,21 @@ package org.apache.pinot.tools.admin.command;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
-import java.io.Reader;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
-import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.BootstrapTableTool;
 import org.apache.pinot.tools.QuickstartTableRequest;
-import org.apache.pinot.tools.utils.JarUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
 
 
 public class QuickstartRunner {
@@ -124,8 +114,8 @@ public class QuickstartRunner {
     for (int i = 0; i < _numControllers; i++) {
       StartControllerCommand controllerStarter = new StartControllerCommand();
       controllerStarter.setControllerPort(String.valueOf(DEFAULT_CONTROLLER_PORT + i))
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME).setTenantIsolation(_enableTenantIsolation)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
+          .setTenantIsolation(_enableTenantIsolation)
           .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath())
           .setConfigOverrides(_configOverrides);
       if (!controllerStarter.execute()) {
@@ -140,8 +130,7 @@ public class QuickstartRunner {
     for (int i = 0; i < _numBrokers; i++) {
       StartBrokerCommand brokerStarter = new StartBrokerCommand();
       brokerStarter.setPort(DEFAULT_BROKER_PORT + i)
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setConfigOverrides(_configOverrides);
       if (!brokerStarter.execute()) {
         throw new RuntimeException("Failed to start Broker");
@@ -155,8 +144,7 @@ public class QuickstartRunner {
     for (int i = 0; i < _numServers; i++) {
       StartServerCommand serverStarter = new StartServerCommand();
       serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
           .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath())
           .setConfigOverrides(_configOverrides);
@@ -171,8 +159,7 @@ public class QuickstartRunner {
     for (int i = 0; i < _numMinions; i++) {
       StartMinionCommand minionStarter = new StartMinionCommand();
       minionStarter.setMinionPort(DEFAULT_MINION_PORT + i)
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setConfigOverrides(_configOverrides);
       if (!minionStarter.execute()) {
         throw new RuntimeException("Failed to start Minion");
@@ -238,46 +225,12 @@ public class QuickstartRunner {
     }
   }
 
-  @Deprecated
-  public void addTable()
-      throws Exception {
-    for (QuickstartTableRequest request : _tableRequests) {
-      new AddTableCommand().setSchemaFile(request.getSchemaFile().getAbsolutePath())
-          .setTableConfigFile(request.getTableRequestFile().getAbsolutePath())
-          .setControllerPort(String.valueOf(_controllerPorts.get(0))).setExecute(true).execute();
-    }
-  }
-
-  @Deprecated
-  public void launchDataIngestionJob()
-      throws Exception {
-    for (QuickstartTableRequest request : _tableRequests) {
-      if (request.getTableType() == TableType.OFFLINE) {
-        try (Reader reader = new BufferedReader(new FileReader(request.getIngestionJobFile().getAbsolutePath()))) {
-          SegmentGenerationJobSpec spec = new Yaml().loadAs(reader, SegmentGenerationJobSpec.class);
-          String inputDirURI = spec.getInputDirURI();
-          if (!new File(inputDirURI).exists()) {
-            URL resolvedInputDirURI = QuickstartRunner.class.getClassLoader().getResource(inputDirURI);
-            if (resolvedInputDirURI.getProtocol().equals("jar")) {
-              String[] splits = resolvedInputDirURI.getFile().split("!");
-              String inputDir = new File(_tempDir, "inputData").toString();
-              JarUtils.copyResourcesToDirectory(splits[0], splits[1].substring(1), inputDir);
-              spec.setInputDirURI(inputDir);
-            } else {
-              spec.setInputDirURI(resolvedInputDirURI.toString());
-            }
-          }
-          IngestionJobLauncher.runIngestionJob(spec);
-        }
-      }
-    }
-  }
-
   public JsonNode runQuery(String query)
       throws Exception {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
-    return JsonUtils.stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort))
-        .setQueryType(CommonConstants.Broker.Request.SQL).setAuthToken(_authToken).setQuery(query).run());
+    return JsonUtils.stringToJsonNode(
+        new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort)).setAuthToken(_authToken).setQuery(query)
+            .run());
   }
 
   public static void registerDefaultPinotFS() {
@@ -294,8 +247,8 @@ public class QuickstartRunner {
       PinotFSFactory.register(scheme, fsClassName, new PinotConfiguration(configs));
       LOGGER.info("Registered PinotFS for scheme: {}", scheme);
     } catch (Exception e) {
-      LOGGER
-          .error("Unable to init PinotFS for scheme: {}, class name: {}, configs: {}", scheme, fsClassName, configs, e);
+      LOGGER.error("Unable to init PinotFS for scheme: {}, class name: {}, configs: {}", scheme, fsClassName, configs,
+          e);
     }
   }
 }

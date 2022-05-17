@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.Iterator;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 
 
@@ -72,12 +71,6 @@ public interface GroupKeyGenerator {
   Iterator<GroupKey> getGroupKeys();
 
   /**
-   * Returns an iterator of {@link StringGroupKey}. Use this interface to iterate through all the group keys.
-   * TODO: Remove this interface after deprecating PQL.
-   */
-  Iterator<StringGroupKey> getStringGroupKeys();
-
-  /**
    * Return current number of unique keys
    */
   int getNumKeys();
@@ -88,24 +81,5 @@ public interface GroupKeyGenerator {
   class GroupKey {
     public int _groupId;
     public Object[] _keys;
-  }
-
-  /**
-   * This class encapsulates the integer group id and the string group key.
-   */
-  class StringGroupKey {
-    public int _groupId;
-    public String _stringKey;
-
-    /**
-     * Returns the group keys as a String array.
-     * NOTE: DO NOT use this method for single group-by expression, directly use _stringKey instead for performance
-     *       concern.
-     */
-    public String[] getKeys() {
-      assert _stringKey.indexOf(DELIMITER) != -1;
-      // Preserve all tokens to support empty strings
-      return StringUtils.splitPreserveAllTokens(_stringKey, GroupKeyGenerator.DELIMITER);
-    }
   }
 }

@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -100,8 +99,6 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-verbose"}, required = false, description = "Enable verbose query logging (default: "
       + "false).")
   private boolean _verbose = false;
-  @CommandLine.Option(names = {"-dialect"}, required = false, description = "Query dialect to use (pql|sql).")
-  private String _dialect = "pql";
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
       + "this message.")
   private boolean _help;
@@ -159,11 +156,6 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       printUsage();
       return false;
     }
-    if (!Arrays.asList("pql", "sql").contains(_dialect)) {
-      LOGGER.error("Argument dialect must one of either 'pql' or 'sql");
-      printUsage();
-      return false;
-    }
 
     LOGGER.info("Start query runner targeting broker: {}:{}", _brokerHost, _brokerPort);
     PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
@@ -176,7 +168,6 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     conf.setStartBroker(false);
     conf.setStartServer(false);
     conf.setVerbose(_verbose);
-    conf.setDialect(_dialect);
 
     List<String> queries =
         makeQueries(IOUtils.readLines(new FileInputStream(_queryFile)), QueryMode.valueOf(_queryMode.toUpperCase()),

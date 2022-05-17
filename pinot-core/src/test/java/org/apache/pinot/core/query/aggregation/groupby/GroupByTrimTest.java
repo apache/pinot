@@ -224,7 +224,7 @@ public class GroupByTrimTest {
     List<Pair<Double, Double>> expectedResult = computeExpectedResult();
 
     // Testcase1: low limit + high min trim size
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 1");
     List<Pair<Double, Double>> top100 = expectedResult.subList(0, 100);
     data.add(new Object[]{queryContext, 100, 5000, top100});
@@ -233,7 +233,7 @@ public class GroupByTrimTest {
     data.add(new Object[]{queryContext, 5000, 100, top100});
 
     // Testcase2: high limit + low min trim size
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+    queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 50");
     List<Pair<Double, Double>> top250 = expectedResult.subList(0, 250);
     data.add(new Object[]{queryContext, 50, 5000, top250});
@@ -243,7 +243,7 @@ public class GroupByTrimTest {
     data.add(new Object[]{queryContext, 20, 30, top250});
 
     // Testcase3: disable trim
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL(
+    queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT metric_0, max(metric_1) FROM testTable GROUP BY metric_0 ORDER BY max(metric_1) DESC LIMIT 10");
     data.add(new Object[]{queryContext, -1, -1, expectedResult});
 

@@ -53,6 +53,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
@@ -196,8 +197,7 @@ public class HelixHelper {
    */
   public static void updateBrokerResource(HelixManager helixManager, String brokerId, List<String> brokerTags,
       @Nullable List<String> tablesAdded, @Nullable List<String> tablesRemoved) {
-    Preconditions.checkArgument(brokerId.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE),
-        "Invalid broker id: %s", brokerId);
+    Preconditions.checkArgument(InstanceTypeUtils.isBroker(brokerId), "Invalid broker id: %s", brokerId);
     for (String brokerTag : brokerTags) {
       Preconditions.checkArgument(TagNameUtils.isBrokerTag(brokerTag), "Invalid broker tag: %s", brokerTag);
     }

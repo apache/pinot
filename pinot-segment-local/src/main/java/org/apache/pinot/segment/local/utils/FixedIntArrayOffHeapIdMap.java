@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.utils;
 
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.segment.local.io.readerwriter.impl.FixedByteSingleValueMultiColumnReaderWriter;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
@@ -162,6 +163,11 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
 
   @Override
   public double getDoubleValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public BigDecimal getBigDecimalValue(int dictId) {
     throw new UnsupportedOperationException();
   }
 

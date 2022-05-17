@@ -22,11 +22,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Controller;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -95,8 +95,8 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
     // All tables should have Helix leader as the controller leader
     for (int i = 0; i < Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
       Pair<String, Integer> hostnamePortPair = controllerLeaderLocator.getControllerLeader(_partitionToTableMap.get(i));
-      Assert.assertEquals(hostnamePortPair.getFirst(), ControllerTest.LOCAL_HOST);
-      Assert.assertEquals((int) hostnamePortPair.getSecond(), getControllerPort());
+      Assert.assertEquals(hostnamePortPair.getLeft(), ControllerTest.LOCAL_HOST);
+      Assert.assertEquals((int) hostnamePortPair.getRight(), getControllerPort());
     }
 
     // Stop the second controller.
@@ -133,7 +133,7 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
         if (pair1 == null) {
           return false;
         }
-        resultSet.add(pair1.getFirst() + pair1.getSecond());
+        resultSet.add(pair1.getLeft() + pair1.getRight());
       }
       return resultSet.size() == expectedNumberOfUniqueResults;
     }, TIMEOUT_IN_MS, errorMessage);

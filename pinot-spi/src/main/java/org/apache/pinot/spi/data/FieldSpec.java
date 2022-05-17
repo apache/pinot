@@ -21,6 +21,7 @@ package org.apache.pinot.spi.data;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.BooleanUtils;
@@ -59,6 +60,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
   public static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = 0.0F;
   public static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
+  public static final BigDecimal DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL = BigDecimal.ZERO;
   public static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
   public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new byte[0];
 
@@ -205,6 +207,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_METRIC_NULL_VALUE_OF_FLOAT;
             case DOUBLE:
               return DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
+            case BIG_DECIMAL:
+              // todo(nhejazi): update documentation w/ default null values.
+              return DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL;
             case STRING:
               return DEFAULT_METRIC_NULL_VALUE_OF_STRING;
             case BYTES:
@@ -299,6 +304,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case DOUBLE:
           jsonNode.put(key, (Double) _defaultNullValue);
           break;
+        case BIG_DECIMAL:
+          jsonNode.put(key, (BigDecimal) _defaultNullValue);
+          break;
         case BOOLEAN:
           jsonNode.put(key, (Integer) _defaultNullValue == 1);
           break;
@@ -379,6 +387,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     LONG(Long.BYTES, true, true),
     FLOAT(Float.BYTES, true, true),
     DOUBLE(Double.BYTES, true, true),
+    BIG_DECIMAL(true, true),
     BOOLEAN(INT, false, true),
     TIMESTAMP(LONG, false, true),
     STRING(false, true),
@@ -463,6 +472,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return Float.valueOf(value);
           case DOUBLE:
             return Double.valueOf(value);
+          case BIG_DECIMAL:
+            return new BigDecimal(value);
           case BOOLEAN:
             return BooleanUtils.toInt(value);
           case TIMESTAMP:
@@ -494,6 +505,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return Float.valueOf(value);
           case DOUBLE:
             return Double.valueOf(value);
+          case BIG_DECIMAL:
+            return new BigDecimal(value);
           case BOOLEAN:
             return BooleanUtils.toInt(value);
           case TIMESTAMP:

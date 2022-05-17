@@ -63,7 +63,7 @@ public class SegmentConversionUtils {
   public static void uploadSegment(Map<String, String> configs, List<Header> httpHeaders,
       List<NameValuePair> parameters, String tableNameWithType, String segmentName, String uploadURL, File fileToUpload)
       throws Exception {
-    // Create a RoundRobinURIProvider to round robin IP addresses when retry uploading. Otherwise may always try to
+    // Create a RoundRobinURIProvider to round-robin IP addresses when retry uploading. Otherwise, it may always try to
     // upload to a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
     RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(new URI(uploadURL));
     // Generate retry policy based on the config

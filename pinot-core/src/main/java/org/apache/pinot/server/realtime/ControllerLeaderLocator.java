@@ -21,6 +21,7 @@ package org.apache.pinot.server.realtime;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
@@ -28,7 +29,6 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
-import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -165,7 +165,7 @@ public class ControllerLeaderLocator {
         }
         int partitionId = LeadControllerUtils.extractPartitionId(partitionName);
         Pair<String, Integer> hostnamePortPair =
-            new Pair<>(instanceConfig.getHostName(), Integer.parseInt(instanceConfig.getPort()));
+            Pair.of(instanceConfig.getHostName(), Integer.parseInt(instanceConfig.getPort()));
         _cachedControllerLeaderMap.put(partitionId, hostnamePortPair);
       }
       _cachedControllerLeaderValid = true;
@@ -213,7 +213,7 @@ public class ControllerLeaderLocator {
     int index = instanceId.lastIndexOf('_');
     String leaderHost = instanceId.substring(0, index);
     int leaderPort = Integer.parseInt(instanceId.substring(index + 1));
-    return new Pair<>(leaderHost, leaderPort);
+    return Pair.of(leaderHost, leaderPort);
   }
 
   /**

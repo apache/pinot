@@ -101,7 +101,7 @@ public class BenchmarkNativeAndLuceneBasedLike {
   public void setUp()
       throws Exception {
     _planMaker = new InstancePlanMakerImplV2();
-    _queryContext = QueryContextConverterUtils.getQueryContextFromSQL(_query);
+    _queryContext = QueryContextConverterUtils.getQueryContext(_query);
     FileUtils.deleteQuietly(INDEX_DIR);
     buildSegment(_fstType);
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();

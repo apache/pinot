@@ -35,6 +35,7 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -50,7 +51,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.utils.Pair;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -118,7 +118,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   private static Map<String, String> createMapField(Pair<String, String>[] pairs) {
     Map<String, String> map = new HashMap<>();
     for (Pair<String, String> pair : pairs) {
-      map.put(pair.getFirst(), pair.getSecond());
+      map.put(pair.getLeft(), pair.getRight());
     }
     return map;
   }
@@ -152,13 +152,13 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     Schema avroSchema = createRecord("eventsRecord", null, null, false);
     Schema enumSchema = createEnum("direction", null, null, Arrays.asList("UP", "DOWN", "LEFT", "RIGHT"));
     Schema fixedSchema = createFixed("fixed", null, null, 4);
-    List<Field> fields = Arrays
-        .asList(new Field(INT_COLUMN, createUnion(Lists.newArrayList(create(Type.INT), create(Type.NULL))), null, null),
-            new Field(STRING_COLUMN, createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null,
-                null), new Field(JSON_COLUMN_1,
-                createUnion(createArray(create(Type.STRING)), createMap(create(Type.STRING)), createRecordSchema(),
-                    create(Type.STRING), create(Type.NULL))), new Field(JSON_COLUMN_2, enumSchema),
-            new Field(JSON_COLUMN_3, fixedSchema));
+    List<Field> fields = Arrays.asList(
+        new Field(INT_COLUMN, createUnion(Lists.newArrayList(create(Type.INT), create(Type.NULL))), null, null),
+        new Field(STRING_COLUMN, createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
+        new Field(JSON_COLUMN_1,
+            createUnion(createArray(create(Type.STRING)), createMap(create(Type.STRING)), createRecordSchema(),
+                create(Type.STRING), create(Type.NULL))), new Field(JSON_COLUMN_2, enumSchema),
+        new Field(JSON_COLUMN_3, fixedSchema));
     avroSchema.setFields(fields);
     List<GenericRow> inputRecords = new ArrayList<>();
     // Insert ARRAY
@@ -168,13 +168,13 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
 
     // Insert MAP
     inputRecords.add(
-        createTableRecord(2, "mickey mouse", createMapField(new Pair[]{new Pair("a", "1"), new Pair("b", "2")}),
+        createTableRecord(2, "mickey mouse", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
             createEnumField(enumSchema, "DOWN"), createFixedField(fixedSchema, 2)));
     inputRecords.add(
-        createTableRecord(3, "donald duck", createMapField(new Pair[]{new Pair("a", "1"), new Pair("b", "2")}),
+        createTableRecord(3, "donald duck", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
             createEnumField(enumSchema, "UP"), createFixedField(fixedSchema, 3)));
     inputRecords.add(
-        createTableRecord(4, "scrooge mcduck", createMapField(new Pair[]{new Pair("a", "1"), new Pair("b", "2")}),
+        createTableRecord(4, "scrooge mcduck", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
             createEnumField(enumSchema, "LEFT"), createFixedField(fixedSchema, 4)));
 
     // insert RECORD
@@ -250,8 +250,8 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   /** Verify that we can query the JSON column that ingested ComplexType data from an AVRO file (see setUp). */
   @Test
   public void testSimpleSelectOnJsonColumn() {
-    Operator operator = getOperatorForSqlQuery(
-        "select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM " + "testTable limit 100");
+    Operator operator =
+        getOperator("select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM " + "testTable limit 100");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
     Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
@@ -275,7 +275,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   /** Verify simple path expression query on ingested Avro file. */
   @Test
   public void testJsonPathSelectOnJsonColumn() {
-    Operator operator = getOperatorForSqlQuery(
+    Operator operator = getOperator(
         "select intColumn, json_extract_scalar(jsonColumn1, '$.name', " + "'STRING', 'null') FROM testTable");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
@@ -296,7 +296,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   /** Verify simple path expression query on ingested Avro file. */
   @Test
   public void testStringValueSelectOnJsonColumn() {
-    Operator operator = getOperatorForSqlQuery("SELECT json_extract_scalar(jsonColumn1, '$', 'STRING') FROM "
+    Operator operator = getOperator("SELECT json_extract_scalar(jsonColumn1, '$', 'STRING') FROM "
         + "testTable WHERE JSON_MATCH(jsonColumn1, '\"$\" = ''test''')");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
@@ -315,13 +315,13 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   /** Verify that ingestion from avro FIXED type field (jsonColumn3) to Pinot JSON column worked fine. */
   @Test
   public void testSimpleSelectOnFixedJsonColumn() {
-    Operator operator = getOperatorForSqlQuery("select jsonColumn3 FROM testTable");
+    Operator operator = getOperator("select jsonColumn3 FROM testTable");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
     Collection<Object[]> rows = block.getSelectionResult();
     Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.JSON);
 
-    List<String> expecteds = Arrays
-        .asList("[[0,0,0,1]]", "[[0,0,0,2]]", "[[0,0,0,3]]", "[[0,0,0,4]]", "[[0,0,0,5]]", "[[0,0,0,6]]",
+    List<String> expecteds =
+        Arrays.asList("[[0,0,0,1]]", "[[0,0,0,2]]", "[[0,0,0,3]]", "[[0,0,0,4]]", "[[0,0,0,5]]", "[[0,0,0,6]]",
             "[[0,0,0,7]]");
     int index = 0;
 

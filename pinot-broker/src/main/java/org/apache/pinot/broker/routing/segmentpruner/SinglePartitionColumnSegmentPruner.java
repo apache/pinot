@@ -36,14 +36,11 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
-import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
+import org.apache.pinot.sql.FilterKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -155,39 +152,19 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
 
   @Override
   public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
-    if (pinotQuery != null) {
-      // SQL
-
-      Expression filterExpression = pinotQuery.getFilterExpression();
-      if (filterExpression == null) {
-        return segments;
-      }
-      Set<String> selectedSegments = new HashSet<>();
-      for (String segment : segments) {
-        PartitionInfo partitionInfo = _partitionInfoMap.get(segment);
-        if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO || isPartitionMatch(filterExpression,
-            partitionInfo)) {
-          selectedSegments.add(segment);
-        }
-      }
-      return selectedSegments;
-    } else {
-      // PQL
-      FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-      if (filterQueryTree == null) {
-        return segments;
-      }
-      Set<String> selectedSegments = new HashSet<>();
-      for (String segment : segments) {
-        PartitionInfo partitionInfo = _partitionInfoMap.get(segment);
-        if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO || isPartitionMatch(filterQueryTree,
-            partitionInfo)) {
-          selectedSegments.add(segment);
-        }
-      }
-      return selectedSegments;
+    Expression filterExpression = brokerRequest.getPinotQuery().getFilterExpression();
+    if (filterExpression == null) {
+      return segments;
     }
+    Set<String> selectedSegments = new HashSet<>();
+    for (String segment : segments) {
+      PartitionInfo partitionInfo = _partitionInfoMap.get(segment);
+      if (partitionInfo == null || partitionInfo == INVALID_PARTITION_INFO || isPartitionMatch(filterExpression,
+          partitionInfo)) {
+        selectedSegments.add(segment);
+      }
+    }
+    return selectedSegments;
   }
 
   private boolean isPartitionMatch(Expression filterExpression, PartitionInfo partitionInfo) {
@@ -233,39 +210,6 @@ public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
           return true;
         }
       }
-      default:
-        return true;
-    }
-  }
-
-  @Deprecated
-  private boolean isPartitionMatch(FilterQueryTree filterQueryTree, PartitionInfo partitionInfo) {
-    switch (filterQueryTree.getOperator()) {
-      case AND:
-        for (FilterQueryTree child : filterQueryTree.getChildren()) {
-          if (!isPartitionMatch(child, partitionInfo)) {
-            return false;
-          }
-        }
-        return true;
-      case OR:
-        for (FilterQueryTree child : filterQueryTree.getChildren()) {
-          if (isPartitionMatch(child, partitionInfo)) {
-            return true;
-          }
-        }
-        return false;
-      case EQUALITY:
-      case IN:
-        if (filterQueryTree.getColumn().equals(_partitionColumn)) {
-          for (String value : filterQueryTree.getValue()) {
-            if (partitionInfo._partitions.contains(partitionInfo._partitionFunction.getPartition(value))) {
-              return true;
-            }
-          }
-          return false;
-        }
-        return true;
       default:
         return true;
     }

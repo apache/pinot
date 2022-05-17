@@ -81,12 +81,18 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   private SegmentVersion _segmentVersion;
   private List<StarTreeV2Metadata> _starTreeV2MetadataList;
-  // Caching properties around can be costly when the number of segments is high according to the
-  // finding in PR #2996. So for now, caching is used only when initializing from input streams.
-  private PropertiesConfiguration _segmentMetadataPropertiesConfiguration = null;
   private String _creatorName;
   private int _totalDocs;
   private final Map<String, String> _customMap = new HashMap<>();
+
+  // Fields specific to realtime table
+  private String _startOffset;
+  private String _endOffset;
+
+  // TODO: No need to cache this. We cannot modify the metadata if it is from a input stream
+  // Caching properties around can be costly when the number of segments is high according to the
+  // finding in PR #2996. So for now, caching is used only when initializing from input streams.
+  private PropertiesConfiguration _segmentMetadataPropertiesConfiguration = null;
 
   @Deprecated
   private String _rawTableName;
@@ -250,6 +256,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       }
     }
 
+    // Set start/end offset if available
+    _startOffset = segmentMetadataPropertiesConfiguration.getString(Segment.Realtime.START_OFFSET, null);
+    _endOffset = segmentMetadataPropertiesConfiguration.getString(Segment.Realtime.END_OFFSET, null);
+
     // Set custom configs from metadata properties
     setCustomConfigs(segmentMetadataPropertiesConfiguration, _customMap);
   }
@@ -379,6 +389,16 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
+  public String getStartOffset() {
+    return _startOffset;
+  }
+
+  @Override
+  public String getEndOffset() {
+    return _endOffset;
+  }
+
+  @Override
   public Map<String, ColumnMetadata> getColumnMetadataMap() {
     return _columnMetadataMap;
   }
@@ -426,6 +446,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       customConfigs.put(key, _customMap.get(key));
     }
     segmentMetadata.set("custom", customConfigs);
+
+    segmentMetadata.put("startOffset", _startOffset);
+    segmentMetadata.put("endOffset", _endOffset);
 
     if (_columnMetadataMap != null) {
       ArrayNode columnsMetadata = JsonUtils.newArrayNode();

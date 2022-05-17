@@ -212,9 +212,9 @@ public abstract class ControllerTestUtils {
       default:
         break;
     }
-    //enable case insensitive pql for test cases.
+    // Enable case-insensitive for test cases.
     configAccessor.set(scope, CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
-    //Set hyperloglog log2m value to 12.
+    // Set hyperloglog log2m value to 12.
     configAccessor.set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
   }
 
@@ -468,6 +468,12 @@ public abstract class ControllerTestUtils {
     schema.addField(new MetricFieldSpec("metricA", FieldSpec.DataType.INT, 0));
     schema.addField(new MetricFieldSpec("metricB", FieldSpec.DataType.DOUBLE, -1));
     schema.addField(new DateTimeFieldSpec("timeColumn", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:DAYS"));
+    return schema;
+  }
+
+  public static Schema createDummySchemaForUpsertTable(String tableName) {
+    Schema schema = createDummySchema(tableName);
+    schema.setPrimaryKeyColumns(Collections.singletonList("dimA"));
     return schema;
   }
 

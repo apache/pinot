@@ -23,10 +23,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.Serializable;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -51,11 +51,9 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.pinot.common.response.broker.AggregationResult;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.common.response.broker.SelectionResults;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
@@ -75,17 +73,21 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
  * Functional tests for text search feature.
  * The tests use two kinds of input data
  * (1) Skills file
- * (2) PQL query log file
+ * (2) Query log file
  * The test table has a SKILLS column and QUERY_LOG column. Text index is created
  * on each of these columns.
  */
@@ -204,7 +206,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<GenericRow> rows = new ArrayList<>();
 
     // read the skills file
-    String[] skills = new String[100];
+    String[] skills = new String[24];
     List<String[]> multiValueStringList = new ArrayList<>();
     int skillCount = 0;
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(
@@ -215,11 +217,12 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         multiValueStringList.add(StringUtils.splitByWholeSeparator(line, ", "));
       }
     }
+    assertEquals(skillCount, 24);
 
-    // read the pql query log file (24k queries) and build dataset
+    // read the query log file (24k queries) and build dataset
     int counter = 0;
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(
-        getClass().getClassLoader().getResourceAsStream("data/text_search_data/pql_query1.txt"))))) {
+        getClass().getClassLoader().getResourceAsStream("data/text_search_data/queries.txt"))))) {
       String line;
       while ((line = reader.readLine()) != null) {
         GenericRow row = new GenericRow();
@@ -244,6 +247,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         counter++;
       }
     }
+    assertEquals(counter, 24150);
 
     return rows;
   }
@@ -295,31 +299,31 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // Search in SKILL_TEXT_COL column to look for documents where each document MUST contain phrase "distributed
     // systems"
     // as is. The expected result table is built by doing grep -n -i 'distributed systems' skills.txt
-    List<Serializable[]> expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    List<Object[]> expected = new ArrayList<>();
+    expected.add(new Object[]{
         1005,
         "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
             + "learning, spark, Kubernetes, transaction processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1009,
         "Distributed systems, database development, columnar query engine, database kernel, storage, indexing and "
             + "transaction processing, building large scale systems"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1010,
         "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
             + "storage, concurrency, multi-threading"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1012, "Distributed systems, Java, database engine, cluster management, docker image building and distribution"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1020,
         "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster "
             + "management, docker image building and distribution"
@@ -331,12 +335,12 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // Search in SKILLS_TEXT_COL column to look for documents where each document MUST contain phrase
     // "query processing" as is. The expected result table is built by doing grep -n -i 'query processing' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1014,
         "Apache spark, Java, C++, query processing, transaction processing, distributed storage, concurrency, "
             + "multi-threading, apache airflow"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1020,
         "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster "
             + "management, docker image building and distribution"
@@ -349,44 +353,44 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // learning"
     // as is. The expected result table is built by doing grep -n -i 'machine learning' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1003, "Java, C++, worked on open source projects, coursera machine learning"});
-    expected.add(new Serializable[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{1003, "Java, C++, worked on open source projects, coursera machine learning"});
+    expected.add(new Object[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
+    expected.add(new Object[]{
         1005,
         "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
             + "learning, spark, Kubernetes, transaction processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1006,
         "Java, Python, C++, Machine learning, building and deploying large scale production systems, concurrency, "
             + "multi-threading, CPU processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1007,
         "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building large "
             + "scale systems, Machine learning"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1010,
         "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
             + "storage, concurrency, multi-threading"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1011,
         "CUDA, GPU, Python, Machine learning, database kernel, storage, indexing and transaction processing, building"
             + " large scale systems"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1016,
         "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building high "
             + "performance scalable systems"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1019,
         "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, "
             + "distributed storage, concurrency, multi-threading, apache airflow"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1020,
         "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster "
             + "management, docker image building and distribution"
@@ -399,13 +403,13 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // "machine learning" and "tensor flow" as is. The expected result table is built by doing
     // grep -n -i -E 'machine learning.*tensor flow|tensor flow.*machine learning' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
+    expected.add(new Object[]{
         1007,
         "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building large "
             + "scale systems, Machine learning"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1016,
         "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building high "
             + "performance scalable systems"
@@ -417,48 +421,48 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // Search in SKILLS_TEXT_COL column to look for documents where each document MUST contain term 'Java'.
     // The expected result table is built by doing grep -n -i 'Java' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1000, "Accounts, Banking, Insurance, worked in NGO, Java"});
-    expected.add(new Serializable[]{1003, "Java, C++, worked on open source projects, coursera machine learning"});
-    expected.add(new Serializable[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{1000, "Accounts, Banking, Insurance, worked in NGO, Java"});
+    expected.add(new Object[]{1003, "Java, C++, worked on open source projects, coursera machine learning"});
+    expected.add(new Object[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
+    expected.add(new Object[]{
         1005,
         "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
             + "learning, spark, Kubernetes, transaction processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1006,
         "Java, Python, C++, Machine learning, building and deploying large scale production systems, concurrency, "
             + "multi-threading, CPU processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1008,
         "Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and deploying"
             + " large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1010,
         "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
             + "storage, concurrency, multi-threading"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1012, "Distributed systems, Java, database engine, cluster management, docker image building and distribution"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1014,
         "Apache spark, Java, C++, query processing, transaction processing, distributed storage, concurrency, "
             + "multi-threading, apache airflow"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1018,
         "Realtime stream processing, publish subscribe, columnar processing for data warehouses, concurrency, Java, "
             + "multi-threading, C++,"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1019,
         "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, "
             + "distributed storage, concurrency, multi-threading, apache airflow"
@@ -471,38 +475,38 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // terms 'Java' and 'C++'. The expected result table is built by doing
     // grep -E -n -i 'c\+\+.*java|java.*c\+\+' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1003, "Java, C++, worked on open source projects, coursera machine learning"});
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{1003, "Java, C++, worked on open source projects, coursera machine learning"});
+    expected.add(new Object[]{
         1005,
         "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
             + "learning, spark, Kubernetes, transaction processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1006,
         "Java, Python, C++, Machine learning, building and deploying large scale production systems, concurrency, "
             + "multi-threading, CPU processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1008,
         "Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and deploying"
             + " large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1014,
         "Apache spark, Java, C++, query processing, transaction processing, distributed storage, concurrency, "
             + "multi-threading, apache airflow"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1018,
         "Realtime stream processing, publish subscribe, columnar processing for data warehouses, concurrency, Java, "
             + "multi-threading, C++,"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1019,
         "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, "
             + "distributed storage, concurrency, multi-threading, apache airflow"
@@ -520,18 +524,18 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // Hence term queries are very useful for such cases. The expected result table is built by doing
     // grep -n -i 'Java, C++' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1003, "Java, C++, worked on open source projects, coursera machine learning"});
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{1003, "Java, C++, worked on open source projects, coursera machine learning"});
+    expected.add(new Object[]{
         1005,
         "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
             + "learning, spark, Kubernetes, transaction processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1008,
         "Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and deploying"
             + " large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1014,
         "Apache spark, Java, C++, query processing, transaction processing, distributed storage, concurrency, "
             + "multi-threading, apache airflow"
@@ -544,7 +548,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // "machine learning" and "gpu processing" as is. The expected result table is built by doing
     // grep -n -i -E 'machine learning.*gpu processing|gpu processing.*machine learning' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1016,
         "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building high "
             + "performance scalable systems"
@@ -558,12 +562,12 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // phrase "gpu processing" but that resulted in missing out on one row. The expected result table is built by doing
     // grep -n -i -E 'machine learning.*gpu|gpu.*machine learning' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1011,
         "CUDA, GPU, Python, Machine learning, database kernel, storage, indexing and transaction processing, building"
             + " large scale systems"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1016,
         "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building high "
             + "performance scalable systems"
@@ -578,12 +582,12 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // grep -n -i -E 'machine learning.*gpu.*python|gpu.*machine learning.*python|gpu.*python.*machine learning'
     // skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1011,
         "CUDA, GPU, Python, Machine learning, database kernel, storage, indexing and transaction processing, building"
             + " large scale systems"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1016,
         "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building high "
             + "performance scalable systems"
@@ -595,31 +599,31 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // Search in SKILLS_TEXT_COL column to look for documents that MUST contain term 'apache'. The expected result
     // table is built by doing grep -n -i 'apache' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1013,
         "Kubernetes, cluster management, operating systems, concurrency, multi-threading, apache airflow, Apache Spark,"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1014,
         "Apache spark, Java, C++, query processing, transaction processing, distributed storage, concurrency, "
             + "multi-threading, apache airflow"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1015,
         "Big data stream processing, Apache Flink, Apache Beam, database kernel, distributed query engines for "
             + "analytics and data warehouses"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1019,
         "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, "
             + "distributed storage, concurrency, multi-threading, apache airflow"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1020,
         "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster "
             + "management, docker image building and distribution"
@@ -633,12 +637,12 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // as is and term 'apache'. The expected result table was built by doing
     // grep -n -i -E 'distributed systems.*apache|apache.*distributed systems' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1020,
         "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster "
             + "management, docker image building and distribution"
@@ -650,30 +654,30 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // Search in SKILLS_TEXT_COL column to look for documents where each document MUST contain term 'database'.
     // The expected result table is built by doing grep -n -i 'database' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1007,
         "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building large "
             + "scale systems, Machine learning"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1009,
         "Distributed systems, database development, columnar query engine, database kernel, storage, indexing and "
             + "transaction processing, building large scale systems"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1011,
         "CUDA, GPU, Python, Machine learning, database kernel, storage, indexing and transaction processing, building"
             + " large scale systems"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1012, "Distributed systems, Java, database engine, cluster management, docker image building and distribution"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1015,
         "Big data stream processing, Apache Flink, Apache Beam, database kernel, distributed query engines for "
             + "analytics and data warehouses"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1021,
         "Database engine, OLAP systems, OLTP transaction processing at large scale, concurrency, multi-threading, GO,"
             + " building large scale systems"
@@ -685,10 +689,10 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // Search in SKILLS_TEXT_COL column to look for documents where each document MUST contain phrase "database engine"
     // as is. The expected result table is built by doing grep -n -i 'database engine' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1012, "Distributed systems, Java, database engine, cluster management, docker image building and distribution"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1021,
         "Database engine, OLAP systems, OLTP transaction processing at large scale, concurrency, multi-threading, GO,"
             + " building large scale systems"
@@ -704,12 +708,12 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // The expected result table is built by doing grep -n -i 'publish-subscribe' skills.txt and
     // grep -n -i 'publish subscribe' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1018,
         "Realtime stream processing, publish subscribe, columnar processing for data warehouses, concurrency, Java, "
             + "multi-threading, C++,"
@@ -722,7 +726,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // "accounts banking insurance" as is. The expected result table is built by doing
     // grep -n -i 'accounts, banking, insurance' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1000, "Accounts, Banking, Insurance, worked in NGO, Java"});
+    expected.add(new Object[]{1000, "Accounts, Banking, Insurance, worked in NGO, Java"});
 
     testSkillsColumn("\"accounts banking insurance\"", expected);
 
@@ -734,9 +738,9 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // table
     // was built by doing grep -n -i 'accounts.*banking.*insurance' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1000, "Accounts, Banking, Insurance, worked in NGO, Java"});
-    expected.add(new Serializable[]{1001, "Accounts, Banking, Finance, Insurance"});
-    expected.add(new Serializable[]{1002, "Accounts, Finance, Banking, Insurance"});
+    expected.add(new Object[]{1000, "Accounts, Banking, Insurance, worked in NGO, Java"});
+    expected.add(new Object[]{1001, "Accounts, Banking, Finance, Insurance"});
+    expected.add(new Object[]{1002, "Accounts, Finance, Banking, Insurance"});
 
     testSkillsColumn("accounts AND banking AND insurance", expected);
 
@@ -746,12 +750,12 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // grep -n -i -E 'distributed systems.*java.*c\+\+|java.*distributed systems.*c\+\+|distributed systems.*c\+\+
     // .*java' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1005,
         "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
             + "learning, spark, Kubernetes, transaction processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
@@ -789,8 +793,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "SELECT INT_COL, SKILLS_TEXT_COL_2 FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_2, '\"distributed systems\" "
             + "AND Java AND C++') LIMIT 50000";
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1005, "ILoveCoding"});
-    expected.add(new Serializable[]{1017, "ILoveCoding"});
+    expected.add(new Object[]{1005, "ILoveCoding"});
+    expected.add(new Object[]{1017, "ILoveCoding"});
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
     // TEST 22: composite phrase and term query using boolean operator OR
@@ -800,63 +804,63 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // any operator. The expected result table was built by doing grep -n -i -E 'distributed systems|java|c\+\+'
     // skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1000, "Accounts, Banking, Insurance, worked in NGO, Java"});
-    expected.add(new Serializable[]{1003, "Java, C++, worked on open source projects, coursera machine learning"});
-    expected.add(new Serializable[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{1000, "Accounts, Banking, Insurance, worked in NGO, Java"});
+    expected.add(new Object[]{1003, "Java, C++, worked on open source projects, coursera machine learning"});
+    expected.add(new Object[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
+    expected.add(new Object[]{
         1005,
         "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
             + "learning, spark, Kubernetes, transaction processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1006,
         "Java, Python, C++, Machine learning, building and deploying large scale production systems, concurrency, "
             + "multi-threading, CPU processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1007,
         "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building large "
             + "scale systems, Machine learning"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1008,
         "Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and deploying"
             + " large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1009,
         "Distributed systems, database development, columnar query engine, database kernel, storage, indexing and "
             + "transaction processing, building large scale systems"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1010,
         "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
             + "storage, concurrency, multi-threading"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1012, "Distributed systems, Java, database engine, cluster management, docker image building and distribution"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1014,
         "Apache spark, Java, C++, query processing, transaction processing, distributed storage, concurrency, "
             + "multi-threading, apache airflow"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1018,
         "Realtime stream processing, publish subscribe, columnar processing for data warehouses, concurrency, Java, "
             + "multi-threading, C++,"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1019,
         "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, "
             + "distributed storage, concurrency, multi-threading, apache airflow"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1020,
         "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster "
             + "management, docker image building and distribution"
@@ -888,20 +892,20 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // as is and any of the following terms 'Java' or 'C++'. The expected result table was built by doing
     // grep -n -i -E 'distributed systems.*(java|c\+\+)' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1005,
         "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
             + "learning, spark, Kubernetes, transaction processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1010,
         "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
             + "storage, concurrency, multi-threading"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1012, "Distributed systems, Java, database engine, cluster management, docker image building and distribution"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
@@ -927,12 +931,12 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
             + "') LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1005,
         "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
             + "learning, spark, Kubernetes, transaction processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
@@ -950,22 +954,22 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // Search in SKILLS_TEXT_COL column to look for documents that have stream* -- stream, streaming, streams etc.
     // The expected result table was built by doing grep -n -i -E 'stream' skills.txt
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1010,
         "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
             + "storage, concurrency, multi-threading"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1015,
         "Big data stream processing, Apache Flink, Apache Beam, database kernel, distributed query engines for "
             + "analytics and data warehouses"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1018,
         "Realtime stream processing, publish subscribe, columnar processing for data warehouses, concurrency, Java, "
             + "multi-threading, C++,"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1019,
         "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, "
             + "distributed storage, concurrency, multi-threading, apache airflow"
@@ -983,7 +987,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // indexable token/term. Hence it won't be available in the in the index on its own. It will be  present as part
     // of larger token depending on where the word boundary is. So we need to use Lucene regex query.
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1022,
         "GET /administrator/ HTTP/1.1 200 4263 - Mozilla/5.0 (Windows NT 6.0; rv:34.0) Gecko/20100101 Firefox/34.0 - "
             + "NullPointerException"
@@ -1005,21 +1009,21 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   public void testTextSearchWithAdditionalFilter()
       throws Exception {
     // TEST 1: combine an index based doc id iterator (text_match) with scan based doc id iterator (range >= ) using AND
-    List<Serializable[]> expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    List<Object[]> expected = new ArrayList<>();
+    expected.add(new Object[]{
         1010,
         "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
             + "storage, concurrency, multi-threading"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1012, "Distributed systems, Java, database engine, cluster management, docker image building and distribution"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1020,
         "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster "
             + "management, docker image building and distribution"
@@ -1045,17 +1049,17 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
     // TEST 2: combine an index based doc id iterator (text_match) with scan based doc id iterator (range <= ) using AND
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1005,
         "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
             + "learning, spark, Kubernetes, transaction processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1009,
         "Distributed systems, database development, columnar query engine, database kernel, storage, indexing and "
             + "transaction processing, building large scale systems"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1010,
         "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
             + "storage, concurrency, multi-threading"
@@ -1092,50 +1096,50 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
     // TEST 4: combine an index based doc id iterator (text_match) with scan based doc id iterator (range <= ) using OR
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1000, "Accounts, Banking, Insurance, worked in NGO, Java"});
-    expected.add(new Serializable[]{1001, "Accounts, Banking, Finance, Insurance"});
-    expected.add(new Serializable[]{1002, "Accounts, Finance, Banking, Insurance"});
-    expected.add(new Serializable[]{1003, "Java, C++, worked on open source projects, coursera machine learning"});
-    expected.add(new Serializable[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{1000, "Accounts, Banking, Insurance, worked in NGO, Java"});
+    expected.add(new Object[]{1001, "Accounts, Banking, Finance, Insurance"});
+    expected.add(new Object[]{1002, "Accounts, Finance, Banking, Insurance"});
+    expected.add(new Object[]{1003, "Java, C++, worked on open source projects, coursera machine learning"});
+    expected.add(new Object[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
+    expected.add(new Object[]{
         1005,
         "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
             + "learning, spark, Kubernetes, transaction processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1006,
         "Java, Python, C++, Machine learning, building and deploying large scale production systems, concurrency, "
             + "multi-threading, CPU processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1007,
         "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building large "
             + "scale systems, Machine learning"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1008,
         "Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and deploying"
             + " large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1009,
         "Distributed systems, database development, columnar query engine, database kernel, storage, indexing and "
             + "transaction processing, building large scale systems"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1010,
         "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
             + "storage, concurrency, multi-threading"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1012, "Distributed systems, Java, database engine, cluster management, docker image building and distribution"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1020,
         "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster "
             + "management, docker image building and distribution"
@@ -1162,7 +1166,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // TEST 5: combine an index based doc id iterator (text_match) with sorted inverted index doc id iterator
     // (equality) using AND
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
@@ -1189,12 +1193,12 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // TEST 6: combine an index based doc id iterator (text_match) with sorted inverted index doc id iterator
     // (equality) using OR
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1005});
-    expected.add(new Serializable[]{1009});
-    expected.add(new Serializable[]{1010});
-    expected.add(new Serializable[]{1012});
-    expected.add(new Serializable[]{1017});
-    expected.add(new Serializable[]{1020});
+    expected.add(new Object[]{1005});
+    expected.add(new Object[]{1009});
+    expected.add(new Object[]{1010});
+    expected.add(new Object[]{1012});
+    expected.add(new Object[]{1017});
+    expected.add(new Object[]{1020});
 
     query =
         "SELECT INT_COL FROM MyTable WHERE INT_COL = 1017 OR TEXT_MATCH(SKILLS_TEXT_COL, '\"Distributed systems\"') "
@@ -1217,12 +1221,12 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // TEST 7: combine an index based doc id iterator (text_match) with another index based doc id iterator
     // (text_match) using AND
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1005});
-    expected.add(new Serializable[]{1009});
-    expected.add(new Serializable[]{1010});
-    expected.add(new Serializable[]{1012});
-    expected.add(new Serializable[]{1017});
-    expected.add(new Serializable[]{1020});
+    expected.add(new Object[]{1005});
+    expected.add(new Object[]{1009});
+    expected.add(new Object[]{1010});
+    expected.add(new Object[]{1012});
+    expected.add(new Object[]{1017});
+    expected.add(new Object[]{1020});
 
     query =
         "SELECT INT_COL FROM MyTable WHERE TEXT_MATCH(QUERY_LOG_TEXT_COL, '\"SELECT count\"') AND TEXT_MATCH"
@@ -1236,16 +1240,16 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // TEST 8: combine an index based doc id iterator (text_match) with another index based doc id iterator
     // (text_match) using OR
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1005});
-    expected.add(new Serializable[]{1009});
-    expected.add(new Serializable[]{1010});
-    expected.add(new Serializable[]{1012});
-    expected.add(new Serializable[]{1013});
-    expected.add(new Serializable[]{1014});
-    expected.add(new Serializable[]{1015});
-    expected.add(new Serializable[]{1017});
-    expected.add(new Serializable[]{1019});
-    expected.add(new Serializable[]{1020});
+    expected.add(new Object[]{1005});
+    expected.add(new Object[]{1009});
+    expected.add(new Object[]{1010});
+    expected.add(new Object[]{1012});
+    expected.add(new Object[]{1013});
+    expected.add(new Object[]{1014});
+    expected.add(new Object[]{1015});
+    expected.add(new Object[]{1017});
+    expected.add(new Object[]{1019});
+    expected.add(new Object[]{1020});
 
     query =
         "SELECT INT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, 'apache') OR TEXT_MATCH(SKILLS_TEXT_COL, "
@@ -1261,7 +1265,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // so this query tests the exact match on the text column which will use the
     // native inverted index.
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1004});
+    expected.add(new Object[]{1004});
     query =
         "SELECT INT_COL FROM MyTable WHERE SKILLS_TEXT_COL_DICT = 'Machine learning, Tensor flow, Java, Stanford "
             + "university,' LIMIT 50000";
@@ -1277,16 +1281,16 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // native inverted index along with text match on the text column which will
     // use the text index
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{1003});
-    expected.add(new Serializable[]{1004});
-    expected.add(new Serializable[]{1005});
-    expected.add(new Serializable[]{1006});
-    expected.add(new Serializable[]{1007});
-    expected.add(new Serializable[]{1010});
-    expected.add(new Serializable[]{1011});
-    expected.add(new Serializable[]{1016});
-    expected.add(new Serializable[]{1019});
-    expected.add(new Serializable[]{1020});
+    expected.add(new Object[]{1003});
+    expected.add(new Object[]{1004});
+    expected.add(new Object[]{1005});
+    expected.add(new Object[]{1006});
+    expected.add(new Object[]{1007});
+    expected.add(new Object[]{1010});
+    expected.add(new Object[]{1011});
+    expected.add(new Object[]{1016});
+    expected.add(new Object[]{1019});
+    expected.add(new Object[]{1020});
 
     query =
         "SELECT INT_COL FROM MyTable WHERE SKILLS_TEXT_COL_DICT = 'Machine learning, Tensor flow, Java, Stanford "
@@ -1326,19 +1330,19 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // so the refcount should be 2 now
     // search() should not see any hits since nothing has been added to the index
     IndexSearcher searcher1 = searcherManager.acquire();
-    Assert.assertEquals(2, searcher1.getIndexReader().getRefCount());
-    Assert.assertEquals(0, searcher1.search(query, 100).scoreDocs.length);
+    assertEquals(2, searcher1.getIndexReader().getRefCount());
+    assertEquals(0, searcher1.search(query, 100).scoreDocs.length);
 
     // acquire a searcher
     // since refresh hasn't happenend yet, this should be the same searcher as searcher1
     // but with refcount incremented. so refcount should be 3 now
     // search() should not see any hits since nothing has been added to the index
     IndexSearcher searcher2 = searcherManager.acquire();
-    Assert.assertEquals(3, searcher2.getIndexReader().getRefCount());
-    Assert.assertEquals(0, searcher2.search(query, 100).scoreDocs.length);
-    Assert.assertEquals(searcher1, searcher2);
-    Assert.assertEquals(3, searcher1.getIndexReader().getRefCount());
-    Assert.assertEquals(0, searcher1.search(query, 100).scoreDocs.length);
+    assertEquals(3, searcher2.getIndexReader().getRefCount());
+    assertEquals(0, searcher2.search(query, 100).scoreDocs.length);
+    assertEquals(searcher1, searcher2);
+    assertEquals(3, searcher1.getIndexReader().getRefCount());
+    assertEquals(0, searcher1.search(query, 100).scoreDocs.length);
 
     // add something to the index but don't commit
     Document docToIndex = new Document();
@@ -1355,39 +1359,39 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // should be 2 (1 as the initial refcount of the reader and +1
     // due to acquire)
     IndexSearcher searcher3 = searcherManager.acquire();
-    Assert.assertEquals(2, searcher3.getIndexReader().getRefCount());
+    assertEquals(2, searcher3.getIndexReader().getRefCount());
     // this searcher should see the uncommitted document in the index
-    Assert.assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
-    Assert.assertNotEquals(searcher2, searcher3);
+    assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
+    assertNotEquals(searcher2, searcher3);
 
     // searcher1 and searcher2 ref count should have gone down by 1 due to refresh
     // since they were the current searcher before refresh happened and after SearcherManager
     // got new searcher after refresh, it decrements the ref count for old one.
-    Assert.assertEquals(2, searcher1.getIndexReader().getRefCount());
-    Assert.assertEquals(0, searcher1.search(query, 100).scoreDocs.length);
-    Assert.assertEquals(2, searcher2.getIndexReader().getRefCount());
-    Assert.assertEquals(0, searcher2.search(query, 100).scoreDocs.length);
+    assertEquals(2, searcher1.getIndexReader().getRefCount());
+    assertEquals(0, searcher1.search(query, 100).scoreDocs.length);
+    assertEquals(2, searcher2.getIndexReader().getRefCount());
+    assertEquals(0, searcher2.search(query, 100).scoreDocs.length);
 
     // done searching with searcher1
     // release it -- this should decrement the refcount by 1 for both searcher1
     // and searcher2 since they are same
     searcherManager.release(searcher1);
-    Assert.assertEquals(1, searcher1.getIndexReader().getRefCount());
-    Assert.assertEquals(1, searcher2.getIndexReader().getRefCount());
+    assertEquals(1, searcher1.getIndexReader().getRefCount());
+    assertEquals(1, searcher2.getIndexReader().getRefCount());
     // the above release should not have impacted searcher3
-    Assert.assertEquals(2, searcher3.getIndexReader().getRefCount());
-    Assert.assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
+    assertEquals(2, searcher3.getIndexReader().getRefCount());
+    assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
 
     // done searching with searcher2
     // release it -- this should decrement the refcount by 1 for both searcher1
     // and searcher2 since they are same
     // this gets the refcount to 0 and the associated reader is closed
     searcherManager.release(searcher2);
-    Assert.assertEquals(0, searcher1.getIndexReader().getRefCount());
-    Assert.assertEquals(0, searcher2.getIndexReader().getRefCount());
+    assertEquals(0, searcher1.getIndexReader().getRefCount());
+    assertEquals(0, searcher2.getIndexReader().getRefCount());
     // the above release should not have impacted searcher3
-    Assert.assertEquals(2, searcher3.getIndexReader().getRefCount());
-    Assert.assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
+    assertEquals(2, searcher3.getIndexReader().getRefCount());
+    assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
 
     // add another document to the index but don't commit
     docToIndex = new Document();
@@ -1395,8 +1399,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     indexWriter.addDocument(docToIndex);
 
     // searcher3 should not see the second document
-    Assert.assertEquals(2, searcher3.getIndexReader().getRefCount());
-    Assert.assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
+    assertEquals(2, searcher3.getIndexReader().getRefCount());
+    assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
 
     // refresh
     searcherManager.maybeRefresh();
@@ -1404,8 +1408,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // refresh would have resulted in a new current searcher inside searcher
     // manager and decremented the ref count of previous current searcher
     // (searcher3)
-    Assert.assertEquals(1, searcher3.getIndexReader().getRefCount());
-    Assert.assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
+    assertEquals(1, searcher3.getIndexReader().getRefCount());
+    assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
 
     // acquire a searcher
     // this should be the refreshed one
@@ -1413,23 +1417,23 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // should be 2 (1 as the initial refcount of the reader and +1
     // due to acquire)
     IndexSearcher searcher4 = searcherManager.acquire();
-    Assert.assertEquals(2, searcher4.getIndexReader().getRefCount());
+    assertEquals(2, searcher4.getIndexReader().getRefCount());
     // we should see both the uncommitted documents with the refreshed searcher
-    Assert.assertEquals(2, searcher4.search(query, 100).scoreDocs.length);
+    assertEquals(2, searcher4.search(query, 100).scoreDocs.length);
     // searcher3 should not have been affected by the new acquire
-    Assert.assertEquals(1, searcher3.getIndexReader().getRefCount());
-    Assert.assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
+    assertEquals(1, searcher3.getIndexReader().getRefCount());
+    assertEquals(1, searcher3.search(query, 100).scoreDocs.length);
 
     // done searching with searcher3
     // release it -- this should decrement its refcount to 0
     // and close the associated reader
     searcherManager.release(searcher3);
-    Assert.assertEquals(0, searcher1.getIndexReader().getRefCount());
-    Assert.assertEquals(0, searcher2.getIndexReader().getRefCount());
-    Assert.assertEquals(0, searcher3.getIndexReader().getRefCount());
+    assertEquals(0, searcher1.getIndexReader().getRefCount());
+    assertEquals(0, searcher2.getIndexReader().getRefCount());
+    assertEquals(0, searcher3.getIndexReader().getRefCount());
     // searcher4 should not have been impacted by above release
-    Assert.assertEquals(2, searcher4.getIndexReader().getRefCount());
-    Assert.assertEquals(2, searcher4.search(query, 100).scoreDocs.length);
+    assertEquals(2, searcher4.getIndexReader().getRefCount());
+    assertEquals(2, searcher4.search(query, 100).scoreDocs.length);
 
     // refresh
     searcherManager.maybeRefresh();
@@ -1438,33 +1442,33 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // in the index. so any acquire after the above refresh will return
     // the same searcher as searcher4 but with 1 more refcount
     IndexSearcher searcher5 = searcherManager.acquire();
-    Assert.assertEquals(3, searcher4.getIndexReader().getRefCount());
-    Assert.assertEquals(2, searcher4.search(query, 100).scoreDocs.length);
-    Assert.assertEquals(3, searcher5.getIndexReader().getRefCount());
-    Assert.assertEquals(2, searcher5.search(query, 100).scoreDocs.length);
-    Assert.assertEquals(searcher4, searcher5);
+    assertEquals(3, searcher4.getIndexReader().getRefCount());
+    assertEquals(2, searcher4.search(query, 100).scoreDocs.length);
+    assertEquals(3, searcher5.getIndexReader().getRefCount());
+    assertEquals(2, searcher5.search(query, 100).scoreDocs.length);
+    assertEquals(searcher4, searcher5);
 
     searcherManager.release(searcher4);
-    Assert.assertEquals(0, searcher1.getIndexReader().getRefCount());
-    Assert.assertEquals(0, searcher2.getIndexReader().getRefCount());
-    Assert.assertEquals(0, searcher3.getIndexReader().getRefCount());
-    Assert.assertEquals(2, searcher4.getIndexReader().getRefCount());
-    Assert.assertEquals(2, searcher4.search(query, 100).scoreDocs.length);
-    Assert.assertEquals(2, searcher5.getIndexReader().getRefCount());
-    Assert.assertEquals(2, searcher5.search(query, 100).scoreDocs.length);
+    assertEquals(0, searcher1.getIndexReader().getRefCount());
+    assertEquals(0, searcher2.getIndexReader().getRefCount());
+    assertEquals(0, searcher3.getIndexReader().getRefCount());
+    assertEquals(2, searcher4.getIndexReader().getRefCount());
+    assertEquals(2, searcher4.search(query, 100).scoreDocs.length);
+    assertEquals(2, searcher5.getIndexReader().getRefCount());
+    assertEquals(2, searcher5.search(query, 100).scoreDocs.length);
 
     searcherManager.release(searcher5);
-    Assert.assertEquals(0, searcher1.getIndexReader().getRefCount());
-    Assert.assertEquals(0, searcher2.getIndexReader().getRefCount());
-    Assert.assertEquals(0, searcher3.getIndexReader().getRefCount());
-    Assert.assertEquals(1, searcher4.getIndexReader().getRefCount());
-    Assert.assertEquals(2, searcher4.search(query, 100).scoreDocs.length);
-    Assert.assertEquals(1, searcher5.getIndexReader().getRefCount());
-    Assert.assertEquals(2, searcher5.search(query, 100).scoreDocs.length);
+    assertEquals(0, searcher1.getIndexReader().getRefCount());
+    assertEquals(0, searcher2.getIndexReader().getRefCount());
+    assertEquals(0, searcher3.getIndexReader().getRefCount());
+    assertEquals(1, searcher4.getIndexReader().getRefCount());
+    assertEquals(2, searcher4.search(query, 100).scoreDocs.length);
+    assertEquals(1, searcher5.getIndexReader().getRefCount());
+    assertEquals(2, searcher5.search(query, 100).scoreDocs.length);
 
     searcherManager.close();
-    Assert.assertEquals(0, searcher4.getIndexReader().getRefCount());
-    Assert.assertEquals(0, searcher5.getIndexReader().getRefCount());
+    assertEquals(0, searcher4.getIndexReader().getRefCount());
+    assertEquals(0, searcher5.getIndexReader().getRefCount());
     indexWriter.close();
   }
 
@@ -1494,7 +1498,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     Query query = queryParser.parse("\"distributed systems\" AND (Java C++)");
     IndexReader indexReader1 = DirectoryReader.open(indexWriter);
     IndexSearcher searcher1 = new IndexSearcher(indexReader1);
-    Assert.assertEquals(1, searcher1.search(query, 50).scoreDocs.length);
+    assertEquals(1, searcher1.search(query, 50).scoreDocs.length);
 
     // add another document but don't commit
     docToIndex = new Document();
@@ -1503,9 +1507,9 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
     // reopen NRT reader and search -- should see two uncommitted documents
     IndexReader indexReader2 = DirectoryReader.openIfChanged((DirectoryReader) indexReader1);
-    Assert.assertNotNull(indexReader2);
+    assertNotNull(indexReader2);
     IndexSearcher searcher2 = new IndexSearcher(indexReader2);
-    Assert.assertEquals(2, searcher2.search(query, 50).scoreDocs.length);
+    assertEquals(2, searcher2.search(query, 50).scoreDocs.length);
 
     // add another document
     docToIndex = new Document();
@@ -1514,9 +1518,9 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
     // reopen NRT reader and search -- should see three uncommitted documents
     IndexReader indexReader3 = DirectoryReader.openIfChanged((DirectoryReader) indexReader2);
-    Assert.assertNotNull(indexReader3);
+    assertNotNull(indexReader3);
     IndexSearcher searcher3 = new IndexSearcher(indexReader3);
-    Assert.assertEquals(3, searcher3.search(query, 50).scoreDocs.length);
+    assertEquals(3, searcher3.search(query, 50).scoreDocs.length);
 
     indexWriter.close();
     indexReader1.close();
@@ -1630,8 +1634,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
           // TODO: see how we can make this more deterministic
           if (count > 200) {
             // we should see an increasing number of hits
-            Assert.assertTrue(hits > 0);
-            Assert.assertTrue(hits >= prevHits);
+            assertTrue(hits > 0);
+            assertTrue(hits >= prevHits);
           }
           count++;
           prevHits = hits;
@@ -1649,13 +1653,13 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
    */
 
   private void testTextSearchSelectQueryHelper(String query, int expectedResultSize, boolean compareGrepOutput,
-      List<Serializable[]> expectedResults)
+      List<Object[]> expectedResults)
       throws Exception {
-    SelectionOnlyOperator operator = getOperatorForSqlQuery(query);
+    SelectionOnlyOperator operator = getOperator(query);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
-    Assert.assertNotNull(resultset);
-    Assert.assertEquals(resultset.size(), expectedResultSize);
+    assertNotNull(resultset);
+    assertEquals(resultset.size(), expectedResultSize);
     if (compareGrepOutput) {
       // compare with grep output
       verifySearchOutputWithGrepResults(resultset);
@@ -1664,11 +1668,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       for (int i = 0; i < expectedResultSize; i++) {
         Object[] actualRow = resultset.get(i);
         Object[] expectedRow = expectedResults.get(i);
-        Assert.assertEquals(actualRow.length, expectedRow.length);
+        assertEquals(actualRow.length, expectedRow.length);
         for (int j = 0; j < actualRow.length; j++) {
           Object actualColValue = actualRow[j];
           Object expectedColValue = expectedRow[j];
-          Assert.assertEquals(actualColValue, expectedColValue);
+          assertEquals(actualColValue, expectedColValue);
         }
       }
     }
@@ -1686,20 +1690,20 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       String[] expectedRow = line.split(":");
       Object[] actualRow = actualResultSet.get(counter);
       int expectedIntColValue = Integer.valueOf(expectedRow[0]) + INT_BASE_VALUE - 1;
-      Assert.assertEquals(expectedIntColValue, actualRow[0]);
-      Assert.assertEquals(expectedRow[1], actualRow[1]);
+      assertEquals(expectedIntColValue, actualRow[0]);
+      assertEquals(expectedRow[1], actualRow[1]);
       counter++;
     }
   }
 
   private void testTextSearchAggregationQueryHelper(String query, int expectedCount) {
-    BaseOperator<IntermediateResultsBlock> operator = getOperatorForPqlQuery(query);
+    BaseOperator<IntermediateResultsBlock> operator = getOperator(query);
     IntermediateResultsBlock operatorResult = operator.nextBlock();
     long count = (Long) operatorResult.getAggregationResult().get(0);
-    Assert.assertEquals(expectedCount, count);
+    assertEquals(expectedCount, count);
   }
 
-  private void testSkillsColumn(String searchQuery, List<Serializable[]> expected)
+  private void testSkillsColumn(String searchQuery, List<Object[]> expected)
       throws Exception {
     for (String skillColumn : Arrays.asList(SKILLS_TEXT_COL_NAME, SKILLS_TEXT_COL_DICT_NAME,
         SKILLS_TEXT_COL_MULTI_TERM_NAME, SKILLS_TEXT_NO_RAW_NAME, SKILLS_TEXT_MV_COL_NAME,
@@ -1717,157 +1721,143 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testInterSegment() {
-    String query =
-        "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\" AND \"Tensor flow\"') "
-            + "LIMIT 50000";
+    String query = "SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\" AND \"Tensor flow\"')";
     testInterSegmentAggregationQueryHelper(query, 12);
-    query =
-        "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"Machine learning\" AND \"Tensor "
-            + "flow\"') LIMIT 50000";
+    query = "SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"Machine learning\" AND \"Tensor flow\"')";
     testInterSegmentAggregationQueryHelper(query, 12);
 
-    query =
-        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\" AND "
-            + "\"Tensor flow\"') LIMIT 50000";
-    List<Serializable[]> expected = new ArrayList<>();
-    expected.add(new Serializable[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
-    expected.add(new Serializable[]{
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\" AND \"Tensor flow\"') LIMIT 50000";
+    List<Object[]> expected = new ArrayList<>();
+    expected.add(new Object[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
+    expected.add(new Object[]{
         1007,
         "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building large "
             + "scale systems, Machine learning"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1016,
         "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building high "
             + "performance scalable systems"
     });
-    expected.add(new Serializable[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
+    expected.add(new Object[]{
         1007,
         "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building large "
             + "scale systems, Machine learning"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1016,
         "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building high "
             + "performance scalable systems"
     });
-    expected.add(new Serializable[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
+    expected.add(new Object[]{
         1007,
         "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building large "
             + "scale systems, Machine learning"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1016,
         "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building high "
             + "performance scalable systems"
     });
-    expected.add(new Serializable[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{1004, "Machine learning, Tensor flow, Java, Stanford university,"});
+    expected.add(new Object[]{
         1007,
         "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building large "
             + "scale systems, Machine learning"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1016,
         "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building high "
             + "performance scalable systems"
     });
     testInterSegmentSelectionQueryHelper(query, expected);
-    query =
-        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"Machine learning\" "
-            + "AND \"Tensor flow\"') LIMIT 50000";
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"Machine learning\" AND \"Tensor flow\"') LIMIT 50000";
     testInterSegmentSelectionQueryHelper(query, expected);
 
     // try arbitrary filters in search expressions
-    query =
-        "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '(\"distributed systems\" AND apache) OR "
-            + "(Java AND C++)') LIMIT 50000";
+    query = "SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL, '(\"distributed systems\" AND apache) OR (Java AND C++)')";
     testInterSegmentAggregationQueryHelper(query, 36);
-    query =
-        "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '(\"distributed systems\" AND apache) OR"
-            + " (Java AND C++)') LIMIT 50000";
+    query = "SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL_DICT, '(\"distributed systems\" AND apache) OR (Java AND C++)')";
     testInterSegmentAggregationQueryHelper(query, 36);
 
-    query =
-        "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '(\"distributed systems\" AND apache) AND "
-            + "(Java AND C++)') LIMIT 50000";
+    query = "SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL, '(\"distributed systems\" AND apache) AND (Java AND C++)')";
     testInterSegmentAggregationQueryHelper(query, 4);
-    query =
-        "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '(\"distributed systems\" AND apache) "
-            + "AND (Java AND C++)') LIMIT 50000";
+    query = "SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL_DICT, '(\"distributed systems\" AND apache) AND (Java AND C++)')";
     testInterSegmentAggregationQueryHelper(query, 4);
 
-    query =
-        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '(\"distributed systems\" AND"
-            + " apache) AND (Java AND C++)') LIMIT 50000";
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL, '(\"distributed systems\" AND apache) AND (Java AND C++)') LIMIT 50000";
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1017,
         "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
             + " concurrency, multi-threading, C++, CPU processing, Java"
     });
     testInterSegmentSelectionQueryHelper(query, expected);
-
-    query =
-        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '(\"distributed "
-            + "systems\" AND apache) AND (Java AND C++)') LIMIT 50000";
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL_DICT, '(\"distributed systems\" AND apache) AND (Java AND C++)') LIMIT 50000";
     testInterSegmentSelectionQueryHelper(query, expected);
 
-    query =
-        "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '(\"apache spark\" OR \"query processing\") "
-            + "AND \"machine learning\"') LIMIT 50000";
+    query = "SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL, '(\"apache spark\" OR \"query processing\") AND \"machine learning\"')";
     testInterSegmentAggregationQueryHelper(query, 4);
-    query =
-        "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '(\"apache spark\" OR \"query "
-            + "processing\") AND \"machine learning\"') LIMIT 50000";
+    query = "SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL_DICT, '(\"apache spark\" OR \"query processing\") AND \"machine learning\"')";
     testInterSegmentAggregationQueryHelper(query, 4);
 
-    query =
-        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '(\"apache spark\" OR \"query"
-            + " processing\") AND \"machine learning\"') LIMIT 50000";
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL, '(\"apache spark\" OR \"query processing\") AND \"machine learning\"') "
+        + "LIMIT 50000";
     expected = new ArrayList<>();
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1020,
         "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster "
             + "management, docker image building and distribution"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1020,
         "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster "
             + "management, docker image building and distribution"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1020,
         "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster "
             + "management, docker image building and distribution"
     });
-    expected.add(new Serializable[]{
+    expected.add(new Object[]{
         1020,
         "Databases, columnar query processing, Apache Arrow, distributed systems, Machine learning, cluster "
             + "management, docker image building and distribution"
     });
     testInterSegmentSelectionQueryHelper(query, expected);
-
-    query =
-        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '(\"apache spark\" OR "
-            + "\"query processing\") AND \"machine learning\"') LIMIT 50000";
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL_DICT, '(\"apache spark\" OR \"query processing\") AND \"machine learning\"') "
+        + "LIMIT 50000";
     testInterSegmentSelectionQueryHelper(query, expected);
 
     // query with only stop-words. they should not be indexed
@@ -1875,6 +1865,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testInterSegmentAggregationQueryHelper(query, 0);
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, 'a and or in the are')";
     testInterSegmentAggregationQueryHelper(query, 0);
+
     // analyzer should prune/ignore the stop words from search expression and consider everything else for a match
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"learned a lot\"')";
     testInterSegmentAggregationQueryHelper(query, 4);
@@ -1882,24 +1873,20 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testInterSegmentAggregationQueryHelper(query, 4);
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"indexing and transaction processing\"')";
     testInterSegmentAggregationQueryHelper(query, 12);
-    query =
-        "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"indexing and transaction "
-            + "processing\"')";
+    query = "SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"indexing and transaction processing\"')";
     testInterSegmentAggregationQueryHelper(query, 12);
-    query =
-        "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"docker image building and distribution\"')";
+    query = "SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL, '\"docker image building and distribution\"')";
     testInterSegmentAggregationQueryHelper(query, 8);
-    query =
-        "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"docker image building and "
-            + "distribution\"')";
+    query = "SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"docker image building and distribution\"')";
     testInterSegmentAggregationQueryHelper(query, 8);
-    query =
-        "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed query engines for analytics "
-            + "and data warehouses\"')";
+    query = "SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL, '\"distributed query engines for analytics and data warehouses\"')";
     testInterSegmentAggregationQueryHelper(query, 8);
-    query =
-        "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"distributed query engines for "
-            + "analytics and data warehouses\"')";
+    query = "SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL_DICT, '\"distributed query engines for analytics and data warehouses\"')";
     testInterSegmentAggregationQueryHelper(query, 8);
     query = "SELECT count(*) FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '\"worked in NGO\"')";
     testInterSegmentAggregationQueryHelper(query, 4);
@@ -1908,54 +1895,16 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   }
 
   private void testInterSegmentAggregationQueryHelper(String query, long expectedCount) {
-    // PQL
-    BrokerResponseNative brokerResponseNative = getBrokerResponseForPqlQuery(query);
-    List<AggregationResult> aggregationResults = brokerResponseNative.getAggregationResults();
-    Assert.assertEquals(aggregationResults.size(), 1);
-    Assert.assertEquals(aggregationResults.get(0).getValue().toString(), String.valueOf(expectedCount));
-    // SQL
-    brokerResponseNative = getBrokerResponseForSqlQuery(query);
-    ResultTable resultTable = brokerResponseNative.getResultTable();
-    DataSchema dataSchema = resultTable.getDataSchema();
-    Assert.assertEquals(dataSchema.size(), 1);
-    Assert.assertEquals(dataSchema.getColumnName(0), "count(*)");
-    Assert.assertEquals(dataSchema.getColumnDataType(0), DataSchema.ColumnDataType.LONG);
-    List<Object[]> rows = resultTable.getRows();
-    Assert.assertEquals(rows.size(), 1);
-    Object[] row = rows.get(0);
-    Assert.assertEquals(row.length, 1);
-    Assert.assertEquals(row[0], expectedCount);
+    DataSchema expectedDataSchema = new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG});
+    List<Object[]> expectedRows = Collections.singletonList(new Object[]{expectedCount});
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query),
+        new ResultTable(expectedDataSchema, expectedRows));
   }
 
-  private void testInterSegmentSelectionQueryHelper(String query, List<Serializable[]> expectedResults) {
-    // PQL
-    BrokerResponseNative brokerResponseNative = getBrokerResponseForPqlQuery(query);
-    SelectionResults selectionResults = brokerResponseNative.getSelectionResults();
-    List<String> columns = selectionResults.getColumns();
-    Assert.assertEquals(columns.size(), 2);
-    List<Serializable[]> rows = selectionResults.getRows();
-    Assert.assertEquals(rows.size(), expectedResults.size());
-    for (int i = 0; i < rows.size(); i++) {
-      Serializable[] actualRow = rows.get(i);
-      Serializable[] expectedRow = expectedResults.get(i);
-      Assert.assertEquals(actualRow[0], String.valueOf(expectedRow[0]));
-      Assert.assertEquals(actualRow[1], expectedRow[1]);
-    }
-    // SQL
-    brokerResponseNative = getBrokerResponseForSqlQuery(query);
-    ResultTable resultTable = brokerResponseNative.getResultTable();
-    DataSchema dataSchema = resultTable.getDataSchema();
-    Assert.assertEquals(dataSchema.size(), 2);
-    Assert.assertEquals(dataSchema.getColumnName(0), "INT_COL");
-    Assert.assertEquals(dataSchema.getColumnName(1), "SKILLS_TEXT_COL");
-    Assert.assertEquals(dataSchema.getColumnDataType(0), DataSchema.ColumnDataType.INT);
-    Assert.assertEquals(dataSchema.getColumnDataType(1), DataSchema.ColumnDataType.STRING);
-    List<Object[]> results = resultTable.getRows();
-    Assert.assertEquals(results.size(), expectedResults.size());
-    for (int i = 0; i < results.size(); i++) {
-      Object[] actualRow = results.get(i);
-      Serializable[] expectedRow = expectedResults.get(i);
-      Assert.assertEquals(actualRow, expectedRow);
-    }
+  private void testInterSegmentSelectionQueryHelper(String query, List<Object[]> expectedRows) {
+    DataSchema expectedDataSchema = new DataSchema(new String[]{"INT_COL", "SKILLS_TEXT_COL"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query),
+        new ResultTable(expectedDataSchema, expectedRows));
   }
 }

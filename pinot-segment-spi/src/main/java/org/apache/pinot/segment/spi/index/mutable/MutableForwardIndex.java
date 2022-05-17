@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.mutable;
 
+import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 
@@ -182,6 +183,22 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
   @Override
   default double getDouble(int docId, ForwardIndexReaderContext context) {
     return getDouble(docId);
+  }
+
+  /**
+   * Reads the BIG_DECIMAL type single-value at the given document id. The passed in reader context can be used to
+   * accelerate the reads.
+   *
+   * @param docId Document id
+   * @return BIG_DECIMAL type single-value at the given document id
+   */
+  default BigDecimal getBigDecimal(int docId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  default BigDecimal getBigDecimal(int docId, ForwardIndexReaderContext context) {
+    return getBigDecimal(docId);
   }
 
   /**

@@ -93,4 +93,18 @@ public class AccessControlUtils {
           Response.Status.FORBIDDEN);
     }
   }
+
+  /**
+   * Validate permission for the given access type against the given table
+   *
+   * @param httpHeaders HTTP headers containing requester identity required by access control object
+   * @param endpointUrl the request url for which this access control is called
+   */
+  public void validatePermission(HttpHeaders httpHeaders, String endpointUrl,
+      AccessControl accessControl) {
+    if (!accessControl.hasAccess(httpHeaders)) {
+      throw new ControllerApplicationException(LOGGER, "Permission is denied for " + endpointUrl,
+          Response.Status.FORBIDDEN);
+    }
+  }
 }

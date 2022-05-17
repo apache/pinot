@@ -34,16 +34,19 @@ public class EpochTimeHandler implements TimeHandler {
   private final DateTimeFormatSpec _formatSpec;
   private final long _startTimeMs;
   private final long _endTimeMs;
+  private final boolean _negateWindowFilter;
+
   private final long _roundBucketMs;
   private final long _partitionBucketMs;
 
-  public EpochTimeHandler(DateTimeFieldSpec fieldSpec, long startTimeMs, long endTimeMs, long roundBucketMs,
-      long partitionBucketMs) {
+  public EpochTimeHandler(DateTimeFieldSpec fieldSpec, long startTimeMs, long endTimeMs, boolean negateWindowFilter,
+      long roundBucketMs, long partitionBucketMs) {
     _timeColumn = fieldSpec.getName();
     _dataType = fieldSpec.getDataType();
     _formatSpec = new DateTimeFormatSpec(fieldSpec.getFormat());
     _startTimeMs = startTimeMs;
     _endTimeMs = endTimeMs;
+    _negateWindowFilter = negateWindowFilter;
     _roundBucketMs = roundBucketMs;
     _partitionBucketMs = partitionBucketMs;
   }
@@ -52,7 +55,8 @@ public class EpochTimeHandler implements TimeHandler {
   public String handleTime(GenericRow row) {
     long timeMs = _formatSpec.fromFormatToMillis(row.getValue(_timeColumn).toString());
     if (_startTimeMs > 0) {
-      if (timeMs < _startTimeMs || timeMs >= _endTimeMs) {
+      boolean outsideTimeWindow = (timeMs < _startTimeMs || timeMs >= _endTimeMs);
+      if (outsideTimeWindow != _negateWindowFilter) {
         return null;
       }
     }

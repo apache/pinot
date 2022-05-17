@@ -22,12 +22,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.optimizer.filter.FilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.FlattenAndOrFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.MergeEqInFilterOptimizer;
@@ -46,34 +42,23 @@ public class QueryOptimizer {
   //   AND/OR predicate so that the children are on the same level to be merged
   // - TimePredicateFilterOptimizer and MergeRangeFilterOptimizer relies on NumericalFilterOptimizer to convert the
   //   values to the proper format so that they can be properly parsed
-  private static final List<FilterOptimizer> FILTER_OPTIMIZERS = Arrays
-      .asList(new FlattenAndOrFilterOptimizer(), new MergeEqInFilterOptimizer(), new NumericalFilterOptimizer(),
+  private static final List<FilterOptimizer> FILTER_OPTIMIZERS =
+      Arrays.asList(new FlattenAndOrFilterOptimizer(), new MergeEqInFilterOptimizer(), new NumericalFilterOptimizer(),
           new TimePredicateFilterOptimizer(), new MergeRangeFilterOptimizer());
 
   private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS =
       Collections.singletonList(new StringPredicateFilterOptimizer());
 
   /**
-   * Optimizes the given PQL query.
+   * Optimizes the given query.
    */
-  public void optimize(BrokerRequest brokerRequest, @Nullable Schema schema) {
-    FilterQuery filterQuery = brokerRequest.getFilterQuery();
-    if (filterQuery != null) {
-      FilterQueryTree filterQueryTree =
-          RequestUtils.buildFilterQuery(filterQuery.getId(), brokerRequest.getFilterSubQueryMap().getFilterQueryMap());
-      for (FilterOptimizer filterOptimizer : FILTER_OPTIMIZERS) {
-        filterQueryTree = filterOptimizer.optimize(filterQueryTree, schema);
-      }
-      RequestUtils.generateFilterFromTree(filterQueryTree, brokerRequest);
-    }
-  }
-
-  /** Optimizes the given SQL query. */
   public void optimize(PinotQuery pinotQuery, @Nullable Schema schema) {
     optimize(pinotQuery, null, schema);
   }
 
-  /** Optimizes the given SQL query. */
+  /**
+   * Optimizes the given query.
+   */
   public void optimize(PinotQuery pinotQuery, @Nullable TableConfig tableConfig, @Nullable Schema schema) {
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {

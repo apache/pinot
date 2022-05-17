@@ -31,7 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.avro.generic.GenericData;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.utils.Pair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -63,7 +63,7 @@ public abstract class AbstractRecordExtractorTest {
   private static Map<String, String> createMap(Pair<String, String>[] entries) {
     Map<String, String> map = new HashMap<>();
     for (Pair<String, String> entry : entries) {
-      map.put(entry.getFirst(), entry.getSecond());
+      map.put(entry.getLeft(), entry.getRight());
     }
     return map;
   }
@@ -79,10 +79,10 @@ public abstract class AbstractRecordExtractorTest {
     List[] arrays = new List[]{Arrays.asList("a", "b", "c"), Arrays.asList("d", "e"), Arrays.asList("w", "x", "y",
         "z"), Collections.singletonList("a")};
     Map<String, String>[] maps = new Map[]{
-        createMap(new Pair[]{new Pair<>("a", "1"), new Pair<>("b", "2")}),
-        createMap(new Pair[]{new Pair<>("a", "3"), new Pair<>("b", "4")}),
-        createMap(new Pair[]{new Pair<>("a", "5"), new Pair<>("b", "6")}),
-        createMap(new Pair[]{new Pair<>("a", "7"), new Pair<>("b", "8")})
+        createMap(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
+        createMap(new Pair[]{Pair.of("a", "3"), Pair.of("b", "4")}),
+        createMap(new Pair[]{Pair.of("a", "5"), Pair.of("b", "6")}),
+        createMap(new Pair[]{Pair.of("a", "7"), Pair.of("b", "8")})
     };
 
     List<Map<String, Object>> inputRecords = new ArrayList<>(4);

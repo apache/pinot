@@ -19,9 +19,12 @@
 package org.apache.pinot.segment.local.io.writer.impl;
 
 import java.io.Closeable;
+import java.math.BigDecimal;
 
 
 public interface VarByteChunkWriter extends Closeable {
+  void putBigDecimal(BigDecimal value);
+
   void putString(String value);
 
   void putBytes(byte[] value);

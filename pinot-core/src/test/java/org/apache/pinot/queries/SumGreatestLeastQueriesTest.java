@@ -24,8 +24,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -47,7 +46,6 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
 
 
 public class SumGreatestLeastQueriesTest extends BaseQueriesTest {
@@ -124,9 +122,8 @@ public class SumGreatestLeastQueriesTest extends BaseQueriesTest {
         + "sum(greatest(" + ON_COLUMN + ", " + OFF_COLUMN + ")), "
         + "sum(least(" + ON_COLUMN + ", " + OFF_COLUMN + ")) "
         + "from " + RAW_TABLE_NAME;
-    Operator<?> operator = getOperatorForSqlQuery(query);
-    assertTrue(operator instanceof AggregationOperator);
-    List<Object> aggregationResult = ((AggregationOperator) operator).nextBlock().getAggregationResult();
+    AggregationOperator aggregationOperator = getOperator(query);
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getAggregationResult();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 4);
     assertEquals(((Number) aggregationResult.get(0)).intValue(), NUM_RECORDS);
@@ -145,9 +142,8 @@ public class SumGreatestLeastQueriesTest extends BaseQueriesTest {
         + "sum(least(" + OFF_COLUMN + ", " + ON_COLUMN + ")) "
         + "from " + RAW_TABLE_NAME + " "
         + "group by " + CLASSIFICATION_COLUMN;
-    Operator<?> operator = getOperatorForSqlQuery(query);
-    assertTrue(operator instanceof AggregationGroupByOperator);
-    AggregationGroupByResult result = ((AggregationGroupByOperator) operator).nextBlock().getAggregationGroupByResult();
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
+    AggregationGroupByResult result = groupByOperator.nextBlock().getAggregationGroupByResult();
     assertNotNull(result);
     Iterator<GroupKeyGenerator.GroupKey> it = result.getGroupKeyIterator();
     while (it.hasNext()) {

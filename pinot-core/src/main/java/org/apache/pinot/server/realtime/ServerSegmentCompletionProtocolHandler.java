@@ -23,6 +23,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
 import javax.net.ssl.SSLContext;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
@@ -30,7 +31,6 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.data.manager.realtime.Server2ControllerSegmentUploader;
 import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
-import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -199,13 +199,13 @@ public class ServerSegmentCompletionProtocolHandler {
       LOGGER.warn("No leader found while trying to send {}", request.toString());
       return null;
     }
+    Integer port = leaderHostPort.getRight();
     String protocol = _protocol;
     if (_controllerHttpsPort != null) {
-      leaderHostPort.setSecond(_controllerHttpsPort);
+      port = _controllerHttpsPort;
       protocol = HTTPS_PROTOCOL;
     }
-
-    return request.getUrl(leaderHostPort.getFirst() + ":" + leaderHostPort.getSecond(), protocol);
+    return request.getUrl(leaderHostPort.getLeft() + ":" + port, protocol);
   }
 
   private SegmentCompletionProtocol.Response sendRequest(String url) {

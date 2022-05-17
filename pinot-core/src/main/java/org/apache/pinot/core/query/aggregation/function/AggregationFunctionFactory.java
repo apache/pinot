@@ -160,6 +160,36 @@ public class AggregationFunctionFactory {
             return new AvgAggregationFunction(firstArgument);
           case MODE:
             return new ModeAggregationFunction(arguments);
+          case FIRSTWITHTIME:
+            if (arguments.size() == 3) {
+              ExpressionContext timeCol = arguments.get(1);
+              ExpressionContext dataType = arguments.get(2);
+              if (dataType.getType() != ExpressionContext.Type.LITERAL) {
+                throw new IllegalArgumentException("Third argument of firstWithTime Function should be literal."
+                    + " The function can be used as firstWithTime(dataColumn, timeColumn, 'dataType')");
+              }
+              FieldSpec.DataType fieldDataType
+                  = FieldSpec.DataType.valueOf(dataType.getLiteral().toUpperCase());
+              switch (fieldDataType) {
+                case BOOLEAN:
+                case INT:
+                  return new FirstIntValueWithTimeAggregationFunction(
+                      firstArgument, timeCol, fieldDataType == FieldSpec.DataType.BOOLEAN);
+                case LONG:
+                  return new FirstLongValueWithTimeAggregationFunction(firstArgument, timeCol);
+                case FLOAT:
+                  return new FirstFloatValueWithTimeAggregationFunction(firstArgument, timeCol);
+                case DOUBLE:
+                  return new FirstDoubleValueWithTimeAggregationFunction(firstArgument, timeCol);
+                case STRING:
+                  return new FirstStringValueWithTimeAggregationFunction(firstArgument, timeCol);
+                default:
+                  throw new IllegalArgumentException("Unsupported Value Type for firstWithTime Function:" + dataType);
+              }
+            } else {
+              throw new IllegalArgumentException("Three arguments are required for firstWithTime Function."
+                  + " The function can be used as firstWithTime(dataColumn, timeColumn, 'dataType')");
+            }
           case LASTWITHTIME:
             if (arguments.size() == 3) {
               ExpressionContext timeCol = arguments.get(1);

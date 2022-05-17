@@ -120,7 +120,7 @@ public class TableResizerTest {
 
     // d1 asc
     TableResizer tableResizer =
-        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d1"));
+        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d1"));
     Map<Key, Record> recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(recordsMap.size(), TRIM_TO_SIZE);
@@ -129,7 +129,7 @@ public class TableResizerTest {
 
     // d1 desc
     tableResizer =
-        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d1 DESC"));
+        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d1 DESC"));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(recordsMap.size(), TRIM_TO_SIZE);
@@ -139,7 +139,7 @@ public class TableResizerTest {
 
     // d1 asc, d3 desc (tie breaking with 2nd comparator)
     tableResizer =
-        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d1, d3 DESC"));
+        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d1, d3 DESC"));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(recordsMap.size(), TRIM_TO_SIZE);
@@ -149,7 +149,7 @@ public class TableResizerTest {
 
     // d1 asc, sum(m1) desc, max(m2) desc
     tableResizer = new TableResizer(DATA_SCHEMA,
-        QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d1, SUM(m1) DESC, max(m2) DESC"));
+        QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d1, SUM(m1) DESC, max(m2) DESC"));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(recordsMap.size(), TRIM_TO_SIZE);
@@ -159,7 +159,7 @@ public class TableResizerTest {
 
     // avg(m4) asc (object type)
     tableResizer =
-        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "AVG(m4)"));
+        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "AVG(m4)"));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(recordsMap.size(), TRIM_TO_SIZE);
@@ -169,7 +169,7 @@ public class TableResizerTest {
 
     // distinctcount(m3) desc, d1 asc (non-comparable intermediate result)
     tableResizer = new TableResizer(DATA_SCHEMA,
-        QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "DISTINCTCOUNT(m3) DESC, d1"));
+        QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "DISTINCTCOUNT(m3) DESC, d1"));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(recordsMap.size(), TRIM_TO_SIZE);
@@ -179,7 +179,7 @@ public class TableResizerTest {
 
     // d2 + d3 asc (post-aggregation)
     tableResizer =
-        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d2 + d3"));
+        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d2 + d3"));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(recordsMap.size(), TRIM_TO_SIZE);
@@ -189,7 +189,7 @@ public class TableResizerTest {
 
     // sum(m1) * d3 desc (post-aggregation)
     tableResizer = new TableResizer(DATA_SCHEMA,
-        QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "SUM(m1) * d3 DESC"));
+        QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "SUM(m1) * d3 DESC"));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(recordsMap.size(), TRIM_TO_SIZE);
@@ -199,7 +199,7 @@ public class TableResizerTest {
 
     // d2 / (distinctcount(m3) + 1) asc, d1 desc (post-aggregation)
     tableResizer = new TableResizer(DATA_SCHEMA,
-        QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d2 / (DISTINCTCOUNT(m3) + 1), d1 DESC"));
+        QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d2 / (DISTINCTCOUNT(m3) + 1), d1 DESC"));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, TRIM_TO_SIZE);
     assertEquals(recordsMap.size(), TRIM_TO_SIZE);
@@ -213,7 +213,7 @@ public class TableResizerTest {
 
     // d1 asc
     tableResizer =
-        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d1"));
+        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d1"));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, trimToSize);
     assertEquals(recordsMap.size(), trimToSize);
@@ -222,7 +222,7 @@ public class TableResizerTest {
 
     // avg(m4) asc (object type)
     tableResizer =
-        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "AVG(m4)"));
+        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "AVG(m4)"));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, trimToSize);
     assertEquals(recordsMap.size(), trimToSize);
@@ -231,7 +231,7 @@ public class TableResizerTest {
 
     // distinctcount(m3) desc, d1 asc (non-comparable intermediate result)
     tableResizer = new TableResizer(DATA_SCHEMA,
-        QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "DISTINCTCOUNT(m3) DESC, d1"));
+        QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "DISTINCTCOUNT(m3) DESC, d1"));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, trimToSize);
     assertEquals(recordsMap.size(), trimToSize);
@@ -240,7 +240,7 @@ public class TableResizerTest {
 
     // d2 / (distinctcount(m3) + 1) asc, d1 desc (post-aggregation)
     tableResizer = new TableResizer(DATA_SCHEMA,
-        QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d2 / (DISTINCTCOUNT(m3) + 1), d1 DESC"));
+        QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d2 / (DISTINCTCOUNT(m3) + 1), d1 DESC"));
     recordsMap = new HashMap<>(_recordsMap);
     tableResizer.resizeRecordsMap(recordsMap, trimToSize);
     assertEquals(recordsMap.size(), trimToSize);
@@ -255,7 +255,7 @@ public class TableResizerTest {
   public void testSortTopRecords() {
     // d1 asc
     TableResizer tableResizer =
-        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d1"));
+        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d1"));
     Map<Key, Record> recordsMap = new HashMap<>(_recordsMap);
     List<Record> sortedRecords = tableResizer.getSortedTopRecords(recordsMap, TRIM_TO_SIZE);
     assertEquals(sortedRecords.size(), TRIM_TO_SIZE);
@@ -269,7 +269,7 @@ public class TableResizerTest {
 
     // d1 asc, d3 desc (tie breaking with 2nd comparator)
     tableResizer =
-        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d1, d3 DESC"));
+        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d1, d3 DESC"));
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.getSortedTopRecords(recordsMap, TRIM_TO_SIZE);
     assertEquals(sortedRecords.size(), TRIM_TO_SIZE);
@@ -285,7 +285,7 @@ public class TableResizerTest {
 
     // d1 asc, sum(m1) desc, max(m2) desc
     tableResizer = new TableResizer(DATA_SCHEMA,
-        QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d1, SUM(m1) DESC, max(m2) DESC"));
+        QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d1, SUM(m1) DESC, max(m2) DESC"));
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.getSortedTopRecords(recordsMap, TRIM_TO_SIZE);
     assertEquals(sortedRecords.size(), TRIM_TO_SIZE);
@@ -301,7 +301,7 @@ public class TableResizerTest {
 
     // avg(m4) asc (object type)
     tableResizer =
-        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "AVG(m4)"));
+        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "AVG(m4)"));
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.getSortedTopRecords(recordsMap, TRIM_TO_SIZE);
     assertEquals(sortedRecords.size(), TRIM_TO_SIZE);
@@ -311,7 +311,7 @@ public class TableResizerTest {
 
     // distinctcount(m3) desc, d1 asc (non-comparable intermediate result)
     tableResizer = new TableResizer(DATA_SCHEMA,
-        QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "DISTINCTCOUNT(m3) DESC, d1"));
+        QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "DISTINCTCOUNT(m3) DESC, d1"));
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.getSortedTopRecords(recordsMap, TRIM_TO_SIZE);
     assertEquals(sortedRecords.size(), TRIM_TO_SIZE);
@@ -321,7 +321,7 @@ public class TableResizerTest {
 
     // d2 / (distinctcount(m3) + 1) asc, d1 desc (post-aggregation)
     tableResizer = new TableResizer(DATA_SCHEMA,
-        QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d2 / (DISTINCTCOUNT(m3) + 1), d1 DESC"));
+        QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d2 / (DISTINCTCOUNT(m3) + 1), d1 DESC"));
     recordsMap = new HashMap<>(_recordsMap);
     sortedRecords = tableResizer.getSortedTopRecords(recordsMap, TRIM_TO_SIZE);
     assertEquals(sortedRecords.size(), TRIM_TO_SIZE);
@@ -336,7 +336,7 @@ public class TableResizerTest {
   @Test
   public void testInSegmentTrim() {
     TableResizer tableResizer =
-        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "d3 DESC"));
+        new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d3 DESC"));
     List<IntermediateRecord> results =
         tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, TRIM_TO_SIZE);
     assertEquals(results.size(), TRIM_TO_SIZE);
@@ -349,7 +349,7 @@ public class TableResizerTest {
       assertEquals(results.get(2)._record, _records.get(3));
     }
 
-    tableResizer = new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContextFromSQL(
+    tableResizer = new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(
         QUERY_PREFIX + "SUM(m1) DESC, max(m2) DESC, DISTINCTCOUNT(m3) DESC"));
     results = tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, TRIM_TO_SIZE);
     assertEquals(results.size(), TRIM_TO_SIZE);
@@ -363,7 +363,7 @@ public class TableResizerTest {
     }
 
     tableResizer = new TableResizer(DATA_SCHEMA,
-        QueryContextConverterUtils.getQueryContextFromSQL(QUERY_PREFIX + "DISTINCTCOUNT(m3) DESC, AVG(m4) ASC"));
+        QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "DISTINCTCOUNT(m3) DESC, AVG(m4) ASC"));
     results = tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, TRIM_TO_SIZE);
     assertEquals(results.size(), TRIM_TO_SIZE);
     // _records[4],  _records[3],  _records[1]

@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.creator.impl;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -148,8 +147,8 @@ public class SegmentColumnarIndexCreatorTest {
   private static long getStartTimeInSegmentMetadata(String testDateTimeFormat, String testDateTime)
       throws Exception {
     String timeColumn = "foo";
-    Schema schema = new Schema.SchemaBuilder()
-        .addDateTime(timeColumn, FieldSpec.DataType.STRING, testDateTimeFormat, "1:MILLISECONDS").build();
+    Schema schema = new Schema.SchemaBuilder().addDateTime(timeColumn, FieldSpec.DataType.STRING, testDateTimeFormat,
+        "1:MILLISECONDS").build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(timeColumn).build();
 
@@ -162,7 +161,7 @@ public class SegmentColumnarIndexCreatorTest {
       FileUtils.deleteQuietly(new File(indexDirPath));
 
       GenericRow row = new GenericRow();
-      row.init(ImmutableMap.of(timeColumn, testDateTime));
+      row.putValue(timeColumn, testDateTime);
       List<GenericRow> rows = ImmutableList.of(row);
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

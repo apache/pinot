@@ -20,11 +20,11 @@ package org.apache.pinot.core.operator.blocks;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
@@ -50,13 +50,13 @@ import org.apache.pinot.spi.utils.ByteArray;
 /**
  * The <code>IntermediateResultsBlock</code> class is the holder of the server side inter-segment results.
  */
+@SuppressWarnings("rawtypes")
 public class IntermediateResultsBlock implements Block {
   private DataSchema _dataSchema;
   private Collection<Object[]> _selectionResult;
   private AggregationFunction[] _aggregationFunctions;
   private List<Object> _aggregationResult;
   private AggregationGroupByResult _aggregationGroupByResult;
-  private List<Map<String, Object>> _combinedAggregationGroupByResult;
   private List<ProcessingException> _processingExceptions;
   private Collection<IntermediateRecord> _intermediateRecords;
   private long _numDocsScanned;
@@ -89,24 +89,9 @@ public class IntermediateResultsBlock implements Block {
    * <p>For aggregation only, the result is a list of values.
    * <p>For aggregation group-by, the result is a list of maps from group keys to aggregation values.
    */
-  @SuppressWarnings("unchecked")
-  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions, List aggregationResult,
-      boolean isGroupBy) {
+  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> aggregationResult) {
     _aggregationFunctions = aggregationFunctions;
-    if (isGroupBy) {
-      _combinedAggregationGroupByResult = aggregationResult;
-    } else {
-      _aggregationResult = aggregationResult;
-    }
-  }
-
-  /**
-   * Constructor for aggregation group-by result with {@link AggregationGroupByResult}.
-   */
-  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
-      @Nullable AggregationGroupByResult aggregationGroupByResults) {
-    _aggregationFunctions = aggregationFunctions;
-    _aggregationGroupByResult = aggregationGroupByResults;
+    _aggregationResult = aggregationResult;
   }
 
   /**
@@ -318,10 +303,6 @@ public class IntermediateResultsBlock implements Block {
       return getAggregationResultDataTable();
     }
 
-    if (_combinedAggregationGroupByResult != null) {
-      return getAggregationGroupByResultDataTable();
-    }
-
     return getMetadataDataTable();
   }
 
@@ -359,6 +340,9 @@ public class IntermediateResultsBlock implements Block {
         break;
       case DOUBLE:
         dataTableBuilder.setColumn(columnIndex, (double) value);
+        break;
+      case BIG_DECIMAL:
+        dataTableBuilder.setColumn(columnIndex, (BigDecimal) value);
         break;
       case STRING:
         dataTableBuilder.setColumn(columnIndex, (String) value);
@@ -426,26 +410,6 @@ public class IntermediateResultsBlock implements Block {
       }
     }
     dataTableBuilder.finishRow();
-    DataTable dataTable = dataTableBuilder.build();
-
-    return attachMetadataToDataTable(dataTable);
-  }
-
-  private DataTable getAggregationGroupByResultDataTable()
-      throws Exception {
-    String[] columnNames = new String[]{"functionName", "GroupByResultMap"};
-    ColumnDataType[] columnDataTypes = new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.OBJECT};
-
-    // Build the data table.
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
-    int numAggregationFunctions = _aggregationFunctions.length;
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      dataTableBuilder.startRow();
-      AggregationFunction aggregationFunction = _aggregationFunctions[i];
-      dataTableBuilder.setColumn(0, aggregationFunction.getColumnName());
-      dataTableBuilder.setColumn(1, _combinedAggregationGroupByResult.get(i));
-      dataTableBuilder.finishRow();
-    }
     DataTable dataTable = dataTableBuilder.build();
 
     return attachMetadataToDataTable(dataTable);

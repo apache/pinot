@@ -47,7 +47,7 @@ public class EmptyQuickstart extends QuickStartBase {
     }
 
     QuickstartRunner runner =
-        new QuickstartRunner(new ArrayList<>(), 1, 1, 1, 0,
+        new QuickstartRunner(new ArrayList<>(), 1, 1, 1, 1,
             dataDir, true, getAuthToken(), getConfigOverrides(), _zkExternalAddress, false);
 
     if (_zkExternalAddress != null) {

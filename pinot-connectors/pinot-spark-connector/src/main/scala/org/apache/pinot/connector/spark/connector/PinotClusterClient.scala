@@ -40,6 +40,7 @@ private[pinot] object PinotClusterClient extends Logging {
   private val TABLE_BROKER_INSTANCES_TEMPLATE = "http://%s//brokers/tables/%s"
   private val TIME_BOUNDARY_TEMPLATE = "http://%s/debug/timeBoundary/%s"
   private val ROUTING_TABLE_TEMPLATE = "http://%s/debug/routingTable/sql?query=%s"
+  private val INSTANCES_API_TEMPLATE = "http://%s/instances/%s"
 
   def getTableSchema(controllerUrl: String, tableName: String): Schema = {
     val rawTableName = TableNameBuilder.extractRawTableName(tableName)
@@ -176,10 +177,31 @@ private[pinot] object PinotClusterClient extends Logging {
     routingTables
   }
 
+  /**
+   * Get host information for a Pinot instance
+   *
+   * @return InstanceInfo
+   */
+  def getInstanceInfo(controllerUrl: String, instance: String): InstanceInfo = {
+    Try {
+      val uri = new URI(String.format(INSTANCES_API_TEMPLATE, controllerUrl, instance))
+      val response = HttpUtils.sendGetRequest(uri)
+      decodeTo[InstanceInfo](response)
+    } match {
+      case Success(decodedReponse) =>
+        decodedReponse
+      case Failure(exception) =>
+        throw PinotException(
+          s"An error occured while reading instance info for: '$instance'",
+          exception
+        )
+    }
+  }
+
   private def getRoutingTableForQuery(brokerUrl: String, sql: String): Map[String, List[String]] = {
     Try {
-      val encodedPqlQueryParam = URLEncoder.encode(sql, "UTF-8")
-      val uri = new URI(String.format(ROUTING_TABLE_TEMPLATE, brokerUrl, encodedPqlQueryParam))
+      val encodedSqlQueryParam = URLEncoder.encode(sql, "UTF-8")
+      val uri = new URI(String.format(ROUTING_TABLE_TEMPLATE, brokerUrl, encodedSqlQueryParam))
       val response = HttpUtils.sendGetRequest(uri)
       decodeTo[Map[String, List[String]]](response)
     } match {
@@ -201,3 +223,8 @@ private[pinot] case class TimeBoundaryInfo(timeColumn: String, timeValue: String
 
   def getRealtimePredicate: String = s"$timeColumn >= $timeValue"
 }
+
+private[pinot] case class InstanceInfo(instanceName: String,
+                                       hostName: String,
+                                       port: String,
+                                       grpcPort: Int)

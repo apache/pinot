@@ -64,15 +64,17 @@ public class MergeTaskUtils {
       return null;
     }
     DateTimeFieldSpec fieldSpec = schema.getSpecForTimeColumn(timeColumn);
-    Preconditions.checkState(fieldSpec != null, "No valid spec found for time column: %s in schema for table: %s",
-        timeColumn, tableConfig.getTableName());
+    Preconditions
+        .checkState(fieldSpec != null, "No valid spec found for time column: %s in schema for table: %s", timeColumn,
+            tableConfig.getTableName());
 
     TimeHandlerConfig.Builder timeHandlerConfigBuilder = new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH);
 
     String windowStartMs = taskConfig.get(MergeTask.WINDOW_START_MS_KEY);
     String windowEndMs = taskConfig.get(MergeTask.WINDOW_END_MS_KEY);
     if (windowStartMs != null && windowEndMs != null) {
-      timeHandlerConfigBuilder.setTimeRange(Long.parseLong(windowStartMs), Long.parseLong(windowEndMs));
+      timeHandlerConfigBuilder.setTimeRange(Long.parseLong(windowStartMs), Long.parseLong(windowEndMs))
+          .setNegateWindowFilter(Boolean.parseBoolean(taskConfig.get(MergeTask.NEGATE_WINDOW_FILTER)));
     }
 
     String roundBucketTimePeriod = taskConfig.get(MergeTask.ROUND_BUCKET_TIME_PERIOD_KEY);

@@ -1,0 +1,45 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.tools.admin.command.filesystem;
+
+import java.net.URI;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
+
+
+public class Utils {
+  private Utils() {
+  }
+
+  public static String getScheme(URI uri) {
+    if (uri.getScheme() != null) {
+      return uri.getScheme();
+    }
+    return PinotFSFactory.LOCAL_PINOT_FS_SCHEME;
+  }
+
+  public static PinotFS getPinotFS(URI uri) {
+    String scheme = getScheme(uri);
+    if (!PinotFSFactory.isSchemeSupported(scheme)) {
+      System.err.println("File scheme " + scheme + " is not supported.");
+      throw new RuntimeException("File scheme " + scheme + " is not supported.");
+    }
+    return PinotFSFactory.create(scheme);
+  }
+}

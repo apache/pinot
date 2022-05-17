@@ -30,6 +30,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -166,7 +167,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   @Test
   public void testSimpleSelectOnJsonColumn() {
     try {
-      Operator operator = getOperatorForSqlQuery("select jsonColumn FROM testTable limit 100");
+      Operator operator = getOperator("select jsonColumn FROM testTable limit 100");
       IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
       Collection<Object[]> rows = block.getSelectionResult();
       Assert.assertEquals(rows.size(), 13);
@@ -179,7 +180,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   /** Test filtering on string value associated with  JSON key*/
   @Test
   public void testExtractScalarWithStringFilter() {
-    Operator operator = getOperatorForSqlQuery(
+    Operator operator = getOperator(
         "select intColumn, json_extract_scalar(jsonColumn, '$.name.last', 'STRING') FROM testTable WHERE "
             + "json_extract_scalar(jsonColumn, '$.name.first', 'STRING') = 'daffy'");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
@@ -196,7 +197,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   /** Test filtering on number value associated with  JSON key*/
   @Test
   public void testExtractScalarWithNumericIntFilter() {
-    Operator operator = getOperatorForSqlQuery(
+    Operator operator = getOperator(
         "select json_extract_scalar(jsonColumn, '$.name.last', 'STRING') FROM testTable WHERE json_extract_scalar"
             + "(jsonColumn, '$.id', 'INT') = 171");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
@@ -213,7 +214,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   public void testExtractScalarWithNumericFloatFilter() {
 
     // query to retrieve result as INT
-    Operator operator1 = getOperatorForSqlQuery(
+    Operator operator1 = getOperator(
         "select json_extract_scalar(jsonColumn, '$.id', 'INT') FROM testTable WHERE json_extract_scalar(jsonColumn, "
             + "'$.id', 'FLOAT') = 161.5");
     IntermediateResultsBlock block1 = (IntermediateResultsBlock) operator1.nextBlock();
@@ -225,7 +226,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(iterator1.next()[0], 161);
 
     // query to retrieve result as DOUBLE
-    Operator operator2 = getOperatorForSqlQuery(
+    Operator operator2 = getOperator(
         "select json_extract_scalar(jsonColumn, '$.id', 'DOUBLE') FROM testTable WHERE json_extract_scalar"
             + "(jsonColumn, '$.id', 'FLOAT') = 161.5");
     IntermediateResultsBlock block2 = (IntermediateResultsBlock) operator2.nextBlock();
@@ -240,7 +241,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   /** Retrieve JSON array after filtering on string value associated with  JSON key*/
   @Test
   public void testExtractScalarArrayWithStringFilter() {
-    Operator operator = getOperatorForSqlQuery(
+    Operator operator = getOperator(
         "select json_extract_scalar(jsonColumn, '$.data', 'STRING') FROM testTable WHERE json_extract_scalar"
             + "(jsonColumn, '$.name.first', 'STRING') = 'daffy'");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
@@ -255,7 +256,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   /** Test filtering on string value within a JSON array*/
   @Test
   public void testExtractScalarWithArrayFilter() {
-    Operator operator = getOperatorForSqlQuery(
+    Operator operator = getOperator(
         "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_extract_scalar"
             + "(jsonColumn, '$.data[0]', 'STRING') IN ('i', 'k')");
     IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
@@ -271,7 +272,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   @Test
   public void testJsonMatchWithoutIndex() {
     try {
-      Operator operator = getOperatorForSqlQuery(
+      Operator operator = getOperator(
           "select json_extract_scalar(stringColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match"
               + "(stringColumn, '\"$.id\"=101')");
       Assert.assertTrue(false);
@@ -282,7 +283,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testJsonMatchAtLevel1WithIndex() {
-    Operator operator = getOperatorForSqlQuery(
+    Operator operator = getOperator(
         "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(jsonColumn,"
             + " '\"$.id\"=101')");
 
@@ -297,7 +298,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testJsonMatchAtLevel2WithIndex() {
-    Operator operator = getOperatorForSqlQuery(
+    Operator operator = getOperator(
         "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(jsonColumn,"
             + " '\"$.name.first\" = ''daffy''')");
 
@@ -312,7 +313,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testJsonMatchArrayWithIndex() {
-    Operator operator = getOperatorForSqlQuery(
+    Operator operator = getOperator(
         "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(jsonColumn,"
             + " '\"$.data[0]\" IN (''k'', ''j'')')");
 
@@ -329,7 +330,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testJsonMatchNestedArrayWithIndex() {
-    Operator operator = getOperatorForSqlQuery(
+    Operator operator = getOperator(
         "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(jsonColumn,"
             + " '\"$.data[0].e[1].y[0].i1\" = 1')");
 
@@ -344,7 +345,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testJsonMatchMultidimensionalArrayWithIndex() {
-    Operator operator = getOperatorForSqlQuery(
+    Operator operator = getOperator(
         "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING') FROM testTable WHERE json_match(jsonColumn,"
             + " '\"$.data[0][1][0]\" = ''3''')");
 
@@ -359,24 +360,25 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testJsonMatchMultidimensionalArrayGroupByWithIndex() {
-    Operator operator = getOperatorForSqlQuery(
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(
         "select json_extract_scalar(jsonColumn, '$.name.first', 'STRING'), count(*) FROM testTable WHERE json_match"
             + "(jsonColumn, '\"$.data[0][1][0]\" = ''3''') GROUP BY json_extract_scalar(jsonColumn, '$.name.first', "
             + "'STRING')");
+    AggregationGroupByResult groupByResult = groupByOperator.nextBlock().getAggregationGroupByResult();
+    Assert.assertNotNull(groupByResult);
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
 
-    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
-    AggregationGroupByResult result = block.getAggregationGroupByResult();
-    Iterator<GroupKeyGenerator.StringGroupKey> iterator = result.getStringGroupKeyIterator();
+    Assert.assertTrue(groupKeyIterator.hasNext());
+    GroupKeyGenerator.GroupKey groupKey1 = groupKeyIterator.next();
+    Assert.assertEquals(groupKey1._keys, new Object[]{"multi-dimensional-2"});
+    Assert.assertEquals(groupByResult.getResultForGroupId(0, groupKey1._groupId), 1L);
 
-    Assert.assertTrue(iterator.hasNext());
-    GroupKeyGenerator.StringGroupKey groupKey1 = iterator.next();
-    Assert.assertEquals(groupKey1._stringKey, "multi-dimensional-2");
-    Assert.assertEquals(((Long) result.getResultForKey(groupKey1, 0)).intValue(), 1L);
+    Assert.assertTrue(groupKeyIterator.hasNext());
+    GroupKeyGenerator.GroupKey groupKey2 = groupKeyIterator.next();
+    Assert.assertEquals(groupKey2._keys, new Object[]{"multi-dimensional-1"});
+    Assert.assertEquals(groupByResult.getResultForGroupId(0, groupKey1._groupId), 2L);
 
-    Assert.assertTrue(iterator.hasNext());
-    GroupKeyGenerator.StringGroupKey groupKey2 = iterator.next();
-    Assert.assertEquals(groupKey2._stringKey, "multi-dimensional-1");
-    Assert.assertEquals(((Long) result.getResultForKey(groupKey1, 0)).intValue(), 2L);
+    Assert.assertFalse(groupKeyIterator.hasNext());
   }
 
   @AfterClass

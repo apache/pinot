@@ -21,9 +21,9 @@ package org.apache.pinot.common.request.context;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
-import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
@@ -34,17 +34,13 @@ import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
-import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
-import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
-import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
@@ -52,17 +48,15 @@ public class RequestContextUtils {
   private RequestContextUtils() {
   }
 
-  private static final Pql2Compiler PQL_COMPILER = new Pql2Compiler();
-
   /**
-   * Converts the given SQL expression into an {@link ExpressionContext}.
+   * Converts the given string expression into an {@link ExpressionContext}.
    */
-  public static ExpressionContext getExpressionFromSQL(String sqlExpression) {
-    if (sqlExpression.equals("*")) {
+  public static ExpressionContext getExpression(String expression) {
+    if (expression.equals("*")) {
       // For 'SELECT *' and 'SELECT COUNT(*)'
       return ExpressionContext.forIdentifier("*");
     } else {
-      return getExpression(CalciteSqlParser.compileToExpression(sqlExpression));
+      return getExpression(CalciteSqlParser.compileToExpression(expression));
     }
   }
 
@@ -80,34 +74,6 @@ public class RequestContextUtils {
       default:
         throw new IllegalStateException();
     }
-  }
-
-  /**
-   * Converts the given PQL expression into an {@link ExpressionContext}.
-   */
-  public static ExpressionContext getExpressionFromPQL(String pqlExpression) {
-    if (pqlExpression.equals("*")) {
-      // For 'SELECT *' and 'SELECT COUNT(*)'
-      return ExpressionContext.forIdentifier("*");
-    } else {
-      return getExpression(PQL_COMPILER.parseToAstNode(pqlExpression));
-    }
-  }
-
-  /**
-   * Converts the given {@link AstNode} into an {@link ExpressionContext}.
-   */
-  public static ExpressionContext getExpression(AstNode astNode) {
-    if (astNode instanceof IdentifierAstNode) {
-      return ExpressionContext.forIdentifier(((IdentifierAstNode) astNode).getName());
-    }
-    if (astNode instanceof FunctionCallAstNode) {
-      return ExpressionContext.forFunction(getFunction((FunctionCallAstNode) astNode));
-    }
-    if (astNode instanceof LiteralAstNode) {
-      return ExpressionContext.forLiteral(((LiteralAstNode) astNode).getValueAsString());
-    }
-    throw new IllegalStateException();
   }
 
   /**
@@ -136,37 +102,39 @@ public class RequestContextUtils {
   }
 
   /**
-   * Converts the given {@link FunctionCallAstNode} into a {@link FunctionContext}.
+   * Converts the given Thrift {@link Expression} into a {@link FilterContext}.
+   * <p>NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
+   *          always convert the right-hand side expressions into strings. We also update boolean predicates that are
+   *          missing an EQUALS filter operator.
    */
-  public static FunctionContext getFunction(FunctionCallAstNode astNode) {
-    String functionName = astNode.getName();
-    if (functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-      // NOTE: COUNT always take one single argument "*"
-      return new FunctionContext(FunctionContext.Type.AGGREGATION, AggregationFunctionType.COUNT.getName(),
-          new ArrayList<>(Collections.singletonList(ExpressionContext.forIdentifier("*"))));
-    }
-    FunctionContext.Type functionType =
-        AggregationFunctionType.isAggregationFunction(functionName) ? FunctionContext.Type.AGGREGATION
-            : FunctionContext.Type.TRANSFORM;
-    List<? extends AstNode> children = astNode.getChildren();
-    if (children != null) {
-      List<ExpressionContext> arguments = new ArrayList<>(children.size());
-      for (AstNode child : children) {
-        arguments.add(getExpression(child));
-      }
-      return new FunctionContext(functionType, functionName, arguments);
-    } else {
-      return new FunctionContext(functionType, functionName, Collections.emptyList());
+  public static FilterContext getFilter(Expression thriftExpression) {
+    ExpressionType type = thriftExpression.getType();
+    switch (type) {
+      case FUNCTION:
+        Function thriftFunction = thriftExpression.getFunctionCall();
+        return getFilter(thriftFunction);
+      case IDENTIFIER:
+        // Convert "WHERE a" to "WHERE a = true"
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new EqPredicate(getExpression(thriftExpression), getStringValue(RequestUtils.getLiteralExpression(true))));
+      case LITERAL:
+        // TODO: Handle literals.
+        throw new IllegalStateException();
+      default:
+        throw new IllegalStateException();
     }
   }
 
-  /**
-   * Converts the given Thrift {@link Expression} into a {@link FilterContext}.
-   * <p>NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
-   *          always convert the right-hand side expressions into strings.
-   */
-  public static FilterContext getFilter(Expression thriftExpression) {
-    Function thriftFunction = thriftExpression.getFunctionCall();
+  public static FilterContext getFilter(Function thriftFunction) {
+    String functionOperator = thriftFunction.getOperator();
+
+    // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
+    if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
+      return new FilterContext(FilterContext.Type.PREDICATE, null,
+          new EqPredicate(ExpressionContext.forFunction(getFunction(thriftFunction)),
+              getStringValue(RequestUtils.getLiteralExpression(true))));
+    }
+
     FilterKind filterKind = FilterKind.valueOf(thriftFunction.getOperator().toUpperCase());
     List<Expression> operands = thriftFunction.getOperands();
     int numOperands = operands.size();
@@ -185,7 +153,8 @@ public class RequestContextUtils {
         return new FilterContext(FilterContext.Type.OR, children, null);
       case NOT:
         assert numOperands == 1;
-        return new FilterContext(FilterContext.Type.NOT, new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
+        return new FilterContext(FilterContext.Type.NOT,
+            new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
       case EQUALS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new EqPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -236,6 +205,9 @@ public class RequestContextUtils {
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new RegexpLikePredicate(getExpression(operands.get(0)),
                 RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
+      case TEXT_CONTAINS:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new TextContainsPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -264,10 +236,36 @@ public class RequestContextUtils {
   /**
    * Converts the given filter {@link ExpressionContext} into a {@link FilterContext}.
    * <p>NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
-   *          always convert the right-hand side expressions into strings.
+   *          always convert the right-hand side expressions into strings. We also update boolean predicates that are
+   *          missing an EQUALS filter operator.
    */
   public static FilterContext getFilter(ExpressionContext filterExpression) {
-    FunctionContext filterFunction = filterExpression.getFunction();
+    ExpressionContext.Type type = filterExpression.getType();
+    switch (type) {
+      case FUNCTION:
+        FunctionContext filterFunction = filterExpression.getFunction();
+        return getFilter(filterFunction);
+      case IDENTIFIER:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new EqPredicate(filterExpression, getStringValue(RequestUtils.getLiteralExpression(true))));
+      case LITERAL:
+        // TODO: Handle literals
+        throw new IllegalStateException();
+      default:
+        throw new IllegalStateException();
+    }
+  }
+
+  public static FilterContext getFilter(FunctionContext filterFunction) {
+    String functionOperator = filterFunction.getFunctionName().toUpperCase();
+
+    // convert "WHERE startsWith(col, 'str')" to "WHERE startsWith(col, 'str') = true"
+    if (!EnumUtils.isValidEnum(FilterKind.class, functionOperator)) {
+      return new FilterContext(FilterContext.Type.PREDICATE, null,
+          new EqPredicate(ExpressionContext.forFunction(filterFunction),
+              getStringValue(RequestUtils.getLiteralExpression(true))));
+    }
+
     FilterKind filterKind = FilterKind.valueOf(filterFunction.getFunctionName().toUpperCase());
     List<ExpressionContext> operands = filterFunction.getArguments();
     int numOperands = operands.size();
@@ -286,7 +284,8 @@ public class RequestContextUtils {
         return new FilterContext(FilterContext.Type.OR, children, null);
       case NOT:
         assert numOperands == 1;
-        return new FilterContext(FilterContext.Type.NOT, new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
+        return new FilterContext(FilterContext.Type.NOT,
+            new ArrayList<>(Collections.singletonList(getFilter(operands.get(0)))), null);
       case EQUALS:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new EqPredicate(operands.get(0), getStringValue(operands.get(1))));
@@ -334,6 +333,9 @@ public class RequestContextUtils {
       case LIKE:
         return new FilterContext(FilterContext.Type.PREDICATE, null, new RegexpLikePredicate(operands.get(0),
             RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
+      case TEXT_CONTAINS:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new TextContainsPredicate(operands.get(0), getStringValue(operands.get(1))));
       case TEXT_MATCH:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new TextMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
@@ -355,60 +357,5 @@ public class RequestContextUtils {
           "Pinot does not support column or function on the right-hand side of the predicate");
     }
     return expressionContext.getLiteral();
-  }
-
-  /**
-   * Converts the given {@link FilterQueryTree} into a {@link FilterContext}.
-   */
-  public static FilterContext getFilter(FilterQueryTree node) {
-    FilterOperator filterOperator = node.getOperator();
-    switch (filterOperator) {
-      case AND:
-        List<FilterQueryTree> childNodes = node.getChildren();
-        List<FilterContext> children = new ArrayList<>(childNodes.size());
-        for (FilterQueryTree childNode : childNodes) {
-          children.add(getFilter(childNode));
-        }
-        return new FilterContext(FilterContext.Type.AND, children, null);
-      case OR:
-        childNodes = node.getChildren();
-        children = new ArrayList<>(childNodes.size());
-        for (FilterQueryTree childNode : childNodes) {
-          children.add(getFilter(childNode));
-        }
-        return new FilterContext(FilterContext.Type.OR, children, null);
-      case EQUALITY:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new EqPredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
-      case NOT:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new NotEqPredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
-      case IN:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new InPredicate(getExpressionFromPQL(node.getColumn()), node.getValue()));
-      case NOT_IN:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new NotInPredicate(getExpressionFromPQL(node.getColumn()), node.getValue()));
-      case RANGE:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RangePredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
-      case REGEXP_LIKE:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new RegexpLikePredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
-      case TEXT_MATCH:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new TextMatchPredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
-      case JSON_MATCH:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new JsonMatchPredicate(getExpressionFromPQL(node.getColumn()), node.getValue().get(0)));
-      case IS_NULL:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new IsNullPredicate(getExpressionFromPQL(node.getColumn())));
-      case IS_NOT_NULL:
-        return new FilterContext(FilterContext.Type.PREDICATE, null,
-            new IsNotNullPredicate(getExpressionFromPQL(node.getColumn())));
-      default:
-        throw new IllegalStateException();
-    }
   }
 }

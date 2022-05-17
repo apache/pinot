@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +65,11 @@ public class CastTransformFunction extends BaseTransformFunction {
           break;
         case "DOUBLE":
           _resultMetadata = DOUBLE_SV_NO_DICTIONARY_METADATA;
+          break;
+        case "DECIMAL":
+        case "BIGDECIMAL":
+        case "BIG_DECIMAL":
+          _resultMetadata = BIG_DECIMAL_SV_NO_DICTIONARY_METADATA;
           break;
         case "BOOLEAN":
           _resultMetadata = BOOLEAN_SV_NO_DICTIONARY_METADATA;
@@ -115,6 +121,10 @@ public class CastTransformFunction extends BaseTransformFunction {
           double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
           ArrayCopyUtils.copy(doubleValues, _intValuesSV, length);
           break;
+        case BIG_DECIMAL:
+          BigDecimal[] bigDecimalValues = _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(bigDecimalValues, _intValuesSV, length);
+          break;
         case STRING:
           String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
           ArrayCopyUtils.copy(stringValues, _intValuesSV, length);
@@ -150,6 +160,10 @@ public class CastTransformFunction extends BaseTransformFunction {
         case DOUBLE:
           double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
           ArrayCopyUtils.copy(doubleValues, _longValuesSV, length);
+          break;
+        case BIG_DECIMAL:
+          BigDecimal[] bigDecimalValues = _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(bigDecimalValues, _longValuesSV, length);
           break;
         case STRING:
           String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
@@ -187,6 +201,10 @@ public class CastTransformFunction extends BaseTransformFunction {
           double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
           ArrayCopyUtils.copy(doubleValues, _floatValuesSV, length);
           break;
+        case BIG_DECIMAL:
+          BigDecimal[] bigDecimalValues = _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(bigDecimalValues, _floatValuesSV, length);
+          break;
         case STRING:
           String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
           ArrayCopyUtils.copy(stringValues, _floatValuesSV, length);
@@ -223,6 +241,10 @@ public class CastTransformFunction extends BaseTransformFunction {
           float[] floatValues = _transformFunction.transformToFloatValuesSV(projectionBlock);
           ArrayCopyUtils.copy(floatValues, _doubleValuesSV, length);
           break;
+        case BIG_DECIMAL:
+          BigDecimal[] bigDecimalValues = _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(bigDecimalValues, _doubleValuesSV, length);
+          break;
         case STRING:
           String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
           ArrayCopyUtils.copy(stringValues, _doubleValuesSV, length);
@@ -231,6 +253,48 @@ public class CastTransformFunction extends BaseTransformFunction {
           throw new IllegalStateException();
       }
       return _doubleValuesSV;
+    }
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    // When casting to types other than BIG_DECIMAL, need to first read as the result type then convert to
+    // BigDecimal values
+    DataType dataType = _resultMetadata.getDataType();
+    DataType resultStoredType = dataType.getStoredType();
+    if (dataType == DataType.BIG_DECIMAL) {
+      return _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+    } else {
+      int length = projectionBlock.getNumDocs();
+      if (_bigDecimalValuesSV == null || _bigDecimalValuesSV.length < length) {
+        _bigDecimalValuesSV = new BigDecimal[length];
+      }
+      int numDocs = projectionBlock.getNumDocs();
+      switch (resultStoredType) {
+        case INT:
+          int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(intValues, _bigDecimalValuesSV, numDocs);
+          break;
+        case LONG:
+          long[] longValues = _transformFunction.transformToLongValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(longValues, _bigDecimalValuesSV, numDocs);
+          break;
+        case FLOAT:
+          float[] floatValues = _transformFunction.transformToFloatValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(floatValues, _bigDecimalValuesSV, numDocs);
+          break;
+        case DOUBLE:
+          double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(doubleValues, _bigDecimalValuesSV, numDocs);
+          break;
+        case STRING:
+          String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(stringValues, _bigDecimalValuesSV, numDocs);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+      return _bigDecimalValuesSV;
     }
   }
 
@@ -283,6 +347,10 @@ public class CastTransformFunction extends BaseTransformFunction {
         case DOUBLE:
           double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
           ArrayCopyUtils.copy(doubleValues, _stringValuesSV, length);
+          break;
+        case BIG_DECIMAL:
+          BigDecimal[] bigDecimalValues = _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+          ArrayCopyUtils.copy(bigDecimalValues, _stringValuesSV, length);
           break;
         case BOOLEAN:
           intValues = _transformFunction.transformToIntValuesSV(projectionBlock);

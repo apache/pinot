@@ -29,12 +29,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.response.broker.AggregationResult;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.GroupByResult;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -225,7 +222,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   @Test
   public void testInnerSegmentAggregation()
       throws Exception {
-    AggregationOperator aggregationOperator = getOperatorForPqlQuery(getAggregationQuery());
+    AggregationOperator aggregationOperator = getOperator(getAggregationQuery());
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
     assertNotNull(aggregationResult);
@@ -285,12 +282,10 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testInterSegmentAggregation()
+  public void testInterSegmentsAggregation()
       throws Exception {
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getAggregationQuery());
-    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-    assertNotNull(aggregationResults);
-    assertEquals(aggregationResults.size(), 5);
+    Object[] aggregationResults = getBrokerResponse(getAggregationQuery()).getResultTable().getRows().get(0);
+    assertEquals(aggregationResults.length, 5);
 
     // Simulate the process of server side merge and broker side merge
 
@@ -305,8 +300,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     avgPair1 = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair1));
     avgPair2 = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair1));
     avgPair1.apply(avgPair2);
-    assertEquals(Double.parseDouble((String) aggregationResults.get(0).getValue()),
-        avgPair1.getSum() / avgPair1.getCount(), 1e-5);
+    double expectedAvgResult = avgPair1.getSum() / avgPair1.getCount();
 
     // DistinctCountHLL
     HyperLogLog hyperLogLog1 = new HyperLogLog(DISTINCT_COUNT_HLL_LOG2M);
@@ -320,12 +314,12 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       hyperLogLog2.addAll(_hyperLogLogs[i]);
     }
     hyperLogLog1.addAll(hyperLogLog2);
-    hyperLogLog1 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE
-        .deserialize(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog1));
-    hyperLogLog2 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE
-        .deserialize(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog1));
+    hyperLogLog1 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog1));
+    hyperLogLog2 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog1));
     hyperLogLog1.addAll(hyperLogLog2);
-    assertEquals(Long.parseLong((String) aggregationResults.get(1).getValue()), hyperLogLog1.cardinality());
+    long expectedDistinctCountHllResult = hyperLogLog1.cardinality();
 
     // MinMaxRange
     MinMaxRangePair minMaxRangePair1 =
@@ -337,13 +331,12 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       minMaxRangePair2.apply(_minMaxRangePairs[i]);
     }
     minMaxRangePair1.apply(minMaxRangePair2);
-    minMaxRangePair1 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE
-        .deserialize(ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
-    minMaxRangePair2 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE
-        .deserialize(ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
+    minMaxRangePair1 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(
+        ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
+    minMaxRangePair2 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(
+        ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
     minMaxRangePair1.apply(minMaxRangePair2);
-    assertEquals(Double.parseDouble((String) aggregationResults.get(2).getValue()),
-        minMaxRangePair1.getMax() - minMaxRangePair1.getMin(), 1e-5);
+    double expectedMinMaxRangeResult = minMaxRangePair1.getMax() - minMaxRangePair1.getMin();
 
     // PercentileEst
     QuantileDigest quantileDigest1 = new QuantileDigest(PERCENTILE_EST_MAX_ERROR);
@@ -357,12 +350,12 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       quantileDigest2.merge(_quantileDigests[i]);
     }
     quantileDigest1.merge(quantileDigest2);
-    quantileDigest1 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE
-        .deserialize(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
-    quantileDigest2 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE
-        .deserialize(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
+    quantileDigest1 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(
+        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
+    quantileDigest2 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(
+        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
     quantileDigest1.merge(quantileDigest2);
-    assertEquals(Long.parseLong((String) aggregationResults.get(3).getValue()), quantileDigest1.getQuantile(0.5));
+    long expectedPercentileEstResult = quantileDigest1.getQuantile(0.5);
 
     // PercentileTDigest
     TDigest tDigest1 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
@@ -379,25 +372,30 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     tDigest1 = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest1));
     tDigest2 = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest1));
     tDigest1.add(tDigest2);
-    assertEquals(Double.parseDouble((String) aggregationResults.get(4).getValue()), tDigest1.quantile(0.5),
-        PERCENTILE_TDIGEST_DELTA);
+    double expectedPercentileTDigestResult = tDigest1.quantile(0.5);
+
+    assertEquals((Double) aggregationResults[0], expectedAvgResult, 1e-5);
+    assertEquals((long) aggregationResults[1], expectedDistinctCountHllResult);
+    assertEquals((Double) aggregationResults[2], expectedMinMaxRangeResult, 1e-5);
+    assertEquals((long) aggregationResults[3], expectedPercentileEstResult);
+    assertEquals((Double) aggregationResults[4], expectedPercentileTDigestResult, PERCENTILE_TDIGEST_DELTA);
   }
 
   @Test
-  public void testInnerSegmentSVGroupBy()
+  public void testInnerSegmentGroupBySV()
       throws Exception {
-    AggregationGroupByOperator groupByOperator = getOperatorForPqlQuery(getSVGroupByQuery());
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(getGroupBySVQuery());
     IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
     AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(groupByResult);
 
-    Iterator<GroupKeyGenerator.StringGroupKey> groupKeyIterator = groupByResult.getStringGroupKeyIterator();
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
     while (groupKeyIterator.hasNext()) {
-      GroupKeyGenerator.StringGroupKey groupKey = groupKeyIterator.next();
-      int groupId = Integer.parseInt(groupKey._stringKey.substring(1));
+      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+      int groupId = Integer.parseInt(((String) groupKey._keys[0]).substring(1));
 
       // Avg
-      AvgPair avgPair = (AvgPair) groupByResult.getResultForKey(groupKey, 0);
+      AvgPair avgPair = (AvgPair) groupByResult.getResultForGroupId(0, groupKey._groupId);
       AvgPair expectedAvgPair = new AvgPair(_avgPairs[groupId].getSum(), _avgPairs[groupId].getCount());
       for (int i = groupId + NUM_GROUPS; i < NUM_ROWS; i += NUM_GROUPS) {
         expectedAvgPair.apply(_avgPairs[i]);
@@ -406,7 +404,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       assertEquals(avgPair.getCount(), expectedAvgPair.getCount());
 
       // DistinctCountHLL
-      HyperLogLog hyperLogLog = (HyperLogLog) groupByResult.getResultForKey(groupKey, 1);
+      HyperLogLog hyperLogLog = (HyperLogLog) groupByResult.getResultForGroupId(1, groupKey._groupId);
       HyperLogLog expectedHyperLogLog = new HyperLogLog(DISTINCT_COUNT_HLL_LOG2M);
       for (int value : _valuesArray[groupId]) {
         expectedHyperLogLog.offer(value);
@@ -417,7 +415,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       assertEquals(hyperLogLog.cardinality(), expectedHyperLogLog.cardinality());
 
       // MinMaxRange
-      MinMaxRangePair minMaxRangePair = (MinMaxRangePair) groupByResult.getResultForKey(groupKey, 2);
+      MinMaxRangePair minMaxRangePair = (MinMaxRangePair) groupByResult.getResultForGroupId(2, groupKey._groupId);
       MinMaxRangePair expectedMinMaxRangePair =
           new MinMaxRangePair(_minMaxRangePairs[groupId].getMin(), _minMaxRangePairs[groupId].getMax());
       for (int i = groupId + NUM_GROUPS; i < NUM_ROWS; i += NUM_GROUPS) {
@@ -427,7 +425,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       assertEquals(minMaxRangePair.getMax(), expectedMinMaxRangePair.getMax());
 
       // PercentileEst
-      QuantileDigest quantileDigest = (QuantileDigest) groupByResult.getResultForKey(groupKey, 3);
+      QuantileDigest quantileDigest = (QuantileDigest) groupByResult.getResultForGroupId(3, groupKey._groupId);
       QuantileDigest expectedQuantileDigest = new QuantileDigest(PERCENTILE_EST_MAX_ERROR);
       for (int value : _valuesArray[groupId]) {
         expectedQuantileDigest.add(value);
@@ -438,7 +436,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       assertEquals(quantileDigest.getQuantile(0.5), expectedQuantileDigest.getQuantile(0.5));
 
       // PercentileTDigest
-      TDigest tDigest = (TDigest) groupByResult.getResultForKey(groupKey, 4);
+      TDigest tDigest = (TDigest) groupByResult.getResultForGroupId(4, groupKey._groupId);
       TDigest expectedTDigest = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : _valuesArray[groupId]) {
         expectedTDigest.add(value);
@@ -451,21 +449,15 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testInterSegmentSVGroupBy()
+  public void testInterSegmentsGroupBySV()
       throws Exception {
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getSVGroupByQuery());
-    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-    assertNotNull(aggregationResults);
-    assertEquals(aggregationResults.size(), 5);
+    List<Object[]> rows = getBrokerResponse(getGroupBySVQuery()).getResultTable().getRows();
+    assertEquals(rows.size(), NUM_GROUPS);
 
-    // Simulate the process of server side merge and broker side merge
+    for (int groupId = 0; groupId < NUM_GROUPS; groupId++) {
+      // Simulate the process of server side merge and broker side merge
 
-    // Avg
-    List<GroupByResult> groupByResults = aggregationResults.get(0).getGroupByResult();
-    assertEquals(groupByResults.size(), 3);
-    for (GroupByResult groupByResult : groupByResults) {
-      int groupId = Integer.parseInt(groupByResult.getGroup().get(0).substring(1));
-
+      // Avg
       AvgPair avgPair1 = new AvgPair(_avgPairs[groupId].getSum(), _avgPairs[groupId].getCount());
       AvgPair avgPair2 = new AvgPair(_avgPairs[groupId].getSum(), _avgPairs[groupId].getCount());
       for (int i = groupId + NUM_GROUPS; i < NUM_ROWS; i += NUM_GROUPS) {
@@ -476,16 +468,9 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       avgPair1 = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair1));
       avgPair2 = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair1));
       avgPair1.apply(avgPair2);
-      assertEquals(Double.parseDouble((String) groupByResult.getValue()), avgPair1.getSum() / avgPair1.getCount(),
-          1e-5);
-    }
+      double expectedAvgResult = avgPair1.getSum() / avgPair1.getCount();
 
-    // DistinctCountHLL
-    groupByResults = aggregationResults.get(1).getGroupByResult();
-    assertEquals(groupByResults.size(), 3);
-    for (GroupByResult groupByResult : groupByResults) {
-      int groupId = Integer.parseInt(groupByResult.getGroup().get(0).substring(1));
-
+      // DistinctCountHLL
       HyperLogLog hyperLogLog1 = new HyperLogLog(DISTINCT_COUNT_HLL_LOG2M);
       HyperLogLog hyperLogLog2 = new HyperLogLog(DISTINCT_COUNT_HLL_LOG2M);
       for (int value : _valuesArray[groupId]) {
@@ -497,20 +482,14 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
         hyperLogLog2.addAll(_hyperLogLogs[i]);
       }
       hyperLogLog1.addAll(hyperLogLog2);
-      hyperLogLog1 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE
-          .deserialize(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog1));
-      hyperLogLog2 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE
-          .deserialize(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog1));
+      hyperLogLog1 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(
+          ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog1));
+      hyperLogLog2 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(
+          ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog1));
       hyperLogLog1.addAll(hyperLogLog2);
-      assertEquals(Long.parseLong((String) groupByResult.getValue()), hyperLogLog1.cardinality());
-    }
+      long expectedDistinctCountHllResult = hyperLogLog1.cardinality();
 
-    // MinMaxRange
-    groupByResults = aggregationResults.get(2).getGroupByResult();
-    assertEquals(groupByResults.size(), 3);
-    for (GroupByResult groupByResult : groupByResults) {
-      int groupId = Integer.parseInt(groupByResult.getGroup().get(0).substring(1));
-
+      // MinMaxRange
       MinMaxRangePair minMaxRangePair1 =
           new MinMaxRangePair(_minMaxRangePairs[groupId].getMin(), _minMaxRangePairs[groupId].getMax());
       MinMaxRangePair minMaxRangePair2 =
@@ -520,21 +499,14 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
         minMaxRangePair2.apply(_minMaxRangePairs[i]);
       }
       minMaxRangePair1.apply(minMaxRangePair2);
-      minMaxRangePair1 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE
-          .deserialize(ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
-      minMaxRangePair2 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE
-          .deserialize(ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
+      minMaxRangePair1 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(
+          ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
+      minMaxRangePair2 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(
+          ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
       minMaxRangePair1.apply(minMaxRangePair2);
-      assertEquals(Double.parseDouble((String) groupByResult.getValue()),
-          minMaxRangePair1.getMax() - minMaxRangePair1.getMin(), 1e-5);
-    }
+      double expectedMinMaxRangeResult = minMaxRangePair1.getMax() - minMaxRangePair1.getMin();
 
-    // PercentileEst
-    groupByResults = aggregationResults.get(3).getGroupByResult();
-    assertEquals(groupByResults.size(), 3);
-    for (GroupByResult groupByResult : groupByResults) {
-      int groupId = Integer.parseInt(groupByResult.getGroup().get(0).substring(1));
-
+      // PercentileEst
       QuantileDigest quantileDigest1 = new QuantileDigest(PERCENTILE_EST_MAX_ERROR);
       QuantileDigest quantileDigest2 = new QuantileDigest(PERCENTILE_EST_MAX_ERROR);
       for (int value : _valuesArray[groupId]) {
@@ -546,20 +518,14 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
         quantileDigest2.merge(_quantileDigests[i]);
       }
       quantileDigest1.merge(quantileDigest2);
-      quantileDigest1 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE
-          .deserialize(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
-      quantileDigest2 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE
-          .deserialize(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
+      quantileDigest1 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(
+          ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
+      quantileDigest2 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(
+          ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
       quantileDigest1.merge(quantileDigest2);
-      assertEquals(Long.parseLong((String) groupByResult.getValue()), quantileDigest1.getQuantile(0.5));
-    }
+      long expectedPercentileEstResult = quantileDigest1.getQuantile(0.5);
 
-    // PercentileTDigest
-    groupByResults = aggregationResults.get(4).getGroupByResult();
-    assertEquals(groupByResults.size(), 3);
-    for (GroupByResult groupByResult : groupByResults) {
-      int groupId = Integer.parseInt(groupByResult.getGroup().get(0).substring(1));
-
+      // PercentileTDigest
       TDigest tDigest1 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
       TDigest tDigest2 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : _valuesArray[groupId]) {
@@ -574,15 +540,21 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       tDigest1 = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest1));
       tDigest2 = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest1));
       tDigest1.add(tDigest2);
-      assertEquals(Double.parseDouble((String) groupByResult.getValue()), tDigest1.quantile(0.5),
-          PERCENTILE_TDIGEST_DELTA);
+      double expectedPercentileTDigestResult = tDigest1.quantile(0.5);
+
+      Object[] row = rows.get(groupId);
+      assertEquals((Double) row[0], expectedAvgResult, 1e-5);
+      assertEquals((long) row[1], expectedDistinctCountHllResult);
+      assertEquals((Double) row[2], expectedMinMaxRangeResult, 1e-5);
+      assertEquals((long) row[3], expectedPercentileEstResult);
+      assertEquals((Double) row[4], expectedPercentileTDigestResult, PERCENTILE_TDIGEST_DELTA);
     }
   }
 
   @Test
-  public void testInnerSegmentMVGroupBy()
+  public void testInnerSegmentGroupByMV()
       throws Exception {
-    AggregationGroupByOperator groupByOperator = getOperatorForPqlQuery(getMVGroupByQuery());
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(getGroupByMVQuery());
     IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
     AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(groupByResult);
@@ -627,41 +599,39 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       expectedTDigest.add(_tDigests[i]);
     }
 
-    Iterator<GroupKeyGenerator.StringGroupKey> groupKeyIterator = groupByResult.getStringGroupKeyIterator();
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
     while (groupKeyIterator.hasNext()) {
-      GroupKeyGenerator.StringGroupKey groupKey = groupKeyIterator.next();
+      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
 
       // Avg
-      AvgPair avgPair = (AvgPair) groupByResult.getResultForKey(groupKey, 0);
+      AvgPair avgPair = (AvgPair) groupByResult.getResultForGroupId(0, groupKey._groupId);
       assertEquals(avgPair.getSum(), expectedAvgPair.getSum());
       assertEquals(avgPair.getCount(), expectedAvgPair.getCount());
 
       // DistinctCountHLL
-      HyperLogLog hyperLogLog = (HyperLogLog) groupByResult.getResultForKey(groupKey, 1);
+      HyperLogLog hyperLogLog = (HyperLogLog) groupByResult.getResultForGroupId(1, groupKey._groupId);
       assertEquals(hyperLogLog.cardinality(), expectedHyperLogLog.cardinality());
 
       // MinMaxRange
-      MinMaxRangePair minMaxRangePair = (MinMaxRangePair) groupByResult.getResultForKey(groupKey, 2);
+      MinMaxRangePair minMaxRangePair = (MinMaxRangePair) groupByResult.getResultForGroupId(2, groupKey._groupId);
       assertEquals(minMaxRangePair.getMin(), expectedMinMaxRangePair.getMin());
       assertEquals(minMaxRangePair.getMax(), expectedMinMaxRangePair.getMax());
 
       // PercentileEst
-      QuantileDigest quantileDigest = (QuantileDigest) groupByResult.getResultForKey(groupKey, 3);
+      QuantileDigest quantileDigest = (QuantileDigest) groupByResult.getResultForGroupId(3, groupKey._groupId);
       assertEquals(quantileDigest.getQuantile(0.5), expectedQuantileDigest.getQuantile(0.5));
 
       // PercentileTDigest
-      TDigest tDigest = (TDigest) groupByResult.getResultForKey(groupKey, 4);
+      TDigest tDigest = (TDigest) groupByResult.getResultForGroupId(4, groupKey._groupId);
       assertEquals(tDigest.quantile(0.5), expectedTDigest.quantile(0.5), PERCENTILE_TDIGEST_DELTA);
     }
   }
 
   @Test
-  public void testInterSegmentMVGroupBy()
+  public void testInterSegmentsGroupByMV()
       throws Exception {
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(getMVGroupByQuery());
-    List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
-    assertNotNull(aggregationResults);
-    assertEquals(aggregationResults.size(), 5);
+    List<Object[]> rows = getBrokerResponse(getGroupByMVQuery()).getResultTable().getRows();
+    assertEquals(rows.size(), NUM_GROUPS);
 
     // Simulate the process of server side merge and broker side merge
 
@@ -676,12 +646,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     avgPair1 = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair1));
     avgPair2 = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair1));
     avgPair1.apply(avgPair2);
-    List<GroupByResult> groupByResults = aggregationResults.get(0).getGroupByResult();
-    assertEquals(groupByResults.size(), 3);
-    for (GroupByResult groupByResult : groupByResults) {
-      assertEquals(Double.parseDouble((String) groupByResult.getValue()), avgPair1.getSum() / avgPair1.getCount(),
-          1e-5);
-    }
+    double expectedAvgResult = avgPair1.getSum() / avgPair1.getCount();
 
     // DistinctCountHLL
     HyperLogLog hyperLogLog1 = new HyperLogLog(DISTINCT_COUNT_HLL_LOG2M);
@@ -695,16 +660,12 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       hyperLogLog2.addAll(_hyperLogLogs[i]);
     }
     hyperLogLog1.addAll(hyperLogLog2);
-    hyperLogLog1 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE
-        .deserialize(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog1));
-    hyperLogLog2 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE
-        .deserialize(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog1));
+    hyperLogLog1 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog1));
+    hyperLogLog2 = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog1));
     hyperLogLog1.addAll(hyperLogLog2);
-    groupByResults = aggregationResults.get(1).getGroupByResult();
-    assertEquals(groupByResults.size(), 3);
-    for (GroupByResult groupByResult : groupByResults) {
-      assertEquals(Long.parseLong((String) groupByResult.getValue()), hyperLogLog1.cardinality());
-    }
+    long expectedDistinctCountHllResult = hyperLogLog1.cardinality();
 
     // MinMaxRange
     MinMaxRangePair minMaxRangePair1 =
@@ -716,17 +677,12 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       minMaxRangePair2.apply(_minMaxRangePairs[i]);
     }
     minMaxRangePair1.apply(minMaxRangePair2);
-    minMaxRangePair1 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE
-        .deserialize(ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
-    minMaxRangePair2 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE
-        .deserialize(ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
+    minMaxRangePair1 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(
+        ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
+    minMaxRangePair2 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(
+        ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
     minMaxRangePair1.apply(minMaxRangePair2);
-    groupByResults = aggregationResults.get(2).getGroupByResult();
-    assertEquals(groupByResults.size(), 3);
-    for (GroupByResult groupByResult : groupByResults) {
-      assertEquals(Double.parseDouble((String) groupByResult.getValue()),
-          minMaxRangePair1.getMax() - minMaxRangePair1.getMin(), 1e-5);
-    }
+    double expectedMinMaxRangeResult = minMaxRangePair1.getMax() - minMaxRangePair1.getMin();
 
     // PercentileEst
     QuantileDigest quantileDigest1 = new QuantileDigest(PERCENTILE_EST_MAX_ERROR);
@@ -740,16 +696,12 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       quantileDigest2.merge(_quantileDigests[i]);
     }
     quantileDigest1.merge(quantileDigest2);
-    quantileDigest1 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE
-        .deserialize(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
-    quantileDigest2 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE
-        .deserialize(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
+    quantileDigest1 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(
+        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
+    quantileDigest2 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(
+        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
     quantileDigest1.merge(quantileDigest2);
-    groupByResults = aggregationResults.get(3).getGroupByResult();
-    assertEquals(groupByResults.size(), 3);
-    for (GroupByResult groupByResult : groupByResults) {
-      assertEquals(Long.parseLong((String) groupByResult.getValue()), quantileDigest1.getQuantile(0.5));
-    }
+    long expectedPercentileEstResult = quantileDigest1.getQuantile(0.5);
 
     // PercentileTDigest
     TDigest tDigest1 = TDigest.createMergingDigest(PERCENTILE_TDIGEST_COMPRESSION);
@@ -766,11 +718,14 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     tDigest1 = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest1));
     tDigest2 = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest1));
     tDigest1.add(tDigest2);
-    groupByResults = aggregationResults.get(4).getGroupByResult();
-    assertEquals(groupByResults.size(), 3);
-    for (GroupByResult groupByResult : groupByResults) {
-      assertEquals(Double.parseDouble((String) groupByResult.getValue()), tDigest1.quantile(0.5),
-          PERCENTILE_TDIGEST_DELTA);
+    double expectedPercentileTDigestResult = tDigest1.quantile(0.5);
+
+    for (Object[] row : rows) {
+      assertEquals((Double) row[0], expectedAvgResult, 1e-5);
+      assertEquals((long) row[1], expectedDistinctCountHllResult);
+      assertEquals((Double) row[2], expectedMinMaxRangeResult, 1e-5);
+      assertEquals((long) row[3], expectedPercentileEstResult);
+      assertEquals((Double) row[4], expectedPercentileTDigestResult, PERCENTILE_TDIGEST_DELTA);
     }
   }
 
@@ -781,12 +736,12 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
         RAW_TABLE_NAME);
   }
 
-  private String getSVGroupByQuery() {
-    return String.format("%s GROUP BY %s", getAggregationQuery(), GROUP_BY_SV_COLUMN);
+  private String getGroupBySVQuery() {
+    return String.format("%1$s GROUP BY %2$s ORDER BY %2$s", getAggregationQuery(), GROUP_BY_SV_COLUMN);
   }
 
-  private String getMVGroupByQuery() {
-    return String.format("%s GROUP BY %s", getAggregationQuery(), GROUP_BY_MV_COLUMN);
+  private String getGroupByMVQuery() {
+    return String.format("%1$s GROUP BY %2$s ORDER BY %2$s", getAggregationQuery(), GROUP_BY_MV_COLUMN);
   }
 
   @AfterClass

@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import java.math.BigDecimal;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -37,12 +39,14 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class RowBasedBlockValSet implements BlockValSet {
 
   private final FieldSpec.DataType _dataType;
+  private final PinotDataType _pinotDataType;
   private final List<Object[]> _rows;
   private final int _columnIndex;
 
   public RowBasedBlockValSet(DataSchema.ColumnDataType columnDataType, List<Object[]> rows,
       int columnIndex) {
     _dataType = columnDataType.toDataType();
+    _pinotDataType = PinotDataType.getPinotDataTypeForExecution(columnDataType);
     _rows = rows;
     _columnIndex = columnIndex;
   }
@@ -136,6 +140,16 @@ public class RowBasedBlockValSet implements BlockValSet {
       }
     } else {
       throw new IllegalStateException("Cannot read double values from data type: " + _dataType);
+    }
+    return values;
+  }
+
+  @Override
+  public BigDecimal[] getBigDecimalValuesSV() {
+    int length = _rows.size();
+    BigDecimal[] values = new BigDecimal[length];
+    for (int i = 0; i < length; i++) {
+      values[i] = _pinotDataType.toBigDecimal(_rows.get(i)[_columnIndex]);
     }
     return values;
   }

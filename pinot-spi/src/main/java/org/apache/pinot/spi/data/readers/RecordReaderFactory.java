@@ -39,6 +39,8 @@ public class RecordReaderFactory {
 
   // TODO: This could be removed once we have dynamic loading plugins supports.
   static final String DEFAULT_AVRO_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader";
+  static final String DEFAULT_AVRO_RECORD_READER_CONFIG_CLASS =
+      "org.apache.pinot.plugin.inputformat.avro.AvroRecordReaderConfig";
   static final String DEFAULT_CSV_RECORD_READER_CLASS = "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader";
   static final String DEFAULT_CSV_RECORD_READER_CONFIG_CLASS =
       "org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig";
@@ -63,8 +65,8 @@ public class RecordReaderFactory {
   }
 
   static {
-    register(FileFormat.AVRO, DEFAULT_AVRO_RECORD_READER_CLASS, null);
-    register(FileFormat.GZIPPED_AVRO, DEFAULT_AVRO_RECORD_READER_CLASS, null);
+    register(FileFormat.AVRO, DEFAULT_AVRO_RECORD_READER_CLASS, DEFAULT_AVRO_RECORD_READER_CONFIG_CLASS);
+    register(FileFormat.GZIPPED_AVRO, DEFAULT_AVRO_RECORD_READER_CLASS, DEFAULT_AVRO_RECORD_READER_CONFIG_CLASS);
     register(FileFormat.CSV, DEFAULT_CSV_RECORD_READER_CLASS, DEFAULT_CSV_RECORD_READER_CONFIG_CLASS);
     register(FileFormat.JSON, DEFAULT_JSON_RECORD_READER_CLASS, null);
     register(FileFormat.THRIFT, DEFAULT_THRIFT_RECORD_READER_CLASS, DEFAULT_THRIFT_RECORD_READER_CONFIG_CLASS);

@@ -48,13 +48,13 @@ public class SelectionQuerySegmentPrunerTest {
         Arrays.asList(getIndexSegment(null, null, 10), getIndexSegment(0L, 10L, 10), getIndexSegment(-5L, 5L, 15));
 
     // Should keep only the first segment
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable LIMIT 0");
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable LIMIT 0");
     List<IndexSegment> result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 1);
     assertSame(result.get(0), indexSegments.get(0));
 
     queryContext =
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable ORDER BY testColumn LIMIT 0");
+        QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY testColumn LIMIT 0");
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 1);
     assertSame(result.get(0), indexSegments.get(0));
@@ -66,30 +66,30 @@ public class SelectionQuerySegmentPrunerTest {
         Arrays.asList(getIndexSegment(null, null, 10), getIndexSegment(0L, 10L, 10), getIndexSegment(-5L, 5L, 15));
 
     // Should keep enough documents to fulfill the LIMIT requirement
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable LIMIT 5");
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable LIMIT 5");
     List<IndexSegment> result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 1);
     assertSame(result.get(0), indexSegments.get(0));
 
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable LIMIT 10");
+    queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable LIMIT 10");
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 1);
     assertSame(result.get(0), indexSegments.get(0));
 
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable LIMIT 15");
+    queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable LIMIT 15");
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 2);
     assertSame(result.get(0), indexSegments.get(0));
     assertSame(result.get(1), indexSegments.get(1));
 
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable LIMIT 25");
+    queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable LIMIT 25");
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 3);
     assertSame(result.get(0), indexSegments.get(0));
     assertSame(result.get(1), indexSegments.get(1));
     assertSame(result.get(2), indexSegments.get(2));
 
-    queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable LIMIT 100");
+    queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable LIMIT 100");
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 3);
     assertSame(result.get(0), indexSegments.get(0));
@@ -111,7 +111,7 @@ public class SelectionQuerySegmentPrunerTest {
 
     // Should keep segments: [null, null], [-5, 5], [0, 10]
     QueryContext queryContext =
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable ORDER BY testColumn LIMIT 5");
+        QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY testColumn LIMIT 5");
     List<IndexSegment> result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 3);
     assertSame(result.get(0), indexSegments.get(5));  // [null, null], 5
@@ -120,7 +120,7 @@ public class SelectionQuerySegmentPrunerTest {
 
     // Should keep segments: [null, null], [-5, 5], [0, 10], [5, 10], [5, 15]
     queryContext =
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable ORDER BY testColumn LIMIT 15, 20");
+        QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY testColumn LIMIT 15, 20");
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 5);
     assertSame(result.get(0), indexSegments.get(5));  // [null, null], 5
@@ -132,7 +132,7 @@ public class SelectionQuerySegmentPrunerTest {
 
     // Should keep segments: [null, null], [-5, 5], [0, 10], [5, 10], [5, 15], [15, 30], [15, 50]
     queryContext =
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable ORDER BY testColumn, foo LIMIT 40");
+        QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY testColumn, foo LIMIT 40");
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 7);
     assertSame(result.get(0), indexSegments.get(5));  // [null, null], 5
@@ -146,7 +146,7 @@ public class SelectionQuerySegmentPrunerTest {
 
     // Should keep segments: [null, null], [20, 30], [15, 50], [15, 30]
     queryContext =
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable ORDER BY testColumn DESC LIMIT 5");
+        QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY testColumn DESC LIMIT 5");
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 4);
     assertSame(result.get(0), indexSegments.get(5));  // [null, null], 5
@@ -157,7 +157,7 @@ public class SelectionQuerySegmentPrunerTest {
 
     // Should keep segments: [null, null], [20, 30], [15, 50], [15, 30]
     queryContext = QueryContextConverterUtils
-        .getQueryContextFromSQL("SELECT * FROM testTable ORDER BY testColumn DESC LIMIT 5, 30");
+        .getQueryContext("SELECT * FROM testTable ORDER BY testColumn DESC LIMIT 5, 30");
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 4);
     assertSame(result.get(0), indexSegments.get(5));  // [null, null], 5
@@ -168,7 +168,7 @@ public class SelectionQuerySegmentPrunerTest {
 
     // Should keep segments: [null, null], [20, 30], [15, 50], [15, 30], [5, 15], [5, 10], [0, 10], [-5, 5]
     queryContext = QueryContextConverterUtils
-        .getQueryContextFromSQL("SELECT * FROM testTable ORDER BY testColumn DESC, foo LIMIT 60");
+        .getQueryContext("SELECT * FROM testTable ORDER BY testColumn DESC, foo LIMIT 60");
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 8);
     assertSame(result.get(0), indexSegments.get(5));  // [null, null], 5
@@ -190,12 +190,12 @@ public class SelectionQuerySegmentPrunerTest {
             getIndexSegment(40L, 50L, 10, true));
 
     // Should not prune any segment for upsert table
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable LIMIT 5");
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable LIMIT 5");
     List<IndexSegment> result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 3);
 
     queryContext =
-        QueryContextConverterUtils.getQueryContextFromSQL("SELECT * FROM testTable ORDER BY testColumn LIMIT 5");
+        QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY testColumn LIMIT 5");
     result = _segmentPruner.prune(indexSegments, queryContext);
     assertEquals(result.size(), 3);
   }

@@ -81,6 +81,7 @@ const LoginPage = (props) => {
       app_state.authWorkflow = AuthWorkflow.BASIC;
       app_state.authToken = authToken;
       props.history.push(app_state.queryConsoleOnlyView ? '/query' : '/');
+      app_state.username = data.username;
     } else {
       setInvalidToken(true);
     }

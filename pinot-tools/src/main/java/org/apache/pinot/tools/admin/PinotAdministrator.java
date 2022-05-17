@@ -32,7 +32,9 @@ import org.apache.pinot.tools.admin.command.BootstrapTableCommand;
 import org.apache.pinot.tools.admin.command.ChangeNumReplicasCommand;
 import org.apache.pinot.tools.admin.command.ChangeTableState;
 import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
+import org.apache.pinot.tools.admin.command.DataImportDryRunCommand;
 import org.apache.pinot.tools.admin.command.DeleteClusterCommand;
+import org.apache.pinot.tools.admin.command.FileSystemCommand;
 import org.apache.pinot.tools.admin.command.GenerateDataCommand;
 import org.apache.pinot.tools.admin.command.GitHubEventsQuickStartCommand;
 import org.apache.pinot.tools.admin.command.ImportDataCommand;
@@ -106,6 +108,7 @@ public class PinotAdministrator {
     SUBCOMMAND_MAP.put("ChangeTableState", new ChangeTableState());
     SUBCOMMAND_MAP.put("AddTenant", new AddTenantCommand());
     SUBCOMMAND_MAP.put("AddSchema", new AddSchemaCommand());
+    SUBCOMMAND_MAP.put("DataImportDryRun", new DataImportDryRunCommand());
     SUBCOMMAND_MAP.put("UpdateSchema", new AddSchemaCommand());
     SUBCOMMAND_MAP.put("UploadSegment", new UploadSegmentCommand());
     SUBCOMMAND_MAP.put("PostQuery", new PostQueryCommand());
@@ -128,6 +131,7 @@ public class PinotAdministrator {
     SUBCOMMAND_MAP.put("StreamGitHubEvents", new StreamGitHubEventsCommand());
     SUBCOMMAND_MAP.put("BootstrapTable", new BootstrapTableCommand());
     SUBCOMMAND_MAP.put("SegmentProcessorFramework", new SegmentProcessorFrameworkCommand());
+    SUBCOMMAND_MAP.put("FileSystem", new FileSystemCommand());
   }
 
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false,

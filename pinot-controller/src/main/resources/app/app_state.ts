@@ -23,6 +23,8 @@ class app_state {
   authWorkflow: AuthWorkflow;
   authToken: string | null;
   columnNameSeparator: string = '#$%';
+  username: string;
+  role: string;
 }
 
 export default new app_state();

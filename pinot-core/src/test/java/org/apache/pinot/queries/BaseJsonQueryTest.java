@@ -36,7 +36,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
-import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 
@@ -181,16 +180,9 @@ public abstract class BaseJsonQueryTest extends BaseQueriesTest {
     return _indexSegments;
   }
 
-  protected void checkResult(String query, Object[][] expecteds) {
-    BrokerResponseNative response1 = getBrokerResponseForOptimizedSqlQuery(query, tableConfig(), schema());
-    List<Object[]> rows = response1.getResultTable().getRows();
-
-    Assert.assertEquals(rows.size(), expecteds.length);
-    for (int i = 0; i < rows.size(); i++) {
-      Object[] actual = rows.get(i);
-      Object[] expected = expecteds[i];
-      Assert.assertEquals(actual, expected);
-    }
+  protected void checkResult(String query, Object[][] expectedResults) {
+    BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, tableConfig(), schema());
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, Arrays.asList(expectedResults));
   }
 
   int numRecords() {

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.metadata;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -260,6 +261,10 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         case DOUBLE:
           builder.setMinValue(Double.valueOf(minString));
           builder.setMaxValue(Double.valueOf(maxString));
+          break;
+        case BIG_DECIMAL:
+          builder.setMinValue(new BigDecimal(minString));
+          builder.setMaxValue(new BigDecimal(maxString));
           break;
         case STRING:
           builder.setMinValue(minString);

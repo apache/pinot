@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.index.reader;
 
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.Closeable;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -132,6 +133,8 @@ public interface Dictionary extends Closeable {
 
   double getDoubleValue(int dictId);
 
+  BigDecimal getBigDecimalValue(int dictId);
+
   String getStringValue(int dictId);
 
   /**
@@ -168,6 +171,12 @@ public interface Dictionary extends Closeable {
   default void readDoubleValues(int[] dictIds, int length, double[] outValues) {
     for (int i = 0; i < length; i++) {
       outValues[i] = getDoubleValue(dictIds[i]);
+    }
+  }
+
+  default void readBigDecimalValues(int[] dictIds, int length, BigDecimal[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getBigDecimalValue(dictIds[i]);
     }
   }
 

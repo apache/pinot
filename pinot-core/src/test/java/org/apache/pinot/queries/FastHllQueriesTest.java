@@ -25,10 +25,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -45,8 +44,10 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 /**
@@ -76,10 +77,10 @@ public class FastHllQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "FastHllQueriesTest");
 
   private static final String BASE_QUERY = "SELECT FASTHLL(column17_HLL), FASTHLL(column18_HLL) FROM testTable";
-  private static final String GROUP_BY = " group by column11";
+  private static final String GROUP_BY = " GROUP BY column11 ORDER BY column11";
   private static final String QUERY_FILTER =
-      " WHERE column1 > 100000000" + " AND column3 BETWEEN 20000000 AND 1000000000" + " AND column5 = 'gFuH'"
-          + " AND (column6 < 500000000 OR column11 NOT IN ('t', 'P'))" + " AND daysSinceEpoch = 126164076";
+      " WHERE column1 > 100000000 " + "AND column3 BETWEEN 20000000 AND 1000000000 " + "AND column5 = 'gFuH' "
+          + "AND (column6 < 500000000 OR column11 NOT IN ('t', 'P')) " + "AND daysSinceEpoch = 126164076";
 
   private IndexSegment _indexSegment;
   // Contains 2 identical index segments
@@ -107,46 +108,46 @@ public class FastHllQueriesTest extends BaseQueriesTest {
 
     // Test inner segment queries
     // Test base query
-    AggregationOperator aggregationOperator = getOperatorForPqlQuery(BASE_QUERY);
+    AggregationOperator aggregationOperator = getOperator(BASE_QUERY);
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     ExecutionStatistics executionStatistics = aggregationOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 30000L, 0L, 60000L, 30000L);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
-    Assert.assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 21L);
-    Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1762L);
+    assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 21L);
+    assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1762L);
     // Test query with filter
-    aggregationOperator = getOperatorForPqlQueryWithFilter(BASE_QUERY);
+    aggregationOperator = getOperatorWithFilter(BASE_QUERY);
     resultsBlock = aggregationOperator.nextBlock();
     executionStatistics = aggregationOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 6129L, 84134L, 12258L, 30000L);
     aggregationResult = resultsBlock.getAggregationResult();
-    Assert.assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 17L);
-    Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1197L);
+    assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 17L);
+    assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1197L);
     // Test query with group-by
-    AggregationGroupByOperator aggregationGroupByOperator = getOperatorForPqlQuery(BASE_QUERY + GROUP_BY);
-    resultsBlock = aggregationGroupByOperator.nextBlock();
-    executionStatistics = aggregationGroupByOperator.getExecutionStatistics();
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(BASE_QUERY + GROUP_BY);
+    resultsBlock = groupByOperator.nextBlock();
+    executionStatistics = groupByOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 30000L, 0L, 90000L, 30000L);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
-    Assert.assertEquals(firstGroupKey._keys[0], "");
-    Assert.assertEquals(
-        ((HyperLogLog) aggregationGroupByResult.getResultForGroupId(0, firstGroupKey._groupId)).cardinality(), 21L);
-    Assert.assertEquals(
-        ((HyperLogLog) aggregationGroupByResult.getResultForGroupId(1, firstGroupKey._groupId)).cardinality(), 691L);
+    assertEquals(firstGroupKey._keys[0], "");
+    assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForGroupId(0, firstGroupKey._groupId)).cardinality(),
+        21L);
+    assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForGroupId(1, firstGroupKey._groupId)).cardinality(),
+        691L);
 
     // Test inter segments base query
-    BrokerResponseNative brokerResponse = getBrokerResponseForPqlQuery(BASE_QUERY);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L, new String[]{"21", "1762"});
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(BASE_QUERY), 120000L, 0L, 240000L, 120000L,
+        new Object[]{21L, 1762L});
     // Test inter segments query with filter
-    brokerResponse = getBrokerResponseForPqlQueryWithFilter(BASE_QUERY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
-        new String[]{"17", "1197"});
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponseWithFilter(BASE_QUERY), 24516L, 336536L, 49032L, 120000L,
+        new Object[]{17L, 1197L});
     // Test inter segments query with group-by
-    brokerResponse = getBrokerResponseForPqlQuery(BASE_QUERY + GROUP_BY);
-    QueriesTestUtils
-        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L, new String[]{"21", "1762"});
+    List<Object[]> expectedRows =
+        Arrays.asList(new Object[]{21L, 691L}, new Object[]{21L, 1762L}, new Object[]{11L, 27L},
+            new Object[]{21L, 1397L}, new Object[]{21L, 1532L});
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(BASE_QUERY + GROUP_BY), 120000L, 0L, 360000L, 120000L,
+        expectedRows);
 
     deleteSegment();
   }
@@ -157,7 +158,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
 
     // Get resource file path
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA_WITH_PRE_GENERATED_HLL_COLUMNS);
-    Assert.assertNotNull(resource);
+    assertNotNull(resource);
     String filePath = resource.getFile();
 
     // Build the segment schema
@@ -186,8 +187,8 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     // to have the time column values in allowed range. Until then, the check
     // is explicitly disabled
     segmentGeneratorConfig.setSkipTimeValueCheck(true);
-    segmentGeneratorConfig
-        .setInvertedIndexCreationColumns(Arrays.asList("column6", "column7", "column11", "column17", "column18"));
+    segmentGeneratorConfig.setInvertedIndexCreationColumns(
+        Arrays.asList("column6", "column7", "column11", "column17", "column18"));
 
     // Build the index segment
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();

@@ -20,14 +20,20 @@ package org.apache.pinot.connector.spark.connector
 
 import org.apache.pinot.connector.spark.BaseTest
 import org.apache.pinot.connector.spark.connector.query.GeneratedSQLs
-import org.apache.pinot.connector.spark.exceptions.PinotException
+import org.apache.pinot.connector.spark.datasource.PinotDataSourceReadOptions
 import org.apache.pinot.spi.config.table.TableType
+import java.util.regex.Pattern
 
 /**
  * Test num of Spark partitions by routing table and input configs.
  */
 class PinotSplitterTest extends BaseTest {
-  private val generatedPql = GeneratedSQLs("tbl", None, "", "")
+  private val generatedSql = GeneratedSQLs("tbl", None, "", "")
+  private val mockInstanceInfoReader = (server: String) => {
+    val matcher = Pattern.compile("Server_(.*)_(\\d+)").matcher(server)
+    matcher.matches()
+    InstanceInfo(server, matcher.group(1), matcher.group(2), -1)
+  }
 
   private val routingTable = Map(
     TableType.OFFLINE -> Map(
@@ -41,26 +47,38 @@ class PinotSplitterTest extends BaseTest {
     )
   )
 
+  private val getReadOptionsWithSegmentsPerSplit = (segmentsPerSplit: Int) => {
+    new PinotDataSourceReadOptions(
+      "tableName",
+      Option(TableType.OFFLINE),
+      "controller",
+      "broker",
+      false,
+      segmentsPerSplit,
+      1000,
+      false)
+  }
+
   test("Total 5 partition splits should be created for maxNumSegmentPerServerRequest = 3") {
-    val maxNumSegmentPerServerRequest = 3
+    val readOptions = getReadOptionsWithSegmentsPerSplit(3)
     val splitResults =
-      PinotSplitter.generatePinotSplits(generatedPql, routingTable, maxNumSegmentPerServerRequest)
+      PinotSplitter.generatePinotSplits(generatedSql, routingTable, mockInstanceInfoReader, readOptions)
 
     splitResults.size shouldEqual 5
   }
 
   test("Total 5 partition splits should be created for maxNumSegmentPerServerRequest = 90") {
-    val maxNumSegmentPerServerRequest = 90
+    val readOptions = getReadOptionsWithSegmentsPerSplit(90)
     val splitResults =
-      PinotSplitter.generatePinotSplits(generatedPql, routingTable, maxNumSegmentPerServerRequest)
+      PinotSplitter.generatePinotSplits(generatedSql, routingTable, mockInstanceInfoReader, readOptions)
 
     splitResults.size shouldEqual 5
   }
 
   test("Total 10 partition splits should be created for maxNumSegmentPerServerRequest = 1") {
-    val maxNumSegmentPerServerRequest = 1
+    val readOptions = getReadOptionsWithSegmentsPerSplit(1)
     val splitResults =
-      PinotSplitter.generatePinotSplits(generatedPql, routingTable, maxNumSegmentPerServerRequest)
+      PinotSplitter.generatePinotSplits(generatedSql, routingTable, mockInstanceInfoReader, readOptions)
 
     splitResults.size shouldEqual 10
   }
@@ -69,31 +87,46 @@ class PinotSplitterTest extends BaseTest {
     val inputRoutingTable = Map(
       TableType.REALTIME -> Map("Server_192.168.1.100_9000" -> List("segment1"))
     )
+    val readOptions = getReadOptionsWithSegmentsPerSplit(5)
 
-    val splitResults = PinotSplitter.generatePinotSplits(generatedPql, inputRoutingTable, 5)
+    val splitResults = PinotSplitter.generatePinotSplits(generatedSql, inputRoutingTable, mockInstanceInfoReader, readOptions)
     val expectedOutput = List(
       PinotSplit(
-        generatedPql,
-        PinotServerAndSegments("192.168.1.100", "9000", List("segment1"), TableType.REALTIME)
+        generatedSql,
+        PinotServerAndSegments("192.168.1.100", "9000", -1, List("segment1"), TableType.REALTIME)
       )
     )
 
     expectedOutput should contain theSameElementsAs splitResults
   }
 
-  test("GeneratePinotSplits method should throw exception due to wrong input Server_HOST_PORT") {
+  test("GeneratePinotSplits with Grpc port reading enabled") {
     val inputRoutingTable = Map(
-      TableType.REALTIME -> Map(
-        "Server_192.168.1.100_9000" -> List("segment1"),
-        "Server_192.168.2.100" -> List("segment5")
+      TableType.REALTIME -> Map("Server_192.168.1.100_9000" -> List("segment1"))
+    )
+    val inputReadOptions = new PinotDataSourceReadOptions(
+      "tableName",
+      Option(TableType.REALTIME),
+      "controller",
+      "broker",
+      false,
+      1,
+      1000,
+      true)
+
+    val inputGrpcPortReader = (server: String) => {
+      InstanceInfo(server, "192.168.1.100", "9000", 8090)
+    }
+
+    val splitResults =
+      PinotSplitter.generatePinotSplits(generatedSql, inputRoutingTable, inputGrpcPortReader, inputReadOptions)
+    val expectedOutput = List(
+      PinotSplit(
+        generatedSql,
+        PinotServerAndSegments("192.168.1.100", "9000", 8090, List("segment1"), TableType.REALTIME)
       )
     )
 
-    val exception = intercept[PinotException] {
-      PinotSplitter.generatePinotSplits(generatedPql, inputRoutingTable, 5)
-    }
-
-    exception.getMessage shouldEqual "'Server_192.168.2.100' did not match!?"
+    expectedOutput should contain theSameElementsAs splitResults
   }
-
 }

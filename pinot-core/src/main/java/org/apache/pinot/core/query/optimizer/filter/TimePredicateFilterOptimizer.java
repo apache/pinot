@@ -28,16 +28,15 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.operator.transform.function.DateTimeConversionTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TimeConversionTransformFunction;
-import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.sql.FilterKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,12 +58,6 @@ import org.slf4j.LoggerFactory;
  */
 public class TimePredicateFilterOptimizer implements FilterOptimizer {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimePredicateFilterOptimizer.class);
-
-  @Override
-  public FilterQueryTree optimize(FilterQueryTree filterQueryTree, @Nullable Schema schema) {
-    // Do not rewrite PQL queries because PQL is deprecated
-    return filterQueryTree;
-  }
 
   @Override
   public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
@@ -105,9 +98,9 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     List<Expression> timeConvertOperands = filterOperands.get(0).getFunctionCall().getOperands();
     Preconditions.checkArgument(timeConvertOperands.size() == 3,
         "Exactly 3 arguments are required for TIME_CONVERT transform function");
-    Preconditions
-        .checkArgument(isStringLiteral(timeConvertOperands.get(1)) && isStringLiteral(timeConvertOperands.get(2)),
-            "The 2nd and 3rd argument for TIME_CONVERT transform function must be string literal");
+    Preconditions.checkArgument(
+        isStringLiteral(timeConvertOperands.get(1)) && isStringLiteral(timeConvertOperands.get(2)),
+        "The 2nd and 3rd argument for TIME_CONVERT transform function must be string literal");
 
     try {
       TimeUnit inputTimeUnit = TimeUnit.valueOf(timeConvertOperands.get(1).getLiteral().getStringValue().toUpperCase());
@@ -242,8 +235,8 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
       // Step 3: Rewrite the filter function
       String rangeString = new Range(lowerValue, lowerInclusive, upperValue, upperInclusive).getRangeString();
       filterFunction.setOperator(FilterKind.RANGE.name());
-      filterFunction
-          .setOperands(Arrays.asList(timeConvertOperands.get(0), RequestUtils.getLiteralExpression(rangeString)));
+      filterFunction.setOperands(
+          Arrays.asList(timeConvertOperands.get(0), RequestUtils.getLiteralExpression(rangeString)));
     } catch (Exception e) {
       LOGGER.warn("Caught exception while optimizing TIME_CONVERT predicate: {}, skipping the optimization",
           filterFunction, e);
@@ -276,8 +269,8 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
       if (outputFormat.getTimeFormat() == TimeFormat.SIMPLE_DATE_FORMAT) {
         return;
       }
-      long granularityMillis = new DateTimeGranularitySpec(dateTimeConvertOperands.get(3).getLiteral().getStringValue())
-          .granularityToMillis();
+      long granularityMillis = new DateTimeGranularitySpec(
+          dateTimeConvertOperands.get(3).getLiteral().getStringValue()).granularityToMillis();
 
       // Step 1: Convert output range to millis range
       Long lowerMillis = null;

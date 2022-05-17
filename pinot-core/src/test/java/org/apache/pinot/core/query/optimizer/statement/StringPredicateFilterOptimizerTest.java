@@ -18,17 +18,13 @@
  */
 package org.apache.pinot.core.query.optimizer.statement;
 
-import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.testng.annotations.Test;
 
 
 public class StringPredicateFilterOptimizerTest {
-  private static final QueryOptimizer OPTIMIZER = new QueryOptimizer();
-  private static final CalciteSqlCompiler SQL_COMPILER = new CalciteSqlCompiler();
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName("testTable")
       .addSingleValueDimension("intColumn1", FieldSpec.DataType.INT)
       .addSingleValueDimension("intColumn2", FieldSpec.DataType.INT)

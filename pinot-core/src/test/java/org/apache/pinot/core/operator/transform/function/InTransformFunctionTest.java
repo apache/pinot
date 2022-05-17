@@ -37,7 +37,7 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
   public void testIntInTransformFunction() {
     String expressionStr =
         String.format("%s IN (%d, %d, %d)", INT_SV_COLUMN, _intSVValues[2], _intSVValues[5], _intSVValues[9]);
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof InTransformFunction);
     assertEquals(transformFunction.getName(), TransformFunctionType.IN.getName());
@@ -56,7 +56,7 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
   public void testIntMVInTransformFunction() {
     String expressionStr =
         String.format("%s IN (%d, %d, %d)", INT_MV_COLUMN, _intMVValues[2][0], _intMVValues[5][0], _intMVValues[9][0]);
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof InTransformFunction);
     assertEquals(transformFunction.getName(), TransformFunctionType.IN.getName());
@@ -81,7 +81,7 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testIntInTransformFunctionWithTransformedValues() {
     String expressionStr = String.format("%s IN (%d, 1+1, 4+5)", INT_SV_COLUMN, _intSVValues[2]);
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof InTransformFunction);
     assertEquals(transformFunction.getName(), TransformFunctionType.IN.getName());
@@ -100,7 +100,7 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
   public void testLongInTransformFunction() {
     String expressionStr =
         String.format("%s IN (%d, %d, %d)", LONG_SV_COLUMN, _longSVValues[2], _longSVValues[7], _longSVValues[11]);
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof InTransformFunction);
     assertEquals(transformFunction.getName(), TransformFunctionType.IN.getName());
@@ -119,7 +119,7 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
   public void testFloatInTransformFunction() {
     String expressionStr =
         String.format("%s IN (%s, %s, %s)", FLOAT_SV_COLUMN, _floatSVValues[3], _floatSVValues[7], _floatSVValues[9]);
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof InTransformFunction);
     assertEquals(transformFunction.getName(), TransformFunctionType.IN.getName());
@@ -138,7 +138,7 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
   public void testDoubleInTransformFunction() {
     String expressionStr = String.format("%s IN (%s, %s, %s)", DOUBLE_SV_COLUMN, _doubleSVValues[3], _doubleSVValues[7],
         _doubleSVValues[9]);
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof InTransformFunction);
     assertEquals(transformFunction.getName(), TransformFunctionType.IN.getName());
@@ -157,7 +157,7 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
   public void testStringInTransformFunction() {
     String expressionStr =
         String.format("%s IN ('a','b','%s','%s')", STRING_SV_COLUMN, _stringSVValues[2], _stringSVValues[5]);
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof InTransformFunction);
     assertEquals(transformFunction.getName(), TransformFunctionType.IN.getName());
@@ -177,7 +177,7 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
     String expressionStr =
         String.format("%s IN ('%s','%s')", BYTES_SV_COLUMN, BytesUtils.toHexString(_bytesSVValues[2]),
             BytesUtils.toHexString(_bytesSVValues[5]));
-    ExpressionContext expression = RequestContextUtils.getExpressionFromSQL(expressionStr);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof InTransformFunction);
     assertEquals(transformFunction.getName(), TransformFunctionType.IN.getName());
