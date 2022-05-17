@@ -2041,24 +2041,20 @@ public class PinotHelixResourceManager {
 
   private Map<InstancePartitionsType, InstancePartitions> fetchOrComputeInstancePartitions(String tableNameWithType,
       TableConfig tableConfig) {
-    boolean isOfflineTable = !TableNameBuilder.isRealtimeTableResource(tableNameWithType);
-    boolean isUpsertTable = !isOfflineTable && tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE;
-    InstancePartitionsType instancePartitionsType = null;
-    if (isOfflineTable) {
-      instancePartitionsType = InstancePartitionsType.OFFLINE;
-    } else if (isUpsertTable) {
+    if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+      return Collections.singletonMap(InstancePartitionsType.OFFLINE, InstancePartitionsUtils
+          .fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, InstancePartitionsType.OFFLINE));
+    }
+    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE) {
       // In an upsert enabled LLC realtime table, all segments of the same partition are collocated on the same server
       // -- consuming or completed. So it is fine to use CONSUMING as the InstancePartitionsType.
-      instancePartitionsType = InstancePartitionsType.CONSUMING;
-    }
-    if (isOfflineTable || isUpsertTable) {
-      return Collections.singletonMap(instancePartitionsType, InstancePartitionsUtils
-          .fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, instancePartitionsType));
+      return Collections.singletonMap(InstancePartitionsType.CONSUMING, InstancePartitionsUtils
+          .fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, InstancePartitionsType.CONSUMING));
     }
     // for non-upsert realtime tables, if COMPLETED instance partitions is available or tag override for
     // completed segments is provided in the tenant config, COMPLETED instance partitions type is used
     // otherwise CONSUMING instance partitions type is used.
-    instancePartitionsType = InstancePartitionsType.COMPLETED;
+    InstancePartitionsType instancePartitionsType = InstancePartitionsType.COMPLETED;
     InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
         InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
     if (instancePartitions != null) {
