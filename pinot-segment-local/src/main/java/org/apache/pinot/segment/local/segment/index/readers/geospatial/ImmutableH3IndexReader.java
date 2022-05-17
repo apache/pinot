@@ -63,7 +63,7 @@ public class ImmutableH3IndexReader implements H3IndexReader {
 
   @Override
   public ImmutableRoaringBitmap getDocIds(long h3Id) {
-    int dictId = _dictionary.indexOf(String.valueOf(h3Id));
+    int dictId = _dictionary.indexOf(h3Id);
     return dictId >= 0 ? _invertedIndex.getDocIds(dictId) : new MutableRoaringBitmap();
   }
 

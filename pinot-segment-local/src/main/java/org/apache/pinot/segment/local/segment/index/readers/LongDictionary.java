@@ -35,6 +35,11 @@ public class LongDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int indexOf(long longValue) {
+    return normalizeIndex(binarySearch(longValue));
+  }
+
+  @Override
   public DataType getValueType() {
     return DataType.LONG;
   }

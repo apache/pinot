@@ -35,6 +35,11 @@ public class IntDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int indexOf(int intValue) {
+    return normalizeIndex(binarySearch(intValue));
+  }
+
+  @Override
   public DataType getValueType() {
     return DataType.INT;
   }
