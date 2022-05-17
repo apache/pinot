@@ -19,6 +19,7 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.util.Collections;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -54,9 +55,14 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
   @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
   private String _authToken;
 
+  @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
+  private String _authTokenUrl;
+
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
       + "this message.")
   private boolean _help = false;
+
+  private AuthProvider _authProvider;
 
   @Override
   public boolean getHelp() {
@@ -108,13 +114,13 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
-  public PostQueryCommand setAuthToken(String authToken) {
-    _authToken = authToken;
+  public PostQueryCommand setQuery(String query) {
+    _query = query;
     return this;
   }
 
-  public PostQueryCommand setQuery(String query) {
-    _query = query;
+  public PostQueryCommand setAuthProvider(AuthProvider authProvider) {
+    _authProvider = authProvider;
     return this;
   }
 
@@ -126,7 +132,8 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     LOGGER.info("Executing command: " + this);
     String url = _brokerProtocol + "://" + _brokerHost + ":" + _brokerPort + "/query/sql";
     String request = JsonUtils.objectToString(Collections.singletonMap(Request.SQL, _query));
-    return sendRequest("POST", url, request, makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
+    return sendRequest("POST", url, request, makeAuthHeaders(makeAuthProvider(_authProvider,
+            _authTokenUrl, _authToken, _user, _password)));
   }
 
   @Override

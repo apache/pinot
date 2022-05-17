@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -71,11 +72,16 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
   @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
   private String _authToken;
 
+  @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
+  private String _authTokenUrl;
+
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
       description = "Print this message.")
   private boolean _help = false;
 
   private String _controllerAddress;
+
+  private AuthProvider _authProvider;
 
   public AddTenantCommand setControllerUrl(String url) {
     _controllerAddress = url;
@@ -117,13 +123,13 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
-  public AddTenantCommand setAuthToken(String authToken) {
-    _authToken = authToken;
+  public AddTenantCommand setExecute(boolean exec) {
+    _exec = exec;
     return this;
   }
 
-  public AddTenantCommand setExecute(boolean exec) {
-    _exec = exec;
+  public AddTenantCommand setAuthProvider(AuthProvider authProvider) {
+    _authProvider = authProvider;
     return this;
   }
 
@@ -147,7 +153,8 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
     Tenant tenant = new Tenant(_role, _name, _instanceCount, _offlineInstanceCount, _realtimeInstanceCount);
     String res = AbstractBaseAdminCommand
         .sendRequest("POST", ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(),
-            tenant.toJsonString(), makeAuthHeader(makeAuthToken(_authToken, _user, _password)));
+            tenant.toJsonString(), makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user,
+                _password)));
 
     LOGGER.info(res);
     System.out.print(res);

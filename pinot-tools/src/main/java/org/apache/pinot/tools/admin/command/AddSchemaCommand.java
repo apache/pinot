@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Collections;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -59,9 +60,14 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
   private String _authToken;
 
+  @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
+  private String _authTokenUrl;
+
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
       description = "Print this message.")
   private boolean _help = false;
+
+  private AuthProvider _authProvider;
 
   @Override
   public boolean getHelp() {
@@ -119,8 +125,8 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
     _password = password;
   }
 
-  public void setAuthToken(String authToken) {
-    _authToken = authToken;
+  public void setAuthProvider(AuthProvider authProvider) {
+    _authProvider = authProvider;
   }
 
   public AddSchemaCommand setExecute(boolean exec) {
@@ -151,8 +157,8 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       fileUploadDownloadClient.addSchema(FileUploadDownloadClient
               .getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort)),
-          schema.getSchemaName(), schemaFile, makeAuthHeader(makeAuthToken(_authToken, _user, _password)),
-          Collections.emptyList());
+          schema.getSchemaName(), schemaFile, makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken,
+              _user, _password)), Collections.emptyList());
     } catch (Exception e) {
       LOGGER.error("Got Exception to upload Pinot Schema: " + schema.getSchemaName(), e);
       return false;

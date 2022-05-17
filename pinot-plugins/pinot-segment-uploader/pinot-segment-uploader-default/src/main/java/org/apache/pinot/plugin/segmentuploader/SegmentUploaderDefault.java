@@ -29,7 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
-import org.apache.pinot.spi.auth.AuthContext;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
@@ -86,15 +86,15 @@ public class SegmentUploaderDefault implements SegmentUploader {
   }
 
   @Override
-  public void uploadSegment(URI segmentTarURI, @Nullable AuthContext authContext)
+  public void uploadSegment(URI segmentTarURI, @Nullable AuthProvider authProvider)
       throws Exception {
     IngestionUtils
-        .uploadSegment(_tableNameWithType, _batchConfig, Collections.singletonList(segmentTarURI), authContext);
+        .uploadSegment(_tableNameWithType, _batchConfig, Collections.singletonList(segmentTarURI), authProvider);
     LOGGER.info("Successfully uploaded segment: {} to table: {}", segmentTarURI, _tableNameWithType);
   }
 
   @Override
-  public void uploadSegmentsFromDir(URI segmentDir, @Nullable AuthContext authContext)
+  public void uploadSegmentsFromDir(URI segmentDir, @Nullable AuthProvider authProvider)
       throws Exception {
 
     List<URI> segmentTarURIs = new ArrayList<>();
@@ -106,7 +106,7 @@ public class SegmentUploaderDefault implements SegmentUploader {
         segmentTarURIs.add(uri);
       }
     }
-    IngestionUtils.uploadSegment(_tableNameWithType, _batchConfig, segmentTarURIs, authContext);
+    IngestionUtils.uploadSegment(_tableNameWithType, _batchConfig, segmentTarURIs, authProvider);
     LOGGER.info("Successfully uploaded segments: {} to table: {}", segmentTarURIs, _tableNameWithType);
   }
 }

@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
@@ -56,7 +57,7 @@ public class Quickstart extends QuickStartBase {
     }
   }
 
-  public String getAuthToken() {
+  public AuthProvider getAuthProvider() {
     return null;
   }
 
@@ -99,7 +100,7 @@ public class Quickstart extends QuickStartBase {
 
     QuickstartTableRequest request = new QuickstartTableRequest(baseDir.getAbsolutePath());
     QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1, dataDir, true, getAuthToken(),
+        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1, dataDir, true, getAuthProvider(),
             getConfigOverrides(), null, true);
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");

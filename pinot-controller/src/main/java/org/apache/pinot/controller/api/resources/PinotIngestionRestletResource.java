@@ -37,6 +37,7 @@ import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -44,6 +45,7 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.FileIngestionHelper;
 import org.apache.pinot.controller.util.FileIngestionHelper.DataPayload;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -202,15 +204,13 @@ public class PinotIngestionRestletResource {
         });
     Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
 
+    AuthProvider authProvider = AuthProviderUtils.extractAuthProvider(_controllerConf,
+        CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY + ".auth");
+
     FileIngestionHelper fileIngestionHelper =
         new FileIngestionHelper(tableConfig, schema, batchConfigMap, getControllerUri(),
-            new File(_controllerConf.getDataDir(), UPLOAD_DIR), getAuthToken());
+            new File(_controllerConf.getDataDir(), UPLOAD_DIR), authProvider);
     return fileIngestionHelper.buildSegmentAndPush(payload);
-  }
-
-  private String getAuthToken() {
-    return _controllerConf
-        .getProperty(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY + ".auth.token");
   }
 
   private URI getControllerUri() {

@@ -35,7 +35,6 @@ import javax.net.ssl.SSLContext;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
@@ -55,12 +54,13 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.message.BasicHeader;
 import org.apache.http.util.EntityUtils;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpErrorInfo;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -110,7 +110,7 @@ public class HttpClient implements AutoCloseable {
   /**
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
    *
-   * @see #sendGetRequest(URI, Map, String)
+   * @see #sendGetRequest(URI, Map, AuthProvider)
    */
   public SimpleHttpResponse sendGetRequest(URI uri)
       throws IOException {
@@ -122,16 +122,15 @@ public class HttpClient implements AutoCloseable {
     return sendGetRequest(uri, headers, null);
   }
 
-  public SimpleHttpResponse sendGetRequest(URI uri, @Nullable Map<String, String> headers, @Nullable String authToken)
+  public SimpleHttpResponse sendGetRequest(URI uri, @Nullable Map<String, String> headers,
+      @Nullable AuthProvider authProvider)
       throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+    AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     if (MapUtils.isNotEmpty(headers)) {
       for (Map.Entry<String, String> header : headers.entrySet()) {
         requestBuilder.addHeader(header.getKey(), header.getValue());
       }
-    }
-    if (StringUtils.isNotBlank(authToken)) {
-      requestBuilder.addHeader(AUTH_HTTP_HEADER, authToken);
     }
     setTimeout(requestBuilder, GET_REQUEST_SOCKET_TIMEOUT_MS);
     return sendRequest(requestBuilder.build());
@@ -140,7 +139,7 @@ public class HttpClient implements AutoCloseable {
   /**
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
    *
-   * @see #sendDeleteRequest(URI, Map, String)
+   * @see #sendDeleteRequest(URI, Map, AuthProvider)
    */
   public SimpleHttpResponse sendDeleteRequest(URI uri)
       throws IOException {
@@ -153,12 +152,10 @@ public class HttpClient implements AutoCloseable {
   }
 
   public SimpleHttpResponse sendDeleteRequest(URI uri, @Nullable Map<String, String> headers,
-      @Nullable String authToken)
+      @Nullable AuthProvider authProvider)
       throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
-    if (StringUtils.isNotBlank(authToken)) {
-      requestBuilder.addHeader(AUTH_HTTP_HEADER, authToken);
-    }
+    AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     if (MapUtils.isNotEmpty(headers)) {
       for (Map.Entry<String, String> header : headers.entrySet()) {
         requestBuilder.addHeader(header.getKey(), header.getValue());
@@ -171,7 +168,7 @@ public class HttpClient implements AutoCloseable {
   /**
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
    *
-   * @see #sendPostRequest(URI, HttpEntity, Map, String)
+   * @see #sendPostRequest(URI, HttpEntity, Map, AuthProvider)
    */
   public SimpleHttpResponse sendPostRequest(URI uri, @Nullable HttpEntity payload,
       @Nullable Map<String, String> headers)
@@ -180,15 +177,13 @@ public class HttpClient implements AutoCloseable {
   }
 
   public SimpleHttpResponse sendPostRequest(URI uri, @Nullable HttpEntity payload,
-      @Nullable Map<String, String> headers, @Nullable String authToken)
+      @Nullable Map<String, String> headers, @Nullable AuthProvider authProvider)
       throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1);
     if (payload != null) {
       requestBuilder.setEntity(payload);
     }
-    if (StringUtils.isNotBlank(authToken)) {
-      requestBuilder.addHeader(AUTH_HTTP_HEADER, authToken);
-    }
+    AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     if (MapUtils.isNotEmpty(headers)) {
       for (Map.Entry<String, String> header : headers.entrySet()) {
         requestBuilder.addHeader(header.getKey(), header.getValue());
@@ -201,7 +196,7 @@ public class HttpClient implements AutoCloseable {
   /**
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
    *
-   * @see #sendPutRequest(URI, HttpEntity, Map, String)
+   * @see #sendPutRequest(URI, HttpEntity, Map, AuthProvider)
    */
   public SimpleHttpResponse sendPutRequest(URI uri, @Nullable HttpEntity payload, @Nullable Map<String, String> headers)
       throws IOException {
@@ -209,15 +204,13 @@ public class HttpClient implements AutoCloseable {
   }
 
   public SimpleHttpResponse sendPutRequest(URI uri, @Nullable HttpEntity payload, @Nullable Map<String, String> headers,
-      @Nullable String authToken)
+      @Nullable AuthProvider authProvider)
       throws IOException {
     RequestBuilder requestBuilder = RequestBuilder.put(uri).setVersion(HttpVersion.HTTP_1_1);
     if (payload != null) {
       requestBuilder.setEntity(payload);
     }
-    if (StringUtils.isNotBlank(authToken)) {
-      requestBuilder.addHeader(AUTH_HTTP_HEADER, authToken);
-    }
+    AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     if (MapUtils.isNotEmpty(headers)) {
       for (Map.Entry<String, String> header : headers.entrySet()) {
         requestBuilder.addHeader(header.getKey(), header.getValue());
@@ -243,13 +236,13 @@ public class HttpClient implements AutoCloseable {
   }
 
   public SimpleHttpResponse sendJsonPostRequest(URI uri, @Nullable String jsonRequestBody,
-      @Nullable Map<String, String> headers, @Nullable String authToken)
+      @Nullable Map<String, String> headers, @Nullable AuthProvider authProvider)
       throws IOException {
     Map<String, String> headersWrapper = MapUtils.isEmpty(headers) ? new HashMap<>() : new HashMap<>(headers);
     headersWrapper.put(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
     HttpEntity entity =
         jsonRequestBody == null ? null : new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON);
-    return sendPostRequest(uri, entity, headers, authToken);
+    return sendPostRequest(uri, entity, headers, authProvider);
   }
 
   public SimpleHttpResponse sendJsonPutRequest(URI uri, @Nullable String jsonRequestBody)
@@ -264,13 +257,13 @@ public class HttpClient implements AutoCloseable {
   }
 
   public SimpleHttpResponse sendJsonPutRequest(URI uri, @Nullable String jsonRequestBody,
-      @Nullable Map<String, String> headers, @Nullable String authToken)
+      @Nullable Map<String, String> headers, @Nullable AuthProvider authProvider)
       throws IOException {
     Map<String, String> headersWrapper = MapUtils.isEmpty(headers) ? new HashMap<>() : new HashMap<>(headers);
     headersWrapper.put(HttpHeaders.CONTENT_TYPE, JSON_CONTENT_TYPE);
     HttpEntity entity =
         jsonRequestBody == null ? null : new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON);
-    return sendPutRequest(uri, entity, headersWrapper, authToken);
+    return sendPutRequest(uri, entity, headersWrapper, authProvider);
   }
 
   // --------------------------------------------------------------------------
@@ -366,15 +359,15 @@ public class HttpClient implements AutoCloseable {
    * @param uri URI
    * @param socketTimeoutMs Socket timeout in milliseconds
    * @param dest File destination
-   * @param authToken auth token
+   * @param authProvider auth provider
    * @param httpHeaders http headers
    * @return Response status code
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public int downloadFile(URI uri, int socketTimeoutMs, File dest, String authToken, List<Header> httpHeaders)
+  public int downloadFile(URI uri, int socketTimeoutMs, File dest, AuthProvider authProvider, List<Header> httpHeaders)
       throws IOException, HttpErrorStatusException {
-    HttpUriRequest request = getDownloadFileRequest(uri, socketTimeoutMs, authToken, httpHeaders);
+    HttpUriRequest request = getDownloadFileRequest(uri, socketTimeoutMs, authProvider, httpHeaders);
     try (CloseableHttpResponse response = _httpClient.execute(request)) {
       StatusLine statusLine = response.getStatusLine();
       int statusCode = statusLine.getStatusCode();
@@ -433,19 +426,6 @@ public class HttpClient implements AutoCloseable {
     requestBuilder.setConfig(requestConfig);
   }
 
-  /**
-   * Generate an (optional) HTTP Authorization header given an auth token.
-   *
-   * @param authToken auth token
-   * @return list of 0 or 1 "Authorization" headers
-   */
-  public static List<Header> makeAuthHeader(String authToken) {
-    if (StringUtils.isBlank(authToken)) {
-      return Collections.emptyList();
-    }
-    return Collections.singletonList(new BasicHeader(AUTH_HTTP_HEADER, authToken));
-  }
-
   private static String getErrorMessage(HttpUriRequest request, CloseableHttpResponse response) {
     String controllerHost = null;
     String controllerVersion = null;
@@ -470,12 +450,10 @@ public class HttpClient implements AutoCloseable {
     return errorMessage;
   }
 
-  private static HttpUriRequest getDownloadFileRequest(URI uri, int socketTimeoutMs, String authToken,
+  private static HttpUriRequest getDownloadFileRequest(URI uri, int socketTimeoutMs, AuthProvider authProvider,
       List<Header> httpHeaders) {
     RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
-    if (org.apache.commons.lang.StringUtils.isNotBlank(authToken)) {
-      requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authToken);
-    }
+    AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
     String userInfo = uri.getUserInfo();
     if (userInfo != null) {

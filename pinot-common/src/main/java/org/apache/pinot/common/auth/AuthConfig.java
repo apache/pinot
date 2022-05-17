@@ -16,19 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.auth;
+package org.apache.pinot.common.auth;
+
+import java.util.Map;
+import org.apache.pinot.spi.env.PinotConfiguration;
+
 
 /**
- * Container for all auth related info
+ * Standardized auth config container for AuthProvider
+ * @see AuthProviderUtils#extractAuthConfig(PinotConfiguration, String)
  */
-public class AuthContext {
-  private final String _authToken;
+public class AuthConfig {
+  public static final String PROVIDER_CLASS = "provider.class";
 
-  public AuthContext(String authToken) {
-    _authToken = authToken;
+  protected Map<String, Object> _properties;
+
+  public AuthConfig(Map<String, Object> properties) {
+    _properties = properties;
   }
 
-  public String getAuthToken() {
-    return _authToken;
+  public Map<String, Object> getProperties() {
+    return _properties;
   }
 }

@@ -36,7 +36,7 @@ public class TableDataManagerConfig {
   private static final String TABLE_DATA_MANAGER_CONSUMER_DIRECTORY = "consumerDirectory";
   private static final String TABLE_DATA_MANAGER_NAME = "name";
   private static final String TABLE_IS_DIMENSION = "isDimTable";
-  private static final String TABLE_DATA_MANGER_AUTH_TOKEN = "authToken";
+  private static final String TABLE_DATA_MANAGER_AUTH = "auth";
 
   private final Configuration _tableDataManagerConfig;
 
@@ -68,8 +68,8 @@ public class TableDataManagerConfig {
     return _tableDataManagerConfig.getBoolean(TABLE_IS_DIMENSION);
   }
 
-  public String getAuthToken() {
-    return _tableDataManagerConfig.getString(TABLE_DATA_MANGER_AUTH_TOKEN);
+  public Configuration getAuthConfig() {
+    return _tableDataManagerConfig.subset(TABLE_DATA_MANAGER_AUTH);
   }
 
   public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
@@ -82,16 +82,18 @@ public class TableDataManagerConfig {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     Preconditions.checkNotNull(tableType);
     defaultConfig.addProperty(TABLE_DATA_MANAGER_TYPE, tableType.name());
-    defaultConfig.addProperty(TABLE_DATA_MANGER_AUTH_TOKEN, instanceDataManagerConfig.getAuthToken());
+
+    // copy auth-related configs
+    instanceDataManagerConfig.getConfig().subset(TABLE_DATA_MANAGER_AUTH).toMap()
+        .forEach((key, value) -> defaultConfig.setProperty(TABLE_DATA_MANAGER_AUTH + "." + key, value));
 
     return new TableDataManagerConfig(defaultConfig);
   }
 
-  public void overrideConfigs(TableConfig tableConfig, String authToken) {
+  public void overrideConfigs(TableConfig tableConfig) {
     // Override table level configs
 
     _tableDataManagerConfig.addProperty(TABLE_IS_DIMENSION, tableConfig.isDimTable());
-    _tableDataManagerConfig.addProperty(TABLE_DATA_MANGER_AUTH_TOKEN, authToken);
 
     // If we wish to override some table level configs using table config, override them here
     // Note: the configs in TableDataManagerConfig is immutable once the table is created, which mean it will not pick

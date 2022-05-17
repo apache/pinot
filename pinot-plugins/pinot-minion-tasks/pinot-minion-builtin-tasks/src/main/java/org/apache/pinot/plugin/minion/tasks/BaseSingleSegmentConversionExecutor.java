@@ -31,14 +31,15 @@ import org.apache.http.HttpHeaders;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
-import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.exception.TaskCancelledException;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +70,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     String downloadURL = configs.get(MinionConstants.DOWNLOAD_URL_KEY);
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
     String originalSegmentCrc = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
-    String authToken = configs.get(MinionConstants.AUTH_TOKEN);
+    AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(configs.get(MinionConstants.AUTH_TOKEN));
 
     long currentSegmentCrc = getSegmentCrc(tableNameWithType, segmentName);
     if (Long.parseLong(originalSegmentCrc) != currentSegmentCrc) {
@@ -150,7 +151,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       httpHeaders.add(ifMatchHeader);
       httpHeaders.add(refreshOnlyHeader);
       httpHeaders.add(segmentZKMetadataCustomMapModifierHeader);
-      httpHeaders.addAll(HttpClient.makeAuthHeader(authToken));
+      httpHeaders.addAll(AuthProviderUtils.toRequestHeaders(authProvider));
 
       // Set parameters for upload request.
       NameValuePair enableParallelPushProtectionParameter =

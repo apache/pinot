@@ -24,10 +24,12 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -526,6 +528,7 @@ public class BaseTableDataManagerTest {
     TableDataManagerConfig config = mock(TableDataManagerConfig.class);
     when(config.getTableName()).thenReturn(TABLE_NAME);
     when(config.getDataDir()).thenReturn(TABLE_DATA_DIR.getAbsolutePath());
+    when(config.getAuthConfig()).thenReturn(new MapConfiguration(Collections.emptyMap()));
 
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),

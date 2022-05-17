@@ -55,8 +55,6 @@ public interface InstanceDataManagerConfig {
 
   int getMaxParallelSegmentDownloads();
 
-  String getAuthToken();
-
   String getSegmentDirectoryLoader();
 
   long getErrorCacheSize();
