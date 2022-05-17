@@ -285,10 +285,16 @@ public class RangePredicateEvaluatorFactory {
       _upperInclusive = upperInclusive;
     }
 
+    /**
+     * Returns the inclusive lower bound of the range.
+     */
     public int getLowerBound() {
       return _lowerInclusive ? _lowerBound : _lowerBound + 1;
     }
 
+    /**
+     * Returns the inclusive upper bound of the range.
+     */
     public int getUpperBound() {
       return _upperInclusive ? _upperBound : _upperBound - 1;
     }
@@ -330,10 +336,16 @@ public class RangePredicateEvaluatorFactory {
       _upperInclusive = upperInclusive;
     }
 
+    /**
+     * Returns the inclusive lower bound of the range.
+     */
     public long getLowerBound() {
       return _lowerInclusive ? _lowerBound : _lowerBound + 1;
     }
 
+    /**
+     * Returns the inclusive upper bound of the range.
+     */
     public long getUpperBound() {
       return _upperInclusive ? _upperBound : _upperBound - 1;
     }
@@ -375,10 +387,16 @@ public class RangePredicateEvaluatorFactory {
       _upperInclusive = upperInclusive;
     }
 
+    /**
+     * Returns the inclusive lower bound of the range.
+     */
     public float getLowerBound() {
       return _lowerInclusive ? _lowerBound : _lowerBound + Float.MIN_VALUE;
     }
 
+    /**
+     * Returns the inclusive upper bound of the range.
+     */
     public float getUpperBound() {
       return _upperInclusive ? _upperBound : _upperBound - Float.MIN_VALUE;
     }
@@ -420,10 +438,16 @@ public class RangePredicateEvaluatorFactory {
       _upperInclusive = upperInclusive;
     }
 
+    /**
+     * Returns the inclusive lower bound of the range.
+     */
     public double getLowerBound() {
       return _lowerInclusive ? _lowerBound : _lowerBound + Double.MIN_VALUE;
     }
 
+    /**
+     * Returns the inclusive upper bound of the range.
+     */
     public double getUpperBound() {
       return _upperInclusive ? _upperBound : _upperBound - Double.MIN_VALUE;
     }
@@ -463,14 +487,6 @@ public class RangePredicateEvaluatorFactory {
       _upperBound = upperBound;
       _lowerInclusive = lowerInclusive;
       _upperInclusive = upperInclusive;
-    }
-
-    public BigDecimal geLowerBound() {
-      return _lowerBound;
-    }
-
-    public BigDecimal getUpperBound() {
-      return _upperBound;
     }
 
     @Override
