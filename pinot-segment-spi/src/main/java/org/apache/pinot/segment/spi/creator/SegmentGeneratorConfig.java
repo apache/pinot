@@ -120,6 +120,19 @@ public class SegmentGeneratorConfig implements Serializable {
 
   private SegmentZKPropsConfig _segmentZKPropsConfig;
 
+  // These segments are only created if _createAllIndexedDuringSegmentGeneration is set to true
+  private final List<String> _bloomFilterCreationColumns = new ArrayList<>();
+
+  public List<String> getBloomFilterCreationColumns() {
+    return _bloomFilterCreationColumns;
+  }
+
+  public List<String> getRangeIndexCreationColumns() {
+    return _rangeIndexCreationColumns;
+  }
+
+  private final List<String> _rangeIndexCreationColumns = new ArrayList<>();
+
   @Deprecated
   public SegmentGeneratorConfig() {
   }
@@ -186,6 +199,26 @@ public class SegmentGeneratorConfig implements Serializable {
         Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
         if ((customConfigs != null && Boolean.parseBoolean(customConfigs.get("generate.inverted.index.before.push")))
             || indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
+          _invertedIndexCreationColumns.addAll(indexingConfig.getInvertedIndexColumns());
+        }
+      }
+
+      if (indexingConfig.isCreateAllIndexedDuringSegmentGeneration()) {
+        if ((indexingConfig.getBloomFilterColumns() != null || indexingConfig.getBloomFilterConfigs() != null)) {
+          if (indexingConfig.getBloomFilterColumns() != null) {
+            _bloomFilterCreationColumns.addAll(indexingConfig.getBloomFilterColumns());
+          }
+
+          if (indexingConfig.getBloomFilterConfigs() != null) {
+            _bloomFilterCreationColumns.addAll(indexingConfig.getBloomFilterConfigs().keySet());
+          }
+        }
+
+        if (indexingConfig.getRangeIndexColumns() != null) {
+          _rangeIndexCreationColumns.addAll(indexingConfig.getRangeIndexColumns());
+        }
+
+        if (indexingConfig.getInvertedIndexColumns() != null) {
           _invertedIndexCreationColumns.addAll(indexingConfig.getInvertedIndexColumns());
         }
       }

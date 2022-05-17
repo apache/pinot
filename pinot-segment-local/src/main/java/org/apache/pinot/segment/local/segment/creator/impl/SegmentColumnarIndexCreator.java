@@ -46,6 +46,8 @@ import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentCreator;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.IndexingOverrides;
+import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
+import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
@@ -55,7 +57,9 @@ import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.FSTType;
+import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -75,7 +79,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.*;
 
-
 /**
  * Segment creator which writes data in a columnar form.
  */
@@ -89,6 +92,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private SegmentGeneratorConfig _config;
   private Map<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
   private final IndexCreatorProvider _indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
+  private final Map<String, BloomFilterCreator> _bloomFilterCreatorMap = new HashMap<>();
+  private final Map<String, CombinedInvertedIndexCreator> _rangeIndexFilterCreatorMap = new HashMap<>();
   private final Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private final Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
   private final Map<String, DictionaryBasedInvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
@@ -134,6 +139,20 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       invertedIndexColumns.add(columnName);
     }
 
+    Set<String> bloomFilterColumns = new HashSet<>();
+    for (String columnName : _config.getBloomFilterCreationColumns()) {
+      Preconditions.checkState(schema.hasColumn(columnName),
+          "Cannot create bloom filter for column: %s because it is not in schema", columnName);
+      bloomFilterColumns.add(columnName);
+    }
+
+    Set<String> rangeIndexColumns = new HashSet<>();
+    for (String columnName : _config.getRangeIndexCreationColumns()) {
+      Preconditions.checkState(schema.hasColumn(columnName),
+          "Cannot create bloom filter for column: %s because it is not in schema", columnName);
+      rangeIndexColumns.add(columnName);
+    }
+
     Set<String> textIndexColumns = new HashSet<>();
     for (String columnName : _config.getTextIndexCreationColumns()) {
       Preconditions.checkState(schema.hasColumn(columnName),
@@ -162,6 +181,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     // Initialize creators for dictionary, forward index and inverted index
+    IndexingConfig indexingConfig = _config.getTableConfig().getIndexingConfig();
+    int rangeIndexVersion =
+        (indexingConfig != null) ? indexingConfig.getRangeIndexVersion() : IndexingConfig.DEFAULT_RANGE_INDEX_VERSION;
     for (FieldSpec fieldSpec : fieldSpecs) {
       // Ignore virtual columns
       if (fieldSpec.isVirtualColumn()) {
@@ -215,6 +237,22 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               dictionaryCreator.getNumBytesPerEntry());
           throw e;
         }
+
+        if (bloomFilterColumns.contains(columnName)) {
+          if (indexingConfig != null && indexingConfig.getBloomFilterConfigs() != null
+              && indexingConfig.getBloomFilterConfigs().containsKey(columnName)) {
+            _bloomFilterCreatorMap.put(columnName, _indexCreatorProvider.newBloomFilterCreator(
+                context.forBloomFilter(indexingConfig.getBloomFilterConfigs().get(columnName))));
+          } else {
+            _bloomFilterCreatorMap.put(columnName, _indexCreatorProvider.newBloomFilterCreator(
+                context.forBloomFilter(new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 0, false))));
+          }
+        }
+      }
+
+      if (rangeIndexColumns.contains(columnName)) {
+        _rangeIndexFilterCreatorMap.put(columnName,
+            _indexCreatorProvider.newRangeIndexCreator(context.forRangeIndex(rangeIndexVersion)));
       }
 
       if (textIndexColumns.contains(columnName)) {
@@ -345,6 +383,33 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
       //get dictionaryCreator, will be null if column is not dictionaryEncoded
       SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+
+      // bloom filter
+      BloomFilterCreator bloomFilterCreator = _bloomFilterCreatorMap.get(columnName);
+      if (bloomFilterCreator != null) {
+        bloomFilterCreator.add((String) columnValueToIndex);
+      }
+
+      // range index
+      CombinedInvertedIndexCreator combinedInvertedIndexCreator = _rangeIndexFilterCreatorMap.get(columnName);
+      if (combinedInvertedIndexCreator != null) {
+        switch (fieldSpec.getDataType()) {
+          case INT:
+            combinedInvertedIndexCreator.add((Integer) columnValueToIndex);
+            break;
+          case LONG:
+            combinedInvertedIndexCreator.add((Long) columnValueToIndex);
+            break;
+          case FLOAT:
+            combinedInvertedIndexCreator.add((Float) columnValueToIndex);
+            break;
+          case DOUBLE:
+            combinedInvertedIndexCreator.add((Double) columnValueToIndex);
+            break;
+          default:
+            throw new RuntimeException("Unsupported data type " + fieldSpec.getDataType() + " for range index");
+        }
+      }
 
       // text-index
       TextIndexCreator textIndexCreator = _textIndexCreatorMap.get(columnName);
@@ -565,6 +630,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     for (NullValueVectorCreator nullValueVectorCreator : _nullValueVectorCreatorMap.values()) {
       nullValueVectorCreator.seal();
     }
+    for (BloomFilterCreator bloomFilterCreator : _bloomFilterCreatorMap.values()) {
+      bloomFilterCreator.seal();
+    }
+    for (CombinedInvertedIndexCreator combinedInvertedIndexCreator : _rangeIndexFilterCreatorMap.values()) {
+      combinedInvertedIndexCreator.seal();
+    }
     writeMetadata();
   }
 
@@ -769,6 +840,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws IOException {
     FileUtils.close(Iterables.concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(),
         _invertedIndexCreatorMap.values(), _textIndexCreatorMap.values(), _fstIndexCreatorMap.values(),
-        _jsonIndexCreatorMap.values(), _h3IndexCreatorMap.values(), _nullValueVectorCreatorMap.values()));
+        _jsonIndexCreatorMap.values(), _h3IndexCreatorMap.values(), _nullValueVectorCreatorMap.values(),
+        _bloomFilterCreatorMap.values(), _rangeIndexFilterCreatorMap.values()));
   }
 }
