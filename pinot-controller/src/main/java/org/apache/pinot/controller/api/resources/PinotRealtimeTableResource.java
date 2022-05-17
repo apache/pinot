@@ -28,12 +28,13 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 
 
 @Api(tags = Constants.TABLE_TAG)
 @Path("/")
-public class PinotSegmentStateResource {
+public class PinotRealtimeTableResource {
   @Inject
   PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
 
@@ -43,10 +44,10 @@ public class PinotSegmentStateResource {
   @Consumes(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Resume the consumption of a realtime table",
       notes = "Resume the consumption of a realtime table")
-  public String resumeRealtimeTableConsumption(
+  public Response resumeConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
     _pinotLLCRealtimeSegmentManager.resumeRealtimeTableConsumption(tableName);
     // TODO(saurabh): Change this
-    return "{\"status\": \"SUCCESS\"}";
+    return Response.ok().build();
   }
 }

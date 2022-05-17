@@ -100,7 +100,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
           IngestionConfigUtils.getStreamConfigMap(tableConfig));
       if (streamConfig.hasLowLevelConsumerType()) {
-        _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig);
+        _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig, false);
       }
     }
   }

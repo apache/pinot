@@ -863,7 +863,9 @@ public class PinotLLCRealtimeSegmentManager {
    * TODO: We need to find a place to detect and update a gauge for nonConsumingPartitionsCount for a table, and
    * reset it to 0 at the end of validateLLC
    */
-  public void ensureAllPartitionsConsuming(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig) {
+  // TODO(saurabh) : We can reduce critical section by having tableName level locks?
+  public synchronized void ensureAllPartitionsConsuming(TableConfig tableConfig,
+      PartitionLevelStreamConfig streamConfig, boolean enforcedByAdmin) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
@@ -878,7 +880,8 @@ public class PinotLLCRealtimeSegmentManager {
         List<PartitionGroupMetadata> newPartitionGroupMetadataList =
             getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
         streamConfig.setOffsetCriteria(originalOffsetCriteria);
-        return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupMetadataList);
+        return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupMetadataList,
+            enforcedByAdmin);
       } else {
         LOGGER.info("Skipping LLC segments validation for disabled table: {}", realtimeTableName);
         return idealState;
@@ -1033,7 +1036,7 @@ public class PinotLLCRealtimeSegmentManager {
    */
   @VisibleForTesting
   IdealState ensureAllPartitionsConsuming(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
-      IdealState idealState, List<PartitionGroupMetadata> newPartitionGroupMetadataList) {
+      IdealState idealState, List<PartitionGroupMetadata> newPartitionGroupMetadataList, boolean enforcedByAdmin) {
     String realtimeTableName = tableConfig.getTableName();
 
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
@@ -1070,6 +1073,10 @@ public class PinotLLCRealtimeSegmentManager {
     //       and restart consumption from the same offset (if possible) or a newer offset (if realtime stream does
     //       not have the same offset).
     //       In latter case, report data loss.
+    // 4. There are no segments in the table's idealstate in CONSUMING state,
+    //    No PROPERTYSTORE segments in IN_PROGRESS state (could be due to the CONSUMING segment being deleted).
+    //    a. Create IN_PROGRESS segment with correct startOffset.
+    //    b. Add segment to ideal state
     for (Map.Entry<Integer, SegmentZKMetadata> entry : latestSegmentZKMetadataMap.entrySet()) {
       int partitionGroupId = entry.getKey();
       SegmentZKMetadata latestSegmentZKMetadata = entry.getValue();
@@ -1148,13 +1155,34 @@ public class PinotLLCRealtimeSegmentManager {
           } else {
             if (newPartitionGroupSet.contains(partitionGroupId)) {
               // If we get here, that means in IdealState, the latest segment has no CONSUMING replicas, but has
-              // replicas
-              // not OFFLINE. That is an unexpected state which cannot be fixed by the validation manager currently. In
-              // that case, we need to either extend this part to handle the state, or prevent segments from getting
-              // into
-              // such state.
-              LOGGER
-                  .error("Got unexpected instance state map: {} for segment: {}", instanceStateMap, latestSegmentName);
+              // replicas not OFFLINE. Create a new IN_PROGRESS segment in PROPERTYSTORE,
+              // add it as CONSUMING segment to IDEALSTATE. Currently, only enabled via /resumeConsumption API
+
+              if (enforcedByAdmin) {
+                LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
+                StreamPartitionMsgOffset startOffset = offsetFactory.create(latestSegmentZKMetadata.getStartOffset());
+                StreamPartitionMsgOffset partitionGroupSmallestOffset =
+                    getPartitionGroupSmallestOffset(streamConfig, partitionGroupId);
+
+                // Start offset must be higher than the start offset of the stream
+                if (partitionGroupSmallestOffset.compareTo(startOffset) > 0) {
+                  LOGGER.error("Data lost from offset: {} to: {} for partition: {} of table: {}", startOffset,
+                      partitionGroupSmallestOffset, partitionGroupId, realtimeTableName);
+                  _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
+                  startOffset = partitionGroupSmallestOffset;
+                }
+                CommittingSegmentDescriptor committingSegmentDescriptor =
+                    new CommittingSegmentDescriptor(null, startOffset.toString(), 0);
+                createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
+                    committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions,
+                    numReplicas, newPartitionGroupMetadataList);
+                String newSegmentName = newLLCSegmentName.getSegmentName();
+                updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, newSegmentName, segmentAssignment,
+                    instancePartitionsMap);
+              } else {
+                LOGGER.error("Got unexpected instance state map: {} for segment: {}",
+                    instanceStateMap, latestSegmentName);
+              }
             }
             // else, the partition group has reached end of life. This is an acceptable state
           }
@@ -1389,82 +1417,9 @@ public class PinotLLCRealtimeSegmentManager {
    */
   public void resumeRealtimeTableConsumption(String tableName) {
     TableConfig tableConfig = _helixResourceManager.getTableConfig(tableName, TableType.REALTIME);
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-
-    InstancePartitions instancePartitions =
-        InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixResourceManager.getHelixZkManager(), tableConfig,
-            InstancePartitionsType.CONSUMING);
-    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
-    IdealState idealState =
-        HelixHelper.getTableIdealState(_helixResourceManager.getHelixZkManager(), realtimeTableName);
-    int numReplicas = getNumReplicas(tableConfig, instancePartitions);
-    Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
-
     PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
         IngestionConfigUtils.getStreamConfigMap(tableConfig));
-    List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
-        getPartitionGroupConsumptionStatusList(idealState, streamConfig);
-    // Read the smallest offset when a new partition is detected
-    OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
-    streamConfig.setOffsetCriteria(OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
-    List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-        getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
-    streamConfig.setOffsetCriteria(originalOffsetCriteria);
 
-    int numPartitionGroups = newPartitionGroupMetadataList.size();
-    Map<Integer, SegmentZKMetadata> partitionToLatestSegment = getLatestSegmentZKMetadataMap(realtimeTableName);
-    for (PartitionGroupMetadata partitionGroupMetadata : newPartitionGroupMetadataList) {
-      int partitionId = partitionGroupMetadata.getPartitionGroupId();
-      if (partitionToLatestSegment.containsKey(partitionId)
-          && idealState.getInstanceStateMap(partitionToLatestSegment.get(partitionId).getSegmentName())
-              .containsValue(SegmentStateModel.CONSUMING)) {
-        // IN_PROGRESS segment already exists, NO-OP
-        LOGGER.info("Skipping partitionGroupId {}, IN_PROGRESS segment already exists", partitionId);
-      } else {
-        // Step 1: Create PROPERTYSTORE nodes for each partitionId (IN_PROGRESS)
-        String offset = partitionGroupMetadata.getStartOffset().toString();
-        long newSegmentCreationTimeMs = System.currentTimeMillis();
-
-        SegmentZKMetadata latestSegmentMeta = partitionToLatestSegment.get(partitionId);
-        int seqNumber = latestSegmentMeta == null ? STARTING_SEQUENCE_NUMBER
-            : new LLCSegmentName(latestSegmentMeta.getSegmentName()).getSequenceNumber() + 1;
-
-        LLCSegmentName newLLCSegment = new LLCSegmentName(tableName, partitionId, seqNumber, newSegmentCreationTimeMs);
-        SegmentZKMetadata newSegmentZKMetadata = new SegmentZKMetadata(newLLCSegment.getSegmentName());
-        newSegmentZKMetadata.setCreationTime(newLLCSegment.getCreationTimeMs());
-        newSegmentZKMetadata.setStartOffset(offset);
-        newSegmentZKMetadata.setNumReplicas(numReplicas);
-        newSegmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
-        SegmentPartitionMetadata segmentPartitionMetadata =
-            getPartitionMetadataFromTableConfig(tableConfig, partitionId);
-        if (segmentPartitionMetadata != null) {
-          newSegmentZKMetadata.setPartitionMetadata(segmentPartitionMetadata);
-        }
-
-        FlushThresholdUpdater flushThresholdUpdater = _flushThresholdUpdateManager
-            .getFlushThresholdUpdater(streamConfig);
-        CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null, offset, 0);
-        flushThresholdUpdater.updateFlushThreshold(streamConfig,
-            newSegmentZKMetadata, committingSegmentDescriptor, null,
-            getMaxNumPartitionsPerInstance(instancePartitions, numPartitionGroups, numReplicas),
-            newPartitionGroupMetadataList);
-
-        _helixResourceManager.getPropertyStore().set(
-            ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, newLLCSegment.getSegmentName()),
-            newSegmentZKMetadata.toZNRecord(), -1, AccessOption.PERSISTENT);
-
-        // Step 2: Update IDEALSTATE
-        SegmentAssignment segmentAssignment =
-            SegmentAssignmentFactory.getSegmentAssignment(_helixResourceManager.getHelixZkManager(), tableConfig);
-        List<String> instancesAssigned =
-            segmentAssignment.assignSegment(newLLCSegment.getSegmentName(), instanceStatesMap, instancePartitionsMap);
-        instanceStatesMap.put(newLLCSegment.getSegmentName(),
-            SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
-      }
-    }
-
-    _helixResourceManager.getHelixAdmin()
-        .setResourceIdealState(_helixResourceManager.getHelixClusterName(), realtimeTableName, idealState);
+    ensureAllPartitionsConsuming(tableConfig, streamConfig, true);
   }
 }
