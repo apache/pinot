@@ -318,7 +318,7 @@ public final class TableConfigUtils {
       // Aggregation configs
       List<AggregationConfig> aggregationConfigs = ingestionConfig.getAggregationConfigs();
       Set<String> aggregationSourceColumns = new HashSet<>();
-      if (CollectionUtils.isEmpty(aggregationConfigs)) {
+      if (!CollectionUtils.isEmpty(aggregationConfigs)) {
         Preconditions.checkState(
             !tableConfig.getIndexingConfig().isAggregateMetrics(),
             "aggregateMetrics cannot be set with AggregationConfig");
