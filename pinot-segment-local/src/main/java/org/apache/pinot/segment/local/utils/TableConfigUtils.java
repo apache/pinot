@@ -132,7 +132,7 @@ public final class TableConfigUtils {
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
       validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
       if (!skipTypes.contains(ValidationType.UPSERT)) {
-        validateUpsertConfig(tableConfig, schema);
+        validateUpsertAndDedupConfig(tableConfig, schema);
         validatePartialUpsertStrategies(tableConfig, schema);
       }
       if (!skipTypes.contains(ValidationType.TASK)) {
@@ -505,34 +505,40 @@ public final class TableConfigUtils {
    *  - comparison column exists
    */
   @VisibleForTesting
-  static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
-    if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE) {
+  static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema) {
+    if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE && tableConfig.getDedupConfig() == null) {
       return;
     }
     // check table type is realtime
     Preconditions
-        .checkState(tableConfig.getTableType() == TableType.REALTIME, "Upsert table is for realtime table only.");
+        .checkState(tableConfig.getTableType() == TableType.REALTIME, "Upsert/Dedup table is for realtime table only.");
     // primary key exists
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
-        "Upsert table must have primary key columns in the schema");
+        "Upsert/Dedup table must have primary key columns in the schema");
     // consumer type must be low-level
     Map<String, String> streamConfigsMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
     StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigsMap);
     Preconditions.checkState(streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType(),
-        "Upsert table must use low-level streaming consumer type");
+        "Upsert/Dedup table must use low-level streaming consumer type");
     // replica group is configured for routing
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE
             .equalsIgnoreCase(tableConfig.getRoutingConfig().getInstanceSelectorType()),
-        "Upsert table must use strict replica-group (i.e. strictReplicaGroup) based routing");
-    // no startree index
-    Preconditions.checkState(
-        CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs()) && !tableConfig
-            .getIndexingConfig().isEnableDefaultStarTree(), "The upsert table cannot have star-tree index.");
-    // comparison column exists
-    if (tableConfig.getUpsertConfig().getComparisonColumn() != null) {
-      String comparisonCol = tableConfig.getUpsertConfig().getComparisonColumn();
-      Preconditions.checkState(schema.hasColumn(comparisonCol), "The comparison column does not exist on schema");
+        "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
+
+    // specifically for upsert
+    if (tableConfig.getUpsertConfig() != null) {
+
+      // no startree index
+      Preconditions.checkState(
+          CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs()) && !tableConfig
+              .getIndexingConfig().isEnableDefaultStarTree(), "The upsert table cannot have star-tree index.");
+
+      // comparison column exists
+      if (tableConfig.getUpsertConfig().getComparisonColumn() != null) {
+        String comparisonCol = tableConfig.getUpsertConfig().getComparisonColumn();
+        Preconditions.checkState(schema.hasColumn(comparisonCol), "The comparison column does not exist on schema");
+      }
     }
   }
 
