@@ -88,7 +88,11 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
       Object value = genericRow.getValue(argument);
       _binding.setVariable(argument, value);
     }
-    return _script.run();
+    try {
+      return _script.run();
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   @Override
