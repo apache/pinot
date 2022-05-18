@@ -92,11 +92,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private SegmentGeneratorConfig _config;
   private Map<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
   private final IndexCreatorProvider _indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
-  private final Map<String, BloomFilterCreator> _bloomFilterCreatorMap = new HashMap<>();
-  private final Map<String, CombinedInvertedIndexCreator> _rangeIndexFilterCreatorMap = new HashMap<>();
   private final Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
   private final Map<String, ForwardIndexCreator> _forwardIndexCreatorMap = new HashMap<>();
   private final Map<String, DictionaryBasedInvertedIndexCreator> _invertedIndexCreatorMap = new HashMap<>();
+  private final Map<String, BloomFilterCreator> _bloomFilterCreatorMap = new HashMap<>();
+  private final Map<String, CombinedInvertedIndexCreator> _rangeIndexFilterCreatorMap = new HashMap<>();
   private final Map<String, TextIndexCreator> _textIndexCreatorMap = new HashMap<>();
   private final Map<String, TextIndexCreator> _fstIndexCreatorMap = new HashMap<>();
   private final Map<String, JsonIndexCreator> _jsonIndexCreatorMap = new HashMap<>();
@@ -149,7 +149,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     Set<String> rangeIndexColumns = new HashSet<>();
     for (String columnName : _config.getRangeIndexCreationColumns()) {
       Preconditions.checkState(schema.hasColumn(columnName),
-          "Cannot create bloom filter for column: %s because it is not in schema", columnName);
+          "Cannot create range index for column: %s because it is not in schema", columnName);
       rangeIndexColumns.add(columnName);
     }
 
@@ -182,8 +182,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     // Initialize creators for dictionary, forward index and inverted index
     IndexingConfig indexingConfig = _config.getTableConfig().getIndexingConfig();
-    int rangeIndexVersion =
-        (indexingConfig != null) ? indexingConfig.getRangeIndexVersion() : IndexingConfig.DEFAULT_RANGE_INDEX_VERSION;
+    int rangeIndexVersion = indexingConfig.getRangeIndexVersion();
     for (FieldSpec fieldSpec : fieldSpecs) {
       // Ignore virtual columns
       if (fieldSpec.isVirtualColumn()) {
@@ -387,7 +386,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       // bloom filter
       BloomFilterCreator bloomFilterCreator = _bloomFilterCreatorMap.get(columnName);
       if (bloomFilterCreator != null) {
-        bloomFilterCreator.add((String) columnValueToIndex);
+        bloomFilterCreator.add(columnValueToIndex.toString());
       }
 
       // range index
