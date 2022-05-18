@@ -1142,8 +1142,8 @@ public class PinotLLCRealtimeSegmentManager {
 
               if (enforcedByAdmin) {
                 createNewConsumingSegment(tableConfig, streamConfig, latestSegmentZKMetadata, currentTimeMs,
-                    partitionGroupId, newPartitionGroupMetadataList, instancePartitions, offsetFactory, instanceStatesMap,
-                    segmentAssignment, instancePartitionsMap, false);
+                    partitionGroupId, newPartitionGroupMetadataList, instancePartitions, offsetFactory,
+                    instanceStatesMap, segmentAssignment, instancePartitionsMap, false);
               } else {
                 LOGGER.error("Got unexpected instance state map: {} for segment: {}",
                     instanceStateMap, latestSegmentName);
@@ -1207,8 +1207,8 @@ public class PinotLLCRealtimeSegmentManager {
 
   private void createNewConsumingSegment(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
       SegmentZKMetadata latestSegmentZKMetadata, long currentTimeMs, int partitionGroupId,
-      List<PartitionGroupMetadata> newPartitionGroupMetadataList,InstancePartitions instancePartitions,
-      StreamPartitionMsgOffsetFactory offsetFactory,Map<String, Map<String, String>> instanceStatesMap,
+      List<PartitionGroupMetadata> newPartitionGroupMetadataList, InstancePartitions instancePartitions,
+      StreamPartitionMsgOffsetFactory offsetFactory, Map<String, Map<String, String>> instanceStatesMap,
       SegmentAssignment segmentAssignment, Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap,
       boolean isLatestSegmentOffline) {
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
