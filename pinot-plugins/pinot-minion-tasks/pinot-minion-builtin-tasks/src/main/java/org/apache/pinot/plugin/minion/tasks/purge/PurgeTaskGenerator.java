@@ -38,12 +38,14 @@ import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @TaskGenerator
 public class PurgeTaskGenerator extends BaseTaskGenerator {
     private static final Logger LOGGER = LoggerFactory.getLogger(PurgeTaskGenerator.class);
+    private static final String DEFAULT_DELTA_PERIOD = "1d";
     private ClusterInfoAccessor _clusterInfoAccessor;
 
     @Override
@@ -81,6 +83,10 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
             } catch (Exception e) {
                 continue;
             }
+            String deltaTimePeriod =
+                taskConfigs.getOrDefault(MinionConstants.PurgeTask.DELTA_TIME_PERIOD_KEY, DEFAULT_DELTA_PERIOD);
+            long purgeDeltaMs = TimeUtils.convertPeriodToMillis(deltaTimePeriod);
+
             LOGGER.info("Start generating task configs for table: {} for task: {}", tableName, taskType);
             // Get max number of tasks for this table
             int tableMaxNumTasks;
@@ -108,8 +114,15 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
             for (SegmentZKMetadata segmentZKMetadata : offlineSegmentsZKMetadata) {
                 Map<String, String> configs = new HashMap<>();
                 String segmentName = segmentZKMetadata.getSegmentName();
+                Long tsLastPurge = Long.valueOf(
+                    segmentZKMetadata.getCustomMap().get(
+                        MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX));
                 //skip running segment
                 if (runningSegments.contains(new Segment(tableName, segmentName))) {
+                    continue;
+                }
+                if ((tsLastPurge != null) && ((System.currentTimeMillis() - tsLastPurge) < purgeDeltaMs)) {
+                    //skip if purge delay is not reached
                     continue;
                 }
                 if (tableNumTasks == tableMaxNumTasks) {

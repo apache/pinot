@@ -67,6 +67,7 @@ public class MinionConstants {
   // Purges rows inside segment that match chosen criteria
   public static class PurgeTask {
     public static final String TASK_TYPE = "PurgeTask";
+    public static final String DELTA_TIME_PERIOD_KEY = "deltaPurgeTimePeriod";
   }
 
   // Common config keys for segment merge tasks.
