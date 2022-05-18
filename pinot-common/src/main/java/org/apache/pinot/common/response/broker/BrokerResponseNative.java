@@ -81,6 +81,10 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _realtimeResponseSerializationCpuTimeNs = 0L;
   private long _offlineTotalCpuTimeNs = 0L;
   private long _realtimeTotalCpuTimeNs = 0L;
+  private long _numSegmentsPrunedByBroker = 0L;
+  private long _numSegmentsPrunedByServer = 0L;
+  private long _explainPlanNumEmptyFilterSegments = 0L;
+  private long _explainPlanNumMatchAllFilterSegments = 0L;
   private int _numRowsResultSet = 0;
   private ResultTable _resultTable;
   private Map<String, String> _traceInfo = new HashMap<>();
@@ -215,6 +219,54 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public void setRealtimeTotalCpuTimeNs(long realtimeTotalCpuTimeNs) {
     _realtimeTotalCpuTimeNs = realtimeTotalCpuTimeNs;
+  }
+
+  @JsonProperty("numSegmentsPrunedByBroker")
+  @Override
+  public long getNumSegmentsPrunedByBroker() {
+    return _numSegmentsPrunedByBroker;
+  }
+
+  @JsonProperty("numSegmentsPrunedByBroker")
+  @Override
+  public void setNumSegmentsPrunedByBroker(long numSegmentsPrunedByBroker) {
+    _numSegmentsPrunedByBroker = numSegmentsPrunedByBroker;
+  }
+
+  @JsonProperty("numSegmentsPrunedByServer")
+  @Override
+  public long getNumSegmentsPrunedByServer() {
+    return _numSegmentsPrunedByServer;
+  }
+
+  @JsonProperty("numSegmentsPrunedByServer")
+  @Override
+  public void setNumSegmentsPrunedByServer(long numSegmentsPrunedByServer) {
+    _numSegmentsPrunedByServer = numSegmentsPrunedByServer;
+  }
+
+  @JsonProperty("explainPlanNumEmptyFilterSegments")
+  @Override
+  public long getExplainPlanNumEmptyFilterSegments() {
+    return _explainPlanNumEmptyFilterSegments;
+  }
+
+  @JsonProperty("explainPlanNumEmptyFilterSegments")
+  @Override
+  public void setExplainPlanNumEmptyFilterSegments(long explainPlanNumEmptyFilterSegments) {
+    _explainPlanNumEmptyFilterSegments = explainPlanNumEmptyFilterSegments;
+  }
+
+  @JsonProperty("explainPlanNumMatchAllFilterSegments")
+  @Override
+  public long getExplainPlanNumMatchAllFilterSegments() {
+    return _explainPlanNumMatchAllFilterSegments;
+  }
+
+  @JsonProperty("explainPlanNumMatchAllFilterSegments")
+  @Override
+  public void setExplainPlanNumMatchAllFilterSegments(long explainPlanNumMatchAllFilterSegments) {
+    _explainPlanNumMatchAllFilterSegments = explainPlanNumMatchAllFilterSegments;
   }
 
   @JsonProperty("resultTable")

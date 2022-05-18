@@ -52,6 +52,10 @@ public class QueryOptionsUtils {
     return numReplicaGroupsToQuery != null ? Integer.parseInt(numReplicaGroupsToQuery) : null;
   }
 
+  public static boolean isExplainPlanVerbose(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.EXPLAIN_PLAN_VERBOSE));
+  }
+
   @Nullable
   public static Integer getMaxExecutionThreads(Map<String, String> queryOptions) {
     String maxExecutionThreadsString = queryOptions.get(Request.QueryOptionKey.MAX_EXECUTION_THREADS);

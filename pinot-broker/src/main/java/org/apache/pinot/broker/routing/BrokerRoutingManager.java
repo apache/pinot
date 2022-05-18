@@ -573,7 +573,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
       }
     }
-    return new RoutingTable(serverInstanceToSegmentsMap, selectionResult.getUnavailableSegments());
+    return new RoutingTable(serverInstanceToSegmentsMap, selectionResult.getUnavailableSegments(),
+        selectionResult.getNumPrunedSegments());
   }
 
   @Override
@@ -705,15 +706,20 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
     InstanceSelector.SelectionResult calculateRouting(BrokerRequest brokerRequest) {
       Set<String> selectedSegments = _segmentSelector.select(brokerRequest);
+      int numTotalSelectedSegments = selectedSegments.size();
       if (!selectedSegments.isEmpty()) {
         for (SegmentPruner segmentPruner : _segmentPruners) {
           selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
         }
       }
+      int numPrunedSegments = numTotalSelectedSegments - selectedSegments.size();
       if (!selectedSegments.isEmpty()) {
-        return _instanceSelector.select(brokerRequest, new ArrayList<>(selectedSegments));
+        InstanceSelector.SelectionResult selectionResult = _instanceSelector.select(brokerRequest,
+            new ArrayList<>(selectedSegments));
+        selectionResult.setNumPrunedSegments(numPrunedSegments);
+        return selectionResult;
       } else {
-        return new InstanceSelector.SelectionResult(Collections.emptyMap(), Collections.emptyList());
+        return new InstanceSelector.SelectionResult(Collections.emptyMap(), Collections.emptyList(), numPrunedSegments);
       }
     }
   }
