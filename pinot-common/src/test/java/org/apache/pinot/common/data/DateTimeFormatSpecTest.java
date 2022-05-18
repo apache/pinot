@@ -248,26 +248,26 @@ public class DateTimeFormatSpecTest {
 
     List<Object[]> entries = new ArrayList<>();
 
-    entries.add(new Object[]{1, TimeUnit.HOURS, "EPOCH", null, new DateTimeFormatSpec("1:HOURS:EPOCH"), null});
-    entries.add(new Object[]{1, TimeUnit.HOURS, "EPOCH", "yyyyMMdd", new DateTimeFormatSpec("1:HOURS:EPOCH"), null});
-    entries.add(new Object[]{5, TimeUnit.MINUTES, "EPOCH", null, new DateTimeFormatSpec("5:MINUTES:EPOCH"), null});
+    entries.add(new Object[]{1, TimeUnit.HOURS, "EPOCH", null, new DateTimeFormatSpec("EPOCH|HOURS|1"), null});
+    entries.add(new Object[]{1, TimeUnit.HOURS, "EPOCH", "yyyyMMdd", new DateTimeFormatSpec("EPOCH|HOURS|1"), null});
+    entries.add(new Object[]{5, TimeUnit.MINUTES, "EPOCH", null, new DateTimeFormatSpec("EPOCH|MINUTES|5"), null});
     entries.add(new Object[]{0, TimeUnit.HOURS, "EPOCH", null, null, null});
     entries.add(new Object[]{1, null, "EPOCH", null, null, null});
     entries.add(new Object[]{1, TimeUnit.HOURS, null, null, null, null});
     entries.add(new Object[]{1, TimeUnit.HOURS, "DUMMY", "yyyyMMdd", null, null});
     entries.add(new Object[]{
-        1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "yyyyMMdd", null,
-        new DateTimeFormatSpec("1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd")
+        1, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT", "yyyyMMdd tz(UTC)", null,
+        new DateTimeFormatSpec("SIMPLE_DATE_FORMAT|yyyyMMdd|tz(UTC)")
     });
     entries.add(new Object[]{
-        1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "yyyyMMdd tz(America/Los_Angeles)", null,
-        new DateTimeFormatSpec("1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/Los_Angeles)")
+        1, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT", "yyyyMMdd tz(America/Los_Angeles)", null,
+        new DateTimeFormatSpec("SIMPLE_DATE_FORMAT|yyyyMMdd|tz(America/Los_Angeles)")
     });
-    entries.add(new Object[]{1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", null, null, null});
-    entries.add(new Object[]{-1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "yyyyMMDD", null, null});
+    entries.add(new Object[]{1, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT", null, null, null});
+    entries.add(new Object[]{-1, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT", "yyyyMMDD", null, null});
     entries.add(new Object[]{
-        1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "M/d/yyyy h:mm:ss a", null,
-        new DateTimeFormatSpec("1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a")
+        1, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT", "M/d/yyyy h:mm:ss a tz(UTC)", null,
+        new DateTimeFormatSpec("SIMPLE_DATE_FORMAT|M/d/yyyy h:mm:ss a|tz(UTC)")
     });
     return entries.toArray(new Object[entries.size()][]);
   }

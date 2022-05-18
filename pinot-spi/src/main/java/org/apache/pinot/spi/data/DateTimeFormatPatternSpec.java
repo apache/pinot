@@ -33,9 +33,9 @@ import org.joda.time.format.DateTimeFormatter;
 public class DateTimeFormatPatternSpec {
 
   /** eg: yyyyMMdd tz(CST) or yyyyMMdd HH tz(GMT+0700) or yyyyMMddHH tz(America/Chicago) **/
-  private static final Pattern SDF_PATTERN_WITH_TIMEZONE = Pattern.compile("^(.+)( tz[ ]*\\((.+)\\))[ ]*");
-  private static final int SDF_PATTERN_GROUP = 1;
-  private static final int TIMEZONE_GROUP = 3;
+  public static final Pattern SDF_PATTERN_WITH_TIMEZONE = Pattern.compile("^(.+)( tz[ ]*\\((.+)\\))[ ]*");
+  public static final int SDF_PATTERN_GROUP = 1;
+  public static final int TIMEZONE_GROUP = 2;
   public static final DateTimeZone DEFAULT_DATETIMEZONE = DateTimeZone.UTC;
   public static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
 

@@ -23,13 +23,19 @@ import com.google.common.base.Preconditions;
 
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
+
+import static org.apache.pinot.spi.data.DateTimeFormatPatternSpec.SDF_PATTERN_GROUP;
+import static org.apache.pinot.spi.data.DateTimeFormatPatternSpec.TIMEZONE_GROUP;
 
 
 /**
@@ -60,7 +66,7 @@ public class DateTimeFormatSpec {
     String[] formatTokens = StringUtils.split(format, COLON_SEPARATOR, MAX_FORMAT_TOKENS);
     if (formatTokens.length == MAX_FORMAT_TOKENS) {
       _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION],
-          formatTokens[FORMAT_PATTERN_POSITION]);
+          String.format("%s tz(%s)",formatTokens[FORMAT_UNIT_POSITION], formatTokens[FORMAT_PATTERN_POSITION]));
     } else {
       _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION]);
     }
@@ -68,7 +74,11 @@ public class DateTimeFormatSpec {
       // TIMESTAMP type stores millis since epoch
       _size = 1;
       _unitSpec = new DateTimeFormatUnitSpec("MILLISECONDS");
-    } else {
+    } else if (_patternSpec.getTimeFormat() == TimeFormat.SIMPLE_DATE_FORMAT) {
+      _size = 1;
+      _unitSpec = new DateTimeFormatUnitSpec("DAYS");
+    }
+    else {
       _size = Integer.parseInt(formatTokens[FORMAT_SIZE_POSITION]);
       _unitSpec = new DateTimeFormatUnitSpec(formatTokens[FORMAT_UNIT_POSITION]);
     }
@@ -78,7 +88,11 @@ public class DateTimeFormatSpec {
    * Constructs a dateTimeSpec format, given the components of a format
    */
   public DateTimeFormatSpec(int columnSize, String columnUnit, String columnTimeFormat) {
-    _format = Joiner.on(COLON_SEPARATOR).join(columnSize, columnUnit, columnTimeFormat);
+    if(columnTimeFormat.equals(TimeFormat.TIMESTAMP.toString())) {
+      _format = "TIMESTAMP";
+    } else {
+      _format = Joiner.on(COLON_SEPARATOR).join(columnTimeFormat, columnUnit, columnSize);
+    }
     validateFormat(_format);
 
     _size = columnSize;
@@ -88,15 +102,24 @@ public class DateTimeFormatSpec {
 
   /**
    * Constructs a dateTimeSpec format, given the components of a format
-   * @param sdfPattern and tz
+   * @param sdfPatternWithTz and tz
    */
-  public DateTimeFormatSpec(int columnSize, String columnUnit, String columnTimeFormat, String sdfPattern) {
-    _format = Joiner.on(COLON_SEPARATOR).join(columnSize, columnUnit, columnTimeFormat, sdfPattern);
+  public DateTimeFormatSpec(int columnSize, String columnUnit, String columnTimeFormat, String sdfPatternWithTz) {
+    String timeFormat = null;
+    String timeZoneString = null;
+    Matcher m = DateTimeFormatPatternSpec.SDF_PATTERN_WITH_TIMEZONE.matcher(sdfPatternWithTz);
+    if (m.find()) {
+      timeFormat = m.group(SDF_PATTERN_GROUP).trim();
+      timeZoneString = m.group(TIMEZONE_GROUP).trim();
+    } else {
+      timeFormat = sdfPatternWithTz;
+    }
+    _format = Joiner.on(COLON_SEPARATOR).join(columnTimeFormat, timeFormat, timeZoneString);
     validateFormat(_format);
 
     _size = columnSize;
     _unitSpec = new DateTimeFormatUnitSpec(columnUnit);
-    _patternSpec = new DateTimeFormatPatternSpec(columnTimeFormat, sdfPattern);
+    _patternSpec = new DateTimeFormatPatternSpec(columnTimeFormat, sdfPatternWithTz);
   }
 
   public String getFormat() {
