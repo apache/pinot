@@ -86,10 +86,6 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   public Object evaluate(GenericRow genericRow) {
     for (String argument : _arguments) {
       Object value = genericRow.getValue(argument);
-      if (value == null) {
-        // FIXME: if any param is null a) exit OR b) assume function handles it ?
-        return null;
-      }
       _binding.setVariable(argument, value);
     }
     return _script.run();

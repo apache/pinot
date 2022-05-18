@@ -105,6 +105,12 @@ public class GroovyFunctionEvaluatorTest {
         genericRow8, "01a54629efb952287e554eb23ef69c52097a75aecc0e3a93ca0855ab6d7a31a0"
     });
 
+    GenericRow genericRow9 = new GenericRow();
+    genericRow9.putValue("ArrTime", 101);
+    genericRow9.putValue("ArrTimeV2", null);
+    entries.add(new Object[]{"Groovy({ArrTimeV2 != null ? ArrTimeV2: ArrTime }, ArrTime, ArrTimeV2)",
+        Lists.newArrayList("ArrTime", "ArrTimeV2"), genericRow9, 101});
+
     return entries.toArray(new Object[entries.size()][]);
   }
 }
