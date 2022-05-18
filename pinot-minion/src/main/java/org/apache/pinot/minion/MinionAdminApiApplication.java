@@ -48,11 +48,12 @@ public class MinionAdminApiApplication extends ResourceConfig {
   public static final String MINION_INSTANCE_ID = "minionInstanceId";
 
   private HttpServer _httpServer;
+  private final String _swaggerDefaultProtocol;
 
   public MinionAdminApiApplication(String instanceId, PinotConfiguration minionConf) {
     packages(RESOURCE_PACKAGE);
     property(PINOT_CONFIGURATION, minionConf);
-
+    _swaggerDefaultProtocol = minionConf.getProperty(CommonConstants.Minion.CONFIG_OF_SWAGGER_SERVER_DEFAULT_PROTOCOL);
     register(new AbstractBinder() {
       @Override
       protected void configure() {
@@ -84,7 +85,11 @@ public class MinionAdminApiApplication extends ResourceConfig {
     beanConfig.setDescription("APIs for accessing Pinot Minion information");
     beanConfig.setContact("https://github.com/apache/pinot");
     beanConfig.setVersion("1.0");
-    beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
+    if (CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(_swaggerDefaultProtocol)) {
+      beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL, CommonConstants.HTTP_PROTOCOL});
+    } else {
+      beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
+    }
     beanConfig.setBasePath("/");
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);

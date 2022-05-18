@@ -43,9 +43,6 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_SWAGGER_SERVER_ENABLED;
-import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_SWAGGER_SERVER_ENABLED;
-
 
 public class AdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AdminApiApplication.class);
@@ -101,23 +98,29 @@ public class AdminApiApplication extends ResourceConfig {
     // Allow optional start of the swagger as the Reflection lib has multi-thread access bug (issues/7271). It is not
     // always possible to pin the Reflection lib on 0.9.9. So this optional setting will disable the swagger because it
     // is NOT an essential part of Pinot servers.
-    if (pinotConfiguration.getProperty(CONFIG_OF_SWAGGER_SERVER_ENABLED, DEFAULT_SWAGGER_SERVER_ENABLED)) {
+    if (pinotConfiguration.getProperty(CommonConstants.Server.CONFIG_OF_SWAGGER_SERVER_ENABLED,
+        CommonConstants.Server.DEFAULT_SWAGGER_SERVER_ENABLED)) {
       LOGGER.info("Starting swagger for the Pinot server.");
       synchronized (PinotReflectionUtils.getReflectionLock()) {
-        setupSwagger(_httpServer);
+        setupSwagger(_httpServer, pinotConfiguration);
       }
     }
     _started = true;
     return true;
   }
 
-  private void setupSwagger(HttpServer httpServer) {
+  private void setupSwagger(HttpServer httpServer, PinotConfiguration pinotConfiguration) {
     BeanConfig beanConfig = new BeanConfig();
     beanConfig.setTitle("Pinot Server API");
     beanConfig.setDescription("APIs for accessing Pinot server information");
     beanConfig.setContact("https://github.com/apache/pinot");
     beanConfig.setVersion("1.0");
-    beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
+    if (CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(
+        pinotConfiguration.getProperty(CommonConstants.Server.CONFIG_OF_SWAGGER_SERVER_DEFAULT_PROTOCOL))) {
+      beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL, CommonConstants.HTTP_PROTOCOL});
+    } else {
+      beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
+    }
     beanConfig.setBasePath("/");
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
