@@ -35,6 +35,11 @@ public class FloatDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int indexOf(float floatValue) {
+    return normalizeIndex(binarySearch(floatValue));
+  }
+
+  @Override
   public DataType getValueType() {
     return DataType.FLOAT;
   }
