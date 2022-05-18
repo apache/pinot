@@ -79,6 +79,18 @@ public final class DateTimeFieldSpec extends FieldSpec {
     _granularity = granularity;
   }
 
+  public DateTimeFieldSpec(String name, DataType dataType, DateTimeFieldConfig dateTimeFieldConfig) {
+    super(name, dataType, true);
+    Preconditions.checkNotNull(name);
+    Preconditions.checkNotNull(dataType);
+    DateTimeFormatSpec.validateFormat(dateTimeFieldConfig.getFormattedValue());
+    DateTimeGranularitySpec.validateGranularity(dateTimeFieldConfig.getGranularityConfig());
+
+    _format = dateTimeFieldConfig.getFormattedValue();
+    _granularity = dateTimeFieldConfig.getGranularityConfig();
+
+  }
+
   /**
    * Constructs a DateTimeFieldSpec with basic fields - name, dataType, format, granularity - and also with
    * defaultNullValue and
