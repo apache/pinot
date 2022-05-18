@@ -25,7 +25,6 @@ docs/_build
 **/.docker/
 **/.env
 **/.factorypath
-kubernetes/examples/helm/charts/
 .mvn/
 
 # Misc
@@ -46,3 +45,9 @@ quickstart*
 
 #build symlink directory
 build*
+
+#helm related files
+kubernetes/helm/**/charts/
+kubernetes/helm/**/requirements.lock
+kubernetes/helm/**/Chart.lock
+
