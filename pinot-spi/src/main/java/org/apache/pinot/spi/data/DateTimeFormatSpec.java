@@ -20,6 +20,8 @@ package org.apache.pinot.spi.data;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+
+import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
@@ -36,16 +38,16 @@ import org.joda.time.format.DateTimeFormatter;
 public class DateTimeFormatSpec {
 
   public static final String NUMBER_REGEX = "[1-9][0-9]*";
-  public static final String COLON_SEPARATOR = ":";
+  public static final String COLON_SEPARATOR = "|";
 
   /* DateTimeFieldSpec format is of format size:timeUnit:timeformat:pattern tz(timezone)
    * tz(timezone) is optional. If not specified, UTC timezone is used */
-  public static final int FORMAT_SIZE_POSITION = 0;
+  public static final int FORMAT_SIZE_POSITION = 2;
   public static final int FORMAT_UNIT_POSITION = 1;
-  public static final int FORMAT_TIMEFORMAT_POSITION = 2;
-  public static final int FORMAT_PATTERN_POSITION = 3;
-  public static final int MIN_FORMAT_TOKENS = 3;
-  public static final int MAX_FORMAT_TOKENS = 4;
+  public static final int FORMAT_TIMEFORMAT_POSITION = 0;
+  public static final int FORMAT_PATTERN_POSITION = 2;
+  public static final int MIN_FORMAT_TOKENS = 1;
+  public static final int MAX_FORMAT_TOKENS = 3;
 
   private final String _format;
   private final int _size;
@@ -181,22 +183,24 @@ public class DateTimeFormatSpec {
     Preconditions.checkNotNull(format, "Format string in dateTimeFieldSpec must not be null");
     String[] formatTokens = StringUtils.split(format, COLON_SEPARATOR, MAX_FORMAT_TOKENS);
     Preconditions.checkState(formatTokens.length >= MIN_FORMAT_TOKENS && formatTokens.length <= MAX_FORMAT_TOKENS,
-        "Incorrect format: %s. Must be of format 'size:timeunit:timeformat(:pattern)'", format);
-    Preconditions.checkState(formatTokens[FORMAT_SIZE_POSITION].matches(NUMBER_REGEX),
-        "Incorrect format size: %s in format: %s. Must be of format '[0-9]+:<TimeUnit>:<TimeFormat>(:pattern)'",
-        formatTokens[FORMAT_SIZE_POSITION], format);
+        "Incorrect format: %s. Must be of format 'EPOCH|<timeUnit>|<size> or SIMPLE_DATE_FORMAT|<timeFormat>|<timezone> or TIMESTAMP'", format);
 
-    DateTimeFormatUnitSpec.validateUnitSpec(formatTokens[FORMAT_UNIT_POSITION]);
+    if(formatTokens[0].equals(TimeFormat.EPOCH.toString())) {
+      Preconditions.checkState(formatTokens[FORMAT_SIZE_POSITION].matches(NUMBER_REGEX),
+              "Incorrect format size: %s in format: %s. Must be of format 'EPOCH|<TimeUnit>|[0-9]+'",
+              formatTokens[FORMAT_SIZE_POSITION], format);
+      DateTimeFormatUnitSpec.validateUnitSpec(formatTokens[FORMAT_UNIT_POSITION]);
+    }
 
     if (formatTokens.length == MIN_FORMAT_TOKENS) {
-      Preconditions.checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString())
-              || formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.TIMESTAMP.toString()),
-          "Incorrect format type: %s in format: %s. Must be of '[0-9]+:<TimeUnit>:EPOCH|TIMESTAMP'",
+      Preconditions.checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.TIMESTAMP.toString()),
+          "Incorrect format type: %s in format: %s. Must be of 'TIMESTAMP'",
           formatTokens[FORMAT_TIMEFORMAT_POSITION], format);
     } else {
       Preconditions
-          .checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
-              "Incorrect format type: %s in format: %s. Must be of '[0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:pattern'",
+          .checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()) ||
+                  formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString()),
+              "Incorrect format type: %s in format: %s. Must be of 'SIMPLE_DATE_FORMAT/EPOCH | <TimeUnit>/<TimeFormat> | ([0-9]+) / (timezone)'",
               formatTokens[FORMAT_TIMEFORMAT_POSITION], format);
     }
   }
