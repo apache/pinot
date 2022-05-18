@@ -47,6 +47,19 @@ public class ExecutionStatistics {
     _numTotalDocs = numTotalDocs;
   }
 
+  private long _numStartreeUsed = 0;
+  private boolean _startreeUsed = false;
+
+  public ExecutionStatistics(long numDocsScanned, long numEntriesScannedInFilter, long numEntriesScannedPostFilter,
+      long numTotalDocs, long numStartreeUsed) {
+    _numDocsScanned = numDocsScanned;
+    _numEntriesScannedInFilter = numEntriesScannedInFilter;
+    _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
+    _numTotalDocs = numTotalDocs;
+    _numStartreeUsed = numStartreeUsed;
+    _startreeUsed = true;
+  }
+
   public long getNumDocsScanned() {
     return _numDocsScanned;
   }
@@ -62,4 +75,8 @@ public class ExecutionStatistics {
   public long getNumTotalDocs() {
     return _numTotalDocs;
   }
+
+  public long getNumStartreeUsed() { return _numStartreeUsed; }
+
+  public boolean isStartreeUsed() { return _startreeUsed; }
 }

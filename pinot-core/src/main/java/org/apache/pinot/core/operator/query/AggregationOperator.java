@@ -45,6 +45,7 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   private final boolean _useStarTree;
 
   private int _numDocsScanned = 0;
+  private long _numStartreeUsed = 0;
 
   public AggregationOperator(AggregationFunction[] aggregationFunctions, TransformOperator transformOperator,
       long numTotalDocs, boolean useStarTree) {
@@ -59,6 +60,7 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
     // Perform aggregation on all the transform blocks
     AggregationExecutor aggregationExecutor;
     if (_useStarTree) {
+      _numStartreeUsed += 1;
       aggregationExecutor = new StarTreeAggregationExecutor(_aggregationFunctions);
     } else {
       aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctions);
@@ -82,8 +84,13 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
-    return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
-        _numTotalDocs);
+    if (_useStarTree) {
+      return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+          _numTotalDocs, _numStartreeUsed);
+    } else {
+      return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+          _numTotalDocs);
+    }
   }
 
   @Override

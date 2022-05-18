@@ -57,6 +57,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   private final QueryContext _queryContext;
 
   private int _numDocsScanned = 0;
+  private long _numStartreeUsed = 0;
 
   public AggregationGroupByOrderByOperator(AggregationFunction[] aggregationFunctions,
       ExpressionContext[] groupByExpressions, TransformOperator transformOperator, long numTotalDocs,
@@ -99,6 +100,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
     if (_useStarTree) {
+      _numStartreeUsed += 1;
       groupByExecutor = new StarTreeGroupByExecutor(_queryContext, _groupByExpressions, _transformOperator);
     } else {
       groupByExecutor = new DefaultGroupByExecutor(_queryContext, _groupByExpressions, _transformOperator);
@@ -147,8 +149,13 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
-    return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
-        _numTotalDocs);
+    if (_useStarTree) {
+      return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+          _numTotalDocs, _numStartreeUsed);
+    } else {
+      return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+          _numTotalDocs);
+    }
   }
 
   @Override

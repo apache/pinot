@@ -70,6 +70,7 @@ public class IntermediateResultsBlock implements Block {
   private long _resizeTimeMs;
   private long _executionThreadCpuTimeNs;
   private int _numServerThreads;
+  private long _numStartreeUsed;
 
   private Table _table;
 
@@ -277,6 +278,10 @@ public class IntermediateResultsBlock implements Block {
 
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  public void setNumStartreeUsed(long numStartreeUsed) {
+    _numStartreeUsed = numStartreeUsed;
   }
 
   /**

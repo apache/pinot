@@ -54,14 +54,19 @@ public class CombineOperatorUtils {
    */
   public static void setExecutionStatistics(IntermediateResultsBlock resultsBlock, List<Operator> operators,
       long threadCpuTimeNs, int numServerThreads) {
+
     int numSegmentsProcessed = operators.size();
     int numSegmentsMatched = 0;
     long numDocsScanned = 0;
     long numEntriesScannedInFilter = 0;
     long numEntriesScannedPostFilter = 0;
     long numTotalDocs = 0;
+    long numStartreeUsed = 0;
+    boolean startreeUsed = false;
+
+    ExecutionStatistics executionStatistics;
     for (Operator operator : operators) {
-      ExecutionStatistics executionStatistics = operator.getExecutionStatistics();
+      executionStatistics = operator.getExecutionStatistics();
       if (executionStatistics.getNumDocsScanned() > 0) {
         numSegmentsMatched++;
       }
@@ -69,6 +74,12 @@ public class CombineOperatorUtils {
       numEntriesScannedInFilter += executionStatistics.getNumEntriesScannedInFilter();
       numEntriesScannedPostFilter += executionStatistics.getNumEntriesScannedPostFilter();
       numTotalDocs += executionStatistics.getNumTotalDocs();
+      if (executionStatistics.isStartreeUsed()) {
+        numStartreeUsed += executionStatistics.getNumStartreeUsed();
+      }
+      if (!startreeUsed && executionStatistics.isStartreeUsed()) {
+        startreeUsed = true;
+      }
     }
     resultsBlock.setNumSegmentsProcessed(numSegmentsProcessed);
     resultsBlock.setNumSegmentsMatched(numSegmentsMatched);
@@ -78,5 +89,8 @@ public class CombineOperatorUtils {
     resultsBlock.setNumTotalDocs(numTotalDocs);
     resultsBlock.setExecutionThreadCpuTimeNs(threadCpuTimeNs);
     resultsBlock.setNumServerThreads(numServerThreads);
+    if (startreeUsed) {
+      resultsBlock.setNumStartreeUsed(numStartreeUsed);
+    }
   }
 }
