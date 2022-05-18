@@ -856,6 +856,10 @@ public class PinotLLCRealtimeSegmentManager {
    * idealState.
    * If so, it should create the new segments in idealState.
    *
+   * If the consuming segment is deleted:
+   * Check whether there are segments in the PROPERTYSTORE with status DONE, but no new segment in status
+   * IN_PROGRESS, and the state for the latest segment in the IDEALSTATE is ONLINE
+   *
    * If the controller fails after step-3, we are fine because the idealState has the new segments.
    * If the controller fails before step-1, the server will see this as an upload failure, and will re-try.
    * @param tableConfig
@@ -863,8 +867,7 @@ public class PinotLLCRealtimeSegmentManager {
    * TODO: We need to find a place to detect and update a gauge for nonConsumingPartitionsCount for a table, and
    * reset it to 0 at the end of validateLLC
    */
-  // TODO(saurabh) : We can reduce critical section by having tableName level locks?
-  public synchronized void ensureAllPartitionsConsuming(TableConfig tableConfig,
+  public void ensureAllPartitionsConsuming(TableConfig tableConfig,
       PartitionLevelStreamConfig streamConfig, boolean enforcedByAdmin) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
@@ -1065,6 +1068,9 @@ public class PinotLLCRealtimeSegmentManager {
     //    b. update current segment in idealstate to ONLINE (only if partition is present in newPartitionGroupMetadata)
     //    c. add new segment in idealstate to CONSUMING on the hosts (only if partition is present in
     //    newPartitionGroupMetadata)
+    // 2. The latest metadata is in DONE state, but the idealstate has no segment in CONSUMING state.
+    //    a. Create metadata for new IN_PROGRESS segment with startOffset set to latest segments' end offset.
+    //    b. Add the newly created segment to idealstate with segment state set to CONSUMING.
     // 2. The latest metadata is IN_PROGRESS, but segment is not there in idealstate.
     //    a. change prev segment to ONLINE in idealstate
     //    b. add latest segment to CONSUMING in idealstate.
@@ -1073,10 +1079,6 @@ public class PinotLLCRealtimeSegmentManager {
     //       and restart consumption from the same offset (if possible) or a newer offset (if realtime stream does
     //       not have the same offset).
     //       In latter case, report data loss.
-    // 4. There are no segments in the table's idealstate in CONSUMING state,
-    //    No PROPERTYSTORE segments in IN_PROGRESS state (could be due to the CONSUMING segment being deleted).
-    //    a. Create IN_PROGRESS segment with correct startOffset.
-    //    b. Add segment to ideal state
     for (Map.Entry<Integer, SegmentZKMetadata> entry : latestSegmentZKMetadataMap.entrySet()) {
       int partitionGroupId = entry.getKey();
       SegmentZKMetadata latestSegmentZKMetadata = entry.getValue();
@@ -1129,29 +1131,9 @@ public class PinotLLCRealtimeSegmentManager {
           // 3. we should never end up with some replicas ONLINE and some OFFLINE.
           if (isAllInstancesInState(instanceStateMap, SegmentStateModel.OFFLINE)) {
             LOGGER.info("Repairing segment: {} which is OFFLINE for all instances in IdealState", latestSegmentName);
-
-            // Create a new segment to re-consume from the previous start offset
-            LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
-            StreamPartitionMsgOffset startOffset = offsetFactory.create(latestSegmentZKMetadata.getStartOffset());
-            StreamPartitionMsgOffset partitionGroupSmallestOffset =
-                getPartitionGroupSmallestOffset(streamConfig, partitionGroupId);
-
-            // Start offset must be higher than the start offset of the stream
-            if (partitionGroupSmallestOffset.compareTo(startOffset) > 0) {
-              LOGGER.error("Data lost from offset: {} to: {} for partition: {} of table: {}", startOffset,
-                  partitionGroupSmallestOffset, partitionGroupId, realtimeTableName);
-              _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
-              startOffset = partitionGroupSmallestOffset;
-            }
-
-            CommittingSegmentDescriptor committingSegmentDescriptor =
-                new CommittingSegmentDescriptor(latestSegmentName, startOffset.toString(), 0);
-            createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
-                committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas,
-                newPartitionGroupMetadataList);
-            String newSegmentName = newLLCSegmentName.getSegmentName();
-            updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, newSegmentName, segmentAssignment,
-                instancePartitionsMap);
+            createNewConsumingSegment(tableConfig, streamConfig, latestSegmentZKMetadata, currentTimeMs,
+                partitionGroupId, newPartitionGroupMetadataList, instancePartitions, offsetFactory, instanceStatesMap,
+                segmentAssignment, instancePartitionsMap, true);
           } else {
             if (newPartitionGroupSet.contains(partitionGroupId)) {
               // If we get here, that means in IdealState, the latest segment has no CONSUMING replicas, but has
@@ -1159,26 +1141,9 @@ public class PinotLLCRealtimeSegmentManager {
               // add it as CONSUMING segment to IDEALSTATE. Currently, only enabled via /resumeConsumption API
 
               if (enforcedByAdmin) {
-                LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
-                StreamPartitionMsgOffset startOffset = offsetFactory.create(latestSegmentZKMetadata.getEndOffset());
-                StreamPartitionMsgOffset partitionGroupSmallestOffset =
-                    getPartitionGroupSmallestOffset(streamConfig, partitionGroupId);
-
-                // Start offset must be higher than the start offset of the stream
-                if (partitionGroupSmallestOffset.compareTo(startOffset) > 0) {
-                  LOGGER.error("Data lost from offset: {} to: {} for partition: {} of table: {}", startOffset,
-                      partitionGroupSmallestOffset, partitionGroupId, realtimeTableName);
-                  _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
-                  startOffset = partitionGroupSmallestOffset;
-                }
-                CommittingSegmentDescriptor committingSegmentDescriptor =
-                    new CommittingSegmentDescriptor(null, startOffset.toString(), 0);
-                createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
-                    committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions,
-                    numReplicas, newPartitionGroupMetadataList);
-                String newSegmentName = newLLCSegmentName.getSegmentName();
-                updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, newSegmentName, segmentAssignment,
-                    instancePartitionsMap);
+                createNewConsumingSegment(tableConfig, streamConfig, latestSegmentZKMetadata, currentTimeMs,
+                    partitionGroupId, newPartitionGroupMetadataList, instancePartitions, offsetFactory, instanceStatesMap,
+                    segmentAssignment, instancePartitionsMap, false);
               } else {
                 LOGGER.error("Got unexpected instance state map: {} for segment: {}",
                     instanceStateMap, latestSegmentName);
@@ -1238,6 +1203,43 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     return idealState;
+  }
+
+  private void createNewConsumingSegment(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
+      SegmentZKMetadata latestSegmentZKMetadata, long currentTimeMs, int partitionGroupId,
+      List<PartitionGroupMetadata> newPartitionGroupMetadataList,InstancePartitions instancePartitions,
+      StreamPartitionMsgOffsetFactory offsetFactory,Map<String, Map<String, String>> instanceStatesMap,
+      SegmentAssignment segmentAssignment, Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap,
+      boolean isLatestSegmentOffline) {
+    int numReplicas = getNumReplicas(tableConfig, instancePartitions);
+    int numPartitions = newPartitionGroupMetadataList.size();
+    LLCSegmentName latestLLCSegmentName = new LLCSegmentName(latestSegmentZKMetadata.getSegmentName());
+    LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
+
+    StreamPartitionMsgOffset startOffset;
+    if (isLatestSegmentOffline) {
+      startOffset = offsetFactory.create(latestSegmentZKMetadata.getStartOffset());
+    } else {
+      startOffset = offsetFactory.create(latestSegmentZKMetadata.getEndOffset());
+    }
+    StreamPartitionMsgOffset partitionGroupSmallestOffset =
+        getPartitionGroupSmallestOffset(streamConfig, partitionGroupId);
+
+    // Start offset must be higher than the start offset of the stream
+    if (partitionGroupSmallestOffset.compareTo(startOffset) > 0) {
+      LOGGER.error("Data lost from offset: {} to: {} for partition: {} of table: {}", startOffset,
+          partitionGroupSmallestOffset, partitionGroupId, tableConfig.getTableName());
+      _controllerMetrics.addMeteredTableValue(tableConfig.getTableName(), ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
+      startOffset = partitionGroupSmallestOffset;
+    }
+    CommittingSegmentDescriptor committingSegmentDescriptor =
+        new CommittingSegmentDescriptor(latestSegmentZKMetadata.getSegmentName(), startOffset.toString(), 0);
+    createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
+        committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions,
+        numReplicas, newPartitionGroupMetadataList);
+    String newSegmentName = newLLCSegmentName.getSegmentName();
+    updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, newSegmentName, segmentAssignment,
+        instancePartitionsMap);
   }
 
   private StreamPartitionMsgOffset getPartitionGroupSmallestOffset(StreamConfig streamConfig, int partitionGroupId) {
