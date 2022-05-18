@@ -47,17 +47,23 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Config related to handling complex type")
   private ComplexTypeConfig _complexTypeConfig;
 
+  @JsonPropertyDescription("Configs related to record aggregation function applied during ingestion")
+  private List<AggregationConfig> _aggregationConfigs;
+
+
   @JsonCreator
   public IngestionConfig(@JsonProperty("batchIngestionConfig") @Nullable BatchIngestionConfig batchIngestionConfig,
       @JsonProperty("streamIngestionConfig") @Nullable StreamIngestionConfig streamIngestionConfig,
       @JsonProperty("filterConfig") @Nullable FilterConfig filterConfig,
       @JsonProperty("transformConfigs") @Nullable List<TransformConfig> transformConfigs,
-      @JsonProperty("complexTypeConfig") @Nullable ComplexTypeConfig complexTypeConfig) {
+      @JsonProperty("complexTypeConfig") @Nullable ComplexTypeConfig complexTypeConfig,
+      @JsonProperty("aggregationConfigs") @Nullable List<AggregationConfig> aggregationConfigs) {
     _batchIngestionConfig = batchIngestionConfig;
     _streamIngestionConfig = streamIngestionConfig;
     _filterConfig = filterConfig;
     _transformConfigs = transformConfigs;
     _complexTypeConfig = complexTypeConfig;
+    _aggregationConfigs = aggregationConfigs;
   }
 
   public IngestionConfig() {
@@ -88,6 +94,11 @@ public class IngestionConfig extends BaseJsonConfig {
     return _complexTypeConfig;
   }
 
+  @Nullable
+  public List<AggregationConfig> getAggregationConfigs() {
+    return _aggregationConfigs;
+  }
+
   public void setBatchIngestionConfig(BatchIngestionConfig batchIngestionConfig) {
     _batchIngestionConfig = batchIngestionConfig;
   }
@@ -106,5 +117,9 @@ public class IngestionConfig extends BaseJsonConfig {
 
   public void setComplexTypeConfig(ComplexTypeConfig complexTypeConfig) {
     _complexTypeConfig = complexTypeConfig;
+  }
+
+  public void setAggregationConfigs(List<AggregationConfig> aggregationConfigs) {
+    _aggregationConfigs = aggregationConfigs;
   }
 }

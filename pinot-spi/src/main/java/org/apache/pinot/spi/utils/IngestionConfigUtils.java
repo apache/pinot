@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
@@ -71,6 +72,17 @@ public final class IngestionConfigUtils {
       throw new IllegalStateException("Could not find streamConfigs for REALTIME table: " + tableNameWithType);
     }
     return streamConfigMap;
+  }
+
+  public static List<AggregationConfig> getAggregationConfigs(TableConfig tableConfig) {
+    String tableNameWithType = tableConfig.getTableName();
+    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+        "aggregationConfigs are only supported in REALTIME tables. Found a OFFLINE table: %s", tableNameWithType);
+
+    if (tableConfig.getIngestionConfig() != null) {
+      return tableConfig.getIngestionConfig().getAggregationConfigs();
+    }
+    return null;
   }
 
   /**
@@ -178,8 +190,8 @@ public final class IngestionConfigUtils {
    * Extracts the segment name generator type from the batchConfigMap, or returns default value if not found
    */
   public static String getSegmentNameGeneratorType(Map<String, String> batchConfigMap) {
-    return batchConfigMap
-        .getOrDefault(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, DEFAULT_SEGMENT_NAME_GENERATOR_TYPE);
+    return batchConfigMap.getOrDefault(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE,
+        DEFAULT_SEGMENT_NAME_GENERATOR_TYPE);
   }
 
   /**

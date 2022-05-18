@@ -948,7 +948,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     tableConfig.setIngestionConfig(new IngestionConfig(null, null, null,
         Arrays.asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
             new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"),
-            new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')")), null));
+            new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')")), null, null));
     updateTableConfig(tableConfig);
 
     // Trigger reload
