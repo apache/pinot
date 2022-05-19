@@ -49,7 +49,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
 
   private final String _controllerResourcePackages;
-  private final String _swaggerDefaultProtocol;
+  private final boolean _useHttps;
   private HttpServer _httpServer;
 
   public ControllerAdminApiApplication(ControllerConf conf) {
@@ -60,7 +60,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     packages(_controllerResourcePackages);
     // TODO See ControllerResponseFilter
     // register(new LoggingFeature());
-    _swaggerDefaultProtocol = conf.getProperty(ControllerConf.CONSOLE_WEBAPP_DEFAULT_PROTOCOL);
+    _useHttps = Boolean.parseBoolean(conf.getProperty(ControllerConf.CONSOLE_SWAGGER_USE_HTTPS));
     if (conf.getProperty(CommonConstants.Controller.CONTROLLER_SERVICE_AUTO_DISCOVERY, false)) {
       register(ServiceAutoDiscoveryFeature.class);
     }
@@ -111,7 +111,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     beanConfig.setDescription("APIs for accessing Pinot Controller information");
     beanConfig.setContact("https://github.com/apache/pinot");
     beanConfig.setVersion("1.0");
-    if (CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(_swaggerDefaultProtocol)) {
+    if (_useHttps) {
+      // Still leave http there as a second choice in case of need for quick tests with http.
       beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL, CommonConstants.HTTP_PROTOCOL});
     } else {
       beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});

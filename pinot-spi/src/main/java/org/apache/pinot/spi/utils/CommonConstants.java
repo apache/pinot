@@ -200,7 +200,7 @@ public class CommonConstants {
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.id";
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
-    public static final String CONFIG_OF_SWAGGER_SERVER_DEFAULT_PROTOCOL = "pinot.broker.swagger.default.protocol";
+    public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.broker.swagger.use.https";
     // Configuration to consider the broker ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this this broker has crossed the threshold percentage of the total number of tables
     // that it is expected to serve.
@@ -318,7 +318,7 @@ public class CommonConstants {
     public static final boolean DEFAULT_NETTYTLS_SERVER_ENABLED = false;
     public static final String CONFIG_OF_SWAGGER_SERVER_ENABLED = "pinot.server.swagger.enabled";
     public static final boolean DEFAULT_SWAGGER_SERVER_ENABLED = true;
-    public static final String CONFIG_OF_SWAGGER_SERVER_DEFAULT_PROTOCOL = "pinot.server.swagger.default.protocol";
+    public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.server.swagger.use.https";
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
 
@@ -497,7 +497,7 @@ public class CommonConstants {
     public static final String METADATA_EVENT_OBSERVER_PREFIX = "metadata.event.notifier";
 
     // Config keys
-    public static final String CONFIG_OF_SWAGGER_SERVER_DEFAULT_PROTOCOL = "pinot.minion.swagger.default.protocol";
+    public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.minion.swagger.use.https";
     public static final String CONFIG_OF_METRICS_PREFIX_KEY = "pinot.minion.metrics.prefix";
     @Deprecated
     public static final String DEPRECATED_CONFIG_OF_METRICS_PREFIX_KEY = "metricsPrefix";

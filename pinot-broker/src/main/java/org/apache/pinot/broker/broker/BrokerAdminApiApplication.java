@@ -45,7 +45,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   private static final String RESOURCE_PACKAGE = "org.apache.pinot.broker.api.resources";
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
   public static final String BROKER_INSTANCE_ID = "brokerInstanceId";
-  private final String _swaggerDefaultProtocol;
+  private final boolean _useHttps;
 
   private HttpServer _httpServer;
 
@@ -53,7 +53,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
       BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor) {
     packages(RESOURCE_PACKAGE);
     property(PINOT_CONFIGURATION, brokerConf);
-    _swaggerDefaultProtocol = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_SWAGGER_SERVER_DEFAULT_PROTOCOL);
+    _useHttps = Boolean.parseBoolean(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_SWAGGER_USE_HTTPS));
     if (brokerConf.getProperty(CommonConstants.Broker.BROKER_SERVICE_AUTO_DISCOVERY, false)) {
       register(ServiceAutoDiscoveryFeature.class);
     }
@@ -91,7 +91,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     beanConfig.setDescription("APIs for accessing Pinot broker information");
     beanConfig.setContact("https://github.com/apache/pinot");
     beanConfig.setVersion("1.0");
-    if (CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(_swaggerDefaultProtocol)) {
+    if (_useHttps) {
+      // Still leave http there as a second choice in case of need for quick tests with http.
       beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL, CommonConstants.HTTP_PROTOCOL});
     } else {
       beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
