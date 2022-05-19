@@ -236,16 +236,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               dictionaryCreator.getNumBytesPerEntry());
           throw e;
         }
+      }
 
-        if (bloomFilterColumns.contains(columnName)) {
-          if (indexingConfig != null && indexingConfig.getBloomFilterConfigs() != null
-              && indexingConfig.getBloomFilterConfigs().containsKey(columnName)) {
-            _bloomFilterCreatorMap.put(columnName, _indexCreatorProvider.newBloomFilterCreator(
-                context.forBloomFilter(indexingConfig.getBloomFilterConfigs().get(columnName))));
-          } else {
-            _bloomFilterCreatorMap.put(columnName, _indexCreatorProvider.newBloomFilterCreator(
-                context.forBloomFilter(new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 0, false))));
-          }
+      if (bloomFilterColumns.contains(columnName)) {
+        if (indexingConfig != null && indexingConfig.getBloomFilterConfigs() != null
+            && indexingConfig.getBloomFilterConfigs().containsKey(columnName)) {
+          _bloomFilterCreatorMap.put(columnName, _indexCreatorProvider.newBloomFilterCreator(
+              context.forBloomFilter(indexingConfig.getBloomFilterConfigs().get(columnName))));
+        } else {
+          _bloomFilterCreatorMap.put(columnName, _indexCreatorProvider.newBloomFilterCreator(
+              context.forBloomFilter(new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 0, false))));
         }
       }
 
