@@ -868,7 +868,7 @@ public class PinotLLCRealtimeSegmentManager {
    * reset it to 0 at the end of validateLLC
    */
   public void ensureAllPartitionsConsuming(TableConfig tableConfig,
-      PartitionLevelStreamConfig streamConfig, boolean enforcedByAdmin) {
+      PartitionLevelStreamConfig streamConfig, boolean recreateDeletedConsumingSegment) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
@@ -884,7 +884,7 @@ public class PinotLLCRealtimeSegmentManager {
             getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
         streamConfig.setOffsetCriteria(originalOffsetCriteria);
         return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupMetadataList,
-            enforcedByAdmin);
+            recreateDeletedConsumingSegment);
       } else {
         LOGGER.info("Skipping LLC segments validation for disabled table: {}", realtimeTableName);
         return idealState;
@@ -1039,7 +1039,7 @@ public class PinotLLCRealtimeSegmentManager {
    */
   @VisibleForTesting
   IdealState ensureAllPartitionsConsuming(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
-      IdealState idealState, List<PartitionGroupMetadata> newPartitionGroupMetadataList, boolean enforcedByAdmin) {
+      IdealState idealState, List<PartitionGroupMetadata> newPartitionGroupMetadataList, boolean recreateDeletedConsumingSegment) {
     String realtimeTableName = tableConfig.getTableName();
 
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
@@ -1071,10 +1071,10 @@ public class PinotLLCRealtimeSegmentManager {
     // 2. The latest metadata is in DONE state, but the idealstate has no segment in CONSUMING state.
     //    a. Create metadata for new IN_PROGRESS segment with startOffset set to latest segments' end offset.
     //    b. Add the newly created segment to idealstate with segment state set to CONSUMING.
-    // 2. The latest metadata is IN_PROGRESS, but segment is not there in idealstate.
+    // 3. The latest metadata is IN_PROGRESS, but segment is not there in idealstate.
     //    a. change prev segment to ONLINE in idealstate
     //    b. add latest segment to CONSUMING in idealstate.
-    // 3. All instances of a segment are in OFFLINE state.
+    // 4. All instances of a segment are in OFFLINE state.
     //    a. Create a new segment (with the next seq number)
     //       and restart consumption from the same offset (if possible) or a newer offset (if realtime stream does
     //       not have the same offset).
@@ -1131,19 +1131,24 @@ public class PinotLLCRealtimeSegmentManager {
           // 3. we should never end up with some replicas ONLINE and some OFFLINE.
           if (isAllInstancesInState(instanceStateMap, SegmentStateModel.OFFLINE)) {
             LOGGER.info("Repairing segment: {} which is OFFLINE for all instances in IdealState", latestSegmentName);
+            StreamPartitionMsgOffset startOffset = offsetFactory.create(latestSegmentZKMetadata.getStartOffset());
             createNewConsumingSegment(tableConfig, streamConfig, latestSegmentZKMetadata, currentTimeMs,
-                partitionGroupId, newPartitionGroupMetadataList, instancePartitions, offsetFactory, instanceStatesMap,
-                segmentAssignment, instancePartitionsMap, true);
+                partitionGroupId, newPartitionGroupMetadataList, instancePartitions, instanceStatesMap,
+                segmentAssignment, instancePartitionsMap, startOffset);
           } else {
             if (newPartitionGroupSet.contains(partitionGroupId)) {
-              // If we get here, that means in IdealState, the latest segment has no CONSUMING replicas, but has
-              // replicas not OFFLINE. Create a new IN_PROGRESS segment in PROPERTYSTORE,
-              // add it as CONSUMING segment to IDEALSTATE. Currently, only enabled via /resumeConsumption API
+              // If we get here, that means in IdealState, the latest segment has all replicas ONLINE, but no
+              // CONSUMING segments.
+              // Create a new IN_PROGRESS segment in PROPERTYSTORE,
+              // add it as CONSUMING segment to IDEALSTATE.
 
-              if (enforcedByAdmin) {
+              if (recreateDeletedConsumingSegment && Status.DONE.equals(latestSegmentZKMetadata.getStatus()) &&
+                  isAllInstancesInState(instanceStateMap, SegmentStateModel.ONLINE)
+              ) {
+                StreamPartitionMsgOffset startOffset = offsetFactory.create(latestSegmentZKMetadata.getEndOffset());
                 createNewConsumingSegment(tableConfig, streamConfig, latestSegmentZKMetadata, currentTimeMs,
-                    partitionGroupId, newPartitionGroupMetadataList, instancePartitions, offsetFactory,
-                    instanceStatesMap, segmentAssignment, instancePartitionsMap, false);
+                    partitionGroupId, newPartitionGroupMetadataList, instancePartitions,
+                    instanceStatesMap, segmentAssignment, instancePartitionsMap, startOffset);
               } else {
                 LOGGER.error("Got unexpected instance state map: {} for segment: {}",
                     instanceStateMap, latestSegmentName);
@@ -1208,20 +1213,12 @@ public class PinotLLCRealtimeSegmentManager {
   private void createNewConsumingSegment(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
       SegmentZKMetadata latestSegmentZKMetadata, long currentTimeMs, int partitionGroupId,
       List<PartitionGroupMetadata> newPartitionGroupMetadataList, InstancePartitions instancePartitions,
-      StreamPartitionMsgOffsetFactory offsetFactory, Map<String, Map<String, String>> instanceStatesMap,
-      SegmentAssignment segmentAssignment, Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap,
-      boolean isLatestSegmentOffline) {
+      Map<String, Map<String, String>> instanceStatesMap, SegmentAssignment segmentAssignment,
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, StreamPartitionMsgOffset startOffset) {
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
     int numPartitions = newPartitionGroupMetadataList.size();
     LLCSegmentName latestLLCSegmentName = new LLCSegmentName(latestSegmentZKMetadata.getSegmentName());
     LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
-
-    StreamPartitionMsgOffset startOffset;
-    if (isLatestSegmentOffline) {
-      startOffset = offsetFactory.create(latestSegmentZKMetadata.getStartOffset());
-    } else {
-      startOffset = offsetFactory.create(latestSegmentZKMetadata.getEndOffset());
-    }
     StreamPartitionMsgOffset partitionGroupSmallestOffset =
         getPartitionGroupSmallestOffset(streamConfig, partitionGroupId);
 
@@ -1232,6 +1229,7 @@ public class PinotLLCRealtimeSegmentManager {
       _controllerMetrics.addMeteredTableValue(tableConfig.getTableName(), ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
       startOffset = partitionGroupSmallestOffset;
     }
+
     CommittingSegmentDescriptor committingSegmentDescriptor =
         new CommittingSegmentDescriptor(latestSegmentZKMetadata.getSegmentName(), startOffset.toString(), 0);
     createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
