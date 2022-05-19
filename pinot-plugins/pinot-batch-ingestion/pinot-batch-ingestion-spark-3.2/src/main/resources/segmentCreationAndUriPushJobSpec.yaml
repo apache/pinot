@@ -19,10 +19,10 @@
 
 executionFrameworkSpec:
   name: 'spark'
-  segmentGenerationJobRunnerClassName: 'SparkSegmentGenerationJobRunner'
-  segmentTarPushJobRunnerClassName: 'SparkSegmentTarPushJobRunner'
-  segmentUriPushJobRunnerClassName: 'SparkSegmentUriPushJobRunner'
-  segmentMetadataPushJobRunnerClassName: 'SparkSegmentMetadataPushJobRunner'
+  segmentGenerationJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark3.SparkSegmentGenerationJobRunner'
+  segmentTarPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark3.SparkSegmentTarPushJobRunner'
+  segmentUriPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark3.SparkSegmentUriPushJobRunner'
+  segmentMetadataPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark3.SparkSegmentMetadataPushJobRunner'
 jobType: SegmentCreationAndUriPush
 inputDirURI: 'file:///path/to/input'
 includeFileNamePattern: 'glob:**/*.parquet'
