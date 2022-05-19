@@ -1451,7 +1451,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       columnNameToCheck = isCaseInsensitive ? columnName.substring(rawTableName.length() + 1).toLowerCase()
           : columnName.substring(rawTableName.length() + 1);
     } else {
-      columnNameToCheck = isCaseInsensitive? columnName.toLowerCase() : columnName;
+      columnNameToCheck = isCaseInsensitive ? columnName.toLowerCase() : columnName;
     }
     if (columnNameMap != null) {
       String actualColumnName = columnNameMap.get(columnNameToCheck);
