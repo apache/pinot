@@ -30,6 +30,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
+@Test(groups = "stateless")
 public class ControllerTenantStatelessTest extends ControllerTest {
   private static final String BROKER_TAG_PREFIX = "brokerTag_";
   private static final String SERVER_TAG_PREFIX = "serverTag_";
@@ -41,7 +42,7 @@ public class ControllerTenantStatelessTest extends ControllerTest {
   private static final int NUM_REALTIME_SERVERS_PER_TAG = 1;
   private static final int NUM_SERVERS_PER_TAG = NUM_OFFLINE_SERVERS_PER_TAG + NUM_REALTIME_SERVERS_PER_TAG;
 
-  @BeforeClass(groups = "stateless")
+  @BeforeClass
   public void setUp()
       throws Exception {
     startZk();
@@ -51,7 +52,7 @@ public class ControllerTenantStatelessTest extends ControllerTest {
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_INSTANCES, false);
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testBrokerTenant()
       throws IOException {
     // Create broker tenants
@@ -111,7 +112,7 @@ public class ControllerTenantStatelessTest extends ControllerTest {
     }
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testEmptyServerTenant() {
     try {
       sendGetRequest(_controllerRequestURLBuilder.forServerTenantGet("doesn't_exist"));
@@ -120,7 +121,7 @@ public class ControllerTenantStatelessTest extends ControllerTest {
     }
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testServerTenant()
       throws IOException {
     // Create server tenants
@@ -187,7 +188,7 @@ public class ControllerTenantStatelessTest extends ControllerTest {
     }
   }
 
-  @AfterClass(groups = "stateless")
+  @AfterClass
   public void tearDown() {
     stopFakeInstances();
     stopController();

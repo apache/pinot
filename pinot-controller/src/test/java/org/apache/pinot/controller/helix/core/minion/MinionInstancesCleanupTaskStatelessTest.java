@@ -29,15 +29,16 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
+@Test(groups = "stateless")
 public class MinionInstancesCleanupTaskStatelessTest extends ControllerTest {
-  @BeforeClass(groups = "stateless")
+  @BeforeClass
   public void setup()
       throws Exception {
     startZk();
     startController();
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testMinionInstancesCleanupTask()
       throws Exception {
     MinionInstancesCleanupTask minionInstancesCleanupTask = _controllerStarter.getMinionInstancesCleanupTask();
@@ -73,7 +74,7 @@ public class MinionInstancesCleanupTaskStatelessTest extends ControllerTest {
     return properties;
   }
 
-  @AfterClass(groups = "stateless")
+  @AfterClass
   public void teardown() {
     stopController();
     stopZk();

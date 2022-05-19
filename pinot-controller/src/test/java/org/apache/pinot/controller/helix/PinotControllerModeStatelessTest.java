@@ -44,15 +44,16 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
+@Test(groups = "stateless")
 public class PinotControllerModeStatelessTest extends ControllerTest {
   private static final long TIMEOUT_IN_MS = 10_000L;
 
-  @BeforeClass(groups = "stateless")
+  @BeforeClass
   public void setUp() {
     startZk();
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testHelixOnlyController()
       throws Exception {
     // Start a Helix-only controller
@@ -66,7 +67,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     stopController();
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testDualModeController()
       throws Exception {
     // Start the first dual-mode controller
@@ -201,7 +202,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     thirdDualModeController.stop();
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testPinotOnlyController()
       throws Exception {
     Map<String, Object> properties = getDefaultControllerConfiguration();
@@ -295,7 +296,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     }, TIMEOUT_IN_MS, "Failed to pick only one instance as: " + expectedInstanceState);
   }
 
-  @AfterMethod(groups = "stateless")
+  @AfterMethod
   public void cleanUpCluster() {
     ZkClient zkClient = new ZkClient(getZkUrl());
     if (zkClient.exists("/" + getHelixClusterName())) {
@@ -304,7 +305,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     zkClient.close();
   }
 
-  @AfterClass(groups = "stateless")
+  @AfterClass
   public void tearDown() {
     stopZk();
   }

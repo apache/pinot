@@ -48,18 +48,19 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
+@Test(groups = "stateless")
 public class PinotTaskManagerStatelessTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "myTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final long TIMEOUT_IN_MS = 10_000L;
 
-  @BeforeClass(groups = "stateless")
+  @BeforeClass
   public void setUp()
       throws Exception {
     startZk();
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testDefaultPinotTaskManagerNoScheduler()
       throws Exception {
     startController();
@@ -68,7 +69,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     stopController();
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testPinotTaskManagerSchedulerWithUpdate()
       throws Exception {
     Map<String, Object> properties = getDefaultControllerConfiguration();
@@ -133,7 +134,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     stopController();
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testPinotTaskManagerSchedulerWithRestart()
       throws Exception {
     Map<String, Object> properties = getDefaultControllerConfiguration();
@@ -244,7 +245,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     assertEquals(((CronTrigger) trigger).getCronExpression(), cronExpression);
   }
 
-  @AfterClass(groups = "stateless")
+  @AfterClass
   public void tearDown() {
     stopZk();
   }

@@ -31,11 +31,12 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
+@Test(groups = "stateless")
 public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
   private static final String TABLE_NAME_1 = "testTable1";
   private static final String TABLE_NAME_2 = "testTable2";
 
-  @BeforeClass(groups = "stateless")
+  @BeforeClass
   public void setUp()
       throws Exception {
     startZk();
@@ -45,7 +46,7 @@ public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
         1);
   }
 
-  public void testGetBrokersHelper(String state, int onlineServers, int offlineServers)
+  private void testGetBrokersHelper(String state, int onlineServers, int offlineServers)
       throws Exception {
     List<String> expectedBrokers = new ArrayList<>();
     if (state == null) {
@@ -132,7 +133,7 @@ public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
     }
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testGetBrokers()
       throws Exception {
     addFakeBrokerInstancesToAutoJoinHelixCluster(10, true);
@@ -162,7 +163,7 @@ public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
     }
   }
 
-  @AfterClass(groups = "stateless")
+  @AfterClass
   public void tearDown() {
     stopFakeInstances();
     stopController();

@@ -51,6 +51,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
+@Test(groups = "stateless")
 public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   private static final int BASE_SERVER_ADMIN_PORT = 10000;
   private static final int NUM_INSTANCES = 5;
@@ -59,7 +60,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
 
-  @BeforeClass(groups = "stateless")
+  @BeforeClass
   public void setUp()
       throws Exception {
     startZk();
@@ -78,7 +79,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     enableResourceConfigForLeadControllerResource(true);
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testValidateDimTableTenantConfig() {
     // Create broker tenant on 3 Brokers
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 3, 0, 0);
@@ -101,7 +102,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     _helixResourceManager.validateTableTenantConfig(dimTableConfig);
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testValidateTenantConfig() {
     // Create broker tenant on 3 Brokers
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 3, 0, 0);
@@ -201,7 +202,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     }
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testUpdateBrokerResource()
       throws Exception {
     // Create broker tenant on 3 brokers
@@ -271,7 +272,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(instanceStateMap.keySet(), new HashSet<>(expectedBrokers));
   }
 
-  @AfterClass(groups = "stateless")
+  @AfterClass
   public void tearDown() {
     stopFakeInstances();
     stopController();

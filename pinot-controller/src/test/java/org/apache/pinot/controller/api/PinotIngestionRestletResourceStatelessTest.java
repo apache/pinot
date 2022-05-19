@@ -50,12 +50,13 @@ import org.testng.annotations.Test;
  * Tests for the ingestion restlet
  *
  */
+@Test(groups = "stateless")
 public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
   private static final String TABLE_NAME = "testTable";
   private static final String TABLE_NAME_WITH_TYPE = "testTable_OFFLINE";
   private File _inputFile;
 
-  @BeforeClass(groups = "stateless")
+  @BeforeClass
   public void setUp()
       throws Exception {
     startZk();
@@ -81,7 +82,7 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
     }
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testIngestEndpoint()
       throws Exception {
 
@@ -115,7 +116,7 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
     Assert.assertEquals(statusCode, 200);
   }
 
-  @AfterClass(groups = "stateless")
+  @AfterClass
   public void tearDown() {
     FileUtils.deleteQuietly(_inputFile);
     stopFakeInstances();

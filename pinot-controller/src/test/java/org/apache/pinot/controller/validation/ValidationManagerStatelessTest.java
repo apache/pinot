@@ -36,6 +36,7 @@ import org.testng.annotations.Test;
 /**
  * Tests for the ValidationManagers.
  */
+@Test(groups = "stateless")
 public class ValidationManagerStatelessTest extends ControllerTest {
   private static final String TEST_TABLE_NAME = "testTable";
   private static final String TEST_TABLE_TWO = "testTable2";
@@ -43,7 +44,7 @@ public class ValidationManagerStatelessTest extends ControllerTest {
 
   private TableConfig _offlineTableConfig;
 
-  @BeforeClass(groups = "stateless")
+  @BeforeClass
   public void setUp()
       throws Exception {
     startZk();
@@ -56,7 +57,7 @@ public class ValidationManagerStatelessTest extends ControllerTest {
     _helixResourceManager.addTable(_offlineTableConfig);
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testRebuildBrokerResourceWhenBrokerAdded()
       throws Exception {
     // Check that the first table we added doesn't need to be rebuilt(case where ideal state brokers and brokers in
@@ -96,7 +97,7 @@ public class ValidationManagerStatelessTest extends ControllerTest {
         .equals(_helixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME)));
   }
 
-  @AfterClass(groups = "stateless")
+  @AfterClass
   public void tearDown() {
     stopFakeInstances();
     stopController();

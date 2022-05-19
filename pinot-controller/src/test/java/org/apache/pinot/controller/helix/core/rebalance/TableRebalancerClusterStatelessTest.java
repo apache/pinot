@@ -56,6 +56,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
+@Test(groups = "stateless")
 public class TableRebalancerClusterStatelessTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
@@ -69,7 +70,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   private static final String TIER_B_NAME = "tierB";
   private static final String TIER_FIXED_NAME = "tierFixed";
 
-  @BeforeClass(groups = "stateless")
+  @BeforeClass
   public void setUp()
       throws Exception {
     startZk();
@@ -86,7 +87,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
    * 4. Migrate back to non-replica-group based segment assignment and rebalance
    * 5. Remove (disable) servers and rebalance
    */
-  @Test(groups = "stateless")
+  @Test
   public void testRebalance()
       throws Exception {
     int numServers = 3;
@@ -326,7 +327,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
    * 2. add nodes for tiers and run rebalance - should see no change
    * 3. add tier config and run rebalance - should see changed assignment
    */
-  @Test(groups = "stateless")
+  @Test
   public void testRebalanceWithTiers()
       throws Exception {
     int numServers = 3;
@@ -417,7 +418,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(TIERED_TABLE_NAME);
   }
 
-  @AfterClass(groups = "stateless")
+  @AfterClass
   public void tearDown() {
     stopFakeInstances();
     stopController();

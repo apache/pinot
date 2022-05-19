@@ -34,6 +34,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
 
+@Test(groups = "stateless")
 public class ControllerStarterStatelessTest extends ControllerTest {
   private final Map<String, Object> _configOverride = new HashMap<>();
 
@@ -44,7 +45,7 @@ public class ControllerStarterStatelessTest extends ControllerTest {
     return defaultConfig;
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testHostnamePortOverride()
       throws Exception {
     _configOverride.clear();
@@ -67,7 +68,7 @@ public class ControllerStarterStatelessTest extends ControllerTest {
     stopZk();
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testInvalidInstanceId()
       throws Exception {
     _configOverride.clear();
@@ -86,7 +87,7 @@ public class ControllerStarterStatelessTest extends ControllerTest {
     }
   }
 
-  @Test(groups = "stateless")
+  @Test
   public void testDefaultInstanceId()
       throws Exception {
     _configOverride.clear();
