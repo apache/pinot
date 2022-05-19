@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.BiMap;
 import io.swagger.annotations.Api;
@@ -132,7 +131,7 @@ public class TableDebugResource {
       tableDebugInfos.add(debugTable(_pinotHelixResourceManager, tableName, type, verbosity));
     }
 
-    return new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(tableDebugInfos);
+    return JsonUtils.objectToPrettyString(tableDebugInfos);
   }
 
   /**

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -35,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.BoundRequestBuilder;
 import org.asynchttpclient.DefaultAsyncHttpClientConfig.Builder;
@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
  */
 public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonAsyncHttpPinotClientTransport.class);
-  private static final ObjectReader OBJECT_READER = new ObjectMapper().reader();
+  private static final ObjectReader OBJECT_READER = JsonUtils.DEFAULT_READER;
 
   private final Map<String, String> _headers;
   private final String _scheme;

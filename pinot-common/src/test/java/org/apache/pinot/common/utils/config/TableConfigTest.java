@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,6 +25,7 @@ import java.nio.file.Paths;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -33,8 +33,6 @@ import static org.testng.AssertJUnit.assertTrue;
 
 
 public class TableConfigTest {
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @DataProvider
   public Object[][] configs()
@@ -55,7 +53,7 @@ public class TableConfigTest {
   @Test(dataProvider = "configs")
   public void testConfigNotRejected(byte[] config)
       throws IOException {
-    TableConfig tableConfig = OBJECT_MAPPER.readerFor(TableConfig.class).readValue(config);
+    TableConfig tableConfig = JsonUtils.DEFAULT_READER.forType(TableConfig.class).readValue(config);
     assertTrue(StringUtils.isNotBlank(tableConfig.getTableName()));
   }
 }

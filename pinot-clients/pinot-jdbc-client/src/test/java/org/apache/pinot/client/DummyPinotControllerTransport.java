@@ -19,9 +19,9 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class DummyPinotControllerTransport extends PinotControllerTransport {
@@ -30,8 +30,7 @@ public class DummyPinotControllerTransport extends PinotControllerTransport {
   public ControllerTenantBrokerResponse getBrokersFromController(String controllerAddress, String tenant) {
     try {
       String jsonString = "[{\"instanceName\": \"dummy\", \"host\" : \"dummy\", \"port\" : 8000}]";
-      ObjectMapper objectMapper = new ObjectMapper();
-      JsonNode dummyBrokerJsonResponse = objectMapper.readTree(jsonString);
+      JsonNode dummyBrokerJsonResponse = JsonUtils.readTree(jsonString);
       return ControllerTenantBrokerResponse.fromJson(dummyBrokerJsonResponse);
     } catch (Exception e) {
     }

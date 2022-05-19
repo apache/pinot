@@ -23,8 +23,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.HashMap;
@@ -59,6 +57,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -337,11 +336,9 @@ public class InputManager {
   @JsonSetter(nulls = Nulls.SKIP)
   public void setSchema(JsonNode jsonNode)
       throws IOException {
-    ObjectReader reader = new ObjectMapper().readerFor(Schema.class);
-    _schema = reader.readValue(jsonNode);
+    _schema = JsonUtils.jsonNodeToObject(jsonNode, Schema.class);
     SchemaUtils.validate(_schema);
-    reader = new ObjectMapper().readerFor(SchemaWithMetaData.class);
-    _schemaWithMetaData = reader.readValue(jsonNode);
+    _schemaWithMetaData = JsonUtils.jsonNodeToObject(jsonNode, SchemaWithMetaData.class);
     _schemaWithMetaData.getDimensionFieldSpecs().forEach(fieldMetadata -> {
       _metaDataMap.put(fieldMetadata.getName(), fieldMetadata);
     });

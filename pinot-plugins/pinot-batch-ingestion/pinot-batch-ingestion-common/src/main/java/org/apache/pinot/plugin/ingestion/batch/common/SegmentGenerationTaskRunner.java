@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.ingestion.batch.common;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.Serializable;
 import java.net.URISyntaxException;
 import java.util.HashMap;
@@ -93,7 +92,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
       if (configs == null) {
         configs = new HashMap<>();
       }
-      JsonNode jsonNode = new ObjectMapper().valueToTree(configs);
+      JsonNode jsonNode = JsonUtils.valueToTree(configs);
       Class<?> clazz = PluginManager.get().loadClass(readerConfigClassName);
       recordReaderConfig = (RecordReaderConfig) JsonUtils.jsonNodeToObject(jsonNode, clazz);
     }

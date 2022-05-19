@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.recommender;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -40,6 +39,7 @@ import org.apache.pinot.controller.recommender.rules.io.configs.SegmentSizeRecom
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -52,12 +52,11 @@ import static org.testng.Assert.*;
 public class TestConfigEngine {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TestConfigEngine.class);
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private InputManager _input;
 
   void loadInput(String fName)
       throws InvalidInputException, IOException {
-    _input = OBJECT_MAPPER.readValue(readInputToStr(fName), InputManager.class);
+    _input = JsonUtils.readValue(readInputToStr(fName), InputManager.class);
     _input.init();
   }
 
@@ -500,7 +499,7 @@ public class TestConfigEngine {
       throws IOException, InvalidInputException {
     String input = readInputToStr(fileName);
     String output = RecommenderDriver.run(input);
-    return OBJECT_MAPPER.readValue(output, ConfigManager.class);
+    return JsonUtils.readValue(output, ConfigManager.class);
   }
 
   private void assertRealtimeProvisioningRecommendation(Map<String, String> matrix) {
