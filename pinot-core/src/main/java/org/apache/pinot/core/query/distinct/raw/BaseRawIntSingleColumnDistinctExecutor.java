@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.core.query.distinct.raw;
 
-import it.unimi.dsi.fastutil.ints.IntIterator;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -29,7 +28,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctTable;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -37,27 +36,26 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  */
 abstract class BaseRawIntSingleColumnDistinctExecutor implements DistinctExecutor {
   final ExpressionContext _expression;
-  final DataType _dataType;
+  final FieldSpec _fieldSpec;
   final int _limit;
 
-  final IntSet _valueSet;
+  final ObjectSet<Integer> _valueSet;
 
-  BaseRawIntSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit) {
+  BaseRawIntSingleColumnDistinctExecutor(ExpressionContext expression, FieldSpec fieldSpec, int limit) {
     _expression = expression;
-    _dataType = dataType;
+    _fieldSpec = fieldSpec;
     _limit = limit;
 
-    _valueSet = new IntOpenHashSet(Math.min(limit, MAX_INITIAL_CAPACITY));
+    _valueSet = new ObjectOpenHashSet<>(Math.min(limit, MAX_INITIAL_CAPACITY));
   }
 
   @Override
   public DistinctTable getResult() {
     DataSchema dataSchema = new DataSchema(new String[]{_expression.toString()},
-        new ColumnDataType[]{ColumnDataType.fromDataTypeSV(_dataType)});
+        new ColumnDataType[]{ColumnDataType.fromDataTypeSV(_fieldSpec.getDataType())}, new FieldSpec[] {_fieldSpec});
     List<Record> records = new ArrayList<>(_valueSet.size());
-    IntIterator valueIterator = _valueSet.iterator();
-    while (valueIterator.hasNext()) {
-      records.add(new Record(new Object[]{valueIterator.nextInt()}));
+    for (Integer i : _valueSet) {
+      records.add(new Record(new Object[]{i}));
     }
     return new DistinctTable(dataSchema, records);
   }

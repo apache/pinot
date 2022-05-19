@@ -122,6 +122,17 @@ public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicat
   public abstract boolean applySV(int dictId);
 
   /**
+   * Apply a single-value entry to the predicate.
+   *
+   * @param dictId Dictionary id
+   * @return Whether the entry matches the predicate
+   */
+  @Override
+  public boolean applySV(Integer dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
    * Apply a multi-value entry to the predicate.
    *
    * @param dictIds Array of dictionary ids

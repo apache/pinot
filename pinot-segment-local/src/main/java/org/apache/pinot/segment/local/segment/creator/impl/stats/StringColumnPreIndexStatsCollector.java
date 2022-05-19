@@ -34,6 +34,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   private int _maxRowLength = 0;
   private String[] _sortedValues;
   private boolean _sealed = false;
+  private boolean _hasNull = false;
 
   public StringColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
@@ -117,8 +118,13 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   }
 
   @Override
-  public boolean hasNull() {
-    return false;
+  public boolean hasNulls() {
+    return _hasNull;
+  }
+
+  @Override
+  public void markHasNull() {
+    _hasNull = true;
   }
 
   @Override

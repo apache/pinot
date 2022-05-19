@@ -132,7 +132,8 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
 
   @Override
   public Long extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    return (long) groupByResultHolder.getDoubleResult(groupKey);
+    Double result = groupByResultHolder.getDoubleResult(groupKey);
+    return result == null ? null : result.longValue();
   }
 
   @Override

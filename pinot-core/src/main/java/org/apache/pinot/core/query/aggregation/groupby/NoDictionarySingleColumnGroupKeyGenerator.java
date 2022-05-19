@@ -38,6 +38,7 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -70,13 +71,15 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   @Override
   public void generateKeysForBlock(TransformBlock transformBlock, int[] groupKeys) {
     BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByExpression);
+    ImmutableRoaringBitmap nullBitmap = blockValSet.getNullBitmap();
     int numDocs = transformBlock.getNumDocs();
 
     switch (_storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < numDocs; i++) {
-          groupKeys[i] = getKeyForValue(intValues[i]);
+          // todo(nhejazi): handle nulls in other data types.
+          groupKeys[i] = getKeyForValue(nullBitmap.contains(i) ? null : intValues[i]);
         }
         break;
       case LONG:
@@ -100,7 +103,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
       case BIG_DECIMAL:
         BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
         for (int i = 0; i < numDocs; i++) {
-          groupKeys[i] = getKeyForValue(bigDecimalValues[i]);
+          groupKeys[i] = getKeyForValue(nullBitmap.contains(i) ? null : bigDecimalValues[i]);
         }
         break;
       case STRING:
@@ -130,7 +133,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private Map createGroupKeyMap(DataType keyType) {
     switch (keyType) {
       case INT:
-        Int2IntMap intMap = new Int2IntOpenHashMap();
+        Object2IntOpenHashMap<Integer> intMap = new Object2IntOpenHashMap();
         intMap.defaultReturnValue(INVALID_ID);
         return intMap;
       case LONG:
@@ -176,14 +179,13 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   @Override
   public Iterator<GroupKey> getGroupKeys() {
     switch (_storedType) {
-      case INT:
-        return new IntGroupKeyIterator((Int2IntOpenHashMap) _groupKeyMap);
       case LONG:
         return new LongGroupKeyIterator((Long2IntOpenHashMap) _groupKeyMap);
       case FLOAT:
         return new FloatGroupKeyIterator((Float2IntOpenHashMap) _groupKeyMap);
       case DOUBLE:
         return new DoubleGroupKeyIterator((Double2IntOpenHashMap) _groupKeyMap);
+      case INT:
       case BIG_DECIMAL:
       case STRING:
       case BYTES:
@@ -198,9 +200,9 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     return _groupKeyMap.size();
   }
 
-  private int getKeyForValue(int value) {
-    Int2IntMap map = (Int2IntMap) _groupKeyMap;
-    int groupId = map.get(value);
+  private int getKeyForValue(Integer value) {
+    Object2IntMap map = (Object2IntMap) _groupKeyMap;
+    int groupId = map.getInt(value);
     if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
       groupId = _numGroups++;
       map.put(value, groupId);

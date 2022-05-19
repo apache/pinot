@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import javax.ws.rs.NotSupportedException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
@@ -32,6 +33,7 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -253,6 +255,11 @@ public abstract class BaseDataTable implements DataTable {
       strings[i] = dictionary.get(_variableSizeData.getInt());
     }
     return strings;
+  }
+
+  @Override
+  public MutableRoaringBitmap getColumnNullBitmap(int colId) {
+    throw new NotSupportedException("column null bitmaps is not stored in DataTable versions: 2, 3");
   }
 
   private int positionCursorInVariableBuffer(int rowId, int colId) {

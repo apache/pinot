@@ -39,8 +39,11 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
@@ -235,10 +238,26 @@ public class SelectionOperatorUtils {
     int numColumns = storedColumnDataTypes.length;
 
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
+
+    // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
+    FieldSpec[] columnFieldSpecs = dataSchema.getColumnFieldSpecs();
+    assert columnFieldSpecs != null;
+    Object[] columnDefaultNullValues = new Object[numColumns];
+    RoaringBitmap[] columnNullBitmap = new RoaringBitmap[numColumns];
+    for (int colId = 0; colId < numColumns; colId++) {
+      columnDefaultNullValues[colId] = columnFieldSpecs[colId].getDefaultNullValue();
+      columnNullBitmap[colId] = new RoaringBitmap();
+    }
+
+    int rowId = 0;
     for (Object[] row : rows) {
       dataTableBuilder.startRow();
       for (int i = 0; i < numColumns; i++) {
         Object columnValue = row[i];
+        if (columnValue == null) {
+          columnValue = columnDefaultNullValues[i];
+          columnNullBitmap[i].add(rowId);
+        }
         switch (storedColumnDataTypes[i]) {
           // Single-value column
           case INT:
@@ -317,8 +336,13 @@ public class SelectionOperatorUtils {
         }
       }
       dataTableBuilder.finishRow();
+      rowId++;
     }
 
+    // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
+    for (int colId = 0; colId < numColumns; colId++) {
+      dataTableBuilder.setColumnNullBitmap(columnNullBitmap[colId].toMutableRoaringBitmap());
+    }
     return dataTableBuilder.build();
   }
 
@@ -391,13 +415,30 @@ public class SelectionOperatorUtils {
    * Reduces a collection of {@link DataTable}s to selection rows for selection queries without <code>ORDER BY</code>.
    * (Broker side)
    */
-  public static List<Object[]> reduceWithoutOrdering(Collection<DataTable> dataTables, int limit) {
+  public static List<Object[]> reduceWithoutOrdering(Collection<DataTable> dataTables,
+      int limit) {
     List<Object[]> rows = new ArrayList<>(Math.min(limit, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
+    MutableRoaringBitmap[] columnNullBitmaps = null;
     for (DataTable dataTable : dataTables) {
+      // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
+      int numColumns = dataTable.getDataSchema().size();
+      if (columnNullBitmaps == null) {
+        columnNullBitmaps = new MutableRoaringBitmap[numColumns];
+      }
+      for (int coldId = 0; coldId < numColumns; coldId++) {
+        columnNullBitmaps[coldId] = dataTable.getColumnNullBitmap(coldId);
+      }
+
       int numRows = dataTable.getNumberOfRows();
       for (int rowId = 0; rowId < numRows; rowId++) {
         if (rows.size() < limit) {
-          rows.add(extractRowFromDataTable(dataTable, rowId));
+          Object[] row = extractRowFromDataTable(dataTable, rowId);
+          for (int colId = 0; colId < numColumns; colId++) {
+            if (columnNullBitmaps[colId].contains(rowId)) {
+              row[colId] = null;
+            }
+          }
+          rows.add(row);
         } else {
           return rows;
         }

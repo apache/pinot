@@ -30,6 +30,7 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
   private double[] _sortedValues;
   private boolean _sealed = false;
   private double _prevValue = Double.NEGATIVE_INFINITY;
+  private boolean _hasNull = false;
 
   public DoubleColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
@@ -99,8 +100,13 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
   }
 
   @Override
-  public boolean hasNull() {
-    return false;
+  public boolean hasNulls() {
+    return _hasNull;
+  }
+
+  @Override
+  public void markHasNull() {
+    _hasNull = true;
   }
 
   @Override

@@ -32,6 +32,7 @@ import java.util.Arrays;
  *   <li>LONG: Long</li>
  *   <li>FLOAT: Float</li>
  *   <li>DOUBLE: Double</li>
+ *   <li>BIG_DECIMAL: BigDecimal</li>
  *   <li>STRING: String</li>
  *   <li>BYTES: ByteArray</li>
  *   <li>OBJECT (intermediate aggregation result): Object</li>

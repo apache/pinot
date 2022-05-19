@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.request.context;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -66,6 +67,25 @@ public class FunctionContext {
   public void getColumns(Set<String> columns) {
     for (ExpressionContext argument : _arguments) {
       argument.getColumns(columns);
+    }
+  }
+
+  /**
+   * Retrieve recursively all identifiers passed as arguments to the function.
+   */
+  public List<String> getAllIdentifiers() {
+    List<String> identifiers = new ArrayList<>();
+    appendIdentifiers(this, identifiers);
+    return identifiers;
+  }
+
+  private static void appendIdentifiers(FunctionContext functionContext, List<String> identifiers) {
+    for (ExpressionContext argument : functionContext.getArguments()) {
+      if (argument.getType() == ExpressionContext.Type.IDENTIFIER) {
+        identifiers.add(argument.getIdentifier());
+      } else if (argument.getType() == ExpressionContext.Type.FUNCTION) {
+        appendIdentifiers(argument.getFunction(), identifiers);
+      }
     }
   }
 

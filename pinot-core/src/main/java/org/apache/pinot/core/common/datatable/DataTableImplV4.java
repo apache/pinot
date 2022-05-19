@@ -19,26 +19,22 @@
 
 package org.apache.pinot.core.common.datatable;
 
-import com.google.common.primitives.Ints;
-import com.google.common.primitives.Longs;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
- * Datatable V3 implementation.
- * The layout of serialized V3 datatable looks like:
+ * Datatable V4 implementation.
+ * The layout of serialized V4 datatable looks like:
  * +-----------------------------------------------+
- * | 13 integers of header:                        |
+ * | 17 integers of header:                        |
  * | VERSION                                       |
  * | NUM_ROWS                                      |
  * | NUM_COLUMNS                                   |
@@ -52,6 +48,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * | FIXED_SIZE_DATA SECTION LENGTH                |
  * | VARIABLE_SIZE_DATA SECTION START OFFSET       |
  * | VARIABLE_SIZE_DATA SECTION LENGTH             |
+ * | FIXED_SIZE_NULL_VECTOR SECTION START OFFSET   |
+ * | FIXED_SIZE_NULL_VECTOR SECTION LENGTH         |
+ * | VARIABLE_SIZE_NULL_VECTOR SECTION START OFFSET|
+ * | VARIABLE_SIZE_NULL_VECTOR SECTION LENGTH      |
  * +-----------------------------------------------+
  * | EXCEPTIONS SECTION                            |
  * +-----------------------------------------------+
@@ -63,35 +63,64 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * +-----------------------------------------------+
  * | VARIABLE_SIZE_DATA SECTION                    |
  * +-----------------------------------------------+
+ * | FIXED_SIZE_NULL_VECTOR SECTION                |
+ * +-----------------------------------------------+
+ * | VARIABLE_SIZE_VECTOR SECTION SECTION          |
+ * +-----------------------------------------------+
  * | METADATA LENGTH                               |
  * | METADATA SECTION                              |
  * +-----------------------------------------------+
  */
-public class DataTableImplV3 extends BaseDataTable {
-  private static final int HEADER_SIZE = Integer.BYTES * 13;
+public class DataTableImplV4 extends DataTableImplV3 {
+  private static final int HEADER_SIZE = Integer.BYTES * 17;
   // _errCodeToExceptionMap stores exceptions as a map of errorCode->errorMessage
   private final Map<Integer, String> _errCodeToExceptionMap;
+  protected byte[] _fixedSizeNullVectorBytes;
+  protected ByteBuffer _fixedSizeNullVectorData;
+  protected byte[] _variableSizeNullVectorBytes;
+  protected ByteBuffer _variableSizeNullVectorData;
 
   /**
    * Construct data table with results. (Server side)
    */
-  public DataTableImplV3(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
-      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
+  public DataTableImplV4(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
+      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes, byte[] fixedSizeNullVectorBytes,
+      byte[] variableSizeNullVectorBytes) {
     super(numRows, dataSchema, dictionaryMap, fixedSizeDataBytes, variableSizeDataBytes);
     _errCodeToExceptionMap = new HashMap<>();
+    _fixedSizeNullVectorBytes = fixedSizeNullVectorBytes;
+    _fixedSizeNullVectorData = ByteBuffer.wrap(fixedSizeNullVectorBytes);
+    _variableSizeNullVectorBytes = variableSizeNullVectorBytes;
+    _variableSizeNullVectorData = ByteBuffer.wrap(variableSizeNullVectorBytes);
+  }
+
+  @Override
+  public MutableRoaringBitmap getColumnNullBitmap(int colId) {
+    // _fixedSizeNullVectorData stores two ints per col: offset, and length.
+    _fixedSizeNullVectorData.position(colId * Integer.BYTES * 2);
+    int offset = _fixedSizeNullVectorData.getInt();
+    int bitmapLength = _fixedSizeNullVectorData.getInt();
+    MutableRoaringBitmap mutableRoaringBitmap = new MutableRoaringBitmap();
+    if (bitmapLength > 0) {
+      _variableSizeNullVectorData.position(offset);
+      for (int i = 0; i < bitmapLength; i++) {
+        mutableRoaringBitmap.add(_variableSizeNullVectorData.getInt());
+      }
+    }
+    return mutableRoaringBitmap;
   }
 
   /**
    * Construct empty data table. (Server side)
    */
-  public DataTableImplV3() {
+  public DataTableImplV4() {
     _errCodeToExceptionMap = new HashMap<>();
   }
 
   /**
    * Construct data table from byte array. (broker side)
    */
-  public DataTableImplV3(ByteBuffer byteBuffer)
+  public DataTableImplV4(ByteBuffer byteBuffer)
       throws IOException {
     // Read header.
     _numRows = byteBuffer.getInt();
@@ -106,6 +135,10 @@ public class DataTableImplV3 extends BaseDataTable {
     int fixedSizeDataLength = byteBuffer.getInt();
     int variableSizeDataStart = byteBuffer.getInt();
     int variableSizeDataLength = byteBuffer.getInt();
+    int fixedSizeNullVectorStart = byteBuffer.getInt();
+    int fixedSizeNullVectorLength = byteBuffer.getInt();
+    int variableSizeNullVectorStart = byteBuffer.getInt();
+    int variableSizeNullVectorLength = byteBuffer.getInt();
 
     // Read exceptions.
     if (exceptionsLength != 0) {
@@ -117,7 +150,7 @@ public class DataTableImplV3 extends BaseDataTable {
 
     // Read dictionary.
     if (dictionaryMapLength != 0) {
-      byteBuffer.position(dictionaryMapStart);
+        byteBuffer.position(dictionaryMapStart);
       _dictionaryMap = deserializeDictionaryMap(byteBuffer);
     } else {
       _dictionaryMap = null;
@@ -157,26 +190,33 @@ public class DataTableImplV3 extends BaseDataTable {
       _variableSizeData = null;
     }
 
+    // Read fixed size null vector data.
+    if (fixedSizeNullVectorLength != 0) {
+      _fixedSizeNullVectorBytes = new byte[fixedSizeNullVectorLength];
+      byteBuffer.position(fixedSizeNullVectorStart);
+      byteBuffer.get(_fixedSizeNullVectorBytes);
+      _fixedSizeNullVectorData = ByteBuffer.wrap(_fixedSizeNullVectorBytes);
+    } else {
+      _fixedSizeNullVectorBytes = null;
+      _fixedSizeNullVectorData = null;
+    }
+
+    // Read variable size null vector data.
+    if (variableSizeNullVectorLength != 0) {
+      _variableSizeNullVectorBytes = new byte[variableSizeNullVectorLength];
+      byteBuffer.position(variableSizeNullVectorStart);
+      byteBuffer.get(_variableSizeNullVectorBytes);
+      _variableSizeNullVectorData = ByteBuffer.wrap(_variableSizeNullVectorBytes);
+    } else {
+      _variableSizeNullVectorBytes = null;
+      _variableSizeNullVectorData = null;
+    }
+
     // Read metadata.
     int metadataLength = byteBuffer.getInt();
     if (metadataLength != 0) {
       _metadata = deserializeMetadata(byteBuffer);
     }
-  }
-
-  @Override
-  public void addException(ProcessingException processingException) {
-    _errCodeToExceptionMap.put(processingException.getErrorCode(), processingException.getMessage());
-  }
-
-  @Override
-  public void addException(int errCode, String errMsg) {
-    _errCodeToExceptionMap.put(errCode, errMsg);
-  }
-
-  @Override
-  public Map<Integer, String> getExceptions() {
-    return _errCodeToExceptionMap;
   }
 
   @Override
@@ -205,21 +245,22 @@ public class DataTableImplV3 extends BaseDataTable {
   }
 
   @Override
-  public DataTableImplV3 toMetadataOnlyDataTable() {
-    DataTableImplV3 metadataOnlyDataTable = new DataTableImplV3();
+  public DataTableImplV4 toMetadataOnlyDataTable() {
+    DataTableImplV4 metadataOnlyDataTable = new DataTableImplV4();
     metadataOnlyDataTable._metadata.putAll(_metadata);
     metadataOnlyDataTable._errCodeToExceptionMap.putAll(_errCodeToExceptionMap);
     return metadataOnlyDataTable;
   }
 
   @Override
-  public DataTableImplV3 toDataOnlyDataTable() {
-    return new DataTableImplV3(_numRows, _dataSchema, _dictionaryMap, _fixedSizeDataBytes, _variableSizeDataBytes);
+  public DataTableImplV4 toDataOnlyDataTable() {
+    return new DataTableImplV4(_numRows, _dataSchema, _dictionaryMap, _fixedSizeDataBytes, _variableSizeDataBytes,
+        _fixedSizeNullVectorBytes, _variableSizeNullVectorBytes);
   }
 
   private void writeLeadingSections(DataOutputStream dataOutputStream)
       throws IOException {
-    dataOutputStream.writeInt(DataTableBuilder.VERSION_3);
+    dataOutputStream.writeInt(DataTableBuilder.VERSION_4);
     dataOutputStream.writeInt(_numRows);
     dataOutputStream.writeInt(_numColumns);
     int dataOffset = HEADER_SIZE;
@@ -266,6 +307,24 @@ public class DataTableImplV3 extends BaseDataTable {
     dataOutputStream.writeInt(dataOffset);
     if (_variableSizeDataBytes != null) {
       dataOutputStream.writeInt(_variableSizeDataBytes.length);
+      dataOffset += _variableSizeDataBytes.length;
+    } else {
+      dataOutputStream.writeInt(0);
+    }
+
+    // Write fixed size null vector section offset(START|SIZE).
+    dataOutputStream.writeInt(dataOffset);
+    if (_fixedSizeNullVectorBytes != null) {
+      dataOutputStream.writeInt(_fixedSizeNullVectorBytes.length);
+      dataOffset += _fixedSizeNullVectorBytes.length;
+    } else {
+      dataOutputStream.writeInt(0);
+    }
+
+    // Write variable size null vector section offset(START|SIZE).
+    dataOutputStream.writeInt(dataOffset);
+    if (_variableSizeNullVectorBytes != null) {
+      dataOutputStream.writeInt(_variableSizeNullVectorBytes.length);
     } else {
       dataOutputStream.writeInt(0);
     }
@@ -289,112 +348,13 @@ public class DataTableImplV3 extends BaseDataTable {
     if (_variableSizeDataBytes != null) {
       dataOutputStream.write(_variableSizeDataBytes);
     }
-  }
-
-  /**
-   * Serialize metadata section to bytes.
-   * Format of the bytes looks like:
-   * [numEntries, bytesOfKV2, bytesOfKV2, bytesOfKV3]
-   * For each KV pair:
-   * - if the value type is String, encode it as: [enumKeyOrdinal, valueLength, Utf8EncodedValue].
-   * - if the value type is int, encode it as: [enumKeyOrdinal, bigEndianRepresentationOfIntValue]
-   * - if the value type is long, encode it as: [enumKeyOrdinal, bigEndianRepresentationOfLongValue]
-   *
-   * Unlike V2, where numeric metadata values (int and long) in V3 are encoded in UTF-8 in the wire format,
-   * in V3 big endian representation is used.
-   */
-  protected byte[] serializeMetadata()
-      throws IOException {
-    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-    DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-
-    dataOutputStream.writeInt(_metadata.size());
-
-    for (Map.Entry<String, String> entry : _metadata.entrySet()) {
-      MetadataKey key = MetadataKey.getByName(entry.getKey());
-      // Ignore unknown keys.
-      if (key == null) {
-        continue;
-      }
-      String value = entry.getValue();
-      dataOutputStream.writeInt(key.ordinal());
-      if (key.getValueType() == MetadataValueType.INT) {
-        dataOutputStream.write(Ints.toByteArray(Integer.parseInt(value)));
-      } else if (key.getValueType() == MetadataValueType.LONG) {
-        dataOutputStream.write(Longs.toByteArray(Long.parseLong(value)));
-      } else {
-        byte[] valueBytes = value.getBytes(UTF_8);
-        dataOutputStream.writeInt(valueBytes.length);
-        dataOutputStream.write(valueBytes);
-      }
+    // Write fixed size null vector bytes.
+    if (_fixedSizeNullVectorBytes != null) {
+      dataOutputStream.write(_fixedSizeNullVectorBytes);
     }
-
-    return byteArrayOutputStream.toByteArray();
-  }
-
-  /**
-   * Even though the wire format of V3 uses UTF-8 for string/bytes and big-endian for numeric values,
-   * the in-memory representation is STRING based for processing the metadata before serialization
-   * (by the server as it adds the statistics in metadata) and after deserialization (by the broker as it receives
-   * DataTable from each server and aggregates the values).
-   * This is to make V3 implementation keep the consumers of Map<String, String> getMetadata() API in the code happy
-   * by internally converting it.
-   *
-   * This method use relative operations on the ByteBuffer and expects the buffer's position to be set correctly.
-   */
-  protected Map<String, String> deserializeMetadata(ByteBuffer buffer)
-      throws IOException {
-    int numEntries = buffer.getInt();
-    Map<String, String> metadata = new HashMap<>();
-    for (int i = 0; i < numEntries; i++) {
-      int keyId = buffer.getInt();
-      MetadataKey key = MetadataKey.getByOrdinal(keyId);
-      // Ignore unknown keys.
-      if (key == null) {
-        continue;
-      }
-      if (key.getValueType() == MetadataValueType.INT) {
-        String value = "" + buffer.getInt();
-        metadata.put(key.getName(), value);
-      } else if (key.getValueType() == MetadataValueType.LONG) {
-        String value = "" + buffer.getLong();
-        metadata.put(key.getName(), value);
-      } else {
-        String value = DataTableUtils.decodeString(buffer);
-        metadata.put(key.getName(), value);
-      }
+    // Write variable size null vector bytes.
+    if (_variableSizeNullVectorBytes != null) {
+      dataOutputStream.write(_variableSizeNullVectorBytes);
     }
-    return metadata;
-  }
-
-  protected byte[] serializeExceptions()
-      throws IOException {
-    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-    DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-
-    dataOutputStream.writeInt(_errCodeToExceptionMap.size());
-
-    for (Map.Entry<Integer, String> entry : _errCodeToExceptionMap.entrySet()) {
-      int key = entry.getKey();
-      String value = entry.getValue();
-      byte[] valueBytes = value.getBytes(UTF_8);
-      dataOutputStream.writeInt(key);
-      dataOutputStream.writeInt(valueBytes.length);
-      dataOutputStream.write(valueBytes);
-    }
-
-    return byteArrayOutputStream.toByteArray();
-  }
-
-  protected Map<Integer, String> deserializeExceptions(ByteBuffer buffer)
-      throws IOException {
-    int numExceptions = buffer.getInt();
-    Map<Integer, String> exceptions = new HashMap<>(numExceptions);
-    for (int i = 0; i < numExceptions; i++) {
-      int errCode = buffer.getInt();
-      String errMessage = DataTableUtils.decodeString(buffer);
-      exceptions.put(errCode, errMessage);
-    }
-    return exceptions;
   }
 }

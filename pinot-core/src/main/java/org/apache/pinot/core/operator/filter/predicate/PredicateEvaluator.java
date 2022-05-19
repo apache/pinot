@@ -73,6 +73,14 @@ public interface PredicateEvaluator {
   boolean applySV(int value);
 
   /**
+   * Apply a single-value entry to the predicate.
+   *
+   * @param value Dictionary id or raw value
+   * @return Whether the entry matches the predicate
+   */
+  boolean applySV(Integer value);
+
+  /**
    * Apply a multi-value entry to the predicate.
    *
    * @param values Array of dictionary ids or raw values

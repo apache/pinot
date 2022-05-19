@@ -46,6 +46,7 @@ import org.apache.pinot.core.query.distinct.raw.RawMultiColumnDistinctExecutor;
 import org.apache.pinot.core.query.distinct.raw.RawStringSingleColumnDistinctOnlyExecutor;
 import org.apache.pinot.core.query.distinct.raw.RawStringSingleColumnDistinctOrderByExecutor;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -81,6 +82,7 @@ public class DistinctExecutorFactory {
       Preconditions.checkArgument(expressionMetadata.isSingleValue(), "DISTINCT cannot be applied to MV expression: %s",
           expression);
       DataType dataType = expressionMetadata.getDataType();
+      FieldSpec fieldSpec = transformOperator.getFieldSpec(expression);
       Dictionary dictionary = transformOperator.getDictionary(expression);
       if (dictionary != null) {
         // Dictionary based
@@ -89,7 +91,8 @@ public class DistinctExecutorFactory {
         // Raw value based
         switch (dataType.getStoredType()) {
           case INT:
-            return new RawIntSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
+            // todo(nhejazi): handle nulls for other data types.
+            return new RawIntSingleColumnDistinctOnlyExecutor(expression, fieldSpec, limit);
           case LONG:
             return new RawLongSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
           case FLOAT:
@@ -97,7 +100,7 @@ public class DistinctExecutorFactory {
           case DOUBLE:
             return new RawDoubleSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
           case BIG_DECIMAL:
-            return new RawBigDecimalSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
+            return new RawBigDecimalSingleColumnDistinctOnlyExecutor(expression, fieldSpec, limit);
           case STRING:
             return new RawStringSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
           case BYTES:
@@ -148,6 +151,7 @@ public class DistinctExecutorFactory {
       Preconditions.checkArgument(expressionMetadata.isSingleValue(), "DISTINCT cannot be applied to MV expression: %s",
           expression);
       DataType dataType = expressionMetadata.getDataType();
+      FieldSpec fieldSpec = transformOperator.getFieldSpec(expression);
       assert orderByExpressions.size() == 1;
       OrderByExpressionContext orderByExpression = orderByExpressions.get(0);
       Dictionary dictionary = transformOperator.getDictionary(expression);
@@ -160,7 +164,7 @@ public class DistinctExecutorFactory {
         // Raw value based
         switch (dataType.getStoredType()) {
           case INT:
-            return new RawIntSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
+            return new RawIntSingleColumnDistinctOrderByExecutor(expression, fieldSpec, orderByExpression, limit);
           case LONG:
             return new RawLongSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
           case FLOAT:
@@ -168,7 +172,8 @@ public class DistinctExecutorFactory {
           case DOUBLE:
             return new RawDoubleSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
           case BIG_DECIMAL:
-            return new RawBigDecimalSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
+            return new RawBigDecimalSingleColumnDistinctOrderByExecutor(expression, fieldSpec, orderByExpression,
+                limit);
           case STRING:
             return new RawStringSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
           case BYTES:

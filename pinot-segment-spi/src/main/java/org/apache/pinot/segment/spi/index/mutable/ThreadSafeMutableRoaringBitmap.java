@@ -31,6 +31,10 @@ public class ThreadSafeMutableRoaringBitmap {
     _mutableRoaringBitmap = new MutableRoaringBitmap();
   }
 
+  public ThreadSafeMutableRoaringBitmap(MutableRoaringBitmap mutableRoaringBitmap) {
+    _mutableRoaringBitmap = mutableRoaringBitmap;
+  }
+
   public ThreadSafeMutableRoaringBitmap(int firstDocId) {
     _mutableRoaringBitmap = new MutableRoaringBitmap();
     _mutableRoaringBitmap.add(firstDocId);

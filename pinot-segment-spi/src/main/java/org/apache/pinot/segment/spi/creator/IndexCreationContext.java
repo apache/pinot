@@ -77,6 +77,7 @@ public interface IndexCreationContext {
     private boolean _hasDictionary = true;
     private Comparable<?> _minValue;
     private Comparable<?> _maxValue;
+    private boolean _hasNull;
 
     public Builder withColumnIndexCreationInfo(ColumnIndexCreationInfo columnIndexCreationInfo) {
       return withLengthOfLongestEntry(columnIndexCreationInfo.getLengthOfLongestEntry())
@@ -102,7 +103,8 @@ public interface IndexCreationContext {
           .withTotalDocs(columnMetadata.getTotalDocs())
           .withDictionary(columnMetadata.hasDictionary())
           .withMinValue(columnMetadata.getMinValue())
-          .withMaxValue(columnMetadata.getMaxValue());
+          .withMaxValue(columnMetadata.getMaxValue())
+          .withHasNull(columnMetadata.hasNull());
     }
 
     public Builder withLengthOfLongestEntry(int lengthOfLongestEntry) {
@@ -157,6 +159,11 @@ public interface IndexCreationContext {
 
     public Builder withMaxValue(Comparable<?> maxValue) {
       _maxValue = maxValue;
+      return this;
+    }
+
+    public Builder withHasNull(boolean hasNull) {
+      _hasNull = hasNull;
       return this;
     }
 

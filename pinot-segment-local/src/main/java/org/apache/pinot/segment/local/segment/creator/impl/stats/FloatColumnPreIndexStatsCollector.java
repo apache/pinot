@@ -30,6 +30,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
   private float[] _sortedValues;
   private boolean _sealed = false;
   private float _prevValue = Float.NEGATIVE_INFINITY;
+  private boolean _hasNull = false;
 
   public FloatColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
@@ -99,8 +100,13 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
   }
 
   @Override
-  public boolean hasNull() {
-    return false;
+  public boolean hasNulls() {
+    return _hasNull;
+  }
+
+  @Override
+  public void markHasNull() {
+    _hasNull = true;
   }
 
   @Override

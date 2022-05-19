@@ -51,6 +51,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
@@ -136,23 +137,23 @@ public class GroupByDataTableReducer implements DataTableReducer {
     if (havingFilter != null) {
       HavingFilterHandler havingFilterHandler = new HavingFilterHandler(havingFilter, postAggregationHandler);
       while (rows.size() < limit && sortedIterator.hasNext()) {
-        Object[] row = sortedIterator.next().getValues();
-        extractFinalAggregationResults(row);
+        Object[] values = sortedIterator.next().getValues();
+        extractFinalAggregationResults(values);
         for (int i = 0; i < numColumns; i++) {
-          row[i] = columnDataTypes[i].convert(row[i]);
+          values[i] = columnDataTypes[i].convert(values[i]);
         }
-        if (havingFilterHandler.isMatch(row)) {
-          rows.add(row);
+        if (havingFilterHandler.isMatch(values)) {
+          rows.add(values);
         }
       }
     } else {
       for (int i = 0; i < limit && sortedIterator.hasNext(); i++) {
-        Object[] row = sortedIterator.next().getValues();
-        extractFinalAggregationResults(row);
+        Object[] values = sortedIterator.next().getValues();
+        extractFinalAggregationResults(values);
         for (int j = 0; j < numColumns; j++) {
-          row[j] = columnDataTypes[j].convert(row[j]);
+          values[j] = columnDataTypes[j].convert(values[j]);
         }
-        rows.add(row);
+        rows.add(values);
       }
     }
     DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
@@ -161,11 +162,11 @@ public class GroupByDataTableReducer implements DataTableReducer {
     int numResultRows = rows.size();
     List<Object[]> resultRows = new ArrayList<>(numResultRows);
     for (Object[] row : rows) {
-      Object[] resultRow = postAggregationHandler.getResult(row);
+      Object[] resultValues = postAggregationHandler.getResult(row);
       for (int i = 0; i < numResultColumns; i++) {
-        resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
+        resultValues[i] = resultColumnDataTypes[i].format(resultValues[i]);
       }
-      resultRows.add(resultRow);
+      resultRows.add(resultValues);
     }
     brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, resultRows));
   }
@@ -180,7 +181,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     }
   }
 
-  /**
+  /**oo
    * Constructs the DataSchema for the rows before the post-aggregation (SQL mode).
    */
   private DataSchema getPrePostAggregationDataSchema(DataSchema dataSchema) {
@@ -250,6 +251,12 @@ public class GroupByDataTableReducer implements DataTableReducer {
               return;
             }
             try {
+              // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
+              MutableRoaringBitmap[] columnNullBitmaps = new MutableRoaringBitmap[_numColumns];
+              for (int i = 0; i < _numColumns; i++) {
+                columnNullBitmaps[i] = dataTable.getColumnNullBitmap(i);
+              }
+
               int numRows = dataTable.getNumberOfRows();
               for (int rowId = 0; rowId < numRows; rowId++) {
                 Object[] values = new Object[_numColumns];
@@ -282,6 +289,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
                     // Add other aggregation intermediate result / group-by column type supports here
                     default:
                       throw new IllegalStateException();
+                  }
+                  if (columnNullBitmaps[colId].contains(rowId)) {
+                    values[colId] = null;
                   }
                 }
                 indexedTable.upsert(new Record(values));

@@ -97,6 +97,12 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
 
       if (_columnStatsCollectorMap.containsKey(columnName)) {
         try {
+          // todo(nhejazi) cannot handle null values in a special way here since dictionaries does not have a header
+          //  section that can indicate the fact whether the dictionary has nulls or not.
+          //  Changing the serialization format of dictionaries is a backward-incompatible change.
+          // Ignore null values (cannot be represented currently by dictionaries).
+          // Mark that the dictionary has null value(s).
+          // _columnStatsCollectorMap.get(columnName).markHasNull();
           _columnStatsCollectorMap.get(columnName).collect(value);
         } catch (Exception e) {
           LOGGER.error("Exception while collecting stats for column:{} in row:{}", columnName, row);

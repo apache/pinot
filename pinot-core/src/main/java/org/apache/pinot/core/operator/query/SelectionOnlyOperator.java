@@ -35,6 +35,9 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock> {
@@ -48,6 +51,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   private final DataSchema _dataSchema;
   private final int _numRowsToKeep;
   private final List<Object[]> _rows;
+  private final ImmutableRoaringBitmap[] _nullBitmaps;
 
   private int _numDocsScanned = 0;
 
@@ -61,17 +65,24 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
     _blockValSets = new BlockValSet[numExpressions];
     String[] columnNames = new String[numExpressions];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
+    FieldSpec[] columnFieldSpecs = new FieldSpec[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
       ExpressionContext expression = _expressions.get(i);
       TransformResultMetadata expressionMetadata = _transformOperator.getResultMetadata(expression);
       columnNames[i] = expression.toString();
       columnDataTypes[i] =
           DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+      columnFieldSpecs[i] = _transformOperator.getFieldSpec(expression);
+      if (columnFieldSpecs[i] == null) {
+        columnFieldSpecs[i] = new MetricFieldSpec(columnNames[i], columnDataTypes[i].toDataType().getStoredType(),
+            null);
+      }
     }
-    _dataSchema = new DataSchema(columnNames, columnDataTypes);
+    _dataSchema = new DataSchema(columnNames, columnDataTypes, columnFieldSpecs);
 
     _numRowsToKeep = queryContext.getLimit();
     _rows = new ArrayList<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
+    _nullBitmaps = new ImmutableRoaringBitmap[numExpressions];
   }
 
   @Override
@@ -89,17 +100,27 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   @Override
   protected IntermediateResultsBlock getNextBlock() {
     TransformBlock transformBlock;
+    // todo: hide null handling code behind a flag (nullHandlingEnabledInSelect).
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
+      int numDocsToAdd = Math.min(_numRowsToKeep - _rows.size(), transformBlock.getNumDocs());
+
       int numExpressions = _expressions.size();
       for (int i = 0; i < numExpressions; i++) {
+        // todo: how to concatenate NullBitmap from diff. blocks?
         _blockValSets[i] = transformBlock.getBlockValueSet(_expressions.get(i));
+        _nullBitmaps[i] = _blockValSets[i].getNullBitmap();
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(_blockValSets);
 
-      int numDocsToAdd = Math.min(_numRowsToKeep - _rows.size(), transformBlock.getNumDocs());
       _numDocsScanned += numDocsToAdd;
-      for (int i = 0; i < numDocsToAdd; i++) {
-        _rows.add(blockValueFetcher.getRow(i));
+      for (int docId = 0; docId < numDocsToAdd; docId++) {
+        Object[] values = blockValueFetcher.getRow(docId);
+        for (int colId = 0; colId < numExpressions; colId++) {
+          if (_nullBitmaps[colId].contains(docId)) {
+            values[colId] = null;
+          }
+        }
+        _rows.add(values);
       }
       if (_rows.size() == _numRowsToKeep) {
         break;

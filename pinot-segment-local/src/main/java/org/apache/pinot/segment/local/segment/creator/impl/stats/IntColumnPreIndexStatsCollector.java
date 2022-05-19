@@ -30,6 +30,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   private int[] _sortedValues;
   private boolean _sealed = false;
   private int _prevValue = Integer.MIN_VALUE;
+  private boolean _hasNull = false;
 
   public IntColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
@@ -99,8 +100,13 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   }
 
   @Override
-  public boolean hasNull() {
-    return false;
+  public boolean hasNulls() {
+    return _hasNull;
+  }
+
+  @Override
+  public void markHasNull() {
+    _hasNull = true;
   }
 
   @Override

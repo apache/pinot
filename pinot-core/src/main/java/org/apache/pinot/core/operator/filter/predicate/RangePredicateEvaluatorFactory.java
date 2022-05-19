@@ -480,12 +480,17 @@ public class RangePredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(BigDecimal value) {
+      // todo(nhejazi): handle and test other data types.
       boolean result = true;
-      if (_lowerBound != null) {
+      boolean isValueNull = value == null;
+      if (_lowerBound != null && !isValueNull) {
         result = _lowerInclusive ? _lowerBound.compareTo(value) <= 0 : _lowerBound.compareTo(value) < 0;
       }
       if (_upperBound != null) {
-        result &= _upperInclusive ? _upperBound.compareTo(value) >= 0 : _upperBound.compareTo(value) > 0;
+        result &= isValueNull
+            || (_upperInclusive ? _upperBound.compareTo(value) >= 0 : _upperBound.compareTo(value) > 0);
+      } else if (!_upperInclusive) {
+        return false;
       }
       return result;
     }

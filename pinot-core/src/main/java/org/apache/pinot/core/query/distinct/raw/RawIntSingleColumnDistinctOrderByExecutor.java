@@ -18,49 +18,51 @@
  */
 package org.apache.pinot.core.query.distinct.raw;
 
-import it.unimi.dsi.fastutil.ints.IntHeapPriorityQueue;
-import it.unimi.dsi.fastutil.ints.IntPriorityQueue;
+import it.unimi.dsi.fastutil.PriorityQueue;
+import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
  * {@link DistinctExecutor} for distinct order-by queries with single raw INT column.
  */
 public class RawIntSingleColumnDistinctOrderByExecutor extends BaseRawIntSingleColumnDistinctExecutor {
-  private final IntPriorityQueue _priorityQueue;
+  private final PriorityQueue<Integer> _priorityQueue;
 
-  public RawIntSingleColumnDistinctOrderByExecutor(ExpressionContext expression, DataType dataType,
+  public RawIntSingleColumnDistinctOrderByExecutor(ExpressionContext expression, FieldSpec fieldSpec,
       OrderByExpressionContext orderByExpression, int limit) {
-    super(expression, dataType, limit);
+    super(expression, fieldSpec, limit);
 
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;
-    _priorityQueue = new IntHeapPriorityQueue(Math.min(limit, MAX_INITIAL_CAPACITY),
-        (i1, i2) -> Integer.compare(i1, i2) * comparisonFactor);
+    _priorityQueue = new ObjectHeapPriorityQueue<Integer>(Math.min(limit, MAX_INITIAL_CAPACITY),
+        (i1, i2) -> i1 == null ? (i2 == null ? 0 : 1) : (i2 == null ? -1 : Integer.compare(i1, i2)) * comparisonFactor);
   }
 
   @Override
   public boolean process(TransformBlock transformBlock) {
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
     int[] values = blockValueSet.getIntValuesSV();
+    ImmutableRoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
     int numDocs = transformBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
-      int value = values[i];
+      Integer value = nullBitmap.contains(i) ? null : values[i];
       if (!_valueSet.contains(value)) {
         if (_valueSet.size() < _limit) {
           _valueSet.add(value);
           _priorityQueue.enqueue(value);
         } else {
-          int firstValue = _priorityQueue.firstInt();
+          Integer firstValue = _priorityQueue.first();
           if (_priorityQueue.comparator().compare(value, firstValue) > 0) {
             _valueSet.remove(firstValue);
             _valueSet.add(value);
-            _priorityQueue.dequeueInt();
+            _priorityQueue.dequeue();
             _priorityQueue.enqueue(value);
           }
         }

@@ -198,6 +198,12 @@ public class InPredicateEvaluatorFactory {
     public boolean applySV(int value) {
       return _matchingValues.contains(value);
     }
+
+    @Override
+    public boolean applySV(Integer value) {
+      // todo(nhejazi): handle and test other data types.
+      return _matchingValues.contains(value);
+    }
   }
 
   private static final class LongRawValueBasedInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {

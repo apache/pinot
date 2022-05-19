@@ -32,6 +32,7 @@ import static org.apache.pinot.segment.spi.Constants.UNKNOWN_CARDINALITY;
 public class MutableNoDictionaryColStatistics implements ColumnStatistics {
   private final DataSourceMetadata _dataSourceMetadata;
   private final MutableForwardIndex _forwardIndex;
+  private boolean _hasNull = false;
 
   public MutableNoDictionaryColStatistics(DataSource dataSource) {
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
@@ -84,8 +85,13 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics {
   }
 
   @Override
-  public boolean hasNull() {
-    return false;
+  public boolean hasNulls() {
+    return _hasNull;
+  }
+
+  @Override
+  public void markHasNull() {
+    _hasNull = true;
   }
 
   @Override

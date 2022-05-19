@@ -30,6 +30,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
@@ -112,7 +113,7 @@ public abstract class BaseQueriesTest {
    * <p>The result should be equivalent to querying 4 identical index segments.
    */
   protected BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker) {
-    return getBrokerResponse(query, planMaker, null);
+    return getBrokerResponse(query, planMaker, null, null);
   }
 
   /**
@@ -120,8 +121,8 @@ public abstract class BaseQueriesTest {
    * <p>Use this to test the whole flow from server to broker.
    * <p>The result should be equivalent to querying 4 identical index segments.
    */
-  protected BrokerResponseNative getBrokerResponse(String query, @Nullable Map<String, String> extraQueryOptions) {
-    return getBrokerResponse(query, PLAN_MAKER, extraQueryOptions);
+  protected BrokerResponseNative getBrokerResponse(String query, @Nullable Map<String, Object> pinotConfigProperties) {
+    return getBrokerResponse(query, PLAN_MAKER, pinotConfigProperties, null);
   }
 
   /**
@@ -130,7 +131,7 @@ public abstract class BaseQueriesTest {
    * <p>The result should be equivalent to querying 4 identical index segments.
    */
   private BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker,
-      @Nullable Map<String, String> extraQueryOptions) {
+      @Nullable Map<String, Object> pinotConfiguration, @Nullable Map<String, String> extraQueryOptions) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     if (extraQueryOptions != null) {
       Map<String, String> queryOptions = pinotQuery.getQueryOptions();
@@ -140,7 +141,7 @@ public abstract class BaseQueriesTest {
       }
       queryOptions.putAll(extraQueryOptions);
     }
-    return getBrokerResponse(pinotQuery, planMaker);
+    return getBrokerResponse(pinotQuery, planMaker, pinotConfiguration);
   }
 
   /**
@@ -148,7 +149,8 @@ public abstract class BaseQueriesTest {
    * <p>Use this to test the whole flow from server to broker.
    * <p>The result should be equivalent to querying 4 identical index segments.
    */
-  private BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery, PlanMaker planMaker) {
+  private BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery, PlanMaker planMaker,
+      @Nullable Map<String, Object> pinotConfigProperties) {
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
     QueryContext serverQueryContext =
@@ -157,13 +159,21 @@ public abstract class BaseQueriesTest {
     // Server side
     serverQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     Plan plan = planMaker.makeInstancePlan(getIndexSegments(), serverQueryContext, EXECUTOR_SERVICE);
+    if (pinotConfigProperties == null) {
+      pinotConfigProperties = new HashMap<>();
+    }
+    if (pinotConfigProperties.containsKey(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION)) {
+      int dataTableVersion = (int) pinotConfigProperties.get(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION);
+      DataTableBuilder.setCurrentDataTableVersion(dataTableVersion);
+    }
     DataTable instanceResponse =
         queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan) : plan.execute();
 
     // Broker side
     // Use 2 Threads for 2 data-tables
-    BrokerReduceService brokerReduceService = new BrokerReduceService(new PinotConfiguration(
-        Collections.singletonMap(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
+    pinotConfigProperties.put(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2);
+    PinotConfiguration pinotConfiguration = new PinotConfiguration(pinotConfigProperties);
+    BrokerReduceService brokerReduceService = new BrokerReduceService(pinotConfiguration);
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
     try {
       // For multi-threaded BrokerReduceService, we cannot reuse the same data-table
@@ -195,6 +205,6 @@ public abstract class BaseQueriesTest {
       @Nullable Schema schema) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     OPTIMIZER.optimize(pinotQuery, config, schema);
-    return getBrokerResponse(pinotQuery, PLAN_MAKER);
+    return getBrokerResponse(pinotQuery, PLAN_MAKER, null);
   }
 }

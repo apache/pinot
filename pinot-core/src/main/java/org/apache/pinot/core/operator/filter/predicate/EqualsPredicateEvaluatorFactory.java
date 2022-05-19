@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.filter.predicate;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.Objects;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -129,6 +130,12 @@ public class EqualsPredicateEvaluatorFactory {
     public boolean applySV(int value) {
       return _matchingValue == value;
     }
+
+    @Override
+    public boolean applySV(Integer value) {
+      // todo(nhejazi): handle and test other data types.
+      return Objects.equals(_matchingValue, value);
+    }
   }
 
   private static final class LongRawValueBasedEqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
@@ -203,7 +210,7 @@ public class EqualsPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(BigDecimal value) {
-      return _matchingValue.compareTo(value) == 0;
+      return Objects.equals(_matchingValue, value);
     }
   }
 

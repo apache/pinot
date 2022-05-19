@@ -183,6 +183,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           .withTotalDocs(segmentIndexCreationInfo.getTotalDocs())
           .withMinValue((Comparable<?>) columnIndexCreationInfo.getMin())
           .withMaxValue((Comparable<?>) columnIndexCreationInfo.getMax())
+          .withHasNull(columnIndexCreationInfo.hasNulls())
           .withTotalNumberOfEntries(columnIndexCreationInfo.getTotalNumberOfEntries())
           .withColumnIndexCreationInfo(columnIndexCreationInfo)
           .sorted(columnIndexCreationInfo.isSorted())
@@ -202,6 +203,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (dictEnabledColumn) {
         // Create dictionary-encoded index
         // Initialize dictionary creator
+
+        // todo(nhejazi): cannot persist the fact that the dictionary has a null value
+        //  (columnIndexCreationInfo.hasNulls()) for now. This is because the the dictionary serialization logic does
+        //  not allow for storing custom metadata (e.g. hasNull), and changes to dictionary serialization format is
+        //  backward-incompatible.
         SegmentDictionaryCreator dictionaryCreator =
             new SegmentDictionaryCreator(columnIndexCreationInfo.getSortedUniqueElementsArray(), fieldSpec, _indexDir,
                 columnIndexCreationInfo.isUseVarLengthDictionary());

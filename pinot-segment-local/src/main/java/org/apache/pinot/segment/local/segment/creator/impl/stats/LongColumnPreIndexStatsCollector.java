@@ -30,6 +30,7 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
   private long[] _sortedValues;
   private boolean _sealed = false;
   private long _prevValue = Long.MIN_VALUE;
+  private boolean _hasNull = false;
 
   public LongColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
@@ -99,8 +100,13 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
   }
 
   @Override
-  public boolean hasNull() {
-    return false;
+  public boolean hasNulls() {
+    return _hasNull;
+  }
+
+  @Override
+  public void markHasNull() {
+    _hasNull = true;
   }
 
   @Override

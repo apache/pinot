@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import java.math.BigDecimal;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -35,7 +37,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
-  private final ForwardIndexReader _reader;
+  private final ForwardIndexReader _forwardIndexReader;
   // TODO: Figure out a way to close the reader context
   //       ChunkReaderContext should be closed explicitly to release the off-heap buffer
   private final ForwardIndexReaderContext _readerContext;
@@ -45,12 +47,22 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
-  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs) {
+  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader forwardIndexReader,
+      NullValueVectorReader nullValueReader, int numDocs) {
     _predicateEvaluator = predicateEvaluator;
-    _reader = reader;
-    _readerContext = reader.createContext();
+    _forwardIndexReader = forwardIndexReader;
+    _readerContext = forwardIndexReader.createContext();
     _numDocs = numDocs;
-    _valueMatcher = getValueMatcher();
+    _valueMatcher = getValueMatcher(nullValueReader);
+  }
+
+  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader forwardIndexReader,
+      int numDocs) {
+    _predicateEvaluator = predicateEvaluator;
+    _forwardIndexReader = forwardIndexReader;
+    _readerContext = forwardIndexReader.createContext();
+    _numDocs = numDocs;
+    _valueMatcher = getValueMatcher(null);
   }
 
   @Override
@@ -98,13 +110,13 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     return _numEntriesScanned;
   }
 
-  private ValueMatcher getValueMatcher() {
-    if (_reader.isDictionaryEncoded()) {
+  private ValueMatcher getValueMatcher(NullValueVectorReader nullValueReader) {
+    if (_forwardIndexReader.isDictionaryEncoded()) {
       return new DictIdMatcher();
     } else {
-      switch (_reader.getValueType()) {
+      switch (_forwardIndexReader.getValueType()) {
         case INT:
-          return new IntMatcher();
+          return new IntMatcher(nullValueReader);
         case LONG:
           return new LongMatcher();
         case FLOAT:
@@ -112,7 +124,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
         case DOUBLE:
           return new DoubleMatcher();
         case BIG_DECIMAL:
-          return new BigDecimalMatcher();
+          return new BigDecimalMatcher(nullValueReader);
         case STRING:
           return new StringMatcher();
         case BYTES:
@@ -135,15 +147,24 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_reader.getDictId(docId, _readerContext));
+      return _predicateEvaluator.applySV(_forwardIndexReader.getDictId(docId, _readerContext));
     }
   }
 
+  // todo(nhejazi): null handling has been implemented for int/BigDecimal data types. Implement for other data types.
   private class IntMatcher implements ValueMatcher {
+    private final NullValueVectorReader _nullValueReader;
+
+    public IntMatcher(NullValueVectorReader nullValueReader) {
+      _nullValueReader = nullValueReader;
+    }
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_reader.getInt(docId, _readerContext));
+      if (_nullValueReader != null && _nullValueReader.isNull(docId)) {
+        return _predicateEvaluator.applySV((Integer) null);
+      }
+      return _predicateEvaluator.applySV(_forwardIndexReader.getInt(docId, _readerContext));
     }
   }
 
@@ -151,7 +172,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_reader.getLong(docId, _readerContext));
+      return _predicateEvaluator.applySV(_forwardIndexReader.getLong(docId, _readerContext));
     }
   }
 
@@ -159,7 +180,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_reader.getFloat(docId, _readerContext));
+      return _predicateEvaluator.applySV(_forwardIndexReader.getFloat(docId, _readerContext));
     }
   }
 
@@ -167,15 +188,23 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_reader.getDouble(docId, _readerContext));
+      return _predicateEvaluator.applySV(_forwardIndexReader.getDouble(docId, _readerContext));
     }
   }
 
   private class BigDecimalMatcher implements ValueMatcher {
+    private final NullValueVectorReader _nullValueReader;
+
+    public BigDecimalMatcher(NullValueVectorReader nullValueReader) {
+      _nullValueReader = nullValueReader;
+    }
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_reader.getBigDecimal(docId, _readerContext));
+      if (_nullValueReader != null && _nullValueReader.isNull(docId)) {
+        return _predicateEvaluator.applySV((BigDecimal) null);
+      }
+      return _predicateEvaluator.applySV(_forwardIndexReader.getBigDecimal(docId, _readerContext));
     }
   }
 
@@ -183,7 +212,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_reader.getString(docId, _readerContext));
+      return _predicateEvaluator.applySV(_forwardIndexReader.getString(docId, _readerContext));
     }
   }
 
@@ -191,7 +220,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_reader.getBytes(docId, _readerContext));
+      return _predicateEvaluator.applySV(_forwardIndexReader.getBytes(docId, _readerContext));
     }
   }
 }

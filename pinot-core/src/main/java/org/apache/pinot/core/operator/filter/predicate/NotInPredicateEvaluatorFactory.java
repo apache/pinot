@@ -29,6 +29,7 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
@@ -214,6 +215,12 @@ public class NotInPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(int value) {
+      return !_nonMatchingValues.contains(value);
+    }
+
+    @Override
+    public boolean applySV(Integer value) {
+      // todo(nhejazi): handle and test other data types.
       return !_nonMatchingValues.contains(value);
     }
   }

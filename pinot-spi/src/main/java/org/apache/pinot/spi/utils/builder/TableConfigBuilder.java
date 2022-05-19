@@ -96,6 +96,7 @@ public class TableConfigBuilder {
   private Map<String, String> _streamConfigs;
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _nullHandlingEnabled;
+  private boolean _nullHandlingInSelectEnabled;
   private List<String> _varLengthDictionaryColumns;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private List<String> _jsonIndexColumns;
@@ -299,6 +300,11 @@ public class TableConfigBuilder {
     _nullHandlingEnabled = nullHandlingEnabled;
     return this;
   }
+  
+  public TableConfigBuilder setNullHandlingInSelectEnabled(boolean nullHandlingInSelectEnabled) {
+    _nullHandlingInSelectEnabled = nullHandlingInSelectEnabled;
+    return this;
+  }
 
   public TableConfigBuilder setCustomConfig(TableCustomConfig customConfig) {
     _customConfig = customConfig;
@@ -401,6 +407,7 @@ public class TableConfigBuilder {
     indexingConfig.setStreamConfigs(_streamConfigs);
     indexingConfig.setSegmentPartitionConfig(_segmentPartitionConfig);
     indexingConfig.setNullHandlingEnabled(_nullHandlingEnabled);
+    indexingConfig.setNullHandlingInSelectEnabled(_nullHandlingInSelectEnabled);
     indexingConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
     indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
     indexingConfig.setJsonIndexColumns(_jsonIndexColumns);

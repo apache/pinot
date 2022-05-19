@@ -67,7 +67,7 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
     DistinctTable distinctTable = _distinctExecutor.getResult();
     // TODO: Use a separate way to represent DISTINCT instead of aggregation.
     return new IntermediateResultsBlock(new AggregationFunction[]{_distinctAggregationFunction},
-        Collections.singletonList(distinctTable));
+        Collections.singletonList(distinctTable), distinctTable.getDataSchema());
   }
 
   @Override

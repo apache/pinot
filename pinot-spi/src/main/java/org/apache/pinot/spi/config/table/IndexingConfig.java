@@ -52,7 +52,10 @@ public class IndexingConfig extends BaseJsonConfig {
   private boolean _enableDynamicStarTreeCreation;
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _aggregateMetrics;
+  // Null handling enabled in ingestion and filtering?
   private boolean _nullHandlingEnabled;
+  // Null handling enabled in selection operator (w/ and w/o order by).
+  private boolean _nullHandlingInSelectEnabled;
 
   /**
    * If `optimizeDictionaryForMetrics` enabled, dictionary is not created for the metric columns
@@ -281,6 +284,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
     _nullHandlingEnabled = nullHandlingEnabled;
+  }
+
+  public boolean isNullHandlingInSelectEnabled() {
+    return _nullHandlingInSelectEnabled;
+  }
+
+  public void setNullHandlingInSelectEnabled(boolean nullHandlingInSelectEnabled) {
+    _nullHandlingInSelectEnabled = nullHandlingInSelectEnabled;
   }
 
   public boolean isOptimizeDictionaryForMetrics() {

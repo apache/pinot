@@ -36,6 +36,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
   private int _maxRowLength = 0;
   private ByteArray[] _sortedValues;
   private boolean _sealed = false;
+  private boolean _hasNull = false;
 
   public BytesColumnPredIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
@@ -122,8 +123,13 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
   }
 
   @Override
-  public boolean hasNull() {
-    return false;
+  public boolean hasNulls() {
+    return _hasNull;
+  }
+
+  @Override
+  public void markHasNull() {
+    _hasNull = true;
   }
 
   @Override

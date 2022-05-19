@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -42,6 +44,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -49,6 +52,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+
 
 /**
  * Queries test for BIG_DECIMAL data type.
@@ -94,14 +99,18 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       GenericRow record = new GenericRow();
       BigDecimal value = BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i));
       // Insert data in 3 different formats
-      if (i % 3 == 0) {
+      if (i % 4 == 0) {
         record.putValue(BIG_DECIMAL_COLUMN, value);
-      } else if (i % 3 == 1) {
+        sum = sum.add(value);
+      } else if (i % 4 == 1) {
         record.putValue(BIG_DECIMAL_COLUMN, BigDecimalUtils.serialize(value));
-      } else {
+        sum = sum.add(value);
+      } else if (i % 4 == 2) {
         record.putValue(BIG_DECIMAL_COLUMN, value.toPlainString());
+        sum = sum.add(value);
+      } else {
+        record.putValue(BIG_DECIMAL_COLUMN, null);
       }
-      sum = sum.add(value);
       _records.add(record);
     }
     _sum = sum;
@@ -114,6 +123,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
+    segmentGeneratorConfig.setNullHandlingEnabled(true);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -125,15 +135,16 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
-  @Test
-  public void testQueriesWithDictColumn()
-      throws Exception {
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(RAW_TABLE_NAME)
-        .build();
-    setUp(tableConfig);
-    testQueries();
-  }
+  // todo(nhejazi): Null handling for Dictionary-based columns is not supported yet.
+//  @Test
+//  public void testQueriesWithDictColumn()
+//      throws Exception {
+//    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+//        .setTableName(RAW_TABLE_NAME)
+//        .build();
+//    setUp(tableConfig);
+//    testQueries();
+//  }
 
   @Test(priority = 1)
   public void testQueriesWithNoDictColumn()
@@ -149,80 +160,120 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
   }
 
   public void testQueries() {
+    Map<String, Object> pinotConfigProperties = new HashMap<>();
+    pinotConfigProperties.put(CommonConstants.Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, 4);
     {
-      String query = "SELECT * FROM testTable";
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      String query = "SELECT * FROM testTable"; // todo: test with 1
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
-      assertEquals(dataSchema,
-          new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
+      assertEquals(dataSchema, new DataSchema(
+          new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         Object[] row = rows.get(i);
         assertEquals(row.length, 1);
-        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)));
-      }
-    }
-    {
-      String query = String.format("SELECT * FROM testTable ORDER BY %s DESC LIMIT 40", BIG_DECIMAL_COLUMN);
-      // getBrokerResponseForSqlQuery(query) runs SQL query on multiple index segments. The result should be equivalent
-      // to querying 4 identical index segments.
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
-      assertEquals(dataSchema,
-          new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
-      List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 40);
-      for (int i = 0; i < 10; i++) {
-        BigDecimal expectedResult = BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - 1 - i));
-        for (int j = 0; j < 4; j++) {
-          Object[] row = rows.get(i * 4 + j);
-          assertEquals(row.length, 1);
-          assertEquals(row[0], expectedResult);
+        if (row[0] != null) {
+          assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)));
         }
       }
     }
     {
+      String query = String.format("SELECT * FROM testTable ORDER BY %s DESC LIMIT 2000", BIG_DECIMAL_COLUMN); // todo: test with no order by columns!
+      // getBrokerResponseForSqlQuery(query) runs SQL query on multiple index segments. The result should be equivalent
+      // to querying 4 identical index segments.
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 2000);
+      // Note 1: we inserted 250 nulls in _records, and since we query 4 identical index segments, the number of null
+      //  values is: 250 * 4 = 1000.
+      // Note 2: The default null ordering is 'NULLS LAST'.
+      for (int i = 0; i < 1000; i++) {
+        Object[] values = rows.get(i);
+        assertEquals(values.length, 1);
+        assertNull(values[0]);
+      }
+      int k = 0;
+      for (int i = 1000; i < 2000; i += 4) {
+        // Null values are inserted at indices where: index % 4 equals 3. Skip null values.
+        if ((NUM_RECORDS - 1 - k) % 4 == 3) {
+          k++;
+        }
+        for (int j = 0; j < 4; j++) {
+          Object[] values = rows.get(i + j);
+          assertEquals(values.length, 1);
+          assertEquals(values[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - 1 - k)));
+        }
+        k++;
+      }
+    }
+    {
+      // todo: test with multiple selected columns, and multiple ordered by columns.
+      // todo: add a test with transformations applied to identifier columns.
+      // todo: put everything behind a feature flag (nullHandlingEnabled, nullHandlingInSelectEnabled).
+      // todo: test with mix of BigDecimal and other primitive columns (e.g. int, float).
       String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s", BIG_DECIMAL_COLUMN,
           BIG_DECIMAL_COLUMN);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 10);
-      for (int i = 0; i < 10; i++) {
-        Object[] row = rows.get(i);
+      int i = 0, index = 0;
+      while (index < rows.size() - 1) {
+        Object[] row = rows.get(index);
         assertEquals(row.length, 1);
+        // Null values are inserted at indices where: index % 4 equals 3. All null values are grouped into a single null
+        // value (because of DISTINCT aggregation function).
+        if (i % 4 == 3) {
+          i++;
+        }
         assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)));
+        i++;
+        index++;
       }
+      // The default null ordering is 'NULLS LAST'. Therefore, null will appear as the last record.
+      assertNull(rows.get(rows.size() - 1)[0]);
     }
     {
       int limit = 40;
       String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s LIMIT %d",
           BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, limit);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
       List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), limit);
-      for (int i = 0; i < limit; i++) {
-        Object[] row = rows.get(i);
+      int i = 0, index = 0;
+      while (index < rows.size() - 1) {
+        Object[] row = rows.get(index);
         assertEquals(row.length, 1);
+        // Null values are inserted at indices where: index % 4 equals 3. All null values are grouped into a single null
+        // value (because of DISTINCT aggregation function).
+        if (i % 4 == 3) {
+          i++;
+        }
         assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)));
+        i++;
+        index++;
       }
+      // The default null ordering is 'NULLS LAST'. Therefore, null will appear as the last record.
+      assertNull(rows.get(rows.size() - 1)[0]);
     }
     {
       // This test case was added to validate path-code for distinct w/o order by. See:
       //   RawBigDecimalSingleColumnDistinctOnlyExecutor class.
       int limit = 40;
       String query = String.format("SELECT DISTINCT %s FROM testTable LIMIT %d", BIG_DECIMAL_COLUMN, limit);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -231,8 +282,9 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       assertEquals(rows.size(), limit);
     }
     {
+      // todo: test with multiple aggregation columns.
       String query = String.format("SELECT COUNT(%s) AS count FROM testTable", BIG_DECIMAL_COLUMN);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"count"}, new ColumnDataType[]{ColumnDataType.LONG}));
@@ -243,39 +295,59 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     {
       String query = String.format("SELECT %s FROM testTable GROUP BY %s ORDER BY %s DESC",
           BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{BIG_DECIMAL_COLUMN},
           new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 10);
-      for (int i = 0; i < 10; i++) {
-        Object[] row = rows.get(i);
+      // The default null ordering is 'NULLS LAST'. Therefore, null will appear as the last record.
+      assertNull(rows.get(0)[0]);
+      int index = 1, i = 0;
+      while (index < rows.size()) {
+        if ((NUM_RECORDS - i - 1) % 4 == 3) {
+          i++;
+        }
+        Object[] row = rows.get(index);
         assertEquals(row.length, 1);
         assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - i - 1)));
+        index++;
+        i++;
       }
     }
     {
       String query = String.format("SELECT COUNT(*) AS count, %s FROM testTable GROUP BY %s ORDER BY %s DESC",
           BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"count", BIG_DECIMAL_COLUMN},
           new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.BIG_DECIMAL}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 10);
-      for (int i = 0; i < 10; i++) {
-        Object[] row = rows.get(i);
+      int i = 0;
+      for (int index = 0; index < 10; index++) {
+        Object[] row = rows.get(index);
         assertEquals(row.length, 2);
-        assertEquals(row[0], 4L);
-        assertEquals(row[1], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - i - 1)).toPlainString());
+        if (index == 0) {
+          // The default null ordering is 'NULLS LAST'.
+          assertEquals(row[0], 1000L);
+          assertNull(row[1]);
+        } else {
+          if ((NUM_RECORDS - i - 1) % 4 == 3) {
+            // Null values are inserted at: index % 4 == 3. All null values are grouped into a single null.
+            i++;
+          }
+          assertEquals(row[0], 4L);
+          assertEquals(row[1], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - i - 1)).toPlainString());
+        }
+        i++;
       }
     }
     {
       String query = String.format("SELECT SUMPRECISION(%s) AS sum FROM testTable", BIG_DECIMAL_COLUMN);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"sum"}, new ColumnDataType[]{ColumnDataType.STRING}));
@@ -285,26 +357,41 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     }
     {
       // Note: defining decimal literals within quotes preserves precision.
-      String query = String.format("SELECT %s FROM testTable WHERE %s > '%s'",
-          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69)));
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BigDecimal lowerLimit = BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69));
+      String query = String.format("SELECT %s FROM testTable WHERE %s > '%s' LIMIT 30",
+          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, lowerLimit);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
+      // Pinot loops through the column values from smallest to biggest and find every null bigger than lowerLimit and
+      // hence returns many nulls.
       List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 10);
-      for (int i = 0; i < 10; i++) {
+      assertEquals(rows.size(), 30);
+      for (int i = 0; i < 17; i++) {
         Object[] row = rows.get(i);
         assertEquals(row.length, 1);
-        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69 + i + 1)));
+        assertNull(row[0]);
+      }
+      int i = 0;
+      for (int index = 17; index < 30; index++) {
+        Object[] row = rows.get(index);
+        assertEquals(row.length, 1);
+        if ((69 + i + 1) % 4 == 3) {
+          // Null values are inserted at: index % 4 == 3.
+          assertNull(row[0]);
+        } else {
+          assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69 + i + 1)));
+        }
+        i++;
       }
     }
     {
       // Note: defining decimal literals within quotes preserves precision.
       String query = String.format("SELECT %s FROM testTable WHERE %s = '%s'",
           BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69)));
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -321,18 +408,53 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       String query = String.format(
           "SELECT MAX(%s) AS maxValue FROM testTable GROUP BY %s HAVING maxValue < %s ORDER BY maxValue",
           BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(5)));
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{"maxValue"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
       List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 5);
-      for (int i = 0; i < 5; i++) {
-        Object[] row = rows.get(i);
+      // The default null ordering is: 'NULLS LAST'. This is why the number of returned value is 4 and not 5.
+      assertEquals(rows.size(), 4);
+      int i = 0;
+      for (int index = 0; index < 4; index++) {
+        if (i % 4 == 3) {
+            // Null values are inserted at: index % 4 == 3.
+            i++;
+        }
+        Object[] row = rows.get(index);
         assertEquals(row.length, 1);
         assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)).doubleValue());
+        i++;
       }
+    }
+    {
+      int lowerLimit = 991;
+      String query = String.format(
+          "SELECT MAX(%s) AS maxValue FROM testTable GROUP BY %s HAVING maxValue > %s ORDER BY maxValue",
+          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(lowerLimit)));
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{"maxValue"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 7);
+      int i = lowerLimit;
+      for (int index = 0; index < 6; index++) {
+        if (i % 4 == 3) {
+          // Null values are inserted at: index % 4 == 3.
+          i++;
+        }
+        Object[] row = rows.get(index);
+        assertEquals(row.length, 1);
+        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)).doubleValue());
+        i++;
+      }
+      // The default null ordering is: 'NULLS LAST'. This is why the last record value is null.
+      Object[] row = rows.get(rows.size() - 1);
+      assertEquals(row.length, 1);
+      assertNull(row[0]);
     }
     {
       // This returns currently 25 rows instead of a single row!

@@ -61,7 +61,7 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
   }
 
   @Override
-  public double getDoubleResult(int groupKey) {
+  public Double getDoubleResult(int groupKey) {
     throw new UnsupportedOperationException();
   }
 

@@ -93,7 +93,9 @@ public interface ColumnStatistics extends Serializable {
   /**
    * @return Returns if any of the values have nulls in the segments.
    */
-  boolean hasNull();
+  boolean hasNulls();
+
+  void markHasNull();
 
   PartitionFunction getPartitionFunction();
 

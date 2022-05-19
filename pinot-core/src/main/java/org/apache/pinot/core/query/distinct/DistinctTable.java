@@ -39,7 +39,10 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
@@ -92,6 +95,7 @@ public class DistinctTable {
         orderByExpressionIndices[i] = columnNames.indexOf(orderByExpression.getExpression().toString());
         comparisonFactors[i] = orderByExpression.isAsc() ? -1 : 1;
       }
+      // todo(nhejazi): returns separate priorityQueue when null handling is not needed.
       _priorityQueue = new ObjectHeapPriorityQueue<>(initialCapacity, (r1, r2) -> {
         Object[] values1 = r1.getValues();
         Object[] values2 = r2.getValues();
@@ -99,6 +103,12 @@ public class DistinctTable {
           int index = orderByExpressionIndices[i];
           Comparable value1 = (Comparable) values1[index];
           Comparable value2 = (Comparable) values2[index];
+          if (value1 == null) {
+            return value2 == null ? 0 : comparisonFactors[i];
+          } else if (value2 == null) {
+            return -comparisonFactors[i];
+          }
+
           int result = value1.compareTo(value2) * comparisonFactors[i];
           if (result != 0) {
             return result;
@@ -242,31 +252,47 @@ public class DistinctTable {
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
+
+    // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
+    FieldSpec[] columnFieldSpecs = _dataSchema.getColumnFieldSpecs();
+    assert columnFieldSpecs != null;
+    Object[] columnDefaultNullValues = new Object[numColumns];
+    RoaringBitmap[] columnNullRoaringBitmap = new RoaringBitmap[numColumns];
+    for (int colId = 0; colId < numColumns; colId++) {
+      columnDefaultNullValues[colId] = columnFieldSpecs[colId].getDefaultNullValue();
+      columnNullRoaringBitmap[colId] = new RoaringBitmap();
+    }
+
+    int rowId = 0;
     for (Record record : _records) {
       dataTableBuilder.startRow();
       Object[] values = record.getValues();
-      for (int i = 0; i < numColumns; i++) {
-        switch (storedColumnDataTypes[i]) {
+      for (int colId = 0; colId < numColumns; colId++) {
+        if (values[colId] == null) {
+          values[colId] = columnDefaultNullValues[colId];
+          columnNullRoaringBitmap[colId].add(rowId);
+        }
+        switch (storedColumnDataTypes[colId]) {
           case INT:
-            dataTableBuilder.setColumn(i, (int) values[i]);
+            dataTableBuilder.setColumn(colId, (int) values[colId]);
             break;
           case LONG:
-            dataTableBuilder.setColumn(i, (long) values[i]);
+            dataTableBuilder.setColumn(colId, (long) values[colId]);
             break;
           case FLOAT:
-            dataTableBuilder.setColumn(i, (float) values[i]);
+            dataTableBuilder.setColumn(colId, (float) values[colId]);
             break;
           case DOUBLE:
-            dataTableBuilder.setColumn(i, (double) values[i]);
+            dataTableBuilder.setColumn(colId, (double) values[colId]);
             break;
           case BIG_DECIMAL:
-            dataTableBuilder.setColumn(i, (BigDecimal) values[i]);
+            dataTableBuilder.setColumn(colId, (BigDecimal) values[colId]);
             break;
           case STRING:
-            dataTableBuilder.setColumn(i, (String) values[i]);
+            dataTableBuilder.setColumn(colId, (String) values[colId]);
             break;
           case BYTES:
-            dataTableBuilder.setColumn(i, (ByteArray) values[i]);
+            dataTableBuilder.setColumn(colId, (ByteArray) values[colId]);
             break;
           // Add other distinct column type supports here
           default:
@@ -274,6 +300,11 @@ public class DistinctTable {
         }
       }
       dataTableBuilder.finishRow();
+      rowId++;
+    }
+    // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
+    for (int colId = 0; colId < numColumns; colId++) {
+      dataTableBuilder.setColumnNullBitmap(columnNullRoaringBitmap[colId].toMutableRoaringBitmap());
     }
     return dataTableBuilder.build().toBytes();
   }
@@ -289,10 +320,21 @@ public class DistinctTable {
     int numRecords = dataTable.getNumberOfRows();
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
+    // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
+    MutableRoaringBitmap[] colNullBitmaps = new MutableRoaringBitmap[numColumns];
+    for (int colId = 0; colId < numColumns; colId++) {
+      colNullBitmaps[colId] = dataTable.getColumnNullBitmap(colId);
+    }
+
     List<Record> records = new ArrayList<>(numRecords);
     for (int i = 0; i < numRecords; i++) {
       Object[] values = new Object[numColumns];
       for (int j = 0; j < numColumns; j++) {
+        if (colNullBitmaps[j].contains(i)) {
+          values[j] = null;
+          continue;
+        }
+
         switch (storedColumnDataTypes[j]) {
           case INT:
             values[j] = dataTable.getInt(i, j);

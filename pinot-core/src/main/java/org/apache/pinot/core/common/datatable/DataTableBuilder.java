@@ -30,6 +30,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -81,6 +82,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 public class DataTableBuilder {
   public static final int VERSION_2 = 2;
   public static final int VERSION_3 = 3;
+  public static final int VERSION_4 = 4;
   private static int _version = VERSION_3;
   private final DataSchema _dataSchema;
   private final int[] _columnOffsets;
@@ -91,6 +93,12 @@ public class DataTableBuilder {
   private final ByteArrayOutputStream _variableSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
   private final DataOutputStream _variableSizeDataOutputStream =
       new DataOutputStream(_variableSizeDataByteArrayOutputStream);
+  private final ByteArrayOutputStream _fixedSizeNullVectorByteArrayOutputStream = new ByteArrayOutputStream();
+  private final DataOutputStream _fixedSizeNullVectorOutputStream =
+      new DataOutputStream(_fixedSizeNullVectorByteArrayOutputStream);
+  private final ByteArrayOutputStream _variableSizeNullVectorByteArrayOutputStream = new ByteArrayOutputStream();
+  private final DataOutputStream _variableSizeNullVectorOutputStream =
+      new DataOutputStream(_variableSizeNullVectorByteArrayOutputStream);
 
   private int _numRows;
   private ByteBuffer _currentRowDataByteBuffer;
@@ -102,11 +110,17 @@ public class DataTableBuilder {
   }
 
   public static DataTable getEmptyDataTable() {
-    return _version == VERSION_2 ? new DataTableImplV2() : new DataTableImplV3();
+    if (_version == VERSION_2) {
+      return new DataTableImplV2();
+    }
+    if (_version == VERSION_4) {
+      return new DataTableImplV4();
+    }
+    return new DataTableImplV3();
   }
 
   public static void setCurrentDataTableVersion(int version) {
-    if (version != VERSION_2 && version != VERSION_3) {
+    if (version != VERSION_2 && version != VERSION_3 && version != VERSION_4) {
       throw new IllegalArgumentException("Unsupported version: " + version);
     }
     _version = version;
@@ -115,6 +129,22 @@ public class DataTableBuilder {
   public void startRow() {
     _numRows++;
     _currentRowDataByteBuffer = ByteBuffer.allocate(_rowSizeInBytes);
+  }
+
+  public void setColumnNullBitmap(ImmutableRoaringBitmap nullBitmap)
+      throws IOException {
+    assert _version >= VERSION_4;
+    _fixedSizeNullVectorOutputStream.writeInt(_variableSizeNullVectorOutputStream.size());
+    if (nullBitmap.isEmpty()) {
+      _fixedSizeNullVectorOutputStream.writeInt(0);
+    } else {
+      int[] nullBitmapArray = nullBitmap.toArray();
+      _fixedSizeNullVectorOutputStream.writeInt(nullBitmapArray.length);
+      // todo: optimize looping through bitmaps.
+      for (int nullBitmapInt : nullBitmapArray) {
+        _variableSizeNullVectorOutputStream.writeInt(nullBitmapInt);
+      }
+    }
   }
 
   public void setColumn(int colId, boolean value) {
@@ -288,9 +318,18 @@ public class DataTableBuilder {
   }
 
   public DataTable build() {
-    return _version == VERSION_2 ? new DataTableImplV2(_numRows, _dataSchema, _reverseDictionaryMap,
-        _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray())
-        : new DataTableImplV3(_numRows, _dataSchema, _reverseDictionaryMap,
-            _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
+    if (_version == VERSION_2) {
+      return new DataTableImplV2(_numRows, _dataSchema, _reverseDictionaryMap,
+          _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
+    }
+    if (_version == VERSION_4) {
+      return new DataTableImplV4(_numRows, _dataSchema, _reverseDictionaryMap,
+          _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray(),
+          _fixedSizeNullVectorByteArrayOutputStream.toByteArray(),
+          _variableSizeNullVectorByteArrayOutputStream.toByteArray());
+    }
+
+    return new DataTableImplV3(_numRows, _dataSchema, _reverseDictionaryMap,
+        _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
   }
 }

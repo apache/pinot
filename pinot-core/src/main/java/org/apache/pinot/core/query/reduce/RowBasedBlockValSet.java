@@ -21,11 +21,13 @@ package org.apache.pinot.core.query.reduce;
 import java.math.BigDecimal;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -49,6 +51,11 @@ public class RowBasedBlockValSet implements BlockValSet {
     _pinotDataType = PinotDataType.getPinotDataTypeForExecution(columnDataType);
     _rows = rows;
     _columnIndex = columnIndex;
+  }
+
+  @Override
+  public ImmutableRoaringBitmap getNullBitmap() {
+    throw new NotImplementedException();
   }
 
   @Override

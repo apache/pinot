@@ -27,6 +27,7 @@ import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
@@ -100,12 +101,20 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[] valueArray = blockValSet.getDoubleValuesSV();
+    // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
+    ImmutableRoaringBitmap nullBitmap = blockValSet.getNullBitmap();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
       int groupKey = groupKeyArray[i];
-      if (value > groupByResultHolder.getDoubleResult(groupKey)) {
-        groupByResultHolder.setValueForKey(groupKey, value);
+      Double result = groupByResultHolder.getDoubleResult(groupKey);
+      if (result != null && value > groupByResultHolder.getDoubleResult(groupKey)) {
+        if (nullBitmap.contains(i)) {
+          groupByResultHolder.setValueForKey(groupKey, null);
+        } else {
+          groupByResultHolder.setValueForKey(groupKey, value);
+        }
       }
     }
   }
@@ -136,6 +145,12 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public Double merge(Double intermediateResult1, Double intermediateResult2) {
+    if (intermediateResult1 == null) {
+      return intermediateResult1;
+    } else if (intermediateResult2 == null) {
+      return intermediateResult2;
+    }
+
     if (intermediateResult1 > intermediateResult2) {
       return intermediateResult1;
     } else {

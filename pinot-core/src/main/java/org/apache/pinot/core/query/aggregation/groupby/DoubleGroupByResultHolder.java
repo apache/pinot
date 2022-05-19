@@ -30,7 +30,7 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
   private final double _defaultValue;
 
   private int _resultHolderCapacity;
-  private double[] _resultArray;
+  private Double[] _resultArray;
 
   /**
    * Constructor for the class.
@@ -44,10 +44,8 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
     _defaultValue = defaultValue;
 
     _resultHolderCapacity = initialCapacity;
-    _resultArray = new double[initialCapacity];
-    if (defaultValue != 0.0) {
-      Arrays.fill(_resultArray, defaultValue);
-    }
+    _resultArray = new Double[initialCapacity];
+    Arrays.fill(_resultArray, defaultValue);
   }
 
   @Override
@@ -61,8 +59,8 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
       // Cap the growth to maximum possible number of group keys
       _resultHolderCapacity = Math.min(_resultHolderCapacity, _maxCapacity);
 
-      double[] current = _resultArray;
-      _resultArray = new double[_resultHolderCapacity];
+      Double[] current = _resultArray;
+      _resultArray = new Double[_resultHolderCapacity];
       System.arraycopy(current, 0, _resultArray, 0, copyLength);
 
       if (_defaultValue != 0.0) {
@@ -72,7 +70,7 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
   }
 
   @Override
-  public double getDoubleResult(int groupKey) {
+  public Double getDoubleResult(int groupKey) {
     if (groupKey == GroupKeyGenerator.INVALID_ID) {
       return _defaultValue;
     } else {
@@ -94,6 +92,8 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
 
   @Override
   public void setValueForKey(int groupKey, Object newValue) {
-    throw new UnsupportedOperationException();
+    if (groupKey != GroupKeyGenerator.INVALID_ID) {
+      _resultArray[groupKey] = (Double) newValue;
+    }
   }
 }

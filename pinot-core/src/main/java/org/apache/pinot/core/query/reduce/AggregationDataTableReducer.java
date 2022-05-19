@@ -102,13 +102,13 @@ public class AggregationDataTableReducer implements DataTableReducer {
     PostAggregationHandler postAggregationHandler =
         new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema());
     DataSchema dataSchema = postAggregationHandler.getResultDataSchema();
-    Object[] row = postAggregationHandler.getResult(finalResults);
+    Object[] values = postAggregationHandler.getResult(finalResults);
     ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     int numColumns = columnDataTypes.length;
     for (int i = 0; i < numColumns; i++) {
-      row[i] = columnDataTypes[i].format(row[i]);
+      values[i] = columnDataTypes[i].format(values[i]);
     }
-    return new ResultTable(dataSchema, Collections.singletonList(row));
+    return new ResultTable(dataSchema, Collections.singletonList(values));
   }
 
   /**
