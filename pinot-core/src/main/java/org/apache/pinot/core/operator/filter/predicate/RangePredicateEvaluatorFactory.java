@@ -436,12 +436,14 @@ public class RangePredicateEvaluatorFactory {
     final BigDecimal _upperBound;
     final int _lowerComparisonValue;
     final int _upperComparisonValue;
+    final boolean _upperInclusive;
 
     BigDecimalRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate, BigDecimal lowerBound,
         BigDecimal upperBound, boolean lowerInclusive, boolean upperInclusive) {
       super(rangePredicate);
       _lowerBound = lowerBound;
       _upperBound = upperBound;
+      _upperInclusive = upperInclusive;
       _lowerComparisonValue = lowerInclusive ? 0 : 1;
       _upperComparisonValue = upperInclusive ? 0 : -1;
     }

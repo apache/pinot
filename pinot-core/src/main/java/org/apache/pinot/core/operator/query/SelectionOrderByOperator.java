@@ -341,7 +341,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
         row[numOrderByExpressions] = docIds[rowId];
         // todo(nhejazi): when filling the non-order-by output expression values later in the row, you should also
         //  handle nulls.
-        // todo(nhejazi): storing default value per column for now instead of relying on FieldSpec (metric vs. dimension)
+        // todo(nhejazi): storing default value per column for now instead of relying on FieldSpec (metric vs. dim)
         //  since passing through column field type requires lots of plumming. Will do in separate PR.
         boolean isMetric = true;
         for (int colId = 0; colId < numOrderByExpressions; colId++) {

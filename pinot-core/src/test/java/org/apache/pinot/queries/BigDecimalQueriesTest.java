@@ -180,7 +180,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      String query = String.format("SELECT * FROM testTable ORDER BY %s DESC LIMIT 2000", BIG_DECIMAL_COLUMN); // todo: test with no order by columns!
+      String query = String.format("SELECT * FROM testTable ORDER BY %s DESC LIMIT 2000", BIG_DECIMAL_COLUMN);
       // getBrokerResponseForSqlQuery(query) runs SQL query on multiple index segments. The result should be equivalent
       // to querying 4 identical index segments.
       BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
@@ -213,10 +213,6 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      // todo: test with multiple selected columns, and multiple ordered by columns.
-      // todo: add a test with transformations applied to identifier columns.
-      // todo: put everything behind a feature flag (nullHandlingEnabled, nullHandlingInSelectEnabled).
-      // todo: test with mix of BigDecimal and other primitive columns (e.g. int, float).
       String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s", BIG_DECIMAL_COLUMN,
           BIG_DECIMAL_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
@@ -226,7 +222,8 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 10);
-      int i = 0, index = 0;
+      int i = 0;
+      int index = 0;
       while (index < rows.size() - 1) {
         Object[] row = rows.get(index);
         assertEquals(row.length, 1);
@@ -252,7 +249,8 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       assertEquals(dataSchema,
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
       List<Object[]> rows = resultTable.getRows();
-      int i = 0, index = 0;
+      int i = 0;
+      int index = 0;
       while (index < rows.size() - 1) {
         Object[] row = rows.get(index);
         assertEquals(row.length, 1);
@@ -282,7 +280,6 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       assertEquals(rows.size(), limit);
     }
     {
-      // todo: test with multiple aggregation columns.
       String query = String.format("SELECT COUNT(%s) AS count FROM testTable", BIG_DECIMAL_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
       ResultTable resultTable = brokerResponse.getResultTable();
@@ -304,7 +301,8 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       assertEquals(rows.size(), 10);
       // The default null ordering is 'NULLS LAST'. Therefore, null will appear as the last record.
       assertNull(rows.get(0)[0]);
-      int index = 1, i = 0;
+      int index = 1;
+      int i = 0;
       while (index < rows.size()) {
         if ((NUM_RECORDS - i - 1) % 4 == 3) {
           i++;

@@ -66,7 +66,6 @@ public class ProjectionBlockValSet implements BlockValSet {
         }
       }
       _nullBitmap = projectedNullBitmap.toImmutableRoaringBitmap();
-
     } else {
       _nullBitmap = null;
     }

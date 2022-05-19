@@ -306,7 +306,7 @@ public class TableConfigBuilder {
     _nullHandlingEnabled = nullHandlingEnabled;
     return this;
   }
-  
+
   public TableConfigBuilder setNullHandlingInSelectEnabled(boolean nullHandlingInSelectEnabled) {
     _nullHandlingInSelectEnabled = nullHandlingInSelectEnabled;
     return this;

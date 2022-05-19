@@ -79,7 +79,8 @@ public class SelectionOperatorService {
     _offset = queryContext.getOffset();
     _numRowsToKeep = _offset + queryContext.getLimit();
     assert queryContext.getOrderByExpressions() != null;
-    _rows = new PriorityQueue<Object[]>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
+    _rows = new PriorityQueue<Object[]>(Math.min(_numRowsToKeep,
+        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
         getTypeCompatibleComparator(queryContext.getOrderByExpressions()));
   }
 

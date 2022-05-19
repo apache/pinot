@@ -351,7 +351,8 @@ public class IntermediateResultsBlock implements Block {
           if (columnFieldSpecs[colIdx] != null) {
             value = columnDefaultNullValues[colIdx];
           } else {
-            value = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC, storedColumnDataTypes[colIdx].toDataType(), null);
+            value = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC,
+                storedColumnDataTypes[colIdx].toDataType(), null);
           }
           columnNullRoaringBitmap[colIdx].add(rowId);
         }
@@ -441,7 +442,8 @@ public class IntermediateResultsBlock implements Block {
       if (columnDataTypes[i] != ColumnDataType.OBJECT) {
         FieldSpec fieldSpec = _dataSchema == null ? null : _dataSchema.getColumnFieldSpecs()[i];
         if (fieldSpec == null) {
-          columnDefaultNullValues[i] = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC, columnDataTypes[i].toDataType(), null);
+          columnDefaultNullValues[i] = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC,
+              columnDataTypes[i].toDataType(), null);
         } else {
           columnDefaultNullValues[i] = fieldSpec.getDefaultNullValue();
         }
