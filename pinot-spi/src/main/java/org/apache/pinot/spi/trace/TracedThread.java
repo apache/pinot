@@ -16,12 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.util.trace;
+package org.apache.pinot.spi.trace;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
-import org.apache.pinot.spi.trace.InvocationRecording;
-import org.apache.pinot.spi.trace.TraceState;
 
 
 final class TracedThread extends Thread implements TraceState {

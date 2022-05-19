@@ -16,33 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.util.trace;
+package org.apache.pinot.spi.trace;
 
 /**
- * Wrapper class for {@link Runnable} to automatically register/un-register itself to/from a request.
+ * Wrapper class for {@link Runnable} to provide hooks for some preparation and cleanup around running the job.
  */
 public abstract class TraceRunnable implements Runnable {
-  private final TraceContext.TraceEntry _parentTraceEntry;
-
-  /**
-   * If trace is not enabled, parent trace entry will be null.
-   */
-  public TraceRunnable() {
-    _parentTraceEntry = TraceContext.getTraceEntry();
-  }
-
   @Override
   public void run() {
-    if (_parentTraceEntry != null) {
-      TraceContext.registerThreadToRequest(_parentTraceEntry);
-    }
+    preRun();
     try {
       runJob();
     } finally {
-      if (_parentTraceEntry != null) {
-        TraceContext.unregisterThreadFromRequest();
-      }
+      postRun();
     }
+  }
+
+  protected void preRun() {
+  }
+
+  protected void postRun() {
   }
 
   public abstract void runJob();

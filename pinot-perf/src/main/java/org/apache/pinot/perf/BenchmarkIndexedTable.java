@@ -39,7 +39,7 @@ import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.core.util.trace.ContextBasedTraceRunnable;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Mode;
@@ -125,7 +125,7 @@ public class BenchmarkIndexedTable {
     CountDownLatch operatorLatch = new CountDownLatch(numSegments);
     Future[] futures = new Future[numSegments];
     for (int i = 0; i < numSegments; i++) {
-      futures[i] = _executorService.submit(new TraceRunnable() {
+      futures[i] = _executorService.submit(new ContextBasedTraceRunnable() {
         @SuppressWarnings("unchecked")
         @Override
         public void runJob() {

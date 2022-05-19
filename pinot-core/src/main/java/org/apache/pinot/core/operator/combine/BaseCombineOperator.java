@@ -35,7 +35,7 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
-import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.core.util.trace.ContextBasedTraceRunnable;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -85,7 +85,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     Tracing.activeRecording().setNumTasks(_numTasks);
     for (int i = 0; i < _numTasks; i++) {
       int taskIndex = i;
-      _futures[i] = _executorService.submit(new TraceRunnable() {
+      _futures[i] = _executorService.submit(new ContextBasedTraceRunnable() {
         @Override
         public void runJob() {
           ThreadTimer executionThreadTimer = new ThreadTimer();

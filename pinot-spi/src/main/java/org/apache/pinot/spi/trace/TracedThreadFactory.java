@@ -16,39 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.util.trace;
+package org.apache.pinot.spi.trace;
 
-import java.util.concurrent.Callable;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
-/**
- * Wrapper class for {@link Callable} to automatically register/un-register itself to/from a request.
- */
-public abstract class TraceCallable<V> implements Callable<V> {
-  private final TraceContext.TraceEntry _parentTraceEntry;
+public final class TracedThreadFactory implements ThreadFactory {
 
-  /**
-   * If trace is not enabled, parent trace entry will be null.
-   */
-  public TraceCallable() {
-    _parentTraceEntry = TraceContext.getTraceEntry();
+  private final int _priority;
+  private final boolean _daemon;
+  private final String _nameFormat;
+  private final AtomicInteger _count = new AtomicInteger();
+
+  public TracedThreadFactory(int priority, boolean daemon, String nameFormat) {
+    _priority = priority;
+    _daemon = daemon;
+    _nameFormat = nameFormat;
   }
 
   @Override
-  public V call()
-      throws Exception {
-    if (_parentTraceEntry != null) {
-      TraceContext.registerThreadToRequest(_parentTraceEntry);
-    }
-    try {
-      return callJob();
-    } finally {
-      if (_parentTraceEntry != null) {
-        TraceContext.unregisterThreadFromRequest();
-      }
-    }
+  public Thread newThread(Runnable task) {
+    Thread thread = new TracedThread(task);
+    thread.setPriority(_priority);
+    thread.setDaemon(_daemon);
+    thread.setName(String.format(_nameFormat, _count.getAndIncrement()));
+    return thread;
   }
-
-  public abstract V callJob()
-      throws Exception;
 }

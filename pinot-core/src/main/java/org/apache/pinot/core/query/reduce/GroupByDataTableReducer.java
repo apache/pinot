@@ -50,7 +50,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.core.util.trace.ContextBasedTraceRunnable;
 
 
 /**
@@ -241,7 +241,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     for (int i = 0; i < numReduceThreadsToUse; i++) {
       List<DataTable> reduceGroup = reduceGroups.get(i);
-      futures[i] = reducerContext.getExecutorService().submit(new TraceRunnable() {
+      futures[i] = reducerContext.getExecutorService().submit(new ContextBasedTraceRunnable() {
         @Override
         public void runJob() {
           for (DataTable dataTable : reduceGroup) {

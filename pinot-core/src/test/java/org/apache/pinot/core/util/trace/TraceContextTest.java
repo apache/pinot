@@ -90,7 +90,7 @@ public class TraceContextTest {
       final int childValue = RANDOM.nextInt();
       expectedTraces.add(getTraceString(chileKey, childValue));
 
-      futures[i] = executorService.submit(new TraceRunnable() {
+      futures[i] = executorService.submit(new ContextBasedTraceRunnable() {
         @Override
         public void runJob() {
           // Add (requestId + 1) logs

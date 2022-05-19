@@ -39,7 +39,7 @@ import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
-import org.apache.pinot.core.util.trace.TraceCallable;
+import org.apache.pinot.core.util.trace.ContextBasedTraceCallable;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.InvocationScope;
@@ -117,7 +117,7 @@ public class CombinePlanNode implements PlanNode {
       Future[] futures = new Future[numTasks];
       for (int i = 0; i < numTasks; i++) {
         int index = i;
-        futures[i] = _executorService.submit(new TraceCallable<List<Operator>>() {
+        futures[i] = _executorService.submit(new ContextBasedTraceCallable<List<Operator>>() {
           @Override
           public List<Operator> callJob() {
             try {

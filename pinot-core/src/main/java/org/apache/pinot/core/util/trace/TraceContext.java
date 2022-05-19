@@ -39,7 +39,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * {@link #register(long requestId)}.
  * <p>
  * To trace the {@link Runnable} or {@link java.util.concurrent.Callable} jobs the request handler creates and will be
- * executed in other threads, use {@link TraceRunnable} or {@link TraceCallable} instead.
+ * executed in other threads, use {@link ContextBasedTraceRunnable} or {@link ContextBasedTraceCallable} instead.
  * <p>
  * At the end of tracing a request, the request handler thread should call {@link #unregister()} to un-register the
  * request from tracing to prevent resource leak.

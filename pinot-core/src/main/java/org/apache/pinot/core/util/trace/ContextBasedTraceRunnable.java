@@ -18,29 +18,33 @@
  */
 package org.apache.pinot.core.util.trace;
 
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.pinot.spi.trace.TraceRunnable;
 
 
-public final class TracedThreadFactory implements ThreadFactory {
+/**
+ * Extend {@link TraceRunnable} to automatically register/un-register itself to/from a request.
+ */
+public abstract class ContextBasedTraceRunnable extends TraceRunnable {
+  private final TraceContext.TraceEntry _parentTraceEntry;
 
-  private final int _priority;
-  private final boolean _daemon;
-  private final String _nameFormat;
-  private final AtomicInteger _count = new AtomicInteger();
-
-  public TracedThreadFactory(int priority, boolean daemon, String nameFormat) {
-    _priority = priority;
-    _daemon = daemon;
-    _nameFormat = nameFormat;
+  /**
+   * If trace is not enabled, parent trace entry will be null.
+   */
+  public ContextBasedTraceRunnable() {
+    _parentTraceEntry = TraceContext.getTraceEntry();
   }
 
   @Override
-  public Thread newThread(Runnable task) {
-    Thread thread = new TracedThread(task);
-    thread.setPriority(_priority);
-    thread.setDaemon(_daemon);
-    thread.setName(String.format(_nameFormat, _count.getAndIncrement()));
-    return thread;
+  public void preRun() {
+    if (_parentTraceEntry != null) {
+      TraceContext.registerThreadToRequest(_parentTraceEntry);
+    }
+  }
+
+  @Override
+  public void postRun() {
+    if (_parentTraceEntry != null) {
+      TraceContext.unregisterThreadFromRequest();
+    }
   }
 }
