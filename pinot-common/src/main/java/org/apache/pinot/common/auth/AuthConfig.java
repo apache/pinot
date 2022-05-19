@@ -16,34 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.common.auth;
 
-import java.io.Serializable;
+import java.util.Map;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-public class Pair<FIRST extends Serializable, SECOND extends Serializable> implements Serializable {
-  private FIRST _first;
-  private SECOND _second;
+/**
+ * Standardized auth config container for AuthProvider
+ * @see AuthProviderUtils#extractAuthConfig(PinotConfiguration, String)
+ */
+public class AuthConfig {
+  public static final String PROVIDER_CLASS = "provider.class";
 
-  public FIRST getFirst() {
-    return _first;
+  protected Map<String, Object> _properties;
+
+  public AuthConfig(Map<String, Object> properties) {
+    _properties = properties;
   }
 
-  public void setFirst(FIRST first) {
-    _first = first;
-  }
-
-  public SECOND getSecond() {
-    return _second;
-  }
-
-  public void setSecond(SECOND second) {
-    _second = second;
-  }
-
-  public Pair(FIRST first, SECOND second) {
-    super();
-    _first = first;
-    _second = second;
+  public Map<String, Object> getProperties() {
+    return _properties;
   }
 }

@@ -36,6 +36,7 @@ import org.testng.annotations.Test;
 /**
  * Tests for the ValidationManagers.
  */
+@Test(groups = "stateless")
 public class ValidationManagerStatelessTest extends ControllerTest {
   private static final String TEST_TABLE_NAME = "testTable";
   private static final String TEST_TABLE_TWO = "testTable2";

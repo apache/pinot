@@ -35,6 +35,7 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -50,7 +51,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.utils.Pair;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -118,7 +118,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   private static Map<String, String> createMapField(Pair<String, String>[] pairs) {
     Map<String, String> map = new HashMap<>();
     for (Pair<String, String> pair : pairs) {
-      map.put(pair.getFirst(), pair.getSecond());
+      map.put(pair.getLeft(), pair.getRight());
     }
     return map;
   }
@@ -168,13 +168,13 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
 
     // Insert MAP
     inputRecords.add(
-        createTableRecord(2, "mickey mouse", createMapField(new Pair[]{new Pair("a", "1"), new Pair("b", "2")}),
+        createTableRecord(2, "mickey mouse", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
             createEnumField(enumSchema, "DOWN"), createFixedField(fixedSchema, 2)));
     inputRecords.add(
-        createTableRecord(3, "donald duck", createMapField(new Pair[]{new Pair("a", "1"), new Pair("b", "2")}),
+        createTableRecord(3, "donald duck", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
             createEnumField(enumSchema, "UP"), createFixedField(fixedSchema, 3)));
     inputRecords.add(
-        createTableRecord(4, "scrooge mcduck", createMapField(new Pair[]{new Pair("a", "1"), new Pair("b", "2")}),
+        createTableRecord(4, "scrooge mcduck", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
             createEnumField(enumSchema, "LEFT"), createFixedField(fixedSchema, 4)));
 
     // insert RECORD

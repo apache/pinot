@@ -38,9 +38,9 @@ public class ZKMetadataUtils {
    * Creates the segment ZK metadata for a new segment.
    */
   public static SegmentZKMetadata createSegmentZKMetadata(String tableNameWithType, SegmentMetadata segmentMetadata,
-      String downloadUrl, @Nullable String crypter, long segmentSizeInBytes) {
+      String downloadUrl, @Nullable String crypterName, long segmentSizeInBytes) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
-    updateSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl, crypter,
+    updateSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl, crypterName,
         segmentSizeInBytes);
     segmentZKMetadata.setPushTime(System.currentTimeMillis());
     return segmentZKMetadata;
@@ -50,14 +50,14 @@ public class ZKMetadataUtils {
    * Refreshes the segment ZK metadata for a segment being replaced.
    */
   public static void refreshSegmentZKMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata,
-      SegmentMetadata segmentMetadata, String downloadUrl, @Nullable String crypter, long segmentSizeInBytes) {
-    updateSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl, crypter,
+      SegmentMetadata segmentMetadata, String downloadUrl, @Nullable String crypterName, long segmentSizeInBytes) {
+    updateSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl, crypterName,
         segmentSizeInBytes);
     segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
   }
 
   private static void updateSegmentZKMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata,
-      SegmentMetadata segmentMetadata, String downloadUrl, @Nullable String crypter, long segmentSizeInBytes) {
+      SegmentMetadata segmentMetadata, String downloadUrl, @Nullable String crypterName, long segmentSizeInBytes) {
     if (segmentMetadata.getTimeInterval() != null) {
       segmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
       segmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
@@ -77,7 +77,7 @@ public class ZKMetadataUtils {
     segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
     segmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
     segmentZKMetadata.setDownloadUrl(downloadUrl);
-    segmentZKMetadata.setCrypterName(crypter);
+    segmentZKMetadata.setCrypterName(crypterName);
 
     // Set partition metadata
     Map<String, ColumnPartitionMetadata> columnPartitionMap = new HashMap<>();

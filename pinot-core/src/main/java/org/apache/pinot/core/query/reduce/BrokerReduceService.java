@@ -112,10 +112,9 @@ public class BrokerReduceService extends BaseReduceService {
     } else {
       queryContext = QueryContextConverterUtils.getQueryContext(brokerRequest.getPinotQuery());
       GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(queryContext);
-      if (gapfillType != null) {
-        GapfillProcessor gapfillProcessor = new GapfillProcessor(queryContext, gapfillType);
-        gapfillProcessor.process(brokerResponseNative);
-      }
+      BaseGapfillProcessor gapfillProcessor =
+          GapfillProcessorFactory.getGapfillProcessor(queryContext, gapfillType);
+      gapfillProcessor.process(brokerResponseNative);
     }
 
     updateAlias(queryContext, brokerResponseNative);

@@ -465,6 +465,13 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
+  @Test(expectedExceptions = IOException.class)
+  public void testUnauthenticatedFailure()
+      throws IOException {
+    sendDeleteRequest(
+        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType("mytable")));
+  }
+
   @Test
   public void testRealtimeSegmentUploadDownload()
       throws Exception {

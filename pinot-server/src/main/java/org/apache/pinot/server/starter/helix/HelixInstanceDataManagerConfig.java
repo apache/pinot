@@ -62,8 +62,6 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
   // Key of whether to enable reloading consuming segments
   public static final String INSTANCE_RELOAD_CONSUMING_SEGMENT = "reload.consumingSegment";
-  // Key of the auth token
-  public static final String AUTH_TOKEN = "auth.token";
   // Key of segment directory loader
   public static final String SEGMENT_DIRECTORY_LOADER = "segment.directory.loader";
 
@@ -73,6 +71,13 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // response times to suffer.
   private static final String MAX_PARALLEL_SEGMENT_BUILDS = "realtime.max.parallel.segment.builds";
   private static final int DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS = 4;
+
+  // Key of how many parallel segment downloads can be made per table.
+  // A value of <= 0 indicates unlimited.
+  // Unlimited parallel downloads can make Pinot controllers receive high burst of download requests,
+  // causing controllers unavailable for that period of time.
+  private static final String MAX_PARALLEL_SEGMENT_DOWNLOADS = "table.level.max.parallel.segment.downloads";
+  private static final int DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS = -1;
 
   // Key of whether to enable split commit
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
@@ -212,11 +217,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
-  public String getAuthToken() {
-    return _instanceDataManagerConfiguration.getProperty(AUTH_TOKEN);
+  public int getMaxParallelSegmentDownloads() {
+    return _instanceDataManagerConfiguration.getProperty(MAX_PARALLEL_SEGMENT_DOWNLOADS,
+        DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS);
   }
 
-  @Override
   public String getSegmentDirectoryLoader() {
     return _instanceDataManagerConfiguration.getProperty(SEGMENT_DIRECTORY_LOADER,
         SegmentDirectoryLoaderRegistry.DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME);

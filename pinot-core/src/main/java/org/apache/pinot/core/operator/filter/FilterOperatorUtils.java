@@ -171,7 +171,8 @@ public class FilterOperatorUtils {
         }
         if (filterOperator instanceof RangeIndexBasedFilterOperator
             || filterOperator instanceof TextContainsFilterOperator || filterOperator instanceof TextMatchFilterOperator
-            || filterOperator instanceof JsonMatchFilterOperator || filterOperator instanceof H3IndexFilterOperator) {
+            || filterOperator instanceof JsonMatchFilterOperator || filterOperator instanceof H3IndexFilterOperator
+            || filterOperator instanceof H3InclusionIndexFilterOperator) {
           return 2;
         }
         if (filterOperator instanceof AndFilterOperator) {

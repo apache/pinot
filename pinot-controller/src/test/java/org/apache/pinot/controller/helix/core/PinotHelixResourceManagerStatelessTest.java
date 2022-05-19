@@ -51,6 +51,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
+@Test(groups = "stateless")
 public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   private static final int BASE_SERVER_ADMIN_PORT = 10000;
   private static final int NUM_INSTANCES = 5;

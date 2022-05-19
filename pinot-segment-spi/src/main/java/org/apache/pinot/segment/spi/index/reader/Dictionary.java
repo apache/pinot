@@ -56,6 +56,38 @@ public interface Dictionary extends Closeable {
   int indexOf(String stringValue);
 
   /**
+   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if
+   * the value does not exist.
+   */
+  default int indexOf(int intValue) {
+    return indexOf(String.valueOf(intValue));
+  }
+
+  /**
+   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if
+   * the value does not exist.
+   */
+  default int indexOf(long longValue) {
+    return indexOf(String.valueOf(longValue));
+  }
+
+  /**
+   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if
+   * the value does not exist.
+   */
+  default int indexOf(float floatValue) {
+    return indexOf(String.valueOf(floatValue));
+  }
+
+  /**
+   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if
+   * the value does not exist.
+   */
+  default int indexOf(double doubleValue) {
+    return indexOf(String.valueOf(doubleValue));
+  }
+
+  /**
    * Returns the insertion index of the string representation of the value in the dictionary. This method follows the
    * same behavior as in {@link Arrays#binarySearch(Object[], Object)}. All sorted dictionaries should support this
    * method. This method is for the range predicate evaluation.

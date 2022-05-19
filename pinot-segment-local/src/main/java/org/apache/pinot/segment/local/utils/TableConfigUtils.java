@@ -24,6 +24,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -34,10 +35,14 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -50,6 +55,7 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
@@ -89,6 +95,9 @@ public final class TableConfigUtils {
   // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
   private static final String KINESIS_STREAM_TYPE = "kinesis";
+  private static final EnumSet<AggregationFunctionType> SUPPORTED_INGESTION_AGGREGATIONS =
+      EnumSet.of(AggregationFunctionType.SUM, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
+          AggregationFunctionType.COUNT);
 
   /**
    * @see TableConfigUtils#validate(TableConfig, Schema, String, boolean)
@@ -306,6 +315,60 @@ public final class TableConfigUtils {
         }
       }
 
+      // Aggregation configs
+      List<AggregationConfig> aggregationConfigs = ingestionConfig.getAggregationConfigs();
+      Set<String> aggregationSourceColumns = new HashSet<>();
+      if (!CollectionUtils.isEmpty(aggregationConfigs)) {
+        Preconditions.checkState(
+            !tableConfig.getIndexingConfig().isAggregateMetrics(),
+            "aggregateMetrics cannot be set with AggregationConfig");
+        Set<String> aggregationColumns = new HashSet<>();
+        for (AggregationConfig aggregationConfig : aggregationConfigs) {
+          String columnName = aggregationConfig.getColumnName();
+          String aggregationFunction = aggregationConfig.getAggregationFunction();
+          if (columnName == null || aggregationFunction == null) {
+            throw new IllegalStateException(
+                "columnName/aggregationFunction cannot be null in AggregationConfig " + aggregationConfig);
+          }
+
+          if (schema != null) {
+            FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+            Preconditions.checkState(fieldSpec != null, "The destination column '" + columnName
+                + "' of the aggregation function must be present in the schema");
+            Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
+                "The destination column '" + columnName + "' of the aggregation function must be a metric column");
+          }
+
+          if (!aggregationColumns.add(columnName)) {
+            throw new IllegalStateException("Duplicate aggregation config found for column '" + columnName + "'");
+          }
+          ExpressionContext expressionContext;
+          try {
+            expressionContext = RequestContextUtils.getExpression(aggregationConfig.getAggregationFunction());
+          } catch (Exception e) {
+            throw new IllegalStateException(
+                "Invalid aggregation function '" + aggregationFunction + "' for column '" + columnName + "'", e);
+          }
+          Preconditions.checkState(expressionContext.getType() == ExpressionContext.Type.FUNCTION,
+              "aggregation function must be a function for: %s", aggregationConfig);
+
+          FunctionContext functionContext = expressionContext.getFunction();
+          validateIngestionAggregation(functionContext.getFunctionName());
+          Preconditions.checkState(functionContext.getArguments().size() == 1,
+              "aggregation function can only have one argument: %s", aggregationConfig);
+
+          ExpressionContext argument = functionContext.getArguments().get(0);
+          Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
+              "aggregator function argument must be a identifier: %s", aggregationConfig);
+
+          aggregationSourceColumns.add(argument.getIdentifier());
+        }
+        if (schema != null) {
+          Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),
+              "all metric columns must be aggregated");
+        }
+      }
+
       // Transform configs
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
@@ -313,8 +376,11 @@ public final class TableConfigUtils {
         for (TransformConfig transformConfig : transformConfigs) {
           String columnName = transformConfig.getColumnName();
           if (schema != null) {
-            Preconditions.checkState(schema.getFieldSpecFor(columnName) != null,
-                "The destination column '" + columnName + "' of the transform function must be present in the schema");
+            Preconditions.checkState(
+                schema.getFieldSpecFor(columnName) != null || aggregationSourceColumns.contains(columnName),
+                "The destination column '" + columnName
+                    + "' of the transform function must be present in the schema or as a source column for "
+                    + "aggregations");
           }
           String transformFunction = transformConfig.getTransformFunction();
           if (columnName == null || transformFunction == null) {
@@ -361,6 +427,23 @@ public final class TableConfigUtils {
         }
       }
     }
+  }
+
+  /**
+   * Currently only, ValueAggregators with fixed width types are allowed, so MIN, MAX, SUM, and COUNT. The reason
+   * is that only the {@link org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex}
+   * supports random inserts and lookups. The
+   * {@link org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex only supports
+   * sequential inserts.
+   */
+  public static void validateIngestionAggregation(String name) {
+    for (AggregationFunctionType functionType : SUPPORTED_INGESTION_AGGREGATIONS) {
+      if (functionType.getName().equals(name)) {
+        return;
+      }
+    }
+    throw new IllegalStateException(
+        String.format("aggregation function %s must be one of %s", name, SUPPORTED_INGESTION_AGGREGATIONS));
   }
 
   @VisibleForTesting

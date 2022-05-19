@@ -70,6 +70,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
@@ -133,7 +134,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _queryQuotaManager = queryQuotaManager;
     _tableCache = tableCache;
     _brokerMetrics = brokerMetrics;
-    _disableGroovy = _config.getProperty(CommonConstants.Broker.DISABLE_GROOVY, false);
+    _disableGroovy = _config.getProperty(Broker.DISABLE_GROOVY, Broker.DEFAULT_DISABLE_GROOVY);
     _useApproximateFunction = _config.getProperty(Broker.USE_APPROXIMATE_FUNCTION, false);
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
         CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
@@ -1007,37 +1008,44 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   private HandlerContext getHandlerContext(@Nullable TableConfig offlineTableConfig,
       @Nullable TableConfig realtimeTableConfig) {
-    boolean offlineTableDisableGroovyQuery = _disableGroovy;
-    boolean offlineTableUseApproximateFunction = _useApproximateFunction;
+    Boolean disableGroovyOverride = null;
+    Boolean useApproximateFunctionOverride = null;
     if (offlineTableConfig != null && offlineTableConfig.getQueryConfig() != null) {
-      Boolean disableGroovyOverride = offlineTableConfig.getQueryConfig().getDisableGroovy();
-      if (disableGroovyOverride != null) {
-        offlineTableDisableGroovyQuery = disableGroovyOverride;
+      QueryConfig offlineTableQueryConfig = offlineTableConfig.getQueryConfig();
+      Boolean disableGroovyOfflineTableOverride = offlineTableQueryConfig.getDisableGroovy();
+      if (disableGroovyOfflineTableOverride != null) {
+        disableGroovyOverride = disableGroovyOfflineTableOverride;
       }
-      Boolean useApproximateFunctionOverride = offlineTableConfig.getQueryConfig().getUseApproximateFunction();
-      if (useApproximateFunctionOverride != null) {
-        offlineTableUseApproximateFunction = useApproximateFunctionOverride;
+      Boolean useApproximateFunctionOfflineTableOverride = offlineTableQueryConfig.getUseApproximateFunction();
+      if (useApproximateFunctionOfflineTableOverride != null) {
+        useApproximateFunctionOverride = useApproximateFunctionOfflineTableOverride;
       }
     }
-
-    boolean realtimeTableDisableGroovyQuery = _disableGroovy;
-    boolean realtimeTableUseApproximateFunction = _useApproximateFunction;
     if (realtimeTableConfig != null && realtimeTableConfig.getQueryConfig() != null) {
-      Boolean disableGroovyOverride = realtimeTableConfig.getQueryConfig().getDisableGroovy();
-      if (disableGroovyOverride != null) {
-        realtimeTableDisableGroovyQuery = disableGroovyOverride;
+      QueryConfig realtimeTableQueryConfig = realtimeTableConfig.getQueryConfig();
+      Boolean disableGroovyRealtimeTableOverride = realtimeTableQueryConfig.getDisableGroovy();
+      if (disableGroovyRealtimeTableOverride != null) {
+        if (disableGroovyOverride == null) {
+          disableGroovyOverride = disableGroovyRealtimeTableOverride;
+        } else {
+          // Disable Groovy if either offline or realtime table config disables Groovy
+          disableGroovyOverride |= disableGroovyRealtimeTableOverride;
+        }
       }
-      Boolean useApproximateFunctionOverride = realtimeTableConfig.getQueryConfig().getUseApproximateFunction();
-      if (useApproximateFunctionOverride != null) {
-        realtimeTableUseApproximateFunction = useApproximateFunctionOverride;
+      Boolean useApproximateFunctionRealtimeTableOverride = realtimeTableQueryConfig.getUseApproximateFunction();
+      if (useApproximateFunctionRealtimeTableOverride != null) {
+        if (useApproximateFunctionOverride == null) {
+          useApproximateFunctionOverride = useApproximateFunctionRealtimeTableOverride;
+        } else {
+          // Use approximate function if both offline and realtime table config uses approximate function
+          useApproximateFunctionOverride &= useApproximateFunctionRealtimeTableOverride;
+        }
       }
     }
 
-    // Disable Groovy if either offline or realtime table config disables Groovy
-    boolean disableGroovy = offlineTableDisableGroovyQuery | realtimeTableDisableGroovyQuery;
-    // Use approximate function if both offline and realtime table config uses approximate function
-    boolean useApproximateFunction = offlineTableUseApproximateFunction & realtimeTableUseApproximateFunction;
-
+    boolean disableGroovy = disableGroovyOverride != null ? disableGroovyOverride : _disableGroovy;
+    boolean useApproximateFunction =
+        useApproximateFunctionOverride != null ? useApproximateFunctionOverride : _useApproximateFunction;
     return new HandlerContext(disableGroovy, useApproximateFunction);
   }
 

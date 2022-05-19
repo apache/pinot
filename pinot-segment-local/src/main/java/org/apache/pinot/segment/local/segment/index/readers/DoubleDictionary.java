@@ -35,6 +35,11 @@ public class DoubleDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int indexOf(double doubleValue) {
+    return normalizeIndex(binarySearch(doubleValue));
+  }
+
+  @Override
   public DataType getValueType() {
     return DataType.DOUBLE;
   }

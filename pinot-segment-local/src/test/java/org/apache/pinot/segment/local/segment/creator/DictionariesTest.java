@@ -155,18 +155,30 @@ public class DictionariesTest {
         case INT:
           Assert.assertTrue(heapDictionary instanceof IntDictionary);
           Assert.assertTrue(mmapDictionary instanceof IntDictionary);
+          int firstInt = heapDictionary.getIntValue(0);
+          Assert.assertEquals(heapDictionary.indexOf(firstInt), heapDictionary.indexOf("" + firstInt));
+          Assert.assertEquals(mmapDictionary.indexOf(firstInt), mmapDictionary.indexOf("" + firstInt));
           break;
         case LONG:
           Assert.assertTrue(heapDictionary instanceof LongDictionary);
           Assert.assertTrue(mmapDictionary instanceof LongDictionary);
+          long firstLong = heapDictionary.getLongValue(0);
+          Assert.assertEquals(heapDictionary.indexOf(firstLong), heapDictionary.indexOf("" + firstLong));
+          Assert.assertEquals(mmapDictionary.indexOf(firstLong), mmapDictionary.indexOf("" + firstLong));
           break;
         case FLOAT:
           Assert.assertTrue(heapDictionary instanceof FloatDictionary);
           Assert.assertTrue(mmapDictionary instanceof FloatDictionary);
+          float firstFloat = heapDictionary.getFloatValue(0);
+          Assert.assertEquals(heapDictionary.indexOf(firstFloat), heapDictionary.indexOf("" + firstFloat));
+          Assert.assertEquals(mmapDictionary.indexOf(firstFloat), mmapDictionary.indexOf("" + firstFloat));
           break;
         case DOUBLE:
           Assert.assertTrue(heapDictionary instanceof DoubleDictionary);
           Assert.assertTrue(mmapDictionary instanceof DoubleDictionary);
+          double firstDouble = heapDictionary.getDoubleValue(0);
+          Assert.assertEquals(heapDictionary.indexOf(firstDouble), heapDictionary.indexOf("" + firstDouble));
+          Assert.assertEquals(mmapDictionary.indexOf(firstDouble), mmapDictionary.indexOf("" + firstDouble));
           break;
         case BIG_DECIMAL:
           Assert.assertTrue(heapDictionary instanceof BigDecimalDictionary);
@@ -205,6 +217,13 @@ public class DictionariesTest {
         if (!columnName.equals("pageKey")) {
           Assert.assertFalse(heapDictionary.indexOf(stringValue) < 0);
           Assert.assertFalse(mmapDictionary.indexOf(stringValue) < 0);
+        }
+        if (entry instanceof Integer) {
+          Assert.assertEquals(mmapDictionary.indexOf((int) entry), mmapDictionary.indexOf(stringValue));
+          Assert.assertEquals(heapDictionary.indexOf((int) entry), heapDictionary.indexOf(stringValue));
+        } else if (entry instanceof Long) {
+          Assert.assertEquals(mmapDictionary.indexOf((long) entry), mmapDictionary.indexOf(stringValue));
+          Assert.assertEquals(heapDictionary.indexOf((long) entry), heapDictionary.indexOf(stringValue));
         }
       }
     }

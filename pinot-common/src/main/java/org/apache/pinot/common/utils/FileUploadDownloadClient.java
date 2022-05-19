@@ -48,9 +48,11 @@ import org.apache.http.entity.mime.content.ContentBody;
 import org.apache.http.entity.mime.content.FileBody;
 import org.apache.http.entity.mime.content.InputStreamBody;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -402,23 +404,20 @@ public class FileUploadDownloadClient implements AutoCloseable {
   }
 
   private static HttpUriRequest getStartReplaceSegmentsRequest(URI uri, String jsonRequestBody, int socketTimeoutMs,
-      @Nullable String authToken) {
+      @Nullable AuthProvider authProvider) {
     RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
         .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE)
         .setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
-    if (StringUtils.isNotBlank(authToken)) {
-      requestBuilder.addHeader("Authorization", authToken);
-    }
+    AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getEndReplaceSegmentsRequest(URI uri, int socketTimeoutMs, @Nullable String authToken) {
+  private static HttpUriRequest getEndReplaceSegmentsRequest(URI uri, int socketTimeoutMs,
+      @Nullable AuthProvider authProvider) {
     RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
         .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE);
-    if (StringUtils.isNotBlank(authToken)) {
-      requestBuilder.addHeader("Authorization", authToken);
-    }
+    AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
@@ -856,17 +855,17 @@ public class FileUploadDownloadClient implements AutoCloseable {
    *
    * @param uri URI
    * @param startReplaceSegmentsRequest request
-   * @param authToken auth token
+   * @param authProvider auth provider
    * @return Response
    * @throws IOException
    * @throws HttpErrorStatusException
    */
   public SimpleHttpResponse startReplaceSegments(URI uri, StartReplaceSegmentsRequest startReplaceSegmentsRequest,
-      @Nullable String authToken)
+      @Nullable AuthProvider authProvider)
       throws IOException, HttpErrorStatusException {
     return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
         getStartReplaceSegmentsRequest(uri, JsonUtils.objectToString(startReplaceSegmentsRequest),
-            HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, authToken)));
+            HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, authProvider)));
   }
 
   /**
@@ -874,15 +873,15 @@ public class FileUploadDownloadClient implements AutoCloseable {
    *
    * @param uri URI
    * @oaram socketTimeoutMs Socket timeout in milliseconds
-   * @param authToken auth token
+   * @param authProvider auth provider
    * @return Response
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse endReplaceSegments(URI uri, int socketTimeoutMs, @Nullable String authToken)
+  public SimpleHttpResponse endReplaceSegments(URI uri, int socketTimeoutMs, @Nullable AuthProvider authProvider)
       throws IOException, HttpErrorStatusException {
     return HttpClient.wrapAndThrowHttpException(
-        _httpClient.sendRequest(getEndReplaceSegmentsRequest(uri, socketTimeoutMs, authToken)));
+        _httpClient.sendRequest(getEndReplaceSegmentsRequest(uri, socketTimeoutMs, authProvider)));
   }
 
   /**
@@ -938,9 +937,9 @@ public class FileUploadDownloadClient implements AutoCloseable {
   /**
    * Deprecated due to lack of auth header support. May break for deployments with auth enabled
    *
-   * Download a file using default settings, with an optional auth token
+   * Download a file using default settings
    *
-   * @see HttpClient#downloadFile(URI, int, File, String, List)
+   * @see HttpClient#downloadFile(URI, int, File, AuthProvider, List)
    *
    * @param uri URI
    * @param socketTimeoutMs Socket timeout in milliseconds
@@ -960,7 +959,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
    *
    * Download a file.
    *
-   * @see FileUploadDownloadClient#downloadFile(URI, File, String)
+   * @see FileUploadDownloadClient#downloadFile(URI, File, AuthProvider)
    *
    * @param uri URI
    * @param dest File destination
@@ -979,14 +978,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
    *
    * @param uri URI
    * @param dest File destination
-   * @param authToken auth token
+   * @param authProvider auth provider
    * @return Response status code
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public int downloadFile(URI uri, File dest, String authToken)
+  public int downloadFile(URI uri, File dest, AuthProvider authProvider)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.downloadFile(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, null, null);
+    return _httpClient.downloadFile(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authProvider, null);
   }
 
   /**
@@ -994,15 +993,15 @@ public class FileUploadDownloadClient implements AutoCloseable {
    *
    * @param uri URI
    * @param dest File destination
-   * @param authToken auth token
+   * @param authProvider auth provider
    * @param httpHeaders http headers
    * @return Response status code
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public int downloadFile(URI uri, File dest, String authToken, List<Header> httpHeaders)
+  public int downloadFile(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.downloadFile(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authToken, httpHeaders);
+    return _httpClient.downloadFile(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authProvider, httpHeaders);
   }
 
   /**

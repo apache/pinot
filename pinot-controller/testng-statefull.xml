@@ -27,70 +27,13 @@
       and destroying their own individual state.
   -->
   <test name="testng.suite.controller.statefull">
+    <groups>
+      <run>
+        <exclude name="stateless"/>
+      </run>
+    </groups>
     <packages>
       <package name="org.apache.pinot.controller.*"/>
     </packages>
-    <classes>
-      <class name="org.apache.pinot.controller.ControllerStarterStatelessTest">
-        <methods>
-          <exclude name=".*" />
-        </methods>
-      </class>
-      <class name="org.apache.pinot.controller.api.ConsumingSegmentInfoReaderStatelessTest">
-        <methods>
-          <exclude name=".*" />
-        </methods>
-      </class>
-      <class name="org.apache.pinot.controller.api.PinotBrokerRestletResourceStatelessTest">
-        <methods>
-          <exclude name=".*" />
-        </methods>
-      </class>
-      <class name="org.apache.pinot.controller.api.PinotIngestionRestletResourceStatelessTest">
-        <methods>
-          <exclude name=".*" />
-        </methods>
-      </class>
-      <class name="org.apache.pinot.controller.helix.ControllerTenantStatelessTest">
-        <methods>
-          <exclude name=".*" />
-        </methods>
-      </class>
-      <class name="org.apache.pinot.controller.helix.PinotControllerModeStatelessTest">
-        <methods>
-          <exclude name=".*" />
-        </methods>
-      </class>
-      <class name="org.apache.pinot.controller.helix.ControllerPeriodicTaskStarterStatelessTest">
-        <methods>
-          <exclude name=".*" />
-        </methods>
-      </class>
-      <class name="org.apache.pinot.controller.helix.core.PinotHelixResourceManagerStatelessTest">
-        <methods>
-          <exclude name=".*" />
-        </methods>
-      </class>
-      <class name="org.apache.pinot.controller.helix.core.minion.MinionInstancesCleanupTaskStatelessTest">
-        <methods>
-          <exclude name=".*" />
-        </methods>
-      </class>
-      <class name="org.apache.pinot.controller.helix.core.minion.PinotTaskManagerStatelessTest">
-        <methods>
-          <exclude name=".*" />
-        </methods>
-      </class>
-      <class name="org.apache.pinot.controller.helix.core.rebalance.TableRebalancerClusterStatelessTest">
-        <methods>
-          <exclude name=".*" />
-        </methods>
-      </class>
-      <class name="org.apache.pinot.controller.validation.ValidationManagerStatelessTest">
-        <methods>
-          <exclude name=".*" />
-        </methods>
-      </class>
-    </classes>
   </test>
 </suite>

@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.controller;
 
-import org.testng.annotations.AfterSuite;
-import org.testng.annotations.BeforeSuite;
+import org.testng.annotations.AfterGroups;
+import org.testng.annotations.BeforeGroups;
 
 
 /**
@@ -35,7 +35,7 @@ public class ControllerTestSetup {
    * TestNG will run this method once before all the test cases are run. We use this method to initialize
    * common state for all the test cases.
    */
-  @BeforeSuite
+  @BeforeGroups
   public void suiteSetup()
       throws Exception {
     ControllerTestUtils.startSuiteRun();
@@ -45,7 +45,7 @@ public class ControllerTestSetup {
    * TestNG will run this method once after all the test cases have run. We use this method to de-initialize
    * common state used by all the test cases.
    */
-  @AfterSuite
+  @AfterGroups
   public void tearDownSuite() {
     ControllerTestUtils.stopSuiteRun();
   }

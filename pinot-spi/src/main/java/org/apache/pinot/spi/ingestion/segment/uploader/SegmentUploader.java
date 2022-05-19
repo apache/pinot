@@ -22,7 +22,7 @@ import java.net.URI;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceStability;
-import org.apache.pinot.spi.auth.AuthContext;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 
 
@@ -49,17 +49,17 @@ public interface SegmentUploader {
   /**
    * Uploads the segment tar file to the cluster
    * @param segmentTarFile URI of segment tar file
-   * @param authContext auth details required to upload pinot segment to controller
+   * @param authProvider auth provider
    */
-  void uploadSegment(URI segmentTarFile, @Nullable AuthContext authContext)
+  void uploadSegment(URI segmentTarFile, @Nullable AuthProvider authProvider)
       throws Exception;
 
   /**
    * Uploads the segments from the segmentDir to the cluster.
    * Looks for segmentTar files recursively, with suffix .tar.gz
    * @param segmentDir URI of directory containing segment tar files
-   * @param authContext auth details required to upload pinot segment to controller
+   * @param authProvider auth auth provider
    */
-  void uploadSegmentsFromDir(URI segmentDir, @Nullable AuthContext authContext)
+  void uploadSegmentsFromDir(URI segmentDir, @Nullable AuthProvider authProvider)
       throws Exception;
 }

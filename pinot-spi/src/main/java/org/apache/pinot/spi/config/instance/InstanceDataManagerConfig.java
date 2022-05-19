@@ -53,7 +53,7 @@ public interface InstanceDataManagerConfig {
 
   int getMaxParallelSegmentBuilds();
 
-  String getAuthToken();
+  int getMaxParallelSegmentDownloads();
 
   String getSegmentDirectoryLoader();
 

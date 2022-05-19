@@ -38,6 +38,7 @@ import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
@@ -63,8 +64,6 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,7 +85,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private HelixManager _helixManager;
   private ServerMetrics _serverMetrics;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private String _authToken;
   private SegmentUploader _segmentUploader;
 
   // Fixed size LRU cache for storing last N errors on the instance.
@@ -103,7 +101,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _instanceId = _instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
     _serverMetrics = serverMetrics;
-    _authToken = config.getProperty(CommonConstants.Server.CONFIG_OF_AUTH_TOKEN);
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
         PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
 
@@ -180,7 +177,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("Creating table data manager for table: {}", tableNameWithType);
     TableDataManagerConfig tableDataManagerConfig =
         TableDataManagerConfig.getDefaultHelixTableDataManagerConfig(_instanceDataManagerConfig, tableNameWithType);
-    tableDataManagerConfig.overrideConfigs(tableConfig, _authToken);
+    tableDataManagerConfig.overrideConfigs(tableConfig);
     TableDataManager tableDataManager =
         TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, _instanceId, _propertyStore,
             _serverMetrics, _helixManager, _errorCache);

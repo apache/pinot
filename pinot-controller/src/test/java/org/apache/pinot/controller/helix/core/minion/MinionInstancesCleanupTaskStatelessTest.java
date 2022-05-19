@@ -29,6 +29,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
+@Test(groups = "stateless")
 public class MinionInstancesCleanupTaskStatelessTest extends ControllerTest {
   @BeforeClass
   public void setup()

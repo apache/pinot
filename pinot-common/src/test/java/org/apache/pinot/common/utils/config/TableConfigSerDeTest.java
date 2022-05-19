@@ -47,6 +47,7 @@ import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
@@ -267,6 +268,8 @@ public class TableConfigSerDeTest {
     }
     {
       // With ingestion config
+      List<AggregationConfig> aggregationConfigs = Lists.newArrayList(new AggregationConfig("SUM__bar", "SUM(bar)"),
+          new AggregationConfig("MIN_foo", "MIN(foo)"));
       List<TransformConfig> transformConfigs =
           Lists.newArrayList(new TransformConfig("bar", "func(moo)"), new TransformConfig("zoo", "myfunc()"));
       Map<String, String> batchConfigMap = new HashMap<>();
@@ -283,7 +286,7 @@ public class TableConfigSerDeTest {
           new IngestionConfig(new BatchIngestionConfig(batchConfigMaps, "APPEND", "HOURLY"),
               new StreamIngestionConfig(streamConfigMaps), new FilterConfig("filterFunc(foo)"), transformConfigs,
               new ComplexTypeConfig(fieldsToUnnest, ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE,
-                  prefixesToRename));
+                  prefixesToRename), aggregationConfigs);
       TableConfig tableConfig = tableConfigBuilder.setIngestionConfig(ingestionConfig).build();
 
       checkIngestionConfig(tableConfig);

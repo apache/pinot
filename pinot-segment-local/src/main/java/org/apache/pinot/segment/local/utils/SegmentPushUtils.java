@@ -37,12 +37,14 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.message.BasicHeader;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -88,7 +90,7 @@ public class SegmentPushUtils implements Serializable {
         return fileURI;
       }
     }
-    return URI.create(String.format("%s%s%s", prefix, fileURI.getRawPath(), suffix));
+    return URI.create((prefix != null ? prefix : "") + fileURI.getRawPath() + (suffix != null ? suffix : ""));
   }
 
   public static void pushSegments(SegmentGenerationJobSpec spec, PinotFS fileSystem, List<String> tarFilePaths)
@@ -105,6 +107,7 @@ public class SegmentPushUtils implements Serializable {
       String fileName = tarFile.getName();
       Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
       String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
+      AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
       for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
         URI controllerURI;
         try {
@@ -125,7 +128,7 @@ public class SegmentPushUtils implements Serializable {
           try (InputStream inputStream = fileSystem.open(tarFileURI)) {
             SimpleHttpResponse response =
                 FILE_UPLOAD_DOWNLOAD_CLIENT.uploadSegment(FileUploadDownloadClient.getUploadSegmentURI(controllerURI),
-                    segmentName, inputStream, HttpClient.makeAuthHeader(spec.getAuthToken()),
+                    segmentName, inputStream, AuthProviderUtils.toRequestHeaders(authProvider),
                     FileUploadDownloadClient.makeTableParam(tableName), tableName, tableType);
             LOGGER.info("Response for pushing table {} segment {} to location {} - {}: {}", tableName, segmentName,
                 controllerURI, response.getStatusCode(), response.getResponse());
@@ -162,6 +165,7 @@ public class SegmentPushUtils implements Serializable {
     for (String segmentUri : segmentUris) {
       URI segmentURI = URI.create(segmentUri);
       PinotFS outputDirFS = PinotFSFactory.create(segmentURI.getScheme());
+      AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
       for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
         URI controllerURI;
         try {
@@ -182,9 +186,8 @@ public class SegmentPushUtils implements Serializable {
           try {
             SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT
                 .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentUri,
-                    HttpClient.makeAuthHeader(spec.getAuthToken()),
-                    FileUploadDownloadClient.makeTableParam(tableName),
-                    HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+                    AuthProviderUtils.toRequestHeaders(authProvider),
+                    FileUploadDownloadClient.makeTableParam(tableName), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
             LOGGER.info("Response for pushing table {} segment uri {} to location {} - {}: {}", tableName, segmentUri,
                 controllerURI, response.getStatusCode(), response.getResponse());
             return true;
@@ -237,6 +240,7 @@ public class SegmentPushUtils implements Serializable {
       Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
       String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
       File segmentMetadataFile = generateSegmentMetadataFile(fileSystem, URI.create(tarFilePath));
+      AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
       try {
         for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
           URI controllerURI;
@@ -260,7 +264,7 @@ public class SegmentPushUtils implements Serializable {
               headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, segmentUriPath));
               headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
                   FileUploadDownloadClient.FileUploadType.METADATA.toString()));
-              headers.addAll(HttpClient.makeAuthHeader(spec.getAuthToken()));
+              headers.addAll(AuthProviderUtils.toRequestHeaders(authProvider));
 
               SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT
                   .uploadSegmentMetadata(FileUploadDownloadClient.getUploadSegmentURI(controllerURI), segmentName,

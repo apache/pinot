@@ -384,6 +384,34 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
     Assert.assertEquals((long) aggregationResult.get(0), 0);
   }
 
+  @Test
+  public void queryStContainsWithMultipleFilters()
+      throws Exception {
+    List<GenericRow> records = new ArrayList<>(1);
+    addRecord(records, -122.0007277, 37.5005785);
+    setUp(records);
+    // Test point is closed to border of a polygon but outside.
+    String query = "SELECT COUNT(*) FROM testTable WHERE ST_Contains(ST_GeomFromText('POLYGON ((\n"
+        + "             -122.0008564 37.5004316, \n"
+        + "             -121.9991291 37.5005168, \n"
+        + "             -121.9990325 37.4995294, \n"
+        + "             -122.0001268 37.4993506,  \n"
+        + "             -122.0008564 37.5004316))'), h3Column_geometry) = 1 AND "
+        + "             ST_Contains(ST_GeomFromText('POLYGON (( \n"
+        + "             -122.0008564 37.5004316, \n"
+        + "             -121.9991291 37.5005168, \n"
+        + "             -121.9990325 37.4995294, \n"
+        + "             -122.0001268 37.4993506, \n"
+        + "             -122.0008564 37.5004316))'), h3Column_geometry) = 0";
+
+    AggregationOperator aggregationOperator = getOperator(query);
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 2, 0, 1);
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    Assert.assertNotNull(aggregationResult);
+    Assert.assertEquals((long) aggregationResult.get(0), 0);
+  }
+
   private void testQuery(String queryTemplate) {
     String h3IndexQuery = String.format(queryTemplate, H3_INDEX_COLUMN);
     String nonH3IndexQuery = String.format(queryTemplate, NON_H3_INDEX_COLUMN);

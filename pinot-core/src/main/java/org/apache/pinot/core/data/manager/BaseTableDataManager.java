@@ -29,13 +29,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationConverter;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -53,15 +58,17 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.Pair;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,6 +79,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDataManager.class);
 
   protected final ConcurrentHashMap<String, SegmentDataManager> _segmentDataManagerMap = new ConcurrentHashMap<>();
+  // Semaphore to restrict the maximum number of parallel segment downloads for a table.
+  private Semaphore _segmentDownloadSemaphore;
 
   protected TableDataManagerConfig _tableDataManagerConfig;
   protected String _instanceId;
@@ -83,7 +92,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected File _resourceTmpDir;
   protected Logger _logger;
   protected HelixManager _helixManager;
-  protected String _authToken;
+  protected AuthProvider _authProvider;
 
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related
   // errors as the value.
@@ -92,7 +101,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
       ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
-      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache) {
+      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache, int maxParallelSegmentDownloads) {
     LOGGER.info("Initializing table data manager for table: {}", tableDataManagerConfig.getTableName());
 
     _tableDataManagerConfig = tableDataManagerConfig;
@@ -100,7 +109,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _propertyStore = propertyStore;
     _serverMetrics = serverMetrics;
     _helixManager = helixManager;
-    _authToken = tableDataManagerConfig.getAuthToken();
+
+    _authProvider = AuthProviderUtils.extractAuthProvider(toPinotConfiguration(_tableDataManagerConfig.getAuthConfig()),
+        null);
 
     _tableNameWithType = tableDataManagerConfig.getTableName();
     _tableDataDir = tableDataManagerConfig.getDataDir();
@@ -119,6 +130,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _resourceTmpDir);
     }
     _errorCache = errorCache;
+    if (maxParallelSegmentDownloads > 0) {
+      LOGGER.info(
+          "Construct segment download semaphore for Table: {}. Maximum number of parallel segment downloads: {}",
+          _tableNameWithType, maxParallelSegmentDownloads);
+      _segmentDownloadSemaphore = new Semaphore(maxParallelSegmentDownloads, true);
+    } else {
+      _segmentDownloadSemaphore = null;
+    }
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
 
     doInit();
@@ -177,7 +196,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    throw new UnsupportedOperationException();
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
   }
 
   @Override
@@ -275,7 +295,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public void addSegmentError(String segmentName, SegmentErrorInfo segmentErrorInfo) {
-    _errorCache.put(new Pair<>(_tableNameWithType, segmentName), segmentErrorInfo);
+    _errorCache.put(Pair.of(_tableNameWithType, segmentName), segmentErrorInfo);
   }
 
   @Override
@@ -284,8 +304,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return Collections.emptyMap();
     } else {
       // Filter out entries that match the table name.
-      return _errorCache.asMap().entrySet().stream().filter(map -> map.getKey().getFirst().equals(_tableNameWithType))
-          .collect(Collectors.toMap(map -> map.getKey().getSecond(), Map.Entry::getValue));
+      return _errorCache.asMap().entrySet().stream().filter(map -> map.getKey().getLeft().equals(_tableNameWithType))
+          .collect(Collectors.toMap(map -> map.getKey().getRight(), Map.Entry::getValue));
     }
   }
 
@@ -403,6 +423,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
     File tarFile = new File(tempRootDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
     String uri = zkMetadata.getDownloadUrl();
     try {
+      if (_segmentDownloadSemaphore != null) {
+        long startTime = System.currentTimeMillis();
+        LOGGER.info("Trying to acquire segment download semaphore for: {}. queue-length: {} ", segmentName,
+            _segmentDownloadSemaphore.getQueueLength());
+        _segmentDownloadSemaphore.acquire();
+        LOGGER.info("Acquired segment download semaphore for: {} (lock-time={}ms, queue-length={}).", segmentName,
+            System.currentTimeMillis() - startTime, _segmentDownloadSemaphore.getQueueLength());
+      }
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(uri, tarFile, zkMetadata.getCrypterName());
       LOGGER.info("Downloaded tarred segment: {} for table: {} from: {} to: {}, file length: {}", segmentName,
           _tableNameWithType, uri, tarFile, tarFile.length());
@@ -412,6 +440,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _tableNameWithType, uri, tarFile);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FAILURES, 1L);
       throw e;
+    } finally {
+      if (_segmentDownloadSemaphore != null) {
+        _segmentDownloadSemaphore.release();
+      }
     }
   }
 
@@ -504,6 +536,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     recoverReloadFailureQuietly(_tableNameWithType, segmentName, indexDir);
 
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    schema = SegmentGeneratorConfig.updateSchemaWithTimestampIndexes(schema,
+        SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(indexLoadingConfig.getTableConfig()));
+
     // Creates the SegmentDirectory object to access the segment metadata.
     // The metadata is null if the segment doesn't exist yet.
     SegmentDirectory segmentDirectory =
@@ -598,5 +633,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
         LOGGER.warn("Failed to close SegmentDirectory due to error: {}", e.getMessage());
       }
     }
+  }
+
+  private static PinotConfiguration toPinotConfiguration(Configuration configuration) {
+    if (configuration == null) {
+      return new PinotConfiguration();
+    }
+    return new PinotConfiguration((Map<String, Object>) (Map) ConfigurationConverter.getMap(configuration));
   }
 }

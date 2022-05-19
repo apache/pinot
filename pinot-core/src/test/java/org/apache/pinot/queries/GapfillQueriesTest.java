@@ -2931,6 +2931,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
         + "    FROM parkingData "
         + "    WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
         + "    GROUP BY time_col, levelId, lotId "
+        + "    ORDER BY time_col"
         + "    LIMIT 200 "
         + "  ) "
         + "  LIMIT 200 "

@@ -34,6 +34,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
 
+@Test(groups = "stateless")
 public class ControllerStarterStatelessTest extends ControllerTest {
   private final Map<String, Object> _configOverride = new HashMap<>();
 

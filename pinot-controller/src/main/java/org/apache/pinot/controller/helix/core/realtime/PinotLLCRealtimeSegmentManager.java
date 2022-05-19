@@ -459,10 +459,6 @@ public class PinotLLCRealtimeSegmentManager {
   public void commitSegmentFile(String realtimeTableName, CommittingSegmentDescriptor committingSegmentDescriptor)
       throws Exception {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
-    if (isPeerSegmentDownloadScheme(committingSegmentDescriptor)) {
-      LOGGER.info("No moving needed for segment on peer servers: {}", committingSegmentDescriptor.getSegmentLocation());
-      return;
-    }
 
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     String segmentName = committingSegmentDescriptor.getSegmentName();
@@ -470,6 +466,12 @@ public class PinotLLCRealtimeSegmentManager {
 
     // Copy the segment file to the controller
     String segmentLocation = committingSegmentDescriptor.getSegmentLocation();
+    Preconditions.checkArgument(segmentLocation != null, "Segment location must be provided");
+    if (segmentLocation.regionMatches(true, 0, CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME, 0,
+        CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME.length())) {
+      LOGGER.info("No moving needed for segment on peer servers: {}", segmentLocation);
+      return;
+    }
     URI segmentFileURI = URIUtils.getUri(segmentLocation);
     URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
     URI uriToMoveTo = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
@@ -492,12 +494,6 @@ public class PinotLLCRealtimeSegmentManager {
       LOGGER.warn("Caught exception while deleting temporary segment files for segment: {}", segmentName, e);
     }
     committingSegmentDescriptor.setSegmentLocation(uriToMoveTo.toString());
-  }
-
-  private boolean isPeerSegmentDownloadScheme(CommittingSegmentDescriptor committingSegmentDescriptor) {
-    return !(committingSegmentDescriptor == null) && !(committingSegmentDescriptor.getSegmentLocation() == null)
-        && committingSegmentDescriptor.getSegmentLocation().toLowerCase()
-        .startsWith(CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME);
   }
 
   /**

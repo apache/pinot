@@ -16,19 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.auth;
+package org.apache.pinot.common.auth;
+
+import java.util.Collections;
+import java.util.Map;
+import org.apache.pinot.spi.auth.AuthProvider;
+
 
 /**
- * Container for all auth related info
+ * Noop auth provider
  */
-public class AuthContext {
-  private final String _authToken;
-
-  public AuthContext(String authToken) {
-    _authToken = authToken;
+public class NullAuthProvider implements AuthProvider {
+  public NullAuthProvider() {
+    // left blank
   }
 
-  public String getAuthToken() {
-    return _authToken;
+  public NullAuthProvider(AuthConfig ignore) {
+    // left blank
+  }
+
+  @Override
+  public Map<String, Object> getRequestHeaders() {
+    return Collections.emptyMap();
+  }
+
+  @Override
+  public String getTaskToken() {
+    return null;
   }
 }

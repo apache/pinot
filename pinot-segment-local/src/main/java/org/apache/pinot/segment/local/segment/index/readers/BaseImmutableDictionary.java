@@ -82,7 +82,10 @@ public abstract class BaseImmutableDictionary implements Dictionary {
 
   @Override
   public int indexOf(String stringValue) {
-    int index = insertionIndexOf(stringValue);
+    return normalizeIndex(insertionIndexOf(stringValue));
+  }
+
+  protected final int normalizeIndex(int index) {
     return (index >= 0) ? index : Dictionary.NULL_VALUE_INDEX;
   }
 

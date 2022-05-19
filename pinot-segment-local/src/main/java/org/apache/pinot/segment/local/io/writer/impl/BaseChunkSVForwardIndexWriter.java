@@ -183,6 +183,7 @@ public abstract class BaseChunkSVForwardIndexWriter implements Closeable {
     }
 
     if (_headerEntryChunkOffsetSize == Integer.BYTES) {
+      Preconditions.checkState(_dataOffset <= Integer.MAX_VALUE, "Integer overflow detected");
       _header.putInt((int) _dataOffset);
     } else if (_headerEntryChunkOffsetSize == Long.BYTES) {
       _header.putLong(_dataOffset);

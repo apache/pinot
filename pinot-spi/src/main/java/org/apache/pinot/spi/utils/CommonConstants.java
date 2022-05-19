@@ -33,7 +33,7 @@ public class CommonConstants {
   public static final String HTTP_PROTOCOL = "http";
   public static final String HTTPS_PROTOCOL = "https";
 
-  public static final String KEY_OF_AUTH_TOKEN = "auth.token";
+  public static final String KEY_OF_AUTH = "auth";
 
   public static final String TABLE_NAME = "tableName";
 
@@ -230,6 +230,7 @@ public class CommonConstants {
     public static final String BROKER_SERVICE_AUTO_DISCOVERY = "pinot.broker.service.auto.discovery";
 
     public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
+    public static final boolean DEFAULT_DISABLE_GROOVY = true;
 
     // Rewrite potential expensive functions to their approximation counterparts
     // - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
@@ -336,7 +337,7 @@ public class CommonConstants {
      * Service token for accessing protected controller APIs.
      * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
      */
-    public static final String CONFIG_OF_AUTH_TOKEN = KEY_OF_AUTH_TOKEN;
+    public static final String CONFIG_OF_AUTH = KEY_OF_AUTH;
 
     // Configuration to consider the server ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this this server has crossed the threshold percentage of the total number of tables
@@ -437,7 +438,7 @@ public class CommonConstants {
        * Service token for accessing protected controller APIs.
        * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
        */
-      public static final String CONFIG_OF_SEGMENT_UPLOADER_AUTH_TOKEN = KEY_OF_AUTH_TOKEN;
+      public static final String CONFIG_OF_SEGMENT_UPLOADER_AUTH = KEY_OF_AUTH;
 
       public static final int DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 300_000;
       public static final int DEFAULT_OTHER_REQUESTS_TIMEOUT = 10_000;

@@ -789,7 +789,7 @@ public class PinotHelixResourceManagerTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME)
             .setNumReplicas(2).setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME)
             .setIngestionConfig(
-                new IngestionConfig(new BatchIngestionConfig(null, "REFRESH", "DAILY"), null, null, null, null))
+                new IngestionConfig(new BatchIngestionConfig(null, "REFRESH", "DAILY"), null, null, null, null, null))
             .build();
 
     ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
