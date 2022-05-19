@@ -65,7 +65,6 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -154,13 +153,10 @@ public final class TableConfigUtils {
    *   <li>Table name shouldn't contain dot or space in it</li>
    * </ul>
    */
-  public static void validateTableName(TableConfig tableConfig, PinotConfiguration pinotConfiguration) {
+  public static void validateTableName(TableConfig tableConfig, boolean allowDots) {
     String tableName = tableConfig.getTableName();
-    if (!pinotConfiguration.getProperty(CommonConstants.Helix.CONFIG_OF_ALLOW_TABLE_NAME_DOTS,
-        CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_DOTS)) {
-      if (tableName.contains(".")) {
-        throw new IllegalStateException("Table name: '" + tableName + "' containing '.' is not allowed");
-      }
+    if (tableName.contains(".") && !allowDots) {
+      throw new IllegalStateException("Table name: '" + tableName + "' containing '.' is not allowed");
     }
     if (tableName.contains(" ")) {
       throw new IllegalStateException("Table name: '" + tableName + "' containing space is not allowed");
