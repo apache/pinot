@@ -30,6 +30,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
+@Test(groups = "stateless")
 public class ControllerTenantStatelessTest extends ControllerTest {
   private static final String BROKER_TAG_PREFIX = "brokerTag_";
   private static final String SERVER_TAG_PREFIX = "serverTag_";
