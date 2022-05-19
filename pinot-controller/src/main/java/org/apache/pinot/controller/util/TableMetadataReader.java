@@ -76,6 +76,29 @@ public class TableMetadataReader {
     return JsonUtils.objectToJsonNode(response);
   }
 
+  public JsonNode getSegmentMetadata(String tableNameWithType, String segmentName, List<String> columns, int timeoutMs)
+      throws InvalidConfigException, IOException {
+    final Map<String, List<String>> serverToSegments =
+        _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+    BiMap<String, String> endpoints =
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+    ServerSegmentMetadataReader serverSegmentMetadataReader =
+        new ServerSegmentMetadataReader(_executor, _connectionManager);
+
+    List<String> segmentsMetadata = serverSegmentMetadataReader
+        .getSegmentMetadataFromServer(tableNameWithType, serverToSegments, endpoints, columns, timeoutMs);
+
+    for (String segmentMetadata : segmentsMetadata) {
+      JsonNode responseJson = JsonUtils.stringToJsonNode(segmentMetadata);
+      String segmentNameJson = responseJson.get("segmentName").asText();
+
+      if(segmentNameJson.equals(segmentName)) {
+        return responseJson;
+      }
+    }
+    return JsonUtils.objectToJsonNode(new HashMap<String, String>());
+  }
+
   /**
    * This method retrieves the aggregated segment metadata for a given table.
    * Currently supports only OFFLINE tables.

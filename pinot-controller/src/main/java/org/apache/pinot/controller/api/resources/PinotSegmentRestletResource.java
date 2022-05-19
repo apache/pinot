@@ -30,6 +30,7 @@ import io.swagger.annotations.ApiResponses;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -286,9 +287,11 @@ public class PinotSegmentRestletResource {
   @Path("segments/{tableName}/{segmentName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the metadata for a segment", notes = "Get the metadata for a segment")
-  public Map<String, String> getSegmentMetadata(
+  public Map<String, Object> getSegmentMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName) {
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
+          List<String> columns) {
     segmentName = URIUtils.decode(segmentName);
     Map<String, String> segmentMetadata = null;
     if (TableNameBuilder.getTableTypeFromTableName(tableName) != null) {
@@ -302,7 +305,24 @@ public class PinotSegmentRestletResource {
     }
 
     if (segmentMetadata != null) {
-      return segmentMetadata;
+      Map<String, Object> result = new HashMap<>(segmentMetadata);
+      try {
+        JsonNode segmentsMetadataJson = getSegmentMetadataFromServer(tableName, segmentName, columns);
+        if (segmentsMetadataJson.has("indexes")) {
+          result.put("indexes", segmentsMetadataJson.get("indexes"));
+        }
+        if (segmentsMetadataJson.has("columns")) {
+          result.put("columns", segmentsMetadataJson.get("columns"));
+        }
+
+      } catch (InvalidConfigException e) {
+        throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
+      } catch (IOException ioe) {
+        throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
+            Status.INTERNAL_SERVER_ERROR, ioe);
+      }
+
+      return result;
     } else {
       throw new ControllerApplicationException(LOGGER,
           "Failed to find segment: " + segmentName + " in table: " + tableName, Status.NOT_FOUND);
@@ -336,7 +356,7 @@ public class PinotSegmentRestletResource {
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER);
     List<List<Map<String, Object>>> resultList = new ArrayList<>(tableNamesWithType.size());
     for (String tableNameWithType : tableNamesWithType) {
-      Map<String, String> segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
+      Map<String, Object> segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName, Collections.emptyList());
       if (segmentMetadata != null) {
         // NOTE: DO NOT change the format for backward-compatibility
         Map<String, Object> resultForTable = new LinkedHashMap<>();
@@ -734,6 +754,14 @@ public class PinotSegmentRestletResource {
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
     return tableMetadataReader
         .getSegmentsMetadata(tableNameWithType, columns, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+  }
+
+  private JsonNode getSegmentMetadataFromServer(String tableNameWithType, String segmentName, List<String> columns)
+      throws InvalidConfigException, IOException {
+    TableMetadataReader tableMetadataReader =
+        new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
+    return tableMetadataReader.getSegmentMetadata(tableNameWithType, segmentName, columns,
+        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 
   // TODO: Move this API into PinotTableRestletResource

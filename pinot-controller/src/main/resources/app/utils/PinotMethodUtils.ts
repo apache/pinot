@@ -576,6 +576,20 @@ const getSegmentDetails = (tableName, segmentName) => {
         columns: ['Server Name', 'Status'],
         records: [...result],
       },
+      indexes: {
+        columns: ['Field Name', 'Bloom Filter', 'Dictionary', 'Forward Index', 'Sorted', 'Inverted Index', 'JSON Index', 'Null Value Vector Reader', 'Range Index'],
+        records: Object.keys(segmentMetaData.indexes).map(fieldName => [
+          fieldName,
+          segmentMetaData.indexes[fieldName]["bloom-filter"] === "YES",
+          segmentMetaData.indexes[fieldName]["dictionary"] === "YES",
+          segmentMetaData.indexes[fieldName]["forward-index"] === "YES",
+          ((segmentMetaData.columns || []).filter(row => row.columnName === fieldName)[0] || {sorted: false}).sorted,
+          segmentMetaData.indexes[fieldName]["inverted-index"] === "YES",
+          segmentMetaData.indexes[fieldName]["json-index"] === "YES",
+          segmentMetaData.indexes[fieldName]["null-value-vector-reader"] === "YES",
+          segmentMetaData.indexes[fieldName]["range-index"] === "YES",
+        ])
+      },
       summary: {
         segmentName,
         totalDocs: segmentMetaData['segment.total.docs'],
