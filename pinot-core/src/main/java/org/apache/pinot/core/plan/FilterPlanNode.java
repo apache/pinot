@@ -230,7 +230,7 @@ public class FilterPlanNode implements PlanNode {
           if (canApplyH3IndexForDistanceCheck(predicate, lhs.getFunction())) {
             return new H3IndexFilterOperator(_indexSegment, predicate, numDocs);
           } else if (canApplyH3IndexForInclusionCheck(predicate, lhs.getFunction())) {
-            return new H3InclusionIndexFilterOperator(_indexSegment, predicate, numDocs);
+            return new H3InclusionIndexFilterOperator(_indexSegment, predicate, _queryContext, numDocs);
           } else {
             // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (IS_NULL,
             //       IS_NOT_NULL, TEXT_MATCH)
