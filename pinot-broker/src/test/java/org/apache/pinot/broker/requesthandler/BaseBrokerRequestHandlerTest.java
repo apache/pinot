@@ -19,12 +19,14 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.mockito.Mockito;
@@ -54,6 +56,33 @@ public class BaseBrokerRequestHandlerTest {
         Assert.fail("rewritten column name should be column_name_1st or column_name_1st, but is " + columnName);
       }
     }
+  }
+
+  @Test
+  public void testGetActualColumnNameCaseSensitive() {
+    Map<String, String> columnNameMap = new HashMap<>();
+    columnNameMap.put("student_name", "student_name");
+    String actualColumnName =
+        BaseBrokerRequestHandler.getActualColumnName("student", "student.student_name", columnNameMap, null, false);
+    Assert.assertEquals(actualColumnName, "student_name");
+    boolean exceptionThrown = false;
+    try {
+      String unusedResult =
+          BaseBrokerRequestHandler.getActualColumnName("student", "student2.student_name", columnNameMap, null, false);
+      Assert.fail("should throw exception if column is not known");
+    } catch (BadQueryRequestException ex) {
+      exceptionThrown = true;
+    }
+    Assert.assertTrue(exceptionThrown, "should throw exception if column is not known");
+    columnNameMap.put("student_student_name", "student_student_name");
+    String wrongColumnName2 = BaseBrokerRequestHandler.getActualColumnName("student",
+        "student_student_name", columnNameMap, null, false);
+    Assert.assertEquals(wrongColumnName2, "student_student_name");
+
+    columnNameMap.put("student", "student");
+    String wrongColumnName3 = BaseBrokerRequestHandler.getActualColumnName("student",
+        "student", columnNameMap, null, false);
+    Assert.assertEquals(wrongColumnName3, "student");
   }
 
   @Test

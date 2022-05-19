@@ -776,6 +776,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   static String getActualTableName(String tableName, TableCache tableCache, BrokerRoutingManager routingManager,
       PinotConfiguration config) {
     // Use TableCache to handle case-insensitive table name
+    boolean allowDots = config.getProperty(CommonConstants.Helix.CONFIG_OF_ALLOW_TABLE_NAME_DOTS,
+        CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_DOTS);
+
     if (tableCache.isCaseInsensitive()) {
       String actualTableName = tableCache.getActualTableName(tableName);
       if (actualTableName != null) {
@@ -783,7 +786,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
 
       // Check if table is in the format of [database_name].[table_name]
-      String[] tableNameSplits = splitTableNameByConfig(tableName, config);
+      String[] tableNameSplits = splitTableNameByConfig(tableName, allowDots);
       if (tableNameSplits.length == 2) {
         actualTableName = tableCache.getActualTableName(tableNameSplits[1]);
         if (actualTableName != null) {
@@ -793,9 +796,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
       return tableName;
     }
-
     // Check if table is in the format of [database_name].[table_name]
-    String[] tableNameSplits = splitTableNameByConfig(tableName, config);
+    String[] tableNameSplits = splitTableNameByConfig(tableName, allowDots);
     if (tableNameSplits.length != 2) {
       return tableName;
     }
@@ -825,16 +827,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Splits a table name by last dot if the config does not allow the table name dots;
    * or if the config allows table name dots, just plain return full table name.
    * @param tableName the table name for split
-   * @param config the PinotConfiguration for testing whether the table name dots are allowed
+   * @param allowDots whether the table allows dots in its name
    * @return the split results
    */
   @VisibleForTesting
-  static String[] splitTableNameByConfig(String tableName, PinotConfiguration config) {
-    if (!config.getProperty(CommonConstants.Helix.CONFIG_OF_ALLOW_TABLE_NAME_DOTS,
-        CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_DOTS)) {
+  static String[] splitTableNameByConfig(String tableName, boolean allowDots) {
+    if (allowDots) {
+      return new String[]{tableName};
+    } else {
       return StringUtils.split(tableName, ".", 2);
     }
-    return new String[]{tableName};
   }
 
   /**
@@ -1437,26 +1439,19 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * - Case-insensitive cluster
    * - Column name in the format of [table_name].[column_name]
    */
-  private static String getActualColumnName(String rawTableName, String columnName,
-      @Nullable Map<String, String> columnNameMap, @Nullable Map<String, String> aliasMap, boolean isCaseInsensitive) {
+  @VisibleForTesting
+  static String getActualColumnName(String rawTableName, String columnName, @Nullable Map<String, String> columnNameMap,
+      @Nullable Map<String, String> aliasMap, boolean isCaseInsensitive) {
     if ("*".equals(columnName)) {
       return columnName;
     }
-    // Check if column is in the format of [table_name].[column_name]
-    String[] splits = splitByLastDot(columnName);
     String columnNameToCheck;
-    if (isCaseInsensitive) {
-      if (splits.length == 2 && rawTableName.equalsIgnoreCase(splits[0])) {
-        columnNameToCheck = splits[1].toLowerCase();
-      } else {
-        columnNameToCheck = columnName.toLowerCase();
-      }
+    if (columnName.regionMatches(!isCaseInsensitive, 0, rawTableName, 0, rawTableName.length())
+        && columnName.length() > rawTableName.length() && columnName.charAt(rawTableName.length()) == '.') {
+      columnNameToCheck = isCaseInsensitive ? columnName.substring(rawTableName.length() + 1).toLowerCase()
+          : columnName.substring(rawTableName.length() + 1);
     } else {
-      if (splits.length == 2 && rawTableName.equals(splits[0])) {
-        columnNameToCheck = splits[1];
-      } else {
-        columnNameToCheck = columnName;
-      }
+      columnNameToCheck = columnName;
     }
     if (columnNameMap != null) {
       String actualColumnName = columnNameMap.get(columnNameToCheck);
