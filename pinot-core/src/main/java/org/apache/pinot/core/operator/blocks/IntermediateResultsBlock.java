@@ -71,7 +71,7 @@ public class IntermediateResultsBlock implements Block {
   private long _executionThreadCpuTimeNs;
   private int _numServerThreads;
   private long _numStartreeUsed;
-  private boolean _startreeUsed;
+  private boolean _startreeUsed = false;
 
   private Table _table;
 
@@ -282,19 +282,12 @@ public class IntermediateResultsBlock implements Block {
   }
 
   public void setNumStartreeUsed(long numStartreeUsed) {
+    _startreeUsed = true;
     _numStartreeUsed = numStartreeUsed;
   }
 
   public long getNumStartreeUsed() {
     return _numStartreeUsed;
-  }
-
-  public void setIsStartreeUsed(boolean startreeUsed) {
-    _startreeUsed = startreeUsed;
-  }
-
-  public boolean isStartreeUsed() {
-    return _startreeUsed;
   }
 
   /**
