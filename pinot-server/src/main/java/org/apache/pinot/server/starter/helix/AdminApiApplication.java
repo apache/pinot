@@ -116,8 +116,7 @@ public class AdminApiApplication extends ResourceConfig {
     beanConfig.setContact("https://github.com/apache/pinot");
     beanConfig.setVersion("1.0");
     if (Boolean.parseBoolean(pinotConfiguration.getProperty(CommonConstants.Server.CONFIG_OF_SWAGGER_USE_HTTPS))) {
-      // Still leave http there as a second choice in case of need for quick tests with http.
-      beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL, CommonConstants.HTTP_PROTOCOL});
+      beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL});
     } else {
       beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
     }
