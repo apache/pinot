@@ -1039,7 +1039,8 @@ public class PinotLLCRealtimeSegmentManager {
    */
   @VisibleForTesting
   IdealState ensureAllPartitionsConsuming(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
-      IdealState idealState, List<PartitionGroupMetadata> newPartitionGroupMetadataList, boolean recreateDeletedConsumingSegment) {
+      IdealState idealState, List<PartitionGroupMetadata> newPartitionGroupMetadataList,
+      boolean recreateDeletedConsumingSegment) {
     String realtimeTableName = tableConfig.getTableName();
 
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
@@ -1142,8 +1143,8 @@ public class PinotLLCRealtimeSegmentManager {
               // Create a new IN_PROGRESS segment in PROPERTYSTORE,
               // add it as CONSUMING segment to IDEALSTATE.
 
-              if (recreateDeletedConsumingSegment && Status.DONE.equals(latestSegmentZKMetadata.getStatus()) &&
-                  isAllInstancesInState(instanceStateMap, SegmentStateModel.ONLINE)
+              if (recreateDeletedConsumingSegment && Status.DONE.equals(latestSegmentZKMetadata.getStatus())
+                  && isAllInstancesInState(instanceStateMap, SegmentStateModel.ONLINE)
               ) {
                 StreamPartitionMsgOffset startOffset = offsetFactory.create(latestSegmentZKMetadata.getEndOffset());
                 createNewConsumingSegment(tableConfig, streamConfig, latestSegmentZKMetadata, currentTimeMs,
