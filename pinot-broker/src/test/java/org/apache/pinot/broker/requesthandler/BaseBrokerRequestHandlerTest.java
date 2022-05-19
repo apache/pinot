@@ -178,17 +178,13 @@ public class BaseBrokerRequestHandlerTest {
 
   @Test
   public void testSplitTableNameByConfig() {
-    PinotConfiguration configuration = new PinotConfiguration();
-    configuration.setProperty(CommonConstants.Helix.CONFIG_OF_ALLOW_TABLE_NAME_DOTS, false);
-    String[] split = BaseBrokerRequestHandler.splitTableNameByConfig("db.table", configuration);
+    String[] split = BaseBrokerRequestHandler.splitTableNameByConfig("db.table", false);
     Assert.assertEquals(split, new String[]{"db", "table"});
 
-    configuration.setProperty(CommonConstants.Helix.CONFIG_OF_ALLOW_TABLE_NAME_DOTS, true);
-    split = BaseBrokerRequestHandler.splitTableNameByConfig("db.schema.table", configuration);
+    split = BaseBrokerRequestHandler.splitTableNameByConfig("db.schema.table", true);
     Assert.assertEquals(split, new String[]{"db.schema.table"});
 
-    configuration.setProperty(CommonConstants.Helix.CONFIG_OF_ALLOW_TABLE_NAME_DOTS, false);
-    split = BaseBrokerRequestHandler.splitTableNameByConfig("db.table", configuration);
+    split = BaseBrokerRequestHandler.splitTableNameByConfig("db.table", false);
     Assert.assertEquals(split, new String[]{"db", "table"});
   }
 }
