@@ -90,7 +90,7 @@ public class CombineOperatorUtils {
     resultsBlock.setExecutionThreadCpuTimeNs(threadCpuTimeNs);
     resultsBlock.setNumServerThreads(numServerThreads);
     if (startreeUsed) {
-      resultsBlock.setIsStartreeused(startreeUsed);
+      // resultsBlock.setIsStartreeused(startreeUsed);
       resultsBlock.setNumStartreeUsed(numStartreeUsed);
     }
   }
