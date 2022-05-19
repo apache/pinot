@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.ingestion.batch.spark;
+package org.apache.pinot.plugin.ingestion.batch.spark3;
 
 import java.io.File;
 import java.io.IOException;
@@ -24,8 +24,8 @@ import java.io.Serializable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -43,13 +43,13 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.VoidFunction;
 
 
-public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Serializable {
+public class SparkSegmentTarPushJobRunner implements IngestionJobRunner, Serializable {
   private SegmentGenerationJobSpec _spec;
 
-  public SparkSegmentMetadataPushJobRunner() {
+  public SparkSegmentTarPushJobRunner() {
   }
 
-  public SparkSegmentMetadataPushJobRunner(SegmentGenerationJobSpec spec) {
+  public SparkSegmentTarPushJobRunner(SegmentGenerationJobSpec spec) {
     init(spec);
   }
 
@@ -119,10 +119,8 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
                 .register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
           }
           try {
-            Map<String, String> segmentUriToTarPathMap = SegmentPushUtils
-                .getSegmentUriToTarPathMap(finalOutputDirURI, _spec.getPushJobSpec(), new String[]{segmentTarPath});
-            SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(finalOutputDirURI.getScheme()),
-                segmentUriToTarPathMap);
+            SegmentPushUtils.pushSegments(_spec, PinotFSFactory.create(finalOutputDirURI.getScheme()),
+                Arrays.asList(segmentTarPath));
           } catch (RetriableOperationException | AttemptsExceededException e) {
             throw new RuntimeException(e);
           }

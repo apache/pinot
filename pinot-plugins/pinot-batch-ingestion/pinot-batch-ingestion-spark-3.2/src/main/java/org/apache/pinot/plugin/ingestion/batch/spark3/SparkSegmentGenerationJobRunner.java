@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.ingestion.batch.spark;
+package org.apache.pinot.plugin.ingestion.batch.spark3;
 
 import java.io.File;
 import java.io.IOException;
