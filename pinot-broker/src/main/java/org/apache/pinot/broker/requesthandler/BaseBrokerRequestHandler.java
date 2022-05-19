@@ -445,7 +445,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
-      if (serverPinotQuery.isExplain()) {
+      if (pinotQuery.isExplain()) {
         // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
         return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
       }
@@ -555,7 +555,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     //       - Compile time function invocation
     //       - Literal only queries
     //       - Any rewrites
-    if (serverPinotQuery.isExplain()) {
+    if (pinotQuery.isExplain()) {
       // Update routing tables to only send request to offline servers for OFFLINE and HYBRID tables.
       // TODO: Assess if the Explain Plan Query should also be routed to REALTIME servers for HYBRID tables
       if (offlineRoutingTable != null) {
