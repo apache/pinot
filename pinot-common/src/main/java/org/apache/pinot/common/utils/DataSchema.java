@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -466,6 +467,8 @@ public class DataSchema {
           doubleValues[i] = longValues[i];
         }
         return doubleValues;
+      } else if (value instanceof DoubleArrayList) {
+        return ((DoubleArrayList) value).elements();
       } else {
         float[] floatValues = (float[]) value;
         int length = floatValues.length;

@@ -266,6 +266,8 @@ public class AggregationFunctionFactory {
                 queryContext.getLimit());
           case STUNION:
             return new StUnionAggregationFunction(firstArgument);
+          case HISTOGRAM:
+            return new HistogramAggregationFunction(arguments);
           default:
             throw new IllegalArgumentException();
         }
