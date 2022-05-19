@@ -71,6 +71,7 @@ public class IntermediateResultsBlock implements Block {
   private long _executionThreadCpuTimeNs;
   private int _numServerThreads;
   private long _numStartreeUsed;
+  private boolean _startreeUsed;
 
   private Table _table;
 
@@ -284,6 +285,18 @@ public class IntermediateResultsBlock implements Block {
     _numStartreeUsed = numStartreeUsed;
   }
 
+  public long getNumStartreeUsed() {
+    return _numStartreeUsed;
+  }
+
+  public void setIsStartreeUsed(boolean startreeUsed) {
+    _startreeUsed = startreeUsed;
+  }
+
+  public boolean isStartreeUsed() {
+    return _startreeUsed;
+  }
+
   /**
    * Get the collection of intermediate records
    */
@@ -444,6 +457,12 @@ public class IntermediateResultsBlock implements Block {
         dataTable.addException(exception);
       }
     }
+
+    if (_startreeUsed) {
+      // dataTable.getMetadata().put(MetadataKey.STARTREE_USED.getName(), String.valueOf(_startreeUsed));
+      dataTable.getMetadata().put(MetadataKey.NUM_STARTREE_USED.getName(), String.valueOf(_numStartreeUsed));
+    }
+
     return dataTable;
   }
 

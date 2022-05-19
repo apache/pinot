@@ -111,7 +111,9 @@ public interface DataTable {
     RESIZE_TIME_MS("resizeTimeMs", MetadataValueType.LONG),
     THREAD_CPU_TIME_NS("threadCpuTimeNs", MetadataValueType.LONG),
     SYSTEM_ACTIVITIES_CPU_TIME_NS("systemActivitiesCpuTimeNs", MetadataValueType.LONG),
-    RESPONSE_SER_CPU_TIME_NS("responseSerializationCpuTimeNs", MetadataValueType.LONG);
+    RESPONSE_SER_CPU_TIME_NS("responseSerializationCpuTimeNs", MetadataValueType.LONG),
+    NUM_STARTREE_USED("numStartreeUsed", MetadataValueType.LONG);
+    STARTREE_USED("startreeUsed", MetadataValueType.BOOL)
 
     private static final MetadataKey[] VALUES;
     private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();
