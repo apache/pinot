@@ -52,7 +52,7 @@ public class PinotResourceManagerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TEST_INSTANCE.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
 
     // Adding an offline table
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).build();

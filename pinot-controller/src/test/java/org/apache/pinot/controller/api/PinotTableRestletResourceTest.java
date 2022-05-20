@@ -62,7 +62,7 @@ public class PinotTableRestletResourceTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TEST_INSTANCE.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
 
     _createTableUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forTableCreate();
     _offlineBuilder.setTableName(OFFLINE_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")

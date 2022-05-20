@@ -61,7 +61,7 @@ public class PinotInstanceAssignmentRestletResourceTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TEST_INSTANCE.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
 
     // Create broker and server tenant
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);

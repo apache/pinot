@@ -68,7 +68,7 @@ public class SegmentLineageCleanupTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TEST_INSTANCE.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
 
     // Create server tenant
     Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_INSTANCES, NUM_INSTANCES, 0);

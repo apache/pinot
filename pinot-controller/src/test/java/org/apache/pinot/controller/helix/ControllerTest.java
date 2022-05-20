@@ -106,7 +106,7 @@ public class ControllerTest {
   /**
    * default static instance used to access all wrapped static instances.
    */
-  protected static final ControllerTest DEFAULT_INSTANCE = new ControllerTest();
+  private static final ControllerTest DEFAULT_INSTANCE = new ControllerTest();
 
   protected int _controllerPort;
   protected String _controllerBaseApiUrl;
@@ -128,6 +128,11 @@ public class ControllerTest {
 
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
+  /**
+   * Acquire the {@link ControllerTest} default instance that can be shared across different test cases.
+   *
+   * @return the default instance.
+   */
   public static ControllerTest getInstance() {
     return DEFAULT_INSTANCE;
   }
@@ -136,7 +141,8 @@ public class ControllerTest {
     return getClass().getSimpleName();
   }
 
-  /** HttpClient is lazy evaluated, static object, only instantiate when first use.
+  /**
+   * HttpClient is lazy evaluated, static object, only instantiate when first use.
    *
    * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
    * context first before the HttpClient can be initialized. However, because we have static usages of the HTTPClient,
@@ -149,7 +155,8 @@ public class ControllerTest {
     return _httpClient;
   }
 
-  /** ControllerRequestClient is lazy evaluated, static object, only instantiate when first use.
+  /**
+   * ControllerRequestClient is lazy evaluated, static object, only instantiate when first use.
    *
    * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
    * context first before the ControllerRequestClient can be initialized. However, because we have static usages of the
@@ -908,15 +915,15 @@ public class ControllerTest {
     return properties;
   }
 
-  public void startSuiteRun()
+  public void startSharedTestSetup()
       throws Exception {
-    startSuiteRun(Collections.emptyMap());
+    startSharedTestSetup(Collections.emptyMap());
   }
 
   /**
    * Initialize shared state for the TestNG suite.
    */
-  public void startSuiteRun(Map<String, Object> extraProperties)
+  public void startSharedTestSetup(Map<String, Object> extraProperties)
       throws Exception {
     startZk();
 
@@ -934,7 +941,7 @@ public class ControllerTest {
   /**
    * Cleanup shared state used in the TestNG suite.
    */
-  public void stopSuiteRun() {
+  public void stopSharedTestSetup() {
     cleanup();
 
     stopFakeInstances();
@@ -945,18 +952,18 @@ public class ControllerTest {
   /**
    * Make sure shared state is setup and valid before each test case class is run.
    */
-  public void setupClusterAndValidate()
+  public void setupSharedStateAndValidate()
       throws Exception {
-    setupClusterAndValidate(Collections.emptyMap());
+    setupSharedStateAndValidate(Collections.emptyMap());
   }
 
-  public void setupClusterAndValidate(Map<String, Object> extraProperties)
+  public void setupSharedStateAndValidate(Map<String, Object> extraProperties)
       throws Exception {
     if (_zookeeperInstance == null || _helixResourceManager == null) {
       // this is expected to happen only when running a single test case outside of testNG suite, i.e when test
       // cases are run one at a time within IntelliJ or through maven command line. When running under a testNG
       // suite, state will have already been setup by @BeforeSuite method in ControllerTestSetup.
-      startSuiteRun(extraProperties);
+      startSharedTestSetup(extraProperties);
     }
 
     // Check number of tenants

@@ -55,7 +55,7 @@ public class TableConfigsRestletResourceTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TEST_INSTANCE.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
     _createTableConfigsUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forTableConfigsCreate();
   }
 

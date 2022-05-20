@@ -53,7 +53,7 @@ public class ZKOperatorTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TEST_INSTANCE.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     TEST_INSTANCE.getHelixResourceManager().addTable(tableConfig);

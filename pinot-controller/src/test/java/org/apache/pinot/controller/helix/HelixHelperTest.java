@@ -40,7 +40,7 @@ public class HelixHelperTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TEST_INSTANCE.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
 
     IdealState idealState = new IdealState(RESOURCE_NAME);
     idealState.setStateModelDefRef("OnlineOffline");

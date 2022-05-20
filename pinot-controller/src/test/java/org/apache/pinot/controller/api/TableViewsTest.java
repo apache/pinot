@@ -49,7 +49,7 @@ public class TableViewsTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TEST_INSTANCE.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
 
     // Create the offline table and add one segment
     TableConfig tableConfig =

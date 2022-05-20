@@ -107,7 +107,7 @@ public class PinotHelixResourceManagerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TEST_INSTANCE.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
 
     // Create server tenant on all Servers
     Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_INSTANCES, NUM_OFFLINE_SERVER_INSTANCES,

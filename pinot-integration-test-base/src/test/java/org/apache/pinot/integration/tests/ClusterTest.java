@@ -92,7 +92,7 @@ public class ClusterTest extends ControllerTest {
   /**
    * default static instance used to access all wrapped static instances.
    */
-  protected static final ClusterTest DEFAULT_INSTANCE = new ClusterTest();
+  protected static final ClusterTest DEFAULT_CLUSTER_INSTANCE = new ClusterTest();
 
   protected String _brokerBaseApiUrl;
 
@@ -101,8 +101,8 @@ public class ClusterTest extends ControllerTest {
   protected List<Integer> _brokerPorts;
   protected BaseMinionStarter _minionStarter;
 
-  public static ClusterTest getInstance() {
-    return DEFAULT_INSTANCE;
+  public static ClusterTest getDefaultClusterInstance() {
+    return DEFAULT_CLUSTER_INSTANCE;
   }
 
   protected PinotConfiguration getDefaultBrokerConfiguration() {

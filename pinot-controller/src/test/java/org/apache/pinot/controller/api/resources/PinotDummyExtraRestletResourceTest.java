@@ -43,7 +43,7 @@ public class PinotDummyExtraRestletResourceTest {
     Map<String, Object> extraProperties = new HashMap<>();
     extraProperties.put(CONTROLLER_RESOURCE_PACKAGES, String.format("%s,%s",
         "org.apache.pinot.controller.api.resources.extrapackage", DEFAULT_CONTROLLER_RESOURCE_PACKAGES));
-    TEST_INSTANCE.setupClusterAndValidate(extraProperties);
+    TEST_INSTANCE.setupSharedStateAndValidate(extraProperties);
   }
 
   @Test

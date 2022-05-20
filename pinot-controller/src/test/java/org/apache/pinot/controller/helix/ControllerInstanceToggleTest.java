@@ -47,7 +47,7 @@ public class ControllerInstanceToggleTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TEST_INSTANCE.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
   }
 
   @Test

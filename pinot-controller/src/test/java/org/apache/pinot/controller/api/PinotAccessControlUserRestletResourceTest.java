@@ -41,7 +41,7 @@ public class PinotAccessControlUserRestletResourceTest {
     @BeforeClass
     public void setup()
         throws Exception {
-        TEST_INSTANCE.setupClusterAndValidate();
+        TEST_INSTANCE.setupSharedStateAndValidate();
 
         _createUserUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forUserCreate();
         _userConfigBuilder.setUsername("testUser").setPassword("123456").setComponentType(ComponentType.CONTROLLER)
