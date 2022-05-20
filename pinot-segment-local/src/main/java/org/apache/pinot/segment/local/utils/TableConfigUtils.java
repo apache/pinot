@@ -482,10 +482,10 @@ public final class TableConfigUtils {
       Preconditions.checkState(!primaryKeyColumns.contains(column), "Merger cannot be applied to primary key columns");
 
       if (upsertConfig.getComparisonColumn() != null) {
-        Preconditions.checkState(upsertConfig.getComparisonColumn().compareTo(column) != 0,
+        Preconditions.checkState(!upsertConfig.getComparisonColumn().equals(column),
             "Merger cannot be applied to comparison column");
       } else {
-        Preconditions.checkState(tableConfig.getValidationConfig().getTimeColumnName().compareTo(column) != 0,
+        Preconditions.checkState(!tableConfig.getValidationConfig().getTimeColumnName().equals(column),
             "Merger cannot be applied to time column");
       }
 
