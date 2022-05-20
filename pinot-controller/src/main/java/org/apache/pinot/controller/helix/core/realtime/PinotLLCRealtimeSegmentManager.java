@@ -1137,14 +1137,12 @@ public class PinotLLCRealtimeSegmentManager {
                 segmentAssignment, instancePartitionsMap, startOffset);
           } else {
             if (newPartitionGroupSet.contains(partitionGroupId)) {
-              // If we get here, that means in IdealState, the latest segment has all replicas ONLINE, but no
-              // CONSUMING segments.
+              // If we get here, that means in IdealState, the latest segment has all replicas ONLINE.
               // Create a new IN_PROGRESS segment in PROPERTYSTORE,
               // add it as CONSUMING segment to IDEALSTATE.
 
               if (recreateDeletedConsumingSegment && Status.DONE.equals(latestSegmentZKMetadata.getStatus())
-                  && isAllInstancesInState(instanceStateMap, SegmentStateModel.ONLINE)
-              ) {
+                  && isAllInstancesInState(instanceStateMap, SegmentStateModel.ONLINE)) {
                 StreamPartitionMsgOffset startOffset = offsetFactory.create(latestSegmentZKMetadata.getEndOffset());
                 createNewConsumingSegment(tableConfig, streamConfig, latestSegmentZKMetadata, currentTimeMs,
                     partitionGroupId, newPartitionGroupMetadataList, instancePartitions,
