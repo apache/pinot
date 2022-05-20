@@ -26,10 +26,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.data.Segment;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
-import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
@@ -42,110 +43,126 @@ import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 @TaskGenerator
 public class PurgeTaskGenerator extends BaseTaskGenerator {
-    private static final Logger LOGGER = LoggerFactory.getLogger(PurgeTaskGenerator.class);
-    private static final String DEFAULT_DELTA_PERIOD = "1d";
-    private ClusterInfoAccessor _clusterInfoAccessor;
+  private static final Logger LOGGER = LoggerFactory.getLogger(PurgeTaskGenerator.class);
+  private static final String DEFAULT_DELTA_PERIOD = "1d";
 
-    @Override
-    public void init(ClusterInfoAccessor clusterInfoAccessor) {
-        LOGGER.info("Initializing purge task");
-        _clusterInfoAccessor = clusterInfoAccessor;
-    }
+  @Override
+  public String getTaskType() {
+    return MinionConstants.PurgeTask.TASK_TYPE;
+  }
 
-    @Override
-    public String getTaskType() {
-        return MinionConstants.PurgeTask.TASK_TYPE;
-    }
+  @Override
+  public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
+    LOGGER.info("Start generating PurgeTask");
+    String taskType = MinionConstants.PurgeTask.TASK_TYPE;
+    List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
 
-    @Override
-    public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
-        LOGGER.info("Start generating PurgeTask");
-        String taskType = MinionConstants.PurgeTask.TASK_TYPE;
-        List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+    for (TableConfig tableConfig : tableConfigs) {
 
-        for (TableConfig tableConfig : tableConfigs) {
+      String tableName = tableConfig.getTableName();
+      if (tableConfig.getTableType() == TableType.REALTIME) {
+        LOGGER.info("Task type : {}, cannot be run on table of type  {}", taskType, TableType.REALTIME);
+        continue;
+      }
 
-            String tableName = tableConfig.getTableName();
-            if (tableConfig.getTableType() == TableType.REALTIME) {
-                LOGGER.info("Task type : {}, cannot be run on table of type  {}", taskType, TableType.REALTIME);
-                continue;
-            }
+      Map<String, String> taskConfigs;
+      try {
+        TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
+        Preconditions.checkNotNull(tableTaskConfig);
+        taskConfigs = tableTaskConfig.getConfigsForTaskType(MinionConstants.PurgeTask.TASK_TYPE);
+        Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: {}", tableName);
+      } catch (Exception e) {
+        continue;
+      }
+      String deltaTimePeriod =
+          taskConfigs.getOrDefault(MinionConstants.PurgeTask.DELTA_TIME_PERIOD_KEY, DEFAULT_DELTA_PERIOD);
+      long purgeDeltaMs = TimeUtils.convertPeriodToMillis(deltaTimePeriod);
 
-            Map<String, String> taskConfigs;
-            try {
-                TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
-                Preconditions.checkNotNull(tableTaskConfig);
-                taskConfigs =
-                        tableTaskConfig.getConfigsForTaskType(MinionConstants.PurgeTask.TASK_TYPE);
-                Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: {}", tableName);
-            } catch (Exception e) {
-                continue;
-            }
-            String deltaTimePeriod =
-                taskConfigs.getOrDefault(MinionConstants.PurgeTask.DELTA_TIME_PERIOD_KEY, DEFAULT_DELTA_PERIOD);
-            long purgeDeltaMs = TimeUtils.convertPeriodToMillis(deltaTimePeriod);
-
-            LOGGER.info("Start generating task configs for table: {} for task: {}", tableName, taskType);
-            // Get max number of tasks for this table
-            int tableMaxNumTasks;
-            String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
-            if (tableMaxNumTasksConfig != null) {
-                try {
-                    tableMaxNumTasks = Integer.parseInt(tableMaxNumTasksConfig);
-                } catch (Exception e) {
-                    tableMaxNumTasks = Integer.MAX_VALUE;
-                    LOGGER.warn("MaxNumTasks have been wrongly set for table : {}, and task {}", tableName, taskType);
-                }
-            } else {
-                tableMaxNumTasks = Integer.MAX_VALUE;
-            }
-            List<SegmentZKMetadata> offlineSegmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(tableName);
-
-            Collections.sort(offlineSegmentsZKMetadata,
-                    Comparator.comparing(
-                        segmentZKMetadata -> segmentZKMetadata.getCustomMap().get(
-                            MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX),
-                        Comparator.nullsFirst(Comparator.naturalOrder())));
-            int tableNumTasks = 0;
-            Set<Segment> runningSegments =
-                    TaskGeneratorUtils.getRunningSegments(MinionConstants.PurgeTask.TASK_TYPE, _clusterInfoAccessor);
-            for (SegmentZKMetadata segmentZKMetadata : offlineSegmentsZKMetadata) {
-                Map<String, String> configs = new HashMap<>();
-                String segmentName = segmentZKMetadata.getSegmentName();
-                Long tsLastPurge = Long.valueOf(
-                    segmentZKMetadata.getCustomMap().get(
-                        MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX));
-                //skip running segment
-                if (runningSegments.contains(new Segment(tableName, segmentName))) {
-                    continue;
-                }
-                if ((tsLastPurge != null) && ((System.currentTimeMillis() - tsLastPurge) < purgeDeltaMs)) {
-                    //skip if purge delay is not reached
-                    continue;
-                }
-                if (tableNumTasks == tableMaxNumTasks) {
-                    break;
-                }
-                configs.put(MinionConstants.TABLE_NAME_KEY, tableName);
-                configs.put(MinionConstants.SEGMENT_NAME_KEY, segmentName);
-                configs.put(MinionConstants.DOWNLOAD_URL_KEY, segmentZKMetadata.getDownloadUrl());
-                configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
-                configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segmentZKMetadata.getCrc()));
-                pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
-                tableNumTasks++;
-            }
-            LOGGER.info("Finished generating {} tasks configs for table: {} "
-                    + "for task: {}", tableNumTasks, tableName, taskType);
+      LOGGER.info("Start generating task configs for table: {} for task: {}", tableName, taskType);
+      // Get max number of tasks for this table
+      int tableMaxNumTasks;
+      String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
+      if (tableMaxNumTasksConfig != null) {
+        try {
+          tableMaxNumTasks = Integer.parseInt(tableMaxNumTasksConfig);
+        } catch (Exception e) {
+          tableMaxNumTasks = Integer.MAX_VALUE;
+          LOGGER.warn("MaxNumTasks have been wrongly set for table : {}, and task {}", tableName, taskType);
         }
-        return pinotTaskConfigs;
-    }
+      } else {
+        tableMaxNumTasks = Integer.MAX_VALUE;
+      }
+      List<SegmentZKMetadata> offlineSegmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(tableName);
 
-    @Override
-    public List<PinotTaskConfig> generateTasks(TableConfig tableConfig,
-                                               Map<String, String> taskConfigs) throws Exception {
-        throw new UnknownTaskTypeException("Adhoc task generation is not supported for task type : "
-                + this.getTaskType());
+      Predicate<SegmentZKMetadata> alreadyPurged = segment -> segment.getCustomMap() != null;
+      Predicate<SegmentZKMetadata> notPurged = segment -> segment.getCustomMap() == null;
+
+      List<SegmentZKMetadata> purgedSegmentsZKMetadata =
+          offlineSegmentsZKMetadata.stream().filter(alreadyPurged).collect(Collectors.toList());
+
+      List<SegmentZKMetadata> notpurgedSegmentsZKMetadata =
+          offlineSegmentsZKMetadata.stream().filter(notPurged).collect(Collectors.toList());
+
+      Collections.sort(purgedSegmentsZKMetadata, Comparator.comparing(
+          segmentZKMetadata -> segmentZKMetadata.getCustomMap()
+              .get(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX),
+          Comparator.nullsFirst(Comparator.naturalOrder())));
+      //add already purged segment at the end
+      notpurgedSegmentsZKMetadata.addAll(purgedSegmentsZKMetadata);
+
+      int tableNumTasks = 0;
+      Set<Segment> runningSegments =
+          TaskGeneratorUtils.getRunningSegments(MinionConstants.PurgeTask.TASK_TYPE, _clusterInfoAccessor);
+      for (SegmentZKMetadata segmentZKMetadata : notpurgedSegmentsZKMetadata) {
+        Map<String, String> configs = new HashMap<>();
+        String segmentName = segmentZKMetadata.getSegmentName();
+        Long tsLastPurge;
+        if (segmentZKMetadata.getCustomMap() != null) {
+          tsLastPurge = Long.valueOf(segmentZKMetadata.getCustomMap()
+              .get(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX));
+        } else {
+          tsLastPurge = 0L;
+        }
+
+        //skip running segment
+        if (runningSegments.contains(new Segment(tableName, segmentName))) {
+          continue;
+        }
+        if ((tsLastPurge != null) && ((System.currentTimeMillis() - tsLastPurge) < purgeDeltaMs)) {
+          //skip if purge delay is not reached
+          continue;
+        }
+        if (tableNumTasks == tableMaxNumTasks) {
+          break;
+        }
+        configs.put(MinionConstants.TABLE_NAME_KEY, tableName);
+        configs.put(MinionConstants.SEGMENT_NAME_KEY, segmentName);
+        configs.put(MinionConstants.DOWNLOAD_URL_KEY, segmentZKMetadata.getDownloadUrl());
+        configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
+        configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segmentZKMetadata.getCrc()));
+        pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
+        tableNumTasks++;
+      }
+      LOGGER.info("Finished generating {} tasks configs for table: {} " + "for task: {}", tableNumTasks, tableName,
+          taskType);
     }
+    return pinotTaskConfigs;
+  }
+
+  /**
+   * Check if the segment is already purged
+   */
+  private boolean isPurgedSegment(SegmentZKMetadata segmentZKMetadata, String mergeLevel) {
+    Map<String, String> customMap = segmentZKMetadata.getCustomMap();
+    return customMap != null;
+  }
+
+  @Override
+  public List<PinotTaskConfig> generateTasks(TableConfig tableConfig, Map<String, String> taskConfigs)
+      throws Exception {
+    throw new UnknownTaskTypeException("Adhoc task generation is not supported for task type : " + this.getTaskType());
+  }
 }

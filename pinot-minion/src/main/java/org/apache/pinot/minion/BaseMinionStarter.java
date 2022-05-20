@@ -43,6 +43,7 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.core.minion.SegmentPurger;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.minion.event.EventObserverFactoryRegistry;
@@ -158,6 +159,17 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     Utils.logVersions();
     MinionContext minionContext = MinionContext.getInstance();
 
+    SegmentPurger.RecordPurgerFactory s = new SegmentPurger.RecordPurgerFactory() {
+      @Override
+      public SegmentPurger.RecordPurger getRecordPurger(String rawTableName) {
+        SegmentPurger.RecordPurger r = row -> {
+          //TODO-IMPLEMENT HERE YOUR OWN PURGE LOGIC
+          return false;
+        };
+        return r;
+      }
+    };
+    minionContext.setRecordPurgerFactory(s);
     // Initialize data directory
     LOGGER.info("Initializing data directory");
     File dataDir = new File(_config
