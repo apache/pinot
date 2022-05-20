@@ -203,6 +203,12 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
         "SELECT SUM(DepDelayMinutes) FROM myStarTable WHERE DepDelay > 0 AND ArrDelay > 0 AND OriginStateName = "
             + "'Massachusetts'";
     testStarQuery(starQuery);
+
+    // Query containing predicate with nested OR and ANDs
+    starQuery =
+        "SELECT SUM(DepDelayMinutes) FROM myStarTable WHERE ((DepDelay > 0 AND ArrDelay > 0) OR (OriginStateName = "
+            + "'Massachusetts' AND DepDelay = 5)) OR ArrDelay = 5 OR (DepDelay = 10 AND ArrDelay = 5)";
+    testStarQuery(starQuery);
   }
 
   private void testStarQuery(String starQuery)
