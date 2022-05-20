@@ -34,6 +34,7 @@ import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexProvider;
 import org.apache.pinot.spi.data.FieldSpec;
 
+import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.INT;
 
 
@@ -49,6 +50,7 @@ public class DefaultMutableIndexProvider implements MutableIndexProvider {
     String column = context.getFieldSpec().getName();
     String segmentName = context.getSegmentName();
     FieldSpec.DataType storedType = context.getFieldSpec().getDataType().getStoredType();
+    int maxLength = context.getFieldSpec().getMaxLength();
     boolean isSingleValue = context.getFieldSpec().isSingleValueField();
     if (!context.hasDictionary()) {
       // No dictionary column must be single-valued
@@ -56,8 +58,10 @@ public class DefaultMutableIndexProvider implements MutableIndexProvider {
       String allocationContext =
           buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
               V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-      if (storedType.isFixedWidth()) {
-        return new FixedByteSVMutableForwardIndex(false, storedType, context.getCapacity(), context.getMemoryManager(),
+      // We consider BYTES with a specific maxLength as being also fixed width maxLength's purpose doubles as the fixed width
+      // when used on a BYTES field.
+      if (storedType.isFixedWidth() || (storedType.getStoredType() == BYTES && maxLength > 0)) {
+        return new FixedByteSVMutableForwardIndex(false, storedType, maxLength, context.getCapacity(), context.getMemoryManager(),
             allocationContext);
       } else {
         // RealtimeSegmentStatsHistory does not have the stats for no-dictionary columns from previous consuming

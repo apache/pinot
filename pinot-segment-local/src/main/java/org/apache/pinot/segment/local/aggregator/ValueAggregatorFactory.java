@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import java.util.List;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -36,7 +38,7 @@ public class ValueAggregatorFactory {
    * @param aggregationType Aggregation type
    * @return Value aggregator
    */
-  public static ValueAggregator getValueAggregator(AggregationFunctionType aggregationType) {
+  public static ValueAggregator getValueAggregator(AggregationFunctionType aggregationType, List<ExpressionContext> arguments) {
     switch (aggregationType) {
       case COUNT:
         return new CountValueAggregator();
@@ -56,7 +58,7 @@ public class ValueAggregatorFactory {
         return new DistinctCountBitmapValueAggregator();
       case DISTINCTCOUNTHLL:
       case DISTINCTCOUNTRAWHLL:
-        return new DistinctCountHLLValueAggregator();
+        return new DistinctCountHLLValueAggregator(arguments);
       case PERCENTILEEST:
       case PERCENTILERAWEST:
         return new PercentileEstValueAggregator();

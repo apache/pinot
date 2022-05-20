@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -40,6 +42,8 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
+import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -97,7 +101,7 @@ public final class TableConfigUtils {
   private static final String KINESIS_STREAM_TYPE = "kinesis";
   private static final EnumSet<AggregationFunctionType> SUPPORTED_INGESTION_AGGREGATIONS =
       EnumSet.of(AggregationFunctionType.SUM, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
-          AggregationFunctionType.COUNT);
+          AggregationFunctionType.COUNT, AggregationFunctionType.DISTINCTCOUNTHLL);
 
   /**
    * @see TableConfigUtils#validate(TableConfig, Schema, String, boolean)
@@ -334,6 +338,7 @@ public final class TableConfigUtils {
         Set<String> aggregationColumns = new HashSet<>();
         for (AggregationConfig aggregationConfig : aggregationConfigs) {
           String columnName = aggregationConfig.getColumnName();
+          FieldSpec fieldSpec = null;
           String aggregationFunction = aggregationConfig.getAggregationFunction();
           if (columnName == null || aggregationFunction == null) {
             throw new IllegalStateException(
@@ -341,7 +346,7 @@ public final class TableConfigUtils {
           }
 
           if (schema != null) {
-            FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+            fieldSpec = schema.getFieldSpecFor(columnName);
             Preconditions.checkState(fieldSpec != null, "The destination column '" + columnName
                 + "' of the aggregation function must be present in the schema");
             Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
@@ -363,12 +368,56 @@ public final class TableConfigUtils {
 
           FunctionContext functionContext = expressionContext.getFunction();
           validateIngestionAggregation(functionContext.getFunctionName());
-          Preconditions.checkState(functionContext.getArguments().size() == 1,
-              "aggregation function can only have one argument: %s", aggregationConfig);
+
+          List<ExpressionContext> arguments = functionContext.getArguments();
+          switch (functionContext.getFunctionName()) {
+            case "distinctcounthll":
+              Preconditions.checkState(functionContext.getArguments().size() >= 1 && functionContext.getArguments().size() <= 2,
+                  "distinctcounthll function can have max two arguments: %s", aggregationConfig);
+
+              int log2m = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M;
+              if (functionContext.getArguments().size() == 2) {
+                Preconditions.checkState(StringUtils.isNumeric(functionContext.getArguments().get(1).getLiteral()) == true,
+                    "distinctcounthll function second argument must be a number");
+
+                log2m = Integer.parseInt(functionContext.getArguments().get(1).getLiteral());
+              }
+
+              int expectedBytesForHLL;
+              try {
+                expectedBytesForHLL = (new HyperLogLog(log2m)).getBytes().length;
+              } catch (IOException e) {
+                throw new RuntimeException(e);
+              }
+
+              String destinationColumn  = aggregationConfig.getColumnName();
+              FieldSpec destinationFieldSpec = schema.getFieldSpecFor(destinationColumn);
+
+              if (destinationFieldSpec == null) {
+                throw new RuntimeException("couldn't find field config for " + destinationColumn + ". Unable to validate aggregation config for distinctcounthll");
+              } else {
+                int maxLength = destinationFieldSpec.getMaxLength();
+                Preconditions.checkState(maxLength == expectedBytesForHLL, "destination field for distinctcounthll must have maxLength property set to " + expectedBytesForHLL + ", the size of a HLL object with log2m of " + log2m);
+                break;
+              }
+            default:
+            Preconditions.checkState(functionContext.getArguments().size() == 1,
+                "aggregation function can only have one argument: %s", aggregationConfig);
+          }
 
           ExpressionContext argument = functionContext.getArguments().get(0);
           Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
-              "aggregator function argument must be a identifier: %s", aggregationConfig);
+              "aggregator function argument must be an identifier: %s", aggregationConfig);
+
+          AggregationFunctionType functionType =
+              AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
+          ValueAggregator valueAggregator = ValueAggregatorFactory.getValueAggregator(functionType, arguments);
+
+          if (schema != null && fieldSpec != null) {
+            Preconditions.checkState(valueAggregator.getAggregatedValueType() == fieldSpec.getDataType(),
+                "aggregator function datatype (%s) must be the same as the schema datatype (%s) for %s",
+                valueAggregator.getAggregatedValueType(), fieldSpec.getDataType(), fieldSpec.getName());
+          }
 
           aggregationSourceColumns.add(argument.getIdentifier());
         }
@@ -447,7 +496,7 @@ public final class TableConfigUtils {
    */
   public static void validateIngestionAggregation(String name) {
     for (AggregationFunctionType functionType : SUPPORTED_INGESTION_AGGREGATIONS) {
-      if (functionType.getName().equals(name)) {
+      if (functionType.getName().toLowerCase().equals(name)) {
         return;
       }
     }
