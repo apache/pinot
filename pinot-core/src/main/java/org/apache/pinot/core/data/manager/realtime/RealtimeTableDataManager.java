@@ -116,6 +116,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
   private UpsertConfig.Mode _upsertMode;
+  private boolean _isDedupEnabled;
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
   private TableDedupMetadataManager _tableDedupMetadataManager;
   private List<String> _primaryKeyColumns;
@@ -163,6 +164,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
     _upsertMode = tableConfig.getUpsertMode();
     if (tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled()) {
+      _isDedupEnabled = tableConfig.getDedupConfig().isDedupEnabled();
       DedupConfig dedupConfig = tableConfig.getDedupConfig();
       HashFunction dedupHashFunction = dedupConfig.getHashFunction();
       _tableDedupMetadataManager =
@@ -372,7 +374,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (isUpsertEnabled()) {
       handleUpsert((ImmutableSegmentImpl) immutableSegment);
     }
+
+    if (_isDedupEnabled) {
+      buildDedupeMeta((ImmutableSegmentImpl) immutableSegment);
+    }
     super.addSegment(immutableSegment);
+  }
+
+  private void buildDedupeMeta(ImmutableSegmentImpl immutableSegment) {
+    // Add segment to partitionMeta
   }
 
   private void handleUpsert(ImmutableSegmentImpl immutableSegment) {
