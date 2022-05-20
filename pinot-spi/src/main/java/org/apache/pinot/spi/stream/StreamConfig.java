@@ -56,6 +56,7 @@ public class StreamConfig {
 
   public static final long DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS = 30_000;
   public static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
+  public static final int DEFAULT_IDLE_TIMEOUT_MILLIS = -1; // disabled, will use default idle count mechanism
 
   private static final String SIMPLE_CONSUMER_TYPE_STRING = "simple";
 
@@ -71,6 +72,8 @@ public class StreamConfig {
 
   private final long _connectionTimeoutMillis;
   private final int _fetchTimeoutMillis;
+
+  private final long _idleTimeoutMillis;
 
   private final int _flushThresholdRows;
   private final long _flushThresholdTimeMillis;
@@ -170,6 +173,20 @@ public class StreamConfig {
       }
     }
     _fetchTimeoutMillis = fetchTimeoutMillis;
+
+    int idleTimeoutMillis = DEFAULT_IDLE_TIMEOUT_MILLIS;
+    String idleTimeoutMillisKey =
+        StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_IDLE_TIMEOUT_MILLIS);
+    String idleTimeoutMillisValue = streamConfigMap.get(idleTimeoutMillisKey);
+    if (idleTimeoutMillisValue != null) {
+      try {
+        idleTimeoutMillis = Integer.parseInt(idleTimeoutMillisValue);
+      } catch (Exception e) {
+        LOGGER.warn("Invalid config {}: {}, defaulting to: {} (i.e. no idle timeout, use only max idle count)",
+            idleTimeoutMillisKey, idleTimeoutMillisValue, DEFAULT_IDLE_TIMEOUT_MILLIS);
+      }
+    }
+    _idleTimeoutMillis = idleTimeoutMillis;
 
     _flushThresholdRows = extractFlushThresholdRows(streamConfigMap);
     _flushThresholdTimeMillis = extractFlushThresholdTimeMillis(streamConfigMap);
@@ -312,6 +329,10 @@ public class StreamConfig {
 
   public int getFetchTimeoutMillis() {
     return _fetchTimeoutMillis;
+  }
+
+  public long getIdleTimeoutMillis() {
+    return _idleTimeoutMillis;
   }
 
   public int getFlushThresholdRows() {

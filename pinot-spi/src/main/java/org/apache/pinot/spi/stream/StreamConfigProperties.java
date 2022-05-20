@@ -43,6 +43,7 @@ public class StreamConfigProperties {
   public static final String STREAM_CONSUMER_OFFSET_CRITERIA = "consumer.prop.auto.offset.reset";
   public static final String STREAM_FETCH_TIMEOUT_MILLIS = "fetch.timeout.millis";
   public static final String STREAM_CONNECTION_TIMEOUT_MILLIS = "connection.timeout.millis";
+  public static final String STREAM_IDLE_TIMEOUT_MILLIS = "idle.timeout.millis";
   public static final String STREAM_DECODER_CLASS = "decoder.class.name";
   public static final String DECODER_PROPS_PREFIX = "decoder.prop";
   public static final String GROUP_ID = "hlc.group.id";

@@ -375,15 +375,72 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
+  /**
+   * Inner class to track the idling of the consumer
+   */
+  private static class IdleContext {
+    final long idlePipeSleepTimeMillis = 100;
+    long idleStartTimeMillis;
+    long idleTimeoutMillis;
+    long consecutiveIdleCount;
+    long maxConsecutiveIdleCount;
+    String thresholdExceededReason;
+
+    public IdleContext(PartitionLevelStreamConfig partitionLevelStreamConfig) {
+      idleTimeoutMillis = partitionLevelStreamConfig.getIdleTimeoutMillis();
+      if (idleTimeoutMillis <=0) {
+        // backward compatible default behavior
+        maxConsecutiveIdleCount = (3 * 60 * 1000) / (idlePipeSleepTimeMillis + partitionLevelStreamConfig
+            .getFetchTimeoutMillis());  // 3 minute count
+      } else {
+        maxConsecutiveIdleCount = -1;
+      }
+      reset();
+    }
+
+    void reset() {
+      idleStartTimeMillis = -1;
+      consecutiveIdleCount = 0;
+      thresholdExceededReason = null;
+    }
+
+    void update() {
+      if (consecutiveIdleCount == 0) {
+        idleStartTimeMillis = System.currentTimeMillis();
+      }
+      consecutiveIdleCount++;
+    }
+
+    /**
+     * idleTimeoutMillis takes precedence over idleCount. If idleTimeoutMillis is configured, idleCount ignored
+     * @return true if any of the thresholds exceeded
+     */
+    boolean idleThresholdExceeded() {
+      if (idleTimeoutMillis > 0) {
+        long totalIdleTimeMillis = System.currentTimeMillis() - idleStartTimeMillis;
+        if (totalIdleTimeMillis > idleTimeoutMillis) {
+          thresholdExceededReason = String.format("Total idle time: %d ms exceeded idle timeout: %d ms", totalIdleTimeMillis,
+              idleTimeoutMillis);
+          return true;
+        }
+      } else {
+        if (consecutiveIdleCount > maxConsecutiveIdleCount) {
+          thresholdExceededReason = String.format("Consecutive idle count: %d exceeded max: %d", consecutiveIdleCount,
+              maxConsecutiveIdleCount);
+          return true;
+        }
+      }
+      return false;
+    }
+  }
+
   protected boolean consumeLoop()
       throws Exception {
     _numRowsErrored = 0;
-    final long idlePipeSleepTimeMillis = 100;
-    final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000) / (idlePipeSleepTimeMillis + _partitionLevelStreamConfig
-        .getFetchTimeoutMillis());  // 3 minute count
+    IdleContext idleContext = new IdleContext(_partitionLevelStreamConfig);
+
     StreamPartitionMsgOffset lastUpdatedOffset = _streamPartitionMsgOffsetFactory
         .create(_currentOffset);  // so that we always update the metric when we enter this method.
-    long consecutiveIdleCount = 0;
     // At this point, we know that we can potentially move the offset, so the old saved segment file is not valid
     // anymore. Remove the file if it exists.
     removeSegmentFile();
@@ -415,10 +472,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         continue;
       }
 
-      processStreamEvents(messageBatch, idlePipeSleepTimeMillis);
+      processStreamEvents(messageBatch, idleContext);
 
       if (_currentOffset.compareTo(lastUpdatedOffset) != 0) {
-        consecutiveIdleCount = 0;
+        idleContext.reset();
         // We consumed something. Update the highest stream offset as well as partition-consuming metric.
         // TODO Issue 5359 Need to find a way to bump metrics without getting actual offset value.
         if (_currentOffset instanceof LongMsgOffset) {
@@ -438,14 +495,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         _currentOffset = nextOffset;
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(nextOffset);
       } else {
-        // We did not consume any rows. Update the partition-consuming metric only if we have been idling for a long
-        // time.
-        // Create a new stream consumer wrapper, in case we are stuck on something.
-        consecutiveIdleCount++;
-        if (consecutiveIdleCount > maxIdleCountBeforeStatUpdate) {
+        idleContext.update();
+        if (idleContext.idleThresholdExceeded()) {
+          // We did not consume any rows.
+          // Update the partition-consuming metric only if we have been idling beyond idle thresholds.
+          // Create a new stream consumer wrapper, in case we are stuck on something.
           _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
-          consecutiveIdleCount = 0;
-          recreateStreamConsumer("Idle for too long");
+          recreateStreamConsumer(idleContext.thresholdExceededReason);
+          idleContext.reset();
         }
       }
     }
@@ -457,7 +514,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return true;
   }
 
-  private void processStreamEvents(MessageBatch messagesAndOffsets, long idlePipeSleepTimeMillis) {
+  private void processStreamEvents(MessageBatch messagesAndOffsets, IdleContext idleContext) {
 
     int messageCount = messagesAndOffsets.getMessageCount();
     _rateLimiter.throttle(messageCount);
@@ -560,10 +617,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
     } else if (messagesAndOffsets.getUnfilteredMessageCount() == 0) {
       if (_segmentLogger.isDebugEnabled()) {
-        _segmentLogger.debug("empty batch received - sleeping for {}ms", idlePipeSleepTimeMillis);
+        _segmentLogger.debug("empty batch received - sleeping for {}ms", idleContext.idlePipeSleepTimeMillis);
       }
       // If there were no messages to be fetched from stream, wait for a little bit as to avoid hammering the stream
-      Uninterruptibles.sleepUninterruptibly(idlePipeSleepTimeMillis, TimeUnit.MILLISECONDS);
+      Uninterruptibles.sleepUninterruptibly(idleContext.idlePipeSleepTimeMillis, TimeUnit.MILLISECONDS);
     }
   }
 
