@@ -451,6 +451,8 @@ public class DataSchema {
     private static double[] toDoubleArray(Object value) {
       if (value instanceof double[]) {
         return (double[]) value;
+      } else if (value instanceof DoubleArrayList) {
+        return ((DoubleArrayList) value).elements();
       } else if (value instanceof int[]) {
         int[] intValues = (int[]) value;
         int length = intValues.length;
@@ -467,8 +469,6 @@ public class DataSchema {
           doubleValues[i] = longValues[i];
         }
         return doubleValues;
-      } else if (value instanceof DoubleArrayList) {
-        return ((DoubleArrayList) value).elements();
       } else {
         float[] floatValues = (float[]) value;
         int length = floatValues.length;
