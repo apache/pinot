@@ -66,10 +66,7 @@ public class DataSchema {
     _columnFieldSpecs = null;
   }
 
-  @JsonCreator
-  public DataSchema(@JsonProperty("columnNames") String[] columnNames,
-      @JsonProperty("columnDataTypes") ColumnDataType[] columnDataTypes,
-      @JsonProperty("columnFieldSpecs") FieldSpec[] columnFieldSpecs) {
+  public DataSchema(String[] columnNames, ColumnDataType[] columnDataTypes, FieldSpec[] columnFieldSpecs) {
     _columnNames = columnNames;
     _columnDataTypes = columnDataTypes;
     _columnFieldSpecs = columnFieldSpecs;

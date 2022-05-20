@@ -316,7 +316,7 @@ public class DataTableBuilder {
       throws IOException {
     _fixedSizeDataByteArrayOutputStream.write(_currentRowDataByteBuffer.array());
   }
-
+  
   public DataTable build() {
     if (_version == VERSION_2) {
       return new DataTableImplV2(_numRows, _dataSchema, _reverseDictionaryMap,

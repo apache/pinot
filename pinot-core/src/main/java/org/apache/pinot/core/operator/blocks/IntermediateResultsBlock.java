@@ -361,7 +361,6 @@ public class IntermediateResultsBlock implements Block {
       dataTableBuilder.finishRow();
       rowId++;
     }
-    // todo(nhejazi): hide null handling code behind a configuration (nullHandlingEnabledInSelect).
     for (int colId = 0; colId < numColumns; colId++) {
       dataTableBuilder.setColumnNullBitmap(columnNullRoaringBitmap[colId].toMutableRoaringBitmap());
     }
