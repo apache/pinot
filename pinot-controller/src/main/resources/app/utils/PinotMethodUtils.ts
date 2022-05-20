@@ -571,6 +571,10 @@ const getSegmentDetails = (tableName, segmentName) => {
       }
     }
 
+    const segmentMetaDataJson = { ...segmentMetaData }
+    delete segmentMetaDataJson.indexes
+    delete segmentMetaDataJson.columns
+
     return {
       replicaSet: {
         columns: ['Server Name', 'Status'],
@@ -597,7 +601,7 @@ const getSegmentDetails = (tableName, segmentName) => {
           'MMMM Do YYYY, h:mm:ss'
         ),
       },
-      JSON: segmentMetaData
+      JSON: segmentMetaDataJson
     };
   });
 };
