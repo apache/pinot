@@ -290,8 +290,7 @@ public class PinotSegmentRestletResource {
   public Map<String, Object> getSegmentMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-          List<String> columns) {
+      @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") List<String> columns) {
     segmentName = URIUtils.decode(segmentName);
     Map<String, String> segmentMetadata = null;
     if (TableNameBuilder.getTableTypeFromTableName(tableName) != null) {
@@ -306,25 +305,33 @@ public class PinotSegmentRestletResource {
 
     if (segmentMetadata != null) {
       Map<String, Object> result = new HashMap<>(segmentMetadata);
-      try {
-        JsonNode segmentsMetadataJson = getSegmentMetadataFromServer(tableName, segmentName, columns);
+      if (columns.size() > 0) {
+        JsonNode segmentsMetadataJson = getExtraMetaData(tableName, segmentName, columns);
         if (segmentsMetadataJson.has("indexes")) {
           result.put("indexes", segmentsMetadataJson.get("indexes"));
         }
         if (segmentsMetadataJson.has("columns")) {
           result.put("columns", segmentsMetadataJson.get("columns"));
         }
-      } catch (InvalidConfigException e) {
-        throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
-      } catch (IOException ioe) {
-        throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
-            Status.INTERNAL_SERVER_ERROR, ioe);
       }
-
       return result;
     } else {
       throw new ControllerApplicationException(LOGGER,
           "Failed to find segment: " + segmentName + " in table: " + tableName, Status.NOT_FOUND);
+    }
+  }
+
+  private JsonNode getExtraMetaData(String tableName, String segmentName, List<String> columns) {
+    try {
+      TableMetadataReader tableMetadataReader = new TableMetadataReader(_executor,
+          _connectionManager, _pinotHelixResourceManager);
+      return tableMetadataReader.getSegmentMetadata(tableName, segmentName, columns,
+          _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
+    } catch (IOException ioe) {
+      throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
+          Status.INTERNAL_SERVER_ERROR, ioe);
     }
   }
 
@@ -753,14 +760,6 @@ public class PinotSegmentRestletResource {
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
     return tableMetadataReader
         .getSegmentsMetadata(tableNameWithType, columns, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
-  }
-
-  private JsonNode getSegmentMetadataFromServer(String tableNameWithType, String segmentName, List<String> columns)
-      throws InvalidConfigException, IOException {
-    TableMetadataReader tableMetadataReader =
-        new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
-    return tableMetadataReader.getSegmentMetadata(tableNameWithType, segmentName, columns,
-        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 
   // TODO: Move this API into PinotTableRestletResource
