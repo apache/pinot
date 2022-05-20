@@ -30,7 +30,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -71,7 +71,7 @@ public class PartitionUpsertMetadataManager {
   private final int _partitionId;
   private final ServerMetrics _serverMetrics;
   private final PartialUpsertHandler _partialUpsertHandler;
-  private final UpsertConfig.HashFunction _hashFunction;
+  private final HashFunction _hashFunction;
 
   // TODO(upsert): consider an off-heap KV store to persist this mapping to improve the recovery speed.
   @VisibleForTesting
@@ -81,7 +81,7 @@ public class PartitionUpsertMetadataManager {
   private final GenericRow _reuse = new GenericRow();
 
   public PartitionUpsertMetadataManager(String tableNameWithType, int partitionId, ServerMetrics serverMetrics,
-      @Nullable PartialUpsertHandler partialUpsertHandler, UpsertConfig.HashFunction hashFunction) {
+      @Nullable PartialUpsertHandler partialUpsertHandler, HashFunction hashFunction) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
@@ -259,7 +259,7 @@ public class PartitionUpsertMetadataManager {
         _primaryKeyToRecordLocationMap.size());
   }
 
-  protected static Object hashPrimaryKey(PrimaryKey primaryKey, UpsertConfig.HashFunction hashFunction) {
+  protected static Object hashPrimaryKey(PrimaryKey primaryKey, HashFunction hashFunction) {
     switch (hashFunction) {
       case NONE:
         return primaryKey;

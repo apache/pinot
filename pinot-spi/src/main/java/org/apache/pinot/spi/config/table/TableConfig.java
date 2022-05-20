@@ -49,6 +49,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY = "instanceAssignmentConfigMap";
   public static final String FIELD_CONFIG_LIST_KEY = "fieldConfigList";
   public static final String UPSERT_CONFIG_KEY = "upsertConfig";
+  public static final String DEDUP_CONFIG_KEY = "dedupConfig";
   public static final String INGESTION_CONFIG_KEY = "ingestionConfig";
   public static final String TIER_CONFIGS_LIST_KEY = "tierConfigs";
   public static final String TUNER_CONFIG_LIST_KEY = "tunerConfigs";
@@ -88,6 +89,9 @@ public class TableConfig extends BaseJsonConfig {
   @JsonPropertyDescription(value = "upsert related config")
   private UpsertConfig _upsertConfig;
 
+  @JsonPropertyDescription(value = "Dedup related config")
+  private DedupConfig _dedupConfig;
+
   @JsonPropertyDescription(value = "Config related to ingesting data into the table")
   private IngestionConfig _ingestionConfig;
 
@@ -113,6 +117,7 @@ public class TableConfig extends BaseJsonConfig {
           Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
       @JsonProperty(FIELD_CONFIG_LIST_KEY) @Nullable List<FieldConfig> fieldConfigList,
       @JsonProperty(UPSERT_CONFIG_KEY) @Nullable UpsertConfig upsertConfig,
+      @JsonProperty(DEDUP_CONFIG_KEY) @Nullable DedupConfig dedupConfig,
       @JsonProperty(INGESTION_CONFIG_KEY) @Nullable IngestionConfig ingestionConfig,
       @JsonProperty(TIER_CONFIGS_LIST_KEY) @Nullable List<TierConfig> tierConfigsList,
       @JsonProperty(IS_DIM_TABLE_KEY) boolean dimTable,
@@ -140,6 +145,7 @@ public class TableConfig extends BaseJsonConfig {
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
     _fieldConfigList = fieldConfigList;
     _upsertConfig = upsertConfig;
+    _dedupConfig = dedupConfig;
     _ingestionConfig = ingestionConfig;
     _tierConfigsList = tierConfigsList;
     _dimTable = dimTable;
@@ -267,6 +273,15 @@ public class TableConfig extends BaseJsonConfig {
     _upsertConfig = upsertConfig;
   }
 
+  @Nullable
+  public DedupConfig getDedupConfig() {
+    return _dedupConfig;
+  }
+
+  public void setDedupConfig(DedupConfig dedupConfig) {
+    _dedupConfig = dedupConfig;
+  }
+
   @JsonProperty(INGESTION_CONFIG_KEY)
   @Nullable
   public IngestionConfig getIngestionConfig() {
@@ -288,8 +303,8 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   @JsonIgnore
-  public UpsertConfig.HashFunction getHashFunction() {
-    return _upsertConfig == null ? UpsertConfig.HashFunction.NONE : _upsertConfig.getHashFunction();
+  public HashFunction getHashFunction() {
+    return _upsertConfig == null ? HashFunction.NONE : _upsertConfig.getHashFunction();
   }
 
   @JsonIgnore

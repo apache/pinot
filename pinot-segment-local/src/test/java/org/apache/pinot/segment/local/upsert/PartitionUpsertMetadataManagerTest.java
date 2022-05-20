@@ -26,7 +26,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -48,12 +48,12 @@ public class PartitionUpsertMetadataManagerTest {
 
   @Test
   public void testAddSegment() {
-    verifyAddSegment(UpsertConfig.HashFunction.NONE);
-    verifyAddSegment(UpsertConfig.HashFunction.MD5);
-    verifyAddSegment(UpsertConfig.HashFunction.MURMUR3);
+    verifyAddSegment(HashFunction.NONE);
+    verifyAddSegment(HashFunction.MD5);
+    verifyAddSegment(HashFunction.MURMUR3);
   }
 
-  private void verifyAddSegment(UpsertConfig.HashFunction hashFunction) {
+  private void verifyAddSegment(HashFunction hashFunction) {
     PartitionUpsertMetadataManager upsertMetadataManager =
         new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, mock(ServerMetrics.class), null, hashFunction);
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
@@ -142,7 +142,7 @@ public class PartitionUpsertMetadataManagerTest {
   }
 
   private static void checkRecordLocation(Map<Object, RecordLocation> recordLocationMap, int keyValue,
-      IndexSegment segment, int docId, int comparisonValue, UpsertConfig.HashFunction hashFunction) {
+      IndexSegment segment, int docId, int comparisonValue, HashFunction hashFunction) {
     RecordLocation recordLocation =
         recordLocationMap.get(PartitionUpsertMetadataManager.hashPrimaryKey(getPrimaryKey(keyValue), hashFunction));
     assertNotNull(recordLocation);
@@ -153,12 +153,12 @@ public class PartitionUpsertMetadataManagerTest {
 
   @Test
   public void testAddRecord() {
-    verifyAddRecord(UpsertConfig.HashFunction.NONE);
-    verifyAddRecord(UpsertConfig.HashFunction.MD5);
-    verifyAddRecord(UpsertConfig.HashFunction.MURMUR3);
+    verifyAddRecord(HashFunction.NONE);
+    verifyAddRecord(HashFunction.MD5);
+    verifyAddRecord(HashFunction.MURMUR3);
   }
 
-  private void verifyAddRecord(UpsertConfig.HashFunction hashFunction) {
+  private void verifyAddRecord(HashFunction hashFunction) {
     PartitionUpsertMetadataManager upsertMetadataManager =
         new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, mock(ServerMetrics.class), null, hashFunction);
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
@@ -224,12 +224,12 @@ public class PartitionUpsertMetadataManagerTest {
 
   @Test
   public void testRemoveSegment() {
-    verifyRemoveSegment(UpsertConfig.HashFunction.NONE);
-    verifyRemoveSegment(UpsertConfig.HashFunction.MD5);
-    verifyRemoveSegment(UpsertConfig.HashFunction.MURMUR3);
+    verifyRemoveSegment(HashFunction.NONE);
+    verifyRemoveSegment(HashFunction.MD5);
+    verifyRemoveSegment(HashFunction.MURMUR3);
   }
 
-  private void verifyRemoveSegment(UpsertConfig.HashFunction hashFunction) {
+  private void verifyRemoveSegment(HashFunction hashFunction) {
     PartitionUpsertMetadataManager upsertMetadataManager =
         new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, mock(ServerMetrics.class), null, hashFunction);
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
@@ -264,18 +264,18 @@ public class PartitionUpsertMetadataManagerTest {
   public void testHashPrimaryKey() {
     PrimaryKey pk = new PrimaryKey(new Object[]{"uuid-1", "uuid-2", "uuid-3"});
     Assert.assertEquals(BytesUtils.toHexString(
-        ((ByteArray) PartitionUpsertMetadataManager.hashPrimaryKey(pk, UpsertConfig.HashFunction.MD5)).getBytes()),
+        ((ByteArray) PartitionUpsertMetadataManager.hashPrimaryKey(pk, HashFunction.MD5)).getBytes()),
         "58de44997505014e02982846a4d1cbbd");
     Assert.assertEquals(BytesUtils.toHexString(
-        ((ByteArray) PartitionUpsertMetadataManager.hashPrimaryKey(pk, UpsertConfig.HashFunction.MURMUR3)).getBytes()),
+        ((ByteArray) PartitionUpsertMetadataManager.hashPrimaryKey(pk, HashFunction.MURMUR3)).getBytes()),
         "7e6b4a98296292a4012225fff037fa8c");
     // reorder
     pk = new PrimaryKey(new Object[]{"uuid-3", "uuid-2", "uuid-1"});
     Assert.assertEquals(BytesUtils.toHexString(
-        ((ByteArray) PartitionUpsertMetadataManager.hashPrimaryKey(pk, UpsertConfig.HashFunction.MD5)).getBytes()),
+        ((ByteArray) PartitionUpsertMetadataManager.hashPrimaryKey(pk, HashFunction.MD5)).getBytes()),
         "d2df12c6dea7b83f965613614eee58e2");
     Assert.assertEquals(BytesUtils.toHexString(
-        ((ByteArray) PartitionUpsertMetadataManager.hashPrimaryKey(pk, UpsertConfig.HashFunction.MURMUR3)).getBytes()),
+        ((ByteArray) PartitionUpsertMetadataManager.hashPrimaryKey(pk, HashFunction.MURMUR3)).getBytes()),
         "8d68b314cc0c8de4dbd55f4dad3c3e66");
   }
 

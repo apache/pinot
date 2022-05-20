@@ -25,6 +25,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
+import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -49,7 +50,7 @@ public class MutableSegmentImplUpsertTest {
   private MutableSegmentImpl _mutableSegmentImpl;
   private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
 
-  private void setup(UpsertConfig.HashFunction hashFunction)
+  private void setup(HashFunction hashFunction)
       throws Exception {
     URL schemaResourceUrl = this.getClass().getClassLoader().getResource(SCHEMA_FILE_PATH);
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
@@ -80,12 +81,12 @@ public class MutableSegmentImplUpsertTest {
   @Test
   public void testHashFunctions()
       throws Exception {
-    testUpsertIngestion(UpsertConfig.HashFunction.NONE);
-    testUpsertIngestion(UpsertConfig.HashFunction.MD5);
-    testUpsertIngestion(UpsertConfig.HashFunction.MURMUR3);
+    testUpsertIngestion(HashFunction.NONE);
+    testUpsertIngestion(HashFunction.MD5);
+    testUpsertIngestion(HashFunction.MURMUR3);
   }
 
-  private void testUpsertIngestion(UpsertConfig.HashFunction hashFunction)
+  private void testUpsertIngestion(HashFunction hashFunction)
       throws Exception {
     setup(hashFunction);
     ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();

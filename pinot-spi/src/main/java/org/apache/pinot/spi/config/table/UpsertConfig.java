@@ -40,10 +40,6 @@ public class UpsertConfig extends BaseJsonConfig {
     APPEND, IGNORE, INCREMENT, OVERWRITE, UNION
   }
 
-  public enum HashFunction {
-    NONE, MD5, MURMUR3
-  }
-
   @JsonPropertyDescription("Upsert mode.")
   private final Mode _mode;
 

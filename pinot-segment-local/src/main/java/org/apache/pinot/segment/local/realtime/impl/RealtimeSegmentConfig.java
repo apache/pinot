@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -60,7 +61,7 @@ public class RealtimeSegmentConfig {
   private final boolean _aggregateMetrics;
   private final boolean _nullHandlingEnabled;
   private final UpsertConfig.Mode _upsertMode;
-  private final UpsertConfig.HashFunction _hashFunction;
+  private final HashFunction _hashFunction;
   private final String _upsertComparisonColumn;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final String _consumerDir;
@@ -75,7 +76,7 @@ public class RealtimeSegmentConfig {
       SegmentZKMetadata segmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
       int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
-      UpsertConfig.Mode upsertMode, String upsertComparisonColumn, UpsertConfig.HashFunction hashFunction,
+      UpsertConfig.Mode upsertMode, String upsertComparisonColumn, HashFunction hashFunction,
       PartitionUpsertMetadataManager partitionUpsertMetadataManager, List<FieldConfig> fieldConfigList,
       List<AggregationConfig> ingestionAggregationConfigs) {
     _tableNameWithType = tableNameWithType;
@@ -103,7 +104,7 @@ public class RealtimeSegmentConfig {
     _nullHandlingEnabled = nullHandlingEnabled;
     _consumerDir = consumerDir;
     _upsertMode = upsertMode != null ? upsertMode : UpsertConfig.Mode.NONE;
-    _hashFunction = hashFunction != null ? hashFunction : UpsertConfig.HashFunction.NONE;
+    _hashFunction = hashFunction != null ? hashFunction : HashFunction.NONE;
     _upsertComparisonColumn = upsertComparisonColumn;
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
     _fieldConfigList = fieldConfigList;
@@ -215,7 +216,7 @@ public class RealtimeSegmentConfig {
     return _upsertMode;
   }
 
-  public UpsertConfig.HashFunction getHashFunction() {
+  public HashFunction getHashFunction() {
     return _hashFunction;
   }
 
@@ -261,7 +262,7 @@ public class RealtimeSegmentConfig {
     private boolean _nullHandlingEnabled = false;
     private String _consumerDir;
     private UpsertConfig.Mode _upsertMode;
-    private UpsertConfig.HashFunction _hashFunction;
+    private HashFunction _hashFunction;
     private String _upsertComparisonColumn;
     private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
     private List<FieldConfig> _fieldConfigList;
@@ -403,7 +404,7 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setHashFunction(UpsertConfig.HashFunction hashFunction) {
+    public Builder setHashFunction(HashFunction hashFunction) {
       _hashFunction = hashFunction;
       return this;
     }
