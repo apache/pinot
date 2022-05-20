@@ -67,8 +67,8 @@ public class SegmentGenerationWithFilterRecordsTest {
   public void setup() {
     String filterFunction =
         "Groovy({((col2 < 1589007600000L) &&  (col3.max() < 4)) || col1 == \"B\"}, col1, col2, col3)";
-    IngestionConfig ingestionConfig =
-        new IngestionConfig(null, null, new FilterConfig(filterFunction), null, null, null);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setFilterConfig(new FilterConfig(filterFunction));
     _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig).build();
     _schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
