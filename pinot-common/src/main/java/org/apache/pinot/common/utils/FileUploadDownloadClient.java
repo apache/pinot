@@ -1005,6 +1005,25 @@ public class FileUploadDownloadClient implements AutoCloseable {
   }
 
   /**
+   * Download and untar a file.
+   *
+   * @param uri URI
+   * @param dest File destination
+   * @param authProvider auth token
+   * @param httpHeaders http headers
+   * @param rateLimit
+   * @return Response status code
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public File downloadUntarFileStreamed(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders,
+      long rateLimit)
+      throws IOException, HttpErrorStatusException {
+    return _httpClient.downloadUntarFileStreamed(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authProvider,
+        httpHeaders, rateLimit);
+  }
+
+  /**
    * Generate a param list with a table name attribute.
    *
    * @param tableName table name

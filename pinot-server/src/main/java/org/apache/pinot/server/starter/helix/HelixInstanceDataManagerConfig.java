@@ -20,6 +20,7 @@ package org.apache.pinot.server.starter.helix;
 
 import java.util.Optional;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -78,6 +79,15 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // causing controllers unavailable for that period of time.
   private static final String MAX_PARALLEL_SEGMENT_DOWNLOADS = "table.level.max.parallel.segment.downloads";
   private static final int DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS = -1;
+
+  // Key of server segment download rate limit
+  private static final String SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT
+      = "segment.download.untar.rate.limit";
+  private static final long DEFAULT_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT = TarGzCompressionUtils.NO_RATE_LIMIT;
+
+  // Key of streamed server segment download-untar
+  private static final String IS_SEGMENT_DOWNLOAD_UNTAR_STREAMED = "segment.download.streamed.untar";
+  private static final boolean DEFAULT_IS_SEGMENT_DOWNLOAD_UNTAR_STREAMED = false;
 
   // Key of whether to enable split commit
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
@@ -230,6 +240,18 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public long getErrorCacheSize() {
     return _instanceDataManagerConfiguration.getProperty(ERROR_CACHE_SIZE, DEFAULT_ERROR_CACHE_SIZE);
+  }
+
+  @Override
+  public boolean isSegmentDownloadUntarStreamed() {
+    return _instanceDataManagerConfiguration.getProperty(IS_SEGMENT_DOWNLOAD_UNTAR_STREAMED,
+        DEFAULT_IS_SEGMENT_DOWNLOAD_UNTAR_STREAMED);
+  }
+
+  @Override
+  public long getSegmentDownloadUntarRateLimit() {
+    return _instanceDataManagerConfiguration.getProperty(SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT,
+        DEFAULT_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT);
   }
 
   @Override

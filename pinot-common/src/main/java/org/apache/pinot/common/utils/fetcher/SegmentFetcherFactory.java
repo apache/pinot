@@ -153,6 +153,16 @@ public class SegmentFetcherFactory {
     getSegmentFetcher(uri.getScheme()).fetchSegmentToLocal(uri, dest);
   }
 
+  public static File fetchUntarToLocalStreamed(String uri, File tempRootDir, long rateLimit)
+      throws Exception {
+    return getInstance().fetchUntarSegmentToLocalStreamedInternal(new URI(uri), tempRootDir, rateLimit);
+  }
+
+  private File fetchUntarSegmentToLocalStreamedInternal(URI uri, File tempRootDir, long rateLimit)
+      throws Exception {
+    return getSegmentFetcher(uri.getScheme()).fetchUntarSegmentToLocalStreamed(uri, tempRootDir, rateLimit);
+  }
+
   /**
    * Fetches a segment from a URI location to a local file and decrypts it if needed
    * @param uri remote segment location

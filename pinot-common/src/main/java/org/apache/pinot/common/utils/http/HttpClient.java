@@ -59,6 +59,7 @@ import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpErrorInfo;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -391,6 +392,29 @@ public class HttpClient implements AutoCloseable {
       }
 
       return statusCode;
+    }
+  }
+
+  public File downloadUntarFileStreamed(URI uri, int socketTimeoutMs, File dest, AuthProvider authProvider,
+      List<Header> httpHeaders, long rateLimit)
+      throws IOException, HttpErrorStatusException {
+    HttpUriRequest request = getDownloadFileRequest(uri, socketTimeoutMs, authProvider, httpHeaders);
+    File ret;
+    try (CloseableHttpResponse response = _httpClient.execute(request)) {
+      StatusLine statusLine = response.getStatusLine();
+      int statusCode = statusLine.getStatusCode();
+      if (statusCode >= 300) {
+        throw new HttpErrorStatusException(HttpClient.getErrorMessage(request, response), statusCode);
+      }
+
+      try (InputStream inputStream = response.getEntity().getContent()) {
+        ret = TarGzCompressionUtils.untarRateLimit(inputStream, dest, rateLimit).get(0);
+      }
+
+      LOGGER.info("Downloaded from: {} to: {}; Response status code: {}", uri, dest,
+              statusCode);
+
+      return ret;
     }
   }
 

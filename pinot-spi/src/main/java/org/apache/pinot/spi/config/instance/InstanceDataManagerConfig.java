@@ -58,4 +58,8 @@ public interface InstanceDataManagerConfig {
   String getSegmentDirectoryLoader();
 
   long getErrorCacheSize();
+
+  boolean isSegmentDownloadUntarStreamed();
+
+  long getSegmentDownloadUntarRateLimit();
 }

@@ -40,6 +40,7 @@ import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
+import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -193,7 +194,7 @@ public abstract class BaseResourceTest {
     TableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager
         .init(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class), mock(ServerMetrics.class),
-            mock(HelixManager.class), null, 0);
+            mock(HelixManager.class), null, new TableDataManagerParams(0, false, -1));
     tableDataManager.start();
     _tableDataManagerMap.put(tableNameWithType, tableDataManager);
   }

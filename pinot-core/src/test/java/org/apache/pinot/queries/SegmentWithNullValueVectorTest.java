@@ -51,6 +51,7 @@ import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -71,6 +72,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.local.segment.index.creator.RawIndexCreatorTest.getRandomValue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 /**
@@ -141,6 +144,12 @@ public class SegmentWithNullValueVectorTest {
     Mockito.when(tableDataManagerConfig.getTableDataManagerType()).thenReturn("OFFLINE");
     Mockito.when(tableDataManagerConfig.getTableName()).thenReturn(TABLE_NAME);
     Mockito.when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
+    InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
+    when(instanceDataManagerConfig.getMaxParallelSegmentBuilds()).thenReturn(4);
+    when(instanceDataManagerConfig.getSegmentDownloadUntarRateLimit()).thenReturn(-1L);
+    when(instanceDataManagerConfig.getMaxParallelSegmentDownloads()).thenReturn(-1);
+    when(instanceDataManagerConfig.isSegmentDownloadUntarStreamed()).thenReturn(false);
+    TableDataManagerProvider.init(instanceDataManagerConfig);
     @SuppressWarnings("unchecked")
     TableDataManager tableDataManager =
         TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, "testInstance",

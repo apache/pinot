@@ -53,6 +53,7 @@ import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
+import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -93,6 +94,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected Logger _logger;
   protected HelixManager _helixManager;
   protected AuthProvider _authProvider;
+  protected long _segmentDownloadUntarRateLimit;
+  protected boolean _isSegmentDownloadUntarStreamed;
 
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related
   // errors as the value.
@@ -101,7 +104,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
       ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
-      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache, int maxParallelSegmentDownloads) {
+      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache,
+      TableDataManagerParams tableDataManagerParams) {
     LOGGER.info("Initializing table data manager for table: {}", tableDataManagerConfig.getTableName());
 
     _tableDataManagerConfig = tableDataManagerConfig;
@@ -130,6 +134,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _resourceTmpDir);
     }
     _errorCache = errorCache;
+    _segmentDownloadUntarRateLimit = tableDataManagerParams.getSegmentDownloadUntarRateLimit();
+    _isSegmentDownloadUntarStreamed = tableDataManagerParams.getSegmentDownloadUntarStreamed();
+    if (_isSegmentDownloadUntarStreamed) {
+      LOGGER.info("Using streamed download-untar for segment download!");
+      LOGGER.info("The rate limit interval for streamed download-untar is {} ms",
+          _segmentDownloadUntarRateLimit);
+    }
+    int maxParallelSegmentDownloads = tableDataManagerParams.getMaxParallelSegmentDownloads();
     if (maxParallelSegmentDownloads > 0) {
       LOGGER.info(
           "Construct segment download semaphore for Table: {}. Maximum number of parallel segment downloads: {}",
@@ -409,11 +421,35 @@ public abstract class BaseTableDataManager implements TableDataManager {
       throws Exception {
     File tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
     FileUtils.forceMkdir(tempRootDir);
+    if (_isSegmentDownloadUntarStreamed && zkMetadata.getCrypterName() == null) {
+      try {
+        File untaredSegDir = streamedDownloadUntarRateLimit(segmentName, zkMetadata, tempRootDir,
+            _segmentDownloadUntarRateLimit);
+        return moveSegment(segmentName, untaredSegDir);
+      } finally {
+        FileUtils.deleteQuietly(tempRootDir);
+      }
+    } else {
+      try {
+        File tarFile = downloadAndDecrypt(segmentName, zkMetadata, tempRootDir);
+        return untarAndMoveSegment(segmentName, tarFile, tempRootDir);
+      } finally {
+        FileUtils.deleteQuietly(tempRootDir);
+      }
+    }
+  }
+
+  private File moveSegment(String segmentName, File untaredSegDir)
+      throws IOException {
     try {
-      File tarFile = downloadAndDecrypt(segmentName, zkMetadata, tempRootDir);
-      return untarAndMoveSegment(segmentName, tarFile, tempRootDir);
-    } finally {
-      FileUtils.deleteQuietly(tempRootDir);
+      File indexDir = getSegmentDataDir(segmentName);
+      FileUtils.deleteDirectory(indexDir);
+      FileUtils.moveDirectory(untaredSegDir, indexDir);
+      return indexDir;
+    } catch (Exception e) {
+      LOGGER.error("Failed to move segment: {} of table: {}", segmentName, _tableNameWithType);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DIR_MOVEMENT_FAILURES, 1L);
+      throw e;
     }
   }
 
@@ -439,6 +475,36 @@ public abstract class BaseTableDataManager implements TableDataManager {
       LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from: {} to: {}", segmentName,
           _tableNameWithType, uri, tarFile);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FAILURES, 1L);
+      throw e;
+    } finally {
+      if (_segmentDownloadSemaphore != null) {
+        _segmentDownloadSemaphore.release();
+      }
+    }
+  }
+
+  private File streamedDownloadUntarRateLimit(String segmentName, SegmentZKMetadata zkMetadata, File tempRootDir,
+      long rateLimit)
+      throws Exception {
+    if (_segmentDownloadSemaphore != null) {
+      long startTime = System.currentTimeMillis();
+      LOGGER.info("Trying to acquire segment download semaphore for: {}. queue-length: {} ", segmentName,
+          _segmentDownloadSemaphore.getQueueLength());
+      _segmentDownloadSemaphore.acquire();
+      LOGGER.info("Acquired segment download semaphore for: {} (lock-time={}ms, queue-length={}).", segmentName,
+          System.currentTimeMillis() - startTime, _segmentDownloadSemaphore.getQueueLength());
+    }
+    LOGGER.info("Trying to download segment {} using streamed download-untar with rateLimit {}", segmentName,
+        rateLimit);
+    String uri = zkMetadata.getDownloadUrl();
+    try {
+      File ret = SegmentFetcherFactory.fetchUntarToLocalStreamed(uri, tempRootDir, rateLimit);
+      LOGGER.info("Downloaded tarred segment: {} for table: {} from: {}", segmentName, _tableNameWithType, uri);
+      return ret;
+    } catch (AttemptsExceededException e) {
+      LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from: {} to: {}", segmentName,
+          _tableNameWithType, uri, tempRootDir);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES, 1L);
       throw e;
     } finally {
       if (_segmentDownloadSemaphore != null) {

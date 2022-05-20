@@ -19,15 +19,19 @@
 package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.RateLimiter;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileDescriptor;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -44,6 +48,11 @@ import org.apache.commons.lang3.StringUtils;
  * Utility class to compress/de-compress tar.gz files.
  */
 public class TarGzCompressionUtils {
+  public static final long NO_RATE_LIMIT = -1;
+  public static final long MATCH_UNTAR_RATE = 0;
+  private static final int DEFAULT_BUFFER_SIZE = 4 * 1024 * 1024;
+  // multiple of SSD block size for efficient write
+
   private TarGzCompressionUtils() {
   }
 
@@ -123,6 +132,16 @@ public class TarGzCompressionUtils {
    */
   public static List<File> untar(InputStream inputStream, File outputDir)
       throws IOException {
+      return untarRateLimit(inputStream, outputDir, NO_RATE_LIMIT);
+  }
+
+  /**
+   * Un-tars an inputstream of a tar.gz file into a directory, returns all the untarred files/directories.
+   * RateLimit limits the untar rate
+   * <p>For security reason, the untarred files must reside in the output directory.
+   */
+  public static List<File> untarRateLimit(InputStream inputStream, File outputDir, long rateLimit)
+      throws IOException {
     String outputDirCanonicalPath = outputDir.getCanonicalPath();
     // Prevent partial path traversal
     if (!outputDirCanonicalPath.endsWith(File.separator)) {
@@ -163,8 +182,12 @@ public class TarGzCompressionUtils {
           if (!parentFile.isDirectory() && !parentFile.mkdirs()) {
             throw new IOException(String.format("Failed to create directory: %s", parentFile));
           }
-          try (OutputStream out = Files.newOutputStream(outputFile.toPath())) {
-            IOUtils.copy(tarGzIn, out);
+          try (FileOutputStream out = new FileOutputStream(outputFile.toPath().toString())) {
+            if (rateLimit != NO_RATE_LIMIT) {
+              copyLarge(tarGzIn, out, rateLimit);
+            } else {
+              IOUtils.copy(tarGzIn, out);
+            }
           }
         }
         untarredFiles.add(outputFile);
@@ -197,5 +220,30 @@ public class TarGzCompressionUtils {
       }
       throw new IOException(String.format("Failed to find file: %s in: %s", fileName, inputFile));
     }
+  }
+
+  public static long copyLarge(InputStream inputStream, FileOutputStream outputStream, long rateLimit)
+      throws IOException {
+    Objects.requireNonNull(inputStream, "inputStream is null");
+    Objects.requireNonNull(outputStream, "outputStream is null");
+    FileDescriptor fd = outputStream.getFD();
+    byte[] buffer = new byte[DEFAULT_BUFFER_SIZE];
+    RateLimiter rateLimiter = RateLimiter.create(rateLimit);
+    long count;
+    int n;
+
+    if (rateLimit == MATCH_UNTAR_RATE) {
+      for (count = 0L; -1 != (n = inputStream.read(buffer)); count += (long) n) {
+        outputStream.write(buffer, 0, n);
+        fd.sync();
+      }
+    } else {
+      for (count = 0L; -1 != (n = inputStream.read(buffer)); count += (long) n) {
+        rateLimiter.acquire(n);
+        outputStream.write(buffer, 0, n);
+        fd.sync();
+      }
+    }
+    return count;
   }
 }
