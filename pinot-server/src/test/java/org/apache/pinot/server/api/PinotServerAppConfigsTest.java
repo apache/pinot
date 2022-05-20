@@ -74,7 +74,7 @@ public class PinotServerAppConfigsTest extends BaseResourceTest {
     // tests Equals on obfuscated expected and actual
     Obfuscator obfuscator = new Obfuscator();
     String obfuscatedExpectedJson = obfuscator.toJsonString(expected);
-    PinotAppConfigs obfuscatedExpected = mapper.readValue(obfuscatedExpectedJson, PinotAppConfigs.class);
+    PinotAppConfigs obfuscatedExpected = JsonUtils.readValue(obfuscatedExpectedJson, PinotAppConfigs.class);
     Assert.assertEquals(actual.getJvmConfig(), obfuscatedExpected.getJvmConfig());
     Assert.assertEquals(actual.getPinotConfig(), obfuscatedExpected.getPinotConfig());
   }
