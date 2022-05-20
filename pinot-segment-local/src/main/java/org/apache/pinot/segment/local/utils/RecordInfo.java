@@ -16,29 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table;
+package org.apache.pinot.segment.local.utils;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 
-public class DedupConfig extends BaseJsonConfig {
-  private final boolean _dedupEnabled;
-  private final HashFunction _hashFunction;
 
-  @JsonCreator
-  public DedupConfig(@JsonProperty(value = "dedupEnabled", required = true) final boolean dedupEnabled,
-      @JsonProperty(value = "hashFunction") final HashFunction hashFunction
-  ) {
-    _dedupEnabled = dedupEnabled;
-    _hashFunction = hashFunction;
+public final class RecordInfo {
+  private final PrimaryKey _primaryKey;
+  private final int _docId;
+  private final Comparable _comparisonValue;
+
+  public RecordInfo(PrimaryKey primaryKey, int docId, Comparable comparisonValue) {
+    _primaryKey = primaryKey;
+    _docId = docId;
+    _comparisonValue = comparisonValue;
   }
 
-  public HashFunction getHashFunction() {
-    return _hashFunction;
+  public PrimaryKey getPrimaryKey() {
+    return _primaryKey;
   }
 
-  public boolean isDedupEnabled() {
-    return _dedupEnabled;
+  public int getDocId() {
+    return _docId;
+  }
+
+  public Comparable getComparisonValue() {
+    return _comparisonValue;
   }
 }

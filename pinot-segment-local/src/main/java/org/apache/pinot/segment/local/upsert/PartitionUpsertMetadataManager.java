@@ -28,12 +28,11 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.utils.HashUtils;
+import org.apache.pinot.segment.local.utils.RecordInfo;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -99,20 +98,21 @@ public class PartitionUpsertMetadataManager {
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
-      _primaryKeyToRecordLocationMap.compute(hashPrimaryKey(recordInfo._primaryKey, _hashFunction),
+      _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
           (primaryKey, currentRecordLocation) -> {
             if (currentRecordLocation != null) {
               // Existing primary key
               IndexSegment currentSegment = currentRecordLocation.getSegment();
-              int comparisonResult = recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue());
+              int comparisonResult =
+                  recordInfo.getComparisonValue().compareTo(currentRecordLocation.getComparisonValue());
 
               // The current record is in the same segment
               // Update the record location when there is a tie to keep the newer record. Note that the record info
               // iterator will return records with incremental doc ids.
               if (segment == currentSegment) {
                 if (comparisonResult >= 0) {
-                  validDocIds.replace(currentRecordLocation.getDocId(), recordInfo._docId);
-                  return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
+                  validDocIds.replace(currentRecordLocation.getDocId(), recordInfo.getDocId());
+                  return new RecordLocation(segment, recordInfo.getDocId(), recordInfo.getComparisonValue());
                 } else {
                   return currentRecordLocation;
                 }
@@ -126,8 +126,8 @@ public class PartitionUpsertMetadataManager {
               String currentSegmentName = currentSegment.getSegmentName();
               if (segmentName.equals(currentSegmentName)) {
                 if (comparisonResult >= 0) {
-                  validDocIds.add(recordInfo._docId);
-                  return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
+                  validDocIds.add(recordInfo.getDocId());
+                  return new RecordLocation(segment, recordInfo.getDocId(), recordInfo.getComparisonValue());
                 } else {
                   return currentRecordLocation;
                 }
@@ -142,15 +142,15 @@ public class PartitionUpsertMetadataManager {
                   && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName.getSequenceNumber(
                   currentSegmentName))) {
                 Objects.requireNonNull(currentSegment.getValidDocIds()).remove(currentRecordLocation.getDocId());
-                validDocIds.add(recordInfo._docId);
-                return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
+                validDocIds.add(recordInfo.getDocId());
+                return new RecordLocation(segment, recordInfo.getDocId(), recordInfo.getComparisonValue());
               } else {
                 return currentRecordLocation;
               }
             } else {
               // New primary key
-              validDocIds.add(recordInfo._docId);
-              return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
+              validDocIds.add(recordInfo.getDocId());
+              return new RecordLocation(segment, recordInfo.getDocId(), recordInfo.getComparisonValue());
             }
           });
     }
@@ -164,30 +164,30 @@ public class PartitionUpsertMetadataManager {
    */
   public void addRecord(IndexSegment segment, RecordInfo recordInfo) {
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
-    _primaryKeyToRecordLocationMap.compute(hashPrimaryKey(recordInfo._primaryKey, _hashFunction),
+    _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
         (primaryKey, currentRecordLocation) -> {
           if (currentRecordLocation != null) {
             // Existing primary key
 
             // Update the record location when the new comparison value is greater than or equal to the current value.
             // Update the record location when there is a tie to keep the newer record.
-            if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
+            if (recordInfo.getComparisonValue().compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
               IndexSegment currentSegment = currentRecordLocation.getSegment();
               int currentDocId = currentRecordLocation.getDocId();
               if (segment == currentSegment) {
-                validDocIds.replace(currentDocId, recordInfo._docId);
+                validDocIds.replace(currentDocId, recordInfo.getDocId());
               } else {
                 Objects.requireNonNull(currentSegment.getValidDocIds()).remove(currentDocId);
-                validDocIds.add(recordInfo._docId);
+                validDocIds.add(recordInfo.getDocId());
               }
-              return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
+              return new RecordLocation(segment, recordInfo.getDocId(), recordInfo.getComparisonValue());
             } else {
               return currentRecordLocation;
             }
           } else {
             // New primary key
-            validDocIds.add(recordInfo._docId);
-            return new RecordLocation(segment, recordInfo._docId, recordInfo._comparisonValue);
+            validDocIds.add(recordInfo.getDocId());
+            return new RecordLocation(segment, recordInfo.getDocId(), recordInfo.getComparisonValue());
           }
         });
     // Update metrics
@@ -216,10 +216,10 @@ public class PartitionUpsertMetadataManager {
     }
 
     RecordLocation currentRecordLocation =
-        _primaryKeyToRecordLocationMap.get(hashPrimaryKey(recordInfo._primaryKey, _hashFunction));
+        _primaryKeyToRecordLocationMap.get(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction));
     if (currentRecordLocation != null) {
       // Existing primary key
-      if (recordInfo._comparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
+      if (recordInfo.getComparisonValue().compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
         _reuse.clear();
         GenericRow previousRecord =
             currentRecordLocation.getSegment().getRecord(currentRecordLocation.getDocId(), _reuse);
@@ -228,7 +228,7 @@ public class PartitionUpsertMetadataManager {
         LOGGER.warn(
             "Got late event for partial-upsert: {} (current comparison value: {}, record comparison value: {}), "
                 + "skipping updating the record", record, currentRecordLocation.getComparisonValue(),
-            recordInfo._comparisonValue);
+            recordInfo.getComparisonValue());
         return record;
       }
     } else {
@@ -257,30 +257,5 @@ public class PartitionUpsertMetadataManager {
     // Update metrics
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
         _primaryKeyToRecordLocationMap.size());
-  }
-
-  protected static Object hashPrimaryKey(PrimaryKey primaryKey, HashFunction hashFunction) {
-    switch (hashFunction) {
-      case NONE:
-        return primaryKey;
-      case MD5:
-        return new ByteArray(HashUtils.hashMD5(primaryKey.asBytes()));
-      case MURMUR3:
-        return new ByteArray(HashUtils.hashMurmur3(primaryKey.asBytes()));
-      default:
-        throw new IllegalArgumentException(String.format("Unrecognized hash function %s", hashFunction));
-    }
-  }
-
-  public static final class RecordInfo {
-    private final PrimaryKey _primaryKey;
-    private final int _docId;
-    private final Comparable _comparisonValue;
-
-    public RecordInfo(PrimaryKey primaryKey, int docId, Comparable comparisonValue) {
-      _primaryKey = primaryKey;
-      _docId = docId;
-      _comparisonValue = comparisonValue;
-    }
   }
 }

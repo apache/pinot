@@ -46,6 +46,7 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
+import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
@@ -538,6 +539,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         }
         for (GenericRow transformedRow : reusedResult.getTransformedRows()) {
           try {
+            // TODO(saurabh): we may have dropped the record due to dedup. Should we increment indexedMessageCount?
             canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
             indexedMessageCount++;
             realtimeRowsConsumedMeter =
@@ -1210,7 +1212,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   public LLRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
       Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionGroupConsumerSemaphore,
-      ServerMetrics serverMetrics, @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+      ServerMetrics serverMetrics, @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager) {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = segmentZKMetadata;
     _tableConfig = tableConfig;
@@ -1307,6 +1310,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     Set<String> fstIndexColumns = indexLoadingConfig.getFSTIndexColumns();
     _fstIndexColumns = new ArrayList<>(fstIndexColumns);
 
+    boolean dedupEnabled = (tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled());
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
@@ -1324,7 +1328,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setIngestionAggregationConfigs(IngestionConfigUtils.getAggregationConfigs(tableConfig))
             .setNullHandlingEnabled(_nullHandlingEnabled)
             .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
+            .setDedupEnabled(dedupEnabled)
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
+            .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setHashFunction(tableConfig.getHashFunction())
             .setUpsertComparisonColumn(tableConfig.getUpsertComparisonColumn())
             .setFieldConfigList(tableConfig.getFieldConfigList());
