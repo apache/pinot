@@ -40,6 +40,8 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
@@ -65,6 +67,8 @@ public class TransformQueriesTest extends BaseQueriesTest {
 
   private static final String D1 = "STRING_COL";
   private static final String M1 = "INT_COL1";
+  private static final String M1_V2 = "INT_COL1_V2";
+  private static final String M1_V3 = "INT_COL1_V3";
   private static final String M2 = "INT_COL2";
   private static final String M3 = "LONG_COL1";
   private static final String M4 = "LONG_COL2";
@@ -112,16 +116,33 @@ public class TransformQueriesTest extends BaseQueriesTest {
     row.putValue(TIME, new DateTime(1973, 1, 8, 14, 6, 4, 3, DateTimeZone.UTC).getMillis());
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
-    for (int i = 0; i < NUM_ROWS; i++) {
+    for (int i = 0; i < NUM_ROWS - 1; i++) {
       rows.add(row);
     }
+    // modifying the last row
+    row = new GenericRow();
+    row.putValue(D1, "Pinot");
+    row.putValue(M1, 1000);
+    row.putValue(M1_V2, null); // column for adding the groovy tranformed value
+    row.putValue(M1_V3, null); // M1_V3 doesn't exist in table schema
+    row.putValue(M2, 2000);
+    row.putValue(M3, 500000);
+    row.putValue(M4, 1000000);
+    row.putValue(TIME, new DateTime(1973, 1, 8, 14, 6, 4, 3, DateTimeZone.UTC).getMillis());
+    rows.add(row);
 
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME)
+        .setIngestionConfig(new IngestionConfig(null, null, null,
+            Arrays.asList(new TransformConfig(M1_V2, "Groovy({INT_COL1_V3  == null || "
+                + "INT_COL1_V3 == Integer.MIN_VALUE ? INT_COL1 : INT_COL1_V3 }, INT_COL1, INT_COL1_V3)")),
+            null, null))
+        .build();
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
             .addSingleValueDimension(M1, FieldSpec.DataType.INT).addSingleValueDimension(M2, FieldSpec.DataType.INT)
             .addSingleValueDimension(M3, FieldSpec.DataType.LONG).addSingleValueDimension(M4, FieldSpec.DataType.LONG)
+            .addSingleValueDimension(M1_V2, FieldSpec.DataType.INT)
             .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME), null).build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
@@ -242,6 +263,19 @@ public class TransformQueriesTest extends BaseQueriesTest {
 
     query = "SELECT AVG(ADD(DIV(INT_COL1, INT_COL2), DIV(LONG_COL1, LONG_COL2))) FROM testTable";
     runAndVerifyInterSegmentQuery(query, 1.0);
+  }
+
+  /**
+   * This test checks the groovy transform when generic raw data could have some values that can be used to
+   * ingest values into pinot column with a different name.
+   */
+  @Test
+  public void testGroovyTransformQuery() {
+    String query = "SELECT INT_COL1, INT_COL1_V2 FROM testTable";
+    List<Object[]> result = getBrokerResponse(query).getResultTable().getRows();
+    for (Object[] obj : result) {
+      assertEquals(obj[0], obj[1]);
+    }
   }
 
   private void runAndVerifyInterSegmentQuery(String query, double expectedResult) {
