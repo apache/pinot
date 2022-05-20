@@ -102,7 +102,7 @@ public class TableMetadataReader {
       JsonNode responseJson = JsonUtils.stringToJsonNode(segmentMetadata);
       String segmentNameJson = responseJson.get("segmentName").asText();
 
-      if(segmentNameJson.equals(segmentName)) {
+      if (segmentNameJson.equals(segmentName)) {
         return responseJson;
       }
     }

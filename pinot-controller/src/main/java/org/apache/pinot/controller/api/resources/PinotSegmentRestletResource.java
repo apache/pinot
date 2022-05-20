@@ -314,7 +314,6 @@ public class PinotSegmentRestletResource {
         if (segmentsMetadataJson.has("columns")) {
           result.put("columns", segmentsMetadataJson.get("columns"));
         }
-
       } catch (InvalidConfigException e) {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
       } catch (IOException ioe) {
