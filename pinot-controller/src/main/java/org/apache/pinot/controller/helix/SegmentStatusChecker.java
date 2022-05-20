@@ -95,7 +95,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   }
 
   @Override
-  protected Context preprocess() {
+  protected Context preprocess(String taskParamasJson) {
     Context context = new Context();
     // check if we need to log disabled tables log messages
     long now = System.currentTimeMillis();

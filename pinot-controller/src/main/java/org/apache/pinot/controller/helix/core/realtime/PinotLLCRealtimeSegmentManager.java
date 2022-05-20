@@ -77,7 +77,6 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -1410,17 +1409,5 @@ public class PinotLLCRealtimeSegmentManager {
         LOGGER.error("Failed to upload segment {} to deep store", segmentName, e);
       }
     }
-  }
-
-  /**
-   * Creates PROPERTYSTORE and IDEALSTATE entries for each partitionGroup to resume realtime table consumption
-   * @param tableName
-   */
-  public void resumeRealtimeTableConsumption(String tableName) {
-    TableConfig tableConfig = _helixResourceManager.getTableConfig(tableName, TableType.REALTIME);
-    PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
-        IngestionConfigUtils.getStreamConfigMap(tableConfig));
-
-    ensureAllPartitionsConsuming(tableConfig, streamConfig, true);
   }
 }

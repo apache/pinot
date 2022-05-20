@@ -32,13 +32,15 @@ public class RunPeriodicTaskMessage extends Message {
   private static final String PERIODIC_TASK_REQUEST_ID = "requestId";
   private static final String PERIODIC_TASK_NAME_KEY = "taskName";
   private static final String TABLE_NAME_WITH_TYPE_KEY = "tableNameWithType";
+  private static final String TASK_PARAMS = "taskParams";
 
   /**
    * @param taskRequestId Request Id that will be appended to log messages.
    * @param periodicTaskName Name of the task that will be run.
    * @param tableNameWithType Table (names with type suffix) on which task will run.
    */
-  public RunPeriodicTaskMessage(String taskRequestId, String periodicTaskName, String tableNameWithType) {
+  public RunPeriodicTaskMessage(String taskRequestId, String periodicTaskName, String tableNameWithType,
+      String taskParamsJson) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(RUN_PERIODIC_TASK_MSG_SUB_TYPE);
     setExecutionTimeout(-1);
@@ -46,6 +48,7 @@ public class RunPeriodicTaskMessage extends Message {
     znRecord.setSimpleField(PERIODIC_TASK_REQUEST_ID, taskRequestId);
     znRecord.setSimpleField(PERIODIC_TASK_NAME_KEY, periodicTaskName);
     znRecord.setSimpleField(TABLE_NAME_WITH_TYPE_KEY, tableNameWithType);
+    znRecord.setSimpleField(TASK_PARAMS, taskParamsJson);
   }
 
   public RunPeriodicTaskMessage(Message message) {
@@ -62,5 +65,9 @@ public class RunPeriodicTaskMessage extends Message {
 
   public String getTableNameWithType() {
     return getRecord().getSimpleField(TABLE_NAME_WITH_TYPE_KEY);
+  }
+
+  public String getTaskParams() {
+    return getRecord().getSimpleField(TASK_PARAMS);
   }
 }

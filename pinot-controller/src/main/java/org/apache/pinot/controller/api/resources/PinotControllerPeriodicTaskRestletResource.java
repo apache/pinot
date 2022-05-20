@@ -101,7 +101,7 @@ public class PinotControllerPeriodicTaskRestletResource {
     recipientCriteria.setResource(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     recipientCriteria.setSelfExcluded(false);
     RunPeriodicTaskMessage runPeriodicTaskMessage =
-        new RunPeriodicTaskMessage(periodicTaskRequestId, periodicTaskName, tableName);
+        new RunPeriodicTaskMessage(periodicTaskRequestId, periodicTaskName, tableName, null);
 
     ClusterMessagingService clusterMessagingService =
         _pinotHelixResourceManager.getHelixZkManager().getMessagingService();

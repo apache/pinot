@@ -45,7 +45,7 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask<Brok
   }
 
   @Override
-  protected Context preprocess() {
+  protected Context preprocess(String taskParamsJson) {
     Context context = new Context();
     context._instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
     return context;

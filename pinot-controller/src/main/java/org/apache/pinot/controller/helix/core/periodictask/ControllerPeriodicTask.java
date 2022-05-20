@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.periodictask;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -62,6 +63,7 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
     try {
       // Check if we have a specific table against which this task needs to be run.
       String propTableNameWithType = (String) periodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME);
+      String taskParamsJson = (String) periodicTaskProperties.get(PeriodicTask.TASK_PARAMS_JSON);
 
       // Process the tables that are managed by this controller
       List<String> tablesToProcess = new ArrayList<>();
@@ -83,7 +85,7 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
       }
 
       if (!tablesToProcess.isEmpty()) {
-        processTables(tablesToProcess);
+        processTables(tablesToProcess, taskParamsJson);
       }
       if (!nonLeaderForTables.isEmpty()) {
         nonLeaderCleanup(nonLeaderForTables);
@@ -103,10 +105,16 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
    * <p>
    * Override one of this method, {@link #processTable(String)} or {@link #processTable(String, C)}.
    */
-  protected void processTables(List<String> tableNamesWithType) {
+  protected void processTables(List<String> tableNamesWithType, String taskParamsJson) {
     int numTables = tableNamesWithType.size();
     LOGGER.info("Processing {} tables in task: {}", numTables, _taskName);
-    C context = preprocess();
+    C context;
+    try {
+      context = preprocess(taskParamsJson);
+    } catch (IOException e) {
+      LOGGER.error("Could not serialize task parameters in task: {}, Aborting task run", _taskName, e);
+      return;
+    }
     int numTablesProcessed = 0;
     for (String tableNameWithType : tableNamesWithType) {
       if (!isStarted()) {
@@ -129,7 +137,7 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   /**
    * Can be overridden to provide context before processing the tables.
    */
-  protected C preprocess() {
+  protected C preprocess(String taskParamsJson) throws IOException {
     return null;
   }
 
@@ -145,7 +153,7 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   /**
    * Processes the given table.
    * <p>
-   * Override one of this method, {@link #processTable(String, C)} or {@link #processTables(List)}.
+   * Override one of this method, {@link #processTable(String, C)} or {@link #processTables(List, String)}.
    */
   protected void processTable(String tableNameWithType) {
   }

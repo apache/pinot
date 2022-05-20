@@ -587,7 +587,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   @Override
-  protected void processTables(List<String> tableNamesWithType) {
+  protected void processTables(List<String> tableNamesWithType, String taskParamsJson) {
     scheduleTasks(tableNamesWithType, true);
   }
 

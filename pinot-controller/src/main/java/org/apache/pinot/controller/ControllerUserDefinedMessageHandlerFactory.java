@@ -71,6 +71,7 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
     private final String _periodicTaskRequestId;
     private final String _periodicTaskName;
     private final String _tableNameWithType;
+    private final String _taskParamsJson;
     private final PeriodicTaskScheduler _periodicTaskScheduler;
 
     RunPeriodicTaskMessageHandler(RunPeriodicTaskMessage message, NotificationContext context,
@@ -79,6 +80,7 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
       _periodicTaskRequestId = message.getPeriodicTaskRequestId();
       _periodicTaskName = message.getPeriodicTaskName();
       _tableNameWithType = message.getTableNameWithType();
+      _taskParamsJson = message.getTaskParams();
       _periodicTaskScheduler = periodicTaskScheduler;
     }
 
@@ -88,7 +90,8 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
       LOGGER.info("[TaskRequestId: {}] Handling RunPeriodicTaskMessage by executing task {}", _periodicTaskRequestId,
           _periodicTaskName);
       _periodicTaskScheduler
-          .scheduleNow(_periodicTaskName, createTaskProperties(_periodicTaskRequestId, _tableNameWithType));
+          .scheduleNow(_periodicTaskName, createTaskProperties(_periodicTaskRequestId, _tableNameWithType,
+              _taskParamsJson));
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);
       return helixTaskResult;
@@ -99,7 +102,8 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
       LOGGER.error("[TaskRequestId: {}] Message handling error.", _periodicTaskRequestId, e);
     }
 
-    private static Properties createTaskProperties(String periodicTaskRequestId, String tableNameWithType) {
+    private static Properties createTaskProperties(String periodicTaskRequestId, String tableNameWithType,
+        String taskParamsJson) {
       Properties periodicTaskParameters = new Properties();
       if (periodicTaskRequestId != null) {
         periodicTaskParameters.setProperty(PeriodicTask.PROPERTY_KEY_REQUEST_ID, periodicTaskRequestId);
@@ -107,6 +111,10 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
 
       if (tableNameWithType != null) {
         periodicTaskParameters.setProperty(PeriodicTask.PROPERTY_KEY_TABLE_NAME, tableNameWithType);
+      }
+
+      if (taskParamsJson != null) {
+        periodicTaskParameters.setProperty(PeriodicTask.TASK_PARAMS_JSON, taskParamsJson);
       }
 
       return periodicTaskParameters;

@@ -20,6 +20,7 @@ package org.apache.pinot.controller.validation;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -37,6 +38,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +57,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final int _segmentLevelValidationIntervalInSeconds;
   private long _lastSegmentLevelValidationRunTimeMs = 0L;
 
+  public static final String RECREATE_DELETED_CONSUMING_SEGMENT_KEY = "recreateDeletedConsumingSegment";
+
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
       ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics) {
@@ -69,7 +73,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   }
 
   @Override
-  protected Context preprocess() {
+  protected Context preprocess(String taskParamsJson) throws IOException {
     Context context = new Context();
     // Run segment level validation only if certain time has passed after previous run
     long currentTimeMs = System.currentTimeMillis();
@@ -79,6 +83,12 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       context._runSegmentLevelValidation = true;
       _lastSegmentLevelValidationRunTimeMs = currentTimeMs;
     }
+
+    if (taskParamsJson != null) {
+        context._realtimeSegmentValidationTaskParameters =
+            JsonUtils.stringToObject(taskParamsJson, RealtimeSegmentValidationTaskParameters.class);
+    }
+
     return context;
   }
 
@@ -100,7 +110,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
           IngestionConfigUtils.getStreamConfigMap(tableConfig));
       if (streamConfig.hasLowLevelConsumerType()) {
-        _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig, false);
+        _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig,
+            streamConfig, context._realtimeSegmentValidationTaskParameters._recreateDeletedConsumingSegment);
       }
     }
   }
@@ -172,8 +183,13 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     _validationMetrics.unregisterAllMetrics();
   }
 
+  public static final class RealtimeSegmentValidationTaskParameters {
+    public boolean _recreateDeletedConsumingSegment;
+  }
+
   public static final class Context {
     private boolean _runSegmentLevelValidation;
+    private RealtimeSegmentValidationTaskParameters _realtimeSegmentValidationTaskParameters;
   }
 
   @VisibleForTesting

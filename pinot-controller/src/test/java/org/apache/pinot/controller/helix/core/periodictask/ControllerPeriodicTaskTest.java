@@ -70,9 +70,9 @@ public class ControllerPeriodicTaskTest {
     }
 
     @Override
-    public void processTables(List<String> tableNamesWithType) {
+    public void processTables(List<String> tableNamesWithType, String taskParamsJson) {
       _processTablesCalled.set(true);
-      super.processTables(tableNamesWithType);
+      super.processTables(tableNamesWithType, taskParamsJson);
     }
 
     @Override
