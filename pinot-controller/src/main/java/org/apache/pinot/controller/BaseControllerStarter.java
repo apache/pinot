@@ -465,7 +465,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_leadControllerManager).to(LeadControllerManager.class);
         bind(_periodicTaskScheduler).to(PeriodicTaskScheduler.class);
         bind(_sqlQueryExecutor).to(SqlQueryExecutor.class);
-        bind(_pinotLLCRealtimeSegmentManager).to(PinotLLCRealtimeSegmentManager.class);
       }
     });
 

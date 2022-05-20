@@ -51,9 +51,6 @@ public class PinotRealtimeTableResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeTableResource.class);
 
   @Inject
-  PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
-
-  @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
 
   @POST
