@@ -19,29 +19,30 @@
 package org.apache.pinot.controller.api;
 
 import java.io.IOException;
-import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 public class AccessControlTest {
+  private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
 
   private static final String TABLE_NAME = "accessTestTable";
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    ControllerTestUtils.setupClusterAndValidate();
+    TEST_INSTANCE.setupClusterAndValidate();
   }
 
   @Test
   public void testAccessDenied() {
     try {
-      ControllerTestUtils.sendGetRequest(
-          ControllerTestUtils.getControllerRequestURLBuilder().forSegmentDownload(TABLE_NAME, "testSegment"));
+      TEST_INSTANCE.sendGetRequest(
+          TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentDownload(TABLE_NAME, "testSegment"));
       Assert.fail("Access not denied");
     } catch (IOException e) {
       Assert.assertTrue(e.getMessage().contains("Got error status code: 403 (Forbidden)"));

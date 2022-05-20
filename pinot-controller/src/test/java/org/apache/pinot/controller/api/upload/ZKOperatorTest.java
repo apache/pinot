@@ -25,7 +25,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.ControllerTestUtils;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -48,20 +48,21 @@ public class ZKOperatorTest {
   private static final String TABLE_NAME = "operatorTestTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
   private static final String SEGMENT_NAME = "testSegment";
+  private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    ControllerTestUtils.setupClusterAndValidate();
+    TEST_INSTANCE.setupClusterAndValidate();
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
+    TEST_INSTANCE.getHelixResourceManager().addTable(tableConfig);
   }
 
   @Test
   public void testCompleteSegmentOperations()
       throws Exception {
-    ZKOperator zkOperator = new ZKOperator(ControllerTestUtils.getHelixResourceManager(), mock(ControllerConf.class),
+    ZKOperator zkOperator = new ZKOperator(TEST_INSTANCE.getHelixResourceManager(), mock(ControllerConf.class),
         mock(ControllerMetrics.class));
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
@@ -86,7 +87,7 @@ public class ZKOperatorTest {
     // Wait for the segment Zk entry to be deleted.
     TestUtils.waitForCondition(aVoid -> {
       SegmentZKMetadata segmentZKMetadata =
-          ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
+          TEST_INSTANCE.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
       return segmentZKMetadata == null;
     }, 30_000L, "Failed to delete segmentZkMetadata.");
 
@@ -94,7 +95,7 @@ public class ZKOperatorTest {
         true, true, httpHeaders);
 
     SegmentZKMetadata segmentZKMetadata =
-        ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
+        TEST_INSTANCE.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
     assertNotNull(segmentZKMetadata);
     assertEquals(segmentZKMetadata.getCrc(), 12345L);
     assertEquals(segmentZKMetadata.getCreationTime(), 123L);
@@ -132,7 +133,7 @@ public class ZKOperatorTest {
     zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, "otherDownloadUrl",
         "otherCrypter", 10, true, true, httpHeaders);
     segmentZKMetadata =
-        ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
+        TEST_INSTANCE.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
     assertNotNull(segmentZKMetadata);
     assertEquals(segmentZKMetadata.getCrc(), 12345L);
     // Push time should not change
@@ -155,7 +156,7 @@ public class ZKOperatorTest {
     zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, "otherDownloadUrl",
         "otherCrypter", 100, true, true, httpHeaders);
     segmentZKMetadata =
-        ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
+        TEST_INSTANCE.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
     assertNotNull(segmentZKMetadata);
     assertEquals(segmentZKMetadata.getCrc(), 23456L);
     // Push time should not change
@@ -170,6 +171,6 @@ public class ZKOperatorTest {
 
   @AfterClass
   public void tearDown() {
-    ControllerTestUtils.cleanup();
+    TEST_INSTANCE.cleanup();
   }
 }

@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -43,6 +42,7 @@ import static org.testng.Assert.*;
 
 
 public class TableCacheTest {
+  private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
   private static final String SCHEMA_NAME = "cacheTestSchema";
   private static final String RAW_TABLE_NAME = "cacheTestTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
@@ -54,13 +54,13 @@ public class TableCacheTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    ControllerTestUtils.setupClusterAndValidate();
+    TEST_INSTANCE.setupClusterAndValidate();
   }
 
   @Test(dataProvider = "testTableCacheDataProvider")
   public void testTableCache(boolean isCaseInsensitive)
       throws Exception {
-    TableCache tableCache = new TableCache(ControllerTestUtils.getPropertyStore(), isCaseInsensitive);
+    TableCache tableCache = new TableCache(TEST_INSTANCE.getPropertyStore(), isCaseInsensitive);
 
     assertNull(tableCache.getSchema(SCHEMA_NAME));
     assertNull(tableCache.getColumnNameMap(SCHEMA_NAME));
@@ -73,7 +73,7 @@ public class TableCacheTest {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(SCHEMA_NAME).addSingleValueDimension("testColumn", DataType.INT)
             .build();
-    ControllerTestUtils.getHelixResourceManager().addSchema(schema, false);
+    TEST_INSTANCE.getHelixResourceManager().addSchema(schema, false);
     // Wait for at most 10 seconds for the callback to add the schema to the cache
     TestUtils.waitForCondition(aVoid -> tableCache.getSchema(SCHEMA_NAME) != null, 10_000L,
         "Failed to add the schema to the cache");
@@ -98,7 +98,7 @@ public class TableCacheTest {
     // Add a table config
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSchemaName(SCHEMA_NAME).build();
-    ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
+    TEST_INSTANCE.getHelixResourceManager().addTable(tableConfig);
     // Wait for at most 10 seconds for the callback to add the table config to the cache
     TestUtils.waitForCondition(
         aVoid -> tableConfig.equals(tableCache.getTableConfig(OFFLINE_TABLE_NAME)) && RAW_TABLE_NAME.equals(
@@ -128,7 +128,7 @@ public class TableCacheTest {
 
     // Update the schema
     schema.addField(new DimensionFieldSpec("newColumn", DataType.LONG, true));
-    ControllerTestUtils.getHelixResourceManager().updateSchema(schema, false);
+    TEST_INSTANCE.getHelixResourceManager().updateSchema(schema, false);
     // Wait for at most 10 seconds for the callback to update the schema in the cache
     // NOTE:
     // - Schema should never be null during the transitioning
@@ -150,7 +150,7 @@ public class TableCacheTest {
 
     // Update the table config and drop the schema name
     tableConfig.getValidationConfig().setSchemaName(null);
-    ControllerTestUtils.getHelixResourceManager().updateTableConfig(tableConfig);
+    TEST_INSTANCE.getHelixResourceManager().updateTableConfig(tableConfig);
     // Wait for at most 10 seconds for the callback to update the table config in the cache
     // NOTE:
     // - Table config should never be null during the transitioning
@@ -181,7 +181,7 @@ public class TableCacheTest {
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
 
     // Remove the table config
-    ControllerTestUtils.getHelixResourceManager().deleteOfflineTable(RAW_TABLE_NAME);
+    TEST_INSTANCE.getHelixResourceManager().deleteOfflineTable(RAW_TABLE_NAME);
     // Wait for at most 10 seconds for the callback to remove the table config from the cache
     // NOTE:
     // - Verify if the callback is fully done by checking the table config change lister because it is the last step of
@@ -196,7 +196,7 @@ public class TableCacheTest {
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
 
     // Remove the schema
-    ControllerTestUtils.getHelixResourceManager().deleteSchema(schema);
+    TEST_INSTANCE.getHelixResourceManager().deleteSchema(schema);
     // Wait for at most 10 seconds for the callback to remove the schema from the cache
     // NOTE:
     // - Verify if the callback is fully done by checking the schema change lister because it is the last step of the
@@ -236,6 +236,6 @@ public class TableCacheTest {
 
   @AfterClass
   public void tearDown() {
-    ControllerTestUtils.cleanup();
+    TEST_INSTANCE.cleanup();
   }
 }
