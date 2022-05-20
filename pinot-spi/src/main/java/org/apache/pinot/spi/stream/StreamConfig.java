@@ -56,7 +56,7 @@ public class StreamConfig {
 
   public static final long DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS = 30_000;
   public static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
-  public static final int DEFAULT_IDLE_TIMEOUT_MILLIS = -1; // disabled, will use default idle count mechanism
+  public static final int DEFAULT_IDLE_TIMEOUT_MILLIS = 3 * 60 * 1000;
 
   private static final String SIMPLE_CONSUMER_TYPE_STRING = "simple";
 
@@ -182,8 +182,8 @@ public class StreamConfig {
       try {
         idleTimeoutMillis = Integer.parseInt(idleTimeoutMillisValue);
       } catch (Exception e) {
-        LOGGER.warn("Invalid config {}: {}, defaulting to: {} (i.e. no idle timeout, use only max idle count)",
-            idleTimeoutMillisKey, idleTimeoutMillisValue, DEFAULT_IDLE_TIMEOUT_MILLIS);
+        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", idleTimeoutMillisKey, idleTimeoutMillisValue,
+            DEFAULT_IDLE_TIMEOUT_MILLIS);
       }
     }
     _idleTimeoutMillis = idleTimeoutMillis;
