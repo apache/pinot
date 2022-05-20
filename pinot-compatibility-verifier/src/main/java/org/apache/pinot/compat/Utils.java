@@ -57,6 +57,6 @@ public class Utils {
     payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
 
     return JsonUtils.stringToJsonNode(
-        ControllerTest.sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString()));
+        ControllerTest.getInstance().sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString()));
   }
 }

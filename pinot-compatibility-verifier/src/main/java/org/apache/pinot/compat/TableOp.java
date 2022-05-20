@@ -109,7 +109,7 @@ public class TableOp extends BaseOp {
       Map<String, String> headers = new HashMap<String, String>() {{
         put("Content-type", "application/json");
       }};
-      ControllerTest.sendPostRequestRaw(
+      ControllerTest.getInstance().sendPostRequestRaw(
           ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl()).forSchemaCreate(),
           FileUtils.readFileToString(new File(getAbsoluteFileName(_schemaFileName))), headers);
       return true;
@@ -121,7 +121,7 @@ public class TableOp extends BaseOp {
 
   private boolean createTable() {
     try {
-      ControllerTest.sendPostRequestRaw(
+      ControllerTest.getInstance().sendPostRequestRaw(
           ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl()).forTableCreate(),
           FileUtils.readFileToString(new File(getAbsoluteFileName(_tableConfigFileName))), Collections.emptyMap());
       return true;
@@ -135,7 +135,7 @@ public class TableOp extends BaseOp {
     try {
       TableConfig tableConfig =
           JsonUtils.fileToObject(new File(getAbsoluteFileName(_tableConfigFileName)), TableConfig.class);
-      ControllerTest.sendDeleteRequest(
+      ControllerTest.getInstance().sendDeleteRequest(
           ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
               .forTableDelete(tableConfig.getTableName()));
       return true;

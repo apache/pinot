@@ -104,7 +104,7 @@ public class ControllerTest {
   public static final int TOTAL_NUM_BROKER_INSTANCES = 2 * NUM_BROKER_INSTANCES;
 
   /**
-   * default static instance used to wrap all static methods access.
+   * default static instance used to access all wrapped static instances.
    */
   protected static final ControllerTest DEFAULT_INSTANCE = new ControllerTest();
 
