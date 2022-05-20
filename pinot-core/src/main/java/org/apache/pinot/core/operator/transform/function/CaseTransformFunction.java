@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -86,13 +87,13 @@ public class CaseTransformFunction extends BaseTransformFunction {
     for (int i = 0; i < numWhenStatements; i++) {
       _whenStatements.add(arguments.get(i));
     }
-    // Add ELSE Statement first
     _elseThenStatements = new ArrayList<>(numWhenStatements + 1);
-    _elseThenStatements.add(arguments.get(numWhenStatements * 2));
-    for (int i = numWhenStatements; i < numWhenStatements * 2; i++) {
+    for (int i = numWhenStatements; i < numWhenStatements * 2 + 1; i++) {
       _elseThenStatements.add(arguments.get(i));
     }
     _selections = new boolean[_elseThenStatements.size()];
+    Collections.reverse(_elseThenStatements);
+    Collections.reverse(_whenStatements);
     _resultMetadata = calculateResultMetadata();
   }
 
@@ -212,7 +213,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
 
   /**
    * Evaluate the ProjectionBlock for the WHEN statements, returns an array with the
-   * index(1 to N) of matched WHEN clause, 0 means nothing matched, so go to ELSE.
+   * index(1 to N) of matched WHEN clause ordered by match priority, 0 means nothing
+   * matched, so go to ELSE.
    */
   private int[] getSelectedArray(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
@@ -228,8 +230,11 @@ public class CaseTransformFunction extends BaseTransformFunction {
       int[] conditions = whenStatement.transformToIntValuesSV(projectionBlock);
       for (int j = 0; j < numDocs & j < conditions.length; j++) {
         _selectedResults[j] = Math.max(conditions[j] * (i + 1), _selectedResults[j]);
-        _selections[_selectedResults[j]] = true;
       }
+    }
+    // try to prune clauses now
+    for (int i = 0; i < numDocs; i++) {
+      _selections[_selectedResults[i]] = true;
     }
     int numSelections = 0;
     for (boolean selection : _selections) {
