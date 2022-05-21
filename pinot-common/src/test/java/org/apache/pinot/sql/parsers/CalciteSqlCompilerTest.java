@@ -19,6 +19,7 @@
 package org.apache.pinot.sql.parsers;
 
 import java.io.StringReader;
+import java.lang.reflect.InvocationTargetException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -37,6 +38,8 @@ import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.rewriter.CompileTimeFunctionsInvoker;
+import org.apache.pinot.sql.parsers.rewriter.GroupByOnlyToOrderByRewriter;
+import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -782,7 +785,8 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testStringLiteral() {
+  public void testStringLiteral()
+      throws InvocationTargetException, InstantiationException, IllegalAccessException, ClassNotFoundException {
     // Do not allow string literal column in selection query
     assertCompilationFails("SELECT 'foo' FROM table");
 
@@ -799,6 +803,35 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(groupbyList.size(), 2);
     Assert.assertEquals(groupbyList.get(0).getLiteral().getStringValue(), "foo");
     Assert.assertEquals(groupbyList.get(1).getIdentifier().getName(), "bar");
+    Assert.assertNull(pinotQuery.getOrderByList());
+
+    // Allow string literal column in aggregation and group-by query with the GroupByOnlyToOrderByRewriter enabled
+    Class<QueryRewriter> queryRewriterClass =
+        (Class<QueryRewriter>) Class.forName(GroupByOnlyToOrderByRewriter.class.getName());
+    CalciteSqlParser.QUERY_REWRITERS.add((QueryRewriter) queryRewriterClass.getDeclaredConstructors()[0].newInstance());
+    pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("SELECT SUM('foo'), MAX(bar) FROM myTable GROUP BY 'foo', bar");
+    selectFunctionList = pinotQuery.getSelectList();
+    Assert.assertEquals(selectFunctionList.size(), 2);
+    Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getLiteral().getStringValue(),
+        "foo");
+    Assert.assertEquals(selectFunctionList.get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "bar");
+    groupbyList = pinotQuery.getGroupByList();
+    Assert.assertEquals(groupbyList.size(), 2);
+    Assert.assertEquals(groupbyList.get(0).getLiteral().getStringValue(), "foo");
+    Assert.assertEquals(groupbyList.get(1).getIdentifier().getName(), "bar");
+    CalciteSqlParser.QUERY_REWRITERS.remove(CalciteSqlParser.QUERY_REWRITERS.size() - 1);
+
+    // Order by will be added to the group by
+    List<Expression> orderbyList = pinotQuery.getOrderByList();
+    Assert.assertEquals(orderbyList.size(), 2);
+    Assert.assertEquals(orderbyList.get(0).getFunctionCall().getOperator(), "asc");
+    Assert.assertEquals(orderbyList.get(0).getFunctionCall().getOperands().size(), 1);
+    Assert.assertEquals(orderbyList.get(0).getFunctionCall().getOperands().get(0).getLiteral().getStringValue(), "foo");
+    Assert.assertEquals(orderbyList.get(1).getFunctionCall().getOperator(), "asc");
+    Assert.assertEquals(orderbyList.get(1).getFunctionCall().getOperands().size(), 1);
+    Assert.assertEquals(orderbyList.get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "bar");
 
     // For UDF, string literal won't be treated as column but as LITERAL
     pinotQuery = CalciteSqlParser.compileToPinotQuery(
@@ -828,6 +861,71 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(groupbyList.get(1).getFunctionCall().getOperands().size(), 2);
     Assert.assertEquals(groupbyList.get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "BAR");
     Assert.assertEquals(groupbyList.get(1).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "FOO");
+    Assert.assertNull(pinotQuery.getOrderByList());
+
+    // For UDF, string literal won't be treated as column but as LITERAL with the GroupByOnlyToOrderByRewriter enabled
+    queryRewriterClass =
+        (Class<QueryRewriter>) Class.forName(GroupByOnlyToOrderByRewriter.class.getName());
+    CalciteSqlParser.QUERY_REWRITERS.add((QueryRewriter) queryRewriterClass.getDeclaredConstructors()[0].newInstance());
+
+    // For UDF, string literal won't be treated as column but as LITERAL
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT SUM(ADD(foo, 'bar')) FROM myTable GROUP BY sub(foo, bar), SUB(BAR, FOO)");
+    selectFunctionList = pinotQuery.getSelectList();
+    Assert.assertEquals(selectFunctionList.size(), 1);
+    Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperator(), "sum");
+    Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().size(), 1);
+    Assert.assertEquals(
+        selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "add");
+    Assert.assertEquals(
+        selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().size(), 2);
+    Assert.assertEquals(
+        selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "foo");
+    Assert.assertEquals(
+        selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1)
+            .getLiteral().getStringValue(), "bar");
+    groupbyList = pinotQuery.getGroupByList();
+    Assert.assertEquals(groupbyList.size(), 2);
+    Assert.assertEquals(groupbyList.get(0).getFunctionCall().getOperator(), "sub");
+    Assert.assertEquals(groupbyList.get(0).getFunctionCall().getOperands().size(), 2);
+    Assert.assertEquals(groupbyList.get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "foo");
+    Assert.assertEquals(groupbyList.get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "bar");
+
+    Assert.assertEquals(groupbyList.get(1).getFunctionCall().getOperator(), "sub");
+    Assert.assertEquals(groupbyList.get(1).getFunctionCall().getOperands().size(), 2);
+    Assert.assertEquals(groupbyList.get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "BAR");
+    Assert.assertEquals(groupbyList.get(1).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "FOO");
+
+    // Order by will be added to the group by
+    orderbyList = pinotQuery.getOrderByList();
+    Assert.assertEquals(orderbyList.size(), 2);
+    Assert.assertEquals(orderbyList.get(0).getFunctionCall().getOperator(), "asc");
+    Assert.assertEquals(orderbyList.get(0).getFunctionCall().getOperands().size(), 1);
+    Assert.assertEquals(orderbyList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "sub");
+    Assert.assertEquals(
+        orderbyList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().size(), 2);
+    Assert.assertEquals(
+        orderbyList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "foo");
+    Assert.assertEquals(
+        orderbyList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1)
+            .getIdentifier().getName(), "bar");
+
+    Assert.assertEquals(orderbyList.get(1).getFunctionCall().getOperator(), "asc");
+    Assert.assertEquals(orderbyList.get(1).getFunctionCall().getOperands().size(), 1);
+    Assert.assertEquals(orderbyList.get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "sub");
+    Assert.assertEquals(
+        orderbyList.get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().size(), 2);
+    Assert.assertEquals(
+        orderbyList.get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "BAR");
+    Assert.assertEquals(
+        orderbyList.get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1)
+            .getIdentifier().getName(), "FOO");
+    CalciteSqlParser.QUERY_REWRITERS.remove(CalciteSqlParser.QUERY_REWRITERS.size() - 1);
   }
 
   @Test
@@ -1176,7 +1274,8 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testQueryValidation() {
+  public void testQueryValidation()
+      throws ClassNotFoundException, InvocationTargetException, InstantiationException, IllegalAccessException {
     // Valid: Selection fields are part of group by identifiers.
     String sql =
         "select group_country, sum(rsvp_count), count(*) from meetupRsvp group by group_city, group_country ORDER BY "
@@ -1202,6 +1301,19 @@ public class CalciteSqlCompilerTest {
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
     Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
+    Assert.assertEquals(pinotQuery.getOrderByListSize(), 0);
+
+    // Valid groupBy non-aggregate function should pass with the GroupByOnlyToOrderByRewriter
+    Class<QueryRewriter> queryRewriterClass =
+        (Class<QueryRewriter>) Class.forName(GroupByOnlyToOrderByRewriter.class.getName());
+    CalciteSqlParser.QUERY_REWRITERS.add((QueryRewriter) queryRewriterClass.getDeclaredConstructors()[0].newInstance());
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
+    // Add order by for aggregate group by only query
+    Assert.assertEquals(pinotQuery.getOrderByListSize(), 1);
+    CalciteSqlParser.QUERY_REWRITERS.remove(CalciteSqlParser.QUERY_REWRITERS.size() - 1);
 
     // Invalid: secondsSinceEpoch should be in groupBy clause.
     try {
@@ -1411,7 +1523,8 @@ public class CalciteSqlCompilerTest {
    * Some exceptions are time related keywords (date, timestamp, time), table, group, which need to be escaped
    */
   @Test
-  public void testReservedKeywords() {
+  public void testReservedKeywords()
+      throws ClassNotFoundException, InvocationTargetException, InstantiationException, IllegalAccessException {
 
     // min, max, avg, sum, value, count, groups
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
@@ -1544,6 +1657,34 @@ public class CalciteSqlCompilerTest {
         pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(1)
             .getFunctionCall().getOperands().get(0).getIdentifier().getName(), "time");
     Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "group");
+    Assert.assertEquals(pinotQuery.getOrderByListSize(), 0);
+
+    // escaping the above works with the GroupByOnlyToOrderByRewriter
+    Class<QueryRewriter> queryRewriterClass =
+        (Class<QueryRewriter>) Class.forName(GroupByOnlyToOrderByRewriter.class.getName());
+    CalciteSqlParser.QUERY_REWRITERS.add((QueryRewriter) queryRewriterClass.getDeclaredConstructors()[0].newInstance());
+
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "select sum(foo) from \"table\" where \"Date\" = 2019 and (\"timestamp\" < 100 or \"time\" > 200) group by "
+            + "\"group\"");
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals(pinotQuery.getDataSource().getTableName(), "table");
+    Assert.assertEquals(
+        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "Date");
+    Assert.assertEquals(
+        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0)
+            .getFunctionCall().getOperands().get(0).getIdentifier().getName(), "timestamp");
+    Assert.assertEquals(
+        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(1)
+            .getFunctionCall().getOperands().get(0).getIdentifier().getName(), "time");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "group");
+    // Group by without order by adds order by
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getFunctionCall().getOperator(), "asc");
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().size(), 1);
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "group");
+    CalciteSqlParser.QUERY_REWRITERS.remove(CalciteSqlParser.QUERY_REWRITERS.size() - 1);
   }
 
   @Test
@@ -1722,7 +1863,8 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testNoArgFunction() {
+  public void testNoArgFunction()
+      throws InvocationTargetException, InstantiationException, IllegalAccessException, ClassNotFoundException {
     String query = "SELECT noArgFunc() FROM foo ";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "noargfunc");
@@ -1736,6 +1878,23 @@ public class CalciteSqlCompilerTest {
     query = "SELECT sum(a), noArgFunc() FROM foo group by noArgFunc()";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperator(), "noargfunc");
+    Assert.assertEquals(pinotQuery.getOrderByListSize(), 0);
+
+    // with the GroupByOnlyToOrderByRewriter
+    Class<QueryRewriter> queryRewriterClass =
+        (Class<QueryRewriter>) Class.forName(GroupByOnlyToOrderByRewriter.class.getName());
+    CalciteSqlParser.QUERY_REWRITERS.add((QueryRewriter) queryRewriterClass.getDeclaredConstructors()[0].newInstance());
+
+    query = "SELECT sum(a), noArgFunc() FROM foo group by noArgFunc()";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperator(), "noargfunc");
+    // Group by adds order by if order by is not specified
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getFunctionCall().getOperator(), "asc");
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().size(), 1);
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "noargfunc");
+    CalciteSqlParser.QUERY_REWRITERS.remove(CalciteSqlParser.QUERY_REWRITERS.size() - 1);
   }
 
   @Test
@@ -2382,7 +2541,8 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testQueryWithSemicolon() {
+  public void testQueryWithSemicolon()
+      throws InvocationTargetException, InstantiationException, IllegalAccessException, ClassNotFoundException {
     String sql;
     PinotQuery pinotQuery;
     sql = "SELECT col1, col2 FROM foo;";
@@ -2411,7 +2571,24 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "col1");
     Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
     Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(pinotQuery.getOrderByListSize(), 0);
+
+    // with the GroupByOnlyToOrderByRewriter
+    Class<QueryRewriter> queryRewriterClass =
+        (Class<QueryRewriter>) Class.forName(GroupByOnlyToOrderByRewriter.class.getName());
+    CalciteSqlParser.QUERY_REWRITERS.add((QueryRewriter) queryRewriterClass.getDeclaredConstructors()[0].newInstance());
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 2);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
     Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "col1");
+    // Group by without order by adds order by
+    Assert.assertEquals(pinotQuery.getOrderByListSize(), 1);
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getFunctionCall().getOperator(), "asc");
+    Assert.assertEquals(pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().size(), 1);
+    Assert.assertEquals(
+        pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col1");
+    CalciteSqlParser.QUERY_REWRITERS.remove(CalciteSqlParser.QUERY_REWRITERS.size() - 1);
 
     // Check for Option SQL Query
     sql = "SELECT col1, count(*) FROM foo group by col1 option(skipUpsert=true);";

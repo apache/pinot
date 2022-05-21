@@ -42,11 +42,13 @@ public class QueryRewriterFactoryTest {
     // Check init with other configs
     QueryRewriterFactory.init("org.apache.pinot.sql.parsers.rewriter.PredicateComparisonRewriter,"
         + "org.apache.pinot.sql.parsers.rewriter.CompileTimeFunctionsInvoker,"
-        + "org.apache.pinot.sql.parsers.rewriter.SelectionsRewriter");
-    Assert.assertEquals(QUERY_REWRITERS.size(), 3);
+        + "org.apache.pinot.sql.parsers.rewriter.SelectionsRewriter,"
+        + "org.apache.pinot.sql.parsers.rewriter.GroupByOnlyToOrderByRewriter");
+    Assert.assertEquals(QUERY_REWRITERS.size(), 4);
     Assert.assertTrue(QUERY_REWRITERS.get(0) instanceof PredicateComparisonRewriter);
     Assert.assertTrue(QUERY_REWRITERS.get(1) instanceof CompileTimeFunctionsInvoker);
     Assert.assertTrue(QUERY_REWRITERS.get(2) instanceof SelectionsRewriter);
+    Assert.assertTrue(QUERY_REWRITERS.get(3) instanceof GroupByOnlyToOrderByRewriter);
 
     // Revert back to default behavior
     QueryRewriterFactory.init(null);

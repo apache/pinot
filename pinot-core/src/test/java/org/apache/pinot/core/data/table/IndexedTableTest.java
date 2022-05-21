@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.table;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -33,6 +34,9 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.rewriter.GroupByOnlyToOrderByRewriter;
+import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -282,5 +286,74 @@ public class IndexedTableTest {
     indexedTable.finish(false);
 
     checkEvicted(indexedTable, "f", "g");
+  }
+
+  @Test
+  public void testNoMoreNewRecordsGroupByOnlyConvertedToGroupByOrderBy()
+      throws InvocationTargetException, InstantiationException, IllegalAccessException, ClassNotFoundException {
+    // Group by without order by is treated like order by
+    // with the GroupByOnlyToOrderByRewriter
+    Class<QueryRewriter> queryRewriterClass =
+        (Class<QueryRewriter>) Class.forName(GroupByOnlyToOrderByRewriter.class.getName());
+    CalciteSqlParser.QUERY_REWRITERS.add((QueryRewriter) queryRewriterClass.getDeclaredConstructors()[0].newInstance());
+
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3");
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"}, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
+    });
+
+    IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, queryContext, 5, TRIM_SIZE, TRIM_THRESHOLD);
+    testNoMoreNewRecordsInTableGroupByOnlyConvertedToGroupByOrderBy(indexedTable);
+
+    indexedTable = new ConcurrentIndexedTable(dataSchema, queryContext, 5, TRIM_SIZE, TRIM_THRESHOLD);
+    testNoMoreNewRecordsInTableGroupByOnlyConvertedToGroupByOrderBy(indexedTable);
+
+    CalciteSqlParser.QUERY_REWRITERS.remove(CalciteSqlParser.QUERY_REWRITERS.size() - 1);
+  }
+
+  private void testNoMoreNewRecordsInTableGroupByOnlyConvertedToGroupByOrderBy(IndexedTable indexedTable) {
+    // Insert 22 records. Check that after 19, 9 are trimmed, after which remaining records can be added again.
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
+    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d, 10d, 200d}));
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
+    Assert.assertEquals(indexedTable.size(), 2);
+
+    indexedTable.upsert(getRecord(new Object[]{"c", 3, 30d, 10d, 300d}));
+    indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d, 10d, 400d}));
+    indexedTable.upsert(getRecord(new Object[]{"e", 5, 50d, 10d, 500d}));
+    indexedTable.upsert(getRecord(new Object[]{"f", 6, 60d, 10d, 600d}));
+    indexedTable.upsert(getRecord(new Object[]{"g", 7, 70d, 10d, 700d}));
+    indexedTable.upsert(getRecord(new Object[]{"h", 8, 80d, 10d, 800d}));
+    indexedTable.upsert(getRecord(new Object[]{"i", 9, 90d, 10d, 900d}));
+    indexedTable.upsert(getRecord(new Object[]{"j", 10, 100d, 10d, 1000d}));
+    indexedTable.upsert(getRecord(new Object[]{"k", 11, 110d, 10d, 1100d}));
+    indexedTable.upsert(getRecord(new Object[]{"l", 12, 120d, 10d, 1200d}));
+    indexedTable.upsert(getRecord(new Object[]{"m", 13, 130d, 10d, 1300d}));
+    indexedTable.upsert(getRecord(new Object[]{"n", 14, 140d, 10d, 1400d}));
+    indexedTable.upsert(getRecord(new Object[]{"o", 15, 150d, 10d, 1500d}));
+    indexedTable.upsert(getRecord(new Object[]{"p", 16, 160d, 10d, 1600d}));
+    indexedTable.upsert(getRecord(new Object[]{"q", 17, 170d, 10d, 1700d}));
+    indexedTable.upsert(getRecord(new Object[]{"r", 18, 180d, 10d, 1800d}));
+    indexedTable.upsert(getRecord(new Object[]{"s", 19, 190d, 10d, 1900d}));
+    Assert.assertEquals(indexedTable.size(), 19);
+
+    // validate that the table got trimmed
+    indexedTable.upsert(getRecord(new Object[]{"t", 20, 200d, 10d, 2000d}));
+    Assert.assertEquals(indexedTable.size(), 10);
+
+    // add more element and validate that they are successfully added
+    indexedTable.upsert(getRecord(new Object[]{"u", 21, 210d, 10d, 2100d}));
+    indexedTable.upsert(getRecord(new Object[]{"v", 22, 220d, 10d, 2200d}));
+    Assert.assertEquals(indexedTable.size(), 12);
+
+    // existing row also allowed
+    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d, 10d, 200d}));
+    Assert.assertEquals(indexedTable.size(), 12);
+
+    indexedTable.finish(false);
+
+    checkEvicted(indexedTable, "k", "l", "m", "n", "o", "p", "q", "r", "s", "t");
   }
 }
