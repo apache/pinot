@@ -117,11 +117,6 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   }
 
   @Override
-  public boolean hasNull() {
-    return false;
-  }
-
-  @Override
   public void seal() {
     _sortedValues = _values.toArray(new String[0]);
     Arrays.sort(_sortedValues);

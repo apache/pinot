@@ -99,11 +99,6 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
   }
 
   @Override
-  public boolean hasNull() {
-    return false;
-  }
-
-  @Override
   public void seal() {
     _sortedValues = _values.toFloatArray();
     Arrays.sort(_sortedValues);
