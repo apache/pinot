@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -41,10 +43,14 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
+import org.apache.pinot.core.common.ExplainPlanRowData;
+import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
+import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
@@ -78,7 +84,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
   private static final String IN_PARTITIONED_SUBQUERY = "inPartitionedSubquery";
-  private static final DataTable EXPLAIN_PLAN_RESULTS_NO_MATCHING_SEGMENT = getExplainPlanResultsForNoMatchingSegment();
 
   private InstanceDataManager _instanceDataManager;
   private ServerMetrics _serverMetrics;
@@ -282,17 +287,20 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
+    int totalSegments = indexSegments.size();
     List<IndexSegment> selectedSegments = _segmentPrunerService.prune(indexSegments, queryContext);
     segmentPruneTimer.stopAndRecord();
     int numSelectedSegments = selectedSegments.size();
     LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
     if (numSelectedSegments == 0) {
       // Only return metadata for streaming query
+      DataTable dataTable;
       if (queryContext.isExplain()) {
-        return EXPLAIN_PLAN_RESULTS_NO_MATCHING_SEGMENT;
+        dataTable = getExplainPlanResultsForNoMatchingSegment(totalSegments);
+      } else {
+        dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
       }
 
-      DataTable dataTable = DataTableUtils.buildEmptyDataTable(queryContext);
       Map<String, String> metadata = dataTable.getMetadata();
       metadata.put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(numTotalDocs));
       metadata.put(MetadataKey.NUM_DOCS_SCANNED.getName(), "0");
@@ -300,6 +308,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       metadata.put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), "0");
       metadata.put(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), "0");
       metadata.put(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), "0");
+      metadata.put(MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName(), String.valueOf(totalSegments));
       return dataTable;
     } else {
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
@@ -315,60 +324,179 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       // Update the total docs in the metadata based on the un-pruned segments
       dataTable.getMetadata().put(MetadataKey.TOTAL_DOCS.getName(), Long.toString(numTotalDocs));
 
+      // Set the number of pruned segments. This count does not include the segments which returned empty filters
+      int prunedSegments = totalSegments - numSelectedSegments;
+      dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName(), String.valueOf(prunedSegments));
+
       return dataTable;
     }
   }
 
   /** @return EXPLAIN_PLAN query result {@link DataTable} when no segments get selected for query execution.*/
-  private static DataTable getExplainPlanResultsForNoMatchingSegment() {
+  private static DataTable getExplainPlanResultsForNoMatchingSegment(int totalNumSegments) {
     DataTableBuilder dataTableBuilder = new DataTableBuilder(DataSchema.EXPLAIN_RESULT_SCHEMA);
     try {
       dataTableBuilder.startRow();
-      dataTableBuilder.setColumn(0, "NO_MATCHING_SEGMENT");
-      dataTableBuilder.setColumn(1, 1);
-      dataTableBuilder.setColumn(2, 0);
+      dataTableBuilder.setColumn(0, String.format(ExplainPlanRows.PLAN_START_FORMAT,
+          totalNumSegments));
+      dataTableBuilder.setColumn(1, ExplainPlanRows.PLAN_START_IDS);
+      dataTableBuilder.setColumn(2, ExplainPlanRows.PLAN_START_IDS);
+      dataTableBuilder.finishRow();
+      dataTableBuilder.startRow();
+      dataTableBuilder.setColumn(0, ExplainPlanRows.ALL_SEGMENTS_PRUNED_ON_SERVER);
+      dataTableBuilder.setColumn(1, 2);
+      dataTableBuilder.setColumn(2, 1);
       dataTableBuilder.finishRow();
     } catch (IOException ioe) {
       LOGGER.error("Unable to create EXPLAIN PLAN result table.", ioe);
     }
     return dataTableBuilder.build();
+  }
+
+  /**
+   * Get a mapping of explain plan depth to a unique list of explain plans for each depth
+   */
+  private static Map<Integer, List<ExplainPlanRows>> getAllSegmentsUniqueExplainPlanRowData(Operator root) {
+    Map<Integer, List<ExplainPlanRows>> operatorDepthToRowDataMap = new HashMap<>();
+    if (root == null) {
+      return operatorDepthToRowDataMap;
+    }
+
+    Map<Integer, HashSet<Integer>> uniquePlanNodeHashCodes = new HashMap<>();
+
+    // Obtain the list of all possible segment plans after the combine root node
+    List<Operator> children = root.getChildOperators();
+    for (Operator child : children) {
+      int[] operatorId = {3};
+      ExplainPlanRows explainPlanRows = new ExplainPlanRows();
+      // Get the segment explain plan for a single segment
+      getSegmentExplainPlanRowData(child, explainPlanRows, operatorId, 2);
+      int numRows = explainPlanRows.getExplainPlanRowData().size();
+      if (numRows > 0) {
+        operatorDepthToRowDataMap.putIfAbsent(numRows, new ArrayList<>());
+        uniquePlanNodeHashCodes.putIfAbsent(numRows, new HashSet<>());
+        int explainPlanRowsHashCode = explainPlanRows.hashCode();
+        if (!uniquePlanNodeHashCodes.get(numRows).contains(explainPlanRowsHashCode)) {
+          // If the hashcode of the explain plan rows returned for this segment is unique, add it to the data structure
+          // and update the set of hashCodes
+          explainPlanRows.incrementNumSegmentsMatchingThisPlan();
+          operatorDepthToRowDataMap.get(numRows).add(explainPlanRows);
+          uniquePlanNodeHashCodes.get(numRows).add(explainPlanRowsHashCode);
+        } else {
+          // If the hashCode for this segment isn't unique, find the explain plan with the matching hashCode and
+          // increment the number of segments that match it provided the plan is the same.
+          boolean explainPlanMatchFound = false;
+          int operatorDepthToRowMapSize = operatorDepthToRowDataMap.get(numRows).size();
+          for (int i = 0; i < operatorDepthToRowMapSize; i++) {
+            ExplainPlanRows explainPlanRowsPotentialMatch = operatorDepthToRowDataMap.get(numRows).get(i);
+            if ((explainPlanRowsPotentialMatch.hashCode() == explainPlanRowsHashCode)
+                && (explainPlanRowsPotentialMatch.equals(explainPlanRows))) {
+              explainPlanRowsPotentialMatch.incrementNumSegmentsMatchingThisPlan();
+              explainPlanMatchFound = true;
+              break;
+            }
+          }
+
+          // HashCode can lead to collisions, which is why an equality check is required to ensure that we don't miss
+          // any potential plans with matching hashcodes. If a match isn't found, add a new entry.
+          if (!explainPlanMatchFound) {
+            explainPlanRows.incrementNumSegmentsMatchingThisPlan();
+            operatorDepthToRowDataMap.get(numRows).add(explainPlanRows);
+          }
+        }
+      }
+    }
+
+    return operatorDepthToRowDataMap;
+  }
+
+  /**
+   * Get the list of Explain Plan rows for a single segment
+   */
+  private static void getSegmentExplainPlanRowData(Operator node, ExplainPlanRows explainPlanRows, int[] globalId,
+      int parentId) {
+    if (node == null) {
+      return;
+    }
+
+    String explainPlanString = node.toExplainString();
+    if (explainPlanString != null) {
+      ExplainPlanRowData explainPlanRowData = new ExplainPlanRowData(explainPlanString, globalId[0], parentId);
+      parentId = globalId[0]++;
+      explainPlanRows.appendExplainPlanRowData(explainPlanRowData);
+      if (node instanceof EmptyFilterOperator) {
+        explainPlanRows.setHasEmptyFilter(true);
+      }
+      if (node instanceof MatchAllFilterOperator) {
+        explainPlanRows.setHasMatchAllFilter(true);
+      }
+    }
+
+    List<Operator> children = node.getChildOperators();
+    for (Operator child : children) {
+      getSegmentExplainPlanRowData(child, explainPlanRows, globalId, parentId);
+    }
   }
 
   /** @return EXPLAIN PLAN query result {@link DataTable}. */
   public static DataTable processExplainPlanQueries(Plan queryPlan) {
     DataTableBuilder dataTableBuilder = new DataTableBuilder(DataSchema.EXPLAIN_RESULT_SCHEMA);
-    Operator root = queryPlan.getPlanNode().run().getChildOperators().get(0);
-    int[] idArray = {1};
+    List<Operator> childOperators = queryPlan.getPlanNode().run().getChildOperators();
+    assert childOperators.size() == 1;
+    Operator root = childOperators.get(0);
+    Map<Integer, List<ExplainPlanRows>> operatorDepthToRowDataMap;
+    int numEmptyFilterSegments = 0;
+    int numMatchAllFilterSegments = 0;
 
     try {
-      addOperatorToTable(dataTableBuilder, root, idArray, 0);
+      // Get the list of unique explain plans
+      operatorDepthToRowDataMap = getAllSegmentsUniqueExplainPlanRowData(root);
+      List<ExplainPlanRows> listOfExplainPlans = new ArrayList<>();
+      operatorDepthToRowDataMap.forEach((key, value) -> listOfExplainPlans.addAll(value));
+
+      // Setup the combine root's explain string
+      setValueInDataTableBuilder(dataTableBuilder, root.toExplainString(), 2, 1);
+
+      // Walk through all the explain plans and create the entries in the explain plan output for each plan
+      for (ExplainPlanRows explainPlanRows : listOfExplainPlans) {
+        numEmptyFilterSegments += explainPlanRows.isHasEmptyFilter()
+            ? explainPlanRows.getNumSegmentsMatchingThisPlan() : 0;
+        numMatchAllFilterSegments += explainPlanRows.isHasMatchAllFilter()
+            ? explainPlanRows.getNumSegmentsMatchingThisPlan() : 0;
+        setValueInDataTableBuilder(dataTableBuilder,
+            String.format(ExplainPlanRows.PLAN_START_FORMAT,
+                explainPlanRows.getNumSegmentsMatchingThisPlan()), ExplainPlanRows.PLAN_START_IDS,
+            ExplainPlanRows.PLAN_START_IDS);
+        for (ExplainPlanRowData explainPlanRowData : explainPlanRows.getExplainPlanRowData()) {
+          setValueInDataTableBuilder(dataTableBuilder, explainPlanRowData.getExplainPlanString(),
+              explainPlanRowData.getOperatorId(), explainPlanRowData.getParentId());
+        }
+      }
     } catch (IOException ioe) {
       LOGGER.error("Unable to create EXPLAIN PLAN result table.", ioe);
     }
-    return dataTableBuilder.build();
+
+    DataTable dataTable = dataTableBuilder.build();
+    dataTable.getMetadata().put(MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName(),
+        String.valueOf(numEmptyFilterSegments));
+    dataTable.getMetadata().put(MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName(),
+        String.valueOf(numMatchAllFilterSegments));
+    return dataTable;
   }
 
-  /** Create EXPLAIN query result {@link DataTable} by recursively stepping through the {@link Operator} tree. */
-  public static void addOperatorToTable(DataTableBuilder dataTableBuilder, Operator node, int[] globalId, int parentId)
+  /**
+   * Set the value for the explain plan fields in the DataTableBuilder
+   */
+  private static void setValueInDataTableBuilder(DataTableBuilder dataTableBuilder, String explainPlanString,
+      int operatorId, int parentId)
       throws IOException {
-    if (node == null) {
-      return;
-    }
-
-    String explainString = node.toExplainString();
-    if (explainString != null) {
+    if (explainPlanString != null) {
       // Only those operators that return a non-null description will be added to the EXPLAIN PLAN output.
       dataTableBuilder.startRow();
-      dataTableBuilder.setColumn(0, explainString);
-      dataTableBuilder.setColumn(1, globalId[0]);
+      dataTableBuilder.setColumn(0, explainPlanString);
+      dataTableBuilder.setColumn(1, operatorId);
       dataTableBuilder.setColumn(2, parentId);
       dataTableBuilder.finishRow();
-      parentId = globalId[0]++;
-    }
-
-    List<Operator> children = node.getChildOperators();
-    for (Operator child : children) {
-      addOperatorToTable(dataTableBuilder, child, globalId, parentId);
     }
   }
 

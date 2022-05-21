@@ -2000,9 +2000,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     assertEquals(response1, "{\"dataSchema\":{\"columnNames\":[\"Operator\",\"Operator_Id\",\"Parent_Id\"],"
         + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},\"rows\":[[\"BROKER_REDUCE(sort:[count(*) ASC],limit:10)"
-        + "\",0,-1],[\"COMBINE_GROUPBY_ORDERBY\",1,0],[\"AGGREGATE_GROUPBY_ORDERBY(groupKeys:Carrier, "
-        + "aggregations:count(*))\",2,1],[\"TRANSFORM_PASSTHROUGH(Carrier)\",3,2],[\"PROJECT(Carrier)\",4,3],"
-        + "[\"DOC_ID_SET\",5,4],[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:*)\",6,5]]}");
+        + "\",1,0],[\"COMBINE_GROUPBY_ORDERBY\",2,1],[\"PLAN_START(numSegmentsForThisPlan:1)\",-1,-1],"
+        + "[\"AGGREGATE_GROUPBY_ORDERBY(groupKeys:Carrier, aggregations:count(*))\",3,2],"
+        + "[\"TRANSFORM_PASSTHROUGH(Carrier)\",4,3],[\"PROJECT(Carrier)\",5,4],"
+        + "[\"DOC_ID_SET\",6,5],[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:*)\",7,6]]}");
 
     // In the query below, FlightNum column has an inverted index and there is no data satisfying the predicate
     // "FlightNum < 0". Hence, all segments are pruned out before query execution on the server side.
@@ -2010,8 +2011,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String response2 = postQuery(query2, _brokerBaseApiUrl).get("resultTable").toString();
 
     assertEquals(response2, "{\"dataSchema\":{\"columnNames\":[\"Operator\",\"Operator_Id\",\"Parent_Id\"],"
-        + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},\"rows\":[[\"BROKER_REDUCE(limit:10)\",0,-1],"
-        + "[\"NO_MATCHING_SEGMENT\",1,0]]}");
+        + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},\"rows\":[[\"BROKER_REDUCE(limit:10)\",1,0],"
+        + "[\"PLAN_START(numSegmentsForThisPlan:12)\",-1,-1],[\"ALL_SEGMENTS_PRUNED_ON_SERVER\",2,1]]}");
   }
 
   /** Test to make sure we are properly handling string comparisons in predicates. */

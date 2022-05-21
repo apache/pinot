@@ -117,7 +117,9 @@ public class BrokerReduceService extends BaseReduceService {
       gapfillProcessor.process(brokerResponseNative);
     }
 
-    updateAlias(queryContext, brokerResponseNative);
+    if (!serverQueryContext.isExplain()) {
+      updateAlias(queryContext, brokerResponseNative);
+    }
     return brokerResponseNative;
   }
 

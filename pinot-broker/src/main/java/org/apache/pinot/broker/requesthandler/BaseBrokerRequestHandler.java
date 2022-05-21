@@ -26,7 +26,6 @@ import com.google.common.util.concurrent.RateLimiter;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -473,6 +472,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Map<ServerInstance, List<String>> offlineRoutingTable = null;
     Map<ServerInstance, List<String>> realtimeRoutingTable = null;
     List<String> unavailableSegments = new ArrayList<>();
+    int numPrunedSegmentsTotal = 0;
     if (offlineBrokerRequest != null) {
       // NOTE: Routing table might be null if table is just removed
       RoutingTable routingTable = _routingManager.getRoutingTable(offlineBrokerRequest);
@@ -484,6 +484,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         } else {
           offlineBrokerRequest = null;
         }
+        numPrunedSegmentsTotal += routingTable.getNumPrunedSegments();
       } else {
         offlineBrokerRequest = null;
       }
@@ -499,6 +500,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         } else {
           realtimeBrokerRequest = null;
         }
+        numPrunedSegmentsTotal += routingTable.getNumPrunedSegments();
       } else {
         realtimeBrokerRequest = null;
       }
@@ -548,15 +550,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Execute the query
     ServerStats serverStats = new ServerStats();
-    if (serverPinotQuery.isExplain()) {
-      // Update routing tables to only send request to 1 server (& generate the plan for 1 segment).
+    // TODO: Handle broker specific operations for explain plan queries such as:
+    //       - Alias handling
+    //       - Compile time function invocation
+    //       - Literal only queries
+    //       - Any rewrites
+    if (pinotQuery.isExplain()) {
+      // Update routing tables to only send request to offline servers for OFFLINE and HYBRID tables.
+      // TODO: Assess if the Explain Plan Query should also be routed to REALTIME servers for HYBRID tables
       if (offlineRoutingTable != null) {
-        setRoutingToOneSegment(offlineRoutingTable);
         // For OFFLINE and HYBRID tables, don't send EXPLAIN query to realtime servers.
         realtimeBrokerRequest = null;
         realtimeRoutingTable = null;
-      } else {
-        setRoutingToOneSegment(realtimeRoutingTable);
       }
     }
     // TODO: Modify processBrokerRequest() to directly take PinotQuery
@@ -564,6 +569,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest, offlineRoutingTable,
             realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats, requestContext);
     brokerResponse.setExceptions(exceptions);
+    brokerResponse.setNumSegmentsPrunedByBroker(numPrunedSegmentsTotal);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
         executionEndTimeNs - routingEndTimeNs);
@@ -638,15 +644,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     function.getOperands()
         .forEach(operand -> setTimestampIndexExpressionOverrideHints(operand, timestampIndexColumns, pinotQuery));
-  }
-
-  /** Set EXPLAIN PLAN query to route to only one segment on one server. */
-  private void setRoutingToOneSegment(Map<ServerInstance, List<String>> routingTable) {
-    Set<Map.Entry<ServerInstance, List<String>>> servers = routingTable.entrySet();
-    // only send request to 1 server
-    Map.Entry<ServerInstance, List<String>> server = servers.iterator().next();
-    routingTable.clear();
-    routingTable.put(server.getKey(), Collections.singletonList(server.getValue().get(0)));
   }
 
   /** Given a {@link PinotQuery}, check if the WHERE clause will always evaluate to false. */
