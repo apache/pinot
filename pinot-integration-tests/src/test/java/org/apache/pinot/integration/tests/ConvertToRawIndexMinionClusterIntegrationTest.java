@@ -56,29 +56,10 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   private PinotHelixTaskResourceManager _helixTaskResourceManager;
   private PinotTaskManager _taskManager;
 
-  @Nullable
-  @Override
-  protected List<String> getNoDictionaryColumns() {
-    return null;
-  }
-
-  // NOTE: Only allow converting raw index for v1 segment
-  @Override
-  protected String getSegmentVersion() {
-    return SegmentVersion.v1.name();
-  }
-
-  @Override
-  protected TableTaskConfig getTaskConfig() {
-    Map<String, String> convertToRawIndexTaskConfigs = new HashMap<>();
-    convertToRawIndexTaskConfigs.put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, "5");
-    convertToRawIndexTaskConfigs.put(ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY, COLUMNS_TO_CONVERT);
-    return new TableTaskConfig(Collections.singletonMap(ConvertToRawIndexTask.TASK_TYPE, convertToRawIndexTaskConfigs));
-  }
-
   @BeforeClass
   public void setUp()
       throws Exception {
+    super.setDataSet(new ConvertToRawIndexMinionClusterIntegrationTestDataSet(this));
     // The parent setUp() sets up Zookeeper, Kafka, controller, broker and servers
     super.setUp();
 
@@ -90,7 +71,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   @Test
   public void testConvertToRawIndexTask()
       throws Exception {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getDataSet().getTableName());
 
     File testDataDir = new File(CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR + "-0", offlineTableName);
     if (!testDataDir.isDirectory()) {
@@ -186,7 +167,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     Assert.assertEquals(_helixResourceManager.getOnlineUnTaggedServerInstanceList().size(), 0);
 
     // Table APIs
-    String rawTableName = getTableName();
+    String rawTableName = getDataSet().getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     List<String> tableNames = _helixResourceManager.getAllTables();
@@ -207,5 +188,33 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     stopMinion();
 
     super.tearDown();
+  }
+
+  private static class ConvertToRawIndexMinionClusterIntegrationTestDataSet extends DefaultIntegrationTestDataSet {
+
+    public ConvertToRawIndexMinionClusterIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest);
+    }
+
+    @Nullable
+    @Override
+    public List<String> getNoDictionaryColumns() {
+      return null;
+    }
+
+    // NOTE: Only allow converting raw index for v1 segment
+    @Override
+    public String getSegmentVersion() {
+      return SegmentVersion.v1.name();
+    }
+
+    @Override
+    public TableTaskConfig getTaskConfig() {
+      Map<String, String> convertToRawIndexTaskConfigs = new HashMap<>();
+      convertToRawIndexTaskConfigs.put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, "5");
+      convertToRawIndexTaskConfigs.put(ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY, COLUMNS_TO_CONVERT);
+      return new TableTaskConfig(
+          Collections.singletonMap(ConvertToRawIndexTask.TASK_TYPE, convertToRawIndexTaskConfigs));
+    }
   }
 }

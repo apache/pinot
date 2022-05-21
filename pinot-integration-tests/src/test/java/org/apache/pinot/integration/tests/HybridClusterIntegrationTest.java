@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.net.URLEncoder;
 import java.util.List;
@@ -43,61 +44,77 @@ import org.testng.annotations.Test;
  * Hybrid cluster integration test that uploads 8 months of data as offline and 6 months of data as realtime (with a
  * two month overlap).
  */
-public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet {
+public class HybridClusterIntegrationTest extends ClusterTest {
   private static final String TENANT_NAME = "TestTenant";
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
+  private ClusterIntegrationTestDataAndQuerySet _testDataSet;
 
   @Override
-  protected String getBrokerTenant() {
+  public String getBrokerTenant() {
     return TENANT_NAME;
   }
 
   @Override
-  protected String getServerTenant() {
+  public String getServerTenant() {
     return TENANT_NAME;
   }
 
   @Override
-  protected void overrideServerConf(PinotConfiguration configuration) {
+  public void overrideServerConf(PinotConfiguration configuration) {
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, false);
+  }
+
+  public void setDataSet(ClusterIntegrationTestDataAndQuerySet dataset) {
+    Preconditions.checkState(_testDataSet == null);
+    _testDataSet = dataset;
+  }
+
+  public ClusterIntegrationTestDataSet getDataSet() {
+    return _testDataSet;
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    setUpTestDirectories(this.getClass().getSimpleName());
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir(), getSegmentDir(), getTarDir());
+
+    // Setting the test data set if not already setup.
+    if (_testDataSet == null) {
+      _testDataSet = new DefaultIntegrationTestDataSet(this);
+    }
 
     // Start Zk, Kafka and Pinot
     startHybridCluster();
 
-    List<File> avroFiles = getAllAvroFiles();
-    List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
-    List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles, NUM_REALTIME_SEGMENTS);
+    List<File> avroFiles = _testDataSet.getAndUnpackAllAvroFiles();
+    List<File> offlineAvroFiles = _testDataSet.getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
+    List<File> realtimeAvroFiles = _testDataSet.getRealtimeAvroFiles(avroFiles, NUM_REALTIME_SEGMENTS);
 
     // Create and upload the schema and table config
-    Schema schema = createSchema();
+    Schema schema = _testDataSet.createSchema();
     addSchema(schema);
-    TableConfig offlineTableConfig = createOfflineTableConfig();
+    TableConfig offlineTableConfig = _testDataSet.createOfflineTableConfig();
     addTableConfig(offlineTableConfig);
-    addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
+    addTableConfig(_testDataSet.createRealtimeTableConfig(realtimeAvroFiles.get(0)));
 
     // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
-        _tarDir);
-    uploadSegments(getTableName(), _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0,
+        getSegmentDir(), getTarDir());
+    uploadSegments(_testDataSet.getTableName(), getTarDir());
 
     // Push data into Kafka
-    pushAvroIntoKafka(realtimeAvroFiles);
+    _testDataSet.pushAvroIntoKafka(realtimeAvroFiles);
 
     // Set up the H2 connection
-    setUpH2Connection(avroFiles);
+    _testDataSet.setUpH2Connection(avroFiles);
 
     // Initialize the query generator
-    setUpQueryGenerator(avroFiles);
+    _testDataSet.setUpQueryGenerator(avroFiles);
 
     // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
+    _testDataSet.waitForAllDocsLoaded(600_000L);
   }
 
   protected void startHybridCluster()
@@ -123,13 +140,15 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testSegmentMetadataApi()
       throws Exception {
-    String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName()));
+    String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(
+        _testDataSet.getTableName()));
     JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
     Assert.assertEquals(tableSegmentsMetadata.size(), 8);
 
     JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
     String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
-    jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
+    jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(
+        _testDataSet.getTableName(), segmentName));
     JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
     Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
         segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
@@ -140,7 +159,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       throws Exception {
     {
       String jsonOutputStr = sendGetRequest(
-          _controllerRequestURLBuilder.forSegmentListAPIWithTableType(getTableName(), TableType.OFFLINE.toString()));
+          _controllerRequestURLBuilder.forSegmentListAPIWithTableType(
+              _testDataSet.getTableName(), TableType.OFFLINE.toString()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // There should be one element in the array
       JsonNode element = array.get(0);
@@ -149,7 +169,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     }
     {
       String jsonOutputStr = sendGetRequest(
-          _controllerRequestURLBuilder.forSegmentListAPIWithTableType(getTableName(), TableType.REALTIME.toString()));
+          _controllerRequestURLBuilder.forSegmentListAPIWithTableType(
+              _testDataSet.getTableName(), TableType.REALTIME.toString()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // There should be one element in the array
       JsonNode element = array.get(0);
@@ -157,7 +178,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       Assert.assertEquals(segments.size(), 3);
     }
     {
-      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()));
+      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(
+          _testDataSet.getTableName()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // there should be 2 elements in the array now.
       int realtimeIndex = 0;
@@ -181,13 +203,13 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testReload()
       throws Exception {
-    super.testReload(true);
+    _testDataSet.testReload(true);
   }
 
   @Test
   public void testBrokerDebugOutput()
       throws Exception {
-    String tableName = getTableName();
+    String tableName = _testDataSet.getTableName();
     Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + tableName));
     Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
     Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + TableNameBuilder.REALTIME.tableNameWithType(tableName)));
@@ -199,7 +221,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testBrokerDebugRoutingTableSQL()
       throws Exception {
-    String tableName = getTableName();
+    String tableName = _testDataSet.getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     String encodedSQL;
@@ -210,58 +232,51 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test
-  @Override
   public void testHardcodedQueries()
       throws Exception {
-    super.testHardcodedQueries();
+    _testDataSet.testHardcodedQueries();
   }
 
   @Test
-  @Override
   public void testQueriesFromQueryFile()
       throws Exception {
-    super.testQueriesFromQueryFile();
+    _testDataSet.testQueriesFromQueryFile();
   }
 
   @Test
-  @Override
   public void testGeneratedQueriesWithMultiValues()
       throws Exception {
-    super.testGeneratedQueriesWithMultiValues();
+    _testDataSet.testGeneratedQueriesWithMultiValues();
   }
 
   @Test
-  @Override
   public void testQueryExceptions()
       throws Exception {
-    super.testQueryExceptions();
+    _testDataSet.testQueryExceptions();
   }
 
   @Test
-  @Override
   public void testInstanceShutdown()
       throws Exception {
-    super.testInstanceShutdown();
+    _testDataSet.testInstanceShutdown();
   }
 
   @Test
-  @Override
   public void testBrokerResponseMetadata()
       throws Exception {
-    super.testBrokerResponseMetadata();
+    _testDataSet.testBrokerResponseMetadata();
   }
 
   @Test
-  @Override
   public void testVirtualColumnQueries() {
-    super.testVirtualColumnQueries();
+    _testDataSet.testVirtualColumnQueries();
   }
 
   @AfterClass
   public void tearDown()
       throws Exception {
     // Try deleting the tables and check that they have no routing table
-    String tableName = getTableName();
+    String tableName = _testDataSet.getTableName();
     dropOfflineTable(tableName);
     dropRealtimeTable(tableName);
 
@@ -291,6 +306,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
    */
   protected void cleanupHybridCluster()
       throws Exception {
-    FileUtils.deleteDirectory(_tempDir);
+    FileUtils.deleteDirectory(getTempDir());
   }
 }

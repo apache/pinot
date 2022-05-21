@@ -23,23 +23,26 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.testng.annotations.BeforeClass;
 
 
 public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
 
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    setTestDataSet(new ExactlyOnceKafkaRealtimeClusterIntegrationTestDataSet(this));
+    super.setUp();
+  }
+
   @Override
-  protected boolean useLlc() {
+  public boolean useLlc() {
     return true;
   }
 
   @Override
-  protected boolean useKafkaTransaction() {
+  public boolean useKafkaTransaction() {
     return true;
-  }
-
-  @Override
-  protected String getLoadMode() {
-    return ReadMode.mmap.name();
   }
 
   @Override
@@ -51,16 +54,24 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends RealtimeClus
     startController(properties);
   }
 
-  @Override
-  protected void pushAvroIntoKafka(List<File> avroFiles)
-      throws Exception {
-    // the first transaction of kafka messages are aborted
-    ClusterIntegrationTestUtils
-        .pushAvroIntoKafkaWithTransaction(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(),
-            getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), false);
-    // the second transaction of kafka messages are committed
-    ClusterIntegrationTestUtils
-        .pushAvroIntoKafkaWithTransaction(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(),
-            getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), true);
+  private static class ExactlyOnceKafkaRealtimeClusterIntegrationTestDataSet
+      extends RealtimeClusterIntegrationTestDataSet {
+
+    public ExactlyOnceKafkaRealtimeClusterIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest, ReadMode.mmap.name());
+    }
+
+    @Override
+    public void pushAvroIntoKafka(List<File> avroFiles)
+        throws Exception {
+      // the first transaction of kafka messages are aborted
+      ClusterIntegrationTestUtils
+          .pushAvroIntoKafkaWithTransaction(avroFiles, "localhost:" + _testCluster.getKafkaPort(), getKafkaTopic(),
+              getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), false);
+      // the second transaction of kafka messages are committed
+      ClusterIntegrationTestUtils
+          .pushAvroIntoKafkaWithTransaction(avroFiles, "localhost:" + _testCluster.getKafkaPort(), getKafkaTopic(),
+              getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), true);
+    }
   }
 }

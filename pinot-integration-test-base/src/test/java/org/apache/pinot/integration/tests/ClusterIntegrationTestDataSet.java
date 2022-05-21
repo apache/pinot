@@ -1,0 +1,499 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.integration.tests;
+
+import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumReader;
+import org.apache.avro.io.DecoderFactory;
+import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
+import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractorConfig;
+import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.QueryConfig;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
+import org.apache.pinot.spi.config.table.RoutingConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.Assert;
+
+
+/**
+ * Shared implementation details of the cluster integration tests for setting up table/schema/data.
+ *
+ * Unlike {@link ClusterTest}, {@code BaseClusterIntegrationTest} sets up the testing data.
+ */
+public abstract class ClusterIntegrationTestDataSet {
+
+  protected ClusterTest _testCluster;
+  // testing setup to validate test results.
+  protected org.apache.pinot.client.Connection _pinotConnection;
+  protected Connection _h2Connection;
+  protected QueryGenerator _queryGenerator;
+
+  public ClusterIntegrationTestDataSet(ClusterTest testCluster) {
+    _testCluster = testCluster;
+  }
+
+  /**
+   * The following getters can be overridden to change default settings.
+   */
+  public abstract String getTableName();
+
+  public abstract String getSchemaName();
+
+  public abstract String getSchemaFileName();
+
+  @Nullable
+  public abstract String getTimeColumnName();
+
+  public abstract String getAvroTarFileName();
+
+  public abstract List<File> getAndUnpackAllAvroFiles()
+      throws Exception;
+
+  public abstract long getCountStarResult();
+
+  public abstract String getStreamConsumerFactoryClassName();
+
+  public abstract String getKafkaTopic();
+
+  public abstract int getMaxNumKafkaMessagesPerBatch();
+
+  @Nullable
+  public abstract byte[] getKafkaMessageHeader();
+
+  @Nullable
+  public abstract String getPartitionColumn();
+
+  @Nullable
+  public abstract String getSortedColumn();
+
+  @Nullable
+  public abstract List<String> getInvertedIndexColumns();
+
+  @Nullable
+  public abstract List<String> getNoDictionaryColumns();
+
+  @Nullable
+  public abstract List<String> getRangeIndexColumns();
+
+  @Nullable
+  public abstract List<String> getBloomFilterColumns();
+
+  @Nullable
+  public abstract List<FieldConfig> getFieldConfigs();
+
+  public abstract int getNumReplicas();
+
+  @Nullable
+  public abstract String getSegmentVersion();
+
+  @Nullable
+  public abstract String getLoadMode();
+
+  @Nullable
+  public abstract TableTaskConfig getTaskConfig();
+
+  @Nullable
+  public abstract IngestionConfig getIngestionConfig();
+
+  public abstract QueryConfig getQueryconfig();
+
+  public abstract boolean getNullHandlingEnabled();
+
+  @Nullable
+  public abstract SegmentPartitionConfig getSegmentPartitionConfig();
+
+  /**
+   * The following methods are based on the getters. Override the getters for non-default settings before calling these
+   * methods.
+   */
+
+  /**
+   * Creates a new schema.
+   */
+  public Schema createSchema()
+      throws IOException {
+    InputStream inputStream = ClusterIntegrationTestDataSet.class.getClassLoader()
+        .getResourceAsStream(getSchemaFileName());
+    Assert.assertNotNull(inputStream);
+    return Schema.fromInputStream(inputStream);
+  }
+
+  /**
+   * Returns the schema in the cluster.
+   */
+  public Schema getSchema() {
+    return _testCluster.getSchema(getSchemaName());
+  }
+
+  /**
+   * Creates a new OFFLINE table config.
+   */
+  public TableConfig createOfflineTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setSchemaName(getSchemaName())
+        .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
+        .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
+        .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
+        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(_testCluster.getBrokerTenant())
+        .setServerTenant(_testCluster.getServerTenant()).setIngestionConfig(getIngestionConfig())
+        .setQueryConfig(getQueryconfig()).setNullHandlingEnabled(getNullHandlingEnabled())
+        .setSegmentPartitionConfig(getSegmentPartitionConfig())
+        .build();
+  }
+
+  /**
+   * Creates a new REALTIME table config.
+   */
+  public TableConfig createRealtimeTableConfig(File sampleAvroFile) {
+    AvroFileSchemaKafkaAvroMessageDecoder.registerAvro(getTableName(), sampleAvroFile);
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
+        .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
+        .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
+        .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
+        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(_testCluster.getBrokerTenant())
+        .setServerTenant(_testCluster.getServerTenant()).setIngestionConfig(getIngestionConfig())
+        .setQueryConfig(getQueryconfig()).setLLC(_testCluster.useLlc()).setStreamConfigs(getStreamConfigs())
+        .setNullHandlingEnabled(getNullHandlingEnabled()).build();
+  }
+
+  /**
+   * Creates a new Upsert enabled table config.
+   */
+  public TableConfig createUpsertTableConfig(File sampleAvroFile, String primaryKeyColumn, int numPartitions) {
+    AvroFileSchemaKafkaAvroMessageDecoder.registerAvro(getTableName(), sampleAvroFile);
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
+    columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
+
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
+        .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
+        .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
+        .setBrokerTenant(_testCluster.getBrokerTenant()).setServerTenant(_testCluster.getServerTenant())
+        .setIngestionConfig(getIngestionConfig()).setLLC(_testCluster.useLlc()).setStreamConfigs(getStreamConfigs())
+        .setNullHandlingEnabled(getNullHandlingEnabled())
+        .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+        .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
+        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null, null)).build();
+  }
+
+  /**
+   * Returns the OFFLINE table config in the cluster.
+   */
+  public TableConfig getOfflineTableConfig() {
+    return _testCluster.getOfflineTableConfig(getTableName());
+  }
+
+  /**
+   * Returns the REALTIME table config in the cluster.
+   */
+  public TableConfig getRealtimeTableConfig() {
+    return _testCluster.getRealtimeTableConfig(getTableName());
+  }
+
+  public Map<String, String> getStreamConfigs() {
+    return getStreamConfigMap();
+  }
+
+  public Map<String, String> getStreamConfigMap() {
+    Map<String, String> streamConfigMap = new HashMap<>();
+    String streamType = "kafka";
+    streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
+    boolean useLlc = _testCluster.useLlc();
+    if (useLlc) {
+      // LLC
+      streamConfigMap.put(
+          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+          StreamConfig.ConsumerType.LOWLEVEL.toString());
+      streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
+              KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST),
+          "localhost:" + _testCluster.getDefaultKafkaPort());
+      if (_testCluster.useKafkaTransaction()) {
+        streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
+                KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL),
+            KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED);
+      }
+    } else {
+      // HLC
+      streamConfigMap.put(
+          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+          StreamConfig.ConsumerType.HIGHLEVEL.toString());
+      streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
+              KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING),
+          _testCluster.getKafkaZKAddress());
+      streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
+              KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER),
+          "localhost:" + _testCluster.getDefaultKafkaPort());
+    }
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), getStreamConsumerFactoryClassName());
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
+        getKafkaTopic());
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
+    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS,
+        Integer.toString(_testCluster.getRealtimeSegmentFlushSize()));
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
+    return streamConfigMap;
+  }
+
+  /**
+   * Get the Pinot connection.
+   *
+   * @return Pinot connection
+   */
+  public org.apache.pinot.client.Connection getPinotConnection() {
+    if (_pinotConnection == null) {
+      _pinotConnection = ConnectionFactory.fromZookeeper(
+          _testCluster.getZkUrl() + "/" + _testCluster.getHelixClusterName());
+    }
+    return _pinotConnection;
+  }
+
+  /**
+   * Get the H2 connection. H2 connection must be set up before calling this method.
+   *
+   * @return H2 connection
+   */
+  public Connection getH2Connection() {
+    Assert.assertNotNull(_h2Connection, "H2 Connection has not been initialized");
+    return _h2Connection;
+  }
+
+  /**
+   * Get the query generator. Query generator must be set up before calling this method.
+   *
+   * @return Query generator.
+   */
+  public QueryGenerator getQueryGenerator() {
+    Assert.assertNotNull(_queryGenerator, "Query Generator has not been initialized");
+    return _queryGenerator;
+  }
+
+  /**
+   * Sets up the H2 connection to a table with pre-loaded data.
+   */
+  public void setUpH2Connection(List<File> avroFiles)
+      throws Exception {
+    Assert.assertNull(_h2Connection);
+    Class.forName("org.h2.Driver");
+    _h2Connection = DriverManager.getConnection("jdbc:h2:mem:");
+    ClusterIntegrationTestUtils.setUpH2TableWithAvro(avroFiles, getTableName(), _h2Connection);
+  }
+
+  /**
+   * Sets up the query generator using the given Avro files.
+   */
+  public void setUpQueryGenerator(List<File> avroFiles) {
+    Assert.assertNull(_queryGenerator);
+    String tableName = getTableName();
+    _queryGenerator = new QueryGenerator(avroFiles, tableName, tableName);
+  }
+
+  /**
+   * Unpack the tarred Avro data into the given directory.
+   *
+   * @param outputDir Output directory
+   * @return List of files unpacked.
+   * @throws Exception
+   */
+  public List<File> unpackAvroData(File outputDir)
+      throws Exception {
+    InputStream inputStream =
+        ClusterIntegrationTestDataSet.class.getClassLoader().getResourceAsStream(getAvroTarFileName());
+    Assert.assertNotNull(inputStream);
+    return TarGzCompressionUtils.untar(inputStream, outputDir);
+  }
+
+  /**
+   * Pushes the data in the given Avro files into a Kafka stream.
+   *
+   * @param avroFiles List of Avro files
+   */
+  public void pushAvroIntoKafka(List<File> avroFiles)
+      throws Exception {
+
+    ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, "localhost:" + _testCluster.getKafkaPort(),
+        getKafkaTopic(), getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(),
+        injectTombstones());
+  }
+
+  public boolean injectTombstones() {
+    return false;
+  }
+
+  public List<File> getOfflineAvroFiles(List<File> avroFiles, int numOfflineSegments) {
+    List<File> offlineAvroFiles = new ArrayList<>(numOfflineSegments);
+    for (int i = 0; i < numOfflineSegments; i++) {
+      offlineAvroFiles.add(avroFiles.get(i));
+    }
+    return offlineAvroFiles;
+  }
+
+  public List<File> getRealtimeAvroFiles(List<File> avroFiles, int numRealtimeSegments) {
+    int numSegments = avroFiles.size();
+    List<File> realtimeAvroFiles = new ArrayList<>(numRealtimeSegments);
+    for (int i = numSegments - numRealtimeSegments; i < numSegments; i++) {
+      realtimeAvroFiles.add(avroFiles.get(i));
+    }
+    return realtimeAvroFiles;
+  }
+
+  public void registerKafkaTopic() {
+    _testCluster.registerKafkaTopic(getKafkaTopic());
+  }
+
+  /**
+   * Get current result for "SELECT COUNT(*)".
+   *
+   * @return Current count start result
+   * @throws Exception
+   */
+  public long getCurrentCountStarResult()
+      throws Exception {
+    return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName()).getResultSet(0).getLong(0);
+  }
+
+  /**
+   * Wait for all documents to get loaded.
+   *
+   * @param timeoutMs Timeout in milliseconds
+   * @throws Exception
+   */
+  public void waitForAllDocsLoaded(long timeoutMs)
+      throws Exception {
+    waitForDocsLoaded(timeoutMs, true);
+  }
+
+  public void waitForDocsLoaded(long timeoutMs, boolean raiseError) {
+    final long countStarResult = getCountStarResult();
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        try {
+          return getCurrentCountStarResult() == countStarResult;
+        } catch (Exception e) {
+          return null;
+        }
+      }
+    }, 100L, timeoutMs, "Failed to load " + countStarResult + " documents", raiseError);
+  }
+
+  /**
+   * Run equivalent Pinot and H2 query and compare the results.
+   */
+  public void testQuery(String query)
+      throws Exception {
+    testQuery(query, query);
+  }
+
+  /**
+   * Run equivalent Pinot and H2 query and compare the results.
+   */
+  public void testQuery(String pinotQuery, String h2Query)
+      throws Exception {
+    ClusterIntegrationTestUtils.testQuery(_testCluster, pinotQuery, _testCluster.getBrokerBaseApiUrl(),
+        getPinotConnection(), h2Query, getH2Connection());
+  }
+
+  public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSchemaKafkaAvroMessageDecoder.class);
+    private static final Map<String, File> AVRO_FILE_MAP = new HashMap<>();
+    private org.apache.avro.Schema _avroSchema;
+    private RecordExtractor _recordExtractor;
+    private DecoderFactory _decoderFactory = new DecoderFactory();
+    private DatumReader<GenericData.Record> _reader;
+
+    protected static void registerAvro(String topicName, File avroFile) {
+      Preconditions.checkState(!AVRO_FILE_MAP.containsKey(topicName));
+      AVRO_FILE_MAP.put(topicName, avroFile);
+    }
+
+    @Override
+    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+        throws Exception {
+      // Load Avro schema
+      try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(AVRO_FILE_MAP.get(topicName))) {
+        _avroSchema = reader.getSchema();
+      }
+      AvroRecordExtractorConfig config = new AvroRecordExtractorConfig();
+      config.init(props);
+      _recordExtractor = new AvroRecordExtractor();
+      _recordExtractor.init(fieldsToRead, config);
+      _reader = new GenericDatumReader<>(_avroSchema);
+    }
+
+    @Override
+    public GenericRow decode(byte[] payload, GenericRow destination) {
+      return decode(payload, 0, payload.length, destination);
+    }
+
+    @Override
+    public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+      try {
+        GenericData.Record avroRecord =
+            _reader.read(null, _decoderFactory.binaryDecoder(payload, offset, length, null));
+        return _recordExtractor.extract(avroRecord, destination);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception", e);
+        throw new RuntimeException(e);
+      }
+    }
+  }
+}

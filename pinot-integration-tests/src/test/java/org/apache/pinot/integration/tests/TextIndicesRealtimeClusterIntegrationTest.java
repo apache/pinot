@@ -50,7 +50,7 @@ import static org.testng.AssertJUnit.fail;
 /**
  * Cluster integration test for near realtime text search (lucene) and realtime text search (native).
  */
-public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
+public class TextIndicesRealtimeClusterIntegrationTest extends ClusterTest {
   private static final String TEXT_COLUMN_NAME = "skills";
   private static final String TEXT_COLUMN_NAME_NATIVE = "skills_native";
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
@@ -66,62 +66,20 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
   private static final String TEST_TEXT_COLUMN_QUERY_NATIVE =
       "SELECT COUNT(*) FROM mytable WHERE TEXT_CONTAINS(skills_native, 'm.*') AND TEXT_CONTAINS(skills_native, "
           + "'spark')";
-
-  @Override
-  public String getTimeColumnName() {
-    return TIME_COLUMN_NAME;
-  }
+  private TextIndicesRealtimeClusterIntegrationTestDataSet _testDataSet;
 
   // TODO: Support Lucene index on HLC consuming segments
   @Override
-  protected boolean useLlc() {
+  public boolean useLlc() {
     return true;
-  }
-
-  @Nullable
-  @Override
-  protected String getSortedColumn() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  protected List<String> getInvertedIndexColumns() {
-    return Collections.singletonList(TEXT_COLUMN_NAME_NATIVE);
-  }
-
-  @Override
-  protected List<String> getNoDictionaryColumns() {
-    return Collections.singletonList(TEXT_COLUMN_NAME);
-  }
-
-  @Nullable
-  @Override
-  protected List<String> getRangeIndexColumns() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  protected List<String> getBloomFilterColumns() {
-    return null;
-  }
-
-  @Override
-  protected List<FieldConfig> getFieldConfigs() {
-    Map<String, String> propertiesMap = new HashMap<>();
-    propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
-
-    return Arrays.asList(
-        new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null),
-        new FieldConfig(TEXT_COLUMN_NAME_NATIVE, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null,
-            propertiesMap));
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    setUpTestDirectories(this.getClass().getSimpleName());
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir());
+    _testDataSet = new TextIndicesRealtimeClusterIntegrationTestDataSet(this);
 
     // Start the Pinot cluster
     startZk();
@@ -136,20 +94,20 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
     File avroFile = createAvroFile();
 
     // Create and upload the schema and table config
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(DefaultIntegrationTestDataSet.DEFAULT_SCHEMA_NAME)
         .addSingleValueDimension(TEXT_COLUMN_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(TEXT_COLUMN_NAME_NATIVE, FieldSpec.DataType.STRING)
         .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
     addSchema(schema);
-    addTableConfig(createRealtimeTableConfig(avroFile));
+    addTableConfig(_testDataSet.createRealtimeTableConfig(avroFile));
 
     // Push data into Kafka
-    pushAvroIntoKafka(Collections.singletonList(avroFile));
+    _testDataSet.pushAvroIntoKafka(Collections.singletonList(avroFile));
 
     // Wait until the table is queryable
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return getCurrentCountStarResult() >= 0;
+        return _testDataSet.getCurrentCountStarResult() >= 0;
       } catch (Exception e) {
         return null;
       }
@@ -159,13 +117,13 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
   @AfterClass
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(getTableName());
+    dropRealtimeTable(_testDataSet.getTableName());
     stopServer();
     stopBroker();
     stopController();
     stopKafka();
     stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    FileUtils.deleteDirectory(getTempDir());
   }
 
   private File createAvroFile()
@@ -182,7 +140,7 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
     }
     assertEquals(skills.size(), NUM_SKILLS);
 
-    File avroFile = new File(_tempDir, "data.avro");
+    File avroFile = new File(getTempDir(), "data.avro");
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     avroSchema.setFields(Arrays.asList(new org.apache.avro.Schema.Field(TEXT_COLUMN_NAME,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
@@ -208,7 +166,7 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
       throws Exception {
     // Keep posting queries until all records are consumed
     long previousResult = 0;
-    while (getCurrentCountStarResult() < NUM_RECORDS) {
+    while (_testDataSet.getCurrentCountStarResult() < NUM_RECORDS) {
       long result = getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY);
       assertTrue(result >= previousResult);
       previousResult = result;
@@ -231,7 +189,7 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
       throws Exception {
     // Keep posting queries until all records are consumed
     long previousResult = 0;
-    while (getCurrentCountStarResult() < NUM_RECORDS) {
+    while (_testDataSet.getCurrentCountStarResult() < NUM_RECORDS) {
       long result = getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY_NATIVE);
       assertTrue(result >= previousResult);
       previousResult = result;
@@ -244,5 +202,57 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
   private long getTextColumnQueryResult(String query)
       throws Exception {
     return postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong();
+  }
+
+  private static class TextIndicesRealtimeClusterIntegrationTestDataSet extends DefaultIntegrationTestDataSet {
+
+    public TextIndicesRealtimeClusterIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest);
+    }
+
+    @Override
+    public String getTimeColumnName() {
+      return TIME_COLUMN_NAME;
+    }
+
+    @Nullable
+    @Override
+    public String getSortedColumn() {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public List<String> getInvertedIndexColumns() {
+      return Collections.singletonList(TEXT_COLUMN_NAME_NATIVE);
+    }
+
+    @Override
+    public List<String> getNoDictionaryColumns() {
+      return Collections.singletonList(TEXT_COLUMN_NAME);
+    }
+
+    @Nullable
+    @Override
+    public List<String> getRangeIndexColumns() {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public List<String> getBloomFilterColumns() {
+      return null;
+    }
+
+    @Override
+    public List<FieldConfig> getFieldConfigs() {
+      Map<String, String> propertiesMap = new HashMap<>();
+      propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
+
+      return Arrays.asList(
+          new FieldConfig(TEXT_COLUMN_NAME, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null),
+          new FieldConfig(TEXT_COLUMN_NAME_NATIVE, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null,
+              propertiesMap));
+    }
   }
 }

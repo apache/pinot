@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import org.apache.avro.reflect.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -44,6 +43,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -102,6 +102,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     if (consumerDirectory.exists()) {
       FileUtils.deleteDirectory(consumerDirectory);
     }
+    setTestDataSet(new RealtimeClusterIntegrationTestDataSet(this, ReadMode.mmap.name()));
     super.setUp();
   }
 
@@ -130,7 +131,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
     // Important: enable peer to peer download.
     segmentsValidationAndRetentionConfig.setPeerSegmentDownloadScheme("http");
     tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
-    tableConfig.getValidationConfig().setTimeColumnName(this.getTimeColumnName());
+    tableConfig.getValidationConfig().setTimeColumnName(_testDataSet.getTimeColumnName());
 
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
@@ -152,18 +153,12 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
   }
 
   @Override
-  protected boolean useLlc() {
+  public boolean useLlc() {
     return true;
   }
 
-  @Nullable
   @Override
-  protected String getLoadMode() {
-    return "MMAP";
-  }
-
-  @Override
-  protected void overrideServerConf(PinotConfiguration configuration) {
+  public void overrideServerConf(PinotConfiguration configuration) {
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, true);
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION, _isDirectAlloc);
     configuration.setProperty(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class.mockfs",
@@ -191,7 +186,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
 
   @Test
   public void testSegmentFlushSize() {
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(_testDataSet.getTableName());
     List<SegmentZKMetadata> segmentsZKMetadata =
         ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, realtimeTableName);
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
@@ -203,7 +198,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
   @Test
   public void testSegmentDownloadURLs() {
     // Verify that all segments of even partition number have empty download url in zk.
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(_testDataSet.getTableName());
     List<SegmentZKMetadata> segmentsZKMetadata =
         ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, realtimeTableName);
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
@@ -225,7 +220,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends RealtimeClust
   @Test
   public void testAllSegmentsAreOnlineOrConsuming() {
     ExternalView externalView = HelixHelper.getExternalViewForResource(_helixAdmin, getHelixClusterName(),
-        TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
+        TableNameBuilder.REALTIME.tableNameWithType(_testDataSet.getTableName()));
     Assert.assertEquals("2", externalView.getReplicas());
     // Verify for each segment e, the state of e in its 2 hosting servers is either ONLINE or CONSUMING
     for (String segment : externalView.getPartitionSet()) {

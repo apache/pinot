@@ -66,7 +66,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Integration test for minion task of type "MergeRollupTask"
  */
-public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
+public class MergeRollupMinionClusterIntegrationTest extends ClusterTest {
   private static final String SINGLE_LEVEL_CONCAT_TEST_TABLE = "myTable1";
   private static final String SINGLE_LEVEL_ROLLUP_TEST_TABLE = "myTable2";
   private static final String MULTI_LEVEL_CONCAT_TEST_TABLE = "myTable3";
@@ -75,18 +75,22 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
   protected PinotTaskManager _taskManager;
   protected PinotHelixResourceManager _pinotHelixResourceManager;
 
-  protected final File _segmentDir1 = new File(_tempDir, "segmentDir1");
-  protected final File _segmentDir2 = new File(_tempDir, "segmentDir2");
-  protected final File _segmentDir3 = new File(_tempDir, "segmentDir3");
-  protected final File _tarDir1 = new File(_tempDir, "tarDir1");
-  protected final File _tarDir2 = new File(_tempDir, "tarDir2");
-  protected final File _tarDir3 = new File(_tempDir, "tarDir3");
+  protected final File _segmentDir1 = new File(getTempDir(), "segmentDir1");
+  protected final File _segmentDir2 = new File(getTempDir(), "segmentDir2");
+  protected final File _segmentDir3 = new File(getTempDir(), "segmentDir3");
+  protected final File _tarDir1 = new File(getTempDir(), "tarDir1");
+  protected final File _tarDir2 = new File(getTempDir(), "tarDir2");
+  protected final File _tarDir3 = new File(getTempDir(), "tarDir3");
+
+  private MergeRollupMinionClusterIntegrationTestDataSet _testDataSet;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir1, _segmentDir2, _segmentDir3, _tarDir1, _tarDir2,
+    setUpTestDirectories(this.getClass().getSimpleName());
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir(), _segmentDir1, _segmentDir2, _segmentDir3, _tarDir1, _tarDir2,
         _tarDir3);
+    _testDataSet = new MergeRollupMinionClusterIntegrationTestDataSet(this);
 
     // Start the Pinot cluster
     startZk();
@@ -95,21 +99,21 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     startServers(1);
 
     // Create and upload the schema and table config
-    Schema schema = createSchema();
+    Schema schema = _testDataSet.createSchema();
     addSchema(schema);
     TableConfig singleLevelConcatTableConfig =
-        createOfflineTableConfig(SINGLE_LEVEL_CONCAT_TEST_TABLE, getSingleLevelConcatTaskConfig());
+        _testDataSet.createOfflineTableConfig(SINGLE_LEVEL_CONCAT_TEST_TABLE, getSingleLevelConcatTaskConfig());
     TableConfig singleLevelRollupTableConfig =
-        createOfflineTableConfig(SINGLE_LEVEL_ROLLUP_TEST_TABLE, getSingleLevelRollupTaskConfig(),
+        _testDataSet.createOfflineTableConfig(SINGLE_LEVEL_ROLLUP_TEST_TABLE, getSingleLevelRollupTaskConfig(),
             getMultiColumnsSegmentPartitionConfig());
     TableConfig multiLevelConcatTableConfig =
-        createOfflineTableConfig(MULTI_LEVEL_CONCAT_TEST_TABLE, getMultiLevelConcatTaskConfig());
+        _testDataSet.createOfflineTableConfig(MULTI_LEVEL_CONCAT_TEST_TABLE, getMultiLevelConcatTaskConfig());
     addTableConfig(singleLevelConcatTableConfig);
     addTableConfig(singleLevelRollupTableConfig);
     addTableConfig(multiLevelConcatTableConfig);
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = _testDataSet.unpackAvroData(getTempDir());
 
     // Create and upload segments
     ClusterIntegrationTestUtils
@@ -123,31 +127,15 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     uploadSegments(MULTI_LEVEL_CONCAT_TEST_TABLE, _tarDir3);
 
     // Set up the H2 connection
-    setUpH2Connection(avroFiles);
+    _testDataSet.setUpH2Connection(avroFiles);
 
     // Initialize the query generator
-    setUpQueryGenerator(avroFiles);
+    _testDataSet.setUpQueryGenerator(avroFiles);
 
     startMinion();
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
     _pinotHelixResourceManager = _controllerStarter.getHelixResourceManager();
-  }
-
-  private TableConfig createOfflineTableConfig(String tableName, TableTaskConfig taskConfig) {
-    return createOfflineTableConfig(tableName, taskConfig, null);
-  }
-
-  private TableConfig createOfflineTableConfig(String tableName, TableTaskConfig taskConfig,
-      @Nullable SegmentPartitionConfig partitionConfig) {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setSchemaName(getSchemaName())
-        .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
-        .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
-        .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
-        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode()).setTaskConfig(taskConfig).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-        .setNullHandlingEnabled(getNullHandlingEnabled()).setSegmentPartitionConfig(partitionConfig).build();
   }
 
   private TableTaskConfig getSingleLevelConcatTaskConfig() {
@@ -609,6 +597,30 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     stopBroker();
     stopController();
     stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    FileUtils.deleteDirectory(getTempDir());
+  }
+
+  private static class MergeRollupMinionClusterIntegrationTestDataSet extends DefaultIntegrationTestDataSet {
+
+    public MergeRollupMinionClusterIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest);
+    }
+
+
+    private TableConfig createOfflineTableConfig(String tableName, TableTaskConfig taskConfig) {
+      return createOfflineTableConfig(tableName, taskConfig, null);
+    }
+
+    private TableConfig createOfflineTableConfig(String tableName, TableTaskConfig taskConfig,
+        @Nullable SegmentPartitionConfig partitionConfig) {
+      return new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setSchemaName(getSchemaName())
+          .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
+          .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
+          .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
+          .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
+          .setLoadMode(getLoadMode()).setTaskConfig(taskConfig).setBrokerTenant(getBrokerTenant())
+          .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
+          .setNullHandlingEnabled(getNullHandlingEnabled()).setSegmentPartitionConfig(partitionConfig).build();
+    }
   }
 }

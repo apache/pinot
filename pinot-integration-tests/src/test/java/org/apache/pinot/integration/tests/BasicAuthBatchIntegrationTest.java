@@ -82,17 +82,17 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   }
 
   @Override
-  protected PinotConfiguration getDefaultBrokerConfiguration() {
+  public PinotConfiguration getDefaultBrokerConfiguration() {
     return BasicAuthTestUtils.addBrokerConfiguration(super.getDefaultBrokerConfiguration().toMap());
   }
 
   @Override
-  protected PinotConfiguration getDefaultServerConfiguration() {
+  public PinotConfiguration getDefaultServerConfiguration() {
     return BasicAuthTestUtils.addServerConfiguration(super.getDefaultServerConfiguration().toMap());
   }
 
   @Override
-  protected PinotConfiguration getDefaultMinionConfiguration() {
+  public PinotConfiguration getDefaultMinionConfiguration() {
     return BasicAuthTestUtils.addMinionConfiguration(super.getDefaultMinionConfiguration().toMap());
   }
 

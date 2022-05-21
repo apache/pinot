@@ -42,82 +42,92 @@ import static org.testng.Assert.assertEquals;
 /**
  * Tests ingestion configs on a hybrid table
  */
-public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegrationTest {
+public class IngestionConfigHybridIntegrationTest extends ClusterTest {
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
   // query result of SELECT COUNT(*) FROM mytable WHERE AirlineID != 19393 AND ArrDelayMinutes > 5 on unfiltered data
   private static final long FILTERED_COUNT_STAR_RESULT = 24047L;
+  private IngestionConfigHybridIntegrationTestDataSet _testDataSet;
 
-  @Override
-  protected String getTimeColumnName() {
-    return TIME_COLUMN_NAME;
-  }
+  private static class IngestionConfigHybridIntegrationTestDataSet extends DefaultIntegrationTestDataSet {
+    public IngestionConfigHybridIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest);
+    }
 
-  protected long getCountStarResult() {
-    return FILTERED_COUNT_STAR_RESULT;
-  }
+    @Override
+    public String getTimeColumnName() {
+      return TIME_COLUMN_NAME;
+    }
 
-  @Override
-  protected IngestionConfig getIngestionConfig() {
-    FilterConfig filterConfig =
-        new FilterConfig("Groovy({AirlineID == 19393 || ArrDelayMinutes <= 5 }, AirlineID, ArrDelayMinutes)");
-    List<TransformConfig> transformConfigs = new ArrayList<>();
-    transformConfigs.add(new TransformConfig("AmPm", "Groovy({DepTime < 1200 ? \"AM\": \"PM\"}, DepTime)"));
-    transformConfigs.add(new TransformConfig("millisSinceEpoch", "fromEpochDays(DaysSinceEpoch)"));
-    transformConfigs.add(new TransformConfig("lowerCaseDestCityName", "lower(DestCityName)"));
+    @Override
+    public long getCountStarResult() {
+      return FILTERED_COUNT_STAR_RESULT;
+    }
 
-    List<Map<String, String>> streamConfigMaps = new ArrayList<>();
-    streamConfigMaps.add(getStreamConfigMap());
-    return new IngestionConfig(null, new StreamIngestionConfig(streamConfigMaps), filterConfig, transformConfigs, null,
-        null);
-  }
+    @Override
+    public IngestionConfig getIngestionConfig() {
+      FilterConfig filterConfig = new FilterConfig(
+          "Groovy({AirlineID == 19393 || ArrDelayMinutes <= 5 }, AirlineID, ArrDelayMinutes)");
+      List<TransformConfig> transformConfigs = new ArrayList<>();
+      transformConfigs.add(new TransformConfig("AmPm", "Groovy({DepTime < 1200 ? \"AM\": \"PM\"}, DepTime)"));
+      transformConfigs.add(new TransformConfig("millisSinceEpoch", "fromEpochDays(DaysSinceEpoch)"));
+      transformConfigs.add(new TransformConfig("lowerCaseDestCityName", "lower(DestCityName)"));
 
-  @Override
-  protected Map<String, String> getStreamConfigs() {
-    return null;
-  }
+      List<Map<String, String>> streamConfigMaps = new ArrayList<>();
+      streamConfigMaps.add(getStreamConfigMap());
+      return new IngestionConfig(null, new StreamIngestionConfig(streamConfigMaps), filterConfig, transformConfigs,
+          null, null);
+    }
 
-  @Override
-  protected Schema createSchema() {
-    return new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
-        .addSingleValueDimension("AirlineID", FieldSpec.DataType.LONG)
-        .addSingleValueDimension("DepTime", FieldSpec.DataType.INT)
-        .addSingleValueDimension("AmPm", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("lowerCaseDestCityName", FieldSpec.DataType.STRING)
-        .addMetric("ArrDelayMinutes", FieldSpec.DataType.DOUBLE)
-        .addDateTime("millisSinceEpoch", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:DAYS").build();
-  }
+    @Override
+    public Map<String, String> getStreamConfigs() {
+      return null;
+    }
 
-  @Override
-  protected String getSortedColumn() {
-    return null;
-  }
+    @Override
+    public Schema createSchema() {
+      return new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
+          .addSingleValueDimension("AirlineID", FieldSpec.DataType.LONG)
+          .addSingleValueDimension("DepTime", FieldSpec.DataType.INT)
+          .addSingleValueDimension("AmPm", FieldSpec.DataType.STRING)
+          .addSingleValueDimension("lowerCaseDestCityName", FieldSpec.DataType.STRING)
+          .addMetric("ArrDelayMinutes", FieldSpec.DataType.DOUBLE).addDateTime("millisSinceEpoch",
+              FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:DAYS").build();
+    }
 
-  @Override
-  protected List<String> getInvertedIndexColumns() {
-    return null;
-  }
+    @Override
+    public String getSortedColumn() {
+      return null;
+    }
 
-  @Override
-  protected List<String> getNoDictionaryColumns() {
-    return null;
-  }
+    @Override
+    public List<String> getInvertedIndexColumns() {
+      return null;
+    }
 
-  @Override
-  protected List<String> getRangeIndexColumns() {
-    return null;
-  }
+    @Override
+    public List<String> getNoDictionaryColumns() {
+      return null;
+    }
 
-  @Override
-  protected List<String> getBloomFilterColumns() {
-    return null;
+    @Override
+    public List<String> getRangeIndexColumns() {
+      return null;
+    }
+
+    @Override
+    public List<String> getBloomFilterColumns() {
+      return null;
+    }
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    setUpTestDirectories(this.getClass().getSimpleName());
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir(), getSegmentDir(), getTarDir());
+    _testDataSet = new IngestionConfigHybridIntegrationTestDataSet(this);
     // Start Zk and Kafka
     startZk();
     startKafka();
@@ -127,40 +137,41 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
     startBroker();
     startServer();
 
-    List<File> avroFiles = getAllAvroFiles();
-    List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
-    List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles, NUM_REALTIME_SEGMENTS);
+    List<File> avroFiles = _testDataSet.getAndUnpackAllAvroFiles();
+    List<File> offlineAvroFiles = _testDataSet.getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
+    List<File> realtimeAvroFiles = _testDataSet.getRealtimeAvroFiles(avroFiles, NUM_REALTIME_SEGMENTS);
 
     // Create and upload the schema and table config
-    Schema schema = createSchema();
+    Schema schema = _testDataSet.createSchema();
     addSchema(schema);
-    TableConfig offlineTableConfig = createOfflineTableConfig();
+    TableConfig offlineTableConfig = _testDataSet.createOfflineTableConfig();
     addTableConfig(offlineTableConfig);
-    addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
+    addTableConfig(_testDataSet.createRealtimeTableConfig(realtimeAvroFiles.get(0)));
 
     // Create and upload segments
     ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(getTableName(), _tarDir);
+        .buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0,
+            getSegmentDir(), getTarDir());
+    uploadSegments(_testDataSet.getTableName(), getTarDir());
 
     // Push data into Kafka
-    pushAvroIntoKafka(realtimeAvroFiles);
+    _testDataSet.pushAvroIntoKafka(realtimeAvroFiles);
 
     // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
+    _testDataSet.waitForAllDocsLoaded(600_000L);
   }
 
   @Test
   public void testQueries()
       throws Exception {
     // Select column created with transform function
-    String sqlQuery = "Select millisSinceEpoch from " + DEFAULT_TABLE_NAME;
+    String sqlQuery = "Select millisSinceEpoch from " + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME;
     JsonNode response = postQuery(sqlQuery);
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "millisSinceEpoch");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG");
 
     // Select column created with transform function
-    sqlQuery = "Select AmPm, DepTime from " + DEFAULT_TABLE_NAME;
+    sqlQuery = "Select AmPm, DepTime from " + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME;
     response = postQuery(sqlQuery);
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "AmPm");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText(), "DepTime");
@@ -173,7 +184,7 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
     }
 
     // Select column created with transform function - offline table
-    sqlQuery = "Select AmPm, DepTime from " + DEFAULT_TABLE_NAME + "_OFFLINE";
+    sqlQuery = "Select AmPm, DepTime from " + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME + "_OFFLINE";
     response = postQuery(sqlQuery);
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "AmPm");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText(), "DepTime");
@@ -186,7 +197,7 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
     }
 
     // Select column created with transform - realtime table
-    sqlQuery = "Select AmPm, DepTime from " + DEFAULT_TABLE_NAME + "_REALTIME";
+    sqlQuery = "Select AmPm, DepTime from " + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME + "_REALTIME";
     response = postQuery(sqlQuery);
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "AmPm");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(1).asText(), "DepTime");
@@ -199,18 +210,20 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
     }
 
     // Check there's no values that should've been filtered
-    sqlQuery = "Select * from " + DEFAULT_TABLE_NAME + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
+    sqlQuery = "Select * from " + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME
+        + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
     response = postQuery(sqlQuery);
     Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
 
     // Check there's no values that should've been filtered - realtime table
-    sqlQuery =
-        "Select * from " + DEFAULT_TABLE_NAME + "_REALTIME" + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
+    sqlQuery = "Select * from " + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME + "_REALTIME"
+        + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
     response = postQuery(sqlQuery);
     Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
 
     // Check there's no values that should've been filtered - offline table
-    sqlQuery = "Select * from " + DEFAULT_TABLE_NAME + "_OFFLINE" + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
+    sqlQuery = "Select * from " + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME + "_OFFLINE"
+        + "  where AirlineID = 19393 or ArrDelayMinutes <= 5";
     response = postQuery(sqlQuery);
     Assert.assertEquals(response.get("resultTable").get("rows").size(), 0);
   }
@@ -218,8 +231,8 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
   @AfterClass
   public void tearDown()
       throws Exception {
-    dropOfflineTable(getTableName());
-    dropRealtimeTable(getTableName());
+    dropOfflineTable(_testDataSet.getTableName());
+    dropRealtimeTable(_testDataSet.getTableName());
     stopServer();
     stopBroker();
     stopController();

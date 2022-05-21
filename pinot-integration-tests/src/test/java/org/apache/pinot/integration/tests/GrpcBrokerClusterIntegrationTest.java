@@ -35,63 +35,68 @@ import org.testng.annotations.Test;
 /**
  * Integration test that converts Avro data for 12 segments and runs queries against it.
  */
-public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest {
+public class GrpcBrokerClusterIntegrationTest extends ClusterTest {
   private static final String TENANT_NAME = "TestTenant";
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
 
+  private ClusterIntegrationTestDataAndQuerySet _testDataSet;
+
   @Override
-  protected String getBrokerTenant() {
+  public String getBrokerTenant() {
     return TENANT_NAME;
   }
 
   @Override
-  protected String getServerTenant() {
+  public String getServerTenant() {
     return TENANT_NAME;
   }
 
   @Override
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+  public void overrideBrokerConf(PinotConfiguration brokerConf) {
     brokerConf.setProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, "grpc");
   }
 
   @Override
-  protected void overrideServerConf(PinotConfiguration serverConf) {
+  public void overrideServerConf(PinotConfiguration serverConf) {
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_GRPC_SERVER, true);
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    setUpTestDirectories(this.getClass().getSimpleName());
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir(), getSegmentDir(), getTarDir());
+
+    _testDataSet = new DefaultIntegrationTestDataSet(this);
 
     // Start Zk, Kafka and Pinot
     startHybridCluster();
 
-    List<File> avroFiles = getAllAvroFiles();
-    List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
-    List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles, NUM_REALTIME_SEGMENTS);
+    List<File> avroFiles = _testDataSet.getAndUnpackAllAvroFiles();
+    List<File> offlineAvroFiles = _testDataSet.getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
+    List<File> realtimeAvroFiles = _testDataSet.getRealtimeAvroFiles(avroFiles, NUM_REALTIME_SEGMENTS);
 
     // Create and upload the schema and table config
-    Schema schema = createSchema();
+    Schema schema = _testDataSet.createSchema();
     addSchema(schema);
-    TableConfig offlineTableConfig = createOfflineTableConfig();
+    TableConfig offlineTableConfig = _testDataSet.createOfflineTableConfig();
     addTableConfig(offlineTableConfig);
-    addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
+    addTableConfig(_testDataSet.createRealtimeTableConfig(realtimeAvroFiles.get(0)));
 
     // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
-        _tarDir);
-    uploadSegments(getTableName(), _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0,
+        getSegmentDir(), getTarDir());
+    uploadSegments(_testDataSet.getTableName(), getTarDir());
 
     // Push data into Kafka
-    pushAvroIntoKafka(realtimeAvroFiles);
+    _testDataSet.pushAvroIntoKafka(realtimeAvroFiles);
 
     // Set up the H2 connection
-    setUpH2Connection(avroFiles);
+    _testDataSet.setUpH2Connection(avroFiles);
 
     // Initialize the query generator
-    setUpQueryGenerator(avroFiles);
+    _testDataSet.setUpQueryGenerator(avroFiles);
 
     // TODO: this doesn't work so we simple wait for 5 second here. will be fixed after:
     // https://github.com/apache/pinot/pull/7839
@@ -121,10 +126,10 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
   public void testGrpcBrokerRequestHandlerOnSelectionOnlyQuery()
       throws Exception {
     String query = "SELECT * FROM mytable LIMIT 1000000";
-    testQuery(query);
+    _testDataSet.testQuery(query);
     query = "SELECT * FROM mytable WHERE DaysSinceEpoch > 16312 LIMIT 10000000";
-    testQuery(query);
+    _testDataSet.testQuery(query);
     query = "SELECT ArrTime, DaysSinceEpoch, Carrier FROM mytable LIMIT 10000000";
-    testQuery(query);
+    _testDataSet.testQuery(query);
   }
 }

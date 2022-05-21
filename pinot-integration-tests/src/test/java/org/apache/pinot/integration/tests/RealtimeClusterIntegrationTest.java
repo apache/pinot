@@ -22,6 +22,7 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import org.apache.avro.reflect.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -37,12 +38,19 @@ import org.testng.annotations.Test;
 /**
  * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
  */
-public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSet {
+public class RealtimeClusterIntegrationTest extends ClusterTest {
+
+  protected ClusterIntegrationTestDataAndQuerySet _testDataSet;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    setUpTestDirectories(this.getClass().getSimpleName());
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir(), getSegmentDir(), getTarDir());
+
+    if (_testDataSet == null) {
+      _testDataSet = new RealtimeClusterIntegrationTestDataSet(this, null);
+    }
 
     // Start the Pinot cluster
     startZk();
@@ -52,30 +60,35 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
     // Start Kafka
     startKafka();
+    _testDataSet.registerKafkaTopic();
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = _testDataSet.unpackAvroData(getTempDir());
 
     // Create and upload the schema and table config
-    Schema schema = createSchema();
+    Schema schema = _testDataSet.createSchema();
     addSchema(schema);
-    TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
+    TableConfig tableConfig = _testDataSet.createRealtimeTableConfig(avroFiles.get(0));
     addTableConfig(tableConfig);
 
     // Push data into Kafka
-    pushAvroIntoKafka(avroFiles);
+    _testDataSet.pushAvroIntoKafka(avroFiles);
 
     // create segments and upload them to controller
     createSegmentsAndUpload(avroFiles, schema, tableConfig);
 
     // Set up the H2 connection
-    setUpH2Connection(avroFiles);
+    _testDataSet.setUpH2Connection(avroFiles);
 
     // Initialize the query generator
-    setUpQueryGenerator(avroFiles);
+    _testDataSet.setUpQueryGenerator(avroFiles);
 
     // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
+    _testDataSet.waitForAllDocsLoaded(600_000L);
+  }
+
+  protected void setTestDataSet(ClusterIntegrationTestDataAndQuerySet dataSet) {
+    _testDataSet = dataSet;
   }
 
   protected void createSegmentsAndUpload(List<File> avroFile, Schema schema, TableConfig tableConfig)
@@ -84,18 +97,8 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
   }
 
   @Override
-  protected void overrideServerConf(PinotConfiguration configuration) {
+  public void overrideServerConf(PinotConfiguration configuration) {
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, false);
-  }
-
-  @Override
-  protected List<String> getNoDictionaryColumns() {
-    // Randomly set time column as no dictionary column.
-    if (new Random().nextInt(2) == 0) {
-      return Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime", "DaysSinceEpoch");
-    } else {
-      return super.getNoDictionaryColumns();
-    }
   }
 
   /**
@@ -136,56 +139,78 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
   private void testDictionaryBasedFunctions(String column)
       throws Exception {
-    testQuery(String.format("SELECT MIN(%s) FROM %s", column, getTableName()));
-    testQuery(String.format("SELECT MAX(%s) FROM %s", column, getTableName()));
-    testQuery(String.format("SELECT MIN_MAX_RANGE(%s) FROM %s", column, getTableName()),
-        String.format("SELECT MAX(%s)-MIN(%s) FROM %s", column, column, getTableName()));
+    _testDataSet.testQuery(String.format("SELECT MIN(%s) FROM %s", column, _testDataSet.getTableName()));
+    _testDataSet.testQuery(String.format("SELECT MAX(%s) FROM %s", column, _testDataSet.getTableName()));
+    _testDataSet.testQuery(String.format("SELECT MIN_MAX_RANGE(%s) FROM %s", column, _testDataSet.getTableName()),
+        String.format("SELECT MAX(%s)-MIN(%s) FROM %s", column, column, _testDataSet.getTableName()));
   }
 
   @Test
   public void testHardcodedQueries()
       throws Exception {
-    super.testHardcodedQueries();
+    _testDataSet.testHardcodedQueries();
   }
 
   @Test
-  @Override
   public void testQueriesFromQueryFile()
       throws Exception {
-    super.testQueriesFromQueryFile();
+    _testDataSet.testQueriesFromQueryFile();
   }
 
   @Test
-  @Override
   public void testGeneratedQueriesWithMultiValues()
       throws Exception {
-    super.testGeneratedQueriesWithMultiValues();
+    _testDataSet.testGeneratedQueriesWithMultiValues();
   }
 
   @Test
-  @Override
   public void testQueryExceptions()
       throws Exception {
-    super.testQueryExceptions();
+    _testDataSet.testQueryExceptions();
   }
 
   @Test
-  @Override
   public void testInstanceShutdown()
       throws Exception {
-    super.testInstanceShutdown();
+    _testDataSet.testInstanceShutdown();
   }
 
   @AfterClass
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(getTableName());
-    cleanupTestTableDataManager(TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
+    dropRealtimeTable(_testDataSet.getTableName());
+    _testDataSet.cleanupTestTableDataManager(TableNameBuilder.REALTIME.tableNameWithType(_testDataSet.getTableName()));
     stopServer();
     stopBroker();
     stopController();
     stopKafka();
     stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    FileUtils.deleteDirectory(getTempDir());
+  }
+
+  protected static class RealtimeClusterIntegrationTestDataSet extends DefaultIntegrationTestDataSet {
+
+    private String _loadMode;
+
+    public RealtimeClusterIntegrationTestDataSet(ClusterTest clusterTest, @Nullable String loadMode) {
+      super(clusterTest);
+      _loadMode = loadMode;
+    }
+
+    @Nullable
+    @Override
+    public String getLoadMode() {
+      return _loadMode;
+    }
+
+    @Override
+    public List<String> getNoDictionaryColumns() {
+      // Randomly set time column as no dictionary column.
+      if (new Random().nextInt(2) == 0) {
+        return Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime", "DaysSinceEpoch");
+      } else {
+        return super.getNoDictionaryColumns();
+      }
+    }
   }
 }

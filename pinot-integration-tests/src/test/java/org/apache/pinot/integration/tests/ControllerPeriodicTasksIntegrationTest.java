@@ -58,7 +58,7 @@ import static org.testng.Assert.assertTrue;
  * The intention of these tests is not to test functionality of daemons, but simply to check that they run as expected
  * and process the tables when the controller starts.
  */
-public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrationTestSet {
+public class ControllerPeriodicTasksIntegrationTest extends ClusterTest {
   private static final int PERIODIC_TASK_INITIAL_DELAY_SECONDS = 30;
   private static final int PERIODIC_TASK_FREQUENCY_SECONDS = 5;
   private static final String PERIODIC_TASK_FREQUENCY = "5s";
@@ -72,37 +72,28 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
   private static final int NUM_OFFLINE_AVRO_FILES = 8;
   private static final int NUM_REALTIME_AVRO_FILES = 6;
 
-  private String _currentTable = DEFAULT_TABLE_NAME;
+  private ControllerPeriodicTaskIntegrationTestSet _testDataSet;
 
   @Override
-  protected String getTableName() {
-    return _currentTable;
-  }
-
-  @Override
-  protected boolean useLlc() {
+  public boolean useLlc() {
     return true;
   }
 
   @Override
-  protected int getNumReplicas() {
-    return NUM_REPLICAS;
-  }
-
-  @Override
-  protected String getBrokerTenant() {
+  public String getBrokerTenant() {
     return TENANT_NAME;
   }
 
   @Override
-  protected String getServerTenant() {
+  public String getServerTenant() {
     return TENANT_NAME;
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    setUpTestDirectories(this.getClass().getSimpleName());
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir(), getSegmentDir(), getTarDir());
 
     startZk();
     startKafka();
@@ -136,39 +127,41 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     createBrokerTenant(TENANT_NAME, NUM_BROKERS);
     createServerTenant(TENANT_NAME, NUM_OFFLINE_SERVERS, NUM_REALTIME_SERVERS);
 
+    _testDataSet = new ControllerPeriodicTaskIntegrationTestSet(this);
+
     // Unpack the Avro files
-    int numAvroFiles = unpackAvroData(_tempDir).size();
+    int numAvroFiles = _testDataSet.unpackAvroData(getTempDir()).size();
     // Avro files has to be ordered as time series data
     List<File> avroFiles = new ArrayList<>(numAvroFiles);
     for (int i = 1; i <= numAvroFiles; i++) {
-      avroFiles.add(new File(_tempDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
+      avroFiles.add(new File(getTempDir(), "On_Time_On_Time_Performance_2014_" + i + ".avro"));
     }
     List<File> offlineAvroFiles = avroFiles.subList(0, NUM_OFFLINE_AVRO_FILES);
     List<File> realtimeAvroFiles = avroFiles.subList(numAvroFiles - NUM_REALTIME_AVRO_FILES, numAvroFiles);
 
     // Create and upload the schema and table config
-    Schema schema = createSchema();
+    Schema schema = _testDataSet.createSchema();
     addSchema(schema);
-    TableConfig offlineTableConfig = createOfflineTableConfig();
+    TableConfig offlineTableConfig = _testDataSet.createOfflineTableConfig();
     addTableConfig(offlineTableConfig);
-    addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
+    addTableConfig(_testDataSet.createRealtimeTableConfig(realtimeAvroFiles.get(0)));
 
     // Create and upload segments
     ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(getTableName(), _tarDir);
+        .buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, getSegmentDir(), getTarDir());
+    uploadSegments(_testDataSet.getTableName(), getTarDir());
 
     // Push data into Kafka
-    pushAvroIntoKafka(realtimeAvroFiles);
+    _testDataSet.pushAvroIntoKafka(realtimeAvroFiles);
 
     // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
+    _testDataSet.waitForAllDocsLoaded(600_000L);
   }
 
   @AfterClass
   public void tearDown()
       throws Exception {
-    String tableName = getTableName();
+    String tableName = _testDataSet.getTableName();
     dropOfflineTable(tableName);
     dropRealtimeTable(tableName);
 
@@ -177,7 +170,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     stopController();
     stopKafka();
     stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    FileUtils.deleteDirectory(getTempDir());
   }
 
   @Test
@@ -187,16 +180,16 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     String disabledTable = "disabledTable";
     String tableWithOfflineSegment = "tableWithOfflineSegment";
 
-    _currentTable = emptyTable;
-    addTableConfig(createOfflineTableConfig());
+    _testDataSet._currentTable = emptyTable;
+    addTableConfig(_testDataSet.createOfflineTableConfig());
 
-    _currentTable = disabledTable;
-    addTableConfig(createOfflineTableConfig());
+    _testDataSet._currentTable = disabledTable;
+    addTableConfig(_testDataSet.createOfflineTableConfig());
     _helixAdmin.enableResource(getHelixClusterName(), TableNameBuilder.OFFLINE.tableNameWithType(disabledTable), false);
 
-    _currentTable = tableWithOfflineSegment;
-    addTableConfig(createOfflineTableConfig());
-    uploadSegments(_currentTable, _tarDir);
+    _testDataSet._currentTable = tableWithOfflineSegment;
+    addTableConfig(_testDataSet.createOfflineTableConfig());
+    uploadSegments(_testDataSet._currentTable, getTarDir());
     // Turn one replica of a segment OFFLINE
     HelixHelper.updateIdealState(_helixManager, TableNameBuilder.OFFLINE.tableNameWithType(tableWithOfflineSegment),
         idealState -> {
@@ -206,7 +199,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
           return idealState;
         }, RetryPolicies.fixedDelayRetryPolicy(2, 10));
 
-    _currentTable = DEFAULT_TABLE_NAME;
+    _testDataSet._currentTable = DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME;
 
     int numTables = 5;
     ControllerMetrics controllerMetrics = _controllerStarter.getControllerMetrics();
@@ -225,7 +218,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
           Long.MIN_VALUE, Long.MIN_VALUE)) {
         return false;
       }
-      String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+      String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(_testDataSet.getTableName());
       IdealState idealState = _helixResourceManager.getTableIdealState(tableNameWithType);
       if (!checkSegmentStatusCheckerMetrics(controllerMetrics, tableNameWithType, idealState, NUM_REPLICAS, 100, 0,
           100)) {
@@ -238,7 +231,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
           100 * (NUM_REPLICAS - 1) / NUM_REPLICAS, 0, 100)) {
         return false;
       }
-      tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+      tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(_testDataSet.getTableName());
       idealState = _helixResourceManager.getTableIdealState(tableNameWithType);
       if (!checkSegmentStatusCheckerMetrics(controllerMetrics, tableNameWithType, idealState, NUM_REPLICAS, 100, 0,
           100)) {
@@ -281,7 +274,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
   public void testRealtimeSegmentRelocator()
       throws Exception {
     // Add relocation tenant config
-    TableConfig realtimeTableConfig = getRealtimeTableConfig();
+    TableConfig realtimeTableConfig = _testDataSet.getRealtimeTableConfig();
     realtimeTableConfig.setTenantConfig(new TenantConfig(TENANT_NAME, TENANT_NAME,
         new TagOverrideConfig(TagNameUtils.getRealtimeTagForTenant(TENANT_NAME),
             TagNameUtils.getOfflineTagForTenant(TENANT_NAME))));
@@ -292,7 +285,8 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
       Set<String> consumingServers = new HashSet<>();
       Set<String> completedServers = new HashSet<>();
       IdealState idealState =
-          _helixResourceManager.getTableIdealState(TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
+          _helixResourceManager.getTableIdealState(TableNameBuilder.REALTIME.tableNameWithType(
+              _testDataSet.getTableName()));
       assertNotNull(idealState);
       for (Map<String, String> instanceStateMap : idealState.getRecord().getMapFields().values()) {
         for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
@@ -319,7 +313,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     Set<String> brokersAfterAdd = _helixResourceManager.getAllInstancesForBrokerTenant(TENANT_NAME);
     assertTrue(brokersAfterAdd.contains(brokerId));
 
-    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(_testDataSet.getTableName());
     TestUtils.waitForCondition(aVoid -> {
       IdealState idealState = HelixHelper.getBrokerIdealStates(_helixAdmin, helixClusterName);
       assertNotNull(idealState);
@@ -342,7 +336,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
   public void testOfflineSegmentIntervalChecker() {
     OfflineSegmentIntervalChecker offlineSegmentIntervalChecker = _controllerStarter.getOfflineSegmentIntervalChecker();
     ValidationMetrics validationMetrics = offlineSegmentIntervalChecker.getValidationMetrics();
-    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(_testDataSet.getTableName());
 
     // Wait until OfflineSegmentIntervalChecker gets executed
     TestUtils.waitForCondition(aVoid -> {
@@ -354,6 +348,34 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
           validationMetrics.getValueOfGauge(ValidationMetrics.makeGaugeName(tableNameWithType, "TotalDocumentCount"));
       return numSegments == NUM_OFFLINE_AVRO_FILES && numMissingSegments == 0 && numTotalDocs == 79003;
     }, 60_000, "Timed out waiting for OfflineSegmentIntervalChecker");
+  }
+
+  private static class ControllerPeriodicTaskIntegrationTestSet extends DefaultIntegrationTestDataSet {
+    private String _currentTable = DEFAULT_TABLE_NAME;
+
+    public ControllerPeriodicTaskIntegrationTestSet(ClusterTest clusterTest) {
+      super(clusterTest);
+    }
+
+    @Override
+    public String getTableName() {
+      return _currentTable;
+    }
+
+    @Override
+    public int getNumReplicas() {
+      return NUM_REPLICAS;
+    }
+
+    @Override
+    public String getBrokerTenant() {
+      return TENANT_NAME;
+    }
+
+    @Override
+    public String getServerTenant() {
+      return TENANT_NAME;
+    }
   }
 
   // TODO: tests for other ControllerPeriodicTasks (RetentionManager, RealtimeSegmentValidationManager)

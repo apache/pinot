@@ -31,6 +31,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.FailureDetector;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
 import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -56,13 +57,15 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     return NUM_SERVERS;
   }
 
-  @Override
-  protected int getNumReplicas() {
-    return NUM_SERVERS;
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    _testDataSet = new OfflineClusterIntegrationTestDataSet(this, NUM_SERVERS);
+    super.setUp();
   }
 
   @Override
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+  public void overrideBrokerConf(PinotConfiguration brokerConf) {
     brokerConf.setProperty(FailureDetector.CONFIG_OF_TYPE, FailureDetector.Type.CONNECTION.name());
   }
 
@@ -132,12 +135,12 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
   @Test
   public void testServerHardFailure()
       throws Exception {
-    long expectedCountStarResult = getCountStarResult();
+    long expectedCountStarResult = _testDataSet.getCountStarResult();
     testCountStarQuery(3, false);
-    assertEquals(getCurrentCountStarResult(), expectedCountStarResult);
+    assertEquals(_testDataSet.getCurrentCountStarResult(), expectedCountStarResult);
 
     // Take a server and shut down its query server to mimic a hard failure
-    BaseServerStarter serverStarter = _serverStarters.get(NUM_SERVERS - 1);
+    BaseServerStarter serverStarter = getServerStarters().get(NUM_SERVERS - 1);
     serverStarter.getServerInstance().shutDown();
 
     // First query should hit all servers and get connection refused exception
@@ -149,12 +152,13 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     // Restart the failed server, and it should be included in the routing again
     serverStarter.stop();
     serverStarter = startOneServer(NUM_SERVERS - 1);
-    _serverStarters.set(NUM_SERVERS - 1, serverStarter);
+    getServerStarters().set(NUM_SERVERS - 1, serverStarter);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResult = postQuery("SELECT COUNT(*) FROM mytable");
         // Result should always be correct
-        assertEquals(queryResult.get("resultTable").get("rows").get(0).get(0).longValue(), getCountStarResult());
+        assertEquals(queryResult.get("resultTable").get("rows").get(0).get(0).longValue(),
+            _testDataSet.getCountStarResult());
         return queryResult.get("numServersQueried").intValue() == NUM_SERVERS;
       } catch (Exception e) {
         throw new RuntimeException(e);
@@ -176,7 +180,8 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
       JsonNode secondException = exceptions.get(1);
       assertEquals(secondException.get("errorCode").intValue(), QueryException.SERVER_NOT_RESPONDING_ERROR_CODE);
     } else {
-      assertEquals(queryResult.get("resultTable").get("rows").get(0).get(0).longValue(), getCountStarResult());
+      assertEquals(queryResult.get("resultTable").get("rows").get(0).get(0).longValue(),
+          _testDataSet.getCountStarResult());
       assertTrue(queryResult.get("exceptions").isEmpty());
     }
   }

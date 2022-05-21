@@ -32,12 +32,16 @@ import org.testng.annotations.Test;
  * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
  * The data pushed to Kafka includes null values.
  */
-public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
+public class NullHandlingIntegrationTest extends ClusterTest {
+  private ClusterIntegrationTestDataAndQuerySet _testDataSet;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    setUpTestDirectories(this.getClass().getSimpleName());
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir());
+
+    _testDataSet = new NullHandlingIntegrationTestDataSet(this);
 
     // Start the Pinot cluster
     startZk();
@@ -49,29 +53,29 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     startKafka();
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = _testDataSet.unpackAvroData(getTempDir());
 
     // Create and upload the schema and table config
-    addSchema(createSchema());
-    addTableConfig(createRealtimeTableConfig(avroFiles.get(0)));
+    addSchema(_testDataSet.createSchema());
+    addTableConfig(_testDataSet.createRealtimeTableConfig(avroFiles.get(0)));
 
     // Push data into Kafka
-    pushAvroIntoKafka(avroFiles);
+    _testDataSet.pushAvroIntoKafka(avroFiles);
 
     // Set up the H2 connection
-    setUpH2Connection(avroFiles);
+    _testDataSet.setUpH2Connection(avroFiles);
 
     // Initialize the query generator
-    setUpQueryGenerator(avroFiles);
+    _testDataSet.setUpQueryGenerator(avroFiles);
 
     // Wait for all documents loaded
-    waitForAllDocsLoaded(10_000L);
+    _testDataSet.waitForAllDocsLoaded(10_000L);
   }
 
   @AfterClass
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(getTableName());
+    dropRealtimeTable(_testDataSet.getTableName());
 
     // Stop the Pinot cluster
     stopServer();
@@ -81,91 +85,98 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     stopKafka();
     // Stop Zookeeper
     stopZk();
-    FileUtils.deleteDirectory(_tempDir);
-  }
-
-  @Override
-  protected String getAvroTarFileName() {
-    return "avro_data_with_nulls.tar.gz";
-  }
-
-  @Override
-  protected String getSchemaFileName() {
-    return "test_null_handling.schema";
-  }
-
-  @Override
-  @Nullable
-  protected String getSortedColumn() {
-    return null;
-  }
-
-  @Override
-  @Nullable
-  protected List<String> getInvertedIndexColumns() {
-    return null;
-  }
-
-  @Override
-  @Nullable
-  protected List<String> getNoDictionaryColumns() {
-    return null;
-  }
-
-  @Override
-  @Nullable
-  protected List<String> getRangeIndexColumns() {
-    return null;
-  }
-
-  @Override
-  @Nullable
-  protected List<String> getBloomFilterColumns() {
-    return null;
-  }
-
-  @Override
-  protected boolean getNullHandlingEnabled() {
-    return true;
-  }
-
-  @Override
-  protected long getCountStarResult() {
-    return 100;
+    FileUtils.deleteDirectory(getTempDir());
   }
 
   @Test
   public void testTotalCount()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM " + getTableName();
-    testQuery(query);
+    String query = "SELECT COUNT(*) FROM " + _testDataSet.getTableName();
+    _testDataSet.testQuery(query);
   }
 
   @Test
   public void testCountWithNullDescription()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE description IS NOT NULL";
-    testQuery(query);
+    String query = "SELECT COUNT(*) FROM " + _testDataSet.getTableName() + " WHERE description IS NOT NULL";
+    _testDataSet.testQuery(query);
   }
 
   @Test
   public void testCountWithNullDescriptionAndSalary()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE description IS NOT NULL AND salary IS NOT NULL";
-    testQuery(query);
+    String query = "SELECT COUNT(*) FROM " + _testDataSet.getTableName()
+        + " WHERE description IS NOT NULL AND salary IS NOT NULL";
+    _testDataSet.testQuery(query);
   }
 
   @Test
   public void testCaseWithNullSalary()
       throws Exception {
-    String query = "SELECT CASE WHEN salary IS NULL THEN 1 ELSE 0 END FROM " + getTableName();
-    testQuery(query);
+    String query = "SELECT CASE WHEN salary IS NULL THEN 1 ELSE 0 END FROM " + _testDataSet.getTableName();
+    _testDataSet.testQuery(query);
   }
 
   @Test
   public void testCaseWithNotNullDescription()
       throws Exception {
-    String query = "SELECT CASE WHEN description IS NOT NULL THEN 1 ELSE 0 END FROM " + getTableName();
-    testQuery(query);
+    String query = "SELECT CASE WHEN description IS NOT NULL THEN 1 ELSE 0 END FROM " + _testDataSet.getTableName();
+    _testDataSet.testQuery(query);
+  }
+
+  private class NullHandlingIntegrationTestDataSet extends DefaultIntegrationTestDataSet {
+    public NullHandlingIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest);
+    }
+
+    @Override
+    public String getAvroTarFileName() {
+      return "avro_data_with_nulls.tar.gz";
+    }
+
+    @Override
+    public String getSchemaFileName() {
+      return "test_null_handling.schema";
+    }
+
+    @Override
+    @Nullable
+    public String getSortedColumn() {
+      return null;
+    }
+
+    @Override
+    @Nullable
+    public List<String> getInvertedIndexColumns() {
+      return null;
+    }
+
+    @Override
+    @Nullable
+    public List<String> getNoDictionaryColumns() {
+      return null;
+    }
+
+    @Override
+    @Nullable
+    public List<String> getRangeIndexColumns() {
+      return null;
+    }
+
+    @Override
+    @Nullable
+    public List<String> getBloomFilterColumns() {
+      return null;
+    }
+
+    @Override
+    public boolean getNullHandlingEnabled() {
+      return true;
+    }
+
+    @Override
+    public long getCountStarResult() {
+      return 100;
+    }
   }
 }
