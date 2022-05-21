@@ -55,7 +55,7 @@ import org.testng.annotations.Test;
  *   </li>
  * </ul>
  */
-public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
+public class StarTreeClusterIntegrationTest extends ClusterTest {
   protected static final String DEFAULT_TABLE_NAME = "myTable";
   protected static final String STAR_TREE_TABLE_NAME = "myStarTable";
   private static final String SCHEMA_FILE_NAME =
@@ -68,35 +68,20 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
           AggregationFunctionType.DISTINCTCOUNTBITMAP);
   private static final int NUM_QUERIES_TO_GENERATE = 100;
 
-  private String _currentTable;
   private StarTreeQueryGenerator _starTree1QueryGenerator;
   private StarTreeQueryGenerator _starTree2QueryGenerator;
-
-  @Override
-  protected String getTableName() {
-    return _currentTable;
-  }
-
-  @Override
-  protected String getSchemaFileName() {
-    return SCHEMA_FILE_NAME;
-  }
-
-  // NOTE: Star-Tree and SegmentInfoProvider does not work on no-dictionary dimensions
-  @Override
-  protected List<String> getNoDictionaryColumns() {
-    return Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay");
-  }
+  private StarTreeClusterIntegrationTestDataSet _testDataSet;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    File defaultTableSegmentDir = new File(_segmentDir, DEFAULT_TABLE_NAME);
-    File defaultTableTarDir = new File(_tarDir, DEFAULT_TABLE_NAME);
-    File starTreeTableSegmentDir = new File(_segmentDir, STAR_TREE_TABLE_NAME);
-    File starTreeTableTarDir = new File(_tarDir, STAR_TREE_TABLE_NAME);
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir, defaultTableSegmentDir, defaultTableTarDir,
-        starTreeTableSegmentDir, starTreeTableTarDir);
+    File defaultTableSegmentDir = new File(getSegmentDir(), DEFAULT_TABLE_NAME);
+    File defaultTableTarDir = new File(getTarDir(), DEFAULT_TABLE_NAME);
+    File starTreeTableSegmentDir = new File(getSegmentDir(), STAR_TREE_TABLE_NAME);
+    File starTreeTableTarDir = new File(getTarDir(), STAR_TREE_TABLE_NAME);
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir(), getSegmentDir(), getTarDir(), defaultTableSegmentDir,
+        defaultTableTarDir, starTreeTableSegmentDir, starTreeTableTarDir);
+    _testDataSet = new StarTreeClusterIntegrationTestDataSet(this);
 
     // Start the Pinot cluster
     startZk();
@@ -105,10 +90,10 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     startServers(2);
 
     // Create and upload the schema and table config
-    Schema schema = createSchema();
+    Schema schema = _testDataSet.createSchema();
     addSchema(schema);
-    _currentTable = DEFAULT_TABLE_NAME;
-    TableConfig defaultTableConfig = createOfflineTableConfig();
+    _testDataSet._currentTable = DEFAULT_TABLE_NAME;
+    TableConfig defaultTableConfig = _testDataSet.createOfflineTableConfig();
     addTableConfig(defaultTableConfig);
 
     // Randomly pick some dimensions and metrics for star-trees
@@ -128,15 +113,15 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
       starTree1Metrics.add(allMetrics.get(2 * i));
       starTree2Metrics.add(allMetrics.get(2 * i + 1));
     }
-    _currentTable = STAR_TREE_TABLE_NAME;
-    TableConfig starTreeTableConfig = createOfflineTableConfig();
+    _testDataSet._currentTable = STAR_TREE_TABLE_NAME;
+    TableConfig starTreeTableConfig = _testDataSet.createOfflineTableConfig();
     starTreeTableConfig.getIndexingConfig().setStarTreeIndexConfigs(
         Arrays.asList(getStarTreeIndexConfig(starTree1Dimensions, starTree1Metrics),
             getStarTreeIndexConfig(starTree2Dimensions, starTree2Metrics)));
     addTableConfig(starTreeTableConfig);
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = _testDataSet.unpackAvroData(getTempDir());
 
     // Create and upload segments
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, defaultTableConfig, schema, 0, defaultTableSegmentDir,
@@ -158,10 +143,10 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
         segmentInfoProvider.getSingleValueDimensionValuesMap(), aggregationFunctions);
 
     // Wait for all documents loaded
-    _currentTable = DEFAULT_TABLE_NAME;
-    waitForAllDocsLoaded(600_000L);
-    _currentTable = STAR_TREE_TABLE_NAME;
-    waitForAllDocsLoaded(600_000L);
+    _testDataSet._currentTable = DEFAULT_TABLE_NAME;
+    _testDataSet.waitForAllDocsLoaded(600_000L);
+    _testDataSet._currentTable = STAR_TREE_TABLE_NAME;
+    _testDataSet.waitForAllDocsLoaded(600_000L);
   }
 
   private static StarTreeIndexConfig getStarTreeIndexConfig(List<String> dimensions, List<String> metrics) {
@@ -226,6 +211,30 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     stopController();
     stopZk();
 
-    FileUtils.deleteDirectory(_tempDir);
+    FileUtils.deleteDirectory(getTempDir());
+  }
+
+  private static class StarTreeClusterIntegrationTestDataSet extends DefaultIntegrationTestDataSet {
+    private String _currentTable;
+
+    public StarTreeClusterIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest);
+    }
+
+    @Override
+    public String getTableName() {
+      return _currentTable;
+    }
+
+    @Override
+    public String getSchemaFileName() {
+      return SCHEMA_FILE_NAME;
+    }
+
+    // NOTE: Star-Tree and SegmentInfoProvider does not work on no-dictionary dimensions
+    @Override
+    public List<String> getNoDictionaryColumns() {
+      return Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay");
+    }
   }
 }

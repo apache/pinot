@@ -51,16 +51,20 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
+public class ThetaSketchIntegrationTest extends ClusterTest {
   private static final String DIM_NAME = "dimName";
   private static final String DIM_VALUE = "dimValue";
   private static final String SHARD_ID = "shardId";
   private static final String THETA_SKETCH = "thetaSketchCol";
+  private DefaultIntegrationTestDataSet _testDataSet;
 
   @BeforeClass
   public void setup()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    setUpTestDirectories(this.getClass().getSimpleName());
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir(), getSegmentDir(), getTarDir());
+
+    _testDataSet = new ThetaSketchIntegrationTestDataSet(this);
 
     // Start the Pinot cluster
     startZk();
@@ -69,42 +73,17 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
     startServer();
 
     // create & upload schema AND table config
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
-        .addSingleValueDimension(DIM_NAME, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(DIM_VALUE, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(SHARD_ID, FieldSpec.DataType.INT)
-        .addSingleValueDimension(THETA_SKETCH, FieldSpec.DataType.BYTES).build();
+    Schema schema = _testDataSet.createSchema();
     addSchema(schema);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(DEFAULT_TABLE_NAME).build();
+    TableConfig tableConfig = _testDataSet.createOfflineTableConfig();
     addTableConfig(tableConfig);
 
     // create & upload segments
     File avroFile = createAvroFile();
-    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(DEFAULT_TABLE_NAME, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, 0, getSegmentDir(), getTarDir());
+    uploadSegments(DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME, getTarDir());
 
-    waitForAllDocsLoaded(60_000);
-  }
-
-  @Override
-  protected long getCountStarResult() {
-    /*
-    Uploaded table content:
-
-    row#  dimName  dimValue  shardId  thetaSketchCol
-    ----  =======  ========  =======  ==============
-    1     Course   Math      1        ...
-    2     Course   History   1        ...
-    3     Course   Biology   1        ...
-    4     Gender   Female    1        ...
-    5     Gender   Male      1        ...
-    6     Course   Math      2        ...
-    7     Course   History   2        ...
-    8     Course   Biology   2        ...
-    9     Gender   Female    2        ...
-    10    Gender   Male      2        ...
-     */
-    return 10;
+    _testDataSet.waitForAllDocsLoaded(60_000);
   }
 
   @Test
@@ -125,51 +104,54 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
 
     // gender = female
     {
-      String query = "select distinctCountThetaSketch(thetaSketchCol) from " + DEFAULT_TABLE_NAME
-          + " where dimName = 'gender' and dimValue = 'Female'";
+      String query = "select distinctCountThetaSketch(thetaSketchCol) from "
+          + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME + " where dimName = 'gender' and dimValue = 'Female'";
       int expected = 50 + 60 + 70 + 110 + 120 + 130;
       runAndAssert(query, expected);
 
       query = "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender'' and dimValue = ''Female''', "
-          + "'$1') from " + DEFAULT_TABLE_NAME;
+          + "'$1') from " + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
 
       query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-          + "'dimName = ''gender''', 'dimValue = ''Female''', 'SET_INTERSECT($1, $2)') from " + DEFAULT_TABLE_NAME;
+          + "'dimName = ''gender''', 'dimValue = ''Female''', 'SET_INTERSECT($1, $2)') from "
+          + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
     }
 
     // gender = male
     {
-      String query = "select distinctCountThetaSketch(thetaSketchCol) from " + DEFAULT_TABLE_NAME
-          + " where dimName = 'gender' and dimValue = 'Male'";
+      String query = "select distinctCountThetaSketch(thetaSketchCol) from "
+          + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME + " where dimName = 'gender' and dimValue = 'Male'";
       int expected = 80 + 90 + 100 + 140 + 150 + 160;
       runAndAssert(query, expected);
 
       query =
           "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender'' and dimValue = ''Male''', '$1') "
-              + "from " + DEFAULT_TABLE_NAME;
+              + "from " + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
 
       query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-          + "'dimName = ''gender''', 'dimValue = ''Male''', 'SET_INTERSECT($1, $2)') from " + DEFAULT_TABLE_NAME;
+          + "'dimName = ''gender''', 'dimValue = ''Male''', 'SET_INTERSECT($1, $2)') from "
+          + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
     }
 
     // course = math
     {
-      String query = "select distinctCountThetaSketch(thetaSketchCol) from " + DEFAULT_TABLE_NAME
-          + " where dimName = 'course' AND dimValue = 'Math'";
+      String query = "select distinctCountThetaSketch(thetaSketchCol) from "
+          + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME + " where dimName = 'course' AND dimValue = 'Math'";
       int expected = 50 + 80 + 110 + 140;
       runAndAssert(query, expected);
 
       query =
           "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''course'' and dimValue = ''Math''', '$1') "
-              + "from " + DEFAULT_TABLE_NAME;
+              + "from " + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
 
       query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-          + "'dimName = ''course''', 'dimValue = ''Math''', 'SET_INTERSECT($1, $2)') from " + DEFAULT_TABLE_NAME;
+          + "'dimName = ''course''', 'dimValue = ''Math''', 'SET_INTERSECT($1, $2)') from "
+          + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
     }
 
@@ -177,18 +159,19 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
     {
       String query = "select distinctCountThetaSketch(thetaSketchCol, '', "
           + "'dimName = ''gender'' and dimValue = ''Female''', 'dimName = ''course'' and dimValue = ''Math''', "
-          + "'SET_INTERSECT($1, $2)') from " + DEFAULT_TABLE_NAME;
+          + "'SET_INTERSECT($1, $2)') from " + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME;
       int expected = 50 + 110;
       runAndAssert(query, expected);
 
       query = "select distinctCountThetaSketch(thetaSketchCol, '', "
           + "'dimName = ''gender''', 'dimValue = ''Female''', 'dimName = ''course''', 'dimValue = ''Math''', "
-          + "'SET_INTERSECT($1, $2, $3, $4)') from " + DEFAULT_TABLE_NAME;
+          + "'SET_INTERSECT($1, $2, $3, $4)') from " + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
 
       query = "select distinctCountThetaSketch(thetaSketchCol, '', "
           + "'dimName = ''gender''', 'dimValue = ''Female''', 'dimName = ''course''', 'dimValue = ''Math''', "
-          + "'SET_INTERSECT(SET_INTERSECT($1, $2), SET_INTERSECT($3, $4))') from " + DEFAULT_TABLE_NAME;
+          + "'SET_INTERSECT(SET_INTERSECT($1, $2), SET_INTERSECT($3, $4))') from "
+          + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
     }
 
@@ -196,20 +179,21 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
     {
       String query = "select distinctCountThetaSketch(thetaSketchCol, '', "
           + "'dimName = ''gender'' and dimValue = ''Male''', 'dimName = ''course'' and dimValue = ''Biology''', "
-          + "'SET_UNION($1, $2)') from " + DEFAULT_TABLE_NAME;
+          + "'SET_UNION($1, $2)') from " + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME;
       int expected = 70 + 80 + 90 + 100 + 130 + 140 + 150 + 160;
       runAndAssert(query, expected);
 
       query = "select distinctCountThetaSketch(thetaSketchCol, '', "
           + "'dimName = ''gender''', 'dimValue = ''Male''', 'dimName = ''course''', 'dimValue = ''Biology''', "
-          + "'SET_UNION(SET_INTERSECT($1, $2), SET_INTERSECT($3, $4))') from " + DEFAULT_TABLE_NAME;
+          + "'SET_UNION(SET_INTERSECT($1, $2), SET_INTERSECT($3, $4))') from "
+          + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
     }
 
     // group by gender
     {
-      String query = "select dimValue, distinctCountThetaSketch(thetaSketchCol) from " + DEFAULT_TABLE_NAME
-          + " where dimName = 'gender' group by dimValue";
+      String query = "select dimValue, distinctCountThetaSketch(thetaSketchCol) from "
+          + DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME + " where dimName = 'gender' group by dimValue";
       ImmutableMap<String, Integer> expected =
           ImmutableMap.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
       runAndAssert(query, expected);
@@ -246,7 +230,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
         new Field(THETA_SKETCH, org.apache.avro.Schema.create(Type.BYTES), null, null)));
 
     // create avro file
-    File avroFile = new File(_tempDir, "data.avro");
+    File avroFile = new File(getTempDir(), "data.avro");
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       fileWriter.create(avroSchema, avroFile);
 
@@ -321,13 +305,55 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
   @AfterClass
   public void tearDown()
       throws IOException {
-    dropOfflineTable(DEFAULT_TABLE_NAME);
+    dropOfflineTable(DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME);
 
     stopServer();
     stopBroker();
     stopController();
     stopZk();
 
-    FileUtils.deleteDirectory(_tempDir);
+    FileUtils.deleteDirectory(getTempDir());
+  }
+
+  private static class ThetaSketchIntegrationTestDataSet extends DefaultIntegrationTestDataSet {
+    public ThetaSketchIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest);
+    }
+
+    @Override
+    public Schema createSchema() {
+      return new Schema.SchemaBuilder().setSchemaName(DefaultIntegrationTestDataSet.DEFAULT_SCHEMA_NAME)
+          .addSingleValueDimension(DIM_NAME, FieldSpec.DataType.STRING)
+          .addSingleValueDimension(DIM_VALUE, FieldSpec.DataType.STRING)
+          .addSingleValueDimension(SHARD_ID, FieldSpec.DataType.INT)
+          .addSingleValueDimension(THETA_SKETCH, FieldSpec.DataType.BYTES).build();
+    }
+
+    @Override
+    public TableConfig createOfflineTableConfig() {
+      return new TableConfigBuilder(TableType.OFFLINE)
+          .setTableName(DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME).build();
+    }
+
+    @Override
+    public long getCountStarResult() {
+    /*
+    Uploaded table content:
+
+    row#  dimName  dimValue  shardId  thetaSketchCol
+    ----  =======  ========  =======  ==============
+    1     Course   Math      1        ...
+    2     Course   History   1        ...
+    3     Course   Biology   1        ...
+    4     Gender   Female    1        ...
+    5     Gender   Male      1        ...
+    6     Course   Math      2        ...
+    7     Course   History   2        ...
+    8     Course   Biology   2        ...
+    9     Gender   Female    2        ...
+    10    Gender   Male      2        ...
+     */
+      return 10;
+    }
   }
 }

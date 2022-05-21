@@ -39,10 +39,11 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrationTestSet {
+public class UpsertTableSegmentUploadIntegrationTest extends ClusterTest {
   private static final int NUM_SERVERS = 2;
   private static final String PRIMARY_KEY_COL = "clientId";
-  private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(DEFAULT_TABLE_NAME);
+  private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(
+      DefaultIntegrationTestDataSet.DEFAULT_TABLE_NAME);
 
   // Segment 1 contains records of pk value 100000 (partition 0)
   private static final String UPLOADED_SEGMENT_1 = "mytable_10027_19736_0 %";
@@ -51,10 +52,19 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
   // Segment 3 contains records of pk value 100002 (partition 1)
   private static final String UPLOADED_SEGMENT_3 = "mytable_10158_19938_2 %";
 
+  private UpsertTableSegmentUploadIntegrationTestDataSet _testDataSet;
+
+  @Override
+  public boolean useLlc() {
+    return true;
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    setUpTestDirectories(this.getClass().getSimpleName());
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir(), getSegmentDir(), getTarDir());
+    _testDataSet = new UpsertTableSegmentUploadIntegrationTestDataSet(this);
 
     // Start the Pinot cluster
     startZk();
@@ -64,90 +74,37 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     startServers(NUM_SERVERS);
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = _testDataSet.unpackAvroData(getTempDir());
 
     // Start Kafka and push data into Kafka
     startKafka();
-    pushAvroIntoKafka(avroFiles);
+    _testDataSet.pushAvroIntoKafka(avroFiles);
 
     // Create and upload schema and table config
-    Schema schema = createSchema();
+    Schema schema = _testDataSet.createSchema();
     addSchema(schema);
-    TableConfig tableConfig = createUpsertTableConfig(avroFiles.get(0), PRIMARY_KEY_COL, getNumKafkaPartitions());
+    TableConfig tableConfig = _testDataSet.createUpsertTableConfig(
+        avroFiles.get(0), PRIMARY_KEY_COL, getNumKafkaPartitions());
     addTableConfig(tableConfig);
 
     // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(getTableName(), TableType.REALTIME, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, getSegmentDir(), getTarDir());
+    uploadSegments(_testDataSet.getTableName(), TableType.REALTIME, getTarDir());
 
     // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
+    _testDataSet.waitForAllDocsLoaded(600_000L);
   }
 
   @AfterClass
   public void tearDown()
       throws IOException {
-    dropRealtimeTable(getTableName());
+    dropRealtimeTable(_testDataSet.getTableName());
     stopServer();
     stopBroker();
     stopController();
     stopKafka();
     stopZk();
-    FileUtils.deleteDirectory(_tempDir);
-  }
-
-  @Override
-  protected String getSchemaFileName() {
-    return "upsert_table_test.schema";
-  }
-
-  @Override
-  protected String getSchemaName() {
-    return "upsertSchema";
-  }
-
-  @Override
-  protected String getAvroTarFileName() {
-    return "upsert_test.tar.gz";
-  }
-
-  @Override
-  protected boolean useLlc() {
-    return true;
-  }
-
-  @Override
-  protected String getPartitionColumn() {
-    return PRIMARY_KEY_COL;
-  }
-
-  @Override
-  protected long getCountStarResult() {
-    // Three distinct records are expected with pk values of 100000, 100001, 100002
-    return 3;
-  }
-
-  @Override
-  protected void waitForAllDocsLoaded(long timeoutMs)
-      throws Exception {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return getCurrentCountStarResultWithoutUpsert() == getCountStarResultWithoutUpsert();
-      } catch (Exception e) {
-        return null;
-      }
-    }, 100L, timeoutMs, "Failed to load all documents");
-    assertEquals(getCurrentCountStarResult(), getCountStarResult());
-  }
-
-  private long getCurrentCountStarResultWithoutUpsert() {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName() + " OPTION(skipUpsert=true)")
-        .getResultSet(0).getLong(0);
-  }
-
-  private long getCountStarResultWithoutUpsert() {
-    // 3 Avro files, each with 100 documents, one copy from streaming source, one copy from batch source
-    return 600;
+    FileUtils.deleteDirectory(getTempDir());
   }
 
   @Test
@@ -158,13 +115,13 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     // Run the real-time segment validation and check again
     _controllerStarter.getRealtimeSegmentValidationManager().run();
     verifyIdealState();
-    assertEquals(getCurrentCountStarResult(), getCountStarResult());
-    assertEquals(getCurrentCountStarResultWithoutUpsert(), getCountStarResultWithoutUpsert());
+    assertEquals(_testDataSet.getCurrentCountStarResult(), _testDataSet.getCountStarResult());
+    assertEquals(_testDataSet.getCurrentCountStarResultWithoutUpsert(), _testDataSet.getCountStarResultWithoutUpsert());
 
     // Restart the servers and check again
     restartServers();
     verifyIdealState();
-    waitForAllDocsLoaded(600_000L);
+    _testDataSet.waitForAllDocsLoaded(600_000L);
   }
 
   private void verifyIdealState() {
@@ -217,6 +174,62 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
         return 1;
       default:
         return new LLCSegmentName(segmentName).getPartitionGroupId();
+    }
+  }
+
+  private static class UpsertTableSegmentUploadIntegrationTestDataSet extends DefaultIntegrationTestDataSet {
+
+    public UpsertTableSegmentUploadIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest);
+    }
+
+    @Override
+    public String getSchemaFileName() {
+      return "upsert_table_test.schema";
+    }
+
+    @Override
+    public String getSchemaName() {
+      return "upsertSchema";
+    }
+
+    @Override
+    public String getAvroTarFileName() {
+      return "upsert_test.tar.gz";
+    }
+
+    @Override
+    public String getPartitionColumn() {
+      return PRIMARY_KEY_COL;
+    }
+
+    @Override
+    public long getCountStarResult() {
+      // Three distinct records are expected with pk values of 100000, 100001, 100002
+      return 3;
+    }
+
+    @Override
+    public void waitForAllDocsLoaded(long timeoutMs)
+        throws Exception {
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          return getCurrentCountStarResultWithoutUpsert() == getCountStarResultWithoutUpsert();
+        } catch (Exception e) {
+          return null;
+        }
+      }, 100L, timeoutMs, "Failed to load all documents");
+      assertEquals(getCurrentCountStarResult(), getCountStarResult());
+    }
+
+    private long getCurrentCountStarResultWithoutUpsert() {
+      return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName() + " OPTION(skipUpsert=true)")
+          .getResultSet(0).getLong(0);
+    }
+
+    private long getCountStarResultWithoutUpsert() {
+      // 3 Avro files, each with 100 documents, one copy from streaming source, one copy from batch source
+      return 600;
     }
   }
 }

@@ -21,7 +21,7 @@ package org.apache.pinot.perf;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
+import org.apache.pinot.integration.tests.ClusterIntegrationTestDataSet;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
@@ -31,7 +31,7 @@ import org.apache.pinot.util.TestUtils;
  * Benchmark that writes a configurable amount of rows in Kafka and checks how much time it takes to consume all of
  * them.
  */
-public class BenchmarkRealtimeConsumptionSpeed extends BaseClusterIntegrationTest {
+public class BenchmarkRealtimeConsumptionSpeed extends ClusterIntegrationTestDataSet {
   private static final int ROW_COUNT = 100_000;
   private static final long TIMEOUT_MILLIS = 20 * 60 * 1000L; // Twenty minutes
 

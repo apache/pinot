@@ -28,6 +28,7 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
+import org.testng.annotations.BeforeClass;
 
 
 /**
@@ -35,9 +36,11 @@ import org.apache.pinot.tools.utils.KafkaStarterUtils;
  */
 public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
 
-  @Override
-  protected String getStreamConsumerFactoryClassName() {
-    return FlakyStreamFactory.class.getName();
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    super.setTestDataSet(new FlakyConsumerRealtimeClusterIntegrationTestDataSet(this));
+    super.setUp();
   }
 
   public static class FlakyStreamLevelConsumer implements StreamLevelConsumer {
@@ -116,6 +119,19 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     @Override
     public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
       throw new UnsupportedOperationException();
+    }
+  }
+
+  private static class FlakyConsumerRealtimeClusterIntegrationTestDataSet
+      extends RealtimeClusterIntegrationTestDataSet {
+
+    public FlakyConsumerRealtimeClusterIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest, null);
+    }
+
+    @Override
+    public String getStreamConsumerFactoryClassName() {
+      return FlakyStreamFactory.class.getName();
     }
   }
 }

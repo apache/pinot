@@ -43,13 +43,13 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
+public class SegmentGenerationMinionClusterIntegrationTest extends ClusterTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerationMinionClusterIntegrationTest.class);
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir());
 
     startZk();
     startController();
@@ -67,7 +67,7 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
       stopController();
       stopZk();
     } finally {
-      FileUtils.deleteQuietly(_tempDir);
+      FileUtils.deleteQuietly(getTempDir());
     }
   }
 
@@ -78,7 +78,7 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
     String tableNameWithType = tableName + "_OFFLINE";
     addSchemaAndTableConfig(tableName);
 
-    File inputDir = new File(_tempDir, tableName);
+    File inputDir = new File(getTempDir(), tableName);
     int rowCnt = prepInputFiles(inputDir, 7, 10);
     assertEquals(rowCnt, 70);
 
@@ -124,7 +124,7 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
       throws Exception {
     addSchemaAndTableConfig(tableName);
 
-    File inputDir = new File(_tempDir, tableName);
+    File inputDir = new File(getTempDir(), tableName);
     int rowCnt = prepInputFiles(inputDir, 7, 10);
     assertEquals(rowCnt, 70);
 

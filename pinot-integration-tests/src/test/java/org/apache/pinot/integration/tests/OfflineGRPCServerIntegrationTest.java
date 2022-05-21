@@ -43,17 +43,20 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest {
+public class OfflineGRPCServerIntegrationTest extends ClusterTest {
+  private ClusterIntegrationTestDataAndQuerySet _testDataSet;
 
   @Override
-  protected void overrideServerConf(PinotConfiguration serverConf) {
+  public void overrideServerConf(PinotConfiguration serverConf) {
     serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_GRPC_SERVER, true);
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    setUpTestDirectories(this.getClass().getSimpleName());
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir(), getSegmentDir(), getTarDir());
+    _testDataSet = new DefaultIntegrationTestDataSet(this);
 
     // Start the Pinot cluster
     startZk();
@@ -62,26 +65,26 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     startServer();
 
     // Create and upload the schema and table config
-    Schema schema = createSchema();
+    Schema schema = _testDataSet.createSchema();
     addSchema(schema);
-    TableConfig tableConfig = createOfflineTableConfig();
+    TableConfig tableConfig = _testDataSet.createOfflineTableConfig();
     addTableConfig(tableConfig);
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = _testDataSet.unpackAvroData(getTempDir());
 
     // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(getTableName(), _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, getSegmentDir(), getTarDir());
+    uploadSegments(_testDataSet.getTableName(), getTarDir());
 
     // Set up the H2 connection
-    setUpH2Connection(avroFiles);
+    _testDataSet.setUpH2Connection(avroFiles);
 
     // Initialize the query generator
-    setUpQueryGenerator(avroFiles);
+    _testDataSet.setUpQueryGenerator(avroFiles);
 
     // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
+    _testDataSet.waitForAllDocsLoaded(600_000L);
   }
 
   public GrpcQueryClient getGrpcQueryClient() {
@@ -188,7 +191,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
 
   private void testNonStreamingRequest(Iterator<Server.ServerResponse> nonStreamingResponses)
       throws Exception {
-    int expectedNumDocs = (int) getCountStarResult();
+    int expectedNumDocs = (int) _testDataSet.getCountStarResult();
     DataTable dataTable = collectNonStreamingRequestResult(nonStreamingResponses);
     assertEquals(dataTable.getNumberOfRows(), expectedNumDocs);
     Map<String, String> metadata = dataTable.getMetadata();
@@ -197,7 +200,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
 
   private void testStreamingRequest(Iterator<Server.ServerResponse> streamingResponses)
       throws Exception {
-    int expectedNumDocs = (int) getCountStarResult();
+    int expectedNumDocs = (int) _testDataSet.getCountStarResult();
     int numTotalDocs = 0;
     while (streamingResponses.hasNext()) {
       Server.ServerResponse streamingResponse = streamingResponses.next();

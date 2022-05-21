@@ -62,30 +62,25 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
   private String _offlineTableName;
 
   @Override
-  protected TableTaskConfig getTaskConfig() {
-    return new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, new HashMap<>()));
-  }
-
-  @Override
-  protected boolean useLlc() {
+  public boolean useLlc() {
     return true;
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
+    setTestDataSet(new RealtimeToOfflineSegmentsMinionClusterIntegrationTestDataSet(this));
     // Setup realtime table, and blank offline table
     super.setUp();
-    addTableConfig(createOfflineTableConfig());
+    addTableConfig(_testDataSet.createOfflineTableConfig());
     startMinion();
 
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
     _pinotHelixResourceManager = _controllerStarter.getHelixResourceManager();
 
-    _realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-    _offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    _realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(_testDataSet.getTableName());
+    _offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(_testDataSet.getTableName());
 
     List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(_realtimeTableName);
     long minSegmentTimeMs = Long.MAX_VALUE;
@@ -106,7 +101,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
     // The number of offline segments would be equal to the product of number of partitions for all the
     // partition columns if segment partitioning is configured.
     SegmentPartitionConfig segmentPartitionConfig =
-        getOfflineTableConfig().getIndexingConfig().getSegmentPartitionConfig();
+        _testDataSet.getOfflineTableConfig().getIndexingConfig().getSegmentPartitionConfig();
     int numOfflineSegmentsPerTask =
         segmentPartitionConfig != null ? segmentPartitionConfig.getColumnPartitionMap().values().stream()
             .map(ColumnPartitionConfig::getNumPartitions).reduce((a, b) -> a * b)
@@ -149,17 +144,6 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
 
     // Check if the metadata is cleaned up on table deletion
     verifyTableDelete(_realtimeTableName);
-  }
-
-  @Nullable
-  @Override
-  protected SegmentPartitionConfig getSegmentPartitionConfig() {
-    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
-    ColumnPartitionConfig columnOneConfig = new ColumnPartitionConfig("murmur", 3);
-    columnPartitionConfigMap.put("AirlineID", columnOneConfig);
-    ColumnPartitionConfig columnTwoConfig = new ColumnPartitionConfig("hashcode", 2);
-    columnPartitionConfigMap.put("OriginAirportID", columnTwoConfig);
-    return new SegmentPartitionConfig(columnPartitionConfigMap);
   }
 
   protected void verifyTableDelete(String tableNameWithType) {
@@ -233,6 +217,30 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends Realt
     stopController();
     stopKafka();
     stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    FileUtils.deleteDirectory(getTempDir());
+  }
+
+  private static class RealtimeToOfflineSegmentsMinionClusterIntegrationTestDataSet
+      extends RealtimeClusterIntegrationTestDataSet {
+    public RealtimeToOfflineSegmentsMinionClusterIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest, null);
+    }
+
+    @Override
+    public TableTaskConfig getTaskConfig() {
+      return new TableTaskConfig(
+          Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, new HashMap<>()));
+    }
+
+    @Nullable
+    @Override
+    public SegmentPartitionConfig getSegmentPartitionConfig() {
+      Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
+      ColumnPartitionConfig columnOneConfig = new ColumnPartitionConfig("murmur", 3);
+      columnPartitionConfigMap.put("AirlineID", columnOneConfig);
+      ColumnPartitionConfig columnTwoConfig = new ColumnPartitionConfig("hashcode", 2);
+      columnPartitionConfigMap.put("OriginAirportID", columnTwoConfig);
+      return new SegmentPartitionConfig(columnPartitionConfigMap);
+    }
   }
 }

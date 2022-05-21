@@ -54,7 +54,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Integration test that enables segment partition for the LLC real-time table.
  */
-public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
+public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends ClusterTest {
   private static final String PARTITION_COLUMN = "DestState";
   // Number of documents in the first and second Avro file
   private static final long NUM_DOCS_IN_FIRST_AVRO_FILE = 9292;
@@ -62,13 +62,13 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
   private static final long NUM_DOCS_IN_THIRD_AVRO_FILE = 9378;
 
   private List<File> _avroFiles;
-  private String _partitionColumn;
-  private long _countStarResult;
+  private SegmentPartitionLLCRealtimeClusterIntegrationTestDataSet _testDataSet;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir());
+    _testDataSet = new SegmentPartitionLLCRealtimeClusterIntegrationTestDataSet(this);
 
     // Start the Pinot cluster
     startZk();
@@ -80,15 +80,15 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
     startKafka();
 
     // Unpack the Avro files
-    _avroFiles = unpackAvroData(_tempDir);
+    _avroFiles = _testDataSet.unpackAvroData(getTempDir());
 
     // Create and upload the schema and table config with reduced number of columns and partition config
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(getSchemaName())
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(_testDataSet.getSchemaName())
         .addSingleValueDimension(PARTITION_COLUMN, DataType.STRING)
         .addDateTime("DaysSinceEpoch", DataType.INT, "1:DAYS:EPOCH", "1:DAYS").build();
     addSchema(schema);
 
-    TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
+    TableConfig tableConfig = _testDataSet.createRealtimeTableConfig(_avroFiles.get(0));
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     indexingConfig.setSegmentPartitionConfig(new SegmentPartitionConfig(
         Collections.singletonMap(PARTITION_COLUMN, new ColumnPartitionConfig("murmur", 2))));
@@ -97,64 +97,23 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
     addTableConfig(tableConfig);
 
     // Push data into Kafka (only ingest the first Avro file)
-    _partitionColumn = PARTITION_COLUMN;
-    pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(0)));
+    _testDataSet._partitionColumn = PARTITION_COLUMN;
+    _testDataSet.pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(0)));
 
     // Wait for all documents loaded
-    _countStarResult = NUM_DOCS_IN_FIRST_AVRO_FILE;
-    waitForAllDocsLoaded(600_000L);
+    _testDataSet._countStarResult = NUM_DOCS_IN_FIRST_AVRO_FILE;
+    _testDataSet.waitForAllDocsLoaded(600_000L);
   }
 
   @Override
-  protected long getCountStarResult() {
-    return _countStarResult;
-  }
-
-  @Override
-  protected boolean useLlc() {
+  public boolean useLlc() {
     return true;
-  }
-
-  @Nullable
-  @Override
-  protected String getPartitionColumn() {
-    return _partitionColumn;
-  }
-
-  @Nullable
-  @Override
-  protected String getSortedColumn() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  protected List<String> getInvertedIndexColumns() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  protected List<String> getNoDictionaryColumns() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  protected List<String> getRangeIndexColumns() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  protected List<String> getBloomFilterColumns() {
-    return null;
   }
 
   @Test
   public void testPartitionMetadata() {
     int[] numSegmentsForPartition = new int[2];
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(_testDataSet.getTableName());
     List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(realtimeTableName);
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       SegmentPartitionMetadata segmentPartitionMetadata = segmentZKMetadata.getPartitionMetadata();
@@ -216,16 +175,16 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
   public void testNonPartitionedStream()
       throws Exception {
     // Push the second Avro file into Kafka without partitioning
-    _partitionColumn = null;
-    pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(1)));
+    _testDataSet._partitionColumn = null;
+    _testDataSet.pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(1)));
 
     // Wait for all documents loaded
-    _countStarResult += NUM_DOCS_IN_SECOND_AVRO_FILE;
-    waitForAllDocsLoaded(600_000L);
+    _testDataSet._countStarResult += NUM_DOCS_IN_SECOND_AVRO_FILE;
+    _testDataSet.waitForAllDocsLoaded(600_000L);
 
     // Check partition metadata
     int[] numSegmentsForPartition = new int[2];
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(_testDataSet.getTableName());
     List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(realtimeTableName);
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       SegmentPartitionMetadata segmentPartitionMetadata = segmentZKMetadata.getPartitionMetadata();
@@ -294,12 +253,12 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
     }
 
     // Push the third Avro file into Kafka with partitioning
-    _partitionColumn = PARTITION_COLUMN;
-    pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(2)));
+    _testDataSet._partitionColumn = PARTITION_COLUMN;
+    _testDataSet.pushAvroIntoKafka(Collections.singletonList(_avroFiles.get(2)));
 
     // Wait for all documents loaded
-    _countStarResult += NUM_DOCS_IN_THIRD_AVRO_FILE;
-    waitForAllDocsLoaded(600_000L);
+    _testDataSet._countStarResult += NUM_DOCS_IN_THIRD_AVRO_FILE;
+    _testDataSet.waitForAllDocsLoaded(600_000L);
 
     // Check partition metadata
     numSegmentsForPartition = new int[2];
@@ -380,12 +339,63 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
   @AfterClass
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(getTableName());
+    dropRealtimeTable(_testDataSet.getTableName());
     stopServer();
     stopBroker();
     stopController();
     stopKafka();
     stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    FileUtils.deleteDirectory(getTempDir());
+  }
+
+  private static class SegmentPartitionLLCRealtimeClusterIntegrationTestDataSet extends DefaultIntegrationTestDataSet {
+    private String _partitionColumn;
+    private long _countStarResult;
+
+    public SegmentPartitionLLCRealtimeClusterIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest);
+    }
+
+
+    @Override
+    public long getCountStarResult() {
+      return _countStarResult;
+    }
+
+    @Nullable
+    @Override
+    public String getPartitionColumn() {
+      return _partitionColumn;
+    }
+
+    @Nullable
+    @Override
+    public String getSortedColumn() {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public List<String> getInvertedIndexColumns() {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public List<String> getNoDictionaryColumns() {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public List<String> getRangeIndexColumns() {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public List<String> getBloomFilterColumns() {
+      return null;
+    }
   }
 }

@@ -55,18 +55,22 @@ import org.testng.annotations.Test;
 /**
  * Tests creating segments via the {@link SegmentWriter} implementations
  */
-public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegrationTest {
+public class SegmentWriterUploaderIntegrationTest extends ClusterTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentWriterUploaderIntegrationTest.class);
 
   private Schema _schema;
   private String _tableNameWithType;
   private List<File> _avroFiles;
+  private DefaultIntegrationTestDataSet _testDataSet;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    setUpTestDirectories(this.getClass().getSimpleName());
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir(), getSegmentDir(), getTarDir());
+
+    _testDataSet = new SegmentWriterUploaderIntegrationTestDataSet(this);
 
     // Start the Pinot cluster
     startZk();
@@ -75,22 +79,12 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
     startServer();
 
     // Create and upload the schema
-    _schema = createSchema();
+    _schema = _testDataSet.createSchema();
     addSchema(_schema);
-    _tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(getTableName());
+    _tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(_testDataSet.getTableName());
 
     // Get avro files
-    _avroFiles = getAllAvroFiles();
-  }
-
-  @Nullable
-  protected IngestionConfig getIngestionConfig() {
-    Map<String, String> batchConfigMap = new HashMap<>();
-    batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, _tarDir.getAbsolutePath());
-    batchConfigMap.put(BatchConfigProperties.OVERWRITE_OUTPUT, "false");
-    batchConfigMap.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _controllerBaseApiUrl);
-    return new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap), "APPEND", "HOURLY"), null,
-        null, null, null, null);
+    _avroFiles = _testDataSet.getAndUnpackAllAvroFiles();
   }
 
   /**
@@ -102,7 +96,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
   public void testFileBasedSegmentWriterAndDefaultUploader()
       throws Exception {
 
-    TableConfig offlineTableConfig = createOfflineTableConfig();
+    TableConfig offlineTableConfig = _testDataSet.createOfflineTableConfig();
     addTableConfig(offlineTableConfig);
 
     SegmentWriter segmentWriter = new FileBasedSegmentWriter();
@@ -141,7 +135,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
     checkNumSegments(0);
 
     // upload all together using dir
-    segmentUploader.uploadSegmentsFromDir(_tarDir.toURI(), null);
+    segmentUploader.uploadSegmentsFromDir(getTarDir().toURI(), null);
     // check num segments
     Assert.assertEquals(getNumSegments(), 3);
     // check totalDocs in query
@@ -216,6 +210,24 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
     stopController();
     stopZk();
 
-    FileUtils.deleteDirectory(_tempDir);
+    FileUtils.deleteDirectory(getTempDir());
+  }
+
+  private class SegmentWriterUploaderIntegrationTestDataSet extends DefaultIntegrationTestDataSet {
+
+    public SegmentWriterUploaderIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest);
+    }
+
+    @Override
+    @Nullable
+    public IngestionConfig getIngestionConfig() {
+      Map<String, String> batchConfigMap = new HashMap<>();
+      batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, getTarDir().getAbsolutePath());
+      batchConfigMap.put(BatchConfigProperties.OVERWRITE_OUTPUT, "false");
+      batchConfigMap.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _controllerBaseApiUrl);
+      return new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(batchConfigMap), "APPEND", "HOURLY"), null,
+          null, null, null, null);
+    }
   }
 }

@@ -54,27 +54,29 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest {
+public class SegmentCompletionIntegrationTest extends ClusterTest {
   private static final int NUM_KAFKA_PARTITIONS = 1;
 
   private String _serverInstance;
   private HelixManager _serverHelixManager;
   private String _currentSegment;
+  private DefaultIntegrationTestDataSet _testDataSet;
 
   @Override
-  protected boolean useLlc() {
+  public boolean useLlc() {
     return true;
   }
 
   @Override
-  protected int getNumKafkaPartitions() {
+  public int getNumKafkaPartitions() {
     return NUM_KAFKA_PARTITIONS;
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir());
+    _testDataSet = new DefaultIntegrationTestDataSet(this);
 
     // Start the Pinot cluster
     startZk();
@@ -86,8 +88,8 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
     startKafka();
 
     // Create and upload the schema and table config
-    addSchema(createSchema());
-    addTableConfig(createRealtimeTableConfig(null));
+    addSchema(_testDataSet.createSchema());
+    addTableConfig(_testDataSet.createRealtimeTableConfig(null));
   }
 
   /**
@@ -124,7 +126,7 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
   @Test
   public void testStopConsumingAndAutoFix()
       throws Exception {
-    final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(_testDataSet.getTableName());
 
     // Check if segment get into CONSUMING state
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
@@ -199,13 +201,13 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
   @AfterClass
   public void tearDown()
       throws IOException {
-    dropRealtimeTable(getTableName());
+    dropRealtimeTable(_testDataSet.getTableName());
     stopFakeServer();
     stopBroker();
     stopController();
     stopKafka();
     stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    FileUtils.deleteDirectory(getTempDir());
   }
 
   private void stopFakeServer() {

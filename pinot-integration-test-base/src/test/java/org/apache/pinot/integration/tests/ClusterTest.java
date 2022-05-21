@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
@@ -31,17 +32,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.io.DecoderFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpStatus;
@@ -52,21 +47,17 @@ import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.minion.BaseMinionStarter;
 import org.apache.pinot.minion.MinionStarter;
-import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
-import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractorConfig;
-import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -74,8 +65,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Minion;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
@@ -84,27 +74,154 @@ import static org.testng.Assert.assertTrue;
 
 /**
  * Base class for integration tests that involve a complete Pinot cluster.
+ *
+ * Similar to {@link ControllerTest}, one should entirely encapsulate the {@code ClusterTest} object as a
+ * singleton within a test group/suite; or instantiate one instance per test class that requires setup.
  */
 public abstract class ClusterTest extends ControllerTest {
   protected static final int DEFAULT_BROKER_PORT = 18099;
   protected static final Random RANDOM = new Random(System.currentTimeMillis());
+  protected static final int DEFAULT_LLC_SEGMENT_FLUSH_SIZE = 5000;
+  protected static final int DEFAULT_HLC_SEGMENT_FLUSH_SIZE = 20000;
+  protected static final int DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS = 3;
+  protected static final int DEFAULT_LLC_NUM_KAFKA_BROKERS = 2;
+  protected static final int DEFAULT_HLC_NUM_KAFKA_BROKERS = 1;
+  protected static final int DEFAULT_LLC_NUM_KAFKA_PARTITIONS = 2;
+  protected static final int DEFAULT_HLC_NUM_KAFKA_PARTITIONS = 10;
 
   protected String _brokerBaseApiUrl;
 
-  protected List<BaseBrokerStarter> _brokerStarters;
-  protected List<BaseServerStarter> _serverStarters;
-  protected List<Integer> _brokerPorts;
-  protected BaseMinionStarter _minionStarter;
+  private List<BaseBrokerStarter> _brokerStarters;
+  private List<BaseServerStarter> _serverStarters;
+  private List<Integer> _brokerPorts;
+  private BaseMinionStarter _minionStarter;
 
-  protected PinotConfiguration getDefaultBrokerConfiguration() {
+  private File _tempDir;
+  private File _segmentDir;
+  private File _tarDir;
+  private List<StreamDataServerStartable> _kafkaStarters;
+
+  // --------------------------------------------------------------------------
+  // Testing environment setup
+  // --------------------------------------------------------------------------
+  public void setUpTestDirectories(String testName) {
+    Preconditions.checkState(_tempDir == null && _segmentDir == null && _tarDir == null);
+    _tempDir = new File(FileUtils.getTempDirectory(), testName);
+    _segmentDir = new File(_tempDir, "segmentDir");
+    _tarDir = new File(_tempDir, "tarDir");
+  }
+
+  public File getTempDir() {
+    return _tempDir;
+  }
+
+  public void setTempDir(File tempDir) {
+    Preconditions.checkState(_tempDir == null);
+    _tempDir = tempDir;
+  }
+  public File getSegmentDir() {
+    return _segmentDir;
+  }
+
+  public void setSegmentDir(File segmentDir) {
+    Preconditions.checkState(_segmentDir == null);
+    _segmentDir = segmentDir;
+  }
+  public File getTarDir() {
+    return _tarDir;
+  }
+
+  public void setTarDir(File tarDir) {
+    Preconditions.checkState(_tarDir == null);
+    _tarDir = tarDir;
+  }
+
+  // --------------------------------------------------------------------------
+  // Kafka setup
+  // --------------------------------------------------------------------------
+  public boolean useLlc() {
+    return false;
+  }
+
+  public boolean useKafkaTransaction() {
+    return false;
+  }
+
+  public int getRealtimeSegmentFlushSize() {
+    if (useLlc()) {
+      return DEFAULT_LLC_SEGMENT_FLUSH_SIZE;
+    } else {
+      return DEFAULT_HLC_SEGMENT_FLUSH_SIZE;
+    }
+  }
+
+  public int getNumKafkaBrokers() {
+    if (useKafkaTransaction()) {
+      return DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS;
+    }
+    if (useLlc()) {
+      return DEFAULT_LLC_NUM_KAFKA_BROKERS;
+    } else {
+      return DEFAULT_HLC_NUM_KAFKA_BROKERS;
+    }
+  }
+
+  public int getKafkaPort() {
+    int idx = RANDOM.nextInt(_kafkaStarters.size());
+    return _kafkaStarters.get(idx).getPort();
+  }
+
+  public String getKafkaZKAddress() {
+    return getZkUrl() + "/kafka";
+  }
+
+  public int getNumKafkaPartitions() {
+    if (useLlc()) {
+      return DEFAULT_LLC_NUM_KAFKA_PARTITIONS;
+    } else {
+      return DEFAULT_HLC_NUM_KAFKA_PARTITIONS;
+    }
+  }
+
+  public void startKafka() {
+    startKafka(KafkaStarterUtils.DEFAULT_KAFKA_PORT);
+  }
+
+  public void startKafka(int port) {
+    Properties kafkaConfig = KafkaStarterUtils.getDefaultKafkaConfiguration();
+    _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), port, getKafkaZKAddress(), kafkaConfig);
+  }
+
+  public void registerKafkaTopic(String kafkaTopic) {
+    _kafkaStarters.get(0).createTopic(kafkaTopic, KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
+  }
+
+  public void stopKafka() {
+    for (StreamDataServerStartable kafkaStarter : _kafkaStarters) {
+      kafkaStarter.stop();
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Broker setup
+  // --------------------------------------------------------------------------
+  public PinotConfiguration getDefaultBrokerConfiguration() {
     return new PinotConfiguration();
   }
 
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+  public List<BaseBrokerStarter> getBrokerStarters() {
+    return _brokerStarters;
+  }
+
+  public String getBrokerTenant() {
+    return TagNameUtils.DEFAULT_TENANT_NAME;
+  }
+
+  public void overrideBrokerConf(PinotConfiguration brokerConf) {
     // Do nothing, to be overridden by tests if they need something specific
   }
 
-  protected PinotConfiguration getBrokerConf(int brokerId) {
+  public PinotConfiguration getBrokerConf(int brokerId) {
     PinotConfiguration brokerConf = getDefaultBrokerConfiguration();
     brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
@@ -115,12 +232,12 @@ public abstract class ClusterTest extends ControllerTest {
     return brokerConf;
   }
 
-  protected void startBroker()
+  public void startBroker()
       throws Exception {
     startBrokers(1);
   }
 
-  protected void startBrokers(int numBrokers)
+  public void startBrokers(int numBrokers)
       throws Exception {
     _brokerStarters = new ArrayList<>(numBrokers);
     _brokerPorts = new ArrayList<>();
@@ -132,7 +249,7 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerBaseApiUrl = "http://localhost:" + _brokerPorts.get(0);
   }
 
-  protected BaseBrokerStarter startOneBroker(int brokerId)
+  public BaseBrokerStarter startOneBroker(int brokerId)
       throws Exception {
     HelixBrokerStarter brokerStarter = new HelixBrokerStarter();
     brokerStarter.init(getBrokerConf(brokerId));
@@ -140,7 +257,7 @@ public abstract class ClusterTest extends ControllerTest {
     return brokerStarter;
   }
 
-  protected void startBrokerHttps()
+  public void startBrokerHttps()
       throws Exception {
     _brokerStarters = new ArrayList<>();
     _brokerPorts = new ArrayList<>();
@@ -163,19 +280,22 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerBaseApiUrl = "https://localhost:" + DEFAULT_BROKER_PORT;
   }
 
-  protected int getRandomBrokerPort() {
+  public int getRandomBrokerPort() {
     return _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
   }
 
-  protected int getBrokerPort(int index) {
+  public int getBrokerPort(int index) {
     return _brokerPorts.get(index);
   }
 
-  protected List<Integer> getBrokerPorts() {
+  public List<Integer> getBrokerPorts() {
     return ImmutableList.copyOf(_brokerPorts);
   }
 
-  protected PinotConfiguration getDefaultServerConfiguration() {
+  // --------------------------------------------------------------------------
+  // Server setup
+  // --------------------------------------------------------------------------
+  public PinotConfiguration getDefaultServerConfiguration() {
     PinotConfiguration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
 
     configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
@@ -185,11 +305,19 @@ public abstract class ClusterTest extends ControllerTest {
     return configuration;
   }
 
-  protected void overrideServerConf(PinotConfiguration serverConf) {
+  public List<BaseServerStarter> getServerStarters() {
+    return _serverStarters;
+  }
+
+  public String getServerTenant() {
+    return TagNameUtils.DEFAULT_TENANT_NAME;
+  }
+
+  public void overrideServerConf(PinotConfiguration serverConf) {
     // Do nothing, to be overridden by tests if they need something specific
   }
 
-  protected PinotConfiguration getServerConf(int serverId) {
+  public PinotConfiguration getServerConf(int serverId) {
     PinotConfiguration serverConf = getDefaultServerConfiguration();
     serverConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     serverConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
@@ -206,12 +334,12 @@ public abstract class ClusterTest extends ControllerTest {
     return serverConf;
   }
 
-  protected void startServer()
+  public void startServer()
       throws Exception {
     startServers(1);
   }
 
-  protected void startServers(int numServers)
+  public void startServers(int numServers)
       throws Exception {
     FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
     _serverStarters = new ArrayList<>(numServers);
@@ -220,7 +348,7 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected BaseServerStarter startOneServer(int serverId)
+  public BaseServerStarter startOneServer(int serverId)
       throws Exception {
     HelixServerStarter serverStarter = new HelixServerStarter();
     serverStarter.init(getServerConf(serverId));
@@ -228,7 +356,7 @@ public abstract class ClusterTest extends ControllerTest {
     return serverStarter;
   }
 
-  protected void startServerHttps()
+  public void startServerHttps()
       throws Exception {
     FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
     _serverStarters = new ArrayList<>();
@@ -244,13 +372,16 @@ public abstract class ClusterTest extends ControllerTest {
     _serverStarters.add(serverStarter);
   }
 
-  protected PinotConfiguration getDefaultMinionConfiguration() {
+  // --------------------------------------------------------------------------
+  // Minion setup
+  // --------------------------------------------------------------------------
+  public PinotConfiguration getDefaultMinionConfiguration() {
     return new PinotConfiguration();
   }
 
   // NOTE: We don't allow multiple Minion instances in the same JVM because Minion uses singleton class MinionContext
   //       to manage the instance level configs
-  protected void startMinion()
+  public void startMinion()
       throws Exception {
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
     PinotConfiguration minionConf = getDefaultMinionConfiguration();
@@ -261,7 +392,7 @@ public abstract class ClusterTest extends ControllerTest {
     _minionStarter.start();
   }
 
-  protected void stopBroker() {
+  public void stopBroker() {
     assertNotNull(_brokerStarters, "Brokers are not started");
     for (BaseBrokerStarter brokerStarter : _brokerStarters) {
       brokerStarter.stop();
@@ -269,7 +400,7 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerStarters = null;
   }
 
-  protected void stopServer() {
+  public void stopServer() {
     assertNotNull(_serverStarters, "Servers are not started");
     for (BaseServerStarter serverStarter : _serverStarters) {
       serverStarter.stop();
@@ -278,14 +409,14 @@ public abstract class ClusterTest extends ControllerTest {
     _serverStarters = null;
   }
 
-  protected void stopMinion() {
+  public void stopMinion() {
     assertNotNull(_minionStarter, "Minion is not started");
     _minionStarter.stop();
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
     _minionStarter = null;
   }
 
-  protected void restartServers()
+  public void restartServers()
       throws Exception {
     assertNotNull(_serverStarters, "Servers are not started");
     for (BaseServerStarter serverStarter : _serverStarters) {
@@ -298,10 +429,13 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
+  // --------------------------------------------------------------------------
+  // Utilities
+  // --------------------------------------------------------------------------
   /**
    * Upload all segments inside the given directory to the cluster.
    */
-  protected void uploadSegments(String tableName, File tarDir)
+  public void uploadSegments(String tableName, File tarDir)
       throws Exception {
     uploadSegments(tableName, TableType.OFFLINE, tarDir);
   }
@@ -309,7 +443,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Upload all segments inside the given directory to the cluster.
    */
-  protected void uploadSegments(String tableName, TableType tableType, File tarDir)
+  public void uploadSegments(String tableName, TableType tableType, File tarDir)
       throws Exception {
     uploadSegments(tableName, tableType, Collections.singletonList(tarDir));
   }
@@ -317,7 +451,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Upload all segments inside the given directories to the cluster.
    */
-  protected void uploadSegments(String tableName, TableType tableType, List<File> tarDirs)
+  public void uploadSegments(String tableName, TableType tableType, List<File> tarDirs)
       throws Exception {
     List<File> segmentTarFiles = new ArrayList<>();
     for (File tarDir : tarDirs) {
@@ -382,47 +516,11 @@ public abstract class ClusterTest extends ControllerTest {
         segmentTarFile, headers, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS).getStatusCode();
   }
 
-  public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
-    private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSchemaKafkaAvroMessageDecoder.class);
-    public static File _avroFile;
-    private org.apache.avro.Schema _avroSchema;
-    private RecordExtractor _recordExtractor;
-    private DecoderFactory _decoderFactory = new DecoderFactory();
-    private DatumReader<GenericData.Record> _reader;
-
-    @Override
-    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
-        throws Exception {
-      // Load Avro schema
-      try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(_avroFile)) {
-        _avroSchema = reader.getSchema();
-      }
-      AvroRecordExtractorConfig config = new AvroRecordExtractorConfig();
-      config.init(props);
-      _recordExtractor = new AvroRecordExtractor();
-      _recordExtractor.init(fieldsToRead, config);
-      _reader = new GenericDatumReader<>(_avroSchema);
-    }
-
-    @Override
-    public GenericRow decode(byte[] payload, GenericRow destination) {
-      return decode(payload, 0, payload.length, destination);
-    }
-
-    @Override
-    public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-      try {
-        GenericData.Record avroRecord =
-            _reader.read(null, _decoderFactory.binaryDecoder(payload, offset, length, null));
-        return _recordExtractor.extract(avroRecord, destination);
-      } catch (Exception e) {
-        LOGGER.error("Caught exception", e);
-        throw new RuntimeException(e);
-      }
-    }
+  public String getBrokerBaseApiUrl() {
+    return _brokerBaseApiUrl;
   }
 
-  protected JsonNode getDebugInfo(final String uri)
+  public JsonNode getDebugInfo(final String uri)
       throws Exception {
     return JsonUtils.stringToJsonNode(sendGetRequest(_brokerBaseApiUrl + "/" + uri));
   }
@@ -430,7 +528,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query/sql)
    */
-  protected JsonNode postQuery(String query)
+  public JsonNode postQuery(String query)
       throws Exception {
     return postQuery(query, _brokerBaseApiUrl);
   }
@@ -456,7 +554,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the controller's sql query endpoint (/query/sql)
    */
-  protected JsonNode postQueryToController(String query)
+  public JsonNode postQueryToController(String query)
       throws Exception {
     return postQueryToController(query, _controllerBaseApiUrl);
   }

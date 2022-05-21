@@ -74,7 +74,7 @@ import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
 
 
-public class TlsIntegrationTest extends BaseClusterIntegrationTest {
+public class TlsIntegrationTest extends ClusterTest {
   private static final String PASSWORD = "changeit";
   private static final char[] PASSWORD_CHAR = PASSWORD.toCharArray();
   private static final Header CLIENT_HEADER = new BasicHeader("Authorization", AUTH_TOKEN);
@@ -89,11 +89,13 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   private final URL _tlsStorePKCS12 = TlsIntegrationTest.class.getResource("/tlstest.p12");
   private final URL _tlsStoreJKS = TlsIntegrationTest.class.getResource("/tlstest.jks");
 
+  private DefaultIntegrationTestDataSet _testDataSet;
+
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
-
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir());
+    _testDataSet = new TlsIntegrationTestDataSet(this);
     // Start Zookeeper
     startZk();
     // Start Pinot cluster
@@ -104,29 +106,29 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     startMinion();
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = _testDataSet.unpackAvroData(getTempDir());
 
     // Create and upload the schema and table config
-    addSchema(createSchema());
-    addTableConfig(createRealtimeTableConfig(avroFiles.get(0)));
-    addTableConfig(createOfflineTableConfig());
+    addSchema(_testDataSet.createSchema());
+    addTableConfig(_testDataSet.createRealtimeTableConfig(avroFiles.get(0)));
+    addTableConfig(_testDataSet.createOfflineTableConfig());
 
     // Push data into Kafka
-    pushAvroIntoKafka(avroFiles);
-    waitForAllDocsLoaded(600_000L);
+    _testDataSet.pushAvroIntoKafka(avroFiles);
+    _testDataSet.waitForAllDocsLoaded(600_000L);
   }
 
   @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(getTableName());
+    dropRealtimeTable(_testDataSet.getTableName());
     stopMinion();
     stopServer();
     stopBroker();
     stopController();
     stopKafka();
     stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    FileUtils.deleteDirectory(getTempDir());
   }
 
   @Override
@@ -165,7 +167,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected PinotConfiguration getDefaultBrokerConfiguration() {
+  public PinotConfiguration getDefaultBrokerConfiguration() {
     Map<String, Object> prop = super.getDefaultBrokerConfiguration().toMap();
 
     // NOTE: defaults must be suitable for cluster-internal communication
@@ -194,7 +196,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected PinotConfiguration getDefaultServerConfiguration() {
+  public PinotConfiguration getDefaultServerConfiguration() {
     Map<String, Object> prop = super.getDefaultServerConfiguration().toMap();
 
     // NOTE: defaults must be suitable for cluster-internal communication
@@ -220,7 +222,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected PinotConfiguration getDefaultMinionConfiguration() {
+  public PinotConfiguration getDefaultMinionConfiguration() {
     Map<String, Object> prop = super.getDefaultMinionConfiguration().toMap();
     prop.put("pinot.minion.tls.keystore.path", _tlsStorePKCS12);
     prop.put("pinot.minion.tls.keystore.password", "changeit");
@@ -234,15 +236,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected TableTaskConfig getTaskConfig() {
-    Map<String, String> prop = new HashMap<>();
-    prop.put("bucketTimePeriod", "30d");
-
-    return new TableTaskConfig(Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, prop));
-  }
-
-  @Override
-  protected boolean useLlc() {
+  public boolean useLlc() {
     return true;
   }
 
@@ -259,20 +253,6 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void addTableConfig(TableConfig tableConfig)
       throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString(), AUTH_HEADER);
-  }
-
-  @Override
-  protected Connection getPinotConnection() {
-    if (_pinotConnection == null) {
-      JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
-      factory.setHeaders(AUTH_HEADER);
-      factory.setScheme(CommonConstants.HTTPS_PROTOCOL);
-      factory.setSslContext(TlsUtils.getSslContext());
-
-      _pinotConnection =
-          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
-    }
-    return _pinotConnection;
   }
 
   @Override
@@ -475,9 +455,9 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testRealtimeSegmentUploadDownload()
       throws Exception {
-    String query = "SELECT count(*) FROM " + getTableName();
+    String query = "SELECT count(*) FROM " + _testDataSet.getTableName();
 
-    ResultSetGroup resultBeforeOffline = getPinotConnection().execute(query);
+    ResultSetGroup resultBeforeOffline = _testDataSet.getPinotConnection().execute(query);
     Assert.assertTrue(resultBeforeOffline.getResultSet(0).getLong(0) > 0);
 
     // schedule offline segment generation
@@ -486,7 +466,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     // wait for offline segments
     JsonNode offlineSegments = TestUtils.waitForResult(() -> {
       JsonNode segmentSets = JsonUtils.stringToJsonNode(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()), AUTH_HEADER));
+          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(_testDataSet.getTableName()), AUTH_HEADER));
       JsonNode currentOfflineSegments =
           new IntRange(0, segmentSets.size()).stream().map(segmentSets::get).filter(s -> s.has("OFFLINE"))
               .map(s -> s.get("OFFLINE")).findFirst().get();
@@ -495,22 +475,22 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     }, 30000);
 
     // Verify constant row count
-    ResultSetGroup resultAfterOffline = getPinotConnection().execute(query);
+    ResultSetGroup resultAfterOffline = _testDataSet.getPinotConnection().execute(query);
     Assert.assertEquals(resultBeforeOffline.getResultSet(0).getLong(0), resultAfterOffline.getResultSet(0).getLong(0));
 
     // download and sanity-check size of offline segment(s)
     for (int i = 0; i < offlineSegments.size(); i++) {
       String segment = offlineSegments.get(i).asText();
-      Assert.assertTrue(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
-              > 200000); // download segment
+      Assert.assertTrue(sendGetRequest(
+          _controllerRequestURLBuilder.forSegmentDownload(_testDataSet.getTableName(), segment), AUTH_HEADER).length()
+          > 200000); // download segment
     }
   }
 
   @Test
   public void testJDBCClient()
       throws Exception {
-    String query = "SELECT count(*) FROM " + getTableName();
+    String query = "SELECT count(*) FROM " + _testDataSet.getTableName();
     java.sql.Connection connection = getValidJDBCConnection(DEFAULT_CONTROLLER_PORT);
     Statement statement = connection.createStatement();
     ResultSet resultSet = statement.executeQuery(query);
@@ -605,4 +585,34 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
    *  -alias localhost-ipv6 -ext SAN=dns:localhost,ip:0:0:0:0:0:0:0:1
    * ```
    */
+
+  private static class TlsIntegrationTestDataSet extends DefaultIntegrationTestDataSet {
+    public TlsIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest);
+    }
+
+    @Override
+    public Connection getPinotConnection() {
+      if (_pinotConnection == null) {
+        JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
+        factory.setHeaders(AUTH_HEADER);
+        factory.setScheme(CommonConstants.HTTPS_PROTOCOL);
+        factory.setSslContext(TlsUtils.getSslContext());
+
+        _pinotConnection =
+            ConnectionFactory.fromZookeeper(_testCluster.getZkUrl() + "/" + _testCluster.getHelixClusterName(),
+                factory.buildTransport());
+      }
+      return _pinotConnection;
+    }
+
+    @Override
+    public TableTaskConfig getTaskConfig() {
+      Map<String, String> prop = new HashMap<>();
+      prop.put("bucketTimePeriod", "30d");
+
+      return new TableTaskConfig(
+          Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, prop));
+    }
+  }
 }

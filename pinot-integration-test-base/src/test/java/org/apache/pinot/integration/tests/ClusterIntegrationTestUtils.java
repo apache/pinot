@@ -527,17 +527,18 @@ public class ClusterIntegrationTestUtils {
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
-      String h2Query, Connection h2Connection)
+  static void testQuery(ClusterTest testCluster, String pinotQuery, String brokerUrl,
+      org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection)
       throws Exception {
-    testQuery(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, null);
+    testQuery(testCluster, pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, null);
   }
 
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
-      String h2Query, Connection h2Connection, @Nullable Map<String, String> headers)
+  static void testQuery(ClusterTest testCluster, String pinotQuery, String brokerUrl,
+      org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
+      @Nullable Map<String, String> headers)
       throws Exception {
     // broker response
     JsonNode pinotResponse = ClusterTest.postQuery(pinotQuery, brokerUrl, headers);

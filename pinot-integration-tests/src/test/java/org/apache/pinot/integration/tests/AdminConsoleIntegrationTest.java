@@ -33,12 +33,13 @@ import org.testng.annotations.Test;
 /**
  * Tests that the controller, broker and server admin consoles return the expected pages.
  */
-public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
+public class AdminConsoleIntegrationTest extends ClusterTest {
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    setUpTestDirectories(this.getClass().getSimpleName());
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir());
     // Start an empty Pinot cluster
     startZk();
     startController();
@@ -53,7 +54,7 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
     stopBroker();
     stopController();
     stopZk();
-    FileUtils.deleteQuietly(_tempDir);
+    FileUtils.deleteQuietly(getTempDir());
   }
 
   /**

@@ -52,13 +52,17 @@ import static org.testng.Assert.assertTrue;
  * Shared set of common tests for cluster integration tests.
  * <p>To enable the test, override it and add @Test annotation.
  */
-public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrationTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTestSet.class);
+public abstract class ClusterIntegrationTestDataAndQuerySet extends ClusterIntegrationTestDataSet {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ClusterIntegrationTestDataAndQuerySet.class);
 
   // Default settings
   private static final String DEFAULT_QUERY_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset.test_queries_200.sql";
   private static final int DEFAULT_NUM_QUERIES_TO_GENERATE = 100;
+
+  public ClusterIntegrationTestDataAndQuerySet(ClusterTest testCluster) {
+    super(testCluster);
+  }
 
   /**
    * Can be overridden to change default setting
@@ -80,7 +84,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   protected void cleanupTestTableDataManager(String tableNameWithType) {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        for (BaseServerStarter serverStarter : _serverStarters) {
+        for (BaseServerStarter serverStarter : _testCluster.getServerStarters()) {
           if (serverStarter.getServerInstance().getInstanceDataManager().getTableDataManager(tableNameWithType)
               != null) {
             return false;
@@ -318,7 +322,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     };
 
     for (String query : queries) {
-      JsonNode response = postQuery(query);
+      JsonNode response = _testCluster.postQuery(query);
       for (String statName : statNames) {
         assertTrue(response.has(statName));
       }
@@ -348,7 +352,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   public void testQueriesFromQueryFile()
       throws Exception {
     InputStream inputStream =
-        BaseClusterIntegrationTestSet.class.getClassLoader().getResourceAsStream(getQueryFileName());
+        ClusterIntegrationTestDataAndQuerySet.class.getClassLoader().getResourceAsStream(getQueryFileName());
     assertNotNull(inputStream);
 
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
@@ -427,7 +431,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   private void testQueryException(String query, int errorCode)
       throws Exception {
-    JsonNode jsonObject = postQuery(query);
+    JsonNode jsonObject = _testCluster.postQuery(query);
     assertEquals(jsonObject.get("exceptions").get(0).get("errorCode").asInt(), errorCode);
   }
 
@@ -438,14 +442,15 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    */
   public void testInstanceShutdown()
       throws Exception {
-    List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
+    List<String> instances = _testCluster.getHelixAdmin().getInstancesInCluster(_testCluster.getHelixClusterName());
     assertFalse(instances.isEmpty(), "List of instances should not be empty");
 
     // Mark all instances in the cluster as shutting down
     for (String instance : instances) {
-      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instance);
+      InstanceConfig instanceConfig = _testCluster.getHelixAdmin().getInstanceConfig(_testCluster.getHelixClusterName(),
+          instance);
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, true);
-      _helixAdmin.setInstanceConfig(getHelixClusterName(), instance, instanceConfig);
+      _testCluster.getHelixAdmin().setInstanceConfig(_testCluster.getHelixClusterName(), instance, instanceConfig);
     }
 
     // Check that the routing table is empty
@@ -453,9 +458,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     // Mark all instances as not shutting down
     for (String instance : instances) {
-      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instance);
+      InstanceConfig instanceConfig = _testCluster.getHelixAdmin().getInstanceConfig(_testCluster.getHelixClusterName(),
+          instance);
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
-      _helixAdmin.setInstanceConfig(getHelixClusterName(), instance, instanceConfig);
+      _testCluster.getHelixAdmin().setInstanceConfig(_testCluster.getHelixClusterName(), instance, instanceConfig);
     }
 
     // Check that the routing table is not empty
@@ -471,16 +477,17 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       checkForInstanceInRoutingTable(instance, true);
 
       // Mark the server instance as shutting down
-      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instance);
+      InstanceConfig instanceConfig = _testCluster.getHelixAdmin().getInstanceConfig(_testCluster.getHelixClusterName(),
+          instance);
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, true);
-      _helixAdmin.setInstanceConfig(getHelixClusterName(), instance, instanceConfig);
+      _testCluster.getHelixAdmin().setInstanceConfig(_testCluster.getHelixClusterName(), instance, instanceConfig);
 
       // Check that it is not in the routing table
       checkForInstanceInRoutingTable(instance, false);
 
       // Re-enable the server instance
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
-      _helixAdmin.setInstanceConfig(getHelixClusterName(), instance, instanceConfig);
+      _testCluster.getHelixAdmin().setInstanceConfig(_testCluster.getHelixClusterName(), instance, instanceConfig);
 
       // Check that it is in the routing table
       checkForInstanceInRoutingTable(instance, true);
@@ -496,7 +503,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode routingTables = getDebugInfo("debug/routingTable/" + getTableName());
+        JsonNode routingTables = _testCluster.getDebugInfo("debug/routingTable/" + getTableName());
         for (JsonNode routingTable : routingTables) {
           if (routingTable.has(instance)) {
             return shouldExist;
@@ -518,7 +525,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode routingTables = getDebugInfo("debug/routingTable/" + getTableName());
+        JsonNode routingTables = _testCluster.getDebugInfo("debug/routingTable/" + getTableName());
         for (JsonNode routingTable : routingTables) {
           if ((routingTable.isEmpty()) != shouldBeEmpty) {
             return false;
@@ -533,7 +540,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   /**
    * TODO: Support removing new added columns for MutableSegment and remove the new added columns before running the
-   *       next test. Use this to replace {@link OfflineClusterIntegrationTest#testDefaultColumns()}.
+   *       next test. Use this to replace OfflineClusterIntegrationTest.testDefaultColumns().
    */
   public void testReload(boolean includeOfflineTable)
       throws Exception {
@@ -541,7 +548,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     Schema schema = getSchema();
 
     String selectStarQuery = "SELECT * FROM " + rawTableName;
-    JsonNode queryResponse = postQuery(selectStarQuery);
+    JsonNode queryResponse = _testCluster.postQuery(selectStarQuery);
     assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), schema.size());
     long numTotalDocs = queryResponse.get("totalDocs").asLong();
 
@@ -562,13 +569,13 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     schema.addField(constructNewMetric(FieldSpec.DataType.BYTES));
 
     // Upload the schema with extra columns
-    addSchema(schema);
+    _testCluster.addSchema(schema);
 
     // Reload the table
     if (includeOfflineTable) {
-      reloadOfflineTable(rawTableName);
+      _testCluster.reloadOfflineTable(rawTableName);
     }
-    reloadRealtimeTable(rawTableName);
+    _testCluster.reloadRealtimeTable(rawTableName);
 
     // Wait for all segments to finish reloading, and test querying the new columns
     // NOTE: Use count query to prevent schema inconsistency error
@@ -576,7 +583,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     long countStarResult = getCountStarResult();
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode testQueryResponse = postQuery(testQuery);
+        JsonNode testQueryResponse = _testCluster.postQuery(testQuery);
         // Should not throw exception during reload
         assertEquals(testQueryResponse.get("exceptions").size(), 0);
         // Total docs should not change during reload
@@ -588,7 +595,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }, 600_000L, "Failed to generate default values for new columns");
 
     // Select star query should return all the columns
-    queryResponse = postQuery(selectStarQuery);
+    queryResponse = _testCluster.postQuery(selectStarQuery);
     assertEquals(queryResponse.get("exceptions").size(), 0);
     JsonNode resultTable = queryResponse.get("resultTable");
     assertEquals(resultTable.get("dataSchema").get("columnNames").size(), schema.size());
@@ -601,7 +608,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         + "NewLongMVDimension < 0 AND NewFloatMVDimension < 0 AND NewDoubleMVDimension < 0 AND "
         + "NewStringMVDimension = 'null' AND NewIntMetric = 0 AND NewLongMetric = 0 AND NewFloatMetric = 0 "
         + "AND NewDoubleMetric = 0 AND NewBytesMetric = ''";
-    queryResponse = postQuery(countStarQuery);
+    queryResponse = _testCluster.postQuery(countStarQuery);
     assertEquals(queryResponse.get("exceptions").size(), 0);
     assertEquals(queryResponse.get("resultTable").get("rows").get(0).get(0).asLong(), countStarResult);
   }

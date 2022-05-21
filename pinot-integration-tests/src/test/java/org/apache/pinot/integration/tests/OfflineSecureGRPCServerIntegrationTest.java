@@ -33,7 +33,7 @@ public class OfflineSecureGRPCServerIntegrationTest extends OfflineGRPCServerInt
   private final URL _tlsStoreJKS = OfflineSecureGRPCServerIntegrationTest.class.getResource("/tlstest.jks");
 
   @Override
-  protected void overrideServerConf(PinotConfiguration serverConf) {
+  public void overrideServerConf(PinotConfiguration serverConf) {
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_GRPC_SERVER, true);
     serverConf.setProperty(Server.CONFIG_OF_GRPCTLS_SERVER_ENABLED, true);
     serverConf.setProperty("pinot.server.grpctls.client.auth.enabled", true);

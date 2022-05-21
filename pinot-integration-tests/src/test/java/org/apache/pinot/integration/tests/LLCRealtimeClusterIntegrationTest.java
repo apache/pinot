@@ -72,19 +72,10 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   private final boolean _enableLeadControllerResource = RANDOM.nextBoolean();
   private final long _startTime = System.currentTimeMillis();
 
-  @Override
-  protected boolean injectTombstones() {
-    return true;
-  }
 
   @Override
-  protected boolean useLlc() {
+  public boolean useLlc() {
     return true;
-  }
-
-  @Override
-  protected String getLoadMode() {
-    return ReadMode.mmap.name();
   }
 
   @Override
@@ -100,7 +91,7 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   }
 
   @Override
-  protected void overrideServerConf(PinotConfiguration configuration) {
+  public void overrideServerConf(PinotConfiguration configuration) {
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, true);
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION, _isDirectAlloc);
     if (_isConsumerDirConfigured) {
@@ -115,25 +106,26 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   @Override
   protected void createSegmentsAndUpload(List<File> avroFiles, Schema schema, TableConfig tableConfig)
       throws Exception {
-    if (!_tarDir.exists()) {
-      _tarDir.mkdir();
+    if (!getTarDir().exists()) {
+      getTarDir().mkdir();
     }
-    if (!_segmentDir.exists()) {
-      _segmentDir.mkdir();
+    if (!getSegmentDir().exists()) {
+      getSegmentDir().mkdir();
     }
 
-    // create segments out of the avro files (segments will be placed in _tarDir)
+    // create segments out of the avro files (segments will be placed in getTarDir())
     List<File> copyOfAvroFiles = new ArrayList<>(avroFiles);
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(copyOfAvroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(copyOfAvroFiles, tableConfig, schema, 0, getSegmentDir(),
+        getTarDir());
 
     // upload segments to controller
-    uploadSegmentsToController(getTableName(), _tarDir, false, false);
+    uploadSegmentsToController(_testDataSet.getTableName(), getTarDir(), false, false);
 
     // upload the first segment again to verify refresh
-    uploadSegmentsToController(getTableName(), _tarDir, true, false);
+    uploadSegmentsToController(_testDataSet.getTableName(), getTarDir(), true, false);
 
     // upload the first segment again to verify refresh with different segment crc
-    uploadSegmentsToController(getTableName(), _tarDir, true, true);
+    uploadSegmentsToController(_testDataSet.getTableName(), getTarDir(), true, true);
 
     // add avro files to the original list so H2 will have the uploaded data as well
     avroFiles.addAll(copyOfAvroFiles);
@@ -185,12 +177,6 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
     _helixResourceManager.updateZkMetadata(tableNameWithType, segmentZKMetadata);
   }
 
-  @Override
-  protected long getCountStarResult() {
-    // all the data that was ingested from Kafka also got uploaded via the controller's upload endpoint
-    return super.getCountStarResult() * 2;
-  }
-
   @BeforeClass
   @Override
   public void setUp()
@@ -202,6 +188,9 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
     // Remove the consumer directory
     FileUtils.deleteQuietly(new File(CONSUMER_DIRECTORY));
+
+    // Setting the custom test data set.
+    setTestDataSet(new LLCRealtimeClusterIntegrationTestDataSet(this));
 
     super.setUp();
   }
@@ -223,7 +212,7 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
   @Test
   public void testSegmentFlushSize() {
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(_testDataSet.getTableName());
     List<SegmentZKMetadata> segmentsZKMetadata =
         ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, realtimeTableName);
     for (SegmentZKMetadata segMetadata : segmentsZKMetadata) {
@@ -237,16 +226,16 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   @Test
   public void testInvertedIndexTriggering()
       throws Exception {
-    long numTotalDocs = getCountStarResult();
+    long numTotalDocs = _testDataSet.getCountStarResult();
 
     JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
     assertTrue(queryResponse.get("numEntriesScannedInFilter").asLong() > 0L);
 
-    TableConfig tableConfig = getRealtimeTableConfig();
+    TableConfig tableConfig = _testDataSet.getRealtimeTableConfig();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
     updateTableConfig(tableConfig);
-    reloadRealtimeTable(getTableName());
+    reloadRealtimeTable(_testDataSet.getTableName());
 
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -274,13 +263,30 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   @Test
   public void testReload()
       throws Exception {
-    testReload(false);
+    _testDataSet.testReload(false);
   }
 
   @Test
-  @Override
   public void testHardcodedServerPartitionedSqlQueries()
       throws Exception {
-    super.testHardcodedServerPartitionedSqlQueries();
+    _testDataSet.testHardcodedServerPartitionedSqlQueries();
+  }
+
+  private static class LLCRealtimeClusterIntegrationTestDataSet extends RealtimeClusterIntegrationTestDataSet {
+
+    public LLCRealtimeClusterIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest, ReadMode.mmap.name());
+    }
+
+    @Override
+    protected boolean injectTombstones() {
+      return true;
+    }
+
+    @Override
+    public long getCountStarResult() {
+      // all the data that was ingested from Kafka also got uploaded via the controller's upload endpoint
+      return super.getCountStarResult() * 2;
+    }
   }
 }

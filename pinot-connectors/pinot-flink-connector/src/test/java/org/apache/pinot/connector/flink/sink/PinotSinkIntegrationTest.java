@@ -34,7 +34,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.pinot.connector.flink.common.FlinkRowGenericRowConverter;
-import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
+import org.apache.pinot.integration.tests.ClusterTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
@@ -52,7 +52,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
+public class PinotSinkIntegrationTest extends ClusterTest {
   public static final String RAW_TABLE_NAME = "testTable";
   public static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
 
@@ -64,7 +64,8 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    setUpTestDirectories(this.getClass().getSimpleName());
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir(), getSegmentDir(), getTarDir());
 
     startZk();
     startController();
@@ -76,7 +77,7 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
     _typeInfo =
         new RowTypeInfo(new TypeInformation[]{Types.INT, Types.LONG, Types.STRING}, new String[]{"a", "b", "c"});
     Map<String, String> batchConfigs = new HashMap<>();
-    batchConfigs.put(BatchConfigProperties.OUTPUT_DIR_URI, _tarDir.getAbsolutePath());
+    batchConfigs.put(BatchConfigProperties.OUTPUT_DIR_URI, getTarDir().getAbsolutePath());
     batchConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "false");
     batchConfigs.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _controllerBaseApiUrl);
     IngestionConfig ingestionConfig =
@@ -100,7 +101,7 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
     stopController();
     stopZk();
 
-    FileUtils.deleteDirectory(_tempDir);
+    FileUtils.deleteDirectory(getTempDir());
   }
 
   @Test

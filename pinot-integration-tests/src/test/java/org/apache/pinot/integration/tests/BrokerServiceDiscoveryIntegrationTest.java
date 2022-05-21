@@ -30,20 +30,11 @@ import org.testng.annotations.Test;
 /**
  * Integration test that starts one broker with auto-discovered echo service and test it
  */
-public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegrationTestSet {
+public class BrokerServiceDiscoveryIntegrationTest extends ClusterTest {
   private static final String TENANT_NAME = "TestTenant";
 
   @Override
-  protected String getBrokerTenant() {
-    return TENANT_NAME;
-  }
-
-  @Override
-  protected String getServerTenant() {
-    return TENANT_NAME;
-  }
-
-  protected PinotConfiguration getDefaultBrokerConfiguration() {
+  public PinotConfiguration getDefaultBrokerConfiguration() {
     PinotConfiguration config = new PinotConfiguration();
     config.setProperty(CommonConstants.Broker.BROKER_SERVICE_AUTO_DISCOVERY, true);
     return config;
@@ -52,7 +43,8 @@ public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegratio
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    setUpTestDirectories(this.getClass().getSimpleName());
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir(), getSegmentDir(), getTarDir());
 
     // Start the Pinot cluster
     startZk();
@@ -69,7 +61,7 @@ public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegratio
     stopBroker();
     stopController();
     stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    FileUtils.deleteDirectory(getTempDir());
   }
 
   @Test
@@ -77,5 +69,23 @@ public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegratio
       throws Exception {
     String response = sendGetRequest(_brokerBaseApiUrl + "/test/echo/doge");
     Assert.assertEquals(response, "doge");
+  }
+
+  private static class BrokerServiceDiscoveryIntegrationDataSet
+      extends DefaultIntegrationTestDataSet {
+
+    public BrokerServiceDiscoveryIntegrationDataSet(ClusterTest clusterTest) {
+      super(clusterTest);
+    }
+
+    @Override
+    public String getBrokerTenant() {
+      return TENANT_NAME;
+    }
+
+    @Override
+    public String getServerTenant() {
+      return TENANT_NAME;
+    }
   }
 }

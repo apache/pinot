@@ -50,16 +50,18 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 
 
-public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
+public class UrlAuthRealtimeIntegrationTest extends ClusterTest {
   final static String AUTH_PROVIDER_CLASS = UrlAuthProvider.class.getCanonicalName();
   final static URL AUTH_URL = UrlAuthRealtimeIntegrationTest.class.getResource("/url-auth-token.txt");
   final static URL AUTH_URL_PREFIXED = UrlAuthRealtimeIntegrationTest.class.getResource("/url-auth-token-prefixed.txt");
   final static String AUTH_PREFIX = "Basic";
+  private UrlAuthRealtimeIntegrationTestDataSet _testDataSet;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    TestUtils.ensureDirectoriesExistAndEmpty(getTempDir());
+    _testDataSet = new UrlAuthRealtimeIntegrationTestDataSet(this);
 
     // Start Zookeeper
     startZk();
@@ -71,29 +73,29 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
     startMinion();
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = _testDataSet.unpackAvroData(getTempDir());
 
     // Create and upload the schema and table config
-    addSchema(createSchema());
-    addTableConfig(createRealtimeTableConfig(avroFiles.get(0)));
-    addTableConfig(createOfflineTableConfig());
+    addSchema(_testDataSet.createSchema());
+    addTableConfig(_testDataSet.createRealtimeTableConfig(avroFiles.get(0)));
+    addTableConfig(_testDataSet.createOfflineTableConfig());
 
     // Push data into Kafka
-    pushAvroIntoKafka(avroFiles);
-    waitForAllDocsLoaded(600_000L);
+    _testDataSet.pushAvroIntoKafka(avroFiles);
+    _testDataSet.waitForAllDocsLoaded(600_000L);
   }
 
   @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(getTableName());
+    dropRealtimeTable(_testDataSet.getTableName());
     stopMinion();
     stopServer();
     stopBroker();
     stopController();
     stopKafka();
     stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    FileUtils.deleteDirectory(getTempDir());
   }
 
   @Override
@@ -107,7 +109,7 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected PinotConfiguration getDefaultBrokerConfiguration() {
+  public PinotConfiguration getDefaultBrokerConfiguration() {
     PinotConfiguration conf = BasicAuthTestUtils.addBrokerConfiguration(super.getDefaultBrokerConfiguration().toMap());
     // no customization yet
 
@@ -115,7 +117,7 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected PinotConfiguration getDefaultServerConfiguration() {
+  public PinotConfiguration getDefaultServerConfiguration() {
     PinotConfiguration conf = BasicAuthTestUtils.addServerConfiguration(super.getDefaultServerConfiguration().toMap());
     conf.setProperty("pinot.server.segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
     conf.setProperty("pinot.server.segment.fetcher.auth.url", AUTH_URL);
@@ -131,7 +133,7 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected PinotConfiguration getDefaultMinionConfiguration() {
+  public PinotConfiguration getDefaultMinionConfiguration() {
     PinotConfiguration conf = BasicAuthTestUtils.addMinionConfiguration(super.getDefaultMinionConfiguration().toMap());
     conf.setProperty("segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
     conf.setProperty("segment.fetcher.auth.url", AUTH_URL_PREFIXED);
@@ -144,16 +146,7 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected TableTaskConfig getTaskConfig() {
-    Map<String, String> properties = new HashMap<>();
-    properties.put("bucketTimePeriod", "30d");
-
-    return new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, properties));
-  }
-
-  @Override
-  protected boolean useLlc() {
+  public boolean useLlc() {
     return true;
   }
 
@@ -170,18 +163,6 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   public void addTableConfig(TableConfig tableConfig)
       throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString(), AUTH_HEADER);
-  }
-
-  @Override
-  protected Connection getPinotConnection() {
-    if (_pinotConnection == null) {
-      JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
-      factory.setHeaders(AUTH_HEADER);
-
-      _pinotConnection =
-          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
-    }
-    return _pinotConnection;
   }
 
   @Override
@@ -202,9 +183,9 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testSegmentUploadDownload()
       throws Exception {
-    String query = "SELECT count(*) FROM " + getTableName();
+    String query = "SELECT count(*) FROM " + _testDataSet.getTableName();
 
-    ResultSetGroup resultBeforeOffline = getPinotConnection().execute(query);
+    ResultSetGroup resultBeforeOffline = _testDataSet.getPinotConnection().execute(query);
     Assert.assertTrue(resultBeforeOffline.getResultSet(0).getLong(0) > 0);
 
     // schedule offline segment generation
@@ -213,7 +194,7 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
     // wait for offline segments
     JsonNode offlineSegments = TestUtils.waitForResult(() -> {
       JsonNode segmentSets = JsonUtils.stringToJsonNode(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()), AUTH_HEADER));
+          sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(_testDataSet.getTableName()), AUTH_HEADER));
       JsonNode currentOfflineSegments =
           new IntRange(0, segmentSets.size()).stream().map(segmentSets::get).filter(s -> s.has("OFFLINE"))
               .map(s -> s.get("OFFLINE")).findFirst().get();
@@ -222,15 +203,44 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
     }, 30000);
 
     // Verify constant row count
-    ResultSetGroup resultAfterOffline = getPinotConnection().execute(query);
+    ResultSetGroup resultAfterOffline = _testDataSet.getPinotConnection().execute(query);
     Assert.assertEquals(resultBeforeOffline.getResultSet(0).getLong(0), resultAfterOffline.getResultSet(0).getLong(0));
 
     // download and sanity-check size of offline segment(s)
     for (int i = 0; i < offlineSegments.size(); i++) {
       String segment = offlineSegments.get(i).asText();
-      Assert.assertTrue(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload(getTableName(), segment), AUTH_HEADER).length()
-              > 200000); // download segment
+      Assert.assertTrue(sendGetRequest(
+          _controllerRequestURLBuilder.forSegmentDownload(_testDataSet.getTableName(), segment), AUTH_HEADER).length()
+          > 200000); // download segment
+    }
+  }
+
+  private static class UrlAuthRealtimeIntegrationTestDataSet extends DefaultIntegrationTestDataSet {
+
+    public UrlAuthRealtimeIntegrationTestDataSet(ClusterTest clusterTest) {
+      super(clusterTest);
+    }
+
+    @Override
+    public TableTaskConfig getTaskConfig() {
+      Map<String, String> properties = new HashMap<>();
+      properties.put("bucketTimePeriod", "30d");
+
+      return new TableTaskConfig(
+          Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, properties));
+    }
+
+    @Override
+    protected Connection getPinotConnection() {
+      if (_pinotConnection == null) {
+        JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
+        factory.setHeaders(AUTH_HEADER);
+
+        _pinotConnection =
+            ConnectionFactory.fromZookeeper(_testCluster.getZkUrl() + "/" + _testCluster.getHelixClusterName(),
+                factory.buildTransport());
+      }
+      return _pinotConnection;
     }
   }
 }
