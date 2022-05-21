@@ -20,12 +20,10 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.io.IOException;
 import java.net.URLEncoder;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -283,7 +281,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     stopController();
     stopKafka();
     stopZk();
-    cleanup();
+    cleanupHybridCluster();
   }
 
   /**
@@ -291,11 +289,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
    *
    * @throws Exception
    */
-  public void cleanup() {
-    try {
-      FileUtils.deleteDirectory(_tempDir);
-    } catch (IOException e) {
-      Utils.rethrowException(e);
-    }
+  protected void cleanupHybridCluster()
+      throws Exception {
+    FileUtils.deleteDirectory(_tempDir);
   }
 }

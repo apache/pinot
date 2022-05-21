@@ -48,15 +48,15 @@ public class PinotTenantRestletResourceTest {
     // Check that no tables on tenant works
     String listTablesUrl =
         TEST_INSTANCE.getControllerRequestURLBuilder().forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME);
-    JsonNode tableList = JsonUtils.stringToJsonNode(TEST_INSTANCE.sendGetRequest(listTablesUrl));
+    JsonNode tableList = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
     assertEquals(tableList.get("tables").size(), 0);
 
     // Add a table
-    TEST_INSTANCE.sendPostRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableCreate(),
+    ControllerTest.sendPostRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableCreate(),
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build().toJsonString());
 
     // There should be 1 table on the tenant
-    tableList = JsonUtils.stringToJsonNode(TEST_INSTANCE.sendGetRequest(listTablesUrl));
+    tableList = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
     JsonNode tables = tableList.get("tables");
     assertEquals(tables.size(), 1);
 

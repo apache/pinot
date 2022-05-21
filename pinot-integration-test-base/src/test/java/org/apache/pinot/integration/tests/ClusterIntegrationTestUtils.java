@@ -540,7 +540,7 @@ public class ClusterIntegrationTestUtils {
       String h2Query, Connection h2Connection, @Nullable Map<String, String> headers)
       throws Exception {
     // broker response
-    JsonNode pinotResponse = ClusterTest.getDefaultClusterInstance().postQuery(pinotQuery, brokerUrl, headers);
+    JsonNode pinotResponse = ClusterTest.postQuery(pinotQuery, brokerUrl, headers);
     if (!pinotResponse.get("exceptions").isEmpty()) {
       throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
     }

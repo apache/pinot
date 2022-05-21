@@ -68,14 +68,14 @@ public class SegmentGenerationAndPushTaskGeneratorTest extends ControllerTest {
     // Set config to 5
     String request = JsonUtils.objectToString(Collections
         .singletonMap(MinionConstants.SegmentGenerationAndPushTask.CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE, "5"));
-    sendPostRequest(_controllerRequestURLBuilder.forClusterConfigs(), request);
+    ControllerTest.sendPostRequest(_controllerRequestURLBuilder.forClusterConfigs(), request);
     Assert.assertEquals(_generator.getNumConcurrentTasksPerInstance(), 5);
 
     // Set config to invalid and should still get 1
     request = JsonUtils.objectToString(Collections
         .singletonMap(MinionConstants.SegmentGenerationAndPushTask.CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE,
             "abcd"));
-    sendPostRequest(_controllerRequestURLBuilder.forClusterConfigs(), request);
+    ControllerTest.sendPostRequest(_controllerRequestURLBuilder.forClusterConfigs(), request);
     Assert.assertEquals(_generator.getNumConcurrentTasksPerInstance(), 1);
   }
 }

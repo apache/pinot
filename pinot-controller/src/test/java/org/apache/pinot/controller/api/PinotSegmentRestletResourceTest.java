@@ -75,13 +75,13 @@ public class PinotSegmentRestletResourceTest {
     // validate the segment metadata
     Map.Entry<String, SegmentMetadata> entry =
         (Map.Entry<String, SegmentMetadata>) segmentMetadataTable.entrySet().toArray()[0];
-    String resp = TEST_INSTANCE.sendGetRequest(
+    String resp = ControllerTest.sendGetRequest(
         TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMetadata(TABLE_NAME, entry.getKey()));
     Map<String, String> fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
     Assert.assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
 
     // use table name with table type
-    resp = TEST_INSTANCE.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder()
+    resp = ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder()
         .forSegmentMetadata(TABLE_NAME + "_OFFLINE", entry.getKey()));
     fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
     Assert.assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
@@ -108,7 +108,7 @@ public class PinotSegmentRestletResourceTest {
 
   private void checkCrcRequest(Map<String, SegmentMetadata> metadataTable, int expectedSize)
       throws Exception {
-    String crcMapStr = TEST_INSTANCE.sendGetRequest(
+    String crcMapStr = ControllerTest.sendGetRequest(
         TEST_INSTANCE.getControllerRequestURLBuilder().forListAllCrcInformationForTable(TABLE_NAME));
     Map<String, String> crcMap = JsonUtils.stringToObject(crcMapStr, Map.class);
     for (String segmentName : crcMap.keySet()) {

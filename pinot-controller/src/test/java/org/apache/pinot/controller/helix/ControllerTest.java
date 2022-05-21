@@ -108,12 +108,13 @@ public class ControllerTest {
    */
   private static final ControllerTest DEFAULT_INSTANCE = new ControllerTest();
 
+  protected static HttpClient _httpClient = null;
+
   protected int _controllerPort;
   protected String _controllerBaseApiUrl;
   protected ControllerConf _controllerConfig;
   protected ControllerRequestURLBuilder _controllerRequestURLBuilder;
 
-  protected HttpClient _httpClient = null;
   protected ControllerRequestClient _controllerRequestClient = null;
 
   protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
@@ -148,7 +149,7 @@ public class ControllerTest {
    * context first before the HttpClient can be initialized. However, because we have static usages of the HTTPClient,
    * it is not possible to create normal member variable, thus the workaround.
    */
-  public HttpClient getHttpClient() {
+  public static HttpClient getHttpClient() {
     if (_httpClient == null) {
       _httpClient = HttpClient.getInstance();
     }
@@ -726,12 +727,12 @@ public class ControllerTest {
     }
   }
 
-  public String sendGetRequest(String urlString)
+  public static String sendGetRequest(String urlString)
       throws IOException {
     return sendGetRequest(urlString, null);
   }
 
-  public String sendGetRequest(String urlString, Map<String, String> headers)
+  public static String sendGetRequest(String urlString, Map<String, String> headers)
       throws IOException {
     try {
       SimpleHttpResponse resp =
@@ -742,17 +743,17 @@ public class ControllerTest {
     }
   }
 
-  public String sendGetRequestRaw(String urlString)
+  public static String sendGetRequestRaw(String urlString)
       throws IOException {
     return IOUtils.toString(new URL(urlString).openStream());
   }
 
-  public String sendPostRequest(String urlString, String payload)
+  public static String sendPostRequest(String urlString, String payload)
       throws IOException {
     return sendPostRequest(urlString, payload, Collections.emptyMap());
   }
 
-  public String sendPostRequest(String urlString, String payload, Map<String, String> headers)
+  public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
       SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(
@@ -763,7 +764,7 @@ public class ControllerTest {
     }
   }
 
-  public String sendPostRequestRaw(String urlString, String payload, Map<String, String> headers)
+  public static String sendPostRequestRaw(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
       EntityBuilder builder = EntityBuilder.create();
@@ -776,17 +777,17 @@ public class ControllerTest {
     }
   }
 
-  public String sendPutRequest(String urlString)
+  public static String sendPutRequest(String urlString)
       throws IOException {
     return sendPutRequest(urlString, null);
   }
 
-  public String sendPutRequest(String urlString, String payload)
+  public static String sendPutRequest(String urlString, String payload)
       throws IOException {
     return sendPutRequest(urlString, payload, Collections.emptyMap());
   }
 
-  public String sendPutRequest(String urlString, String payload, Map<String, String> headers)
+  public static String sendPutRequest(String urlString, String payload, Map<String, String> headers)
       throws IOException {
     try {
       SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(
@@ -797,12 +798,12 @@ public class ControllerTest {
     }
   }
 
-  public String sendDeleteRequest(String urlString)
+  public static String sendDeleteRequest(String urlString)
       throws IOException {
     return sendDeleteRequest(urlString, Collections.emptyMap());
   }
 
-  public String sendDeleteRequest(String urlString, Map<String, String> headers)
+  public static String sendDeleteRequest(String urlString, Map<String, String> headers)
       throws IOException {
     try {
       SimpleHttpResponse resp =
@@ -813,26 +814,26 @@ public class ControllerTest {
     }
   }
 
-  private String constructResponse(SimpleHttpResponse resp) {
+  private static String constructResponse(SimpleHttpResponse resp) {
     return resp.getResponse();
   }
 
-  public SimpleHttpResponse sendMultipartPostRequest(String url, String body)
+  public static SimpleHttpResponse sendMultipartPostRequest(String url, String body)
       throws IOException {
     return sendMultipartPostRequest(url, body, Collections.emptyMap());
   }
 
-  public SimpleHttpResponse sendMultipartPostRequest(String url, String body, Map<String, String> headers)
+  public static SimpleHttpResponse sendMultipartPostRequest(String url, String body, Map<String, String> headers)
       throws IOException {
     return getHttpClient().sendMultipartPostRequest(url, body, headers);
   }
 
-  public SimpleHttpResponse sendMultipartPutRequest(String url, String body)
+  public static SimpleHttpResponse sendMultipartPutRequest(String url, String body)
       throws IOException {
     return sendMultipartPutRequest(url, body, null);
   }
 
-  public SimpleHttpResponse sendMultipartPutRequest(String url, String body, Map<String, String> headers)
+  public static SimpleHttpResponse sendMultipartPutRequest(String url, String body, Map<String, String> headers)
       throws IOException {
     return getHttpClient().sendMultipartPutRequest(url, body, headers);
   }
@@ -899,9 +900,13 @@ public class ControllerTest {
     return _controllerConfig;
   }
 
-  public Map<String, Object> getSuiteControllerConfiguration() {
+  /**
+   * Do not override this method as the configuration is shared across all default TestNG group.
+   */
+  public final Map<String, Object> getSharedControllerConfiguration() {
     Map<String, Object> properties = getDefaultControllerConfiguration();
 
+    // TODO: move these test specific configs into respective test classes.
     // Used in AccessControlTest
     properties.put(ControllerConf.ACCESS_CONTROL_FACTORY_CLASS, AccessControlTest.DenyAllAccessFactory.class.getName());
 
@@ -921,15 +926,15 @@ public class ControllerTest {
   }
 
   /**
-   * Initialize shared state for the TestNG suite.
+   * Initialize shared state for the TestNG default test group.
    */
   public void startSharedTestSetup(Map<String, Object> extraProperties)
       throws Exception {
     startZk();
 
-    Map<String, Object> suiteControllerConfiguration = getSuiteControllerConfiguration();
-    suiteControllerConfiguration.putAll(extraProperties);
-    startController(suiteControllerConfiguration);
+    Map<String, Object> sharedControllerConfiguration = getSharedControllerConfiguration();
+    sharedControllerConfiguration.putAll(extraProperties);
+    startController(sharedControllerConfiguration);
 
     addMoreFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, true);
     addMoreFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, true);
@@ -939,7 +944,7 @@ public class ControllerTest {
   }
 
   /**
-   * Cleanup shared state used in the TestNG suite.
+   * Cleanup shared state used in the TestNG default test group.
    */
   public void stopSharedTestSetup() {
     cleanup();
@@ -960,9 +965,9 @@ public class ControllerTest {
   public void setupSharedStateAndValidate(Map<String, Object> extraProperties)
       throws Exception {
     if (_zookeeperInstance == null || _helixResourceManager == null) {
-      // this is expected to happen only when running a single test case outside of testNG suite, i.e when test
+      // this is expected to happen only when running a single test case outside of testNG group, i.e when test
       // cases are run one at a time within IntelliJ or through maven command line. When running under a testNG
-      // suite, state will have already been setup by @BeforeSuite method in ControllerTestSetup.
+      // group, state will have already been setup by @BeforeGroups method in ControllerTestSetup.
       startSharedTestSetup(extraProperties);
     }
 

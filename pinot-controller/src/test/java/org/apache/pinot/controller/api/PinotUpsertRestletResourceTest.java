@@ -57,7 +57,7 @@ public class PinotUpsertRestletResourceTest {
         TEST_INSTANCE.getControllerRequestURLBuilder().forUpsertTableHeapEstimation(10000, 48, 8);
 
     JsonNode result = JsonUtils.stringToJsonNode(
-        TEST_INSTANCE.sendPostRequest(estimateHeapUsageUrl, tableAndSchemaConfig.toJsonString()));
+        ControllerTest.sendPostRequest(estimateHeapUsageUrl, tableAndSchemaConfig.toJsonString()));
     assertEquals(result.get("bytesPerKey").asInt(), 48);
     assertEquals(result.get("bytesPerValue").asInt(), 60);
     assertEquals(result.get("totalKeySpace(bytes)").asLong(), 480000);

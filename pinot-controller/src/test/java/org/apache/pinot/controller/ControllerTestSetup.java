@@ -24,7 +24,7 @@ import org.testng.annotations.BeforeGroups;
 
 
 /**
- * All test cases in {@link org.apache.pinot.controller} package are run as part the a TestNG suite (see testng.xml).
+ * All test cases in {@link org.apache.pinot.controller} package are run as part a TestNG group (see testng_*.xml).
  * This helps to setup (see {@link #setUpGroup()} and tear down (see {@link #tearDownGroup()} the shared state before
  * and after all tests are run. Each test case class should implement a @BeforeClass method, which would call
  * @link ControllerTest.getInstance()#validate()} method to validate shared state. Each test case class should also

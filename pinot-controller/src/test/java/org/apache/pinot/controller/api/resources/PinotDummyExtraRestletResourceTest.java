@@ -50,7 +50,7 @@ public class PinotDummyExtraRestletResourceTest {
   public void testExtraDummyResourcePackages()
       throws Exception {
     String baseUrl = TEST_INSTANCE.getControllerBaseApiUrl();
-    String resp = TEST_INSTANCE.sendGetRequest(StringUtil.join("/", baseUrl, "testExtra"));
+    String resp = ControllerTest.sendGetRequest(StringUtil.join("/", baseUrl, "testExtra"));
     assertEquals(resp, "DummyMsg");
   }
 

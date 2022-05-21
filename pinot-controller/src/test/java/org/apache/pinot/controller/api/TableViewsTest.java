@@ -164,7 +164,7 @@ public class TableViewsTest {
 
   private TableViews.TableView getTableView(String tableName, String view, String tableType)
       throws Exception {
-    return JsonUtils.stringToObject(TEST_INSTANCE.sendGetRequest(
+    return JsonUtils.stringToObject(ControllerTest.sendGetRequest(
             TEST_INSTANCE.getControllerRequestURLBuilder().forTableView(tableName, view, tableType)),
         TableViews.TableView.class);
   }

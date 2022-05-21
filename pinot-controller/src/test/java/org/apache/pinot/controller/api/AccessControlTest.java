@@ -41,7 +41,7 @@ public class AccessControlTest {
   @Test
   public void testAccessDenied() {
     try {
-      TEST_INSTANCE.sendGetRequest(
+      ControllerTest.sendGetRequest(
           TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentDownload(TABLE_NAME, "testSegment"));
       Assert.fail("Access not denied");
     } catch (IOException e) {

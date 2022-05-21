@@ -68,7 +68,7 @@ public class PinotSchemaRestletResourceTest {
     // Add the schema
     String addSchemaUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forSchemaCreate();
     SimpleHttpResponse resp =
-        TEST_INSTANCE.sendMultipartPostRequest(addSchemaUrl, schema.toSingleLineJsonString());
+        ControllerTest.sendMultipartPostRequest(addSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 200);
 
     // Add a new column
@@ -77,16 +77,16 @@ public class PinotSchemaRestletResourceTest {
 
     // Update the schema with addSchema api and override off
     resp =
-        TEST_INSTANCE.sendMultipartPostRequest(addSchemaUrl + "?override=false", schema.toSingleLineJsonString());
+        ControllerTest.sendMultipartPostRequest(addSchemaUrl + "?override=false", schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 409);
 
     // Update the schema with addSchema api and override on
-    resp = TEST_INSTANCE.sendMultipartPostRequest(addSchemaUrl, schema.toSingleLineJsonString());
+    resp = ControllerTest.sendMultipartPostRequest(addSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 200);
 
     // Get the schema and verify the new column exists
     String getSchemaUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forSchemaGet(schemaName);
-    Schema remoteSchema = Schema.fromString(TEST_INSTANCE.sendGetRequest(getSchemaUrl));
+    Schema remoteSchema = Schema.fromString(ControllerTest.sendGetRequest(getSchemaUrl));
     Assert.assertEquals(remoteSchema, schema);
     Assert.assertTrue(remoteSchema.hasColumn(newColumnFieldSpec.getName()));
 
@@ -96,11 +96,11 @@ public class PinotSchemaRestletResourceTest {
 
     // Update the schema with updateSchema api
     String updateSchemaUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forSchemaUpdate(schemaName);
-    resp = TEST_INSTANCE.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
+    resp = ControllerTest.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 200);
 
     // Get the schema and verify both the new columns exist
-    remoteSchema = Schema.fromString(TEST_INSTANCE.sendGetRequest(getSchemaUrl));
+    remoteSchema = Schema.fromString(ControllerTest.sendGetRequest(getSchemaUrl));
     Assert.assertEquals(remoteSchema, schema);
     Assert.assertTrue(remoteSchema.hasColumn(newColumnFieldSpec.getName()));
     Assert.assertTrue(remoteSchema.hasColumn(newColumnFieldSpec2.getName()));
@@ -109,29 +109,29 @@ public class PinotSchemaRestletResourceTest {
     newColumnFieldSpec.setDataType(DataType.INT);
 
     // Update the schema with addSchema api and override on
-    resp = TEST_INSTANCE.sendMultipartPostRequest(addSchemaUrl, schema.toSingleLineJsonString());
+    resp = ControllerTest.sendMultipartPostRequest(addSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 400);
 
     // Update the schema with updateSchema api
-    resp = TEST_INSTANCE.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
+    resp = ControllerTest.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 400);
 
     // Change the column data type from STRING to BOOLEAN
     newColumnFieldSpec.setDataType(DataType.BOOLEAN);
 
     // Update the schema with addSchema api and override on
-    resp = TEST_INSTANCE.sendMultipartPostRequest(addSchemaUrl, schema.toSingleLineJsonString());
+    resp = ControllerTest.sendMultipartPostRequest(addSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 200);
 
     // Change another column data type from STRING to BOOLEAN
     newColumnFieldSpec2.setDataType(DataType.BOOLEAN);
 
     // Update the schema with updateSchema api
-    resp = TEST_INSTANCE.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
+    resp = ControllerTest.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 200);
 
     // Get the schema and verify the data types are not changed
-    remoteSchema = Schema.fromString(TEST_INSTANCE.sendGetRequest(getSchemaUrl));
+    remoteSchema = Schema.fromString(ControllerTest.sendGetRequest(getSchemaUrl));
     Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec.getName()).getDataType(), DataType.STRING);
     Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getDataType(), DataType.STRING);
 
@@ -140,33 +140,33 @@ public class PinotSchemaRestletResourceTest {
     schema.addField(newColumnFieldSpec3);
 
     // Update the schema with updateSchema api
-    resp = TEST_INSTANCE.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
+    resp = ControllerTest.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 200);
 
     // Get the schema and verify the new column has BOOLEAN data type
-    remoteSchema = Schema.fromString(TEST_INSTANCE.sendGetRequest(getSchemaUrl));
+    remoteSchema = Schema.fromString(ControllerTest.sendGetRequest(getSchemaUrl));
     Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec3.getName()).getDataType(), DataType.BOOLEAN);
 
     // Post invalid schema string
     String invalidSchemaString = schema.toSingleLineJsonString().substring(1);
-    resp = TEST_INSTANCE.sendMultipartPostRequest(addSchemaUrl, invalidSchemaString);
+    resp = ControllerTest.sendMultipartPostRequest(addSchemaUrl, invalidSchemaString);
     Assert.assertEquals(resp.getStatusCode(), 400);
-    resp = TEST_INSTANCE.sendMultipartPutRequest(updateSchemaUrl, invalidSchemaString);
+    resp = ControllerTest.sendMultipartPutRequest(updateSchemaUrl, invalidSchemaString);
     Assert.assertEquals(resp.getStatusCode(), 400);
 
     // Update schema with null schema name
     schema.setSchemaName(null);
-    resp = TEST_INSTANCE.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
+    resp = ControllerTest.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 400);
 
     // Update schema with non-matching schema name
     String newSchemaName = "newSchemaName";
     schema.setSchemaName(newSchemaName);
-    resp = TEST_INSTANCE.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
+    resp = ControllerTest.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 400);
 
     // Update non-existing schema
-    resp = TEST_INSTANCE.sendMultipartPutRequest(
+    resp = ControllerTest.sendMultipartPutRequest(
         TEST_INSTANCE.getControllerRequestURLBuilder().forSchemaUpdate(newSchemaName),
         schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 404);
@@ -186,17 +186,17 @@ public class PinotSchemaRestletResourceTest {
             + "  } ]}";
 
     String response =
-        TEST_INSTANCE.sendPostRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forSchemaValidate(),
+        ControllerTest.sendPostRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forSchemaValidate(),
             schemaStringWithExtraProps);
     Assert.assertTrue(response.contains("/illegalKey1\" : 1"));
 
     response =
-        TEST_INSTANCE.sendPostRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forSchemaCreate(),
+        ControllerTest.sendPostRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forSchemaCreate(),
             schemaStringWithExtraProps);
     Assert.assertEquals(response,
         "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"transcript2 successfully added\"}");
 
-    response = TEST_INSTANCE.sendPutRequest(
+    response = ControllerTest.sendPutRequest(
         TEST_INSTANCE.getControllerRequestURLBuilder().forSchemaUpdate("transcript2"),
         schemaStringWithExtraProps);
     Assert.assertEquals(response,
@@ -216,16 +216,16 @@ public class PinotSchemaRestletResourceTest {
             + "  \"metricFieldSpecs\" : [ {\n" + "    \"name\" : \"score\",\n" + "    \"dataType\" : \"FLOAT\"\n"
             + "  } ]}";
 
-    SimpleHttpResponse response = TEST_INSTANCE.sendMultipartPostRequest(
+    SimpleHttpResponse response = ControllerTest.sendMultipartPostRequest(
         TEST_INSTANCE.getControllerRequestURLBuilder().forSchemaValidate(), schemaStringWithExtraProps);
     Assert.assertTrue(response.getResponse().contains("/illegalKey1\" : 1"));
 
-    response = TEST_INSTANCE.sendMultipartPostRequest(
+    response = ControllerTest.sendMultipartPostRequest(
         TEST_INSTANCE.getControllerRequestURLBuilder().forSchemaCreate(), schemaStringWithExtraProps);
     Assert.assertEquals(response.getResponse(),
         "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"transcript2 successfully added\"}");
 
-    response = TEST_INSTANCE.sendMultipartPutRequest(
+    response = ControllerTest.sendMultipartPutRequest(
         TEST_INSTANCE.getControllerRequestURLBuilder().forSchemaUpdate("transcript2"),
         schemaStringWithExtraProps);
     Assert.assertEquals(response.getResponse(),

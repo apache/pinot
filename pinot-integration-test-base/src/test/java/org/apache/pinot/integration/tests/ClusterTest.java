@@ -85,14 +85,9 @@ import static org.testng.Assert.assertTrue;
 /**
  * Base class for integration tests that involve a complete Pinot cluster.
  */
-public class ClusterTest extends ControllerTest {
+public abstract class ClusterTest extends ControllerTest {
   protected static final int DEFAULT_BROKER_PORT = 18099;
   protected static final Random RANDOM = new Random(System.currentTimeMillis());
-
-  /**
-   * default static instance used to access all wrapped static instances.
-   */
-  protected static final ClusterTest DEFAULT_CLUSTER_INSTANCE = new ClusterTest();
 
   protected String _brokerBaseApiUrl;
 
@@ -100,10 +95,6 @@ public class ClusterTest extends ControllerTest {
   protected List<BaseServerStarter> _serverStarters;
   protected List<Integer> _brokerPorts;
   protected BaseMinionStarter _minionStarter;
-
-  public static ClusterTest getDefaultClusterInstance() {
-    return DEFAULT_CLUSTER_INSTANCE;
-  }
 
   protected PinotConfiguration getDefaultBrokerConfiguration() {
     return new PinotConfiguration();
@@ -447,7 +438,7 @@ public class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/sql)
    */
-  public JsonNode postQuery(String query, String brokerBaseApiUrl)
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl)
       throws Exception {
     return postQuery(query, brokerBaseApiUrl, null);
   }
@@ -455,7 +446,7 @@ public class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/sql)
    */
-  public JsonNode postQuery(String query, String brokerBaseApiUrl, Map<String, String> headers)
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl, Map<String, String> headers)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
@@ -473,7 +464,7 @@ public class ClusterTest extends ControllerTest {
   /**
    * Queries the controller's sql query endpoint (/sql)
    */
-  public JsonNode postQueryToController(String query, String controllerBaseApiUrl)
+  public static JsonNode postQueryToController(String query, String controllerBaseApiUrl)
       throws Exception {
     return postQueryToController(query, controllerBaseApiUrl, null);
   }
@@ -481,7 +472,7 @@ public class ClusterTest extends ControllerTest {
   /**
    * Queries the controller's sql query endpoint (/sql)
    */
-  public JsonNode postQueryToController(String query, String controllerBaseApiUrl, Map<String, String> headers)
+  public static JsonNode postQueryToController(String query, String controllerBaseApiUrl, Map<String, String> headers)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);

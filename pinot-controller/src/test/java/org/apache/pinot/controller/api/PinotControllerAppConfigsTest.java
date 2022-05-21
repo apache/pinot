@@ -54,7 +54,7 @@ public class PinotControllerAppConfigsTest {
     PinotAppConfigs expected = new PinotAppConfigs(expectedControllerConf);
 
     String configsJson =
-        TEST_INSTANCE.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forAppConfigs());
+        ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forAppConfigs());
     ObjectMapper mapper = new ObjectMapper();
     PinotAppConfigs actual = mapper.readValue(configsJson, PinotAppConfigs.class);
 
