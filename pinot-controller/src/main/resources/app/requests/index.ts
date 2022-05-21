@@ -55,7 +55,7 @@ export const putSchema = (name: string, params: string): Promise<AxiosResponse<O
   baseApi.put(`/schemas/${name}`, params, { headers });
 
 export const getSegmentMetadata = (tableName: string, segmentName: string): Promise<AxiosResponse<IdealState>> =>
-  baseApi.get(`/segments/${tableName}/${segmentName}/metadata`);
+  baseApi.get(`/segments/${tableName}/${segmentName}/metadata?columns=*`);
 
 export const getTableSize = (name: string): Promise<AxiosResponse<TableSize>> =>
   baseApi.get(`/tables/${name}/size`);

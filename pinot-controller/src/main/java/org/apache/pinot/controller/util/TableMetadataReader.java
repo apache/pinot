@@ -21,10 +21,13 @@ package org.apache.pinot.controller.util;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.BiMap;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
@@ -74,6 +77,36 @@ public class TableMetadataReader {
       response.put(responseJson.get("segmentName").asText(), responseJson);
     }
     return JsonUtils.objectToJsonNode(response);
+  }
+
+  /**
+   * This method retrieves the full segment metadata for a given table and segment
+   * @return segment metadata
+   */
+  public JsonNode getSegmentMetadata(String tableNameWithType, String segmentName, List<String> columns, int timeoutMs)
+      throws InvalidConfigException, IOException {
+    Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentName);
+
+    Map<String, List<String>> serverToSegments = servers.stream()
+        .collect(Collectors.toMap(s -> s, s -> Collections.singletonList(segmentName)));
+
+    BiMap<String, String> endpoints =
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(servers);
+    ServerSegmentMetadataReader serverSegmentMetadataReader =
+        new ServerSegmentMetadataReader(_executor, _connectionManager);
+
+    List<String> segmentsMetadata = serverSegmentMetadataReader
+        .getSegmentMetadataFromServer(tableNameWithType, serverToSegments, endpoints, columns, timeoutMs);
+
+    for (String segmentMetadata : segmentsMetadata) {
+      JsonNode responseJson = JsonUtils.stringToJsonNode(segmentMetadata);
+      String segmentNameJson = responseJson.get("segmentName").asText();
+
+      if (segmentNameJson.equals(segmentName)) {
+        return responseJson;
+      }
+    }
+    return JsonUtils.objectToJsonNode(new HashMap<String, String>());
   }
 
   /**
