@@ -373,11 +373,12 @@ public class StreamConfig {
     return "StreamConfig{" + "_type='" + _type + '\'' + ", _topicName='" + _topicName + '\'' + ", _consumerTypes="
         + _consumerTypes + ", _consumerFactoryClassName='" + _consumerFactoryClassName + '\'' + ", _offsetCriteria='"
         + _offsetCriteria + '\'' + ", _connectionTimeoutMillis=" + _connectionTimeoutMillis + ", _fetchTimeoutMillis="
-        + _fetchTimeoutMillis + ", _flushThresholdRows=" + _flushThresholdRows + ", _flushThresholdTimeMillis="
-        + _flushThresholdTimeMillis + ", _flushSegmentDesiredSizeBytes=" + _flushThresholdSegmentSizeBytes
-        + ", _flushAutotuneInitialRows=" + _flushAutotuneInitialRows + ", _decoderClass='" + _decoderClass + '\''
-        + ", _decoderProperties=" + _decoderProperties + ", _groupId='" + _groupId + "', _topicConsumptionRateLimit="
-        + _topicConsumptionRateLimit + ", _tableNameWithType='" + _tableNameWithType + '}';
+        + _fetchTimeoutMillis + ", _idleTimeoutMillis=" + _idleTimeoutMillis + ", _flushThresholdRows="
+        + _flushThresholdRows + ", _flushThresholdTimeMillis=" + _flushThresholdTimeMillis
+        + ", _flushSegmentDesiredSizeBytes=" + _flushThresholdSegmentSizeBytes + ", _flushAutotuneInitialRows="
+        + _flushAutotuneInitialRows + ", _decoderClass='" + _decoderClass + '\'' + ", _decoderProperties="
+        + _decoderProperties + ", _groupId='" + _groupId + "', _topicConsumptionRateLimit=" + _topicConsumptionRateLimit
+        + ", _tableNameWithType='" + _tableNameWithType + '}';
   }
 
   @Override
@@ -392,19 +393,18 @@ public class StreamConfig {
 
     StreamConfig that = (StreamConfig) o;
 
-    return EqualityUtils.isEqual(_connectionTimeoutMillis, that._connectionTimeoutMillis) && EqualityUtils
-        .isEqual(_fetchTimeoutMillis, that._fetchTimeoutMillis) && EqualityUtils
-        .isEqual(_flushThresholdRows, that._flushThresholdRows) && EqualityUtils
-        .isEqual(_flushThresholdTimeMillis, that._flushThresholdTimeMillis) && EqualityUtils
-        .isEqual(_flushThresholdSegmentSizeBytes, that._flushThresholdSegmentSizeBytes) && EqualityUtils
-        .isEqual(_flushAutotuneInitialRows, that._flushAutotuneInitialRows) && EqualityUtils.isEqual(_type, that._type)
-        && EqualityUtils.isEqual(_topicName, that._topicName) && EqualityUtils
-        .isEqual(_consumerTypes, that._consumerTypes) && EqualityUtils
-        .isEqual(_consumerFactoryClassName, that._consumerFactoryClassName) && EqualityUtils
-        .isEqual(_offsetCriteria, that._offsetCriteria) && EqualityUtils.isEqual(_decoderClass, that._decoderClass)
-        && EqualityUtils.isEqual(_decoderProperties, that._decoderProperties) && EqualityUtils
-        .isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_tableNameWithType, that._tableNameWithType)
-        && EqualityUtils.isEqual(_topicConsumptionRateLimit, that._topicConsumptionRateLimit)
+    return EqualityUtils.isEqual(_connectionTimeoutMillis, that._connectionTimeoutMillis) && EqualityUtils.isEqual(
+        _fetchTimeoutMillis, that._fetchTimeoutMillis) && EqualityUtils.isEqual(_idleTimeoutMillis,
+        that._idleTimeoutMillis) && EqualityUtils.isEqual(_flushThresholdRows, that._flushThresholdRows)
+        && EqualityUtils.isEqual(_flushThresholdTimeMillis, that._flushThresholdTimeMillis) && EqualityUtils.isEqual(
+        _flushThresholdSegmentSizeBytes, that._flushThresholdSegmentSizeBytes) && EqualityUtils.isEqual(
+        _flushAutotuneInitialRows, that._flushAutotuneInitialRows) && EqualityUtils.isEqual(_type, that._type)
+        && EqualityUtils.isEqual(_topicName, that._topicName) && EqualityUtils.isEqual(_consumerTypes,
+        that._consumerTypes) && EqualityUtils.isEqual(_consumerFactoryClassName, that._consumerFactoryClassName)
+        && EqualityUtils.isEqual(_offsetCriteria, that._offsetCriteria) && EqualityUtils.isEqual(_decoderClass,
+        that._decoderClass) && EqualityUtils.isEqual(_decoderProperties, that._decoderProperties)
+        && EqualityUtils.isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_tableNameWithType,
+        that._tableNameWithType) && EqualityUtils.isEqual(_topicConsumptionRateLimit, that._topicConsumptionRateLimit)
         && EqualityUtils.isEqual(_streamConfigMap, that._streamConfigMap);
   }
 
@@ -417,6 +417,7 @@ public class StreamConfig {
     result = EqualityUtils.hashCodeOf(result, _offsetCriteria);
     result = EqualityUtils.hashCodeOf(result, _connectionTimeoutMillis);
     result = EqualityUtils.hashCodeOf(result, _fetchTimeoutMillis);
+    result = EqualityUtils.hashCodeOf(result, _idleTimeoutMillis);
     result = EqualityUtils.hashCodeOf(result, _flushThresholdRows);
     result = EqualityUtils.hashCodeOf(result, _flushThresholdTimeMillis);
     result = EqualityUtils.hashCodeOf(result, _flushThresholdSegmentSizeBytes);
