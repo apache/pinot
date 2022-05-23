@@ -857,7 +857,9 @@ public class PinotLLCRealtimeSegmentManager {
    *
    * If the consuming segment is deleted:
    * Check whether there are segments in the PROPERTYSTORE with status DONE, but no new segment in status
-   * IN_PROGRESS, and the state for the latest segment in the IDEALSTATE is ONLINE
+   * IN_PROGRESS, and the state for the latest segment in the IDEALSTATE is ONLINE.
+   * If so, it should create a new CONSUMING segment for the partition.
+   * (this operation is done only if @param recreateDeletedConsumingSegment is set to true)
    *
    * If the controller fails after step-3, we are fine because the idealState has the new segments.
    * If the controller fails before step-1, the server will see this as an upload failure, and will re-try.
@@ -1127,7 +1129,7 @@ public class PinotLLCRealtimeSegmentManager {
           // CONSUMING segment
           // 1. all replicas OFFLINE and metadata IN_PROGRESS/DONE - a segment marked itself OFFLINE during
           // consumption for some reason
-          // 2. all replicas ONLINE and metadata DONE - Resolved in https://github.com/linkedin/pinot/pull/2890
+          // 2. all replicas ONLINE and metadata DONE
           // 3. we should never end up with some replicas ONLINE and some OFFLINE.
           if (isAllInstancesInState(instanceStateMap, SegmentStateModel.OFFLINE)) {
             LOGGER.info("Repairing segment: {} which is OFFLINE for all instances in IdealState", latestSegmentName);
