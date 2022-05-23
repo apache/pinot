@@ -181,6 +181,7 @@ public class JsonUtils {
   /**
    * Reads the first json object from the file that can contain multiple objects
    */
+  @Nullable
   public static JsonNode fileToFirstJsonNode(File jsonFile)
       throws IOException {
     JsonFactory jf = new JsonFactory();
