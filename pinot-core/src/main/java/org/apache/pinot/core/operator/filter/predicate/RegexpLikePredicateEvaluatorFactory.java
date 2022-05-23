@@ -80,6 +80,19 @@ public class RegexpLikePredicateEvaluatorFactory {
     }
 
     @Override
+    public int applySV(int limit, int[] docIds, int[] values) {
+      int matches = 0;
+      for (int i = 0; i < limit; i++) {
+        int value = values[i];
+        if (applySV(value)) {
+          docIds[matches] = docIds[i];
+          values[matches++] = value;
+        }
+      }
+      return matches;
+    }
+
+    @Override
     public int[] getMatchingDictIds() {
       if (_matchingDictIds == null) {
         IntList matchingDictIds = new IntArrayList();

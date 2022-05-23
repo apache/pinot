@@ -73,6 +73,27 @@ public interface PredicateEvaluator {
   boolean applySV(int value);
 
   /**
+   * Apply the predicate to a batch of single-value entries.
+   * Compact matching entries into the prefix of the arrays.
+   *
+   * @param limit How much of the input to consume.
+   * @param docIds The docIds associated with the values - may be modified by invocation.
+   * @param values Batch of dictionary ids or raw values - may be modified by invocation.
+   * @return the index of the first non-matching entry.
+   */
+  default int applySV(int limit, int[] docIds, int[] values) {
+    int matches = 0;
+    for (int i = 0; i < limit; i++) {
+      int value = values[i];
+      if (applySV(value)) {
+        docIds[matches] = docIds[i];
+        values[matches++] = value;
+      }
+    }
+    return matches;
+  }
+
+  /**
    * Apply a multi-value entry to the predicate.
    *
    * @param values Array of dictionary ids or raw values
@@ -118,6 +139,27 @@ public interface PredicateEvaluator {
   boolean applySV(long value);
 
   /**
+   * Apply the predicate to a batch of single-value entries.
+   * Compact matching entries into the prefix of the arrays.
+   *
+   * @param limit How much of the input to consume.
+   * @param docIds The docIds associated with the values - may be modified by invocation.
+   * @param values Batch of raw values - may be modified by invocation.
+   * @return the index of the first non-matching entry.
+   */
+  default int applySV(int limit, int[] docIds, long[] values) {
+    int matches = 0;
+    for (int i = 0; i < limit; i++) {
+      long value = values[i];
+      if (applySV(value)) {
+        docIds[matches] = docIds[i];
+        values[matches++] = value;
+      }
+    }
+    return matches;
+  }
+
+  /**
    * Apply a multi-value entry to the predicate.
    *
    * @param values Array of raw values
@@ -135,6 +177,27 @@ public interface PredicateEvaluator {
   boolean applySV(float value);
 
   /**
+   * Apply the predicate to a batch of single-value entries.
+   * Compact matching entries into the prefix of the arrays.
+   *
+   * @param limit How much of the input to consume.
+   * @param docIds The docIds associated with the values - may be modified by invocation.
+   * @param values Batch of raw values - may be modified by invocation.
+   * @return the index of the first non-matching entry.
+   */
+  default int applySV(int limit, int[] docIds, float[] values) {
+    int matches = 0;
+    for (int i = 0; i < limit; i++) {
+      float value = values[i];
+      if (applySV(value)) {
+        docIds[matches] = docIds[i];
+        values[matches++] = value;
+      }
+    }
+    return matches;
+  }
+
+  /**
    * Apply a multi-value entry to the predicate.
    *
    * @param values Array of raw values
@@ -150,6 +213,27 @@ public interface PredicateEvaluator {
    * @return Whether the entry matches the predicate
    */
   boolean applySV(double value);
+
+  /**
+   * Apply the predicate to a batch of single-value entries.
+   * Compact matching entries into the prefix of the arrays.
+   *
+   * @param limit How much of the input to consume.
+   * @param docIds The docIds associated with the values - may be modified by invocation.
+   * @param values Batch of raw values - may be modified by invocation.
+   * @return the index of the first non-matching entry.
+   */
+  default int applySV(int limit, int[] docIds, double[] values) {
+    int matches = 0;
+    for (int i = 0; i < limit; i++) {
+      double value = values[i];
+      if (applySV(value)) {
+        docIds[matches] = docIds[i];
+        values[matches++] = value;
+      }
+    }
+    return matches;
+  }
 
   /**
    * Apply a multi-value entry to the predicate.

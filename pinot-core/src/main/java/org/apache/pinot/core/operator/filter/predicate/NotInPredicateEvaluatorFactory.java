@@ -171,6 +171,19 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
+    public int applySV(int limit, int[] docIds, int[] values) {
+      int matches = 0;
+      for (int i = 0; i < limit; i++) {
+        int value = values[i];
+        if (applySV(value)) {
+          docIds[matches] = docIds[i];
+          values[matches++] = value;
+        }
+      }
+      return matches;
+    }
+
+    @Override
     public int[] getMatchingDictIds() {
       if (_matchingDictIds == null) {
         int dictionarySize = _dictionary.length();
@@ -216,6 +229,19 @@ public class NotInPredicateEvaluatorFactory {
     public boolean applySV(int value) {
       return !_nonMatchingValues.contains(value);
     }
+
+    @Override
+    public int applySV(int limit, int[] docIds, int[] values) {
+      int matches = 0;
+      for (int i = 0; i < limit; i++) {
+        int value = values[i];
+        if (applySV(value)) {
+          docIds[matches] = docIds[i];
+          values[matches++] = value;
+        }
+      }
+      return matches;
+    }
   }
 
   private static final class LongRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
@@ -234,6 +260,19 @@ public class NotInPredicateEvaluatorFactory {
     @Override
     public boolean applySV(long value) {
       return !_nonMatchingValues.contains(value);
+    }
+
+    @Override
+    public int applySV(int limit, int[] docIds, long[] values) {
+      int matches = 0;
+      for (int i = 0; i < limit; i++) {
+        long value = values[i];
+        if (applySV(value)) {
+          docIds[matches] = docIds[i];
+          values[matches++] = value;
+        }
+      }
+      return matches;
     }
   }
 
@@ -254,6 +293,19 @@ public class NotInPredicateEvaluatorFactory {
     public boolean applySV(float value) {
       return !_nonMatchingValues.contains(value);
     }
+
+    @Override
+    public int applySV(int limit, int[] docIds, float[] values) {
+      int matches = 0;
+      for (int i = 0; i < limit; i++) {
+        float value = values[i];
+        if (applySV(value)) {
+          docIds[matches] = docIds[i];
+          values[matches++] = value;
+        }
+      }
+      return matches;
+    }
   }
 
   private static final class DoubleRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
@@ -272,6 +324,19 @@ public class NotInPredicateEvaluatorFactory {
     @Override
     public boolean applySV(double value) {
       return !_nonMatchingValues.contains(value);
+    }
+
+    @Override
+    public int applySV(int limit, int[] docIds, double[] values) {
+      int matches = 0;
+      for (int i = 0; i < limit; i++) {
+        double value = values[i];
+        if (applySV(value)) {
+          docIds[matches] = docIds[i];
+          values[matches++] = value;
+        }
+      }
+      return matches;
     }
   }
 
