@@ -48,10 +48,11 @@ public class QueryOptionsUtils {
   }
 
   // TODO: Debug options has been kept for backward compatibility should be deprecated in future releases
-  public static boolean isSkipStartree(Map<String, String> queryOptions, Map<String, String> debugOptions) {
-    boolean disabledWithQueryOption = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.SKIP_STARTREE));
+  public static boolean isSkipStarTree(Map<String, String> queryOptions, Map<String, String> debugOptions) {
+    boolean disabledWithQueryOption = !Boolean.parseBoolean(
+        queryOptions.getOrDefault(Request.QueryOptionKey.USE_STAR_TREE_KEY, "true"));
     return disabledWithQueryOption || (debugOptions != null
-        && !Boolean.parseBoolean(debugOptions.get(Request.DebugOptionsKey.USE_STAR_TREE_KEY)));
+        && !Boolean.parseBoolean(debugOptions.getOrDefault(Request.QueryOptionKey.USE_STAR_TREE_KEY, "true")));
   }
 
   public static Integer getNumReplicaGroupsToQuery(Map<String, String> queryOptions) {

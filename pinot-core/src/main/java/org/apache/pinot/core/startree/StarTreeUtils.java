@@ -52,7 +52,7 @@ public class StarTreeUtils {
    * Returns whether star-tree is disabled for the query.
    */
   public static boolean isStarTreeDisabled(QueryContext queryContext) {
-    return queryContext.isSkipStartree();
+    return queryContext.isSkipStarTree();
   }
 
   /**
