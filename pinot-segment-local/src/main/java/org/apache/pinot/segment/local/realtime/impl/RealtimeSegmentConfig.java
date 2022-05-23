@@ -462,7 +462,8 @@ public class RealtimeSegmentConfig {
           _textIndexColumns, _fstIndexColumns, _jsonIndexColumns, _h3IndexConfigs, _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
           _nullHandlingEnabled, _consumerDir, _upsertMode, _dedupEnabled, _upsertComparisonColumn, _hashFunction,
-          _partitionUpsertMetadataManager, _partitionDedupMetadataManager, _fieldConfigList, _ingestionAggregationConfigs);
+          _partitionUpsertMetadataManager, _partitionDedupMetadataManager, _fieldConfigList,
+          _ingestionAggregationConfigs);
     }
   }
 }

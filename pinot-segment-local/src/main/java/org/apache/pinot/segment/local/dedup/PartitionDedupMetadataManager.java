@@ -19,11 +19,13 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.local.utils.RecordInfo;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +49,19 @@ public class PartitionDedupMetadataManager {
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
     _hashFunction = hashFunction;
+  }
+
+  public void addSegment(IndexSegment segment, Iterator<RecordInfo> recordInfoIterator) {
+    // Add all PKs to _primaryKeySet
+    while (recordInfoIterator.hasNext()) {
+      RecordInfo recordInfo = recordInfoIterator.next();
+      _primaryKeySet.put(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), true);
+    }
+  }
+
+  public void removeSegment(IndexSegment segment) {
+    // Remove all PKs from _primaryKeySet
+    // how??
   }
 
   public boolean checkRecordPresentOrUpdate(RecordInfo recordInfo) {
