@@ -80,7 +80,7 @@ public class TableResponse {
         throws ExecutionException {
       String response = getStringResponse(timeout, unit);
       try {
-        JsonNode jsonResponse = JsonUtils.readTree(response);
+        JsonNode jsonResponse = JsonUtils.stringToJsonNode(response);
         TableResponse tableResponse = TableResponse.fromJson(jsonResponse);
         return tableResponse;
       } catch (IOException e) {

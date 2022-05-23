@@ -44,7 +44,7 @@ public class ExecutionStatsTest {
             + "\"numSegmentsProcessed\":10, \"numSegmentsMatched\":10, \"numConsumingSegmentsQueried\":10, "
             + "\"minConsumingFreshnessTimeMs\":10, \"totalDocs\":10, \"numGroupsLimitReached\":true, "
             + "\"timeUsedMs\":10}";
-    _mockBrokerResponse = JsonUtils.readTree(json);
+    _mockBrokerResponse = JsonUtils.stringToJsonNode(json);
     _executionStatsUnderTest = new ExecutionStats(_mockBrokerResponse);
   }
 

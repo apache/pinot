@@ -108,7 +108,7 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
     // For a sample response payload,
     // check https://docs.microsoft.com/en-us/azure/virtual-machines/windows/instance-metadata-service?tabs=linux
     try {
-      final JsonNode jsonNode = JsonUtils.readTree(responsePayload);
+      final JsonNode jsonNode = JsonUtils.stringToJsonNode(responsePayload);
       final JsonNode computeNode = jsonNode.path(COMPUTE);
 
       if (computeNode.isMissingNode()) {

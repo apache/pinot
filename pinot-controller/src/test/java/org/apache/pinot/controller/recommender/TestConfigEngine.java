@@ -56,7 +56,7 @@ public class TestConfigEngine {
 
   void loadInput(String fName)
       throws InvalidInputException, IOException {
-    _input = JsonUtils.readValue(readInputToStr(fName), InputManager.class);
+    _input = JsonUtils.stringToObject(readInputToStr(fName), InputManager.class);
     _input.init();
   }
 
@@ -499,7 +499,7 @@ public class TestConfigEngine {
       throws IOException, InvalidInputException {
     String input = readInputToStr(fileName);
     String output = RecommenderDriver.run(input);
-    return JsonUtils.readValue(output, ConfigManager.class);
+    return JsonUtils.stringToObject(output, ConfigManager.class);
   }
 
   private void assertRealtimeProvisioningRecommendation(Map<String, String> matrix) {

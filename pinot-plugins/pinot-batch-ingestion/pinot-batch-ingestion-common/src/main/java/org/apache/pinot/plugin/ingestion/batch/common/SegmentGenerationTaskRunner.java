@@ -92,7 +92,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
       if (configs == null) {
         configs = new HashMap<>();
       }
-      JsonNode jsonNode = JsonUtils.valueToTree(configs);
+      JsonNode jsonNode = JsonUtils.objectToJsonNode(configs);
       Class<?> clazz = PluginManager.get().loadClass(readerConfigClassName);
       recordReaderConfig = (RecordReaderConfig) JsonUtils.jsonNodeToObject(jsonNode, clazz);
     }

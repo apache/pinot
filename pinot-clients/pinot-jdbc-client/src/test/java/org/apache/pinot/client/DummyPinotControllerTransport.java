@@ -30,7 +30,7 @@ public class DummyPinotControllerTransport extends PinotControllerTransport {
   public ControllerTenantBrokerResponse getBrokersFromController(String controllerAddress, String tenant) {
     try {
       String jsonString = "[{\"instanceName\": \"dummy\", \"host\" : \"dummy\", \"port\" : 8000}]";
-      JsonNode dummyBrokerJsonResponse = JsonUtils.readTree(jsonString);
+      JsonNode dummyBrokerJsonResponse = JsonUtils.stringToJsonNode(jsonString);
       return ControllerTenantBrokerResponse.fromJson(dummyBrokerJsonResponse);
     } catch (Exception e) {
     }

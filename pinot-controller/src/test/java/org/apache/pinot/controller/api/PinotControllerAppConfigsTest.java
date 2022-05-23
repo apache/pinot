@@ -53,7 +53,7 @@ public class PinotControllerAppConfigsTest {
 
     String configsJson =
         ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forAppConfigs());
-    PinotAppConfigs actual = JsonUtils.readValue(configsJson, PinotAppConfigs.class);
+    PinotAppConfigs actual = JsonUtils.stringToObject(configsJson, PinotAppConfigs.class);
 
     // RuntimeConfig is not checked as it has information that can change during the test run.
     // Also, some of the system configs can change, so compare the ones that don't.
@@ -69,7 +69,7 @@ public class PinotControllerAppConfigsTest {
     // tests Equals on obfuscated expected and actual
     Obfuscator obfuscator = new Obfuscator();
     String obfuscatedExpectedJson = obfuscator.toJsonString(expected);
-    PinotAppConfigs obfuscatedExpected = JsonUtils.readValue(obfuscatedExpectedJson, PinotAppConfigs.class);
+    PinotAppConfigs obfuscatedExpected = JsonUtils.stringToObject(obfuscatedExpectedJson, PinotAppConfigs.class);
     Assert.assertEquals(actual.getJvmConfig(), obfuscatedExpected.getJvmConfig());
     Assert.assertEquals(actual.getPinotConfig(), obfuscatedExpected.getPinotConfig());
   }

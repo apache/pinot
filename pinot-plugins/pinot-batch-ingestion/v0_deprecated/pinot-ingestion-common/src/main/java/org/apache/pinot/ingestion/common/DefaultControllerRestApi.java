@@ -189,7 +189,7 @@ public class DefaultControllerRestApi implements ControllerRestApi {
             .getRetrieveAllSegmentWithTableTypeHttpUri(pushLocation.getHost(), pushLocation.getPort(), _rawTableName,
                 tableType));
         JsonNode segmentList = getSegmentsFromJsonSegmentAPI(response.getResponse(), tableType);
-        return JsonUtils.convertValue(segmentList, ArrayList.class);
+        return JsonUtils.jsonNodeToObject(segmentList, ArrayList.class);
       } catch (Exception e) {
         LOGGER.warn("Caught exception while getting all {} segments for table: {} from push location: {}", tableType,
             _rawTableName, pushLocation, e);

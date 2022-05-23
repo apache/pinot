@@ -181,7 +181,7 @@ public class PinotResultSetTest {
           lastByte = stream.read();
         }
         String jsonText = builder.toString();
-        return BrokerResponse.fromJson(JsonUtils.readTree(jsonText));
+        return BrokerResponse.fromJson(JsonUtils.stringToJsonNode(jsonText));
       } catch (Exception e) {
         Assert.fail("Unexpected exception", e);
         return null;

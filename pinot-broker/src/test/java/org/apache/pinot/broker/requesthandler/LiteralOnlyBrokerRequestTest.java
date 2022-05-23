@@ -128,7 +128,7 @@ public class LiteralOnlyBrokerRequestTest {
     byte[] randBytes = new byte[12];
     RANDOM.nextBytes(randBytes);
     String ranStr = BytesUtils.toHexString(randBytes);
-    JsonNode request = JsonUtils.readTree(String.format("{\"sql\":\"SELECT %d, '%s'\"}", randNum, ranStr));
+    JsonNode request = JsonUtils.stringToJsonNode(String.format("{\"sql\":\"SELECT %d, '%s'\"}", randNum, ranStr));
     RequestContext requestStats = Tracing.getTracer().createRequestScope();
     BrokerResponseNative brokerResponse = requestHandler.handleRequest(request, null, requestStats);
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), String.format("%d", randNum));
@@ -152,7 +152,7 @@ public class LiteralOnlyBrokerRequestTest {
             new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()),
             null, null);
     long currentTsMin = System.currentTimeMillis();
-    JsonNode request = JsonUtils.readTree(
+    JsonNode request = JsonUtils.stringToJsonNode(
         "{\"sql\":\"SELECT now() as currentTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as firstDayOf2020\"}");
     RequestContext requestStats = Tracing.getTracer().createRequestScope();
     BrokerResponseNative brokerResponse = requestHandler.handleRequest(request, null, requestStats);
@@ -171,7 +171,7 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
 
     long oneHourAgoTsMin = System.currentTimeMillis() - ONE_HOUR_IN_MS;
-    request = JsonUtils.readTree(
+    request = JsonUtils.stringToJsonNode(
         "{\"sql\":\"SELECT ago('PT1H') as oneHourAgoTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as "
             + "firstDayOf2020\"}");
     requestStats = Tracing.getTracer().createRequestScope();
@@ -192,7 +192,7 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[1], 1577836800000L);
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
 
-    request = JsonUtils.readTree(
+    request = JsonUtils.stringToJsonNode(
         "{\"sql\":\"SELECT encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') AS encoded, "
             + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') AS decoded\"}");
     requestStats = Tracing.getTracer().createRequestScope();
@@ -223,7 +223,7 @@ public class LiteralOnlyBrokerRequestTest {
             null, null);
 
     // Test 1: select constant
-    JsonNode request = JsonUtils.readTree("{\"sql\":\"EXPLAIN PLAN FOR SELECT 1.5, 'test'\"}");
+    JsonNode request = JsonUtils.stringToJsonNode("{\"sql\":\"EXPLAIN PLAN FOR SELECT 1.5, 'test'\"}");
     RequestContext requestStats = Tracing.getTracer().createRequestScope();
     BrokerResponseNative brokerResponse = requestHandler.handleRequest(request, null, requestStats);
 
@@ -239,7 +239,7 @@ public class LiteralOnlyBrokerRequestTest {
 
     // Test 2: invoke compile time function -> literal only
     long currentTsMin = System.currentTimeMillis();
-    request = JsonUtils.readTree(
+    request = JsonUtils.stringToJsonNode(
         "{\"sql\":\"EXPLAIN PLAN FOR SELECT 6+8 as addition, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as "
             + "firstDayOf2020\"}");
     requestStats = Tracing.getTracer().createRequestScope();

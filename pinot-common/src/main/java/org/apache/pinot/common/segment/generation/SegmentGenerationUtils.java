@@ -126,7 +126,7 @@ public class SegmentGenerationUtils {
     // Controller API returns a wrapper of table config.
     JsonNode tableJsonNode;
     try {
-      tableJsonNode = JsonUtils.readTree(tableConfigJson);
+      tableJsonNode = JsonUtils.stringToJsonNode(tableConfigJson);
     } catch (IOException e) {
       throw new RuntimeException("Failed to decode table config into JSON from String - '" + tableConfigJson + "'", e);
     }

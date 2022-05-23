@@ -121,7 +121,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     Assert.assertEquals("Long", genericRow.getValue(testColumnName).getClass().getSimpleName());
 
     String jsonString = genericRecord.toString();
-    Map<String, Object> jsonMap = JsonUtils.readValue(jsonString, JsonUtils.GENERIC_JSON_TYPE);
+    Map<String, Object> jsonMap = JsonUtils.stringToObject(jsonString, JsonUtils.GENERIC_JSON_TYPE);
     // The data type got changed to Integer, which will then have to trigger the convert method in
     // DataTypeTransformer class.
     Assert.assertEquals("Integer", jsonMap.get(testColumnName).getClass().getSimpleName());

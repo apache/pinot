@@ -39,7 +39,7 @@ public class GroupByResultSetTest {
     String jsonString =
         "{\"groupByResult\":[{\"value\":1, \"group\":[\"testGroup1\"]},{\"value\":2, \"group\":[\"testGroup2\"]}], "
             + "\"groupByColumns\":[\"testGroupColumn\"], \"function\":\"testFunction\"}";
-    _mockJsonObject = JsonUtils.readTree(jsonString);
+    _mockJsonObject = JsonUtils.stringToJsonNode(jsonString);
     _groupByResultSetUnderTest = new GroupByResultSet(_mockJsonObject);
   }
 

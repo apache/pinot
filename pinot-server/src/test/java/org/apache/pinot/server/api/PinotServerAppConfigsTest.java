@@ -58,7 +58,7 @@ public class PinotServerAppConfigsTest extends BaseResourceTest {
 
     Response response = _webTarget.path("/appconfigs").request().get(Response.class);
     String configsJson = response.readEntity(String.class);
-    PinotAppConfigs actual = JsonUtils.readValue(configsJson, PinotAppConfigs.class);
+    PinotAppConfigs actual = JsonUtils.stringToObject(configsJson, PinotAppConfigs.class);
 
     // RuntimeConfig is not checked as it has information that can change during the test run.
     // Also, some of the system configs can change, so compare the ones that don't.
@@ -74,7 +74,7 @@ public class PinotServerAppConfigsTest extends BaseResourceTest {
     // tests Equals on obfuscated expected and actual
     Obfuscator obfuscator = new Obfuscator();
     String obfuscatedExpectedJson = obfuscator.toJsonString(expected);
-    PinotAppConfigs obfuscatedExpected = JsonUtils.readValue(obfuscatedExpectedJson, PinotAppConfigs.class);
+    PinotAppConfigs obfuscatedExpected = JsonUtils.stringToObject(obfuscatedExpectedJson, PinotAppConfigs.class);
     Assert.assertEquals(actual.getJvmConfig(), obfuscatedExpected.getJvmConfig());
     Assert.assertEquals(actual.getPinotConfig(), obfuscatedExpected.getPinotConfig());
   }

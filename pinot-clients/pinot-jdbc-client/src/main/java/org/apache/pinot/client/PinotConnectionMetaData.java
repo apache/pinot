@@ -112,7 +112,7 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
         pinotMeta.addRow(Arrays.asList(row));
       }
 
-      JsonNode resultTable = JsonUtils.valueToTree(pinotMeta);
+      JsonNode resultTable = JsonUtils.objectToJsonNode(pinotMeta);
       return PinotResultSet.fromResultTable(new ResultTableResultSet(resultTable));
     } catch (Exception e) {
       throw new SQLException(e);
@@ -142,7 +142,7 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
     row.add(TABLE_TYPE);
     pinotMeta.addRow(row);
 
-    JsonNode resultTable = JsonUtils.valueToTree(pinotMeta);
+    JsonNode resultTable = JsonUtils.objectToJsonNode(pinotMeta);
     return PinotResultSet.fromResultTable(new ResultTableResultSet(resultTable));
   }
 
@@ -178,7 +178,7 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
       }
     }
 
-    JsonNode resultTable = JsonUtils.valueToTree(pinotMeta);
+    JsonNode resultTable = JsonUtils.objectToJsonNode(pinotMeta);
     return PinotResultSet.fromResultTable(new ResultTableResultSet(resultTable));
   }
 

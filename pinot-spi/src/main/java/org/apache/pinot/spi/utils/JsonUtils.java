@@ -90,11 +90,6 @@ public class JsonUtils {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
   }
 
-  public static <T> T readValue(String jsonString, Class<T> valueType)
-      throws JsonProcessingException {
-    return DEFAULT_MAPPER.readValue(jsonString, valueType);
-  }
-
   public static <T> Pair<T, Map<String, Object>> inputStreamToObjectAndUnrecognizedProperties(
       InputStream jsonInputStream, Class<T> valueType)
       throws IOException {
@@ -145,18 +140,8 @@ public class JsonUtils {
     return DEFAULT_READER.forType(valueTypeRef).readValue(jsonString);
   }
 
-  public static <T> T readValue(String jsonString, TypeReference<T> valueTypeRef)
-      throws JsonProcessingException {
-    return DEFAULT_READER.forType(valueTypeRef).readValue(jsonString);
-  }
-
   public static JsonNode stringToJsonNode(String jsonString)
       throws IOException {
-    return DEFAULT_READER.readTree(jsonString);
-  }
-
-  public static JsonNode readTree(String jsonString)
-      throws JsonProcessingException {
     return DEFAULT_READER.readTree(jsonString);
   }
 
@@ -235,11 +220,6 @@ public class JsonUtils {
     return DEFAULT_WRITER.writeValueAsString(object);
   }
 
-  public static Object writeValueAsString(Object object)
-      throws JsonProcessingException {
-    return DEFAULT_WRITER.writeValueAsString(object);
-  }
-
   public static String objectToPrettyString(Object object)
       throws JsonProcessingException {
     return DEFAULT_PRETTY_WRITER.writeValueAsString(object);
@@ -251,10 +231,6 @@ public class JsonUtils {
   }
 
   public static JsonNode objectToJsonNode(Object object) {
-    return DEFAULT_MAPPER.valueToTree(object);
-  }
-
-  public static JsonNode valueToTree(Object object) {
     return DEFAULT_MAPPER.valueToTree(object);
   }
 
@@ -629,13 +605,5 @@ public class JsonUtils {
           throw new UnsupportedOperationException("Unsupported field type: " + fieldType + " for field: " + name);
       }
     }
-  }
-
-  public static <T> T convertValue(JsonNode node, TypeReference<T> typeReference) {
-    return DEFAULT_MAPPER.convertValue(node, typeReference);
-  }
-
-  public static <T> T convertValue(JsonNode node, Class<T> clazz) {
-    return DEFAULT_MAPPER.convertValue(node, clazz);
   }
 }

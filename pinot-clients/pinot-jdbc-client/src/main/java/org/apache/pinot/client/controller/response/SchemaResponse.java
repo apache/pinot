@@ -77,7 +77,7 @@ public class SchemaResponse {
         throws ExecutionException {
       String response = getStringResponse(timeout, unit);
       try {
-        JsonNode jsonResponse = JsonUtils.readTree(response);
+        JsonNode jsonResponse = JsonUtils.stringToJsonNode(response);
         return SchemaResponse.fromJson(jsonResponse);
       } catch (IOException e) {
         new ExecutionException(e);

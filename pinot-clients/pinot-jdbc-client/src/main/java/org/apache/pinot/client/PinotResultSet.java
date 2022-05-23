@@ -79,7 +79,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
 
   public static PinotResultSet fromJson(String jsonText) {
     try {
-      JsonNode brokerResponse = JsonUtils.readTree(jsonText);
+      JsonNode brokerResponse = JsonUtils.stringToJsonNode(jsonText);
       ResultSet resultSet = new ResultTableResultSet(brokerResponse.get("resultTable"));
       return new PinotResultSet(resultSet);
     } catch (Exception e) {

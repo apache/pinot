@@ -37,7 +37,7 @@ public class SelectionResultSetTest {
   public void setUp()
       throws Exception {
     String jsonString = "{\"results\":[[\"r1c1\",\"r1c2\"]], \"columns\":[\"column1\", \"column2\"]}";
-    _mockSelectionResults = JsonUtils.readTree(jsonString);
+    _mockSelectionResults = JsonUtils.stringToJsonNode(jsonString);
     _selectionResultSetUnderTest = new SelectionResultSet(_mockSelectionResults);
   }
 

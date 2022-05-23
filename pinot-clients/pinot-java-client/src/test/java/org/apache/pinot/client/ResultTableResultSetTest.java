@@ -41,7 +41,7 @@ public class ResultTableResultSetTest {
     String json =
         "{ \"rows\" : [[\"r1c1\", \"r1c2\"], [\"r2c1\", \"r2c2\"]], \"dataSchema\" : {\"columnNames\":[\"column1\", "
             + "\"column2\"], " + "\"columnDataTypes\":[\"column1DataType\", \"column2DataType\"]} } ";
-    _jsonNode = JsonUtils.readTree(json);
+    _jsonNode = JsonUtils.stringToJsonNode(json);
     _resultTableResultSetUnderTest = new ResultTableResultSet(_jsonNode);
   }
 

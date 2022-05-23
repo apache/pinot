@@ -37,7 +37,7 @@ public class AggregationResultSetTest {
   public void setUp()
       throws Exception {
     String jsonString = "{\"function\":\"testFunction\", \"value\":\"123\"}";
-    _mockJsonObject = JsonUtils.readTree(jsonString);
+    _mockJsonObject = JsonUtils.stringToJsonNode(jsonString);
     _aggregationResultSetUnderTest = new AggregationResultSet(_mockJsonObject);
   }
 

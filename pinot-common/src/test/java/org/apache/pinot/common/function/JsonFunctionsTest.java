@@ -266,14 +266,14 @@ public class JsonFunctionsTest {
   @Test(dataProvider = "jsonPathStringTestCases")
   public void testJsonPathString(Map<String, Object> map, String path, String expected)
       throws JsonProcessingException {
-    String value = JsonFunctions.jsonPathString(JsonUtils.writeValueAsString(map), path);
+    String value = JsonFunctions.jsonPathString(JsonUtils.objectToString(map), path);
     assertEquals(value, expected);
   }
 
   @Test(dataProvider = "jsonPathStringTestCases")
   public void testJsonPathStringWithDefaultValue(Map<String, Object> map, String path, String expected)
       throws JsonProcessingException {
-    String value = JsonFunctions.jsonPathString(JsonUtils.writeValueAsString(map), path, expected);
+    String value = JsonFunctions.jsonPathString(JsonUtils.objectToString(map), path, expected);
     assertEquals(value, expected);
   }
 
@@ -293,7 +293,7 @@ public class JsonFunctionsTest {
   @Test(dataProvider = "jsonPathArrayTestCases")
   public void testJsonPathArray(Map<String, Object> map, String path, Object[] expected)
       throws JsonProcessingException {
-    Object[] value = JsonFunctions.jsonPathArray(JsonUtils.writeValueAsString(map), path);
+    Object[] value = JsonFunctions.jsonPathArray(JsonUtils.objectToString(map), path);
     if (expected == null) {
       assertNull(value);
     } else {
