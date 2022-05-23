@@ -220,4 +220,44 @@ public interface BrokerResponse {
    * against realtime table in request handling, into the broker response.
    */
   void setRealtimeTotalCpuTimeNs(long realtimeTotalCpuTimeNs);
+
+  /**
+   * Get the total number of segments pruned on the Broker side
+   */
+  long getNumSegmentsPrunedByBroker();
+
+  /**
+   * Set the total number of segments pruned on the Broker side
+   */
+  void setNumSegmentsPrunedByBroker(long numSegmentsPrunedByBroker);
+
+  /**
+   * Get the total number of segments pruned on the Server side
+   */
+  long getNumSegmentsPrunedByServer();
+
+  /**
+   * Set the total number of segments pruned on the Server side
+   */
+  void setNumSegmentsPrunedByServer(long numSegmentsPrunedByServer);
+
+  /**
+   * Get the total number of segments with an EmptyFilterOperator when Explain Plan is called
+   */
+  long getExplainPlanNumEmptyFilterSegments();
+
+  /**
+   * Set the total number of segments with an EmptyFilterOperator when Explain Plan is called
+   */
+  void setExplainPlanNumEmptyFilterSegments(long explainPlanNumEmptyFilterSegments);
+
+  /**
+   * Get the total number of segments with a MatchAllFilterOperator when Explain Plan is called
+   */
+  long getExplainPlanNumMatchAllFilterSegments();
+
+  /**
+   * Set the total number of segments with a MatchAllFilterOperator when Explain Plan is called
+   */
+  void setExplainPlanNumMatchAllFilterSegments(long explainPlanNumMatchAllFilterSegments);
 }

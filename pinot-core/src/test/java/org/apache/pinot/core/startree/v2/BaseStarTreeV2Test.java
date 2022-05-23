@@ -70,6 +70,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 /**
@@ -93,6 +94,8 @@ abstract class BaseStarTreeV2Test<R, A> {
   private static final String DIMENSION_D2 = "d2";
   private static final int DIMENSION_CARDINALITY = 100;
   private static final String METRIC = "m";
+
+  // Supported filters
   private static final String QUERY_FILTER_AND = " WHERE d1 = 0 AND d2 < 10";
   // StarTree supports OR predicates only on a single dimension
   private static final String QUERY_FILTER_OR = " WHERE d1 > 10 OR d1 < 50";
@@ -102,11 +105,18 @@ abstract class BaseStarTreeV2Test<R, A> {
   private static final String QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS_THREE_PREDICATES =
       " WHERE (d2 > 95 OR d2 < 25) AND (d1 > 10 OR d1 < 50)";
   private static final String QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION = " WHERE d1 = 95 AND (d1 > 90 OR d1 < 100)";
+
+  // Unsupported filters
+  private static final String QUERY_FILTER_OR_MULTIPLE_DIMENSIONS = " WHERE d1 > 10 OR d2 < 50";
+  private static final String QUERY_FILTER_OR_ON_AND = " WHERE (d1 > 10 AND d1 < 50) OR d1 < 50";
+  private static final String QUERY_FILTER_OR_ON_NOT = " WHERE (NOT d1 > 10) OR d1 < 50";
+
   private static final String QUERY_GROUP_BY = " GROUP BY d2";
   private static final String FILTER_AGG_CLAUSE = " FILTER(WHERE d1 > 10)";
 
   private ValueAggregator _valueAggregator;
   private DataType _aggregatedValueType;
+  private String _aggregation;
   private IndexSegment _indexSegment;
   private StarTreeV2 _starTreeV2;
 
@@ -115,6 +125,16 @@ abstract class BaseStarTreeV2Test<R, A> {
       throws Exception {
     _valueAggregator = getValueAggregator();
     _aggregatedValueType = _valueAggregator.getAggregatedValueType();
+    AggregationFunctionType aggregationType = _valueAggregator.getAggregationType();
+    if (aggregationType == AggregationFunctionType.COUNT) {
+      _aggregation = "COUNT(*)";
+    } else if (aggregationType == AggregationFunctionType.PERCENTILEEST
+        || aggregationType == AggregationFunctionType.PERCENTILETDIGEST) {
+      // Append a percentile number for percentile functions
+      _aggregation = String.format("%s(%s, 50)", aggregationType.getName(), METRIC);
+    } else {
+      _aggregation = String.format("%s(%s)", aggregationType.getName(), METRIC);
+    }
 
     Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder().addSingleValueDimension(DIMENSION_D1, DataType.INT)
         .addSingleValueDimension(DIMENSION_D2, DataType.INT);
@@ -162,51 +182,29 @@ abstract class BaseStarTreeV2Test<R, A> {
   }
 
   @Test
-  public void testQueries()
-      throws IOException {
-    testQueriesHelper(false);
-    testQueriesHelper(true);
+  public void testUnsupportedFilters() {
+    String query = String.format("SELECT %s FROM %s", _aggregation, TABLE_NAME);
+    testUnsupportedFilter(query + QUERY_FILTER_OR_MULTIPLE_DIMENSIONS);
+    testUnsupportedFilter(query + QUERY_FILTER_OR_ON_AND);
+    testUnsupportedFilter(query + QUERY_FILTER_OR_ON_NOT);
   }
 
-  private void testQueriesHelper(boolean runFilteredAggregate)
+  @Test
+  public void testQueries()
       throws IOException {
-    AggregationFunctionType aggregationType = _valueAggregator.getAggregationType();
-    String aggregation;
-    String filteredAggregation = null;
-    if (aggregationType == AggregationFunctionType.COUNT) {
-      aggregation = "COUNT(*)";
-    } else if (aggregationType == AggregationFunctionType.PERCENTILEEST
-        || aggregationType == AggregationFunctionType.PERCENTILETDIGEST) {
-      // Append a percentile number for percentile functions
-      aggregation = String.format("%s50(%s)", aggregationType.getName(), METRIC);
-    } else {
-      aggregation = String.format("%s(%s)", aggregationType.getName(), METRIC);
+    String nonFilteredQuery = String.format("SELECT %s FROM %s", _aggregation, TABLE_NAME);
+    String filteredQuery = String.format("SELECT %s%s FROM %s", _aggregation, FILTER_AGG_CLAUSE, TABLE_NAME);
+    for (String query : Arrays.asList(nonFilteredQuery, filteredQuery)) {
+      testQuery(query);
+      testQuery(query + QUERY_FILTER_AND);
+      testQuery(query + QUERY_FILTER_OR);
+      testQuery(query + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS);
+      testQuery(query + QUERY_FILTER_COMPLEX_AND_MULTIPLE_DIMENSIONS_THREE_PREDICATES);
+      testQuery(query + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS_THREE_PREDICATES);
+      testQuery(query + QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION);
     }
-
-    String baseQuery = String.format("SELECT %s FROM %s", aggregation, TABLE_NAME);
-    String filteredQuery;
-
-    if (runFilteredAggregate) {
-      filteredAggregation = aggregation + FILTER_AGG_CLAUSE;
-      filteredQuery = String.format("SELECT %s FROM %s", filteredAggregation, TABLE_NAME);
-    } else {
-      filteredQuery = baseQuery;
-    }
-
-    testQuery(filteredQuery);
-    testQuery(filteredQuery + QUERY_FILTER_AND);
-    testQuery(filteredQuery + QUERY_FILTER_OR);
-    testQuery(filteredQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS);
-    testQuery(filteredQuery + QUERY_FILTER_COMPLEX_AND_MULTIPLE_DIMENSIONS_THREE_PREDICATES);
-    testQuery(filteredQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS_THREE_PREDICATES);
-    testQuery(filteredQuery + QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION);
-    testQuery(baseQuery + QUERY_GROUP_BY);
-    testQuery(baseQuery + QUERY_FILTER_AND + QUERY_GROUP_BY);
-    testQuery(baseQuery + QUERY_FILTER_OR + QUERY_GROUP_BY);
-    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS + QUERY_GROUP_BY);
-    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS_THREE_PREDICATES + QUERY_GROUP_BY);
-    testQuery(baseQuery + QUERY_FILTER_COMPLEX_AND_MULTIPLE_DIMENSIONS_THREE_PREDICATES + QUERY_GROUP_BY);
-    testQuery(baseQuery + QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION + QUERY_GROUP_BY);
+    // TODO: Test group-by on filtered query after supporting it
+    testQuery(nonFilteredQuery + QUERY_GROUP_BY);
   }
 
   @AfterClass
@@ -216,7 +214,17 @@ abstract class BaseStarTreeV2Test<R, A> {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
-  void testQuery(String query)
+  private void testUnsupportedFilter(String query) {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, queryContext);
+    filterPlanNode.run();
+    Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
+        StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, queryContext.getFilter(),
+            filterPlanNode.getPredicateEvaluators());
+    assertNull(predicateEvaluatorsMap);
+  }
+
+  private void testQuery(String query)
       throws IOException {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
 

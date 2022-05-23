@@ -33,7 +33,7 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
   }
 
 
-  private static final String EXPLAIN_NAME = "FILTER_EMPTY";
+  public static final String EXPLAIN_NAME = "FILTER_EMPTY";
 
   private static final EmptyFilterOperator INSTANCE = new EmptyFilterOperator();
 

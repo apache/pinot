@@ -84,15 +84,23 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
 
   @Override
   public Object evaluate(GenericRow genericRow) {
+    boolean hasNullArgument = false;
     for (String argument : _arguments) {
       Object value = genericRow.getValue(argument);
       if (value == null) {
-        // FIXME: if any param is null a) exit OR b) assume function handles it ?
-        return null;
+        hasNullArgument = true;
       }
       _binding.setVariable(argument, value);
     }
-    return _script.run();
+    try {
+      return _script.run();
+    } catch (Exception e) {
+      if (hasNullArgument) {
+        return null;
+      } else {
+        throw e;
+      }
+    }
   }
 
   @Override

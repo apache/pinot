@@ -30,6 +30,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -48,6 +49,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
 
   private static final String EXPLAIN_NAME = "INCLUSION_FILTER_H3_INDEX";
+  private static final String LITERAL_H3_CELLS_CACHE_NAME = "st_contain_literal_h3_cells";
 
   private final IndexSegment _segment;
   private final Predicate _predicate;
@@ -55,11 +57,14 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   private final H3IndexReader _h3IndexReader;
   private final Geometry _geometry;
   private final boolean _isPositiveCheck;
+  private final QueryContext _queryContext;
 
-  public H3InclusionIndexFilterOperator(IndexSegment segment, Predicate predicate, int numDocs) {
+  public H3InclusionIndexFilterOperator(IndexSegment segment, Predicate predicate, QueryContext queryContext,
+      int numDocs) {
     _segment = segment;
     _predicate = predicate;
     _numDocs = numDocs;
+    _queryContext = queryContext;
 
     List<ExpressionContext> arguments = predicate.getLhs().getFunction().getArguments();
     EqPredicate eqPredicate = (EqPredicate) predicate;
@@ -79,8 +84,10 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   @Override
   protected FilterBlock getNextBlock() {
     // get the set of H3 cells at the specified resolution which completely cover the input shape and potential cover.
-    Pair<LongSet, LongSet> fullCoverAndPotentialCoverCells =
-        H3Utils.coverGeometryInH3(_geometry, _h3IndexReader.getH3IndexResolution().getLowestResolution());
+    Pair<LongSet, LongSet> fullCoverAndPotentialCoverCells = _queryContext
+        .getOrComputeSharedValue(Pair.class, LITERAL_H3_CELLS_CACHE_NAME,
+            k -> H3Utils.coverGeometryInH3(_geometry, _h3IndexReader.getH3IndexResolution().getLowestResolution()));
+
     LongSet fullyCoverH3Cells = fullCoverAndPotentialCoverCells.getLeft();
     LongSet potentialCoverH3Cells = fullCoverAndPotentialCoverCells.getRight();
 

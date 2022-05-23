@@ -21,12 +21,16 @@ package org.apache.pinot.core.operator.transform.function;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Random;
+import java.util.stream.Stream;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
@@ -36,6 +40,54 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
       TransformFunctionType.GREATER_THAN_OR_EQUAL, TransformFunctionType.LESS_THAN,
       TransformFunctionType.LESS_THAN_OR_EQUAL
   };
+
+  @DataProvider
+  public Object[][] params() {
+    return Stream.of(INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN)
+        .flatMap(col -> Stream.of(
+            new int[] {3, 2, 1},
+            new int[] {1, 2, 3},
+            new int[] {Integer.MAX_VALUE / 2, Integer.MAX_VALUE / 4, 0},
+            new int[] {0, Integer.MAX_VALUE / 4, Integer.MAX_VALUE / 2},
+            new int[] {0, Integer.MIN_VALUE / 4, Integer.MIN_VALUE},
+            new int[] {Integer.MIN_VALUE, 0, 1},
+            new int[] {Integer.MAX_VALUE, Integer.MIN_VALUE, 1},
+            new int[] {Integer.MAX_VALUE, Integer.MAX_VALUE - 1, Integer.MAX_VALUE - 2}
+        ).map(thresholds -> new Object[]{col, thresholds[0], thresholds[1], thresholds[2]}))
+        .toArray(Object[][]::new);
+  }
+
+  @Test(dataProvider = "params")
+  public void testCasePriorityObserved(String column, int threshold1, int threshold2, int threshold3) {
+    String statement = String.format("CASE WHEN %s > %d THEN 3 WHEN %s > %d THEN 2 WHEN %s > %d THEN 1 ELSE -1 END",
+        column, threshold1, column, threshold2, column, threshold3);
+    ExpressionContext expression = RequestContextUtils.getExpression(statement);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    int[] expectedIntResults = new int[NUM_ROWS];
+    for (int i = 0; i < expectedIntResults.length; i++) {
+      switch (column) {
+        case INT_SV_COLUMN:
+          expectedIntResults[i] = _intSVValues[i] > threshold1 ? 3
+              : _intSVValues[i] > threshold2 ? 2 : _intSVValues[i] > threshold3 ? 1 : -1;
+          break;
+        case LONG_SV_COLUMN:
+          expectedIntResults[i] = _longSVValues[i] > threshold1 ? 3
+              : _longSVValues[i] > threshold2 ? 2 : _longSVValues[i] > threshold3 ? 1 : -1;
+          break;
+        case FLOAT_SV_COLUMN:
+          expectedIntResults[i] = _floatSVValues[i] > threshold1 ? 3
+              : _floatSVValues[i] > threshold2 ? 2 : _floatSVValues[i] > threshold3 ? 1 : -1;
+          break;
+        case DOUBLE_SV_COLUMN:
+          expectedIntResults[i] = _doubleSVValues[i] > threshold1 ? 3
+              : _doubleSVValues[i] > threshold2 ? 2 : _doubleSVValues[i] > threshold3 ? 1 : -1;
+          break;
+        default:
+      }
+    }
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    assertEquals(expectedIntResults, intValues);
+  }
 
   @Test
   public void testCaseTransformFunctionWithIntResults() {
@@ -149,8 +201,8 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
         RequestContextUtils.getExpression(String.format("CASE WHEN %s THEN 100 ELSE 10 END", predicate));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
-    Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
+    assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
     testTransformFunction(transformFunction, expectedValues);
   }
 
@@ -159,8 +211,8 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
         RequestContextUtils.getExpression(String.format("CASE WHEN %s THEN 100.0 ELSE 10.0 END", predicate));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
-    Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.FLOAT);
+    assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.FLOAT);
     testTransformFunction(transformFunction, expectedValues);
   }
 
@@ -170,8 +222,8 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
         String.format("CASE WHEN %s THEN '100.99887766554433221' ELSE '10.1122334455667788909' END", predicate));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
-    Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.BIG_DECIMAL);
+    assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.BIG_DECIMAL);
     testTransformFunction(transformFunction, expectedValues);
   }
 
@@ -180,8 +232,8 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
         RequestContextUtils.getExpression(String.format("CASE WHEN %s THEN 'aaa' ELSE 'bbb' END", predicate));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
-    Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.STRING);
+    assertEquals(transformFunction.getName(), CaseTransformFunction.FUNCTION_NAME);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.STRING);
     testTransformFunction(transformFunction, expectedValues);
   }
 
