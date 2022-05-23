@@ -47,6 +47,7 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0"},
         new Object[]{"SELECT a.col1, a.ts, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
             + "WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0"},
+        new Object[]{"SELECT a.col1, a.col3 + a.ts FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'"},
     };
   }
 }
