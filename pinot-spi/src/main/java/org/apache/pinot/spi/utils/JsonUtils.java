@@ -225,6 +225,10 @@ public class JsonUtils {
     return DEFAULT_READER.forType(valueTypeRef).readValue(jsonNode);
   }
 
+  public static Map<String, Object> jsonNodeToMap(JsonNode node) {
+    return DEFAULT_MAPPER.convertValue(node, GENERIC_JSON_TYPE);
+  }
+
   public static String objectToString(Object object)
       throws JsonProcessingException {
     return DEFAULT_WRITER.writeValueAsString(object);
@@ -624,10 +628,6 @@ public class JsonUtils {
           throw new UnsupportedOperationException("Unsupported field type: " + fieldType + " for field: " + name);
       }
     }
-  }
-
-  public static Map<String, Object> defaultConvertValue(JsonNode node) {
-    return DEFAULT_MAPPER.convertValue(node, GENERIC_JSON_TYPE);
   }
 
   public static <T> T convertValue(JsonNode node, TypeReference<T> typeReference) {
