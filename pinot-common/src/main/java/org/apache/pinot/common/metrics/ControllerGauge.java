@@ -26,6 +26,7 @@ import org.apache.pinot.common.Utils;
  */
 public enum ControllerGauge implements AbstractMetrics.Gauge {
 
+  REPLICATION_FROM_CONFIG("replicas", false),
   // Number of complete replicas of table in external view containing all segments online in ideal state
   NUMBER_OF_REPLICAS("replicas", false),
 
