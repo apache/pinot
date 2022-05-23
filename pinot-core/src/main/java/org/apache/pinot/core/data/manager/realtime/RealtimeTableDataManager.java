@@ -168,7 +168,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       DedupConfig dedupConfig = tableConfig.getDedupConfig();
       HashFunction dedupHashFunction = dedupConfig.getHashFunction();
       _tableDedupMetadataManager =
-          new TableDedupMetadataManager(_tableNameWithType, _serverMetrics, dedupHashFunction);
+          new TableDedupMetadataManager(_tableNameWithType, _primaryKeyColumns, _serverMetrics, dedupHashFunction);
     }
 
     if (isUpsertEnabled()) {
@@ -392,44 +392,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId);
     immutableSegment.enableDedup(partitionDedupMetadataManager);
-
-    Map<String, PinotSegmentColumnReader> columnToReaderMap = new HashMap<>();
-    for (String primaryKeyColumn : _primaryKeyColumns) {
-      columnToReaderMap.put(primaryKeyColumn, new PinotSegmentColumnReader(immutableSegment, primaryKeyColumn));
-    }
-    columnToReaderMap
-        .put(_upsertComparisonColumn, new PinotSegmentColumnReader(immutableSegment, _upsertComparisonColumn));
-    int numTotalDocs = immutableSegment.getSegmentMetadata().getTotalDocs();
-    int numPrimaryKeyColumns = _primaryKeyColumns.size();
-    Iterator<RecordInfo> recordInfoIterator =
-        new Iterator<RecordInfo>() {
-          private int _docId = 0;
-
-          @Override
-          public boolean hasNext() {
-            return _docId < numTotalDocs;
-          }
-
-          @Override
-          public RecordInfo next() {
-            Object[] values = new Object[numPrimaryKeyColumns];
-            for (int i = 0; i < numPrimaryKeyColumns; i++) {
-              Object value = columnToReaderMap.get(_primaryKeyColumns.get(i)).getValue(_docId);
-              if (value instanceof byte[]) {
-                value = new ByteArray((byte[]) value);
-              }
-              values[i] = value;
-            }
-            PrimaryKey primaryKey = new PrimaryKey(values);
-            Object upsertComparisonValue = columnToReaderMap.get(_upsertComparisonColumn).getValue(_docId);
-            Preconditions.checkState(upsertComparisonValue instanceof Comparable,
-                "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
-            return new RecordInfo(primaryKey, _docId++,
-                (Comparable) upsertComparisonValue);
-          }
-        };
-
-    partitionDedupMetadataManager.addSegment(immutableSegment, recordInfoIterator);
+    partitionDedupMetadataManager.addSegment(immutableSegment);
   }
 
   private void handleUpsert(ImmutableSegmentImpl immutableSegment) {
