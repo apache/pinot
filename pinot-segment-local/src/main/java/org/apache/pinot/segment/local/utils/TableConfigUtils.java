@@ -155,7 +155,7 @@ public final class TableConfigUtils {
    */
   public static void validateTableName(TableConfig tableConfig, boolean allowDots) {
     String tableName = tableConfig.getTableName();
-    int dotCount = StringUtils.countMatches(tableName,'.');
+    int dotCount = StringUtils.countMatches(tableName, '.');
     // For transitioning into full [database_name].[table_name] support, we allow the table name
     // with one dot at max, so the admin may create mydb.mytable with a feature knob.
     if (allowDots && dotCount > 1) {

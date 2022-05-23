@@ -781,7 +781,6 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       // expected
     }
-
   }
 
   @Test
