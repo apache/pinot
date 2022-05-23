@@ -249,7 +249,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestContext.setTableName(rawTableName);
 
     try {
-      boolean isCaseInsensitive = _tableCache.isCaseInsensitive();
+      boolean isCaseInsensitive = _tableCache.isIgnoreCase();
       Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
       if (columnNameMap != null) {
         updateColumnNames(rawTableName, serverPinotQuery, isCaseInsensitive, columnNameMap);
@@ -770,7 +770,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * @param tableCache the table case-sensitive cache
    * @param routingManager the routing mananger for testing whether a route exists
    * @param config the Pinot Configuration
-   * @return
+   * @return the table name in the format of [database_name].[table_name]
    */
   @VisibleForTesting
   static String getActualTableName(String tableName, TableCache tableCache, BrokerRoutingManager routingManager,
@@ -779,7 +779,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     boolean allowDots = config.getProperty(CommonConstants.Helix.CONFIG_OF_ALLOW_TABLE_NAME_DOTS,
         CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_DOTS);
 
-    if (tableCache.isCaseInsensitive()) {
+    if (tableCache.isIgnoreCase()) {
       String actualTableName = tableCache.getActualTableName(tableName);
       if (actualTableName != null) {
         return actualTableName;
@@ -1401,21 +1401,20 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Fixes the column names to the actual column names in the given expression.
    */
   private static void fixColumnName(String rawTableName, Expression expression, Map<String, String> columnNameMap,
-      Map<String, String> aliasMap, boolean isCaseInsensitive) {
+      Map<String, String> aliasMap, boolean ignoreCase) {
     ExpressionType expressionType = expression.getType();
     if (expressionType == ExpressionType.IDENTIFIER) {
       Identifier identifier = expression.getIdentifier();
-      identifier.setName(
-          getActualColumnName(rawTableName, identifier.getName(), columnNameMap, aliasMap, isCaseInsensitive));
+      identifier.setName(getActualColumnName(rawTableName, identifier.getName(), columnNameMap, aliasMap, ignoreCase));
     } else if (expressionType == ExpressionType.FUNCTION) {
       final Function functionCall = expression.getFunctionCall();
       switch (functionCall.getOperator()) {
         case "as":
-          fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, aliasMap, isCaseInsensitive);
+          fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, aliasMap, ignoreCase);
           final Expression rightAsExpr = functionCall.getOperands().get(1);
           if (rightAsExpr.isSetIdentifier()) {
             String rightColumn = rightAsExpr.getIdentifier().getName();
-            if (isCaseInsensitive) {
+            if (ignoreCase) {
               aliasMap.put(rightColumn.toLowerCase(), rightColumn);
             } else {
               aliasMap.put(rightColumn, rightColumn);
@@ -1427,7 +1426,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           break;
         default:
           for (Expression operand : functionCall.getOperands()) {
-            fixColumnName(rawTableName, operand, columnNameMap, aliasMap, isCaseInsensitive);
+            fixColumnName(rawTableName, operand, columnNameMap, aliasMap, ignoreCase);
           }
           break;
       }
@@ -1441,17 +1440,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    */
   @VisibleForTesting
   static String getActualColumnName(String rawTableName, String columnName, @Nullable Map<String, String> columnNameMap,
-      @Nullable Map<String, String> aliasMap, boolean isCaseInsensitive) {
+      @Nullable Map<String, String> aliasMap, boolean ignoreCase) {
     if ("*".equals(columnName)) {
       return columnName;
     }
     String columnNameToCheck;
-    if (columnName.regionMatches(!isCaseInsensitive, 0, rawTableName, 0, rawTableName.length())
+    if (columnName.regionMatches(ignoreCase, 0, rawTableName, 0, rawTableName.length())
         && columnName.length() > rawTableName.length() && columnName.charAt(rawTableName.length()) == '.') {
-      columnNameToCheck = isCaseInsensitive ? columnName.substring(rawTableName.length() + 1).toLowerCase()
+      columnNameToCheck = ignoreCase ? columnName.substring(rawTableName.length() + 1).toLowerCase()
           : columnName.substring(rawTableName.length() + 1);
     } else {
-      columnNameToCheck = isCaseInsensitive ? columnName.toLowerCase() : columnName;
+      columnNameToCheck = ignoreCase ? columnName.toLowerCase() : columnName;
     }
     if (columnNameMap != null) {
       String actualColumnName = columnNameMap.get(columnNameToCheck);

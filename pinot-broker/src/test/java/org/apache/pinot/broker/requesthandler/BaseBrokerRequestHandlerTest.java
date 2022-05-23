@@ -63,26 +63,59 @@ public class BaseBrokerRequestHandlerTest {
     Map<String, String> columnNameMap = new HashMap<>();
     columnNameMap.put("student_name", "student_name");
     String actualColumnName =
-        BaseBrokerRequestHandler.getActualColumnName("student", "student.student_name", columnNameMap, null, false);
+        BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable.student_name", columnNameMap, null, false);
     Assert.assertEquals(actualColumnName, "student_name");
     boolean exceptionThrown = false;
     try {
-      String unusedResult =
-          BaseBrokerRequestHandler.getActualColumnName("student", "student2.student_name", columnNameMap, null, false);
+      BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable2.student_name", columnNameMap, null, false);
       Assert.fail("should throw exception if column is not known");
     } catch (BadQueryRequestException ex) {
       exceptionThrown = true;
     }
     Assert.assertTrue(exceptionThrown, "should throw exception if column is not known");
-    columnNameMap.put("student_student_name", "student_student_name");
-    String wrongColumnName2 = BaseBrokerRequestHandler.getActualColumnName("student",
-        "student_student_name", columnNameMap, null, false);
-    Assert.assertEquals(wrongColumnName2, "student_student_name");
+    exceptionThrown = false;
+    try {
+      BaseBrokerRequestHandler.getActualColumnName("mytable", "MYTABLE.student_name", columnNameMap, null, false);
+      Assert.fail("should throw exception if case sensitive and table name different");
+    } catch (BadQueryRequestException ex) {
+      exceptionThrown = true;
+    }
+    Assert.assertTrue(exceptionThrown, "should throw exception if column is not known");
+    columnNameMap.put("mytable_student_name", "mytable_student_name");
+    String wrongColumnName2 =
+        BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable_student_name", columnNameMap, null, false);
+    Assert.assertEquals(wrongColumnName2, "mytable_student_name");
 
-    columnNameMap.put("student", "student");
-    String wrongColumnName3 = BaseBrokerRequestHandler.getActualColumnName("student",
-        "student", columnNameMap, null, false);
-    Assert.assertEquals(wrongColumnName3, "student");
+    columnNameMap.put("mytable", "mytable");
+    String wrongColumnName3 =
+        BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable", columnNameMap, null, false);
+    Assert.assertEquals(wrongColumnName3, "mytable");
+  }
+
+  @Test
+  public void testGetActualColumnNameCaseInSensitive() {
+    Map<String, String> columnNameMap = new HashMap<>();
+    columnNameMap.put("student_name", "student_name");
+    String actualColumnName =
+        BaseBrokerRequestHandler.getActualColumnName("mytable", "MYTABLE.student_name", columnNameMap, null, true);
+    Assert.assertEquals(actualColumnName, "student_name");
+    boolean exceptionThrown = false;
+    try {
+      BaseBrokerRequestHandler.getActualColumnName("student", "MYTABLE2.student_name", columnNameMap, null, true);
+      Assert.fail("should throw exception if column is not known");
+    } catch (BadQueryRequestException ex) {
+      exceptionThrown = true;
+    }
+    Assert.assertTrue(exceptionThrown, "should throw exception if column is not known");
+    columnNameMap.put("mytable_student_name", "mytable_student_name");
+    String wrongColumnName2 =
+        BaseBrokerRequestHandler.getActualColumnName("mytable", "MYTABLE_student_name", columnNameMap, null, true);
+    Assert.assertEquals(wrongColumnName2, "mytable_student_name");
+
+    columnNameMap.put("mytable", "mytable");
+    String wrongColumnName3 =
+        BaseBrokerRequestHandler.getActualColumnName("MYTABLE", "mytable", columnNameMap, null, true);
+    Assert.assertEquals(wrongColumnName3, "mytable");
   }
 
   @Test
@@ -120,7 +153,7 @@ public class BaseBrokerRequestHandlerTest {
 
     TableCache tableCache = Mockito.mock(TableCache.class);
     BrokerRoutingManager routingManager = Mockito.mock(BrokerRoutingManager.class);
-    when(tableCache.isCaseInsensitive()).thenReturn(true);
+    when(tableCache.isIgnoreCase()).thenReturn(true);
     when(tableCache.getActualTableName("mytable")).thenReturn("mytable");
     Assert.assertEquals(
         BaseBrokerRequestHandler.getActualTableName("mytable", tableCache, routingManager, configuration), "mytable");
@@ -129,7 +162,7 @@ public class BaseBrokerRequestHandlerTest {
         BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache, routingManager, configuration),
         "mytable");
 
-    when(tableCache.isCaseInsensitive()).thenReturn(false);
+    when(tableCache.isIgnoreCase()).thenReturn(false);
     when(routingManager.routingExists("mytable_OFFLINE")).thenReturn(true);
     when(routingManager.routingExists("mytable_REALTIME")).thenReturn(true);
     Assert.assertEquals(
@@ -145,7 +178,7 @@ public class BaseBrokerRequestHandlerTest {
 
     TableCache tableCache = Mockito.mock(TableCache.class);
     BrokerRoutingManager routingManager = Mockito.mock(BrokerRoutingManager.class);
-    when(tableCache.isCaseInsensitive()).thenReturn(true);
+    when(tableCache.isIgnoreCase()).thenReturn(true);
     // the tableCache should have only "db.mytable" in it since this is the only table
     when(tableCache.getActualTableName("mytable")).thenReturn(null);
     when(tableCache.getActualTableName("db.mytable")).thenReturn("db.mytable");
@@ -165,7 +198,7 @@ public class BaseBrokerRequestHandlerTest {
         BaseBrokerRequestHandler.getActualTableName("other.mytable", tableCache, routingManager, configuration),
         "other.mytable");
 
-    when(tableCache.isCaseInsensitive()).thenReturn(false);
+    when(tableCache.isIgnoreCase()).thenReturn(false);
     when(routingManager.routingExists("db.namespace.mytable_OFFLINE")).thenReturn(true);
     when(routingManager.routingExists("db.namespace.mytable_REALTIME")).thenReturn(true);
     Assert.assertEquals(
