@@ -184,8 +184,8 @@ public class PinotTableRestletResource {
       TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
       // TableConfigUtils.validateTableName(...) checks table name rules.
       // So it won't effect already created tables.
-      boolean allowDots = _controllerConf.getProperty(CommonConstants.Helix.CONFIG_OF_ALLOW_TABLE_NAME_DOTS,
-          CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_DOTS);
+      boolean allowDots = _controllerConf.getProperty(CommonConstants.Helix.ALLOW_TABLE_NAME_WITH_DATABASE,
+          CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_WITH_DATABASE);
         TableConfigUtils.validateTableName(tableConfig, allowDots);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);

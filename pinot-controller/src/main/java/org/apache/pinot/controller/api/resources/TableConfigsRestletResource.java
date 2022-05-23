@@ -409,8 +409,8 @@ public class TableConfigsRestletResource {
       Preconditions.checkState(rawTableName.equals(schema.getSchemaName()),
           "'tableName': %s must be equal to 'schemaName' from 'schema': %s", rawTableName, schema.getSchemaName());
       SchemaUtils.validate(schema);
-      boolean allowDots = _controllerConf.getProperty(CommonConstants.Helix.CONFIG_OF_ALLOW_TABLE_NAME_DOTS,
-          CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_DOTS);
+      boolean allowDots = _controllerConf.getProperty(CommonConstants.Helix.ALLOW_TABLE_NAME_WITH_DATABASE,
+          CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_WITH_DATABASE);
       if (offlineTableConfig != null) {
         String offlineRawTableName = TableNameBuilder.extractRawTableName(offlineTableConfig.getTableName());
         Preconditions.checkState(offlineRawTableName.equals(rawTableName),

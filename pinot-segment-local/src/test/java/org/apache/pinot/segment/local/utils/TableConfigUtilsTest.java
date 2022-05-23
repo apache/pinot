@@ -49,7 +49,6 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -759,21 +758,30 @@ public class TableConfigUtilsTest {
       String tableName = malformedTableName[i];
       TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build();
       try {
-        TableConfigUtils.validateTableName(tableConfig, CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_DOTS);
+        TableConfigUtils.validateTableName(tableConfig, CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_WITH_DATABASE);
         Assert.fail("Should fail for malformed table name : " + tableName);
       } catch (IllegalStateException e) {
         // expected
       }
     }
 
-    PinotConfiguration configuration = new PinotConfiguration();
-    String allowedWitConfig = "test.table";
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(allowedWitConfig).build();
+    String allowedWithConfig = "test.table";
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(allowedWithConfig).build();
     try {
       TableConfigUtils.validateTableName(tableConfig, true);
     } catch (IllegalStateException e) {
       Assert.fail("Should allow table name with dot if configuration is turned on");
     }
+
+    String rejected = "test.another.table";
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rejected).build();
+    try {
+      TableConfigUtils.validateTableName(tableConfig, true);
+      Assert.fail("Should fail for malformed table name : " + rejected);
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
   }
 
   @Test

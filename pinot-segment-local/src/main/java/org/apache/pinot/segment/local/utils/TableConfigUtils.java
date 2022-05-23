@@ -155,7 +155,11 @@ public final class TableConfigUtils {
    */
   public static void validateTableName(TableConfig tableConfig, boolean allowDots) {
     String tableName = tableConfig.getTableName();
-    if (tableName.contains(".") && !allowDots) {
+    int dotCount = StringUtils.countMatches(tableName,'.');
+    if (allowDots && dotCount > 1) {
+      throw new IllegalStateException("Table name: '" + tableName + "' containing more than one '.' is not allowed");
+    }
+    if (!allowDots && dotCount > 0) {
       throw new IllegalStateException("Table name: '" + tableName + "' containing '.' is not allowed");
     }
     if (tableName.contains(" ")) {

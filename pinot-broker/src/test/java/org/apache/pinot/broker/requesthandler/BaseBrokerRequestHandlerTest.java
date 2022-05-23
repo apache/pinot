@@ -149,7 +149,7 @@ public class BaseBrokerRequestHandlerTest {
   public void testGetActualTableNameBanningDots() {
     // not allowing dots
     PinotConfiguration configuration = new PinotConfiguration();
-    configuration.setProperty(CommonConstants.Helix.CONFIG_OF_ALLOW_TABLE_NAME_DOTS, false);
+    configuration.setProperty(CommonConstants.Helix.ALLOW_TABLE_NAME_WITH_DATABASE, false);
 
     TableCache tableCache = Mockito.mock(TableCache.class);
     BrokerRoutingManager routingManager = Mockito.mock(BrokerRoutingManager.class);
@@ -174,7 +174,7 @@ public class BaseBrokerRequestHandlerTest {
   public void testGetActualTableNameAllowingDots() {
     // not allowing dots
     PinotConfiguration configuration = new PinotConfiguration();
-    configuration.setProperty(CommonConstants.Helix.CONFIG_OF_ALLOW_TABLE_NAME_DOTS, true);
+    configuration.setProperty(CommonConstants.Helix.ALLOW_TABLE_NAME_WITH_DATABASE, true);
 
     TableCache tableCache = Mockito.mock(TableCache.class);
     BrokerRoutingManager routingManager = Mockito.mock(BrokerRoutingManager.class);

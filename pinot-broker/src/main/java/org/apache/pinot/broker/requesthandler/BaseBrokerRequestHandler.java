@@ -776,8 +776,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   static String getActualTableName(String tableName, TableCache tableCache, BrokerRoutingManager routingManager,
       PinotConfiguration config) {
     // Use TableCache to handle case-insensitive table name
-    boolean allowDots = config.getProperty(CommonConstants.Helix.CONFIG_OF_ALLOW_TABLE_NAME_DOTS,
-        CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_DOTS);
+    boolean allowDots = config.getProperty(CommonConstants.Helix.ALLOW_TABLE_NAME_WITH_DATABASE,
+        CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_WITH_DATABASE);
 
     if (tableCache.isIgnoreCase()) {
       String actualTableName = tableCache.getActualTableName(tableName);
