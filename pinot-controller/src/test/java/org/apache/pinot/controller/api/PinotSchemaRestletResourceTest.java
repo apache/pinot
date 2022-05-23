@@ -50,7 +50,7 @@ public class PinotSchemaRestletResourceTest {
         + "  \"metricFieldSpecs\" : [ {\n" + "    \"name\" : \"score\",\n" + "    \"dataType\" : \"FLOAT\"\n"
         + "  } ]}";
     try {
-      final String response = TEST_INSTANCE
+      final String response = ControllerTest
           .sendPostRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forSchemaCreate(), schemaString);
       Assert.assertEquals(response, "{\"unrecognizedProperties\":{},\"status\":\"transcript successfully added\"}");
     } catch (IOException e) {

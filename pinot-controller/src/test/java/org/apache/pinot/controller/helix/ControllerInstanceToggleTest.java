@@ -57,8 +57,7 @@ public class ControllerInstanceToggleTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(
             TEST_INSTANCE.MIN_NUM_REPLICAS).build();
-    TEST_INSTANCE
-        .sendPostRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableCreate(),
+    ControllerTest.sendPostRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableCreate(),
             tableConfig.toJsonString());
     Assert.assertEquals(
         TEST_INSTANCE
@@ -117,7 +116,7 @@ public class ControllerInstanceToggleTest {
     }
 
     // Delete table
-    TEST_INSTANCE
+    ControllerTest
         .sendDeleteRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableDelete(RAW_TABLE_NAME));
     Assert.assertEquals(
         TEST_INSTANCE
@@ -131,7 +130,7 @@ public class ControllerInstanceToggleTest {
     // It may take time for an instance to toggle the state.
     TestUtils.waitForCondition(aVoid -> {
       try {
-        TEST_INSTANCE
+        ControllerTest
             .sendPostRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forInstanceState(instanceName),
                 state);
       } catch (IOException ioe) {

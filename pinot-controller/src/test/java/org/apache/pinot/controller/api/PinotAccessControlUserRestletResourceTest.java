@@ -97,7 +97,7 @@ public class PinotAccessControlUserRestletResourceTest {
         userConfig.setRole("ADMIN");
         userConfig.setPassword("654321");
 
-        JsonNode jsonResponse = JsonUtils.stringToJsonNode(TEST_INSTANCE
+        JsonNode jsonResponse = JsonUtils.stringToJsonNode(ControllerTest
             .sendPutRequest(TEST_INSTANCE.getControllerRequestURLBuilder()
                     .forUpdateUserConfig(username, "CONTROLLER", true),
                 userConfig.toString()));
@@ -114,8 +114,7 @@ public class PinotAccessControlUserRestletResourceTest {
         // Case 1: Create a CONTORLLER user and delete it directly w/o using query param.
         UserConfig controllerUserConfig = _userConfigBuilder.setUsername("user1")
             .setComponentType(ComponentType.CONTROLLER).build();
-        String creationResponse = TEST_INSTANCE
-            .sendPostRequest(_createUserUrl, controllerUserConfig.toJsonString());
+        String creationResponse = ControllerTest.sendPostRequest(_createUserUrl, controllerUserConfig.toJsonString());
         Assert.assertEquals(creationResponse, "{\"status\":\"User user1_CONTROLLER has been successfully added!\"}");
 
         // Delete controller user using CONTROLLER suffix

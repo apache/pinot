@@ -49,7 +49,7 @@ public class ControllerSentinelTestV2 {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(
             TEST_INSTANCE.MIN_NUM_REPLICAS).build();
-    TEST_INSTANCE
+    ControllerTest
         .sendPostRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableCreate(),
             tableConfig.toJsonString());
     Assert.assertEquals(
@@ -82,7 +82,7 @@ public class ControllerSentinelTestV2 {
     }
 
     // Delete table
-    TEST_INSTANCE
+    ControllerTest
         .sendDeleteRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableDelete(TABLE_NAME));
     Assert.assertEquals(
         TEST_INSTANCE

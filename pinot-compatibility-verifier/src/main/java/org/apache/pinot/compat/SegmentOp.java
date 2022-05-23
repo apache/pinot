@@ -294,7 +294,7 @@ public class SegmentOp extends BaseOp {
         _segmentName = _tableName + "_" + _generationNumber;
       }
 
-      ControllerTest.getInstance().sendDeleteRequest(
+      ControllerTest.sendDeleteRequest(
           ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
               .forSegmentDelete(_tableName, _segmentName));
       return verifySegmentDeleted();
@@ -334,7 +334,7 @@ public class SegmentOp extends BaseOp {
    */
   private TableViews.TableView getExternalViewForTable()
       throws IOException {
-    return JsonUtils.stringToObject(ControllerTest.getInstance().sendGetRequest(
+    return JsonUtils.stringToObject(ControllerTest.sendGetRequest(
         ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
             .forTableExternalView(_tableName)), TableViews.TableView.class);
   }

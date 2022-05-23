@@ -180,7 +180,7 @@ public class PinotInstanceRestletResourceTest {
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
-          String getResponse = TEST_INSTANCE
+          String getResponse = ControllerTest
               .sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forInstance(instanceName));
           JsonNode instance = JsonUtils.stringToJsonNode(getResponse);
           boolean result =
