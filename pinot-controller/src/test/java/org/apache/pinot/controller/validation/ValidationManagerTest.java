@@ -24,7 +24,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.controller.ControllerTestUtils;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -48,6 +48,7 @@ import static org.testng.Assert.assertEquals;
  * Tests for the ValidationManagers.
  */
 public class ValidationManagerTest {
+  private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
   private static final String TEST_TABLE_NAME = "validationTable";
   private static final String OFFLINE_TEST_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
   private static final String TEST_SEGMENT_NAME = "testSegment";
@@ -58,21 +59,21 @@ public class ValidationManagerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    ControllerTestUtils.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
 
     _offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setNumReplicas(2).build();
-    ControllerTestUtils.getHelixResourceManager().addTable(_offlineTableConfig);
+    TEST_INSTANCE.getHelixResourceManager().addTable(_offlineTableConfig);
   }
 
   @Test
   public void testPushTimePersistence() {
     SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
 
-    ControllerTestUtils.getHelixResourceManager()
+    TEST_INSTANCE.getHelixResourceManager()
         .addNewSegment(OFFLINE_TEST_TABLE_NAME, segmentMetadata, "downloadUrl");
     SegmentZKMetadata segmentZKMetadata =
-        ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TEST_TABLE_NAME, TEST_SEGMENT_NAME);
+        TEST_INSTANCE.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     long pushTime = segmentZKMetadata.getPushTime();
     // Check that the segment has been pushed in the last 30 seconds
     Assert.assertTrue(System.currentTimeMillis() - pushTime < 30_000);
@@ -83,16 +84,16 @@ public class ValidationManagerTest {
     // NOTE: In order to send the refresh message, the segment need to be in the ExternalView
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
     TestUtils.waitForCondition(aVoid -> {
-      ExternalView externalView = ControllerTestUtils.getHelixAdmin()
-          .getResourceExternalView(ControllerTestUtils.getHelixClusterName(), offlineTableName);
+      ExternalView externalView = TEST_INSTANCE.getHelixAdmin()
+          .getResourceExternalView(TEST_INSTANCE.getHelixClusterName(), offlineTableName);
       return externalView != null && externalView.getPartitionSet().contains(TEST_SEGMENT_NAME);
     }, 30_000L, "Failed to find the segment in the ExternalView");
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
-    ControllerTestUtils.getHelixResourceManager()
+    TEST_INSTANCE.getHelixResourceManager()
         .refreshSegment(offlineTableName, segmentMetadata, segmentZKMetadata, EXPECTED_VERSION, "downloadUrl");
 
     segmentZKMetadata =
-        ControllerTestUtils.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TEST_TABLE_NAME, TEST_SEGMENT_NAME);
+        TEST_INSTANCE.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     // Check that the segment still has the same push time
     assertEquals(segmentZKMetadata.getPushTime(), pushTime);
     // Check that the refresh time is in the last 30 seconds
@@ -166,6 +167,6 @@ public class ValidationManagerTest {
 
   @AfterClass
   public void tearDown() {
-    ControllerTestUtils.cleanup();
+    TEST_INSTANCE.cleanup();
   }
 }
