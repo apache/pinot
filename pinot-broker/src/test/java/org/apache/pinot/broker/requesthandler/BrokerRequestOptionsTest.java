@@ -62,7 +62,7 @@ public class BrokerRequestOptionsTest {
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
     Assert.assertEquals(pinotQuery.getQueryOptions().get(Request.TRACE), "true");
 
-    // DEBUG_OPTIONS
+    // DEBUG_OPTIONS (debug options will also be included as query options)
     // Has debugOptions
     jsonRequest = JsonUtils.newObjectNode();
     jsonRequest.put(Request.DEBUG_OPTIONS, "debugOption1=foo");
@@ -70,7 +70,7 @@ public class BrokerRequestOptionsTest {
     BaseBrokerRequestHandler.setOptions(pinotQuery, requestId, query, jsonRequest);
     Assert.assertEquals(pinotQuery.getDebugOptionsSize(), 1);
     Assert.assertEquals(pinotQuery.getDebugOptions().get("debugOption1"), "foo");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
+    Assert.assertEquals(pinotQuery.getQueryOptions(), pinotQuery.getDebugOptions());
 
     // Has multiple debugOptions
     jsonRequest.put(Request.DEBUG_OPTIONS, "debugOption1=foo;debugOption2=bar");
@@ -79,7 +79,7 @@ public class BrokerRequestOptionsTest {
     Assert.assertEquals(pinotQuery.getDebugOptionsSize(), 2);
     Assert.assertEquals(pinotQuery.getDebugOptions().get("debugOption1"), "foo");
     Assert.assertEquals(pinotQuery.getDebugOptions().get("debugOption2"), "bar");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
+    Assert.assertEquals(pinotQuery.getQueryOptions(), pinotQuery.getDebugOptions());
 
     // Invalid debug options
     jsonRequest.put(Request.DEBUG_OPTIONS, "debugOption1");
@@ -136,9 +136,10 @@ public class BrokerRequestOptionsTest {
     BaseBrokerRequestHandler.setOptions(pinotQuery, requestId, query, jsonRequest);
     Assert.assertEquals(pinotQuery.getDebugOptionsSize(), 1);
     Assert.assertEquals(pinotQuery.getDebugOptions().get("debugOption1"), "foo");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 3);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 4);
     Assert.assertEquals(pinotQuery.getQueryOptions().get("queryOption1"), "bar");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("queryOption2"), "moo");
     Assert.assertEquals(pinotQuery.getQueryOptions().get(Request.TRACE), "true");
+    Assert.assertEquals(pinotQuery.getDebugOptions().get("debugOption1"), "foo");
   }
 }

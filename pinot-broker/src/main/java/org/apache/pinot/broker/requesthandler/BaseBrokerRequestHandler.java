@@ -1480,6 +1480,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   @VisibleForTesting
   static void setOptions(PinotQuery pinotQuery, long requestId, String query, JsonNode jsonRequest) {
     Map<String, String> queryOptions = new HashMap<>();
+    if (jsonRequest.has(Broker.Request.DEBUG_OPTIONS)) {
+      Map<String, String> debugOptions = getOptionsFromJson(jsonRequest, Broker.Request.DEBUG_OPTIONS);
+      if (!debugOptions.isEmpty()) {
+        LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
+        pinotQuery.setDebugOptions(debugOptions);
+
+        // NOTE: Debug options are deprecated. Put all debug options into query options for backward compatibility.
+        queryOptions.putAll(debugOptions);
+      }
+    }
     if (jsonRequest.has(Broker.Request.QUERY_OPTIONS)) {
       Map<String, String> queryOptionsFromJson = getOptionsFromJson(jsonRequest, Broker.Request.QUERY_OPTIONS);
       queryOptions.putAll(queryOptionsFromJson);
@@ -1496,14 +1506,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     pinotQuery.setQueryOptions(queryOptions);
     if (!queryOptions.isEmpty()) {
       LOGGER.debug("Query options are set to: {} for request {}: {}", queryOptions, requestId, query);
-    }
-
-    if (jsonRequest.has(Broker.Request.DEBUG_OPTIONS)) {
-      Map<String, String> debugOptions = getOptionsFromJson(jsonRequest, Broker.Request.DEBUG_OPTIONS);
-      if (!debugOptions.isEmpty()) {
-        LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
-        pinotQuery.setDebugOptions(debugOptions);
-      }
     }
   }
 
