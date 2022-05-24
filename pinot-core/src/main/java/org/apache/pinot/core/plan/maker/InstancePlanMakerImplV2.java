@@ -191,7 +191,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     // Set skipUpsert
     queryContext.setSkipUpsert(QueryOptionsUtils.isSkipUpsert(queryOptions));
 
-    // Set skipStartree
+    // Set skipStarTree
     queryContext.setSkipStarTree(QueryOptionsUtils.isSkipStarTree(queryOptions, debugOptions));
 
     // Set maxExecutionThreads
