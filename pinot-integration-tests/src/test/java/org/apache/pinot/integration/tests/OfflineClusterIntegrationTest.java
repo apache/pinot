@@ -437,16 +437,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test(dependsOnMethods = "testRangeIndexTriggering")
   public void testInvertedIndexTriggering()
       throws Exception {
-    // TODO: testing.... shake shake any flakiness out
-    for (int i = 0; i < 13; i++) {
-      System.out.println("round: " + i);
-      doTestInvertedIndexTriggering();
-      Thread.sleep(1000);
-    }
-  }
-
-  public void doTestInvertedIndexTriggering()
-      throws Exception {
     long numTotalDocs = getCountStarResult();
 
     // Without index on DivActualElapsedTime, all docs are scanned at filtering stage.
@@ -476,8 +466,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Add the inverted index back to test index removal via force download.
     addInvertedIndex();
-    // TODO: testing.... in order to run many rounds to shake things out
-    // assertEquals(getTableSize(getTableName()), tableSizeWithNewIndex);
+    assertEquals(getTableSize(getTableName()), tableSizeWithNewIndex);
 
     // Update table config to remove the new inverted index.
     tableConfig = getOfflineTableConfig();
@@ -501,7 +490,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
     }, 600_000L, "Failed to clean up obsolete index in segment");
     // As query behavior changed, the segment reload must have been done. The new table size should be like below,
-    // with only one segment being reloaded with force download and losing the inverted index.
+    // with only one segment being reloaded with force download and dropping the inverted index.
     long tableSizeAfterReloadSegment = getTableSize(getTableName());
     assertTrue(tableSizeAfterReloadSegment > DISK_SIZE_IN_BYTES && tableSizeAfterReloadSegment < tableSizeWithNewIndex);
 
@@ -517,10 +506,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     addInvertedIndex();
     // The table size gets larger for sure, but it does not necessarily equal to tableSizeWithNewIndex, because the
     // order of entries in the index_map file can change when the raw segment adds/deletes indices back and forth.
-    System.out.println("Sizes:");
-    System.out.println(getTableSize(getTableName()));
-    System.out.println(tableSizeAfterReloadSegment);
-    System.out.println(tableSizeWithNewIndex);
     assertTrue(getTableSize(getTableName()) > tableSizeAfterReloadSegment);
 
     // Force to download the whole table and use the original table config, so the disk usage should get back to
