@@ -855,15 +855,16 @@ public class PinotLLCRealtimeSegmentManager {
    * idealState.
    * If so, it should create the new segments in idealState.
    *
-   * If the consuming segment is deleted:
-   * Check whether there are segments in the PROPERTYSTORE with status DONE, but no new segment in status
-   * IN_PROGRESS, and the state for the latest segment in the IDEALSTATE is ONLINE.
-   * If so, it should create a new CONSUMING segment for the partition.
-   * (this operation is done only if @param recreateDeletedConsumingSegment is set to true)
-   *
    * If the controller fails after step-3, we are fine because the idealState has the new segments.
    * If the controller fails before step-1, the server will see this as an upload failure, and will re-try.
    * @param tableConfig
+   *
+   * If the consuming segment is deleted by user intentionally or by mistake:
+   * Check whether there are segments in the PROPERTYSTORE with status DONE, but no new segment in status
+   * IN_PROGRESS, and the state for the latest segment in the IDEALSTATE is ONLINE.
+   * If so, it should create a new CONSUMING segment for the partition.
+   * (this operation is done only if @param recreateDeletedConsumingSegment is set to true,
+   * which means it's manually triggered by admin not by automatic periodic task)
    *
    * TODO: We need to find a place to detect and update a gauge for nonConsumingPartitionsCount for a table, and
    * reset it to 0 at the end of validateLLC
@@ -1139,12 +1140,11 @@ public class PinotLLCRealtimeSegmentManager {
                 segmentAssignment, instancePartitionsMap, startOffset);
           } else {
             if (newPartitionGroupSet.contains(partitionGroupId)) {
-              // If we get here, that means in IdealState, the latest segment has all replicas ONLINE.
-              // Create a new IN_PROGRESS segment in PROPERTYSTORE,
-              // add it as CONSUMING segment to IDEALSTATE.
-
               if (recreateDeletedConsumingSegment && Status.DONE.equals(latestSegmentZKMetadata.getStatus())
                   && isAllInstancesInState(instanceStateMap, SegmentStateModel.ONLINE)) {
+                // If we get here, that means in IdealState, the latest segment has all replicas ONLINE.
+                // Create a new IN_PROGRESS segment in PROPERTYSTORE,
+                // add it as CONSUMING segment to IDEALSTATE.
                 StreamPartitionMsgOffset startOffset = offsetFactory.create(latestSegmentZKMetadata.getEndOffset());
                 createNewConsumingSegment(tableConfig, streamConfig, latestSegmentZKMetadata, currentTimeMs,
                     partitionGroupId, newPartitionGroupMetadataList, instancePartitions,

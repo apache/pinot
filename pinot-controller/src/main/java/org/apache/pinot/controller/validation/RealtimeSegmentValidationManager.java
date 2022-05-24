@@ -82,11 +82,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       context._runSegmentLevelValidation = true;
       _lastSegmentLevelValidationRunTimeMs = currentTimeMs;
     }
-
-    if (periodicTaskProperties.containsKey(RECREATE_DELETED_CONSUMING_SEGMENT_KEY)) {
-        context._recreateDeletedConsumingSegment =
-            Boolean.parseBoolean(periodicTaskProperties.getProperty(RECREATE_DELETED_CONSUMING_SEGMENT_KEY));
-    }
+    context._recreateDeletedConsumingSegment =
+        Boolean.parseBoolean(periodicTaskProperties.getProperty(RECREATE_DELETED_CONSUMING_SEGMENT_KEY));
 
     return context;
   }

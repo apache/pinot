@@ -81,7 +81,7 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
       _periodicTaskRequestId = message.getPeriodicTaskRequestId();
       _periodicTaskName = message.getPeriodicTaskName();
       _tableNameWithType = message.getTableNameWithType();
-      _taskProperties = message.getTaskParams();
+      _taskProperties = message.getTaskProperties();
       _periodicTaskScheduler = periodicTaskScheduler;
     }
 

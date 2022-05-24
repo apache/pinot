@@ -32,7 +32,6 @@ public interface PeriodicTask extends Runnable {
   // PeriodicTask objects may take a {@link Properties} object. Define all the keys property keys here.
   String PROPERTY_KEY_REQUEST_ID = "requestId";
   String PROPERTY_KEY_TABLE_NAME = "tableNameWithType";
-  String TASK_PARAMS_JSON = "taskParams";
 
   /**
    * Returns the periodic task name.

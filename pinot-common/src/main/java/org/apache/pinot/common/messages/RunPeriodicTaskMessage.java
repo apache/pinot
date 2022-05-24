@@ -71,7 +71,7 @@ public class RunPeriodicTaskMessage extends Message {
     return getRecord().getSimpleField(TABLE_NAME_WITH_TYPE_KEY);
   }
 
-  public Map<String, String> getTaskParams() {
+  public Map<String, String> getTaskProperties() {
     return getRecord().getMapField(TASK_PROPERTIES);
   }
 }
