@@ -16,9 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.spi.metrics;
 
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

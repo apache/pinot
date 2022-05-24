@@ -26,10 +26,10 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.LinkedList;
 import java.util.List;
-import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
