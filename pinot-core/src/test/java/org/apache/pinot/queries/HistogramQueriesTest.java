@@ -231,16 +231,11 @@ public class HistogramQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.get(0)[0], new double[]{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
-    assertEquals(rows.get(1)[0],
-        new double[]{396, 400, 400, 400, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
-    assertEquals(rows.get(2)[0],
-        new double[]{0, 0, 0, 0, 396, 400, 400, 400, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
-    assertEquals(rows.get(3)[0],
-        new double[]{0, 0, 0, 0, 0, 0, 0, 0, 396, 400, 400, 400, 4, 0, 0, 0, 0, 0, 0, 0});
-    assertEquals(rows.get(4)[0],
-        new double[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 396, 400, 400, 400, 4, 0, 0, 0});
-    assertEquals(rows.get(5)[0],
-        new double[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 396, 400, 400, 400});
+    assertEquals(rows.get(1)[0], new double[]{396, 400, 400, 400, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
+    assertEquals(rows.get(2)[0], new double[]{0, 0, 0, 0, 396, 400, 400, 400, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
+    assertEquals(rows.get(3)[0], new double[]{0, 0, 0, 0, 0, 0, 0, 0, 396, 400, 400, 400, 4, 0, 0, 0, 0, 0, 0, 0});
+    assertEquals(rows.get(4)[0], new double[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 396, 400, 400, 400, 4, 0, 0, 0});
+    assertEquals(rows.get(5)[0], new double[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 396, 400, 400, 400});
   }
 
   @Test
@@ -252,7 +247,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
     assertTrue(operator instanceof AggregationOperator);
     IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
-        2*NUM_RECORDS, NUM_RECORDS);
+        2 * NUM_RECORDS, NUM_RECORDS);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
     assertNotNull(aggregationResult);
     assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(),
@@ -274,7 +269,8 @@ public class HistogramQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.get(0)[0],
-        new double[]{200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 204});
+        new double[]{200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200,
+            204});
   }
 
   @Test
@@ -286,9 +282,8 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       Object operator = getOperator(query);
       assertTrue(operator instanceof AggregationOperator);
       IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
-    } catch (Exception e){
-      assertEquals(e.getMessage(),
-          "Invalid aggregation function: histogram(intColumn,'1000','1000','10')");
+    } catch (Exception e) {
+      assertEquals(e.getMessage(), "Invalid aggregation function: histogram(intColumn,'1000','1000','10')");
     }
 
     try {
@@ -296,9 +291,8 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       Object operator = getOperator(query);
       assertTrue(operator instanceof AggregationOperator);
       IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
-    } catch (Exception e){
-      assertEquals(e.getMessage(),
-          "Invalid aggregation function: histogram(intColumn,'0','1000','-1')");
+    } catch (Exception e) {
+      assertEquals(e.getMessage(), "Invalid aggregation function: histogram(intColumn,'0','1000','-1')");
     }
 
     try {
@@ -306,9 +300,8 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       Object operator = getOperator(query);
       assertTrue(operator instanceof AggregationOperator);
       IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
-    } catch (Exception e){
-      assertEquals(e.getMessage(),
-          "Invalid aggregation function: histogram(intColumn,arrayvalueconstructor('0'))");
+    } catch (Exception e) {
+      assertEquals(e.getMessage(), "Invalid aggregation function: histogram(intColumn,arrayvalueconstructor('0'))");
     }
 
     try {
@@ -316,7 +309,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       Object operator = getOperator(query);
       assertTrue(operator instanceof AggregationOperator);
       IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
-    } catch (Exception e){
+    } catch (Exception e) {
       assertEquals(e.getMessage(),
           "Caught exception while parsing query: SELECT HISTOGRAM(intColumn,FUNCTION[0, 10, 20]) FROM testTable");
     }
@@ -326,7 +319,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       Object operator = getOperator(query);
       assertTrue(operator instanceof AggregationOperator);
       IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
-    } catch (Exception e){
+    } catch (Exception e) {
       assertEquals(e.getMessage(),
           "Invalid aggregation function: histogram(intColumn,arrayvalueconstructor('0','0','1','2'))");
     }
