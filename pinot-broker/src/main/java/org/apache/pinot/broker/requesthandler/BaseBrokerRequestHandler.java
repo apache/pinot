@@ -1470,27 +1470,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     throw new BadQueryRequestException("Unknown columnName '" + columnName + "' found in the query");
   }
 
-  /**
-   * Split the column/table name by its last dot. In this way we can extract column name from format like
-   * select [database].[schema].[tableName].[columnName] from ....
-   * <code>
-   * splitByLastDot("db.schema.table.column") == {"db.schema.table", "column"};
-   * splitByLastDot("") == {""};
-   * splitByLastDot(".") == {"", ""}
-   * </code>
-   * @param columnOrTableName the column name with dots
-   * @return Array of one or two elements, by splitting results
-   */
-  @VisibleForTesting
-  static String[] splitByLastDot(String columnOrTableName) {
-    int lastDot = columnOrTableName.lastIndexOf(".");
-    if (lastDot >= 0) {
-      return new String[]{columnOrTableName.substring(0, lastDot), columnOrTableName.substring(lastDot + 1)};
-    } else {
-      return new String[]{columnOrTableName};
-    }
-  }
-
   private static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
     return Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=')
         .split(request.get(optionsKey).asText());

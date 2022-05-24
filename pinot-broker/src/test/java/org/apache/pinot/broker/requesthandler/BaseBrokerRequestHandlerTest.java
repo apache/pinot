@@ -119,33 +119,6 @@ public class BaseBrokerRequestHandlerTest {
   }
 
   @Test
-  public void testSplitByLastDot() {
-    String[] res = BaseBrokerRequestHandler.splitByLastDot("db.table.column_name");
-    Assert.assertEquals(res.length, 2);
-    Assert.assertEquals(res[0], "db.table");
-    Assert.assertEquals(res[1], "column_name");
-
-    res = BaseBrokerRequestHandler.splitByLastDot("table.column_name");
-    Assert.assertEquals(res.length, 2);
-    Assert.assertEquals(res[0], "table");
-    Assert.assertEquals(res[1], "column_name");
-
-    res = BaseBrokerRequestHandler.splitByLastDot("");
-    Assert.assertEquals(res.length, 1);
-    Assert.assertEquals(res[0], "");
-
-    res = BaseBrokerRequestHandler.splitByLastDot(".");
-    Assert.assertEquals(res.length, 2);
-    Assert.assertEquals(res[0], "");
-    Assert.assertEquals(res[0], "");
-
-    res = BaseBrokerRequestHandler.splitByLastDot(".column_name");
-    Assert.assertEquals(res.length, 2);
-    Assert.assertEquals(res[0], "");
-    Assert.assertEquals(res[1], "column_name");
-  }
-
-  @Test
   public void testGetActualTableNameBanningDots() {
     // not allowing dots
     PinotConfiguration configuration = new PinotConfiguration();
