@@ -18,18 +18,27 @@
  */
 package org.apache.pinot.core.query.pruner;
 
+import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.segment.index.readers.bloom.OnHeapGuavaBloomFilterReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -138,7 +147,8 @@ public class ColumnValueSegmentPrunerTest {
   }
 
   @Test
-  public void testBloomFilterInPredicatePruning() {
+  public void testBloomFilterInPredicatePruning()
+      throws IOException {
     Map<String, Object> properties = new HashMap<>();
     // override default value
     properties.put(ColumnValueSegmentPruner.IN_PREDICATE_THRESHOLD, 5);
@@ -150,17 +160,18 @@ public class ColumnValueSegmentPrunerTest {
     when(indexSegment.getDataSource("column")).thenReturn(dataSource);
     // Add support for bloom filter
     DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
-    BloomFilterReader bloomFilterReader = mock(BloomFilterReader.class);
+    BloomFilterReader bloomFilterReader = new BloomFilterReaderBuilder()
+        .put("1")
+        .put("2")
+        .put("3")
+        .put("5")
+        .put("7")
+        .put("21")
+        .build();
 
     when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
     when(dataSource.getBloomFilter()).thenReturn(bloomFilterReader);
-    when(bloomFilterReader.mightContain("1")).thenReturn(true);
-    when(bloomFilterReader.mightContain("2")).thenReturn(true);
-    when(bloomFilterReader.mightContain("3")).thenReturn(true);
-    when(bloomFilterReader.mightContain("5")).thenReturn(true);
-    when(bloomFilterReader.mightContain("7")).thenReturn(true);
-    when(bloomFilterReader.mightContain("21")).thenReturn(true);
     when(dataSourceMetadata.getMinValue()).thenReturn(5);
     when(dataSourceMetadata.getMaxValue()).thenReturn(10);
 
@@ -210,5 +221,26 @@ public class ColumnValueSegmentPrunerTest {
   private boolean runPruner(IndexSegment indexSegment, String query) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     return PRUNER.prune(Arrays.asList(indexSegment), queryContext).isEmpty();
+  }
+
+  private static class BloomFilterReaderBuilder {
+    private BloomFilter<String> _bloomfilter = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100, 0.01);
+    public BloomFilterReaderBuilder put(String value) {
+      _bloomfilter.put(value);
+      return this;
+    }
+
+    public BloomFilterReader build() throws IOException {
+      File file = Files.createTempFile("test", ".bloom").toFile();
+      try (FileOutputStream fos = new FileOutputStream(file)) {
+        _bloomfilter.writeTo(fos);
+        try (PinotDataBuffer pinotDataBuffer = PinotDataBuffer.loadBigEndianFile(file)) {
+          // on heap filter should never use the buffer, so we can close it and delete the file
+          return new OnHeapGuavaBloomFilterReader(pinotDataBuffer);
+        }
+      } finally {
+        file.delete();
+      }
+    }
   }
 }
