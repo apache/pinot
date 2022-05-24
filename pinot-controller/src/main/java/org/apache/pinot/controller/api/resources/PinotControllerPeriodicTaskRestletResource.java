@@ -22,7 +22,6 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.util.List;
-import java.util.UUID;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -31,13 +30,9 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.helix.ClusterMessagingService;
-import org.apache.helix.Criteria;
-import org.apache.helix.InstanceType;
-import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +42,6 @@ import org.slf4j.LoggerFactory;
 public class PinotControllerPeriodicTaskRestletResource {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotControllerPeriodicTaskRestletResource.class);
-  private static final String API_REQUEST_ID_PREFIX = "api-";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -84,33 +78,11 @@ public class PinotControllerPeriodicTaskRestletResource {
       tableName = matchingTableNamesWithType.get(0);
     }
 
-    // Generate an id for this request by taking first eight characters of a randomly generated UUID. This request id
-    // is returned to the user and also appended to log messages so that user can locate all log messages associated
-    // with this PeriodicTask's execution.
-    String periodicTaskRequestId = API_REQUEST_ID_PREFIX + UUID.randomUUID().toString().substring(0, 8);
+    Pair<String, Integer> taskExecutionDetails = _pinotHelixResourceManager
+        .invokeControllerPeriodicTask(tableName, periodicTaskName, null);
 
-    LOGGER.info(
-        "[TaskRequestId: {}] Sending periodic task message to all controllers for running task {} against {}.",
-        periodicTaskRequestId, periodicTaskName, tableName != null ? " table '" + tableName + "'" : "all tables");
-
-    // Create and send message to send to all controllers (including this one)
-    Criteria recipientCriteria = new Criteria();
-    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName("%");
-    recipientCriteria.setSessionSpecific(true);
-    recipientCriteria.setResource(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
-    recipientCriteria.setSelfExcluded(false);
-    RunPeriodicTaskMessage runPeriodicTaskMessage =
-        new RunPeriodicTaskMessage(periodicTaskRequestId, periodicTaskName, tableName, null);
-
-    ClusterMessagingService clusterMessagingService =
-        _pinotHelixResourceManager.getHelixZkManager().getMessagingService();
-    int messageCount = clusterMessagingService.send(recipientCriteria, runPeriodicTaskMessage, null, -1);
-    LOGGER.info("[TaskRequestId: {}] Periodic task execution message sent to {} controllers.", periodicTaskRequestId,
-        messageCount);
-
-    return "{\"Log Request Id\": \"" + periodicTaskRequestId + "\",\"Controllers notified\":" + (messageCount > 0)
-        + "}";
+    return "{\"Log Request Id\": \"" + taskExecutionDetails.getLeft()
+        + "\",\"Controllers notified\":" + (taskExecutionDetails.getRight() > 0) + "}";
   }
 
   @GET
