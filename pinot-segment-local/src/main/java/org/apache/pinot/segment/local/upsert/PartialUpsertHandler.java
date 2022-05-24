@@ -20,40 +20,25 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.helix.HelixDataAccessor;
-import org.apache.helix.HelixManager;
-import org.apache.helix.PropertyKey;
-import org.apache.helix.model.CurrentState;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.model.LiveInstance;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMergerFactory;
+import org.apache.pinot.segment.local.utils.tablestate.TableState;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 /**
  * Handler for partial-upsert.
  */
 public class PartialUpsertHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PartialUpsertHandler.class);
-
   // _column2Mergers maintains the mapping of merge strategies per columns.
   private final Map<String, PartialUpsertMerger> _column2Mergers = new HashMap<>();
+  private final TableState _tableState;
 
-  private final HelixManager _helixManager;
-  private final String _tableNameWithType;
-  private boolean _allSegmentsLoaded;
-
-  public PartialUpsertHandler(HelixManager helixManager, String tableNameWithType, Schema schema,
+  public PartialUpsertHandler(TableState tableState, Schema schema,
       Map<String, UpsertConfig.Strategy> partialUpsertStrategies, UpsertConfig.Strategy defaultPartialUpsertStrategy,
       String comparisonColumn) {
-    _helixManager = helixManager;
-    _tableNameWithType = tableNameWithType;
+    _tableState = tableState;
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
       _column2Mergers.put(entry.getKey(), PartialUpsertMergerFactory.getMerger(entry.getValue()));
     }
@@ -72,59 +57,7 @@ public class PartialUpsertHandler {
    * Consuming segment should perform this check to ensure all previous records are loaded before inserting new records.
    */
   public synchronized boolean isAllSegmentsLoaded() {
-    if (_allSegmentsLoaded) {
-      return true;
-    }
-
-    HelixDataAccessor dataAccessor = _helixManager.getHelixDataAccessor();
-    PropertyKey.Builder keyBuilder = dataAccessor.keyBuilder();
-    IdealState idealState = dataAccessor.getProperty(keyBuilder.idealStates(_tableNameWithType));
-    if (idealState == null) {
-      LOGGER.warn("Failed to find ideal state for table: {}", _tableNameWithType);
-      return false;
-    }
-    String instanceName = _helixManager.getInstanceName();
-    LiveInstance liveInstance = dataAccessor.getProperty(keyBuilder.liveInstance(instanceName));
-    if (liveInstance == null) {
-      LOGGER.warn("Failed to find live instance for instance: {}", instanceName);
-      return false;
-    }
-    String sessionId = liveInstance.getEphemeralOwner();
-    CurrentState currentState =
-        dataAccessor.getProperty(keyBuilder.currentState(instanceName, sessionId, _tableNameWithType));
-    if (currentState == null) {
-      LOGGER.warn("Failed to find current state for instance: {}, sessionId: {}, table: {}", instanceName, sessionId,
-          _tableNameWithType);
-      return false;
-    }
-
-    // Check if ideal state and current state matches for all segments assigned to the current instance
-    Map<String, Map<String, String>> idealStatesMap = idealState.getRecord().getMapFields();
-    Map<String, String> currentStateMap = currentState.getPartitionStateMap();
-    for (Map.Entry<String, Map<String, String>> entry : idealStatesMap.entrySet()) {
-      String segmentName = entry.getKey();
-      Map<String, String> instanceStateMap = entry.getValue();
-      String expectedState = instanceStateMap.get(instanceName);
-      // Only track ONLINE segments assigned to the current instance
-      if (!SegmentStateModel.ONLINE.equals(expectedState)) {
-        continue;
-      }
-      String actualState = currentStateMap.get(segmentName);
-      if (!SegmentStateModel.ONLINE.equals(actualState)) {
-        if (SegmentStateModel.ERROR.equals(actualState)) {
-          LOGGER
-              .error("Find ERROR segment: {}, table: {}, expected: {}", segmentName, _tableNameWithType, expectedState);
-        } else {
-          LOGGER.info("Find unloaded segment: {}, table: {}, expected: {}, actual: {}", segmentName, _tableNameWithType,
-              expectedState, actualState);
-        }
-        return false;
-      }
-    }
-
-    LOGGER.info("All segments loaded for table: {}", _tableNameWithType);
-    _allSegmentsLoaded = true;
-    return true;
+    return _tableState.isAllSegmentsLoaded();
   }
 
   /**

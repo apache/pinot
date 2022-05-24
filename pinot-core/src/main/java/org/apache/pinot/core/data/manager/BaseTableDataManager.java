@@ -56,6 +56,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
+import org.apache.pinot.segment.local.utils.tablestate.TableState;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -92,6 +93,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected File _resourceTmpDir;
   protected Logger _logger;
   protected HelixManager _helixManager;
+  protected TableState _tableState;
   protected AuthProvider _authProvider;
 
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related
@@ -116,6 +118,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _tableNameWithType = tableDataManagerConfig.getTableName();
     _tableDataDir = tableDataManagerConfig.getDataDir();
     _indexDir = new File(_tableDataDir);
+    _tableState = new TableState(_helixManager, _tableNameWithType);
+
     if (!_indexDir.exists()) {
       Preconditions.checkState(_indexDir.mkdirs(),
           "Unable to create index directory at %s. Check that the user has permissions on this directory.", _indexDir);

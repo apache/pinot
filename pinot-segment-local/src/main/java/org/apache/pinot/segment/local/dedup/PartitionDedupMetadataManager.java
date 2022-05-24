@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.local.utils.RecordInfo;
+import org.apache.pinot.segment.local.utils.tablestate.TableState;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -41,6 +42,7 @@ public class PartitionDedupMetadataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionUpsertMetadataManager.class);
 
   private final String _tableNameWithType;
+  private final TableState _tableState;
   private final List<String> _primaryKeyColumns;
   private final int _partitionId;
   private final ServerMetrics _serverMetrics;
@@ -50,9 +52,10 @@ public class PartitionDedupMetadataManager {
   @VisibleForTesting
   final ConcurrentHashMap<Object, Boolean> _primaryKeySet = new ConcurrentHashMap<>();
 
-  public PartitionDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns,
+  public PartitionDedupMetadataManager(String tableNameWithType, TableState tableState, List<String> primaryKeyColumns,
       int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction) {
     _tableNameWithType = tableNameWithType;
+    _tableState = tableState;
     _primaryKeyColumns = primaryKeyColumns;
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
@@ -108,7 +111,18 @@ public class PartitionDedupMetadataManager {
     };
   }
 
+
   public boolean checkRecordPresentOrUpdate(RecordInfo recordInfo) {
+    while (_tableState.isAllSegmentsLoaded()) {
+      LOGGER.info("Sleeping 1 second waiting for all segments loaded for partial-upsert table: {}", _tableNameWithType);
+      try {
+        //noinspection BusyWait
+        Thread.sleep(1000L);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
     Boolean isPresent =
         _primaryKeySet.putIfAbsent(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), true);
     return (isPresent != null);

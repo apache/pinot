@@ -168,7 +168,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       DedupConfig dedupConfig = tableConfig.getDedupConfig();
       HashFunction dedupHashFunction = dedupConfig.getHashFunction();
       _tableDedupMetadataManager =
-          new TableDedupMetadataManager(_tableNameWithType, _primaryKeyColumns, _serverMetrics, dedupHashFunction);
+          new TableDedupMetadataManager(_tableNameWithType, _tableState, _primaryKeyColumns, _serverMetrics,
+              dedupHashFunction);
     }
 
     if (isUpsertEnabled()) {
@@ -183,7 +184,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         if (comparisonColumn == null) {
           comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
         }
-        partialUpsertHandler = new PartialUpsertHandler(_helixManager, _tableNameWithType, schema,
+        partialUpsertHandler = new PartialUpsertHandler(_tableState, schema,
             upsertConfig.getPartialUpsertStrategies(), upsertConfig.getDefaultPartialUpsertStrategy(),
             comparisonColumn);
       }

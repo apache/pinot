@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.upsert;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.helix.HelixManager;
+import org.apache.pinot.segment.local.utils.tablestate.TableState;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -38,7 +38,7 @@ public class PartialUpsertHandlerTest {
 
   @Test
   public void testMerge() {
-    HelixManager helixManager = Mockito.mock(HelixManager.class);
+    TableState tableState = Mockito.mock(TableState.class);
 
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
         .addSingleValueDimension("field1", FieldSpec.DataType.LONG)
@@ -49,7 +49,7 @@ public class PartialUpsertHandlerTest {
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.INCREMENT);
     PartialUpsertHandler handler =
-        new PartialUpsertHandler(helixManager, realtimeTableName, schema, partialUpsertStrategies,
+        new PartialUpsertHandler(tableState, schema, partialUpsertStrategies,
             UpsertConfig.Strategy.OVERWRITE, "hoursSinceEpoch");
 
     // both records are null.
@@ -97,7 +97,7 @@ public class PartialUpsertHandlerTest {
 
   @Test
   public void testMergeWithDefaultPartialUpsertStrategy() {
-    HelixManager helixManager = Mockito.mock(HelixManager.class);
+    TableState tableState = Mockito.mock(TableState.class);
 
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
         .addSingleValueDimension("field1", FieldSpec.DataType.LONG).addMetric("field2", FieldSpec.DataType.LONG)
@@ -108,7 +108,7 @@ public class PartialUpsertHandlerTest {
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.INCREMENT);
     PartialUpsertHandler handler =
-        new PartialUpsertHandler(helixManager, realtimeTableName, schema, partialUpsertStrategies,
+        new PartialUpsertHandler(tableState, schema, partialUpsertStrategies,
             UpsertConfig.Strategy.OVERWRITE, "hoursSinceEpoch");
 
     // previousRecord is null default value, while newRecord is not.
