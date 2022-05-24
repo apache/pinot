@@ -41,6 +41,9 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final ForwardIndexReaderContext _readerContext;
   private final int _numDocs;
   private final ValueMatcher _valueMatcher;
+  private final int[] _batch = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
+  private int _firstMismatch;
+  private int _cursor;
 
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
@@ -55,6 +58,33 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   @Override
   public int next() {
+    if (_cursor >= _firstMismatch) {
+      int limit;
+      int batchSize = 0;
+      do {
+        limit = Math.min(_numDocs - _nextDocId, OPTIMAL_ITERATOR_BATCH_SIZE);
+        if (limit > 0) {
+          for (int i = 0; i < limit; i++) {
+            _batch[i] = _nextDocId + i;
+          }
+          batchSize = _valueMatcher.matchValues(limit, _batch);
+          _nextDocId += limit;
+          _numEntriesScanned += limit;
+        }
+      } while (limit > 0 & batchSize == 0);
+      _firstMismatch = batchSize;
+      _cursor = 0;
+      if (_firstMismatch == 0) {
+        return Constants.EOF;
+      }
+    }
+    return _batch[_cursor++];
+  }
+
+  @Override
+  public int advance(int targetDocId) {
+    _nextDocId = targetDocId;
+    _firstMismatch = 0;
     while (_nextDocId < _numDocs) {
       int nextDocId = _nextDocId++;
       _numEntriesScanned++;
@@ -63,12 +93,6 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       }
     }
     return Constants.EOF;
-  }
-
-  @Override
-  public int advance(int targetDocId) {
-    _nextDocId = targetDocId;
-    return next();
   }
 
   @Override
