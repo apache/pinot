@@ -129,25 +129,22 @@ public class BaseBrokerRequestHandlerTest {
     when(tableCache.isIgnoreCase()).thenReturn(true);
     when(tableCache.getActualTableName("mytable")).thenReturn("mytable");
     Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("mytable", tableCache, routingManager, configuration), "mytable");
+        BaseBrokerRequestHandler.getActualTableName("mytable", tableCache, routingManager), "mytable");
     when(tableCache.getActualTableName("db.mytable")).thenReturn(null);
     Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache, routingManager, configuration),
+        BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache, routingManager),
         "mytable");
 
     when(tableCache.isIgnoreCase()).thenReturn(false);
     when(routingManager.routingExists("mytable_OFFLINE")).thenReturn(true);
     when(routingManager.routingExists("mytable_REALTIME")).thenReturn(true);
     Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache, routingManager, configuration),
+        BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache, routingManager),
         "mytable");
   }
 
   @Test
   public void testGetActualTableNameAllowingDots() {
-    // not allowing dots
-    PinotConfiguration configuration = new PinotConfiguration();
-    configuration.setProperty(CommonConstants.Helix.ALLOW_TABLE_NAME_WITH_DATABASE, true);
 
     TableCache tableCache = Mockito.mock(TableCache.class);
     BrokerRoutingManager routingManager = Mockito.mock(BrokerRoutingManager.class);
@@ -159,38 +156,26 @@ public class BaseBrokerRequestHandlerTest {
     when(tableCache.getActualTableName("test_table")).thenReturn(null);
 
     Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("test_table", tableCache, routingManager, configuration),
+        BaseBrokerRequestHandler.getActualTableName("test_table", tableCache, routingManager),
         "test_table");
     Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("mytable", tableCache, routingManager, configuration), "mytable");
+        BaseBrokerRequestHandler.getActualTableName("mytable", tableCache, routingManager), "mytable");
 
     Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache, routingManager, configuration),
+        BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache, routingManager),
         "db.mytable");
     Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("other.mytable", tableCache, routingManager, configuration),
+        BaseBrokerRequestHandler.getActualTableName("other.mytable", tableCache, routingManager),
         "other.mytable");
 
     when(tableCache.isIgnoreCase()).thenReturn(false);
     when(routingManager.routingExists("db.namespace.mytable_OFFLINE")).thenReturn(true);
     when(routingManager.routingExists("db.namespace.mytable_REALTIME")).thenReturn(true);
     Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache, routingManager, configuration),
+        BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache, routingManager),
         "db.mytable");
     Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("db.namespace.mytable", tableCache, routingManager, configuration),
+        BaseBrokerRequestHandler.getActualTableName("db.namespace.mytable", tableCache, routingManager),
         "db.namespace.mytable");
-  }
-
-  @Test
-  public void testSplitTableNameByConfig() {
-    String[] split = BaseBrokerRequestHandler.splitTableNameByConfig("db.table", false);
-    Assert.assertEquals(split, new String[]{"db", "table"});
-
-    split = BaseBrokerRequestHandler.splitTableNameByConfig("db.schema.table", true);
-    Assert.assertEquals(split, new String[]{"db.schema.table"});
-
-    split = BaseBrokerRequestHandler.splitTableNameByConfig("db.table", false);
-    Assert.assertEquals(split, new String[]{"db", "table"});
   }
 }

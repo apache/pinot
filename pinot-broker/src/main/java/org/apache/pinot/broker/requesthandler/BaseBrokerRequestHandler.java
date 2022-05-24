@@ -243,7 +243,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     String tableName =
-        getActualTableName(serverPinotQuery.getDataSource().getTableName(), _tableCache, _routingManager, _config);
+        getActualTableName(serverPinotQuery.getDataSource().getTableName(), _tableCache, _routingManager);
     serverPinotQuery.getDataSource().setTableName(tableName);
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     requestContext.setTableName(rawTableName);
@@ -769,16 +769,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * @param tableName the table name in the query
    * @param tableCache the table case-sensitive cache
    * @param routingManager the routing mananger for testing whether a route exists
-   * @param config the Pinot Configuration
    * @return the table name in the format of [database_name].[table_name]
    */
   @VisibleForTesting
-  static String getActualTableName(String tableName, TableCache tableCache, BrokerRoutingManager routingManager,
-      PinotConfiguration config) {
+  static String getActualTableName(String tableName, TableCache tableCache, BrokerRoutingManager routingManager) {
     // Use TableCache to handle case-insensitive table name
-    boolean allowDots = config.getProperty(CommonConstants.Helix.ALLOW_TABLE_NAME_WITH_DATABASE,
-        CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_WITH_DATABASE);
-
     if (tableCache.isIgnoreCase()) {
       String actualTableName = tableCache.getActualTableName(tableName);
       if (actualTableName != null) {
@@ -786,7 +781,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
 
       // Check if table is in the format of [database_name].[table_name]
-      String[] tableNameSplits = splitTableNameByConfig(tableName, allowDots);
+      String[] tableNameSplits = StringUtils.split(tableName, ".", 2);
       if (tableNameSplits.length == 2) {
         actualTableName = tableCache.getActualTableName(tableNameSplits[1]);
         if (actualTableName != null) {
@@ -797,7 +792,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return tableName;
     }
     // Check if table is in the format of [database_name].[table_name]
-    String[] tableNameSplits = splitTableNameByConfig(tableName, allowDots);
+    String[] tableNameSplits = StringUtils.split(tableName, ".", 2);
     if (tableNameSplits.length != 2) {
       return tableName;
     }
@@ -821,22 +816,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return tableNameSplits[1];
     }
     return tableName;
-  }
-
-  /**
-   * Splits a table name by last dot if the config does not allow the table name dots;
-   * or if the config allows table name dots, just plain return full table name.
-   * @param tableName the table name for split
-   * @param allowDots whether the table allows dots in its name
-   * @return the split results
-   */
-  @VisibleForTesting
-  static String[] splitTableNameByConfig(String tableName, boolean allowDots) {
-    if (allowDots) {
-      return new String[]{tableName};
-    } else {
-      return StringUtils.split(tableName, ".", 2);
-    }
   }
 
   /**
