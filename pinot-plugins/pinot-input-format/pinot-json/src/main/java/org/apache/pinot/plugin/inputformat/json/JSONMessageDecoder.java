@@ -59,7 +59,7 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   public GenericRow decode(byte[] payload, GenericRow destination) {
     try {
       JsonNode message = JsonUtils.bytesToJsonNode(payload);
-      Map<String, Object> from = JsonUtils.jsonNodeToObject(message);
+      Map<String, Object> from = JsonUtils.jsonNodeToMap(message);
       _jsonRecordExtractor.extract(from, destination);
       return destination;
     } catch (Exception e) {
