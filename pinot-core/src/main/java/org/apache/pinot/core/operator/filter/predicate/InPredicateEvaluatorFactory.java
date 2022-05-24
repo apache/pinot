@@ -182,12 +182,12 @@ public class InPredicateEvaluatorFactory {
 
     @Override
     public int applySV(int limit, int[] docIds, int[] values) {
+      // reimplemented here to ensure applySV can be inlined
       int matches = 0;
       for (int i = 0; i < limit; i++) {
         int value = values[i];
         if (applySV(value)) {
-          docIds[matches] = docIds[i];
-          values[matches++] = value;
+          docIds[matches++] = docIds[i];
         }
       }
       return matches;
@@ -214,12 +214,12 @@ public class InPredicateEvaluatorFactory {
 
     @Override
     public int applySV(int limit, int[] docIds, int[] values) {
+      // reimplemented here to ensure applySV can be inlined
       int matches = 0;
       for (int i = 0; i < limit; i++) {
         int value = values[i];
         if (applySV(value)) {
-          docIds[matches] = docIds[i];
-          values[matches++] = value;
+          docIds[matches++] = docIds[i];
         }
       }
       return matches;
@@ -246,12 +246,12 @@ public class InPredicateEvaluatorFactory {
 
     @Override
     public int applySV(int limit, int[] docIds, long[] values) {
+      // reimplemented here to ensure applySV can be inlined
       int matches = 0;
       for (int i = 0; i < limit; i++) {
         long value = values[i];
         if (applySV(value)) {
-          docIds[matches] = docIds[i];
-          values[matches++] = value;
+          docIds[matches++] = docIds[i];
         }
       }
       return matches;
@@ -278,12 +278,12 @@ public class InPredicateEvaluatorFactory {
 
     @Override
     public int applySV(int limit, int[] docIds, float[] values) {
+      // reimplemented here to ensure applySV can be inlined
       int matches = 0;
       for (int i = 0; i < limit; i++) {
         float value = values[i];
         if (applySV(value)) {
-          docIds[matches] = docIds[i];
-          values[matches++] = value;
+          docIds[matches++] = docIds[i];
         }
       }
       return matches;
@@ -310,12 +310,12 @@ public class InPredicateEvaluatorFactory {
 
     @Override
     public int applySV(int limit, int[] docIds, double[] values) {
+      // reimplemented here to ensure applySV can be inlined
       int matches = 0;
       for (int i = 0; i < limit; i++) {
         double value = values[i];
         if (applySV(value)) {
-          docIds[matches] = docIds[i];
-          values[matches++] = value;
+          docIds[matches++] = docIds[i];
         }
       }
       return matches;

@@ -74,11 +74,11 @@ public interface PredicateEvaluator {
 
   /**
    * Apply the predicate to a batch of single-value entries.
-   * Compact matching entries into the prefix of the arrays.
+   * Compact matching entries into the prefix of the docIds array.
    *
    * @param limit How much of the input to consume.
    * @param docIds The docIds associated with the values - may be modified by invocation.
-   * @param values Batch of dictionary ids or raw values - may be modified by invocation.
+   * @param values Batch of dictionary ids or raw values.
    * @return the index of the first non-matching entry.
    */
   default int applySV(int limit, int[] docIds, int[] values) {
@@ -86,8 +86,7 @@ public interface PredicateEvaluator {
     for (int i = 0; i < limit; i++) {
       int value = values[i];
       if (applySV(value)) {
-        docIds[matches] = docIds[i];
-        values[matches++] = value;
+        docIds[matches++] = docIds[i];
       }
     }
     return matches;
@@ -140,7 +139,7 @@ public interface PredicateEvaluator {
 
   /**
    * Apply the predicate to a batch of single-value entries.
-   * Compact matching entries into the prefix of the arrays.
+   * Compact matching entries into the prefix of the docIds array.
    *
    * @param limit How much of the input to consume.
    * @param docIds The docIds associated with the values - may be modified by invocation.
@@ -152,8 +151,7 @@ public interface PredicateEvaluator {
     for (int i = 0; i < limit; i++) {
       long value = values[i];
       if (applySV(value)) {
-        docIds[matches] = docIds[i];
-        values[matches++] = value;
+        docIds[matches++] = docIds[i];
       }
     }
     return matches;
@@ -178,7 +176,7 @@ public interface PredicateEvaluator {
 
   /**
    * Apply the predicate to a batch of single-value entries.
-   * Compact matching entries into the prefix of the arrays.
+   * Compact matching entries into the prefix of the docIds array.
    *
    * @param limit How much of the input to consume.
    * @param docIds The docIds associated with the values - may be modified by invocation.
@@ -190,8 +188,7 @@ public interface PredicateEvaluator {
     for (int i = 0; i < limit; i++) {
       float value = values[i];
       if (applySV(value)) {
-        docIds[matches] = docIds[i];
-        values[matches++] = value;
+        docIds[matches++] = docIds[i];
       }
     }
     return matches;
@@ -216,7 +213,7 @@ public interface PredicateEvaluator {
 
   /**
    * Apply the predicate to a batch of single-value entries.
-   * Compact matching entries into the prefix of the arrays.
+   * Compact matching entries into the prefix of the docIds array.
    *
    * @param limit How much of the input to consume.
    * @param docIds The docIds associated with the values - may be modified by invocation.
@@ -228,8 +225,7 @@ public interface PredicateEvaluator {
     for (int i = 0; i < limit; i++) {
       double value = values[i];
       if (applySV(value)) {
-        docIds[matches] = docIds[i];
-        values[matches++] = value;
+        docIds[matches++] = docIds[i];
       }
     }
     return matches;
