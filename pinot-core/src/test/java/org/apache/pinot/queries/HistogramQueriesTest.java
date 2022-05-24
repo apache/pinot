@@ -268,9 +268,9 @@ public class HistogramQueriesTest extends BaseQueriesTest {
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
-    assertEquals(rows.get(0)[0],
-        new double[]{200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200,
-            204});
+    assertEquals(rows.get(0)[0], new double[]{
+        200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 204
+    });
   }
 
   @Test
@@ -283,7 +283,9 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       assertTrue(operator instanceof AggregationOperator);
       IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
     } catch (Exception e) {
-      assertEquals(e.getMessage(), "Invalid aggregation function: histogram(intColumn,'1000','1000','10')");
+      assertEquals(e.getMessage(),
+          "Invalid aggregation function: histogram(intColumn,'1000','1000','10'), Exception: The right most edge must"
+              + " be greater than left most edge, given 1000.0 and 1000.0");
     }
 
     try {
@@ -292,7 +294,9 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       assertTrue(operator instanceof AggregationOperator);
       IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
     } catch (Exception e) {
-      assertEquals(e.getMessage(), "Invalid aggregation function: histogram(intColumn,'0','1000','-1')");
+      assertEquals(e.getMessage(),
+          "Invalid aggregation function: histogram(intColumn,'0','1000','-1'), Exception: The number of bins must be "
+              + "greater than zero, given -1");
     }
 
     try {
@@ -301,7 +305,9 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       assertTrue(operator instanceof AggregationOperator);
       IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
     } catch (Exception e) {
-      assertEquals(e.getMessage(), "Invalid aggregation function: histogram(intColumn,arrayvalueconstructor('0'))");
+      assertEquals(e.getMessage(),
+          "Invalid aggregation function: histogram(intColumn,arrayvalueconstructor('0')), Exception: The number of "
+              + "bin edges must be greater than 1");
     }
 
     try {
@@ -321,7 +327,8 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
     } catch (Exception e) {
       assertEquals(e.getMessage(),
-          "Invalid aggregation function: histogram(intColumn,arrayvalueconstructor('0','0','1','2'))");
+          "Invalid aggregation function: histogram(intColumn,arrayvalueconstructor('0','0','1','2')), Exception: The "
+              + "bin edges must be strictly increasing");
     }
   }
 

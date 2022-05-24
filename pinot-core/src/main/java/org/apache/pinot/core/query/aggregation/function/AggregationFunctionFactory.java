@@ -273,7 +273,8 @@ public class AggregationFunctionFactory {
         }
       }
     } catch (Exception e) {
-      throw new BadQueryRequestException("Invalid aggregation function: " + function);
+      throw new BadQueryRequestException(
+          "Invalid aggregation function: " + function + ", Exception: " + e.getMessage());
     }
   }
 
