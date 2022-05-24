@@ -77,6 +77,19 @@ public class FSTBasedRegexpPredicateEvaluatorFactory {
     }
 
     @Override
+    public int applySV(int limit, int[] docIds, int[] values) {
+      // reimplemented here to ensure applySV can be inlined
+      int matches = 0;
+      for (int i = 0; i < limit; i++) {
+        int value = values[i];
+        if (applySV(value)) {
+          docIds[matches++] = docIds[i];
+        }
+      }
+      return matches;
+    }
+
+    @Override
     public int[] getMatchingDictIds() {
       return _dictIds.toArray();
     }
