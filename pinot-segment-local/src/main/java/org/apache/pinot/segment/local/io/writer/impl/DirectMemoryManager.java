@@ -19,10 +19,10 @@
 package org.apache.pinot.segment.local.io.writer.impl;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 
 
 // Allocates memory using direct allocation

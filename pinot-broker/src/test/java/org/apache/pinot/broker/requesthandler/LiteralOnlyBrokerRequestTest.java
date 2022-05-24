@@ -26,10 +26,10 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -99,8 +99,8 @@ public class LiteralOnlyBrokerRequestTest {
         .compileToPinotQuery("SELECT encodeUrl('key1=value 1&key2=value@!$2&key3=value%3'),"
             + " decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') FROM myTable")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
-            .compileToPinotQuery("SELECT count(*) from foo "
-                + "where bar = encodeUrl('key1=value 1&key2=value@!$2&key3=value%3')")));
+        .compileToPinotQuery("SELECT count(*) from foo "
+            + "where bar = encodeUrl('key1=value 1&key2=value@!$2&key3=value%3')")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
         .compileToPinotQuery("SELECT count(*) from foo "
             + "where bar = decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253')")));
@@ -230,8 +230,10 @@ public class LiteralOnlyBrokerRequestTest {
 
     checkExplainResultSchema(brokerResponse.getResultTable().getDataSchema(),
         new String[]{"Operator", "Operator_Id", "Parent_Id"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.INT});
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
+            DataSchema.ColumnDataType.INT
+        });
 
     Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0),
@@ -248,8 +250,10 @@ public class LiteralOnlyBrokerRequestTest {
 
     checkExplainResultSchema(brokerResponse.getResultTable().getDataSchema(),
         new String[]{"Operator", "Operator_Id", "Parent_Id"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.INT});
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
+            DataSchema.ColumnDataType.INT
+        });
 
     Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0),
