@@ -177,7 +177,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_PINOT_SERVER_STARTABLE_CLASS = "pinot.server.startable.class";
     public static final String CONFIG_OF_PINOT_MINION_STARTABLE_CLASS = "pinot.minion.startable.class";
 
-    public static final String CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED = "pinot.server.multi_stage.enabled";
+    public static final String CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED = "pinot.multistage.engine.enabled";
     public static final boolean DEFAULT_MULTI_STAGE_ENGINE_ENABLED = false;
   }
 
@@ -227,11 +227,10 @@ public class CommonConstants {
 
     // Configure the request handler type used by broker to handler inbound query request.
     // NOTE: the request handler type refers to the communication between Broker and Server.
-    public static final String BROKER_REQUEST_HANDLER_TYPE_JSON_OVERRIDE_KEY = "handler.type";
     public static final String BROKER_REQUEST_HANDLER_TYPE = "pinot.broker.request.handler.type";
     public static final String NETTY_BROKER_REQUEST_HANDLER_TYPE = "netty";
     public static final String GRPC_BROKER_REQUEST_HANDLER_TYPE = "grpc";
-    public static final String MULTI_STAGE_BROKER_REQUEST_HANDLER_TYPE = "multi_stage";
+    public static final String MULTI_STAGE_BROKER_REQUEST_HANDLER_TYPE = "multistage";
     public static final String DEFAULT_BROKER_REQUEST_HANDLER_TYPE = NETTY_BROKER_REQUEST_HANDLER_TYPE;
 
 
@@ -265,6 +264,7 @@ public class CommonConstants {
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
+        public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
 
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated

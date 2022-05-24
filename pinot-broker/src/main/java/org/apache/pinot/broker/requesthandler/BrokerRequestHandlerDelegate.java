@@ -34,33 +34,25 @@ import org.apache.pinot.spi.utils.CommonConstants;
  */
 public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
-  private String _defaultBrokerRequestHandlerType;
-  @Nullable
-  private SingleConnectionBrokerRequestHandler _singleConnectionBrokerRequestHandler;
-  @Nullable
-  private GrpcBrokerRequestHandler _grpcBrokerRequestHandler;
-  @Nullable
-  private WorkerQueryRequestHandler _multiStageWorkerRequestHandler;
+  private final BrokerRequestHandler _singleStageBrokerRequestHandler;
+  private final MultiStageBrokerRequestHandler _multiStageWorkerRequestHandler;
 
-  public BrokerRequestHandlerDelegate(@Nullable String defaultBrokerRequestHandlerType,
-      @Nullable SingleConnectionBrokerRequestHandler singleConnectionBrokerRequestHandler,
-      @Nullable GrpcBrokerRequestHandler grpcBrokerRequestHandler,
-      @Nullable WorkerQueryRequestHandler multiStageWorkerRequestHandler
+  private final boolean _isMultiStageQueryEngineEnabled;
+
+
+  public BrokerRequestHandlerDelegate(
+      BrokerRequestHandler singleStageBrokerRequestHandler,
+      @Nullable MultiStageBrokerRequestHandler multiStageWorkerRequestHandler
   ) {
-    _defaultBrokerRequestHandlerType = defaultBrokerRequestHandlerType != null ? defaultBrokerRequestHandlerType
-        : CommonConstants.Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE;
-    _singleConnectionBrokerRequestHandler = singleConnectionBrokerRequestHandler;
-    _grpcBrokerRequestHandler = grpcBrokerRequestHandler;
+    _singleStageBrokerRequestHandler = singleStageBrokerRequestHandler;
     _multiStageWorkerRequestHandler = multiStageWorkerRequestHandler;
+    _isMultiStageQueryEngineEnabled = _multiStageWorkerRequestHandler != null;
   }
 
   @Override
   public void start() {
-    if (_singleConnectionBrokerRequestHandler != null) {
-      _singleConnectionBrokerRequestHandler.start();
-    }
-    if (_grpcBrokerRequestHandler != null) {
-      _grpcBrokerRequestHandler.start();
+    if (_singleStageBrokerRequestHandler != null) {
+      _singleStageBrokerRequestHandler.start();
     }
     if (_multiStageWorkerRequestHandler != null) {
       _multiStageWorkerRequestHandler.start();
@@ -69,11 +61,8 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public void shutDown() {
-    if (_singleConnectionBrokerRequestHandler != null) {
-      _singleConnectionBrokerRequestHandler.shutDown();
-    }
-    if (_grpcBrokerRequestHandler != null) {
-      _grpcBrokerRequestHandler.shutDown();
+    if (_singleStageBrokerRequestHandler != null) {
+      _singleStageBrokerRequestHandler.shutDown();
     }
     if (_multiStageWorkerRequestHandler != null) {
       _multiStageWorkerRequestHandler.shutDown();
@@ -84,30 +73,12 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   public BrokerResponse handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
       RequestContext requestContext)
       throws Exception {
-    JsonNode node = request.get(CommonConstants.Broker.BROKER_REQUEST_HANDLER_TYPE_JSON_OVERRIDE_KEY);
-    String handlerType = node == null ? _defaultBrokerRequestHandlerType : node.asText();
-    switch (handlerType) {
-      case CommonConstants.Broker.NETTY_BROKER_REQUEST_HANDLER_TYPE:
-        if (_singleConnectionBrokerRequestHandler != null) {
-          return _singleConnectionBrokerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
-        } else {
-          break;
-        }
-      case CommonConstants.Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE:
-        if (_grpcBrokerRequestHandler != null) {
-          return _grpcBrokerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
-        } else {
-          break;
-        }
-      case CommonConstants.Broker.MULTI_STAGE_BROKER_REQUEST_HANDLER_TYPE:
-        if (_multiStageWorkerRequestHandler != null) {
-          return _multiStageWorkerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
-        } else {
-          break;
-        }
-      default:
-        break;
+    if (_isMultiStageQueryEngineEnabled && _multiStageWorkerRequestHandler != null) {
+      JsonNode node = request.get(CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE);
+      if (node != null && node.asBoolean()) {
+        return _multiStageWorkerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
+      }
     }
-    throw new UnsupportedOperationException("Unable to find request handler for type: " + handlerType);
+    return _singleStageBrokerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
   }
 }

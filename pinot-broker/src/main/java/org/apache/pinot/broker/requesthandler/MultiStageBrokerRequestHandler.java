@@ -30,7 +30,6 @@ import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
-import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -60,8 +59,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class WorkerQueryRequestHandler extends BaseBrokerRequestHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(WorkerQueryRequestHandler.class);
+public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
   private static final long DEFAULT_TIMEOUT_NANO = 10_000_000_000L;
   private final String _reducerHostname;
   private final int _reducerPort;
@@ -70,10 +69,11 @@ public class WorkerQueryRequestHandler extends BaseBrokerRequestHandler {
   private QueryEnvironment _queryEnvironment;
   private QueryDispatcher _queryDispatcher;
 
-  public WorkerQueryRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
+  public MultiStageBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
+      BrokerMetrics brokerMetrics) {
     super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
+    LOGGER.info("Starting Multi-stage BrokerRequestHandler.");
     String reducerHostname = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (reducerHostname == null) {
       // use broker ID as host name, but remove the
