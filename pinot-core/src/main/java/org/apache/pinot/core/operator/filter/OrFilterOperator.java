@@ -79,6 +79,6 @@ public class OrFilterOperator extends BaseFilterOperator {
     for (int i = 0; i < _filterOperators.size(); i++) {
       bitmaps[i] = _filterOperators.get(i).getBitmaps().reduce();
     }
-    return BufferFastAggregation.or(bitmaps).getCardinality();
+    return BufferFastAggregation.orCardinality(bitmaps);
   }
 }
