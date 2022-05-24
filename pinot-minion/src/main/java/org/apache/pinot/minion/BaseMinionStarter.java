@@ -159,17 +159,17 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     Utils.logVersions();
     MinionContext minionContext = MinionContext.getInstance();
 
-    SegmentPurger.RecordPurgerFactory s = new SegmentPurger.RecordPurgerFactory() {
+    SegmentPurger.RecordPurgerFactory recordPurgerFactory = new SegmentPurger.RecordPurgerFactory() {
       @Override
       public SegmentPurger.RecordPurger getRecordPurger(String rawTableName) {
-        SegmentPurger.RecordPurger r = row -> {
+        SegmentPurger.RecordPurger recordPurger = row -> {
           //TODO-IMPLEMENT HERE YOUR OWN PURGE LOGIC
           return false;
         };
-        return r;
+        return recordPurger;
       }
     };
-    minionContext.setRecordPurgerFactory(s);
+    minionContext.setRecordPurgerFactory(recordPurgerFactory);
     // Initialize data directory
     LOGGER.info("Initializing data directory");
     File dataDir = new File(_config
