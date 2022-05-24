@@ -47,6 +47,14 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.SKIP_UPSERT));
   }
 
+  // TODO: Debug options has been kept for backward compatibility should be deprecated in future releases
+  public static boolean isSkipStarTree(Map<String, String> queryOptions, Map<String, String> debugOptions) {
+    boolean disabledWithQueryOption = !Boolean.parseBoolean(
+        queryOptions.getOrDefault(Request.QueryOptionKey.USE_STAR_TREE_KEY, "true"));
+    return disabledWithQueryOption || (debugOptions != null
+        && !Boolean.parseBoolean(debugOptions.getOrDefault(Request.QueryOptionKey.USE_STAR_TREE_KEY, "true")));
+  }
+
   public static Integer getNumReplicaGroupsToQuery(Map<String, String> queryOptions) {
     String numReplicaGroupsToQuery = queryOptions.get(Request.QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
     return numReplicaGroupsToQuery != null ? Integer.parseInt(numReplicaGroupsToQuery) : null;

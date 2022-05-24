@@ -21,7 +21,7 @@ package org.apache.pinot.controller.api;
 import java.io.IOException;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.ControllerTestUtils;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.Obfuscator;
 import org.testng.Assert;
@@ -34,10 +34,12 @@ import org.testng.annotations.Test;
  * Test for {@link org.apache.pinot.controller.api.resources.PinotControllerAppConfigs} class.
  */
 public class PinotControllerAppConfigsTest {
+  private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
+
   @BeforeClass
   public void setUp()
       throws Exception {
-    ControllerTestUtils.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
   }
 
   /**
@@ -48,11 +50,11 @@ public class PinotControllerAppConfigsTest {
   @Test
   public void testControllerAppConfigs()
       throws IOException {
-    ControllerConf expectedControllerConf = ControllerTestUtils.getControllerConfig();
+    ControllerConf expectedControllerConf = TEST_INSTANCE.getControllerConfig();
     PinotAppConfigs expected = new PinotAppConfigs(expectedControllerConf);
 
     String configsJson =
-        ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder().forAppConfigs());
+        ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forAppConfigs());
     PinotAppConfigs actual = JsonUtils.stringToObject(configsJson, PinotAppConfigs.class);
 
     // RuntimeConfig is not checked as it has information that can change during the test run.
@@ -76,6 +78,6 @@ public class PinotControllerAppConfigsTest {
 
   @AfterClass
   public void tearDown() {
-    ControllerTestUtils.cleanup();
+    TEST_INSTANCE.cleanup();
   }
 }

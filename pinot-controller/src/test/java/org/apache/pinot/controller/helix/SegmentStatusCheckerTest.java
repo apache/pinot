@@ -43,8 +43,11 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -74,6 +77,9 @@ public class SegmentStatusCheckerTest {
     final String tableName = "myTable_OFFLINE";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setNumReplicas(2).build();
+
     IdealState idealState = new IdealState(tableName);
     idealState.setPartitionState("myTable_0", "pinot1", "ONLINE");
     idealState.setPartitionState("myTable_0", "pinot2", "ONLINE");
@@ -105,6 +111,7 @@ public class SegmentStatusCheckerTest {
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
+      when(_helixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
     }
@@ -144,6 +151,7 @@ public class SegmentStatusCheckerTest {
     _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
+    Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.REPLICATION_FROM_CONFIG), 2);
     Assert
         .assertEquals(_controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENT_COUNT), 3);
     Assert.assertEquals(
@@ -171,6 +179,9 @@ public class SegmentStatusCheckerTest {
     final String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setTimeColumnName("timeColumn").setLLC(true)
+            .setNumReplicas(3).build();
     final LLCSegmentName seg1 = new LLCSegmentName(rawTableName, 1, 0, System.currentTimeMillis());
     final LLCSegmentName seg2 = new LLCSegmentName(rawTableName, 1, 1, System.currentTimeMillis());
     final LLCSegmentName seg3 = new LLCSegmentName(rawTableName, 2, 1, System.currentTimeMillis());
@@ -201,6 +212,7 @@ public class SegmentStatusCheckerTest {
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
       _helixPropertyStore = mock(ZkHelixPropertyStore.class);
+      when(_helixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
       when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
@@ -227,6 +239,7 @@ public class SegmentStatusCheckerTest {
     _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
+    Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.REPLICATION_FROM_CONFIG), 3);
     Assert.assertEquals(
         _controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert

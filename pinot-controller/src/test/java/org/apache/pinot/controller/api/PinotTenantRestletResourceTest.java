@@ -20,7 +20,7 @@ package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.controller.ControllerTestUtils;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -33,12 +33,13 @@ import static org.testng.Assert.assertTrue;
 
 
 public class PinotTenantRestletResourceTest {
+  private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
   private static final String TABLE_NAME = "restletTable_OFFLINE";
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    ControllerTestUtils.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
   }
 
   @Test
@@ -46,16 +47,16 @@ public class PinotTenantRestletResourceTest {
       throws Exception {
     // Check that no tables on tenant works
     String listTablesUrl =
-        ControllerTestUtils.getControllerRequestURLBuilder().forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME);
-    JsonNode tableList = JsonUtils.stringToJsonNode(ControllerTestUtils.sendGetRequest(listTablesUrl));
+        TEST_INSTANCE.getControllerRequestURLBuilder().forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME);
+    JsonNode tableList = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
     assertEquals(tableList.get("tables").size(), 0);
 
     // Add a table
-    ControllerTestUtils.sendPostRequest(ControllerTestUtils.getControllerRequestURLBuilder().forTableCreate(),
+    ControllerTest.sendPostRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableCreate(),
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build().toJsonString());
 
     // There should be 1 table on the tenant
-    tableList = JsonUtils.stringToJsonNode(ControllerTestUtils.sendGetRequest(listTablesUrl));
+    tableList = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
     JsonNode tables = tableList.get("tables");
     assertEquals(tables.size(), 1);
 
@@ -70,6 +71,6 @@ public class PinotTenantRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
-    ControllerTestUtils.cleanup();
+    TEST_INSTANCE.cleanup();
   }
 }

@@ -20,7 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.controller.ControllerTestUtils;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -35,6 +35,7 @@ import static org.testng.Assert.assertEquals;
  * Test for extra resource package registered with HTTP server
  */
 public class PinotDummyExtraRestletResourceTest {
+  private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
 
   @BeforeClass
   public void setUp()
@@ -42,19 +43,19 @@ public class PinotDummyExtraRestletResourceTest {
     Map<String, Object> extraProperties = new HashMap<>();
     extraProperties.put(CONTROLLER_RESOURCE_PACKAGES, String.format("%s,%s",
         "org.apache.pinot.controller.api.resources.extrapackage", DEFAULT_CONTROLLER_RESOURCE_PACKAGES));
-    ControllerTestUtils.setupClusterAndValidate(extraProperties);
+    TEST_INSTANCE.setupSharedStateAndValidate(extraProperties);
   }
 
   @Test
   public void testExtraDummyResourcePackages()
       throws Exception {
-    String baseUrl = ControllerTestUtils.getControllerBaseApiUrl();
-    String resp = ControllerTestUtils.sendGetRequest(StringUtil.join("/", baseUrl, "testExtra"));
+    String baseUrl = TEST_INSTANCE.getControllerBaseApiUrl();
+    String resp = ControllerTest.sendGetRequest(StringUtil.join("/", baseUrl, "testExtra"));
     assertEquals(resp, "DummyMsg");
   }
 
   @AfterClass
   public void tearDown() {
-    ControllerTestUtils.cleanup();
+    TEST_INSTANCE.cleanup();
   }
 }
