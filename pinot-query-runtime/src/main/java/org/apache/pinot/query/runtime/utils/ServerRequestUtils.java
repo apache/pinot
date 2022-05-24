@@ -18,17 +18,20 @@
  */
 package org.apache.pinot.query.runtime.utils;
 
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
+import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
@@ -106,6 +109,13 @@ public class ServerRequestUtils {
     } else if (node instanceof ProjectNode) {
       pinotQuery.setSelectList(CalciteRexExpressionParser.convertSelectList(
           ((ProjectNode) node).getProjects(), pinotQuery));
+    } else if (node instanceof AggregateNode) {
+      // set agg list
+      pinotQuery.setSelectList(CalciteRexExpressionParser.convertSelectList(
+          ((AggregateNode) node).getAggCalls(), pinotQuery));
+      // set group-by list
+      pinotQuery.setGroupByList(CalciteRexExpressionParser.convertGroupByList(
+          ((AggregateNode) node).getGroupSet(), pinotQuery));
     } else if (node instanceof MailboxSendNode) {
       // TODO: MailboxSendNode should be the root of the leaf stage. but ignore for now since it is handle seperately
       // in QueryRunner as a single step sender.

@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.logical;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
@@ -60,6 +61,12 @@ public interface RexExpression {
     } else {
       throw new IllegalArgumentException("Unsupported RexNode type with SqlKind: " + rexNode.getKind());
     }
+  }
+
+  static RexExpression toRexExpression(AggregateCall aggCall) {
+    List<RexExpression> operands = aggCall.getArgList().stream().map(InputRef::new).collect(Collectors.toList());
+    return new RexExpression.FunctionCall(aggCall.getAggregation().getKind(), toDataType(aggCall.getType()),
+        aggCall.getAggregation().getName(), operands);
   }
 
   static Object toRexValue(FieldSpec.DataType dataType, Comparable value) {

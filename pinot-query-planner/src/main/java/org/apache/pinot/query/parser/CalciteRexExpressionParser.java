@@ -54,7 +54,7 @@ public class CalciteRexExpressionParser {
   // --------------------------------------------------------------------------
 
   public static List<Expression> convertSelectList(List<RexExpression> rexNodeList, PinotQuery pinotQuery) {
-    List<Expression> selectExpr = new ArrayList<>();
+    List<Expression> selectExpr = pinotQuery.getSelectList() == null ? new ArrayList<>() : pinotQuery.getSelectList();
 
     final Iterator<RexExpression> iterator = rexNodeList.iterator();
     while (iterator.hasNext()) {
@@ -63,6 +63,19 @@ public class CalciteRexExpressionParser {
     }
 
     return selectExpr;
+  }
+
+  public static List<Expression> convertGroupByList(List<RexExpression> rexNodeList, PinotQuery pinotQuery) {
+    List<Expression> groupByExpr = pinotQuery.getGroupByList() == null
+        ? new ArrayList<>() : pinotQuery.getGroupByList();
+
+    final Iterator<RexExpression> iterator = rexNodeList.iterator();
+    while (iterator.hasNext()) {
+      final RexExpression next = iterator.next();
+      groupByExpr.add(toExpression(next, pinotQuery));
+    }
+
+    return groupByExpr;
   }
 
   private static List<Expression> convertDistinctSelectList(RexExpression.FunctionCall rexCall, PinotQuery pinotQuery) {
@@ -169,7 +182,7 @@ public class CalciteRexExpressionParser {
       operands.add(toExpression(childNode, pinotQuery));
     }
     ParserUtils.validateFunction(functionName, operands);
-    Expression functionExpression = RequestUtils.getFunctionExpression(functionName);
+    Expression functionExpression = RequestUtils.getFunctionExpression(canonicalizeFunctionName(functionName));
     functionExpression.getFunctionCall().setOperands(operands);
     return functionExpression;
   }
@@ -208,5 +221,16 @@ public class CalciteRexExpressionParser {
     Expression andExpression = RequestUtils.getFunctionExpression(SqlKind.OR.name());
     andExpression.getFunctionCall().setOperands(operands);
     return andExpression;
+  }
+
+  /**
+   * Canonicalize Calcite generated Logical function names.
+   */
+  private static String canonicalizeFunctionName(String functionName) {
+    if (functionName.endsWith("0")) {
+      return functionName.substring(0, functionName.length() - 1);
+    } else {
+      return functionName;
+    }
   }
 }
