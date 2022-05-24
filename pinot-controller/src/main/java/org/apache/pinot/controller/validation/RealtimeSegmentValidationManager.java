@@ -21,6 +21,7 @@ package org.apache.pinot.controller.validation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -55,6 +56,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final int _segmentLevelValidationIntervalInSeconds;
   private long _lastSegmentLevelValidationRunTimeMs = 0L;
 
+  public static final String RECREATE_DELETED_CONSUMING_SEGMENT_KEY = "recreateDeletedConsumingSegment";
+
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
       ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics) {
@@ -69,7 +72,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   }
 
   @Override
-  protected Context preprocess() {
+  protected Context preprocess(Properties periodicTaskProperties) {
     Context context = new Context();
     // Run segment level validation only if certain time has passed after previous run
     long currentTimeMs = System.currentTimeMillis();
@@ -79,6 +82,9 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       context._runSegmentLevelValidation = true;
       _lastSegmentLevelValidationRunTimeMs = currentTimeMs;
     }
+    context._recreateDeletedConsumingSegment =
+        Boolean.parseBoolean(periodicTaskProperties.getProperty(RECREATE_DELETED_CONSUMING_SEGMENT_KEY));
+
     return context;
   }
 
@@ -100,7 +106,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
           IngestionConfigUtils.getStreamConfigMap(tableConfig));
       if (streamConfig.hasLowLevelConsumerType()) {
-        _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig);
+        _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig,
+            streamConfig, context._recreateDeletedConsumingSegment);
       }
     }
   }
@@ -174,6 +181,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
   public static final class Context {
     private boolean _runSegmentLevelValidation;
+    private boolean _recreateDeletedConsumingSegment;
   }
 
   @VisibleForTesting

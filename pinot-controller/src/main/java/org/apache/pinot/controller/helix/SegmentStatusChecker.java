@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -95,7 +96,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   }
 
   @Override
-  protected Context preprocess() {
+  protected Context preprocess(Properties periodicTaskProperties) {
     Context context = new Context();
     // check if we need to log disabled tables log messages
     long now = System.currentTimeMillis();
