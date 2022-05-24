@@ -201,6 +201,11 @@ public class JsonUtils {
     return DEFAULT_READER.readTree(new ByteArrayInputStream(jsonBytes));
   }
 
+  public static Map<String, Object> jsonNodeToObject(JsonNode jsonNode)
+      throws IOException {
+    return DEFAULT_READER.forType(MAP_TYPE_REFERENCE).readValue(jsonNode);
+  }
+
   public static <T> T jsonNodeToObject(JsonNode jsonNode, Class<T> valueType)
       throws IOException {
     return DEFAULT_READER.forType(valueType).readValue(jsonNode);
