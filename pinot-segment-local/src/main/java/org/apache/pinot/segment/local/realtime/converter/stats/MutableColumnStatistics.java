@@ -164,11 +164,6 @@ public class MutableColumnStatistics implements ColumnStatistics {
   }
 
   @Override
-  public boolean hasNull() {
-    return false;
-  }
-
-  @Override
   public PartitionFunction getPartitionFunction() {
     return _dataSource.getDataSourceMetadata().getPartitionFunction();
   }

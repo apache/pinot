@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.segment.processing.framework;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
@@ -74,15 +74,15 @@ public class SegmentProcessorFrameworkTest {
   private Schema _schema;
   private Schema _schemaMV;
 
-  private final List<Object[]> _rawData = Lists
-      .newArrayList(new Object[]{"abc", 1000, 1597719600000L}, new Object[]{null, 2000, 1597773600000L},
+  private final List<Object[]> _rawData =
+      Arrays.asList(new Object[]{"abc", 1000, 1597719600000L}, new Object[]{null, 2000, 1597773600000L},
           new Object[]{"abc", null, 1597777200000L}, new Object[]{"abc", 4000, 1597795200000L},
           new Object[]{"abc", 3000, 1597802400000L}, new Object[]{null, null, 1597838400000L},
           new Object[]{"xyz", 4000, 1597856400000L}, new Object[]{null, 1000, 1597878000000L},
           new Object[]{"abc", 7000, 1597881600000L}, new Object[]{"xyz", 6000, 1597892400000L});
 
-  private final List<Object[]> _rawDataMultiValue = Lists
-      .newArrayList(new Object[]{new String[]{"a", "b"}, 1000, 1597795200000L},
+  private final List<Object[]> _rawDataMultiValue =
+      Arrays.asList(new Object[]{new String[]{"a", "b"}, 1000, 1597795200000L},
           new Object[]{null, null, 1597795200000L}, new Object[]{null, 1000, 1597795200000L},
           new Object[]{new String[]{"a", "b"}, null, 1597795200000L});
 
@@ -243,9 +243,7 @@ public class SegmentProcessorFrameworkTest {
     assertNotNull(clicksNullValueVector);
     assertEquals(clicksNullValueVector.getNullBitmap().toArray(), new int[]{2, 5});
     timeDataSource = segment.getDataSource("time");
-    NullValueVectorReader timeNullValueVector = timeDataSource.getNullValueVector();
-    assertNotNull(timeNullValueVector);
-    assertTrue(timeNullValueVector.getNullBitmap().isEmpty());
+    assertNull(timeDataSource.getNullValueVector());
     assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
     segment.destroy();
     FileUtils.cleanDirectory(workingDir);
@@ -266,7 +264,7 @@ public class SegmentProcessorFrameworkTest {
 
     // Time filter
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
-        new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597795200000L, 1597881600000L).build())
+            new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597795200000L, 1597881600000L).build())
         .build();
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
@@ -300,7 +298,7 @@ public class SegmentProcessorFrameworkTest {
 
     // Time filter - filtered everything
     config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).setTimeHandlerConfig(
-        new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597968000000L, 1598054400000L).build())
+            new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH).setTimeRange(1597968000000L, 1598054400000L).build())
         .build();
     framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     outputSegments = framework.process();
@@ -390,13 +388,9 @@ public class SegmentProcessorFrameworkTest {
     assertNotNull(campaignNullValueVector);
     assertEquals(campaignNullValueVector.getNullBitmap().toArray(), new int[]{0});
     clicksDataSource = segment.getDataSource("clicks");
-    clicksNullValueVector = clicksDataSource.getNullValueVector();
-    assertNotNull(clicksNullValueVector);
-    assertTrue(clicksNullValueVector.getNullBitmap().isEmpty());
+    assertNull(clicksDataSource.getNullValueVector());
     timeDataSource = segment.getDataSource("time");
-    timeNullValueVector = timeDataSource.getNullValueVector();
-    assertNotNull(timeNullValueVector);
-    assertTrue(timeNullValueVector.getNullBitmap().isEmpty());
+    assertNull(timeDataSource.getNullValueVector());
     assertEquals(segmentMetadata.getName(), "myTable_1597708800000_1597708800000_0");
     segment.destroy();
     // segment 1
@@ -420,13 +414,9 @@ public class SegmentProcessorFrameworkTest {
     assertNotNull(campaignNullValueVector);
     assertEquals(campaignNullValueVector.getNullBitmap().toArray(), new int[]{0});
     clicksDataSource = segment.getDataSource("clicks");
-    clicksNullValueVector = clicksDataSource.getNullValueVector();
-    assertNotNull(clicksNullValueVector);
-    assertTrue(clicksNullValueVector.getNullBitmap().isEmpty());
+    assertNull(clicksDataSource.getNullValueVector());
     timeDataSource = segment.getDataSource("time");
-    timeNullValueVector = timeDataSource.getNullValueVector();
-    assertNotNull(timeNullValueVector);
-    assertTrue(timeNullValueVector.getNullBitmap().isEmpty());
+    assertNull(timeDataSource.getNullValueVector());
     assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597795200000_1");
     segment.destroy();
     FileUtils.cleanDirectory(workingDir);
@@ -558,13 +548,9 @@ public class SegmentProcessorFrameworkTest {
     assertNotNull(campaignNullValueVector);
     assertEquals(campaignNullValueVector.getNullBitmap().toArray(), new int[]{0});
     DataSource clicksDataSource = segment.getDataSource("clicks");
-    NullValueVectorReader clicksNullValueVector = clicksDataSource.getNullValueVector();
-    assertNotNull(clicksNullValueVector);
-    assertTrue(clicksNullValueVector.getNullBitmap().isEmpty());
+    assertNull(clicksDataSource.getNullValueVector());
     DataSource timeDataSource = segment.getDataSource("time");
-    NullValueVectorReader timeNullValueVector = timeDataSource.getNullValueVector();
-    assertNotNull(timeNullValueVector);
-    assertTrue(timeNullValueVector.getNullBitmap().isEmpty());
+    assertNull(timeDataSource.getNullValueVector());
     assertEquals(segmentMetadata.getName(), "myTable_1597795200000_1597795200000_0");
     segment.destroy();
     FileUtils.cleanDirectory(workingDir);

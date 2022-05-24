@@ -99,11 +99,6 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
   }
 
   @Override
-  public boolean hasNull() {
-    return false;
-  }
-
-  @Override
   public void seal() {
     _sortedValues = _values.toDoubleArray();
     Arrays.sort(_sortedValues);
