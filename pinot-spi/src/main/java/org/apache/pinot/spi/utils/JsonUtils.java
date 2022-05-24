@@ -81,7 +81,7 @@ public class JsonUtils {
   public static final ObjectReader DEFAULT_READER = DEFAULT_MAPPER.reader();
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
-  public static final TypeReference<HashMap<String, Object>> GENERIC_JSON_TYPE =
+  public static final TypeReference<HashMap<String, Object>> MAP_TYPE_REFERENCE =
       new TypeReference<HashMap<String, Object>>() {
       };
 
@@ -101,10 +101,10 @@ public class JsonUtils {
       Class<T> valueType)
       throws IOException {
     T instance = DEFAULT_READER.forType(valueType).readValue(jsonString);
-    Map<String, Object> inputJsonMap = flatten(DEFAULT_MAPPER.readValue(jsonString, GENERIC_JSON_TYPE));
+    Map<String, Object> inputJsonMap = flatten(DEFAULT_MAPPER.readValue(jsonString, MAP_TYPE_REFERENCE));
 
     String instanceJson = DEFAULT_MAPPER.writeValueAsString(instance);
-    Map<String, Object> instanceJsonMap = flatten(DEFAULT_MAPPER.readValue(instanceJson, GENERIC_JSON_TYPE));
+    Map<String, Object> instanceJsonMap = flatten(DEFAULT_MAPPER.readValue(instanceJson, MAP_TYPE_REFERENCE));
 
     MapDifference<String, Object> difference = Maps.difference(inputJsonMap, instanceJsonMap);
     return Pair.of(instance, difference.entriesOnlyOnLeft());
@@ -212,7 +212,7 @@ public class JsonUtils {
   }
 
   public static Map<String, Object> jsonNodeToMap(JsonNode node) {
-    return DEFAULT_MAPPER.convertValue(node, GENERIC_JSON_TYPE);
+    return DEFAULT_MAPPER.convertValue(node, MAP_TYPE_REFERENCE);
   }
 
   public static String objectToString(Object object)
