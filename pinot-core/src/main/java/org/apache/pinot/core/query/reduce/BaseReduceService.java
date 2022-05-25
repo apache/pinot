@@ -143,6 +143,7 @@ public abstract class BaseReduceService {
     private long _offlineTotalCpuTimeNs = 0L;
     private long _realtimeTotalCpuTimeNs = 0L;
     private boolean _numGroupsLimitReached = false;
+    private long _numStartreeUsed = 0L;
 
     protected ExecutionStatsAggregator(boolean enableTrace) {
       _enableTrace = enableTrace;
@@ -235,6 +236,11 @@ public abstract class BaseReduceService {
         _numTotalDocs += Long.parseLong(numTotalDocsString);
       }
       _numGroupsLimitReached |= Boolean.parseBoolean(metadata.get(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
+
+      String numStartreeUsedString = metadata.get(MetadataKey.NUM_STARTREE_USED.getName());
+      if (numStartreeUsedString != null) {
+        _numStartreeUsed += Long.parseLong(numStartreeUsedString);
+      }
     }
 
     protected void setStats(String rawTableName, BrokerResponseNative brokerResponseNative,
@@ -265,6 +271,7 @@ public abstract class BaseReduceService {
       brokerResponseNative.setRealtimeResponseSerializationCpuTimeNs(_realtimeResponseSerializationCpuTimeNs);
       brokerResponseNative.setOfflineTotalCpuTimeNs(_offlineTotalCpuTimeNs);
       brokerResponseNative.setRealtimeTotalCpuTimeNs(_realtimeTotalCpuTimeNs);
+      brokerResponseNative.setNumStartreeUsed(_numStartreeUsed);
       if (_numConsumingSegmentsProcessed > 0) {
         brokerResponseNative.setNumConsumingSegmentsQueried(_numConsumingSegmentsProcessed);
         brokerResponseNative.setMinConsumingFreshnessTimeMs(_minConsumingFreshnessTimeMs);

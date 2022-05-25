@@ -77,6 +77,11 @@ public interface BrokerResponse {
    */
   long getNumDocsScanned();
 
+  /** 
+   * Get number of segments using the startree index.
+   */
+  long getNumStartreeUsed();
+
   /**
    * Get number of entries scanned in filter phase while processing the query.
    */

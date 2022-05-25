@@ -47,7 +47,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
     "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs", "segmentStatistics",
-    "traceInfo"
+    "traceInfo", "numStartreeUsed"
 })
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
@@ -86,6 +86,8 @@ public class BrokerResponseNative implements BrokerResponse {
   private Map<String, String> _traceInfo = new HashMap<>();
   private List<QueryProcessingException> _processingExceptions = new ArrayList<>();
   private List<String> _segmentStatistics = new ArrayList<>();
+  
+  private long _numStartreeUsed = 0L;
 
   public BrokerResponseNative() {
   }
@@ -271,6 +273,16 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("numDocsScanned")
   public void setNumDocsScanned(long numDocsScanned) {
     _numDocsScanned = numDocsScanned;
+  }
+
+  @JsonProperty("numStartreeUsed")
+  public long getNumStartreeUsed() {
+    return _numStartreeUsed;
+  }
+
+  @JsonProperty("numStartreeUsed")
+  public void setNumStartreeUsed(long numStartreeUsed ){
+    _numStartreeUsed = numStartreeUsed;
   }
 
   @JsonProperty("numEntriesScannedInFilter")

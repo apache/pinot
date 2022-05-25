@@ -45,6 +45,7 @@ public class ExecutionStats {
   private static final String TOTAL_DOCS = "totalDocs";
   private static final String NUM_GROUPS_LIMIT_REACHED = "numGroupsLimitReached";
   private static final String TIME_USED_MS = "timeUsedMs";
+  private static final String NUM_STARTREE_USED = "numStartreeUsed";
 
   private final JsonNode _brokerResponse;
 
