@@ -24,6 +24,7 @@ import it.unimi.dsi.fastutil.ints.IntArrays;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -582,6 +583,9 @@ public class MutableSegmentImpl implements MutableSegment {
           case DOUBLE:
             forwardIndex.setDouble(docId, ((Number) value).doubleValue());
             break;
+          case BIG_DECIMAL:
+            forwardIndex.setBigDecimal(docId, (BigDecimal) value);
+            break;
           default:
             throw new UnsupportedOperationException(
                 "Unsupported data type: " + dataType + " for aggregation: " + column);
@@ -654,6 +658,9 @@ public class MutableSegmentImpl implements MutableSegment {
               break;
             case DOUBLE:
               forwardIndex.setDouble(docId, (Double) value);
+              break;
+            case BIG_DECIMAL:
+              forwardIndex.setBigDecimal(docId, (BigDecimal) value);
               break;
             case STRING:
               forwardIndex.setString(docId, (String) value);
@@ -947,6 +954,8 @@ public class MutableSegmentImpl implements MutableSegment {
           return forwardIndex.getFloat(docId);
         case DOUBLE:
           return forwardIndex.getDouble(docId);
+        case BIG_DECIMAL:
+          return forwardIndex.getBigDecimal(docId);
         case STRING:
           return forwardIndex.getString(docId);
         case BYTES:

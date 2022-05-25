@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -90,6 +91,15 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
           max = Math.max(values[i], max);
         }
         aggregationResultHolder.setValue(Math.max(max, aggregationResultHolder.getDoubleResult()));
+        break;
+      }
+      case BIG_DECIMAL: {
+        BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
+        BigDecimal max = values[0];
+        for (int i = 0; i < length & i < values.length; i++) {
+          max = values[i].max(max);
+        }
+        aggregationResultHolder.setValue(Math.max(max.doubleValue(), aggregationResultHolder.getDoubleResult()));
         break;
       }
       default:
