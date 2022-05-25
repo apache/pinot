@@ -39,6 +39,12 @@ public class DataTypeConversionFunctions {
   private DataTypeConversionFunctions() {
   }
 
+  // SQL Calcite fails to parse 'cast(value, targetType)' as cast is a reserved SQL keyword.
+  @ScalarFunction
+  public static Object cast2(Object value, String targetTypeLiteral) {
+    return cast(value, targetTypeLiteral);
+  }
+
   @ScalarFunction
   public static Object cast(Object value, String targetTypeLiteral) {
     try {

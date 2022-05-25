@@ -92,6 +92,7 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
         for (int i = 0; i < length & i < values.length; i++) {
           decimalSum = decimalSum.add(values[i]);
         }
+        // todo: even though the source data has BIG_DECIMAL type, we still only support double precision.
         sum = decimalSum.doubleValue();
         break;
       }

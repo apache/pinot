@@ -583,9 +583,6 @@ public class MutableSegmentImpl implements MutableSegment {
           case DOUBLE:
             forwardIndex.setDouble(docId, ((Number) value).doubleValue());
             break;
-          case BIG_DECIMAL:
-            forwardIndex.setBigDecimal(docId, (BigDecimal) value);
-            break;
           default:
             throw new UnsupportedOperationException(
                 "Unsupported data type: " + dataType + " for aggregation: " + column);
