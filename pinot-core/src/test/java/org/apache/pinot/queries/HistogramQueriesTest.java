@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -63,10 +62,8 @@ public class HistogramQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "HistogramQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
-  private static final Random RANDOM = new Random();
 
   private static final int NUM_RECORDS = 2000;
-  private static final int MAX_VALUE = 3000;
 
   private static final String INT_COLUMN = "intColumn";
   private static final String LONG_COLUMN = "longColumn";
@@ -413,7 +410,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
     assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(),
         new double[]{100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 101});
 
-    query = "SELECT HISTOGRAM(floatColumn,0.5, 5.5, 5) FROM testTable";
+    query = "SELECT HISTOGRAM(floatColumn, ARRAY[0.5,1.5,2.5,3.5,4.5,5.5]) FROM testTable";
     operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
     resultsBlock = ((AggregationOperator) operator).nextBlock();
@@ -443,6 +440,48 @@ public class HistogramQueriesTest extends BaseQueriesTest {
     aggregationResult = resultsBlock.getAggregationResult();
     assertNotNull(aggregationResult);
     assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{1, 1, 1, 1, 2});
+
+    query = "SELECT HISTOGRAM(longColumn, ARRAY[-900, -850, -800, 1]) FROM testTable WHERE "
+        + "longColumn BETWEEN -1000 AND -950 OR longColumn BETWEEN -900 AND 2 OR longColumn BETWEEN 900 AND 950";
+    operator = getOperator(query);
+    assertTrue(operator instanceof AggregationOperator);
+    resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), 1005, 0, 1005,
+        NUM_RECORDS);
+    aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{50, 50, 802});
+
+    query = "SELECT HISTOGRAM(longColumn, ARRAY[-900, -850, -800, 1]) FROM testTable WHERE "
+        + "longColumn BETWEEN -1000 AND -950 OR longColumn BETWEEN -900 AND 2 OR longColumn BETWEEN 900 AND 950";
+    operator = getOperator(query);
+    assertTrue(operator instanceof AggregationOperator);
+    resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), 1005, 0, 1005,
+        NUM_RECORDS);
+    aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{50, 50, 802});
+
+    query = "SELECT HISTOGRAM(longColumn, ARRAY[-1004,-1003,-1002,-1001,-1000,-999]) FROM testTable";
+    operator = getOperator(query);
+    assertTrue(operator instanceof AggregationOperator);
+    resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS, NUM_RECORDS);
+    aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{0, 0, 0, 0, 2});
+
+    query = "SELECT HISTOGRAM(floatColumn, ARRAY[995,996,997,998,999,1000,1001,1002]) FROM testTable";
+    operator = getOperator(query);
+    assertTrue(operator instanceof AggregationOperator);
+    resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS, NUM_RECORDS);
+    aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{2, 2, 2, 2, 2, 0, 0});
   }
 
   @AfterClass
