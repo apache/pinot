@@ -284,7 +284,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
     } catch (Exception e) {
       assertEquals(e.getMessage(),
-          "Invalid aggregation function: histogram(intColumn,'1000','1000','10'), Exception: The right most edge must"
+          "Invalid aggregation function: histogram(intColumn,'1000','1000','10'); Reason: The right most edge must"
               + " be greater than left most edge, given 1000.0 and 1000.0");
     }
 
@@ -295,7 +295,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
     } catch (Exception e) {
       assertEquals(e.getMessage(),
-          "Invalid aggregation function: histogram(intColumn,'0','1000','-1'), Exception: The number of bins must be "
+          "Invalid aggregation function: histogram(intColumn,'0','1000','-1'); Reason: The number of bins must be "
               + "greater than zero, given -1");
     }
 
@@ -306,7 +306,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
     } catch (Exception e) {
       assertEquals(e.getMessage(),
-          "Invalid aggregation function: histogram(intColumn,arrayvalueconstructor('0')), Exception: The number of "
+          "Invalid aggregation function: histogram(intColumn,arrayvalueconstructor('0')); Reason: The number of "
               + "bin edges must be greater than 1");
     }
 
@@ -327,9 +327,122 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
     } catch (Exception e) {
       assertEquals(e.getMessage(),
-          "Invalid aggregation function: histogram(intColumn,arrayvalueconstructor('0','0','1','2')), Exception: The "
+          "Invalid aggregation function: histogram(intColumn,arrayvalueconstructor('0','0','1','2')); Reason: The "
               + "bin edges must be strictly increasing");
     }
+
+    try {
+      query = "SELECT HISTOGRAM(intColumn) FROM testTable";
+      Object operator = getOperator(query);
+      assertTrue(operator instanceof AggregationOperator);
+      IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
+    } catch (Exception e) {
+      assertEquals(e.getMessage(),
+          "Invalid aggregation function: histogram(intColumn); Reason: Histogram expects 2 or 4 arguments, got: 1;"
+              + " usage example: `Histogram(columnName, ARRAY[0,1,10,100])` to specify bins [0,1), [1,10), [10,1000] "
+              + "or `Histogram(columnName, 0, 1000, 10)` to specify 10 equal-length bins [0,100), [100,200), ..., "
+              + "[900,1000]");
+    }
+  }
+
+  @Test
+  public void testBucketEdgeAndSearch() {
+    String query = "SELECT HISTOGRAM(intColumn,0,100,9) FROM testTable";
+    Object operator = getOperator(query);
+    assertTrue(operator instanceof AggregationOperator);
+    IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS, NUM_RECORDS);
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(),
+        new double[]{12, 11, 11, 11, 11, 11, 11, 11, 12});
+    // [0, 11], [12, 22], [23, 33], [34, 44], [45, 55], [56,66], [67, 77], [78, 88], [89, 100]
+
+    query = "SELECT HISTOGRAM(intColumn,ARRAY[0,1]) FROM testTable";
+    operator = getOperator(query);
+    assertTrue(operator instanceof AggregationOperator);
+    resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS, NUM_RECORDS);
+    aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{2});
+
+    query = "SELECT HISTOGRAM(intColumn,ARRAY[1999,2000]) FROM testTable";
+    operator = getOperator(query);
+    assertTrue(operator instanceof AggregationOperator);
+    resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS, NUM_RECORDS);
+    aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{1});
+
+    query = "SELECT HISTOGRAM(longColumn,ARRAY[\"-Infinity\", -999, -800, -500, 500, 600, 800, \"Infinity\"]) FROM "
+        + "testTable";
+    operator = getOperator(query);
+    assertTrue(operator instanceof AggregationOperator);
+    resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS, NUM_RECORDS);
+    aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(),
+        new double[]{1, 199, 300, 1000, 100, 200, 200});
+
+    query = "SELECT HISTOGRAM(longColumn,-999.5, 500.5, 15) FROM testTable";
+    operator = getOperator(query);
+    assertTrue(operator instanceof AggregationOperator);
+    resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS, NUM_RECORDS);
+    aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(),
+        new double[]{100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100});
+
+    query = "SELECT HISTOGRAM(longColumn, -1000, 500, 15) FROM testTable";
+    operator = getOperator(query);
+    assertTrue(operator instanceof AggregationOperator);
+    resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS, NUM_RECORDS);
+    aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(),
+        new double[]{100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 101});
+
+    query = "SELECT HISTOGRAM(floatColumn,0.5, 5.5, 5) FROM testTable";
+    operator = getOperator(query);
+    assertTrue(operator instanceof AggregationOperator);
+    resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS, NUM_RECORDS);
+    aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{2, 2, 2, 2, 3});
+    // {0.5, 1} {1.5, 2}, {2.5, 3}, {3.5,4}, {4.5, 5, 5.5}
+
+    query = "SELECT HISTOGRAM(doubleColumn, ARRAY[-1, 0, 1, 2, 3, 4]) FROM testTable";
+    operator = getOperator(query);
+    assertTrue(operator instanceof AggregationOperator);
+    resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS, NUM_RECORDS);
+    aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{0, 1, 1, 1, 2});
+
+    query = "SELECT HISTOGRAM(longColumn, ARRAY[-1, 0, 1, 2, 3, 4]) FROM testTable";
+    operator = getOperator(query);
+    assertTrue(operator instanceof AggregationOperator);
+    resultsBlock = ((AggregationOperator) operator).nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
+        NUM_RECORDS, NUM_RECORDS);
+    aggregationResult = resultsBlock.getAggregationResult();
+    assertNotNull(aggregationResult);
+    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{1, 1, 1, 1, 2});
   }
 
   @AfterClass

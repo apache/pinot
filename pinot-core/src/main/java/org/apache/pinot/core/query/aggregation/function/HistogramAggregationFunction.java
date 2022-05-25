@@ -53,7 +53,7 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
     super(arguments.get(0));
     int numArguments = arguments.size();
     Preconditions.checkArgument(numArguments == 4 || numArguments == 2, "Histogram expects 2 or 4 arguments, got: %s;"
-        + "usage example: `Histogram(columnName, ARRAY[0,1,10,100])` to specify bins [0,1), [1,10), [10,1000] or "
+        + " usage example: `Histogram(columnName, ARRAY[0,1,10,100])` to specify bins [0,1), [1,10), [10,1000] or "
         + "`Histogram(columnName, 0, 1000, 10)` to specify 10 equal-length bins "
         + "[0,100), [100,200), ..., [900,1000]", numArguments);
     if (numArguments == 2) {
