@@ -89,8 +89,8 @@ public class CombineOperatorUtils {
     resultsBlock.setNumTotalDocs(numTotalDocs);
     resultsBlock.setExecutionThreadCpuTimeNs(threadCpuTimeNs);
     resultsBlock.setNumServerThreads(numServerThreads);
-    // if (startreeUsed) {
-    resultsBlock.setNumStartreeUsed(numStartreeUsed);
-    // }
+    if (startreeUsed) {
+      resultsBlock.setNumStartreeUsed(numStartreeUsed);
+    }
   }
 }
