@@ -38,6 +38,7 @@ import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.GuavaBloomFilterReaderUtils;
 import org.apache.pinot.segment.spi.FetchContext;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
@@ -292,7 +293,9 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
   private boolean pruneEqPredicate(IndexSegment segment, EqPredicate eqPredicate,
       Map<String, DataSource> dataSourceCache, Map<Predicate, Object> valueCache) {
     String column = eqPredicate.getLhs().getIdentifier();
-    DataSource dataSource = dataSourceCache.computeIfAbsent(column, segment::getDataSource);
+    DataSource dataSource = segment instanceof ImmutableSegment
+        ? segment.getDataSource(column)
+        : dataSourceCache.computeIfAbsent(column, segment::getDataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
@@ -336,7 +339,9 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
   private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate,
       Map<String, DataSource> dataSourceCache, Map<Predicate, Object> valueCache) {
     String column = inPredicate.getLhs().getIdentifier();
-    DataSource dataSource = dataSourceCache.computeIfAbsent(column, segment::getDataSource);
+    DataSource dataSource = segment instanceof ImmutableSegment
+        ? segment.getDataSource(column)
+        : dataSourceCache.computeIfAbsent(column, segment::getDataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
@@ -402,7 +407,9 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
   private boolean pruneRangePredicate(IndexSegment segment, RangePredicate rangePredicate,
       Map<String, DataSource> dataSourceCache) {
     String column = rangePredicate.getLhs().getIdentifier();
-    DataSource dataSource = dataSourceCache.computeIfAbsent(column, segment::getDataSource);
+    DataSource dataSource = segment instanceof ImmutableSegment
+        ? segment.getDataSource(column)
+        : dataSourceCache.computeIfAbsent(column, segment::getDataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
