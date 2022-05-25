@@ -135,8 +135,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     try {
       _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
     } catch (IOException | ClassNotFoundException e) {
-      _logger.error("Error reading history object for table {} from {}", _tableNameWithType,
-          statsFile.getAbsolutePath(), e);
+      _logger
+          .error("Error reading history object for table {} from {}", _tableNameWithType, statsFile.getAbsolutePath(),
+              e);
       File savedFile = new File(_tableDataDir, STATS_FILE_NAME + "." + UUID.randomUUID());
       try {
         FileUtils.moveFile(statsFile, savedFile);
@@ -334,17 +335,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           throw new RuntimeException("Failed to find local copy for committed HLC segment: " + segmentName);
         }
       }
-
       // Local segment doesn't exist or cannot load, download a new copy
       downloadAndReplaceSegment(segmentName, segmentZKMetadata, indexLoadingConfig, tableConfig);
-
-    } else if (segmentZKMetadata.getStatus() == Status.UPLOADED) {
-      // The segment is uploaded to an upsert enabled realtime table. Download the segment and load.
-      String downloadUrl = segmentZKMetadata.getDownloadUrl();
-      Preconditions.checkNotNull(downloadUrl, "Upload segment metadata has no download url");
-      downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, downloadUrl);
-      _logger.info("Downloaded, untarred and add segment {} of table {} from {}", segmentName,
-          tableConfig.getTableName(), downloadUrl);
       return;
     } else {
       // Metadata has not been committed, delete the local segment if exists
@@ -366,7 +358,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       PartitionUpsertMetadataManager partitionUpsertMetadataManager =
           _tableUpsertMetadataManager != null ? _tableUpsertMetadataManager.getOrCreatePartitionManager(
               partitionGroupId) : null;
-
       PartitionDedupMetadataManager partitionDedupMetadataManager =
           _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
               : null;
@@ -441,8 +432,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     for (String primaryKeyColumn : _primaryKeyColumns) {
       columnToReaderMap.put(primaryKeyColumn, new PinotSegmentColumnReader(immutableSegment, primaryKeyColumn));
     }
-    columnToReaderMap.put(_upsertComparisonColumn,
-        new PinotSegmentColumnReader(immutableSegment, _upsertComparisonColumn));
+    columnToReaderMap
+        .put(_upsertComparisonColumn, new PinotSegmentColumnReader(immutableSegment, _upsertComparisonColumn));
     int numTotalDocs = immutableSegment.getSegmentMetadata().getTotalDocs();
     int numPrimaryKeyColumns = _primaryKeyColumns.size();
     Iterator<RecordInfo> recordInfoIterator = new Iterator<RecordInfo>() {
@@ -548,8 +539,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private boolean isPeerSegmentDownloadEnabled(TableConfig tableConfig) {
     return
         CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())
-            || CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(
-            tableConfig.getValidationConfig().getPeerSegmentDownloadScheme());
+            || CommonConstants.HTTPS_PROTOCOL
+            .equalsIgnoreCase(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme());
   }
 
   private void downloadSegmentFromPeer(String segmentName, String downloadScheme,

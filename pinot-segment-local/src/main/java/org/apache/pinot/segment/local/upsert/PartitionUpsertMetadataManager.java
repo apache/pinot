@@ -264,7 +264,7 @@ public class PartitionUpsertMetadataManager {
       while (iterator.hasNext()) {
         int docId = iterator.next();
         segment.getPrimaryKey(docId, reuse);
-        _primaryKeyToRecordLocationMap.computeIfPresent(reuse, (pk, recordLocation) -> {
+        _primaryKeyToRecordLocationMap.computeIfPresent(hashPrimaryKey(reuse, _hashFunction), (pk, recordLocation) -> {
           if (recordLocation.getSegment() == segment) {
             return null;
           }
