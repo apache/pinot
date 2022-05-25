@@ -135,6 +135,7 @@ const responseStatCols = [
   'numConsumingSegmentsQueried',
   'numEntriesScannedInFilter',
   'numEntriesScannedPostFilter',
+  'numStartreeUsed',
   'numGroupsLimitReached',
   'partialResponse',
   'minConsumingFreshnessTimeMs',
