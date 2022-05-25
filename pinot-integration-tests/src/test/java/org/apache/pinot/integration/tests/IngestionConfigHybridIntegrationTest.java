@@ -20,7 +20,8 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -60,17 +61,18 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
 
   @Override
   protected IngestionConfig getIngestionConfig() {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(
+        new StreamIngestionConfig(Collections.singletonList(getStreamConfigMap())));
     FilterConfig filterConfig =
         new FilterConfig("Groovy({AirlineID == 19393 || ArrDelayMinutes <= 5 }, AirlineID, ArrDelayMinutes)");
-    List<TransformConfig> transformConfigs = new ArrayList<>();
-    transformConfigs.add(new TransformConfig("AmPm", "Groovy({DepTime < 1200 ? \"AM\": \"PM\"}, DepTime)"));
-    transformConfigs.add(new TransformConfig("millisSinceEpoch", "fromEpochDays(DaysSinceEpoch)"));
-    transformConfigs.add(new TransformConfig("lowerCaseDestCityName", "lower(DestCityName)"));
-
-    List<Map<String, String>> streamConfigMaps = new ArrayList<>();
-    streamConfigMaps.add(getStreamConfigMap());
-    return new IngestionConfig(null, new StreamIngestionConfig(streamConfigMaps), filterConfig, transformConfigs, null,
-        null);
+    ingestionConfig.setFilterConfig(filterConfig);
+    List<TransformConfig> transformConfigs = Arrays.asList(
+        new TransformConfig("AmPm", "Groovy({DepTime < 1200 ? \"AM\": \"PM\"}, DepTime)"),
+        new TransformConfig("millisSinceEpoch", "fromEpochDays(DaysSinceEpoch)"),
+        new TransformConfig("lowerCaseDestCityName", "lower(DestCityName)"));
+    ingestionConfig.setTransformConfigs(transformConfigs);
+    return ingestionConfig;
   }
 
   @Override
@@ -139,8 +141,8 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
     addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
 
     // Create and upload segments
-    ClusterIntegrationTestUtils
-        .buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
+        _tarDir);
     uploadSegments(getTableName(), _tarDir);
 
     // Push data into Kafka
