@@ -571,7 +571,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
-  public PrimaryKey getPrimaryKey(int docId, PrimaryKey reuse) {
+  public void getPrimaryKey(int docId, PrimaryKey reuse) {
     int numPrimaryKeyColumns = _partitionUpsertMetadataManager.getPrimaryKeyColumns().size();
     Object[] values = new Object[numPrimaryKeyColumns];;
     for (int i = 0; i < numPrimaryKeyColumns; i++) {
@@ -581,7 +581,7 @@ public class MutableSegmentImpl implements MutableSegment {
           indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
       values[i] = value;
     }
-    return new PrimaryKey(values);
+    reuse.setValues(values);
   }
 
   private void updateDictionary(GenericRow row) {

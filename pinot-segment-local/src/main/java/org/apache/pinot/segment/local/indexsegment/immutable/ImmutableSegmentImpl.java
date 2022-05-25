@@ -236,15 +236,14 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
-  public PrimaryKey getPrimaryKey(int docId, PrimaryKey reuse) {
+  public void getPrimaryKey(int docId, PrimaryKey reuse) {
     try {
       if (_pinotSegmentRecordReader == null) {
         _pinotSegmentRecordReader = new PinotSegmentRecordReader();
         _pinotSegmentRecordReader.init(this);
       }
-      return _pinotSegmentRecordReader.getPrimaryKey(docId, _partitionUpsertMetadataManager.getPrimaryKeyColumns());
+      _pinotSegmentRecordReader.getPrimaryKey(docId, _partitionUpsertMetadataManager.getPrimaryKeyColumns(), reuse);
     } catch (Exception e) {
-      e.printStackTrace();
       throw new RuntimeException("Failed to use PinotSegmentRecordReader to read primary key from immutable segment");
     }
   }

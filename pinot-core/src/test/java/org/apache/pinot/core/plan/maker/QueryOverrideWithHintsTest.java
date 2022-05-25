@@ -95,8 +95,7 @@ public class QueryOverrideWithHintsTest {
     }
 
     @Override
-    public PrimaryKey getPrimaryKey(int docId, PrimaryKey reuse) {
-      return null;
+    public void getPrimaryKey(int docId, PrimaryKey reuse) {
     }
 
     @Override

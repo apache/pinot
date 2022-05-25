@@ -259,12 +259,12 @@ public class PartitionUpsertMetadataManager {
     LOGGER.info("Removing upsert metadata for segment: {}", segmentName);
 
     if (!Objects.requireNonNull(segment.getValidDocIds()).getMutableRoaringBitmap().isEmpty()) {
-      PrimaryKey reuse = new PrimaryKey(new Object[]{});
+      PrimaryKey reuse = new PrimaryKey(new Object[_primaryKeyColumns.size()]);
       PeekableIntIterator iterator = segment.getValidDocIds().getMutableRoaringBitmap().getIntIterator();
       while (iterator.hasNext()) {
         int docId = iterator.next();
-        PrimaryKey primaryKey = segment.getPrimaryKey(docId, reuse);
-        _primaryKeyToRecordLocationMap.computeIfPresent(primaryKey, (pk, recordLocation) -> {
+        segment.getPrimaryKey(docId, reuse);
+        _primaryKeyToRecordLocationMap.computeIfPresent(reuse, (pk, recordLocation) -> {
           if (recordLocation.getSegment() == segment) {
             return null;
           }

@@ -26,9 +26,13 @@ import org.apache.commons.lang3.SerializationUtils;
  * The primary key of a record. Note that the value used in the primary key must be single-value.
  */
 public class PrimaryKey {
-  private final Object[] _values;
+  private Object[] _values;
 
   public PrimaryKey(Object[] values) {
+    _values = values;
+  }
+
+  public void setValues(Object[] values) {
     _values = values;
   }
 

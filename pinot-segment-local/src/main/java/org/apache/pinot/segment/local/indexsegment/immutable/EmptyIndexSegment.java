@@ -96,7 +96,7 @@ public class EmptyIndexSegment implements ImmutableSegment {
   }
 
   @Override
-  public PrimaryKey getPrimaryKey(int docId, PrimaryKey reuse) {
+  public void getPrimaryKey(int docId, PrimaryKey reuse) {
     throw new UnsupportedOperationException("Cannot read primary key from empty segment");
   }
 

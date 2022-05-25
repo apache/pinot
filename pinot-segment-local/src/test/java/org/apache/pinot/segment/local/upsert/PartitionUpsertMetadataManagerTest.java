@@ -41,6 +41,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -165,7 +166,13 @@ public class PartitionUpsertMetadataManagerTest {
     String segmentName = getSegmentName(sequenceNumber);
     when(segment.getSegmentName()).thenReturn(segmentName);
     when(segment.getValidDocIds()).thenReturn(validDocIds);
-    when(segment.getPrimaryKey(anyInt(), any())).thenAnswer(i -> primaryKeys.get(i.getArgument(0)));
+    doAnswer((invocation) -> {
+        PrimaryKey pk = primaryKeys.get(invocation.getArgument(0));
+        PrimaryKey reuse = invocation.getArgument(1, PrimaryKey.class);
+        reuse.setValues(pk.getValues());
+        return null;
+      }).when(segment).getPrimaryKey(anyInt(), any(PrimaryKey.class));
+
     return segment;
   }
 

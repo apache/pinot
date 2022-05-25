@@ -232,7 +232,7 @@ public class PinotSegmentRecordReader implements RecordReader {
     }
   }
 
-  public PrimaryKey getPrimaryKey(int docId, List<String> primaryKeyColumns) {
+  public void getPrimaryKey(int docId, List<String> primaryKeyColumns, PrimaryKey reuse) {
     int numPrimaryKeyColumns = primaryKeyColumns.size();
     Object[] values = new Object[numPrimaryKeyColumns];;
     for (int i = 0; i < numPrimaryKeyColumns; i++) {
@@ -243,7 +243,7 @@ public class PinotSegmentRecordReader implements RecordReader {
       }
       values[i] = value;
     }
-    return new PrimaryKey(values);
+    reuse.setValues(values);
   }
 
   @Override

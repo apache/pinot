@@ -94,7 +94,7 @@ public interface IndexSegment {
    * @param reuse Reusable buffer for the primary key
    * @return Primary key for the given document Id
    */
-  PrimaryKey getPrimaryKey(int docId, PrimaryKey reuse);
+  void getPrimaryKey(int docId, PrimaryKey reuse);
 
   /**
    * Hints the segment to begin prefetching buffers for specified columns.
