@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.EqualityUtils;
 
 
@@ -38,6 +39,7 @@ public class KafkaPartitionLevelStreamConfig {
   private final int _kafkaFetcherSizeBytes;
   private final int _kafkaFetcherMinBytes;
   private final String _kafkaIsolationLevel;
+  private final boolean _populateMetadata;
   private final Map<String, String> _streamConfigMap;
 
   /**
@@ -49,18 +51,18 @@ public class KafkaPartitionLevelStreamConfig {
 
     _kafkaTopicName = streamConfig.getTopicName();
 
-    String llcBrokerListKey = KafkaStreamConfigProperties
-        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST);
-    String llcBufferKey = KafkaStreamConfigProperties
-        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE);
-    String llcTimeoutKey = KafkaStreamConfigProperties
-        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT);
-    String fetcherSizeKey = KafkaStreamConfigProperties
-        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_SIZE_BYTES);
-    String fetcherMinBytesKey = KafkaStreamConfigProperties
-        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES);
-    String isolationLevelKey = KafkaStreamConfigProperties
-        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL);
+    String llcBrokerListKey = KafkaStreamConfigProperties.constructStreamProperty(
+        KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST);
+    String llcBufferKey = KafkaStreamConfigProperties.constructStreamProperty(
+        KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE);
+    String llcTimeoutKey = KafkaStreamConfigProperties.constructStreamProperty(
+        KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT);
+    String fetcherSizeKey = KafkaStreamConfigProperties.constructStreamProperty(
+        KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_SIZE_BYTES);
+    String fetcherMinBytesKey = KafkaStreamConfigProperties.constructStreamProperty(
+        KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES);
+    String isolationLevelKey = KafkaStreamConfigProperties.constructStreamProperty(
+        KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL);
     _bootstrapHosts = _streamConfigMap.get(llcBrokerListKey);
     _kafkaBufferSize = getIntConfigWithDefault(_streamConfigMap, llcBufferKey,
         KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT);
@@ -74,10 +76,14 @@ public class KafkaPartitionLevelStreamConfig {
     if (_kafkaIsolationLevel != null) {
       Preconditions.checkArgument(
           _kafkaIsolationLevel.equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED)
-              || _kafkaIsolationLevel
-              .equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_UNCOMMITTED),
+              || _kafkaIsolationLevel.equals(
+              KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_UNCOMMITTED),
           String.format("Unrecognized Kafka isolation level: %s", _kafkaIsolationLevel));
     }
+
+    String populateRowMetadataProperty = StreamConfigProperties.constructStreamProperty(streamConfig.getType(),
+        StreamConfigProperties.METADATA_POPULATE);
+    _populateMetadata = "true".equalsIgnoreCase(streamConfig.getStreamConfigsMap().get(populateRowMetadataProperty));
 
     Preconditions.checkNotNull(_bootstrapHosts,
         "Must specify kafka brokers list " + llcBrokerListKey + " in case of low level kafka consumer");
@@ -111,6 +117,10 @@ public class KafkaPartitionLevelStreamConfig {
     return _kafkaIsolationLevel;
   }
 
+  public boolean isPopulateMetadata() {
+    return _populateMetadata;
+  }
+
   private int getIntConfigWithDefault(Map<String, String> configMap, String key, int defaultValue) {
     String stringValue = configMap.get(key);
     try {
@@ -128,7 +138,8 @@ public class KafkaPartitionLevelStreamConfig {
     return "KafkaLowLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\'' + ", _bootstrapHosts='"
         + _bootstrapHosts + '\'' + ", _kafkaBufferSize='" + _kafkaBufferSize + '\'' + ", _kafkaSocketTimeout='"
         + _kafkaSocketTimeout + '\'' + ", _kafkaFetcherSizeBytes='" + _kafkaFetcherSizeBytes + '\''
-        + ", _kafkaFetcherMinBytes='" + _kafkaFetcherMinBytes + '\'' + '}';
+        + ", _kafkaFetcherMinBytes='" + _kafkaFetcherMinBytes + '\'' + ", _populateMetadata='" + _populateMetadata
+        + '\'' + '}';
   }
 
   @Override
@@ -143,12 +154,11 @@ public class KafkaPartitionLevelStreamConfig {
 
     KafkaPartitionLevelStreamConfig that = (KafkaPartitionLevelStreamConfig) o;
 
-    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils
-        .isEqual(_bootstrapHosts, that._bootstrapHosts) && EqualityUtils
-        .isEqual(_kafkaBufferSize, that._kafkaBufferSize) && EqualityUtils
-        .isEqual(_kafkaSocketTimeout, that._kafkaSocketTimeout) && EqualityUtils
-        .isEqual(_kafkaFetcherSizeBytes, that._kafkaFetcherSizeBytes) && EqualityUtils
-        .isEqual(_kafkaFetcherMinBytes, that._kafkaFetcherMinBytes);
+    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils.isEqual(_bootstrapHosts,
+        that._bootstrapHosts) && EqualityUtils.isEqual(_kafkaBufferSize, that._kafkaBufferSize)
+        && EqualityUtils.isEqual(_kafkaSocketTimeout, that._kafkaSocketTimeout) && EqualityUtils.isEqual(
+        _kafkaFetcherSizeBytes, that._kafkaFetcherSizeBytes) && EqualityUtils.isEqual(_kafkaFetcherMinBytes,
+        that._kafkaFetcherMinBytes) && EqualityUtils.isEqual(_populateMetadata, that._populateMetadata);
   }
 
   @Override
@@ -159,6 +169,7 @@ public class KafkaPartitionLevelStreamConfig {
     result = EqualityUtils.hashCodeOf(result, _kafkaSocketTimeout);
     result = EqualityUtils.hashCodeOf(result, _kafkaFetcherSizeBytes);
     result = EqualityUtils.hashCodeOf(result, _kafkaFetcherMinBytes);
+    result = EqualityUtils.hashCodeOf(result, _populateMetadata);
     return result;
   }
 }
