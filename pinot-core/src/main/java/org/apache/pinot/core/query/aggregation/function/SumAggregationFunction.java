@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -83,6 +84,16 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
         for (int i = 0; i < length & i < values.length; i++) {
           sum += values[i];
         }
+        break;
+      }
+      case BIG_DECIMAL: {
+        BigDecimal decimalSum = BigDecimal.valueOf(sum);
+        BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
+        for (int i = 0; i < length & i < values.length; i++) {
+          decimalSum = decimalSum.add(values[i]);
+        }
+        // TODO: even though the source data has BIG_DECIMAL type, we still only support double precision.
+        sum = decimalSum.doubleValue();
         break;
       }
       default:
