@@ -39,7 +39,7 @@ import org.apache.pinot.query.planner.hints.PinotRelationalHints;
 
 
 /**
- * Special rule for Pinot, always insert exchange after JOIN
+ * Special rule for Pinot, this rule is fixed to always insert exchange after JOIN node.
  */
 public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
   public static final PinotJoinExchangeNodeInsertRule INSTANCE =

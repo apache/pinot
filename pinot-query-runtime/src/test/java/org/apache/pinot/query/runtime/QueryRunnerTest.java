@@ -164,7 +164,7 @@ public class QueryRunnerTest {
 //
 //        new Object[]{"SELECT a.col1, a.col3 + a.col3 FROM a WHERE a.col3 >= 0 AND a.col2 = 'foo'", 3},
 
-        new Object[]{"SELECT a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'foo' GROUP BY a.col1", 3},
+        new Object[]{"SELECT a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'foo' GROUP BY a.col1", 1},
     };
   }
 }

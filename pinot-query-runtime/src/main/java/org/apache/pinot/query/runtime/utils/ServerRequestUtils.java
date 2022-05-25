@@ -18,13 +18,11 @@
  */
 package org.apache.pinot.query.runtime.utils;
 
-import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
-import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
