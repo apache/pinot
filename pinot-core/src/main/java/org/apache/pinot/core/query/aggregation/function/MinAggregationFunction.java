@@ -99,7 +99,7 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
         for (int i = 0; i < length & i < values.length; i++) {
           min = values[i].min(min);
         }
-        // todo: even though the source data has BIG_DECIMAL type, we still only support double precision.
+        // TODO: even though the source data has BIG_DECIMAL type, we still only support double precision.
         aggregationResultHolder.setValue(Math.min(min.doubleValue(), aggregationResultHolder.getDoubleResult()));
         break;
       }

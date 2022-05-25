@@ -77,8 +77,8 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
       ingestionConfig.setTransformConfigs(new ArrayList<TransformConfig>());
     }
     List<TransformConfig> transformConfig = ingestionConfig.getTransformConfigs();
-    transformConfig.add(new TransformConfig("DepDelayDecimal", "cast2(DepDelay, 'BIG_DECIMAL')"));
-    transformConfig.add(new TransformConfig("ArrDelayDecimal", "cast2(ArrDelay, 'BIG_DECIMAL')"));
+    transformConfig.add(new TransformConfig("DepDelayDecimal", "CAST(DepDelay AS BIG_DECIMAL)"));
+    transformConfig.add(new TransformConfig("ArrDelayDecimal", "CAST(ArrDelay AS BIG_DECIMAL)"));
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     List<String> noDictColumns = new ArrayList<String>();
     noDictColumns.add("ArrDelayDecimal");
