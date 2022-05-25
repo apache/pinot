@@ -86,7 +86,7 @@ public class JsonUtils {
       };
 
   public static <T> T stringToObject(String jsonString, Class<T> valueType)
-      throws IOException {
+      throws JsonProcessingException {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
   }
 
