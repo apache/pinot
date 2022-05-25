@@ -19,7 +19,7 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -37,8 +37,7 @@ public class SelectionResultSetTest {
   public void setUp()
       throws Exception {
     String jsonString = "{\"results\":[[\"r1c1\",\"r1c2\"]], \"columns\":[\"column1\", \"column2\"]}";
-    ObjectMapper objectMapper = new ObjectMapper();
-    _mockSelectionResults = objectMapper.readTree(jsonString);
+    _mockSelectionResults = JsonUtils.stringToJsonNode(jsonString);
     _selectionResultSetUnderTest = new SelectionResultSet(_mockSelectionResults);
   }
 

@@ -19,7 +19,6 @@
 package org.apache.pinot.ingestion.common;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.InputStream;
@@ -184,14 +183,13 @@ public class DefaultControllerRestApi implements ControllerRestApi {
   @Override
   public List<String> getAllSegments(String tableType) {
     LOGGER.info("Getting all segments of table {}", _rawTableName);
-    ObjectMapper objectMapper = new ObjectMapper();
     for (PushLocation pushLocation : _pushLocations) {
       try {
         SimpleHttpResponse response = _fileUploadDownloadClient.getHttpClient().sendGetRequest(FileUploadDownloadClient
             .getRetrieveAllSegmentWithTableTypeHttpUri(pushLocation.getHost(), pushLocation.getPort(), _rawTableName,
                 tableType));
         JsonNode segmentList = getSegmentsFromJsonSegmentAPI(response.getResponse(), tableType);
-        return objectMapper.convertValue(segmentList, ArrayList.class);
+        return JsonUtils.jsonNodeToObject(segmentList, ArrayList.class);
       } catch (Exception e) {
         LOGGER.warn("Caught exception while getting all {} segments for table: {} from push location: {}", tableType,
             _rawTableName, pushLocation, e);

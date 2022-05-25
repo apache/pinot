@@ -19,7 +19,6 @@
 package org.apache.pinot.server.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import javax.ws.rs.core.Response;
@@ -27,6 +26,7 @@ import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.Obfuscator;
 import org.testng.Assert;
@@ -58,8 +58,7 @@ public class PinotServerAppConfigsTest extends BaseResourceTest {
 
     Response response = _webTarget.path("/appconfigs").request().get(Response.class);
     String configsJson = response.readEntity(String.class);
-    ObjectMapper mapper = new ObjectMapper();
-    PinotAppConfigs actual = mapper.readValue(configsJson, PinotAppConfigs.class);
+    PinotAppConfigs actual = JsonUtils.stringToObject(configsJson, PinotAppConfigs.class);
 
     // RuntimeConfig is not checked as it has information that can change during the test run.
     // Also, some of the system configs can change, so compare the ones that don't.
@@ -75,7 +74,7 @@ public class PinotServerAppConfigsTest extends BaseResourceTest {
     // tests Equals on obfuscated expected and actual
     Obfuscator obfuscator = new Obfuscator();
     String obfuscatedExpectedJson = obfuscator.toJsonString(expected);
-    PinotAppConfigs obfuscatedExpected = mapper.readValue(obfuscatedExpectedJson, PinotAppConfigs.class);
+    PinotAppConfigs obfuscatedExpected = JsonUtils.stringToObject(obfuscatedExpectedJson, PinotAppConfigs.class);
     Assert.assertEquals(actual.getJvmConfig(), obfuscatedExpected.getJvmConfig());
     Assert.assertEquals(actual.getPinotConfig(), obfuscatedExpected.getPinotConfig());
   }

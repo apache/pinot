@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.controller.api;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.Obfuscator;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -55,8 +55,7 @@ public class PinotControllerAppConfigsTest {
 
     String configsJson =
         ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forAppConfigs());
-    ObjectMapper mapper = new ObjectMapper();
-    PinotAppConfigs actual = mapper.readValue(configsJson, PinotAppConfigs.class);
+    PinotAppConfigs actual = JsonUtils.stringToObject(configsJson, PinotAppConfigs.class);
 
     // RuntimeConfig is not checked as it has information that can change during the test run.
     // Also, some of the system configs can change, so compare the ones that don't.
@@ -72,7 +71,7 @@ public class PinotControllerAppConfigsTest {
     // tests Equals on obfuscated expected and actual
     Obfuscator obfuscator = new Obfuscator();
     String obfuscatedExpectedJson = obfuscator.toJsonString(expected);
-    PinotAppConfigs obfuscatedExpected = mapper.readValue(obfuscatedExpectedJson, PinotAppConfigs.class);
+    PinotAppConfigs obfuscatedExpected = JsonUtils.stringToObject(obfuscatedExpectedJson, PinotAppConfigs.class);
     Assert.assertEquals(actual.getJvmConfig(), obfuscatedExpected.getJvmConfig());
     Assert.assertEquals(actual.getPinotConfig(), obfuscatedExpected.getPinotConfig());
   }

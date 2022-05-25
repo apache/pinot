@@ -19,7 +19,6 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -31,6 +30,7 @@ import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.response.SchemaResponse;
 import org.apache.pinot.client.controller.response.TableResponse;
 import org.apache.pinot.client.utils.DriverUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,8 +39,6 @@ import static org.apache.pinot.client.utils.Constants.*;
 
 public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotConnectionMetaData.class);
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final PinotConnection _connection;
   private final PinotControllerTransport _controllerTransport;
@@ -114,7 +112,7 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
         pinotMeta.addRow(Arrays.asList(row));
       }
 
-      JsonNode resultTable = OBJECT_MAPPER.valueToTree(pinotMeta);
+      JsonNode resultTable = JsonUtils.objectToJsonNode(pinotMeta);
       return PinotResultSet.fromResultTable(new ResultTableResultSet(resultTable));
     } catch (Exception e) {
       throw new SQLException(e);
@@ -144,7 +142,7 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
     row.add(TABLE_TYPE);
     pinotMeta.addRow(row);
 
-    JsonNode resultTable = OBJECT_MAPPER.valueToTree(pinotMeta);
+    JsonNode resultTable = JsonUtils.objectToJsonNode(pinotMeta);
     return PinotResultSet.fromResultTable(new ResultTableResultSet(resultTable));
   }
 
@@ -180,7 +178,7 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
       }
     }
 
-    JsonNode resultTable = OBJECT_MAPPER.valueToTree(pinotMeta);
+    JsonNode resultTable = JsonUtils.objectToJsonNode(pinotMeta);
     return PinotResultSet.fromResultTable(new ResultTableResultSet(resultTable));
   }
 

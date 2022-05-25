@@ -19,12 +19,11 @@
 package org.apache.pinot.client.controller.response;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.asynchttpclient.Response;
 
 
@@ -69,8 +68,6 @@ public class SchemaResponse {
   }
 
   public static class SchemaResponseFuture extends ControllerResponseFuture<SchemaResponse> {
-    private static final ObjectReader OBJECT_READER = new ObjectMapper().reader();
-
     public SchemaResponseFuture(Future<Response> response, String url) {
       super(response, url);
     }
@@ -80,7 +77,7 @@ public class SchemaResponse {
         throws ExecutionException {
       String response = getStringResponse(timeout, unit);
       try {
-        JsonNode jsonResponse = OBJECT_READER.readTree(response);
+        JsonNode jsonResponse = JsonUtils.stringToJsonNode(response);
         return SchemaResponse.fromJson(jsonResponse);
       } catch (IOException e) {
         new ExecutionException(e);

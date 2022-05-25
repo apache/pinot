@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.json;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
@@ -38,7 +36,6 @@ import org.slf4j.LoggerFactory;
  */
 public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(JSONMessageDecoder.class);
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String JSON_RECORD_EXTRACTOR_CLASS =
       "org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor";
 
@@ -62,8 +59,7 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   public GenericRow decode(byte[] payload, GenericRow destination) {
     try {
       JsonNode message = JsonUtils.bytesToJsonNode(payload);
-      Map<String, Object> from = OBJECT_MAPPER.convertValue(message, new TypeReference<Map<String, Object>>() {
-      });
+      Map<String, Object> from = JsonUtils.jsonNodeToMap(message);
       _jsonRecordExtractor.extract(from, destination);
       return destination;
     } catch (Exception e) {

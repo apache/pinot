@@ -56,6 +56,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "jsonExtractScalar";
 
+  // This ObjectMapper requires special configurations, hence we can't use pinot JsonUtils here.
   private static final ObjectMapper OBJECT_MAPPER_WITH_BIG_DECIMAL = new ObjectMapper()
       .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
 
