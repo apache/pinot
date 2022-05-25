@@ -194,7 +194,7 @@ public class PinotTableRestletResourceTest {
     try {
       String response = ControllerTest.sendPostRequest(_createTableUrl, tableConfig.toJsonString());
       Assert.assertEquals(response,
-          "{\"unrecognizedProperties\":{},\"status\":\"Table test_table_cron_schedule_OFFLINE succesfully added\"}");
+          "{\"unrecognizedProperties\":{},\"status\":\"Table test_table_cron_schedule_OFFLINE successfully added\"}");
     } catch (IOException e) {
       // Expected 400 Bad Request
       Assert.fail("This is a valid table config with cron schedule");
@@ -382,7 +382,7 @@ public class PinotTableRestletResourceTest {
     TableConfig realtimeTableConfig = _realtimeBuilder.setTableName("table0").build();
     String creationResponse = ControllerTest.sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     Assert.assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table0_REALTIME succesfully added\"}");
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table0_REALTIME successfully added\"}");
 
     // Delete realtime table using REALTIME suffix.
     String deleteResponse = ControllerTest.sendDeleteRequest(
@@ -393,7 +393,7 @@ public class PinotTableRestletResourceTest {
     TableConfig offlineTableConfig = _offlineBuilder.setTableName("table0").build();
     creationResponse = ControllerTest.sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
     Assert.assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table0_OFFLINE succesfully added\"}");
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table0_OFFLINE successfully added\"}");
 
     // Delete offline table using OFFLINE suffix.
     deleteResponse = ControllerTest.sendDeleteRequest(
@@ -404,12 +404,12 @@ public class PinotTableRestletResourceTest {
     TableConfig rtConfig1 = _realtimeBuilder.setTableName("table1").build();
     creationResponse = ControllerTest.sendPostRequest(_createTableUrl, rtConfig1.toJsonString());
     Assert.assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table1_REALTIME succesfully added\"}");
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table1_REALTIME successfully added\"}");
 
     TableConfig offlineConfig1 = _offlineBuilder.setTableName("table1").build();
     creationResponse = ControllerTest.sendPostRequest(_createTableUrl, offlineConfig1.toJsonString());
     Assert.assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table1_OFFLINE succesfully added\"}");
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table1_OFFLINE successfully added\"}");
 
     deleteResponse = ControllerTest.sendDeleteRequest(
         StringUtil.join("/", TEST_INSTANCE.getControllerBaseApiUrl(), "tables", "table1"));
@@ -419,12 +419,12 @@ public class PinotTableRestletResourceTest {
     TableConfig rtConfig2 = _realtimeBuilder.setTableName("table2").build();
     creationResponse = ControllerTest.sendPostRequest(_createTableUrl, rtConfig2.toJsonString());
     Assert.assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table2_REALTIME succesfully added\"}");
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table2_REALTIME successfully added\"}");
 
     TableConfig offlineConfig2 = _offlineBuilder.setTableName("table2").build();
     creationResponse = ControllerTest.sendPostRequest(_createTableUrl, offlineConfig2.toJsonString());
     Assert.assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table2_OFFLINE succesfully added\"}");
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table2_OFFLINE successfully added\"}");
 
     // The conflict between param type and table name suffix causes no table being deleted.
     try {
@@ -457,12 +457,12 @@ public class PinotTableRestletResourceTest {
     TableConfig rtConfig3 = _realtimeBuilder.setTableName("table3").build();
     creationResponse = ControllerTest.sendPostRequest(_createTableUrl, rtConfig3.toJsonString());
     Assert.assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table3_REALTIME succesfully added\"}");
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table3_REALTIME successfully added\"}");
 
     TableConfig offlineConfig3 = _offlineBuilder.setTableName("table3").build();
     creationResponse = ControllerTest.sendPostRequest(_createTableUrl, offlineConfig3.toJsonString());
     Assert.assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table table3_OFFLINE succesfully added\"}");
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table3_OFFLINE successfully added\"}");
 
     deleteResponse = ControllerTest.sendDeleteRequest(
         StringUtil.join("/", TEST_INSTANCE.getControllerBaseApiUrl(), "tables", "table3_REALTIME?type=realtime"));
@@ -481,13 +481,13 @@ public class PinotTableRestletResourceTest {
     TableConfig realtimeTableConfig = _realtimeBuilder.setTableName("testTable").build();
     String creationResponse = ControllerTest.sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     Assert.assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table testTable_REALTIME succesfully added\"}");
+        "{\"unrecognizedProperties\":{},\"status\":\"Table testTable_REALTIME successfully added\"}");
 
     // Create a valid OFFLINE table
     TableConfig offlineTableConfig = _offlineBuilder.setTableName("testTable").build();
     creationResponse = ControllerTest.sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
     Assert.assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{},\"status\":\"Table testTable_OFFLINE succesfully added\"}");
+        "{\"unrecognizedProperties\":{},\"status\":\"Table testTable_OFFLINE successfully added\"}");
 
     // Case 1: Check table state with specifying tableType as realtime should return 1 [enabled]
     String realtimeStateResponse = ControllerTest.sendGetRequest(
@@ -625,7 +625,7 @@ public class PinotTableRestletResourceTest {
     String creationResponse = ControllerTest.sendPostRequest(_createTableUrl, jsonNode.toString());
     Assert.assertEquals(creationResponse,
         "{\"unrecognizedProperties\":{\"/illegalKey1\":1,\"/illegalKey2/illegalKey3\":2},\"status\":\"Table "
-            + "valid_table_name_extra_props_REALTIME succesfully added\"}");
+            + "valid_table_name_extra_props_REALTIME successfully added\"}");
 
     // update table with unrecognizedProperties
     String updationResponse = ControllerTest.sendPutRequest(
