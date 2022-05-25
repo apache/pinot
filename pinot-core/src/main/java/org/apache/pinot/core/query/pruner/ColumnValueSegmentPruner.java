@@ -97,7 +97,11 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     // Extract EQ/IN/RANGE predicate columns
     Set<String> eqInColumns = new HashSet<>();
     Set<String> rangeColumns = new HashSet<>();
-    extractPredicateColumns(filter, eqInColumns, rangeColumns);
+    // As Predicates are recursive structures, their hashCode is quite expensive.
+    // By using an IdentityHashMap here we don't need to iterate over the recursive
+    // structure. This is specially useful in the IN expression.
+    Map<Predicate, Object> cachedValues = new IdentityHashMap<>();
+    extractPredicateColumns(filter, eqInColumns, rangeColumns, cachedValues);
 
     if (eqInColumns.isEmpty() && rangeColumns.isEmpty()) {
       return segments;
@@ -106,10 +110,6 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     int numSegments = segments.size();
     List<IndexSegment> selectedSegments = new ArrayList<>(numSegments);
 
-    // By using an IdentityHashMap, we may be creating more entries, but each lookup will be faster
-    // which should compensate in cases where there are hundreds of segments
-    Map<Object, Hash128> hashCache = new IdentityHashMap<>();
-
     if (!eqInColumns.isEmpty() && query.isEnablePrefetch()) {
       Map[] dataSourceCaches = new Map[numSegments];
       FetchContext[] fetchContexts = new FetchContext[numSegments];
@@ -117,8 +117,8 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
         // Prefetch bloom filter for columns within the EQ/IN predicate if exists
         for (int i = 0; i < numSegments; i++) {
           IndexSegment segment = segments.get(i);
-          Map<String, DataSource> dataSourceCache = new HashMap<>();
-          Map<String, List<ColumnIndexType>> columnToIndexList = new HashMap<>();
+          Map<String, DataSource> dataSourceCache = new HashMap<>(eqInColumns.size());
+          Map<String, List<ColumnIndexType>> columnToIndexList = new HashMap<>(eqInColumns.size());
           for (String column : eqInColumns) {
             DataSource dataSource = segment.getDataSource(column);
             dataSourceCache.put(column, dataSource);
@@ -142,14 +142,14 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
           if (fetchContext != null) {
             segment.acquire(fetchContext);
             try {
-              if (!pruneSegment(segment, filter, dataSourceCaches[i], hashCache)) {
+              if (!pruneSegment(segment, filter, dataSourceCaches[i], cachedValues)) {
                 selectedSegments.add(segment);
               }
             } finally {
               segment.release(fetchContext);
             }
           } else {
-            if (!pruneSegment(segment, filter, dataSourceCaches[i], hashCache)) {
+            if (!pruneSegment(segment, filter, dataSourceCaches[i], cachedValues)) {
               selectedSegments.add(segment);
             }
           }
@@ -164,9 +164,10 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
         }
       }
     } else {
+      Map<String, DataSource> dataSourceCache = new HashMap<>(eqInColumns.size() + rangeColumns.size());
       for (IndexSegment segment : segments) {
-        Map<String, DataSource> dataSourceCache = new HashMap<>();
-        if (!pruneSegment(segment, filter, dataSourceCache, hashCache)) {
+        dataSourceCache.clear();
+        if (!pruneSegment(segment, filter, dataSourceCache, cachedValues)) {
           selectedSegments.add(segment);
         }
       }
@@ -177,12 +178,13 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
   /**
    * Extracts predicate columns from the given filter.
    */
-  private void extractPredicateColumns(FilterContext filter, Set<String> eqInColumns, Set<String> rangeColumns) {
+  private void extractPredicateColumns(FilterContext filter, Set<String> eqInColumns, Set<String> rangeColumns,
+      Map<Predicate, Object> cachedValues) {
     switch (filter.getType()) {
       case AND:
       case OR:
         for (FilterContext child : filter.getChildren()) {
-          extractPredicateColumns(child, eqInColumns, rangeColumns);
+          extractPredicateColumns(child, eqInColumns, rangeColumns, cachedValues);
         }
         break;
       case NOT:
@@ -199,6 +201,33 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
         String column = lhs.getIdentifier();
 
         Predicate.Type predicateType = predicate.getType();
+        switch (predicateType) {
+          case EQ: {
+            eqInColumns.add(column);
+            cachedValues.put(predicate, new CachedValue(((EqPredicate) predicate).getValue()));
+            break;
+          }
+          case IN: {
+            InPredicate inPredicate = (InPredicate) predicate;
+            if (inPredicate.getValues().size() > _inPredicateThreshold) {
+              break;
+            }
+            eqInColumns.add(column);
+            List<CachedValue> list = new ArrayList<>(inPredicate.getValues().size());
+            for (String value : inPredicate.getValues()) {
+              list.add(new CachedValue(value));
+            }
+            cachedValues.put(predicate, list);
+            break;
+          }
+          case RANGE: {
+            rangeColumns.add(column);
+            break;
+          }
+          default: {
+            break;
+          }
+        }
         if (predicateType == Predicate.Type.EQ || (predicateType == Predicate.Type.IN
             && ((InPredicate) predicate).getValues().size() <= _inPredicateThreshold)) {
           eqInColumns.add(column);
@@ -212,18 +241,18 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
   }
 
   private boolean pruneSegment(IndexSegment segment, FilterContext filter, Map<String, DataSource> dataSourceCache,
-      Map<Object, Hash128> hashCache) {
+      Map<Predicate, Object> cachedValues) {
     switch (filter.getType()) {
       case AND:
         for (FilterContext child : filter.getChildren()) {
-          if (pruneSegment(segment, child, dataSourceCache, hashCache)) {
+          if (pruneSegment(segment, child, dataSourceCache, cachedValues)) {
             return true;
           }
         }
         return false;
       case OR:
         for (FilterContext child : filter.getChildren()) {
-          if (!pruneSegment(segment, child, dataSourceCache, hashCache)) {
+          if (!pruneSegment(segment, child, dataSourceCache, cachedValues)) {
             return false;
           }
         }
@@ -239,9 +268,9 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
         }
         Predicate.Type predicateType = predicate.getType();
         if (predicateType == Predicate.Type.EQ) {
-          return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache, hashCache);
+          return pruneEqPredicate(segment, (EqPredicate) predicate, dataSourceCache, cachedValues);
         } else if (predicateType == Predicate.Type.IN) {
-          return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache, hashCache);
+          return pruneInPredicate(segment, (InPredicate) predicate, dataSourceCache, cachedValues);
         } else if (predicateType == Predicate.Type.RANGE) {
           return pruneRangePredicate(segment, (RangePredicate) predicate, dataSourceCache);
         } else {
@@ -261,7 +290,7 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
    * </ul>
    */
   private boolean pruneEqPredicate(IndexSegment segment, EqPredicate eqPredicate,
-      Map<String, DataSource> dataSourceCache, Map<Object, Hash128> hashes) {
+      Map<String, DataSource> dataSourceCache, Map<Predicate, Object> valueCache) {
     String column = eqPredicate.getLhs().getIdentifier();
     DataSource dataSource = dataSourceCache.computeIfAbsent(column, segment::getDataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner
@@ -287,7 +316,7 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     // Check bloom filter
     BloomFilterReader bloomFilter = dataSource.getBloomFilter();
     if (bloomFilter != null) {
-      Hash128 hash = hashes.computeIfAbsent(value, Hash128::new);
+      CachedValue hash = ((CachedValue) valueCache.get(eqPredicate));
       if (!bloomFilter.mightContain(hash._hash1, hash._hash2)) {
         return true;
       }
@@ -305,7 +334,7 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
    * <p>NOTE: segments will not be pruned if the number of values is greater than the threshold.
    */
   private boolean pruneInPredicate(IndexSegment segment, InPredicate inPredicate,
-      Map<String, DataSource> dataSourceCache, Map<Object, Hash128> hashes) {
+      Map<String, DataSource> dataSourceCache, Map<Predicate, Object> valueCache) {
     String column = inPredicate.getLhs().getIdentifier();
     DataSource dataSource = dataSourceCache.computeIfAbsent(column, segment::getDataSource);
     // NOTE: Column must exist after DataSchemaSegmentPruner
@@ -318,11 +347,12 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
       return false;
     }
 
+    List<CachedValue> cachedValues = (List<CachedValue>) valueCache.get(inPredicate);
+
     // Check min/max value
     boolean someInRange = false;
-    for (String value : values) {
-      Comparable inValue = convertValue(value, dataSourceMetadata.getDataType());
-      if (checkMinMaxRange(dataSourceMetadata, inValue)) {
+    for (CachedValue value : cachedValues) {
+      if (checkMinMaxRange(dataSourceMetadata, value.getComparableValue(dataSourceMetadata.getDataType()))) {
         someInRange = true;
         break;
       }
@@ -336,9 +366,8 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     if (bloomFilter == null) {
       return false;
     }
-    for (String value : values) {
-      Hash128 hash = hashes.computeIfAbsent(value, Hash128::new);
-      if (bloomFilter.mightContain(hash._hash1, hash._hash2)) {
+    for (CachedValue value : cachedValues) {
+      if (bloomFilter.mightContain(value._hash1, value._hash2)) {
         return false;
       }
     }
@@ -448,16 +477,26 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     }
   }
 
-  private static class Hash128 {
+  private static class CachedValue {
+    private final String _strValue;
     private final long _hash1;
     private final long _hash2;
+    private DataType _dt;
+    private Comparable _comparableValue;
 
-    private Hash128(Object value) {
-      String strValue = value.toString();
-
-      byte[] hash = GuavaBloomFilterReaderUtils.hash(strValue);
+    private CachedValue(Object value) {
+      _strValue = value.toString();
+      byte[] hash = GuavaBloomFilterReaderUtils.hash(_strValue);
       _hash1 = Longs.fromBytes(hash[7], hash[6], hash[5], hash[4], hash[3], hash[2], hash[1], hash[0]);
       _hash2 = Longs.fromBytes(hash[15], hash[14], hash[13], hash[12], hash[11], hash[10], hash[9], hash[8]);
+    }
+
+    private Comparable getComparableValue(DataType dt) {
+      if (_dt == null || _comparableValue == null) {
+        _dt = dt;
+        _comparableValue = convertValue(_strValue, dt);
+      }
+      return _comparableValue;
     }
   }
 }

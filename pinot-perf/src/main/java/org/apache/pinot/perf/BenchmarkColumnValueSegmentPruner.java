@@ -77,9 +77,9 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @Warmup(iterations = 5, time = 2)
 @Measurement(iterations = 5, time = 2)
 @State(Scope.Benchmark)
-public class BenchmarkServerSegmentPruner {
+public class BenchmarkColumnValueSegmentPruner {
 
-  public static final String QUERY_1 = "SELECT * FROM MyTable WHERE SORTED_COL IN ('1', '2', '3', '4')";
+  public static final String QUERY_1 = "SELECT * FROM MyTable WHERE SORTED_COL IN (1, 2, 3, 4)";
 
   @Param({"10"})
   private int _numRows;
@@ -95,7 +95,7 @@ public class BenchmarkServerSegmentPruner {
 
   public static void main(String[] args)
       throws Exception {
-    ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkServerSegmentPruner.class.getSimpleName());
+    ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkColumnValueSegmentPruner.class.getSimpleName());
     new Runner(opt.build()).run();
   }
 
