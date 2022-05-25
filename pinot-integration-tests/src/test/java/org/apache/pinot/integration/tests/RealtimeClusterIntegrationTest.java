@@ -58,7 +58,6 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
-
     addSchema(schema);
     TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
     addTableConfig(tableConfig);
