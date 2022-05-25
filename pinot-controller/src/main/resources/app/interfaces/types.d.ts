@@ -116,6 +116,7 @@ declare module 'Models' {
     numConsumingSegmentsQueried: number
     numEntriesScannedInFilter: number
     numEntriesScannedPostFilter: number
+    numStartreeUsed: number
     numGroupsLimitReached: boolean
     partialResponse?: number
     minConsumingFreshnessTimeMs: number
