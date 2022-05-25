@@ -19,17 +19,11 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -64,25 +58,9 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
-    schema.addField(new MetricFieldSpec("DepDelayDecimal", FieldSpec.DataType.BIG_DECIMAL));
-    schema.addField(new MetricFieldSpec("ArrDelayDecimal", FieldSpec.DataType.BIG_DECIMAL));
 
     addSchema(schema);
     TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
-    if (tableConfig.getIngestionConfig() == null) {
-      tableConfig.setIngestionConfig(new IngestionConfig());
-    }
-    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
-    if (ingestionConfig.getTransformConfigs() == null) {
-      ingestionConfig.setTransformConfigs(new ArrayList<TransformConfig>());
-    }
-    List<TransformConfig> transformConfig = ingestionConfig.getTransformConfigs();
-    transformConfig.add(new TransformConfig("DepDelayDecimal", "CAST(DepDelay AS BIG_DECIMAL)"));
-    transformConfig.add(new TransformConfig("ArrDelayDecimal", "CAST(ArrDelay AS BIG_DECIMAL)"));
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    List<String> noDictColumns = new ArrayList<String>();
-    noDictColumns.add("ArrDelayDecimal");
-    indexingConfig.setNoDictionaryColumns(noDictColumns);
     addTableConfig(tableConfig);
 
     // Push data into Kafka
@@ -169,73 +147,6 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
   public void testHardcodedQueries()
       throws Exception {
     super.testHardcodedQueries();
-    String query1 =
-        "SELECT COUNT(DepDelayDecimal) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
-    String query2 = "SELECT COUNT(DepDelay) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
-    // DepDelayDecimal is created by casting DepDelay double values to BIG_DECIMAL. Count should match.
-    testQuery(query1, query2);
-
-    query1 = "SELECT COUNT(DepDelayDecimal) FROM mytable";
-    query2 = "SELECT COUNT(DepDelay) FROM mytable";
-    testQuery(query1, query2);
-
-    query1 = "SELECT MIN(DepDelayDecimal) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
-    query2 = "SELECT MIN(DepDelay) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
-    // MIN(DepDelayDecimal) should match MIN(DepDelay).
-    testQuery(query1, query2);
-
-    query1 = "SELECT MIN(DepDelayDecimal) FROM mytable";
-    query2 = "SELECT MIN(DepDelay) FROM mytable";
-    testQuery(query1, query2);
-
-    query1 = "SELECT MAX(DepDelayDecimal) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
-    query2 = "SELECT MAX(DepDelay) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
-    testQuery(query1, query2);
-
-    query1 = "SELECT MAX(DepDelayDecimal) FROM mytable";
-    query2 = "SELECT MAX(DepDelay) FROM mytable";
-    testQuery(query1, query2);
-
-    query1 = "SELECT SUM(DepDelayDecimal) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
-    query2 = "SELECT SUM(DepDelay) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
-    testQuery(query1, query2);
-
-    query1 = "SELECT SUM(DepDelayDecimal) FROM mytable";
-    query2 = "SELECT SUM(DepDelay) FROM mytable";
-    testQuery(query1, query2);
-
-    query1 = "SELECT COUNT(ArrDelayDecimal) FROM mytable WHERE CarrierDelay=15 LIMIT 1";
-    query2 = "SELECT COUNT(ArrDelay) FROM mytable WHERE CarrierDelay=15 LIMIT 1";
-    testQuery(query1, query2);
-
-    query1 = "SELECT COUNT(ArrDelayDecimal) FROM mytable";
-    query2 = "SELECT COUNT(ArrDelay) FROM mytable";
-    testQuery(query1, query2);
-
-    query1 = "SELECT MIN(ArrDelayDecimal) FROM mytable WHERE CarrierDelay=15 LIMIT 1";
-    query2 = "SELECT MIN(ArrDelay) FROM mytable WHERE CarrierDelay=15 LIMIT 1";
-    // MIN(DepDelayDecimal) should match MIN(DepDelay).
-    testQuery(query1, query2);
-
-    query1 = "SELECT MIN(ArrDelayDecimal) FROM mytable";
-    query2 = "SELECT MIN(ArrDelay) FROM mytable";
-    testQuery(query1, query2);
-
-    query1 = "SELECT MAX(ArrDelayDecimal) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
-    query2 = "SELECT MAX(ArrDelay) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
-    testQuery(query1, query2);
-
-    query1 = "SELECT MAX(ArrDelayDecimal) FROM mytable";
-    query2 = "SELECT MAX(ArrDelay) FROM mytable";
-    testQuery(query1, query2);
-
-    query1 = "SELECT SUM(ArrDelayDecimal) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
-    query2 = "SELECT SUM(ArrDelay) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
-    testQuery(query1, query2);
-
-    query1 = "SELECT SUM(ArrDelayDecimal) FROM mytable";
-    query2 = "SELECT SUM(ArrDelay) FROM mytable";
-    testQuery(query1, query2);
   }
 
   @Test
