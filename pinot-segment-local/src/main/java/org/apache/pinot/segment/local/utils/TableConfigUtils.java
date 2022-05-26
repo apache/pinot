@@ -511,7 +511,6 @@ public final class TableConfigUtils {
    *  - strict replica-group is configured for routing type
    *  - consumer type must be low-level
    *  - comparison column exists
-   *  - Metrics Aggregation is not enabled when upsert config is
    */
   @VisibleForTesting
   static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema) {
