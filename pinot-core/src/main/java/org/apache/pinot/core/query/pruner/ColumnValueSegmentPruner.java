@@ -212,11 +212,10 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
           }
           case IN: {
             InPredicate inPredicate = (InPredicate) predicate;
-            if (inPredicate.getValues().size() > _inPredicateThreshold) {
-              break;
+            if (inPredicate.getValues().size() <= _inPredicateThreshold) {
+              eqInColumns.add(column);
+              valueCache.add(inPredicate);
             }
-            eqInColumns.add(column);
-            valueCache.add(inPredicate);
             break;
           }
           case RANGE: {
