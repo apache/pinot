@@ -118,8 +118,8 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
         // Prefetch bloom filter for columns within the EQ/IN predicate if exists
         for (int i = 0; i < numSegments; i++) {
           IndexSegment segment = segments.get(i);
-          Map<String, DataSource> dataSourceCache = new HashMap<>(eqInColumns.size());
-          Map<String, List<ColumnIndexType>> columnToIndexList = new HashMap<>(eqInColumns.size());
+          Map<String, DataSource> dataSourceCache = new HashMap<>();
+          Map<String, List<ColumnIndexType>> columnToIndexList = new HashMap<>();
           for (String column : eqInColumns) {
             DataSource dataSource = segment.getDataSource(column);
             dataSourceCache.put(column, dataSource);
@@ -165,7 +165,7 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
         }
       }
     } else {
-      Map<String, DataSource> dataSourceCache = new HashMap<>(eqInColumns.size() + rangeColumns.size());
+      Map<String, DataSource> dataSourceCache = new HashMap<>();
       for (IndexSegment segment : segments) {
         dataSourceCache.clear();
         if (!pruneSegment(segment, filter, dataSourceCache, cachedValues)) {
