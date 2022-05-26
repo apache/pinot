@@ -511,6 +511,7 @@ public final class TableConfigUtils {
    *  - strict replica-group is configured for routing type
    *  - consumer type must be low-level
    *  - comparison column exists
+   *  - Metrics Aggregation is not enabled when upsert config is
    */
   @VisibleForTesting
   static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema) {
@@ -556,6 +557,19 @@ public final class TableConfigUtils {
         Preconditions.checkState(schema.hasColumn(comparisonCol), "The comparison column does not exist on schema");
       }
     }
+    Preconditions.checkState(isAggregateMetricsEnabled(tableConfig),
+            "Metrics aggregation and upsert cannot be enabled together");
+  }
+
+  /**
+   * Checks if Metrics aggregation is enabled.
+   */
+  @VisibleForTesting
+  static boolean isAggregateMetricsEnabled(TableConfig config) {
+    if(config.getIndexingConfig() == null || config.getIngestionConfig() == null) {
+      return false;
+    }
+    return config.getIndexingConfig().isAggregateMetrics() && CollectionUtils.isEmpty(config.getIngestionConfig().getAggregationConfigs());
   }
 
   /**
