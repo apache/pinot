@@ -525,30 +525,6 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
         return _comparableValue;
       }
 
-      static final LongExtractor EXTRACTOR;
-
-      interface LongExtractor {
-        long extract(byte[] bytes, int index);
-      }
-
-      static {
-        LongExtractor extractor;
-        try {
-          MethodType mt = MethodType.methodType(VarHandle.class, Class.class, ByteOrder.class);
-          MethodHandle mh = MethodHandles.lookup().findStatic(MethodHandles.class, "byteArrayViewVarHandle", mt);
-
-          VarHandle varHandle = (VarHandle) mh.invokeExact(long[].class, ByteOrder.LITTLE_ENDIAN);
-          extractor = (bytes, index) -> (long) varHandle.get(bytes, index * 8);
-        } catch (Throwable e) {
-          extractor = (bytes, index) -> {
-            int i = index * 8;
-            return Longs.fromBytes(bytes[i + 7], bytes[i + 6], bytes[i + 5],
-                bytes[i + 4], bytes[i + 3], bytes[i + 2], bytes[i + 1], bytes[i]);
-          };
-        }
-        EXTRACTOR = extractor;
-      }
-
       private void ensureDataType(DataType dt) {
         if (!dt.equals(_dt)) {
           String strValue = _value.toString();
@@ -561,8 +537,8 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
       private boolean mightBeContained(BloomFilterReader bloomFilter) {
         if (!_hashed) {
           byte[] hash = GuavaBloomFilterReaderUtils.hash(_comparableValue.toString());
-          _hash1 = EXTRACTOR.extract(hash, 0);
-          _hash2 = EXTRACTOR.extract(hash, 1);
+          _hash1 = Longs.fromBytes(hash[7], hash[6], hash[5], hash[4], hash[3], hash[2], hash[1], hash[0]);
+          _hash2 = Longs.fromBytes(hash[15], hash[14], hash[13], hash[12], hash[11], hash[10], hash[9], hash[8]);
           _hashed = true;
         }
         return bloomFilter.mightContain(_hash1, _hash2);
