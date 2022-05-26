@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -41,6 +42,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -94,7 +96,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   }
 
   @Override
-  protected Context preprocess() {
+  protected Context preprocess(Properties periodicTaskProperties) {
     Context context = new Context();
     // check if we need to log disabled tables log messages
     long now = System.currentTimeMillis();
@@ -108,6 +110,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   @Override
   protected void processTable(String tableNameWithType, Context context) {
     try {
+      updateTableConfigMetrics(tableNameWithType);
       updateSegmentMetrics(tableNameWithType, context);
       updateTableSizeMetrics(tableNameWithType);
     } catch (Exception e) {
@@ -122,6 +125,26 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, context._realTimeTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, context._offlineTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, context._disabledTableCount);
+  }
+
+  /**
+   * Updates metrics related to the table config.
+   * If table config not found, resets the metrics
+   */
+  private void updateTableConfigMetrics(String tableNameWithType) {
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    if (tableConfig == null) {
+      LOGGER.warn("Found null table config for table: {}. Resetting table config metrics.", tableNameWithType);
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, 0);
+      return;
+    }
+    int replication;
+    if (tableConfig.getTableType() == TableType.REALTIME) {
+      replication = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
+    } else {
+      replication = tableConfig.getValidationConfig().getReplicationNumber();
+    }
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, replication);
   }
 
   private void updateTableSizeMetrics(String tableNameWithType)

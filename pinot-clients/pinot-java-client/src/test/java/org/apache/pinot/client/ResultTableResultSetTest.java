@@ -19,8 +19,8 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
@@ -41,8 +41,7 @@ public class ResultTableResultSetTest {
     String json =
         "{ \"rows\" : [[\"r1c1\", \"r1c2\"], [\"r2c1\", \"r2c2\"]], \"dataSchema\" : {\"columnNames\":[\"column1\", "
             + "\"column2\"], " + "\"columnDataTypes\":[\"column1DataType\", \"column2DataType\"]} } ";
-    ObjectMapper objectMapper = new ObjectMapper();
-    _jsonNode = objectMapper.readTree(json);
+    _jsonNode = JsonUtils.stringToJsonNode(json);
     _resultTableResultSetUnderTest = new ResultTableResultSet(_jsonNode);
   }
 

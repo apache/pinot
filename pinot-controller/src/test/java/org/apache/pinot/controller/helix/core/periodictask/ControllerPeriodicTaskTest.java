@@ -20,15 +20,16 @@ package org.apache.pinot.controller.helix.core.periodictask;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
@@ -70,9 +71,9 @@ public class ControllerPeriodicTaskTest {
     }
 
     @Override
-    public void processTables(List<String> tableNamesWithType) {
+    public void processTables(List<String> tableNamesWithType, Properties periodicTaskProperties) {
       _processTablesCalled.set(true);
-      super.processTables(tableNamesWithType);
+      super.processTables(tableNamesWithType, periodicTaskProperties);
     }
 
     @Override

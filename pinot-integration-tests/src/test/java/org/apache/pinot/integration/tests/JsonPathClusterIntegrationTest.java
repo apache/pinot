@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import com.jayway.jsonpath.spi.cache.Cache;
 import com.jayway.jsonpath.spi.cache.CacheProvider;
 import java.io.File;
@@ -89,13 +88,16 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
             .addSingleValueDimension(COMPLEX_MAP_STR_FIELD_NAME, DataType.STRING)
             .addMultiValueDimension(COMPLEX_MAP_STR_K3_FIELD_NAME, DataType.STRING).build();
     addSchema(schema);
-    List<TransformConfig> transformConfigs = Lists.newArrayList(
+    List<TransformConfig> transformConfigs = Arrays.asList(
         new TransformConfig(MY_MAP_STR_K1_FIELD_NAME, "jsonPathString(" + MY_MAP_STR_FIELD_NAME + ", '$.k1')"),
         new TransformConfig(MY_MAP_STR_K2_FIELD_NAME, "jsonPathString(" + MY_MAP_STR_FIELD_NAME + ", '$.k2')"),
         new TransformConfig(COMPLEX_MAP_STR_K3_FIELD_NAME,
             "jsonPathArray(" + COMPLEX_MAP_STR_FIELD_NAME + ", '$.k3')"));
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
-        .setIngestionConfig(new IngestionConfig(null, null, null, transformConfigs, null, null)).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setIngestionConfig(ingestionConfig)
+            .build();
     addTableConfig(tableConfig);
 
     // Create and upload segments

@@ -19,7 +19,6 @@
 package org.apache.pinot.common.segment.generation;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -69,9 +68,8 @@ public class SegmentGenerationUtils {
     String schemaJson;
     if (PinotFSFactory.isSchemeSupported(scheme)) {
       // Try to use PinotFS to read schema URI
-      PinotFS pinotFS = PinotFSFactory.create(scheme);
       InputStream schemaStream;
-      try {
+      try (PinotFS pinotFS = PinotFSFactory.create(scheme)) {
         schemaStream = pinotFS.open(schemaURI);
       } catch (IOException e) {
         throw new RuntimeException("Failed to fetch schema from PinotFS - '" + schemaURI + "'", e);
@@ -112,8 +110,7 @@ public class SegmentGenerationUtils {
     String tableConfigJson;
     if (PinotFSFactory.isSchemeSupported(scheme)) {
       // Try to use PinotFS to read table config URI
-      PinotFS pinotFS = PinotFSFactory.create(scheme);
-      try {
+      try (PinotFS pinotFS = PinotFSFactory.create(scheme);) {
         tableConfigJson = IOUtils.toString(pinotFS.open(tableConfigURI), StandardCharsets.UTF_8);
       } catch (IOException e) {
         throw new RuntimeException("Failed to open table config file stream on Pinot fs - '" + tableConfigURI + "'", e);
@@ -129,7 +126,7 @@ public class SegmentGenerationUtils {
     // Controller API returns a wrapper of table config.
     JsonNode tableJsonNode;
     try {
-      tableJsonNode = new ObjectMapper().readTree(tableConfigJson);
+      tableJsonNode = JsonUtils.stringToJsonNode(tableConfigJson);
     } catch (IOException e) {
       throw new RuntimeException("Failed to decode table config into JSON from String - '" + tableConfigJson + "'", e);
     }

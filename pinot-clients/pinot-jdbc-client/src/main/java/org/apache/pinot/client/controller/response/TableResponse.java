@@ -19,14 +19,13 @@
 package org.apache.pinot.client.controller.response;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.asynchttpclient.Response;
 
 
@@ -72,8 +71,6 @@ public class TableResponse {
   }
 
   public static class TableResponseFuture extends ControllerResponseFuture<TableResponse> {
-    private static final ObjectReader OBJECT_READER = new ObjectMapper().reader();
-
     public TableResponseFuture(Future<Response> response, String url) {
       super(response, url);
     }
@@ -83,7 +80,7 @@ public class TableResponse {
         throws ExecutionException {
       String response = getStringResponse(timeout, unit);
       try {
-        JsonNode jsonResponse = OBJECT_READER.readTree(response);
+        JsonNode jsonResponse = JsonUtils.stringToJsonNode(response);
         TableResponse tableResponse = TableResponse.fromJson(jsonResponse);
         return tableResponse;
       } catch (IOException e) {

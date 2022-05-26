@@ -42,6 +42,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -55,6 +56,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -90,6 +92,7 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
+import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -165,6 +168,7 @@ public class PinotHelixResourceManager {
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   public static final String APPEND = "APPEND";
   private static final int DEFAULT_TABLE_UPDATER_LOCKERS_SIZE = 100;
+  private static final String API_REQUEST_ID_PREFIX = "api-";
 
   // TODO: make this configurable
   public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
@@ -3558,6 +3562,40 @@ public class PinotHelixResourceManager {
     }
 
     return tableConfig.getValidationConfig().getReplicationNumber();
+  }
+
+  /**
+   * Trigger controller periodic task using helix messaging service
+   * @param tableName Name of table against which task is to be run
+   * @param periodicTaskName Task name
+   * @param taskProperties Extra properties to be passed along
+   * @return Task id for filtering logs, along with the number of successfully sent messages
+   */
+  public Pair<String, Integer> invokeControllerPeriodicTask(String tableName, String periodicTaskName,
+      Map<String, String> taskProperties) {
+    String periodicTaskRequestId = API_REQUEST_ID_PREFIX + UUID.randomUUID().toString().substring(0, 8);
+
+    LOGGER.info(
+        "[TaskRequestId: {}] Sending periodic task message to all controllers for running task {} against {},"
+            + " with properties {}.\"", periodicTaskRequestId, periodicTaskName,
+        tableName != null ? " table '" + tableName + "'" : "all tables", taskProperties);
+
+    // Create and send message to send to all controllers (including this one)
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setSessionSpecific(true);
+    recipientCriteria.setResource(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+    recipientCriteria.setSelfExcluded(false);
+    RunPeriodicTaskMessage runPeriodicTaskMessage =
+        new RunPeriodicTaskMessage(periodicTaskRequestId, periodicTaskName, tableName, taskProperties);
+
+    ClusterMessagingService clusterMessagingService = getHelixZkManager().getMessagingService();
+    int messageCount = clusterMessagingService.send(recipientCriteria, runPeriodicTaskMessage, null, -1);
+
+    LOGGER.info("[TaskRequestId: {}] Periodic task execution message sent to {} controllers.", periodicTaskRequestId,
+        messageCount);
+    return Pair.of(periodicTaskRequestId, messageCount);
   }
 
   /*

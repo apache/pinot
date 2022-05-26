@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.client;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.Properties;
 import java.util.concurrent.Future;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -157,7 +157,7 @@ public class ResultSetGroupTest {
           lastByte = stream.read();
         }
         String jsonText = builder.toString();
-        return BrokerResponse.fromJson(new ObjectMapper().readTree(jsonText));
+        return BrokerResponse.fromJson(JsonUtils.stringToJsonNode(jsonText));
       } catch (Exception e) {
         Assert.fail("Unexpected exception", e);
         return null;

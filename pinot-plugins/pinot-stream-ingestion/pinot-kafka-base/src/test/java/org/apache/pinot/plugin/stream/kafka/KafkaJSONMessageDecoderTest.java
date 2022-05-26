@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.stream.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -28,13 +27,12 @@ import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class KafkaJSONMessageDecoderTest {
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @Test
   public void testJsonDecoderWithoutOutgoingTimeSpec()
@@ -85,7 +83,7 @@ public class KafkaJSONMessageDecoderTest {
       GenericRow r = new GenericRow();
       String line = reader.readLine();
       while (line != null) {
-        JsonNode jsonNode = OBJECT_MAPPER.reader().readTree(line);
+        JsonNode jsonNode = JsonUtils.DEFAULT_READER.readTree(line);
         decoder.decode(line.getBytes(), r);
         for (String field : sourceFields.keySet()) {
           Object actualValue = r.getValue(field);

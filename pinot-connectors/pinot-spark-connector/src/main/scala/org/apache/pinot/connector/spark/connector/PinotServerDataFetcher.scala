@@ -21,7 +21,7 @@ package org.apache.pinot.connector.spark.connector
 import java.util.{List => JList, Map => JMap}
 
 import org.apache.helix.model.InstanceConfig
-import org.apache.pinot.common.metrics.{BrokerMetrics, PinotMetricUtils}
+import org.apache.pinot.common.metrics.BrokerMetrics
 import org.apache.pinot.common.request.BrokerRequest
 import org.apache.pinot.common.utils.DataTable
 import org.apache.pinot.connector.spark.datasource.PinotDataSourceReadOptions
@@ -29,6 +29,7 @@ import org.apache.pinot.connector.spark.exceptions.PinotException
 import org.apache.pinot.connector.spark.utils.Logging
 import org.apache.pinot.core.transport.{AsyncQueryResponse, QueryRouter, ServerInstance}
 import org.apache.pinot.spi.config.table.TableType
+import org.apache.pinot.spi.metrics.PinotMetricUtils
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler
 
 import scala.collection.JavaConverters._

@@ -19,7 +19,7 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -37,8 +37,7 @@ public class AggregationResultSetTest {
   public void setUp()
       throws Exception {
     String jsonString = "{\"function\":\"testFunction\", \"value\":\"123\"}";
-    ObjectMapper objectMapper = new ObjectMapper();
-    _mockJsonObject = objectMapper.readTree(jsonString);
+    _mockJsonObject = JsonUtils.stringToJsonNode(jsonString);
     _aggregationResultSetUnderTest = new AggregationResultSet(_mockJsonObject);
   }
 

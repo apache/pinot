@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.query.scheduler.fcfs;
 
-import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.scheduler.SchedulerQueryContext;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.core.query.scheduler.TestHelper.createQueryRequest;

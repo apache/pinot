@@ -21,8 +21,8 @@ package org.apache.pinot.controller.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.net.URL;
-import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.controller.api.resources.TableAndSchemaConfig;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -34,10 +34,12 @@ import static org.testng.Assert.assertEquals;
 
 
 public class PinotUpsertRestletResourceTest {
+  private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
+
   @BeforeClass
   public void setUp()
       throws Exception {
-    ControllerTestUtils.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
   }
 
   @Test
@@ -52,10 +54,10 @@ public class PinotUpsertRestletResourceTest {
     TableAndSchemaConfig tableAndSchemaConfig = new TableAndSchemaConfig(tableConfig, schema);
 
     String estimateHeapUsageUrl =
-        ControllerTestUtils.getControllerRequestURLBuilder().forUpsertTableHeapEstimation(10000, 48, 8);
+        TEST_INSTANCE.getControllerRequestURLBuilder().forUpsertTableHeapEstimation(10000, 48, 8);
 
     JsonNode result = JsonUtils.stringToJsonNode(
-        ControllerTestUtils.sendPostRequest(estimateHeapUsageUrl, tableAndSchemaConfig.toJsonString()));
+        ControllerTest.sendPostRequest(estimateHeapUsageUrl, tableAndSchemaConfig.toJsonString()));
     assertEquals(result.get("bytesPerKey").asInt(), 48);
     assertEquals(result.get("bytesPerValue").asInt(), 60);
     assertEquals(result.get("totalKeySpace(bytes)").asLong(), 480000);
@@ -67,7 +69,7 @@ public class PinotUpsertRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
-    ControllerTestUtils.cleanup();
+    TEST_INSTANCE.cleanup();
   }
 
   private File readFile(String fileName)

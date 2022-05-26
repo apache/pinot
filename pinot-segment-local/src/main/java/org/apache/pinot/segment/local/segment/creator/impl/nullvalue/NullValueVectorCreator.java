@@ -30,36 +30,36 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
- * Used to persist the null bitmap on disk. This is used by SegmentCreator
- * while indexing rows.
+ * Used to persist the null bitmap on disk. This is used by SegmentCreator while indexing rows.
  */
 public class NullValueVectorCreator implements Closeable {
-
-  private MutableRoaringBitmap _nullBitmap;
-  private File _nullValueVectorFile;
+  private final MutableRoaringBitmap _nullBitmap = new MutableRoaringBitmap();
+  private final File _nullValueVectorFile;
 
   public NullValueVectorCreator(File indexDir, String columnName) {
     _nullValueVectorFile = new File(indexDir, columnName + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
-    _nullBitmap = new MutableRoaringBitmap();
-  }
-
-  public void seal()
-      throws IOException {
-    try (DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(_nullValueVectorFile))) {
-      _nullBitmap.serialize(outputStream);
-    }
-  }
-
-  @Override
-  public void close() {
-  }
-
-  @VisibleForTesting
-  ImmutableRoaringBitmap getNullBitmap() {
-    return _nullBitmap.clone();
   }
 
   public void setNull(int docId) {
     _nullBitmap.add(docId);
+  }
+
+  public void seal()
+      throws IOException {
+    // Create null value vector file only if the bitmap is not empty
+    if (!_nullBitmap.isEmpty()) {
+      try (DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(_nullValueVectorFile))) {
+        _nullBitmap.serialize(outputStream);
+      }
+    }
+  }
+
+  @VisibleForTesting
+  ImmutableRoaringBitmap getNullBitmap() {
+    return _nullBitmap;
+  }
+
+  @Override
+  public void close() {
   }
 }

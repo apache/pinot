@@ -466,8 +466,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Add the inverted index back to test index removal via force download.
     addInvertedIndex();
-    long tableSizeAfterAddingIndexAgain = getTableSize(getTableName());
-    assertEquals(tableSizeAfterAddingIndexAgain, tableSizeWithNewIndex);
+    assertEquals(getTableSize(getTableName()), tableSizeWithNewIndex);
 
     // Update table config to remove the new inverted index.
     tableConfig = getOfflineTableConfig();
@@ -484,13 +483,36 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
         // Total docs should not change during reload
         assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-        return getTableSize(getTableName()) < tableSizeAfterAddingIndexAgain;
+        // If the segment got reloaded, the query should scan its docs.
+        return queryResponse.get("numEntriesScannedInFilter").asLong() > 0;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to clean up obsolete index in segment");
+    // As query behavior changed, the segment reload must have been done. The new table size should be like below,
+    // with only one segment being reloaded with force download and dropping the inverted index.
+    long tableSizeAfterReloadSegment = getTableSize(getTableName());
+    assertTrue(tableSizeAfterReloadSegment > DISK_SIZE_IN_BYTES && tableSizeAfterReloadSegment < tableSizeWithNewIndex);
 
-    // Force to download the whole table and expect disk usage drops further.
+    // Add inverted index back to check if reloading whole table with force download works.
+    // Note that because we have force downloaded a segment above, it's important to reset the table state by adding
+    // the inverted index back before check if reloading whole table with force download works. Otherwise, the query's
+    // numEntriesScannedInFilter can become numTotalDocs sooner than expected, while the segment (reloaded by the test
+    // above) is being reloaded again, causing the table size smaller than expected.
+    //
+    // As to why the table size could be smaller than expected, it's because when reloading a segment with force
+    // download, the original segment dir is deleted and then replaced with the newly downloaded segment, leaving a
+    // small chance of race condition between getting table size check and replacing the segment dir, i.e. flaky test.
+    addInvertedIndex();
+    // The table size gets larger for sure, but it does not necessarily equal to tableSizeWithNewIndex, because the
+    // order of entries in the index_map file can change when the raw segment adds/deletes indices back and forth.
+    assertTrue(getTableSize(getTableName()) > tableSizeAfterReloadSegment);
+
+    // Force to download the whole table and use the original table config, so the disk usage should get back to
+    // initial value.
+    tableConfig = getOfflineTableConfig();
+    tableConfig.getIndexingConfig().setInvertedIndexColumns(getInvertedIndexColumns());
+    updateTableConfig(tableConfig);
     reloadOfflineTable(getTableName(), true);
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -945,10 +967,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     _schemaFileName = SCHEMA_FILE_NAME_WITH_EXTRA_COLUMNS;
     addSchema(createSchema());
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setIngestionConfig(new IngestionConfig(null, null, null,
-        Arrays.asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
-            new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"),
-            new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')")), null, null));
+    List<TransformConfig> transformConfigs = Arrays.asList(
+        new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
+        new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"),
+        new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
+    tableConfig.setIngestionConfig(ingestionConfig);
     updateTableConfig(tableConfig);
 
     // Trigger reload

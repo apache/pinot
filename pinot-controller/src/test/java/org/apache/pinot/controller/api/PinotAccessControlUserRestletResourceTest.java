@@ -21,7 +21,7 @@ package org.apache.pinot.controller.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import org.apache.pinot.common.utils.BcryptUtils;
-import org.apache.pinot.controller.ControllerTestUtils;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
@@ -33,6 +33,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 public class PinotAccessControlUserRestletResourceTest {
+    private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
 
     private String _createUserUrl;
     private final UserConfigBuilder _userConfigBuilder = new UserConfigBuilder();
@@ -40,9 +41,9 @@ public class PinotAccessControlUserRestletResourceTest {
     @BeforeClass
     public void setup()
         throws Exception {
-        ControllerTestUtils.setupClusterAndValidate();
+        TEST_INSTANCE.setupSharedStateAndValidate();
 
-        _createUserUrl = ControllerTestUtils.getControllerRequestURLBuilder().forUserCreate();
+        _createUserUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forUserCreate();
         _userConfigBuilder.setUsername("testUser").setPassword("123456").setComponentType(ComponentType.CONTROLLER)
             .setRoleType(RoleType.USER);
     }
@@ -52,7 +53,7 @@ public class PinotAccessControlUserRestletResourceTest {
         throws Exception {
         String userconfigString = _userConfigBuilder.setUsername("bad.user.with.dot").build().toJsonString();
         try {
-            ControllerTestUtils.sendPostRequest(_createUserUrl, userconfigString);
+            ControllerTest.sendPostRequest(_createUserUrl, userconfigString);
             Assert.fail("Adding a user with dot in username does not fail");
         } catch (IOException e) {
             Assert.assertTrue(e.getMessage().contains(
@@ -61,11 +62,11 @@ public class PinotAccessControlUserRestletResourceTest {
 
         // Creating an user with a valid username should succeed
         userconfigString = _userConfigBuilder.setUsername("valid_table_name").build().toJsonString();
-        ControllerTestUtils.sendPostRequest(_createUserUrl, userconfigString);
+        ControllerTest.sendPostRequest(_createUserUrl, userconfigString);
 
         // Create an user that already exists should fail
         try {
-            ControllerTestUtils.sendPostRequest(_createUserUrl, userconfigString);
+            ControllerTest.sendPostRequest(_createUserUrl, userconfigString);
             Assert.fail("Creation of an existing user does not fail");
         } catch (IOException e) {
             Assert.assertTrue(e.getMessage().contains("User valid_table_name_CONTROLLER already exists"));
@@ -75,7 +76,7 @@ public class PinotAccessControlUserRestletResourceTest {
     private UserConfig getUserConfig(String username, String componentType)
         throws Exception {
         String userConfigString =
-            ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder()
+            ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder()
                 .forUserGet(username, componentType));
         String usernameWithType = username + "_" + componentType;
         return JsonUtils.jsonNodeToObject(JsonUtils.stringToJsonNode(userConfigString)
@@ -88,7 +89,7 @@ public class PinotAccessControlUserRestletResourceTest {
         String username = "updateTC";
         String userConfigString = _userConfigBuilder.setUsername(username).setComponentType(ComponentType.CONTROLLER)
             .build().toJsonString();
-        ControllerTestUtils.sendPostRequest(_createUserUrl, userConfigString);
+        ControllerTest.sendPostRequest(_createUserUrl, userConfigString);
         // user creation should succeed
         UserConfig userConfig = getUserConfig(username, "CONTROLLER");
         Assert.assertEquals(userConfig.getRoleType().toString(), RoleType.USER.toString());
@@ -96,8 +97,8 @@ public class PinotAccessControlUserRestletResourceTest {
         userConfig.setRole("ADMIN");
         userConfig.setPassword("654321");
 
-        JsonNode jsonResponse = JsonUtils.stringToJsonNode(ControllerTestUtils
-            .sendPutRequest(ControllerTestUtils.getControllerRequestURLBuilder()
+        JsonNode jsonResponse = JsonUtils.stringToJsonNode(ControllerTest
+            .sendPutRequest(TEST_INSTANCE.getControllerRequestURLBuilder()
                     .forUpdateUserConfig(username, "CONTROLLER", true),
                 userConfig.toString()));
         Assert.assertTrue(jsonResponse.has("status"));
@@ -113,25 +114,24 @@ public class PinotAccessControlUserRestletResourceTest {
         // Case 1: Create a CONTORLLER user and delete it directly w/o using query param.
         UserConfig controllerUserConfig = _userConfigBuilder.setUsername("user1")
             .setComponentType(ComponentType.CONTROLLER).build();
-        String creationResponse = ControllerTestUtils
-            .sendPostRequest(_createUserUrl, controllerUserConfig.toJsonString());
+        String creationResponse = ControllerTest.sendPostRequest(_createUserUrl, controllerUserConfig.toJsonString());
         Assert.assertEquals(creationResponse, "{\"status\":\"User user1_CONTROLLER has been successfully added!\"}");
 
         // Delete controller user using CONTROLLER suffix
-        String deleteResponse = ControllerTestUtils.sendDeleteRequest(
-            StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(),
+        String deleteResponse = ControllerTest.sendDeleteRequest(
+            StringUtil.join("/", TEST_INSTANCE.getControllerBaseApiUrl(),
                 "users", "user1?component=CONTROLLER"));
         Assert.assertEquals(deleteResponse, "{\"status\":\"User: user1_CONTROLLER has been successfully deleted\"}");
 
         // Case 2: Create a BROKER user and delete it directly w/o using query param.
         UserConfig brokerUserConfig = _userConfigBuilder.setUsername("user1").setComponentType(ComponentType.BROKER)
             .build();
-        creationResponse = ControllerTestUtils.sendPostRequest(_createUserUrl, brokerUserConfig.toJsonString());
+        creationResponse = ControllerTest.sendPostRequest(_createUserUrl, brokerUserConfig.toJsonString());
         Assert.assertEquals(creationResponse, "{\"status\":\"User user1_BROKER has been successfully added!\"}");
 
         // Delete controller user using BROKER suffix
-        deleteResponse = ControllerTestUtils.sendDeleteRequest(
-            StringUtil.join("/", ControllerTestUtils.getControllerBaseApiUrl(), "users", "user1?component=BROKER")
+        deleteResponse = ControllerTest.sendDeleteRequest(
+            StringUtil.join("/", TEST_INSTANCE.getControllerBaseApiUrl(), "users", "user1?component=BROKER")
         );
         Assert.assertEquals(deleteResponse, "{\"status\":\"User: user1_BROKER has been successfully deleted\"}");
     }

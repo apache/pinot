@@ -19,7 +19,8 @@
 package org.apache.pinot.spi.utils;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -53,11 +54,10 @@ public class IngestionConfigUtilsTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setTimeColumnName("timeColumn").build();
 
     // get from ingestion config (when not present in indexing config)
-    Map<String, String> streamConfigMap = new HashMap<>();
-    streamConfigMap.put("streamType", "kafka");
-    tableConfig.setIngestionConfig(
-        new IngestionConfig(null, new StreamIngestionConfig(Lists.newArrayList(streamConfigMap)), null, null, null,
-            null));
+    Map<String, String> streamConfigMap = Collections.singletonMap("streamType", "kafka");
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(Collections.singletonList(streamConfigMap)));
+    tableConfig.setIngestionConfig(ingestionConfig);
     Map<String, String> actualStreamConfigsMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
     Assert.assertEquals(actualStreamConfigsMap.size(), 1);
     Assert.assertEquals(actualStreamConfigsMap.get("streamType"), "kafka");
@@ -74,9 +74,8 @@ public class IngestionConfigUtilsTest {
     Assert.assertEquals(actualStreamConfigsMap.get("streamType"), "kafka");
 
     // fail if multiple found
-    tableConfig.setIngestionConfig(new IngestionConfig(null,
-        new StreamIngestionConfig(Lists.newArrayList(streamConfigMap, deprecatedStreamConfigMap)), null, null, null,
-        null));
+    ingestionConfig.setStreamIngestionConfig(
+        new StreamIngestionConfig(Arrays.asList(streamConfigMap, deprecatedStreamConfigMap)));
     try {
       IngestionConfigUtils.getStreamConfigMap(tableConfig);
       Assert.fail("Should fail for multiple stream configs");
@@ -103,9 +102,10 @@ public class IngestionConfigUtilsTest {
   @Test
   public void testGetPushFrequency() {
     // get from ingestion config, when not present in segmentsConfig
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
-    tableConfig.setIngestionConfig(
-        new IngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"), null, null, null, null, null));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setIngestionConfig(ingestionConfig).build();
     Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), "HOURLY");
 
     // get from ingestion config, even if present in segmentsConfig
@@ -128,9 +128,10 @@ public class IngestionConfigUtilsTest {
   @Test
   public void testGetPushType() {
     // get from ingestion config, when not present in segmentsConfig
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
-    tableConfig.setIngestionConfig(
-        new IngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"), null, null, null, null, null));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "APPEND", "HOURLY"));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setIngestionConfig(ingestionConfig).build();
     Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig), "APPEND");
 
     // get from ingestion config, even if present in segmentsConfig

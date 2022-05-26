@@ -99,11 +99,6 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   }
 
   @Override
-  public boolean hasNull() {
-    return false;
-  }
-
-  @Override
   public void seal() {
     _sortedValues = _values.toIntArray();
     Arrays.sort(_sortedValues);

@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.provider;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -40,6 +39,7 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -107,9 +107,8 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
 
     // For a sample response payload,
     // check https://docs.microsoft.com/en-us/azure/virtual-machines/windows/instance-metadata-service?tabs=linux
-    final ObjectMapper objectMapper = new ObjectMapper();
     try {
-      final JsonNode jsonNode = objectMapper.readTree(responsePayload);
+      final JsonNode jsonNode = JsonUtils.stringToJsonNode(responsePayload);
       final JsonNode computeNode = jsonNode.path(COMPUTE);
 
       if (computeNode.isMissingNode()) {

@@ -19,7 +19,7 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -44,8 +44,7 @@ public class ExecutionStatsTest {
             + "\"numSegmentsProcessed\":10, \"numSegmentsMatched\":10, \"numConsumingSegmentsQueried\":10, "
             + "\"minConsumingFreshnessTimeMs\":10, \"totalDocs\":10, \"numGroupsLimitReached\":true, "
             + "\"timeUsedMs\":10}";
-    ObjectMapper objectMapper = new ObjectMapper();
-    _mockBrokerResponse = objectMapper.readTree(json);
+    _mockBrokerResponse = JsonUtils.stringToJsonNode(json);
     _executionStatsUnderTest = new ExecutionStats(_mockBrokerResponse);
   }
 

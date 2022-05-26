@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.sql.ResultSetMetaData;
 import java.util.Calendar;
@@ -27,6 +26,7 @@ import java.util.Date;
 import java.util.concurrent.Future;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.client.utils.DateTimeUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -181,7 +181,7 @@ public class PinotResultSetTest {
           lastByte = stream.read();
         }
         String jsonText = builder.toString();
-        return BrokerResponse.fromJson(new ObjectMapper().readTree(jsonText));
+        return BrokerResponse.fromJson(JsonUtils.stringToJsonNode(jsonText));
       } catch (Exception e) {
         Assert.fail("Unexpected exception", e);
         return null;

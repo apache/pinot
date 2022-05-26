@@ -19,7 +19,6 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -39,6 +38,7 @@ import java.util.Map;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.base.AbstractBaseResultSet;
 import org.apache.pinot.client.utils.DateTimeUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,7 +79,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
 
   public static PinotResultSet fromJson(String jsonText) {
     try {
-      JsonNode brokerResponse = new ObjectMapper().readTree(jsonText);
+      JsonNode brokerResponse = JsonUtils.stringToJsonNode(jsonText);
       ResultSet resultSet = new ResultTableResultSet(brokerResponse.get("resultTable"));
       return new PinotResultSet(resultSet);
     } catch (Exception e) {

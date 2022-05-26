@@ -81,12 +81,12 @@ public class JsonUtils {
   public static final ObjectReader DEFAULT_READER = DEFAULT_MAPPER.reader();
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
-  private static final TypeReference<HashMap<String, Object>> GENERIC_JSON_TYPE =
+  public static final TypeReference<HashMap<String, Object>> MAP_TYPE_REFERENCE =
       new TypeReference<HashMap<String, Object>>() {
       };
 
   public static <T> T stringToObject(String jsonString, Class<T> valueType)
-      throws IOException {
+      throws JsonProcessingException {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
   }
 
@@ -101,10 +101,10 @@ public class JsonUtils {
       Class<T> valueType)
       throws IOException {
     T instance = DEFAULT_READER.forType(valueType).readValue(jsonString);
-    Map<String, Object> inputJsonMap = flatten(DEFAULT_MAPPER.readValue(jsonString, GENERIC_JSON_TYPE));
+    Map<String, Object> inputJsonMap = flatten(DEFAULT_MAPPER.readValue(jsonString, MAP_TYPE_REFERENCE));
 
     String instanceJson = DEFAULT_MAPPER.writeValueAsString(instance);
-    Map<String, Object> instanceJsonMap = flatten(DEFAULT_MAPPER.readValue(instanceJson, GENERIC_JSON_TYPE));
+    Map<String, Object> instanceJsonMap = flatten(DEFAULT_MAPPER.readValue(instanceJson, MAP_TYPE_REFERENCE));
 
     MapDifference<String, Object> difference = Maps.difference(inputJsonMap, instanceJsonMap);
     return Pair.of(instance, difference.entriesOnlyOnLeft());
@@ -166,11 +166,12 @@ public class JsonUtils {
   /**
    * Reads the first json object from the file that can contain multiple objects
    */
+  @Nullable
   public static JsonNode fileToFirstJsonNode(File jsonFile)
       throws IOException {
-    try (InputStream inputStream = new FileInputStream(jsonFile)) {
-      JsonFactory jf = new JsonFactory();
-      JsonParser jp = jf.createParser(inputStream);
+    JsonFactory jf = new JsonFactory();
+    try (InputStream inputStream = new FileInputStream(jsonFile);
+        JsonParser jp = jf.createParser(inputStream)) {
       jp.setCodec(DEFAULT_MAPPER);
       jp.nextToken();
       if (jp.hasCurrentToken()) {
@@ -208,6 +209,11 @@ public class JsonUtils {
   public static <T> T jsonNodeToObject(JsonNode jsonNode, TypeReference<T> valueTypeRef)
       throws IOException {
     return DEFAULT_READER.forType(valueTypeRef).readValue(jsonNode);
+  }
+
+  public static Map<String, Object> jsonNodeToMap(JsonNode jsonNode)
+      throws IOException {
+    return DEFAULT_READER.forType(MAP_TYPE_REFERENCE).readValue(jsonNode);
   }
 
   public static String objectToString(Object object)
@@ -475,6 +481,7 @@ public class JsonUtils {
     if (fieldsToUnnest == null) {
       fieldsToUnnest = new ArrayList<>();
     }
+    Preconditions.checkNotNull(jsonNode, "the JSON data shall be an object but it is null");
     Preconditions.checkState(jsonNode.isObject(), "the JSON data shall be an object");
     return getPinotSchemaFromJsonNode(jsonNode, fieldTypeMap, timeUnit, fieldsToUnnest, delimiter,
         collectionNotUnnestedToJson);

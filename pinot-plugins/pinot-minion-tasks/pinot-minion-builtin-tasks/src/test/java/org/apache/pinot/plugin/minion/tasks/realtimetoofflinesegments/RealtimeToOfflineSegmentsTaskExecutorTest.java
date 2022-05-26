@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -98,14 +99,18 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     TableConfig tableConfigWithSortedCol =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_WITH_SORTED_COL).setTimeColumnName(T)
             .setSortedColumn(D1).build();
+    IngestionConfig ingestionConfigEpochHours = new IngestionConfig();
+    ingestionConfigEpochHours.setTransformConfigs(
+        Collections.singletonList(new TransformConfig(T_TRX, "toEpochHours(t)")));
     TableConfig tableConfigEpochHours =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_EPOCH_HOURS).setTimeColumnName(T_TRX)
-            .setSortedColumn(D1).setIngestionConfig(new IngestionConfig(null, null, null,
-                Lists.newArrayList(new TransformConfig(T_TRX, "toEpochHours(t)")), null, null)).build();
+            .setSortedColumn(D1).setIngestionConfig(ingestionConfigEpochHours).build();
+    IngestionConfig ingestionConfigSDF = new IngestionConfig();
+    ingestionConfigSDF.setTransformConfigs(
+        Collections.singletonList(new TransformConfig(T_TRX, "toDateTime(t, 'yyyyMMddHH')")));
     TableConfig tableConfigSDF =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_SDF).setTimeColumnName(T_TRX)
-            .setSortedColumn(D1).setIngestionConfig(new IngestionConfig(null, null, null,
-                Lists.newArrayList(new TransformConfig(T_TRX, "toDateTime(t, 'yyyyMMddHH')")), null, null)).build();
+            .setSortedColumn(D1).setIngestionConfig(ingestionConfigSDF).build();
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
             .addMetric(M1, FieldSpec.DataType.INT)

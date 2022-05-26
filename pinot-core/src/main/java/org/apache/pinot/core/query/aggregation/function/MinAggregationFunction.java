@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -90,6 +91,16 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
           min = Math.min(values[i], min);
         }
         aggregationResultHolder.setValue(Math.min(min, aggregationResultHolder.getDoubleResult()));
+        break;
+      }
+      case BIG_DECIMAL: {
+        BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
+        BigDecimal min = values[0];
+        for (int i = 0; i < length & i < values.length; i++) {
+          min = values[i].min(min);
+        }
+        // TODO: even though the source data has BIG_DECIMAL type, we still only support double precision.
+        aggregationResultHolder.setValue(Math.min(min.doubleValue(), aggregationResultHolder.getDoubleResult()));
         break;
       }
       default:

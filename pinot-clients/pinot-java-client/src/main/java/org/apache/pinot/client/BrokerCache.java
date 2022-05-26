@@ -20,7 +20,6 @@ package org.apache.pinot.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,6 +30,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.asynchttpclient.AsyncHttpClient;
@@ -70,7 +70,6 @@ public class BrokerCache {
   private static final TypeReference<Map<String, List<BrokerInstance>>> RESPONSE_TYPE_REF =
       new TypeReference<Map<String, List<BrokerInstance>>>() {
       };
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private final Random _random = new Random();
   private final AsyncHttpClient _client;
   private final String _address;
@@ -88,7 +87,7 @@ public class BrokerCache {
     Future<Response> responseFuture = getRequest.addHeader("accept", "application/json").execute();
     Response response = responseFuture.get();
     String responseBody = response.getResponseBody(StandardCharsets.UTF_8);
-    return OBJECT_MAPPER.readValue(responseBody, RESPONSE_TYPE_REF);
+    return JsonUtils.stringToObject(responseBody, RESPONSE_TYPE_REF);
   }
 
   private BrokerData getBrokerData(Map<String, List<BrokerInstance>> responses) {

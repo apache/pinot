@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -80,11 +79,14 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
         .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_VALUE_COLUMN_SUFFIX, DataType.INT)
         .addSingleValueDimension(STRING_KEY_MAP_STR_FIELD_NAME, DataType.STRING)
         .addSingleValueDimension(INT_KEY_MAP_STR_FIELD_NAME, DataType.STRING).build();
-    List<TransformConfig> transformConfigs = Lists.newArrayList(
+    List<TransformConfig> transformConfigs = Arrays.asList(
         new TransformConfig(STRING_KEY_MAP_STR_FIELD_NAME, "toJsonMapStr(" + STRING_KEY_MAP_FIELD_NAME + ")"),
         new TransformConfig(INT_KEY_MAP_STR_FIELD_NAME, "toJsonMapStr(" + INT_KEY_MAP_FIELD_NAME + ")"));
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
-        .setIngestionConfig(new IngestionConfig(null, null, null, transformConfigs, null, null)).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setIngestionConfig(ingestionConfig)
+            .build();
     addTableConfig(tableConfig);
 
     // Create and upload segments

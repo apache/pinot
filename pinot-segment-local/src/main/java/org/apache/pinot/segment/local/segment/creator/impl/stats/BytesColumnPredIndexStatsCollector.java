@@ -122,11 +122,6 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
   }
 
   @Override
-  public boolean hasNull() {
-    return false;
-  }
-
-  @Override
   public void seal() {
     _sortedValues = _values.toArray(new ByteArray[0]);
     Arrays.sort(_sortedValues);

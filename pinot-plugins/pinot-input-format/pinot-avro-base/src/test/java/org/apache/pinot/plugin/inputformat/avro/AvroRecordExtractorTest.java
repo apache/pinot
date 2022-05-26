@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -47,6 +45,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -57,7 +56,6 @@ import static org.apache.avro.Schema.*;
  * Tests the {@link AvroRecordExtractor} using a schema containing groovy transform functions
  */
 public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
-  private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
   private final File _dataFile = new File(_tempDir, "events.avro");
 
   /**
@@ -123,8 +121,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     Assert.assertEquals("Long", genericRow.getValue(testColumnName).getClass().getSimpleName());
 
     String jsonString = genericRecord.toString();
-    Map<String, Object> jsonMap = DEFAULT_MAPPER.readValue(jsonString, new TypeReference<Map<String, Object>>() {
-    });
+    Map<String, Object> jsonMap = JsonUtils.stringToObject(jsonString, JsonUtils.MAP_TYPE_REFERENCE);
     // The data type got changed to Integer, which will then have to trigger the convert method in
     // DataTypeTransformer class.
     Assert.assertEquals("Integer", jsonMap.get(testColumnName).getClass().getSimpleName());

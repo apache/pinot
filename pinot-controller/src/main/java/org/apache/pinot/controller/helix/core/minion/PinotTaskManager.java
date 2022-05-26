@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -587,7 +588,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   @Override
-  protected void processTables(List<String> tableNamesWithType) {
+  protected void processTables(List<String> tableNamesWithType, Properties taskProperties) {
     scheduleTasks(tableNamesWithType, true);
   }
 

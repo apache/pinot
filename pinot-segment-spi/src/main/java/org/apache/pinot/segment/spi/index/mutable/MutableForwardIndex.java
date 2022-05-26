@@ -274,6 +274,16 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
   }
 
   /**
+   * Writes the BIG_DECIMAL type single-value into the given document id.
+   *
+   * @param docId Document id
+   * @param value Value to write
+   */
+  default void setBigDecimal(int docId, BigDecimal value) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
    * Writes the STRING type single-value into the given document id.
    *
    * @param docId Document id

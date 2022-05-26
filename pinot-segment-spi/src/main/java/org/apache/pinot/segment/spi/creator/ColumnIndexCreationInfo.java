@@ -75,10 +75,6 @@ public class ColumnIndexCreationInfo implements Serializable {
     return _columnStatistics.isSorted();
   }
 
-  public boolean hasNulls() {
-    return _columnStatistics.hasNull();
-  }
-
   public int getTotalNumberOfEntries() {
     return _columnStatistics.getTotalNumberOfEntries();
   }
