@@ -115,12 +115,16 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public DataSource getDataSource(String column) {
-    return _lazyDataSource.computeIfAbsent(column, c -> {
-      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(c);
+    DataSource result = _lazyDataSource.get(column);
+    if (result == null) {
+      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       Preconditions.checkNotNull(columnMetadata,
-          "ColumnMetadata for %s should not be null. Potentially invalid column name specified.", c);
-      return new ImmutableDataSource(columnMetadata, _indexContainerMap.get(c));
-    });
+          "ColumnMetadata for %s should not be null. Potentially invalid column name specified.",
+          column);
+      result = new ImmutableDataSource(columnMetadata, _indexContainerMap.get(column));
+      _lazyDataSource.put(column, result);
+    }
+    return result;
   }
 
   @Override
