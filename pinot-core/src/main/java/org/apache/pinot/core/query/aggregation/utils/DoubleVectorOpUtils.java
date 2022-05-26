@@ -27,20 +27,16 @@ public class DoubleVectorOpUtils {
   }
 
   public static DoubleArrayList vectorAdd(DoubleArrayList a, DoubleArrayList b) {
-    Preconditions.checkState(a.size() == b.size(), "The two operand arrays are not of the same size! provided %s, %s",
-        a.size(), b.size());
-    for (int i = 0; i < a.size(); i++) {
-      a.elements()[i] += b.elements()[i];
-    }
-    return a;
+    return vectorAdd(a, b.elements());
   }
 
   public static DoubleArrayList vectorAdd(DoubleArrayList a, double[] b) {
-    Preconditions.checkState(a.size() == b.length, "The two operand arrays are not of the same size! provided %s, %s",
-        a.size(), b.length);
-    ;
-    for (int i = 0; i < a.size(); i++) {
-      a.elements()[i] += b[i];
+    double[] elements = a.elements();
+    int length = elements.length;
+    Preconditions.checkState(length == b.length, "The two operand arrays are not of the same size! provided %s, %s",
+        length, b.length);
+    for (int i = 0; i < length; i++) {
+      elements[i] += b[i];
     }
     return a;
   }
@@ -66,7 +62,8 @@ public class DoubleVectorOpUtils {
 
   public static DoubleArrayList incrementElement(DoubleArrayList a, int offset, double val) {
     Preconditions.checkState(a.size() > offset, "The offset %s exceeds the array size!", offset);
-    a.elements()[offset] += val;
+    double[] elements = a.elements();
+    elements[offset] += val;
     return a;
   }
 
