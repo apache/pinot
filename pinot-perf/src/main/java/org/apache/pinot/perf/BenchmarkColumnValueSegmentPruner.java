@@ -66,6 +66,7 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.profile.JavaFlightRecorderProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
@@ -96,6 +97,10 @@ public class BenchmarkColumnValueSegmentPruner {
   public static void main(String[] args)
       throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkColumnValueSegmentPruner.class.getSimpleName());
+    if (args.length > 0 && args[0].equals("jfr")) {
+      opt = opt.addProfiler(JavaFlightRecorderProfiler.class)
+          .jvmArgsAppend("-XX:+UnlockDiagnosticVMOptions", "-XX:+DebugNonSafepoints");
+    }
     new Runner(opt.build()).run();
   }
 
