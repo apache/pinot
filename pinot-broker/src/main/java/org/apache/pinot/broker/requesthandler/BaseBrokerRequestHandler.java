@@ -1483,6 +1483,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (jsonRequest.has(Broker.Request.DEBUG_OPTIONS)) {
       Map<String, String> debugOptions = getOptionsFromJson(jsonRequest, Broker.Request.DEBUG_OPTIONS);
       if (!debugOptions.isEmpty()) {
+        // TODO: Do not set debug options after releasing 0.11.0. Currently we kept it for backward compatibility.
         LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
         pinotQuery.setDebugOptions(debugOptions);
 
