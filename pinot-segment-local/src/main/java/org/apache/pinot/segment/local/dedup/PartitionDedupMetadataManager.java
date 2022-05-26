@@ -113,7 +113,7 @@ public class PartitionDedupMetadataManager {
 
 
   public boolean checkRecordPresentOrUpdate(RecordInfo recordInfo) {
-    while (_tableState.isAllSegmentsLoaded()) {
+    while (!_tableState.isAllSegmentsLoaded()) {
       LOGGER.info("Sleeping 1 second waiting for all segments loaded for partial-upsert table: {}", _tableNameWithType);
       try {
         //noinspection BusyWait

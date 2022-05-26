@@ -165,6 +165,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _upsertMode = tableConfig.getUpsertMode();
     if (tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled()) {
       _isDedupEnabled = tableConfig.getDedupConfig().isDedupEnabled();
+      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+      Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
+      _primaryKeyColumns = schema.getPrimaryKeyColumns();
       DedupConfig dedupConfig = tableConfig.getDedupConfig();
       HashFunction dedupHashFunction = dedupConfig.getHashFunction();
       _tableDedupMetadataManager =
