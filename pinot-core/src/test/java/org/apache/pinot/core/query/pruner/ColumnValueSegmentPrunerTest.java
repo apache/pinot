@@ -147,7 +147,7 @@ public class ColumnValueSegmentPrunerTest {
   }
 
   @Test
-  public void testBloomFilterInPredicatePruning()
+  public void testBloomFilterPredicatePruning()
       throws IOException {
     Map<String, Object> properties = new HashMap<>();
     // override default value
@@ -161,52 +161,52 @@ public class ColumnValueSegmentPrunerTest {
     // Add support for bloom filter
     DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
     BloomFilterReader bloomFilterReader = new BloomFilterReaderBuilder()
-        .put("1")
-        .put("2")
-        .put("3")
-        .put("5")
-        .put("7")
-        .put("21")
+        .put("1.0")
+        .put("2.0")
+        .put("3.0")
+        .put("5.0")
+        .put("7.0")
+        .put("21.0")
         .build();
 
-    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.DOUBLE);
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
     when(dataSource.getBloomFilter()).thenReturn(bloomFilterReader);
-    when(dataSourceMetadata.getMinValue()).thenReturn(5);
-    when(dataSourceMetadata.getMaxValue()).thenReturn(10);
+    when(dataSourceMetadata.getMinValue()).thenReturn(5.0);
+    when(dataSourceMetadata.getMaxValue()).thenReturn(10.0);
 
     // all out the bloom filter and out of range
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0)"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0, 3, 4)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0.0)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0.0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0.0, 3.0, 4.0)"));
 
     // some in the bloom filter but all out of range
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 1"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (1)"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (21)"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (21, 30)"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21 AND column = 30"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21 OR column = 30"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 1.0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (1.0)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21.0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (21.0)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (21.0, 30.0)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21.0 AND column = 30.0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21.0 OR column = 30.0"));
 
     // all out the bloom filter but some in range
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 6"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (6)"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 OR column = 6"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 6.0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (6.0)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0.0 OR column = 6.0"));
 
     // all in the bloom filter and in range
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (5)"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5 OR column = 7"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (5, 7)"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5 AND column = 7"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5.0"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (5.0)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5.0 OR column = 7.0"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (5.0, 7.0)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5.0 AND column = 7.0"));
 
     // some in the bloom filter and in range
     assertFalse(
-        runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5 OR column = 0"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5 AND column = 0"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (8, 10)"));
+        runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0.0, 5.0)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5.0 OR column = 0.0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5.0 AND column = 0.0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (8.0, 10.0)"));
   }
 
   private IndexSegment mockIndexSegment() {
