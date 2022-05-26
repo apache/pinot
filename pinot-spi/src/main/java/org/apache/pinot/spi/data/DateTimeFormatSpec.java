@@ -288,7 +288,7 @@ public class DateTimeFormatSpec {
         "Incorrect format: %s. Must be of the format 'EPOCH|<timeUnit>(|<size>)' or 'SDF|<timeFormat>(|<timezone>)' or 'TIMESTAMP'");
     if(formatTokens.length == MAX_FORMAT_TOKENS_PIPE && formatTokens[FORMAT_SIZE_POSITION].equals(TimeFormat.EPOCH.toString())) {
       Preconditions.checkState(formatTokens[FORMAT_SIZE_POSITION_PIPE].matches(NUMBER_REGEX),
-          "Incorrect format size: %s in format: %s. Must be of format '[0-9]+:<TimeUnit>:<TimeFormat>(:pattern)'",
+          "Incorrect format size: %s in format: %s. Must be of format 'EPOCH|<timeUnit>|[0-9]+'",
           formatTokens[FORMAT_SIZE_POSITION_PIPE], format);
     }
   }
