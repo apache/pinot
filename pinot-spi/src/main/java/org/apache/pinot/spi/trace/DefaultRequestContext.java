@@ -60,7 +60,6 @@ public class DefaultRequestContext implements RequestScope {
   private int _numRowsResultSet;
   private long _requestArrivalTimeMillis;
   private long _reduceTimeMillis;
-  // private long _numStartreeUsed;
 
   private FanoutType _fanoutType;
   private int _numUnavailableSegments;
@@ -323,11 +322,6 @@ public class DefaultRequestContext implements RequestScope {
     return _numRowsResultSet;
   }
 
-//  @Override
-//  public long getNumStartreeUsed() {
-//    return _numStartreeUsed;
-//  }
-
   @Override
   public void setProcessingTimeMillis(long processingTimeMillis) {
     _processingTimeMillis = processingTimeMillis;
@@ -407,11 +401,6 @@ public class DefaultRequestContext implements RequestScope {
   public void setReduceTimeMillis(long reduceTimeMillis) {
     _reduceTimeMillis = reduceTimeMillis;
   }
-
-//  @Override
-//  public void setNumStartreeUsed(long numStartreeUsed) {
-//    _numStartreeUsed = numStartreeUsed;
-//  }
 
   @Override
   public void close() {

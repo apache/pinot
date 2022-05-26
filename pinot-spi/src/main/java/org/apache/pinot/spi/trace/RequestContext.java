@@ -125,8 +125,6 @@ public interface RequestContext {
 
   int getNumRowsResultSet();
 
-  // long getNumStartreeUsed();
-
   void setProcessingTimeMillis(long processingTimeMillis);
 
   void setTotalDocs(long totalDocs);
@@ -158,8 +156,6 @@ public interface RequestContext {
   void setNumRowsResultSet(int numRowsResultSet);
 
   void setReduceTimeMillis(long reduceTimeMillis);
-
-  // void setNumStartreeUsed(long numStartreeUsed);
 
   enum FanoutType {
     OFFLINE, REALTIME, HYBRID
