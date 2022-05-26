@@ -26,10 +26,13 @@ import org.apache.pinot.core.transport.ServerInstance;
 public class RoutingTable {
   private final Map<ServerInstance, List<String>> _serverInstanceToSegmentsMap;
   private final List<String> _unavailableSegments;
+  private final int _numPrunedSegments;
 
-  public RoutingTable(Map<ServerInstance, List<String>> serverInstanceToSegmentsMap, List<String> unavailableSegments) {
+  public RoutingTable(Map<ServerInstance, List<String>> serverInstanceToSegmentsMap, List<String> unavailableSegments,
+      int numPrunedSegments) {
     _serverInstanceToSegmentsMap = serverInstanceToSegmentsMap;
     _unavailableSegments = unavailableSegments;
+    _numPrunedSegments = numPrunedSegments;
   }
 
   public Map<ServerInstance, List<String>> getServerInstanceToSegmentsMap() {
@@ -38,5 +41,9 @@ public class RoutingTable {
 
   public List<String> getUnavailableSegments() {
     return _unavailableSegments;
+  }
+
+  public int getNumPrunedSegments() {
+    return _numPrunedSegments;
   }
 }

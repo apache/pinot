@@ -62,7 +62,6 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
     try {
       // Check if we have a specific table against which this task needs to be run.
       String propTableNameWithType = (String) periodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME);
-
       // Process the tables that are managed by this controller
       List<String> tablesToProcess = new ArrayList<>();
       List<String> nonLeaderForTables = new ArrayList<>();
@@ -83,7 +82,7 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
       }
 
       if (!tablesToProcess.isEmpty()) {
-        processTables(tablesToProcess);
+        processTables(tablesToProcess, periodicTaskProperties);
       }
       if (!nonLeaderForTables.isEmpty()) {
         nonLeaderCleanup(nonLeaderForTables);
@@ -103,10 +102,10 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
    * <p>
    * Override one of this method, {@link #processTable(String)} or {@link #processTable(String, C)}.
    */
-  protected void processTables(List<String> tableNamesWithType) {
+  protected void processTables(List<String> tableNamesWithType, Properties periodicTaskProperties) {
     int numTables = tableNamesWithType.size();
     LOGGER.info("Processing {} tables in task: {}", numTables, _taskName);
-    C context = preprocess();
+    C context = preprocess(periodicTaskProperties);
     int numTablesProcessed = 0;
     for (String tableNameWithType : tableNamesWithType) {
       if (!isStarted()) {
@@ -129,14 +128,14 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   /**
    * Can be overridden to provide context before processing the tables.
    */
-  protected C preprocess() {
+  protected C preprocess(Properties periodicTaskProperties) {
     return null;
   }
 
   /**
    * Processes the given table.
    * <p>
-   * Override one of this method, {@link #processTable(String)} or {@link #processTables(List)}.
+   * Override one of this method, {@link #processTable(String)} or {@link #processTables(List, Properties)}.
    */
   protected void processTable(String tableNameWithType, C context) {
     processTable(tableNameWithType);
@@ -145,7 +144,7 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   /**
    * Processes the given table.
    * <p>
-   * Override one of this method, {@link #processTable(String, C)} or {@link #processTables(List)}.
+   * Override one of this method, {@link #processTable(String, C)} or {@link #processTables(List, Properties)}.
    */
   protected void processTable(String tableNameWithType) {
   }

@@ -281,7 +281,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     stopController();
     stopKafka();
     stopZk();
-    cleanup();
+    cleanupHybridCluster();
   }
 
   /**
@@ -289,7 +289,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
    *
    * @throws Exception
    */
-  protected void cleanup()
+  protected void cleanupHybridCluster()
       throws Exception {
     FileUtils.deleteDirectory(_tempDir);
   }

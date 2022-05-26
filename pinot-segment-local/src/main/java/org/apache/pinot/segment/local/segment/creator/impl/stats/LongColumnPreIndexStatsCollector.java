@@ -100,16 +100,6 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
   }
 
   @Override
-  public boolean hasNulls() {
-    return _hasNull;
-  }
-
-  @Override
-  public void markHasNull() {
-    _hasNull = true;
-  }
-
-  @Override
   public void seal() {
     _sortedValues = _values.toLongArray();
     Arrays.sort(_sortedValues);

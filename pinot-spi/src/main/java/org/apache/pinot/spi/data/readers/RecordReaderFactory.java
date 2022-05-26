@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.data.readers;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -132,7 +131,7 @@ public class RecordReaderFactory {
       throws ClassNotFoundException, IOException {
     String readerConfigClassName = getRecordReaderConfigClassName(fileFormat.toString());
     if (readerConfigClassName != null) {
-      JsonNode jsonNode = new ObjectMapper().valueToTree(configs);
+      JsonNode jsonNode = JsonUtils.objectToJsonNode(configs);
       Class<?> clazz = PluginManager.get().loadClass(readerConfigClassName);
       return (RecordReaderConfig) JsonUtils.jsonNodeToObject(jsonNode, clazz);
     }

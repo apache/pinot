@@ -113,16 +113,6 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
   }
 
   @Override
-  public boolean hasNulls() {
-    return _hasNull;
-  }
-
-  @Override
-  public void markHasNull() {
-    _hasNull = true;
-  }
-
-  @Override
   public void seal() {
     _sortedValues = _values.toArray(new BigDecimal[0]);
     Arrays.sort(_sortedValues);

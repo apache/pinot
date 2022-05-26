@@ -178,6 +178,19 @@ public class RangePredicateEvaluatorFactory {
     }
 
     @Override
+    public int applySV(int limit, int[] docIds, int[] dictIds) {
+      // reimplemented here to ensure applySV can be inlined
+      int matches = 0;
+      for (int i = 0; i < limit; i++) {
+        int dictId = dictIds[i];
+        if (applySV(dictId)) {
+          docIds[matches++] = docIds[i];
+        }
+      }
+      return matches;
+    }
+
+    @Override
     public int getNumMatchingDictIds() {
       return _numMatchingDictIds;
     }
@@ -309,6 +322,19 @@ public class RangePredicateEvaluatorFactory {
     public boolean applySV(int value) {
       return value >= _inclusiveLowerBound && value <= _inclusiveUpperBound;
     }
+
+    @Override
+    public int applySV(int limit, int[] docIds, int[] values) {
+      // reimplemented here to ensure applySV can be inlined
+      int matches = 0;
+      for (int i = 0; i < limit; i++) {
+        int value = values[i];
+        if (applySV(value)) {
+          docIds[matches++] = docIds[i];
+        }
+      }
+      return matches;
+    }
   }
 
   public static final class LongRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
@@ -348,6 +374,19 @@ public class RangePredicateEvaluatorFactory {
     @Override
     public boolean applySV(long value) {
       return value >= _inclusiveLowerBound && value <= _inclusiveUpperBound;
+    }
+
+    @Override
+    public int applySV(int limit, int[] docIds, long[] values) {
+      // reimplemented here to ensure applySV can be inlined
+      int matches = 0;
+      for (int i = 0; i < limit; i++) {
+        long value = values[i];
+        if (applySV(value)) {
+          docIds[matches++] = docIds[i];
+        }
+      }
+      return matches;
     }
   }
 
@@ -389,6 +428,19 @@ public class RangePredicateEvaluatorFactory {
     public boolean applySV(float value) {
       return value >= _inclusiveLowerBound && value <= _inclusiveUpperBound;
     }
+
+    @Override
+    public int applySV(int limit, int[] docIds, float[] values) {
+      // reimplemented here to ensure applySV can be inlined
+      int matches = 0;
+      for (int i = 0; i < limit; i++) {
+        float value = values[i];
+        if (applySV(value)) {
+          docIds[matches++] = docIds[i];
+        }
+      }
+      return matches;
+    }
   }
 
   public static final class DoubleRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
@@ -428,6 +480,19 @@ public class RangePredicateEvaluatorFactory {
     @Override
     public boolean applySV(double value) {
       return value >= _inclusiveLowerBound && value <= _inclusiveUpperBound;
+    }
+
+    @Override
+    public int applySV(int limit, int[] docIds, double[] values) {
+      // reimplemented here to ensure applySV can be inlined
+      int matches = 0;
+      for (int i = 0; i < limit; i++) {
+        double value = values[i];
+        if (applySV(value)) {
+          docIds[matches++] = docIds[i];
+        }
+      }
+      return matches;
     }
   }
 

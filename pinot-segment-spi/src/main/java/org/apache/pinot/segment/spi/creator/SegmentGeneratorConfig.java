@@ -75,6 +75,8 @@ public class SegmentGeneratorConfig implements Serializable {
   private final Set<String> _rawIndexCreationColumns = new HashSet<>();
   private final Map<String, ChunkCompressionType> _rawIndexCompressionType = new HashMap<>();
   private final List<String> _invertedIndexCreationColumns = new ArrayList<>();
+  private final List<String> _bloomFilterCreationColumns = new ArrayList<>();
+  private final List<String> _rangeIndexCreationColumns = new ArrayList<>();
   private final List<String> _textIndexCreationColumns = new ArrayList<>();
   private final List<String> _fstIndexCreationColumns = new ArrayList<>();
   private final List<String> _jsonIndexCreationColumns = new ArrayList<>();
@@ -188,6 +190,18 @@ public class SegmentGeneratorConfig implements Serializable {
             || indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
           _invertedIndexCreationColumns.addAll(indexingConfig.getInvertedIndexColumns());
         }
+      }
+
+      if (indexingConfig.getBloomFilterColumns() != null) {
+        _bloomFilterCreationColumns.addAll(indexingConfig.getBloomFilterColumns());
+      }
+
+      if (indexingConfig.getBloomFilterConfigs() != null) {
+        _bloomFilterCreationColumns.addAll(indexingConfig.getBloomFilterConfigs().keySet());
+      }
+
+      if (indexingConfig.getRangeIndexColumns() != null) {
+        _rangeIndexCreationColumns.addAll(indexingConfig.getRangeIndexColumns());
       }
 
       if (indexingConfig.getJsonIndexColumns() != null) {
@@ -366,6 +380,14 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public List<String> getInvertedIndexCreationColumns() {
     return _invertedIndexCreationColumns;
+  }
+
+  public List<String> getBloomFilterCreationColumns() {
+    return _bloomFilterCreationColumns;
+  }
+
+  public List<String> getRangeIndexCreationColumns() {
+    return _rangeIndexCreationColumns;
   }
 
   /**

@@ -85,16 +85,6 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics {
   }
 
   @Override
-  public boolean hasNulls() {
-    return _hasNull;
-  }
-
-  @Override
-  public void markHasNull() {
-    _hasNull = true;
-  }
-
-  @Override
   public PartitionFunction getPartitionFunction() {
     return _dataSourceMetadata.getPartitionFunction();
   }

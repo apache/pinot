@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.validation;
 
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -45,7 +46,7 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask<Brok
   }
 
   @Override
-  protected Context preprocess() {
+  protected Context preprocess(Properties periodicTaskProperties) {
     Context context = new Context();
     context._instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
     return context;

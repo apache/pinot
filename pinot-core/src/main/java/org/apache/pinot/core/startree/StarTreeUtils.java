@@ -35,7 +35,6 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -46,16 +45,6 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 @SuppressWarnings("rawtypes")
 public class StarTreeUtils {
   private StarTreeUtils() {
-  }
-
-  public static final String USE_STAR_TREE_KEY = "useStarTree";
-
-  /**
-   * Returns whether star-tree is disabled for the query.
-   */
-  public static boolean isStarTreeDisabled(QueryContext queryContext) {
-    Map<String, String> debugOptions = queryContext.getDebugOptions();
-    return debugOptions != null && "false".equalsIgnoreCase(debugOptions.get(USE_STAR_TREE_KEY));
   }
 
   /**

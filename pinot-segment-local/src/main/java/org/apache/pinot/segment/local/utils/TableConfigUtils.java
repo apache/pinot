@@ -564,6 +564,14 @@ public final class TableConfigUtils {
       UpsertConfig.Strategy columnStrategy = entry.getValue();
       Preconditions.checkState(!primaryKeyColumns.contains(column), "Merger cannot be applied to primary key columns");
 
+      if (upsertConfig.getComparisonColumn() != null) {
+        Preconditions.checkState(!upsertConfig.getComparisonColumn().equals(column),
+            "Merger cannot be applied to comparison column");
+      } else {
+        Preconditions.checkState(!tableConfig.getValidationConfig().getTimeColumnName().equals(column),
+            "Merger cannot be applied to time column");
+      }
+
       FieldSpec fieldSpec = schema.getFieldSpecFor(column);
       Preconditions.checkState(fieldSpec != null, "Merger cannot be applied to non-existing column: %s", column);
 

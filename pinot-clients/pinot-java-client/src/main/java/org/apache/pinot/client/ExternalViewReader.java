@@ -20,7 +20,6 @@ package org.apache.pinot.client;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -38,6 +37,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import org.I0Itec.zkclient.ZkClient;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ExternalViewReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExternalViewReader.class);
-  private static final ObjectReader OBJECT_READER = new ObjectMapper().reader();
+  private static final ObjectReader OBJECT_READER = JsonUtils.DEFAULT_READER;
   public static final String BROKER_EXTERNAL_VIEW_PATH = "/EXTERNALVIEW/brokerResource";
   public static final String BROKER_INSTANCE_PATH = "/CONFIGS/PARTICIPANT";
   public static final String REALTIME_SUFFIX = "_REALTIME";

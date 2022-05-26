@@ -23,7 +23,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.pinot.controller.ControllerTestUtils;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -37,26 +37,27 @@ import org.testng.annotations.Test;
  * Tests for the file upload restlet.
  */
 public class PinotFileUploadTest {
+  private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
   private static final String TABLE_NAME = "fileTable";
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    ControllerTestUtils.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
 
     // Adding table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setSegmentAssignmentStrategy("RandomAssignmentStrategy")
         .setNumReplicas(2)
         .build();
-    ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
+    TEST_INSTANCE.getHelixResourceManager().addTable(tableConfig);
   }
 
   @Test
   public void testUploadBogusData()
       throws Exception {
     org.apache.http.client.HttpClient httpClient = new DefaultHttpClient();
-    HttpPost httpPost = new HttpPost(ControllerTestUtils.getControllerRequestURLBuilder().forDataFileUpload());
+    HttpPost httpPost = new HttpPost(TEST_INSTANCE.getControllerRequestURLBuilder().forDataFileUpload());
     HttpEntity entity = new StringEntity("blah");
     httpPost.setEntity(entity);
     HttpResponse response = httpClient.execute(httpPost);
@@ -67,6 +68,6 @@ public class PinotFileUploadTest {
 
   @AfterClass
   public void tearDown() {
-    ControllerTestUtils.cleanup();
+    TEST_INSTANCE.cleanup();
   }
 }

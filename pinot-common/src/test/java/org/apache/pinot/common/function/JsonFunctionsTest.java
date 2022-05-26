@@ -19,7 +19,6 @@
 package org.apache.pinot.common.function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
@@ -27,6 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.scalar.JsonFunctions;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -254,8 +254,6 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathArray(rawData, "$.[*].score"), new Integer[]{90, 50});
   }
 
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
   @DataProvider
   public static Object[][] jsonPathStringTestCases() {
     return new Object[][]{
@@ -268,14 +266,14 @@ public class JsonFunctionsTest {
   @Test(dataProvider = "jsonPathStringTestCases")
   public void testJsonPathString(Map<String, Object> map, String path, String expected)
       throws JsonProcessingException {
-    String value = JsonFunctions.jsonPathString(OBJECT_MAPPER.writeValueAsString(map), path);
+    String value = JsonFunctions.jsonPathString(JsonUtils.objectToString(map), path);
     assertEquals(value, expected);
   }
 
   @Test(dataProvider = "jsonPathStringTestCases")
   public void testJsonPathStringWithDefaultValue(Map<String, Object> map, String path, String expected)
       throws JsonProcessingException {
-    String value = JsonFunctions.jsonPathString(OBJECT_MAPPER.writeValueAsString(map), path, expected);
+    String value = JsonFunctions.jsonPathString(JsonUtils.objectToString(map), path, expected);
     assertEquals(value, expected);
   }
 
@@ -295,7 +293,7 @@ public class JsonFunctionsTest {
   @Test(dataProvider = "jsonPathArrayTestCases")
   public void testJsonPathArray(Map<String, Object> map, String path, Object[] expected)
       throws JsonProcessingException {
-    Object[] value = JsonFunctions.jsonPathArray(OBJECT_MAPPER.writeValueAsString(map), path);
+    Object[] value = JsonFunctions.jsonPathArray(JsonUtils.objectToString(map), path);
     if (expected == null) {
       assertNull(value);
     } else {

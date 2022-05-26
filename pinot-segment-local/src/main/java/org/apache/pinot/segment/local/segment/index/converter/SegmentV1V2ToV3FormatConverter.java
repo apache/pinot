@@ -163,6 +163,9 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
           copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.INVERTED_INDEX);
           copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.FST_INDEX);
           copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.JSON_INDEX);
+          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.H3_INDEX);
+          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.RANGE_INDEX);
+          copyIndexIfExists(v2DataReader, v3DataWriter, column, ColumnIndexType.BLOOM_FILTER);
         }
 
         v3DataWriter.save();

@@ -49,6 +49,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
 
   private final String _controllerResourcePackages;
+  private final boolean _useHttps;
   private HttpServer _httpServer;
 
   public ControllerAdminApiApplication(ControllerConf conf) {
@@ -58,7 +59,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     _controllerResourcePackages = conf.getControllerResourcePackages();
     packages(_controllerResourcePackages);
     // TODO See ControllerResponseFilter
-//    register(new LoggingFeature());
+    // register(new LoggingFeature());
+    _useHttps = Boolean.parseBoolean(conf.getProperty(ControllerConf.CONSOLE_SWAGGER_USE_HTTPS));
     if (conf.getProperty(CommonConstants.Controller.CONTROLLER_SERVICE_AUTO_DISCOVERY, false)) {
       register(ServiceAutoDiscoveryFeature.class);
     }
@@ -109,7 +111,11 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     beanConfig.setDescription("APIs for accessing Pinot Controller information");
     beanConfig.setContact("https://github.com/apache/pinot");
     beanConfig.setVersion("1.0");
-    beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
+    if (_useHttps) {
+      beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL});
+    } else {
+      beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
+    }
     beanConfig.setBasePath("/");
     beanConfig.setResourcePackage(_controllerResourcePackages);
     beanConfig.setScan(true);

@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -53,15 +54,17 @@ public class ExpressionTransformerTest {
         .addMultiValueDimension("map2_values", FieldSpec.DataType.INT).addMetric("cost", FieldSpec.DataType.DOUBLE)
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
 
-    List<TransformConfig> transformConfigs = new ArrayList<>();
-    transformConfigs.add(new TransformConfig("userId", "Groovy({user_id}, user_id)"));
-    transformConfigs.add(new TransformConfig("fullName", "Groovy({firstName+' '+lastName}, firstName, lastName)"));
-    transformConfigs.add(new TransformConfig("maxBid", "Groovy({bids.max{ it.toBigDecimal() }}, bids)"));
-    transformConfigs.add(new TransformConfig("map2_keys", "Groovy({map2.sort()*.key}, map2)"));
-    transformConfigs.add(new TransformConfig("map2_values", "Groovy({map2.sort()*.value}, map2)"));
-    transformConfigs.add(new TransformConfig("hoursSinceEpoch", "Groovy({timestamp/(1000*60*60)}, timestamp)"));
+    List<TransformConfig> transformConfigs = Arrays.asList(
+        new TransformConfig("userId", "Groovy({user_id}, user_id)"),
+        new TransformConfig("fullName", "Groovy({firstName+' '+lastName}, firstName, lastName)"),
+        new TransformConfig("maxBid", "Groovy({bids.max{ it.toBigDecimal() }}, bids)"),
+        new TransformConfig("map2_keys", "Groovy({map2.sort()*.key}, map2)"),
+        new TransformConfig("map2_values", "Groovy({map2.sort()*.value}, map2)"),
+        new TransformConfig("hoursSinceEpoch", "Groovy({timestamp/(1000*60*60)}, timestamp)"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTransformFunctions")
-        .setIngestionConfig(new IngestionConfig(null, null, null, transformConfigs, null, null)).build();
+        .setIngestionConfig(ingestionConfig).build();
 
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     DataTypeTransformer dataTypeTransformer = new DataTypeTransformer(pinotSchema);
@@ -145,12 +148,14 @@ public class ExpressionTransformerTest {
     // also specified in table config, ignore the schema setting
     pinotSchema.getFieldSpecFor("hoursSinceEpoch").setTransformFunction("Groovy({timestamp/(1000)}, timestamp)");
 
-    List<TransformConfig> transformConfigs = new ArrayList<>();
-    transformConfigs.add(new TransformConfig("userId", "Groovy({user_id}, user_id)"));
-    transformConfigs.add(new TransformConfig("fullName", "Groovy({firstName+' '+lastName}, firstName, lastName)"));
-    transformConfigs.add(new TransformConfig("hoursSinceEpoch", "Groovy({timestamp/(1000*60*60)}, timestamp)"));
+    List<TransformConfig> transformConfigs = Arrays.asList(
+        new TransformConfig("userId", "Groovy({user_id}, user_id)"),
+        new TransformConfig("fullName", "Groovy({firstName+' '+lastName}, firstName, lastName)"),
+        new TransformConfig("hoursSinceEpoch", "Groovy({timestamp/(1000*60*60)}, timestamp)"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTransformFunctions")
-        .setIngestionConfig(new IngestionConfig(null, null, null, transformConfigs, null, null)).build();
+        .setIngestionConfig(ingestionConfig).build();
 
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
 
@@ -201,10 +206,13 @@ public class ExpressionTransformerTest {
     Schema pinotSchema = new Schema();
     DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("fullName", FieldSpec.DataType.STRING, true);
     pinotSchema.addField(dimensionFieldSpec);
-    List<TransformConfig> transformConfigs = new ArrayList<>();
-    transformConfigs.add(new TransformConfig("fullName", "Groovy({firstName + ' ' + lastName}, firstName, lastName)"));
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testValueExists")
-        .setIngestionConfig(new IngestionConfig(null, null, null, transformConfigs, null, null)).build();
+    List<TransformConfig> transformConfigs = Collections.singletonList(
+        new TransformConfig("fullName", "Groovy({firstName + ' ' + lastName}, firstName, lastName)"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testValueExists").setIngestionConfig(ingestionConfig)
+            .build();
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
 
     GenericRow genericRow = new GenericRow();
@@ -220,7 +228,7 @@ public class ExpressionTransformerTest {
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
             new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing")).build();
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testValueExists")
-        .setIngestionConfig(new IngestionConfig(null, null, null, null, null, null)).build();
+        .setIngestionConfig(new IngestionConfig()).build();
     expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
 
     genericRow = new GenericRow();
@@ -238,13 +246,14 @@ public class ExpressionTransformerTest {
         .addSingleValueDimension("b", FieldSpec.DataType.STRING).addSingleValueDimension("c", FieldSpec.DataType.STRING)
         .addSingleValueDimension("d", FieldSpec.DataType.STRING).addSingleValueDimension("e", FieldSpec.DataType.STRING)
         .addSingleValueDimension("f", FieldSpec.DataType.STRING).build();
-    List<TransformConfig> transformConfigs = new ArrayList<>();
-    transformConfigs.add(new TransformConfig("d", "plus(x, 10)"));
-    transformConfigs.add(new TransformConfig("b", "plus(d, 10)"));
-    transformConfigs.add(new TransformConfig("a", "plus(b, 10)"));
-    transformConfigs.add(new TransformConfig("c", "plus(a, d)"));
-    transformConfigs.add(new TransformConfig("f", "plus(e, 10)"));
-    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null, null);
+    List<TransformConfig> transformConfigs = Arrays.asList(
+        new TransformConfig("d", "plus(x, 10)"),
+        new TransformConfig("b", "plus(d, 10)"),
+        new TransformConfig("a", "plus(b, 10)"),
+        new TransformConfig("c", "plus(a, d)"),
+        new TransformConfig("f", "plus(e, 10)"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testDerivedFunctions")
         .setIngestionConfig(ingestionConfig).build();
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
@@ -268,11 +277,11 @@ public class ExpressionTransformerTest {
         .addSingleValueDimension("b", FieldSpec.DataType.INT).addSingleValueDimension("c", FieldSpec.DataType.INT)
         .build();
 
-    List<TransformConfig> transformConfigs = new ArrayList<>();
-    transformConfigs.add(new TransformConfig("a", "plus(b,10)"));
-    transformConfigs.add(new TransformConfig("a", "plus(c,10)"));
-
-    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null, null);
+    List<TransformConfig> transformConfigs = Arrays.asList(
+        new TransformConfig("a", "plus(b,10)"),
+        new TransformConfig("a", "plus(c,10)"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testMultipleTransformFunctionSortOrder")
             .setIngestionConfig(ingestionConfig).build();
@@ -289,13 +298,13 @@ public class ExpressionTransformerTest {
         .build();
 
     // Define transform function dependencies: a -> (b,c), b -> d, d -> e, c -> (d,e)
-    List<TransformConfig> transformConfigs = new ArrayList<>();
-    transformConfigs.add(new TransformConfig("a", "plus(b,c)"));
-    transformConfigs.add(new TransformConfig("b", "plus(d,10)"));
-    transformConfigs.add(new TransformConfig("d", "plus(e,10)"));
-    transformConfigs.add(new TransformConfig("c", "plus(d,e)"));
-
-    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null, null);
+    List<TransformConfig> transformConfigs = Arrays.asList(
+        new TransformConfig("a", "plus(b,c)"),
+        new TransformConfig("b", "plus(d,10)"),
+        new TransformConfig("d", "plus(e,10)"),
+        new TransformConfig("c", "plus(d,e)"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testNonCyclicTransformFunctionSortOrder")
             .setIngestionConfig(ingestionConfig).build();
@@ -318,12 +327,12 @@ public class ExpressionTransformerTest {
         .build();
 
     // Define transform function dependencies: a -> b, b -> c, c -> a
-    List<TransformConfig> transformConfigs = new ArrayList<>();
-    transformConfigs.add(new TransformConfig("a", "plus(b,10)"));
-    transformConfigs.add(new TransformConfig("b", "plus(c,10)"));
-    transformConfigs.add(new TransformConfig("c", "plus(a,10)"));
-
-    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, transformConfigs, null, null);
+    List<TransformConfig> transformConfigs = Arrays.asList(
+        new TransformConfig("a", "plus(b,10)"),
+        new TransformConfig("b", "plus(c,10)"),
+        new TransformConfig("c", "plus(a,10)"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testRecrusiveTransformFunctionSortOrder")
             .setIngestionConfig(ingestionConfig).build();

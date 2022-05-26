@@ -23,7 +23,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
@@ -38,6 +37,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.Obfuscator;
 
 
@@ -56,7 +56,6 @@ import org.apache.pinot.spi.utils.Obfuscator;
 @JsonPropertyOrder({"systemConfig", "runtimeConfig", "pinotConfig", "jvmConfig"})
 public class PinotAppConfigs {
   private static final String UNKNOWN_VALUE = "-";
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @JsonProperty("systemConfig")
   private SystemConfig _systemConfig;
@@ -341,7 +340,7 @@ public class PinotAppConfigs {
 
   public String toJSONString() {
     try {
-      return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(new Obfuscator().toJson(this));
+      return JsonUtils.objectToPrettyString(new Obfuscator().toJson(this));
     } catch (JsonProcessingException e) {
       return e.getMessage();
     }

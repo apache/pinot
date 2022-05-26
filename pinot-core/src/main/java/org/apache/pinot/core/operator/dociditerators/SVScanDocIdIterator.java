@@ -43,6 +43,9 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final ForwardIndexReaderContext _readerContext;
   private final int _numDocs;
   private final ValueMatcher _valueMatcher;
+  private final int[] _batch = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
+  private int _firstMismatch;
+  private int _cursor;
 
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
@@ -67,6 +70,33 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   @Override
   public int next() {
+    if (_cursor >= _firstMismatch) {
+      int limit;
+      int batchSize = 0;
+      do {
+        limit = Math.min(_numDocs - _nextDocId, OPTIMAL_ITERATOR_BATCH_SIZE);
+        if (limit > 0) {
+          for (int i = 0; i < limit; i++) {
+            _batch[i] = _nextDocId + i;
+          }
+          batchSize = _valueMatcher.matchValues(limit, _batch);
+          _nextDocId += limit;
+          _numEntriesScanned += limit;
+        }
+      } while (limit > 0 & batchSize == 0);
+      _firstMismatch = batchSize;
+      _cursor = 0;
+      if (_firstMismatch == 0) {
+        return Constants.EOF;
+      }
+    }
+    return _batch[_cursor++];
+  }
+
+  @Override
+  public int advance(int targetDocId) {
+    _nextDocId = targetDocId;
+    _firstMismatch = 0;
     while (_nextDocId < _numDocs) {
       int nextDocId = _nextDocId++;
       _numEntriesScanned++;
@@ -75,12 +105,6 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       }
     }
     return Constants.EOF;
-  }
-
-  @Override
-  public int advance(int targetDocId) {
-    _nextDocId = targetDocId;
-    return next();
   }
 
   @Override
@@ -94,13 +118,13 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     int[] buffer = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
     while (docIdIterator.hasNext()) {
       int limit = docIdIterator.nextBatch(buffer);
-      for (int i = 0; i < limit; i++) {
-        int nextDocId = buffer[i];
-        _numEntriesScanned++;
-        if (_valueMatcher.doesValueMatch(nextDocId)) {
-          result.add(nextDocId);
+      if (limit > 0) {
+        int firstMismatch = _valueMatcher.matchValues(limit, buffer);
+        for (int i = 0; i < firstMismatch; i++) {
+          result.add(buffer[i]);
         }
       }
+      _numEntriesScanned += limit;
     }
     return result.get();
   }
@@ -141,13 +165,38 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
      * Returns {@code true} if the value for the given document id matches the predicate, {@code false} Otherwise.
      */
     boolean doesValueMatch(int docId);
+
+    /**
+     * Filters out non matching values and compacts matching docIds in the start of the array.
+     * @param limit how much of the input to read
+     * @param docIds the docIds to match - may be modified by this method so take a copy if necessary.
+     * @return the index in the array of the first non-matching element - all elements before this index match.
+     */
+    default int matchValues(int limit, int[] docIds) {
+      int matchCount = 0;
+      for (int i = 0; i < limit; i++) {
+        int docId = docIds[i];
+        if (doesValueMatch(docId)) {
+          docIds[matchCount++] = docId;
+        }
+      }
+      return matchCount;
+    }
   }
 
   private class DictIdMatcher implements ValueMatcher {
 
+    private final int[] _buffer = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
+
     @Override
     public boolean doesValueMatch(int docId) {
       return _predicateEvaluator.applySV(_forwardIndexReader.getDictId(docId, _readerContext));
+    }
+
+    @Override
+    public int matchValues(int limit, int[] docIds) {
+      _reader.readDictIds(docIds, limit, _buffer, _readerContext);
+      return _predicateEvaluator.applySV(limit, docIds, _buffer);
     }
   }
 
@@ -159,6 +208,8 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       _nullValueReader = nullValueReader;
     }
 
+    private final int[] _buffer = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
+
     @Override
     public boolean doesValueMatch(int docId) {
       if (_nullValueReader != null && _nullValueReader.isNull(docId)) {
@@ -166,29 +217,59 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       }
       return _predicateEvaluator.applySV(_forwardIndexReader.getInt(docId, _readerContext));
     }
+
+    @Override
+    public int matchValues(int limit, int[] docIds) {
+      _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
+      return _predicateEvaluator.applySV(limit, docIds, _buffer);
+    }
   }
 
   private class LongMatcher implements ValueMatcher {
+
+    private final long[] _buffer = new long[OPTIMAL_ITERATOR_BATCH_SIZE];
 
     @Override
     public boolean doesValueMatch(int docId) {
       return _predicateEvaluator.applySV(_forwardIndexReader.getLong(docId, _readerContext));
     }
+
+    @Override
+    public int matchValues(int limit, int[] docIds) {
+      _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
+      return _predicateEvaluator.applySV(limit, docIds, _buffer);
+    }
   }
 
   private class FloatMatcher implements ValueMatcher {
+
+    private final float[] _buffer = new float[OPTIMAL_ITERATOR_BATCH_SIZE];
 
     @Override
     public boolean doesValueMatch(int docId) {
       return _predicateEvaluator.applySV(_forwardIndexReader.getFloat(docId, _readerContext));
     }
+
+    @Override
+    public int matchValues(int limit, int[] docIds) {
+      _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
+      return _predicateEvaluator.applySV(limit, docIds, _buffer);
+    }
   }
 
   private class DoubleMatcher implements ValueMatcher {
 
+    private final double[] _buffer = new double[OPTIMAL_ITERATOR_BATCH_SIZE];
+
     @Override
     public boolean doesValueMatch(int docId) {
       return _predicateEvaluator.applySV(_forwardIndexReader.getDouble(docId, _readerContext));
+    }
+
+    @Override
+    public int matchValues(int limit, int[] docIds) {
+      _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
+      return _predicateEvaluator.applySV(limit, docIds, _buffer);
     }
   }
 

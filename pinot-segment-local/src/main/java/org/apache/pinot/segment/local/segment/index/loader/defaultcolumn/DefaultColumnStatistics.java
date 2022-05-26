@@ -35,7 +35,6 @@ public class DefaultColumnStatistics implements ColumnStatistics {
   private final boolean _isSorted;
   private final int _totalNumberOfEntries;
   private final int _maxNumberOfMultiValues;
-  private boolean _hasNull = false;
 
   public DefaultColumnStatistics(Object minValue, Object maxValue, Object uniqueValuesSet, boolean isSorted,
       int totalNumberOfEntries, int maxNumberOfMultiValues) {
@@ -90,16 +89,6 @@ public class DefaultColumnStatistics implements ColumnStatistics {
   @Override
   public int getMaxNumberOfMultiValues() {
     return _maxNumberOfMultiValues;
-  }
-
-  @Override
-  public boolean hasNulls() {
-    return _hasNull;
-  }
-
-  @Override
-  public void markHasNull() {
-    _hasNull = true;
   }
 
   @Override

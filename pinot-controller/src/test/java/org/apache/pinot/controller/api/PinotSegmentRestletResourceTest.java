@@ -20,7 +20,7 @@ package org.apache.pinot.controller.api;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.controller.ControllerTestUtils;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -35,12 +35,13 @@ import org.testng.annotations.Test;
 
 
 public class PinotSegmentRestletResourceTest {
+  private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
   private static final String TABLE_NAME = "pinotSegmentRestletResourceTestTable";
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    ControllerTestUtils.setupClusterAndValidate();
+    TEST_INSTANCE.setupSharedStateAndValidate();
   }
 
   @Test
@@ -49,10 +50,10 @@ public class PinotSegmentRestletResourceTest {
     // Adding table
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(1).build();
-    ControllerTestUtils.getHelixResourceManager().addTable(tableConfig);
+    TEST_INSTANCE.getHelixResourceManager().addTable(tableConfig);
 
     // Wait for the table addition
-    while (!ControllerTestUtils.getHelixResourceManager().hasOfflineTable(TABLE_NAME)) {
+    while (!TEST_INSTANCE.getHelixResourceManager().hasOfflineTable(TABLE_NAME)) {
       Thread.sleep(100);
     }
 
@@ -63,7 +64,7 @@ public class PinotSegmentRestletResourceTest {
     // Upload Segments
     for (int i = 0; i < 5; i++) {
       SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME);
-      ControllerTestUtils.getHelixResourceManager()
+      TEST_INSTANCE.getHelixResourceManager()
           .addNewSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), segmentMetadata, "downloadUrl");
       segmentMetadataTable.put(segmentMetadata.getName(), segmentMetadata);
     }
@@ -74,13 +75,13 @@ public class PinotSegmentRestletResourceTest {
     // validate the segment metadata
     Map.Entry<String, SegmentMetadata> entry =
         (Map.Entry<String, SegmentMetadata>) segmentMetadataTable.entrySet().toArray()[0];
-    String resp = ControllerTestUtils.sendGetRequest(
-        ControllerTestUtils.getControllerRequestURLBuilder().forSegmentMetadata(TABLE_NAME, entry.getKey()));
+    String resp = ControllerTest.sendGetRequest(
+        TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMetadata(TABLE_NAME, entry.getKey()));
     Map<String, String> fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
     Assert.assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
 
     // use table name with table type
-    resp = ControllerTestUtils.sendGetRequest(ControllerTestUtils.getControllerRequestURLBuilder()
+    resp = ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder()
         .forSegmentMetadata(TABLE_NAME + "_OFFLINE", entry.getKey()));
     fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
     Assert.assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
@@ -89,7 +90,7 @@ public class PinotSegmentRestletResourceTest {
     // Add more segments
     for (int i = 0; i < 5; i++) {
       SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME);
-      ControllerTestUtils.getHelixResourceManager()
+      TEST_INSTANCE.getHelixResourceManager()
           .addNewSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), segmentMetadata, "downloadUrl");
       segmentMetadataTable.put(segmentMetadata.getName(), segmentMetadata);
     }
@@ -98,7 +99,7 @@ public class PinotSegmentRestletResourceTest {
     checkCrcRequest(segmentMetadataTable, 10);
 
     // Delete segments
-    ControllerTestUtils.getHelixResourceManager().deleteSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME),
+    TEST_INSTANCE.getHelixResourceManager().deleteSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME),
         segmentMetadataTable.values().iterator().next().getName());
 
     // Check crc api
@@ -107,8 +108,8 @@ public class PinotSegmentRestletResourceTest {
 
   private void checkCrcRequest(Map<String, SegmentMetadata> metadataTable, int expectedSize)
       throws Exception {
-    String crcMapStr = ControllerTestUtils.sendGetRequest(
-        ControllerTestUtils.getControllerRequestURLBuilder().forListAllCrcInformationForTable(TABLE_NAME));
+    String crcMapStr = ControllerTest.sendGetRequest(
+        TEST_INSTANCE.getControllerRequestURLBuilder().forListAllCrcInformationForTable(TABLE_NAME));
     Map<String, String> crcMap = JsonUtils.stringToObject(crcMapStr, Map.class);
     for (String segmentName : crcMap.keySet()) {
       SegmentMetadata metadata = metadataTable.get(segmentName);
@@ -120,6 +121,6 @@ public class PinotSegmentRestletResourceTest {
 
   @AfterClass
   public void tearDown() {
-    ControllerTestUtils.cleanup();
+    TEST_INSTANCE.cleanup();
   }
 }

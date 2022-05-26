@@ -54,8 +54,8 @@ public class DataPreprocessingHelperTest {
     Path outputPath = new Path("mockOutputPath");
     DataPreprocessingHelper dataPreprocessingHelper = new AvroDataPreprocessingHelper(inputPaths, outputPath);
 
-    BatchIngestionConfig batchIngestionConfig = new BatchIngestionConfig(null, "APPEND", "DAILY");
-    IngestionConfig ingestionConfig = new IngestionConfig(batchIngestionConfig, null, null, null, null, null);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "APPEND", "DAILY"));
 
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testTableName").setIngestionConfig(ingestionConfig)

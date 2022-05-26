@@ -122,6 +122,9 @@ public class BenchmarkQueries extends BaseQueriesTest {
   public static final String NO_INDEX_LIKE_QUERY = "SELECT RAW_INT_COL FROM MyTable "
       + "WHERE NO_INDEX_STRING_COL LIKE '%foo%'";
 
+  public static final String FILTERING_BITMAP_SCAN_QUERY = "SELECT RAW_INT_COL FROM MyTable "
+      + "WHERE INT_COL = 1 AND RAW_INT_COL IN (0, 1, 2)";
+
   public static final String MULTI_GROUP_BY_ORDER_BY = "SELECT NO_INDEX_STRING_COL,INT_COL,COUNT(*) "
       + "FROM MyTable GROUP BY NO_INDEX_STRING_COL,INT_COL ORDER BY NO_INDEX_STRING_COL, INT_COL ASC";
 
@@ -160,6 +163,9 @@ public class BenchmarkQueries extends BaseQueriesTest {
       + "WHERE INT_COL = 0 and SORTED_COL = 1"
       + "GROUP BY INT_COL, SORTED_COL ORDER BY SORTED_COL, INT_COL ASC";
 
+  public static final String FILTERING_SCAN_QUERY = "SELECT SUM(RAW_INT_COL) FROM MyTable "
+      + "WHERE RAW_INT_COL BETWEEN 1 AND 10";
+
   @Param("1500000")
   private int _numRows;
   @Param({"EXP(0.001)", "EXP(0.5)", "EXP(0.999)"})
@@ -168,7 +174,8 @@ public class BenchmarkQueries extends BaseQueriesTest {
       MULTI_GROUP_BY_WITH_RAW_QUERY, MULTI_GROUP_BY_WITH_RAW_QUERY_2, FILTERED_QUERY, NON_FILTERED_QUERY,
       SUM_QUERY, NO_INDEX_LIKE_QUERY, MULTI_GROUP_BY_ORDER_BY, MULTI_GROUP_BY_ORDER_BY_LOW_HIGH, TIME_GROUP_BY,
       RAW_COLUMN_SUMMARY_STATS, COUNT_OVER_BITMAP_INDEX_IN, COUNT_OVER_BITMAP_INDEXES,
-      COUNT_OVER_BITMAP_AND_SORTED_INDEXES, COUNT_OVER_BITMAP_INDEX_EQUALS, STARTREE_SUM_QUERY, STARTREE_FILTER_QUERY
+      COUNT_OVER_BITMAP_AND_SORTED_INDEXES, COUNT_OVER_BITMAP_INDEX_EQUALS, STARTREE_SUM_QUERY, STARTREE_FILTER_QUERY,
+      FILTERING_BITMAP_SCAN_QUERY, FILTERING_SCAN_QUERY
   })
   String _query;
   private IndexSegment _indexSegment;
@@ -242,7 +249,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
         .setSortedColumn(SORTED_COL_NAME)
         .setStarTreeIndexConfigs(Collections.singletonList(new StarTreeIndexConfig(
             Arrays.asList(SORTED_COL_NAME, INT_COL_NAME), null, Collections.singletonList(
-                new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
+            new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
             Integer.MAX_VALUE)))
         .build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)

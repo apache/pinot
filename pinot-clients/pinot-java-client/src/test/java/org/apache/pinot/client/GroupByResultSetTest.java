@@ -19,7 +19,7 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -39,8 +39,7 @@ public class GroupByResultSetTest {
     String jsonString =
         "{\"groupByResult\":[{\"value\":1, \"group\":[\"testGroup1\"]},{\"value\":2, \"group\":[\"testGroup2\"]}], "
             + "\"groupByColumns\":[\"testGroupColumn\"], \"function\":\"testFunction\"}";
-    ObjectMapper objectMapper = new ObjectMapper();
-    _mockJsonObject = objectMapper.readTree(jsonString);
+    _mockJsonObject = JsonUtils.stringToJsonNode(jsonString);
     _groupByResultSetUnderTest = new GroupByResultSet(_mockJsonObject);
   }
 

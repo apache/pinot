@@ -26,7 +26,7 @@ import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 
 
 public class MatchAllFilterOperator extends BaseFilterOperator {
-  private static final String EXPLAIN_NAME = "FILTER_MATCH_ENTIRE_SEGMENT";
+  public static final String EXPLAIN_NAME = "FILTER_MATCH_ENTIRE_SEGMENT";
   private final int _numDocs;
 
   public MatchAllFilterOperator(int numDocs) {

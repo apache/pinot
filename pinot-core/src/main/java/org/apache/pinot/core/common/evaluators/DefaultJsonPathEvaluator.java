@@ -41,6 +41,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
 
+  // This ObjectMapper requires special configurations, hence we can't use pinot JsonUtils here.
   private static final ObjectMapper OBJECT_MAPPER_WITH_BIG_DECIMAL = new ObjectMapper()
       .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
 

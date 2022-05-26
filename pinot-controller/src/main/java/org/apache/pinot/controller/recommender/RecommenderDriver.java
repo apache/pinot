@@ -53,6 +53,7 @@ public class RecommenderDriver {
 
     InputManager inputManager;
     ConfigManager outputManager;
+    // This ObjectMapper requires special configurations, hence we can't use pinot JsonUtils here.
     ObjectMapper objectMapper = new ObjectMapper();
     objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
 

@@ -61,10 +61,17 @@ public interface InstanceSelector {
   class SelectionResult {
     private final Map<String, String> _segmentToInstanceMap;
     private final List<String> _unavailableSegments;
+    private int _numPrunedSegments;
 
     public SelectionResult(Map<String, String> segmentToInstanceMap, List<String> unavailableSegments) {
+      this(segmentToInstanceMap, unavailableSegments, 0);
+    }
+
+    public SelectionResult(Map<String, String> segmentToInstanceMap, List<String> unavailableSegments,
+        int numPrunedSegments) {
       _segmentToInstanceMap = segmentToInstanceMap;
       _unavailableSegments = unavailableSegments;
+      _numPrunedSegments = numPrunedSegments;
     }
 
     /**
@@ -79,6 +86,20 @@ public interface InstanceSelector {
      */
     public List<String> getUnavailableSegments() {
       return _unavailableSegments;
+    }
+
+    /**
+     * Returns the number of segments pruned by the broker
+     */
+    public int getNumPrunedSegments() {
+      return _numPrunedSegments;
+    }
+
+    /**
+     * Sets the number of segments pruned by the broker
+     */
+    public void setNumPrunedSegments(int numPrunedSegments) {
+      _numPrunedSegments = numPrunedSegments;
     }
   }
 }

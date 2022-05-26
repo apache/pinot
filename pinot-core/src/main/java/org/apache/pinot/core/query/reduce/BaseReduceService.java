@@ -142,6 +142,9 @@ public abstract class BaseReduceService {
     private long _realtimeResponseSerializationCpuTimeNs = 0L;
     private long _offlineTotalCpuTimeNs = 0L;
     private long _realtimeTotalCpuTimeNs = 0L;
+    private long _numSegmentsPrunedByServer = 0L;
+    private long _explainPlanNumEmptyFilterSegments = 0L;
+    private long _explainPlanNumMatchAllFilterSegments = 0L;
     private boolean _numGroupsLimitReached = false;
 
     protected ExecutionStatsAggregator(boolean enableTrace) {
@@ -230,6 +233,23 @@ public abstract class BaseReduceService {
       _realtimeTotalCpuTimeNs =
           _realtimeThreadCpuTimeNs + _realtimeSystemActivitiesCpuTimeNs + _realtimeResponseSerializationCpuTimeNs;
 
+      String numSegmentsPrunedByServer = metadata.get(MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName());
+      if (numSegmentsPrunedByServer != null) {
+        _numSegmentsPrunedByServer += Long.parseLong(numSegmentsPrunedByServer);
+      }
+
+      String explainPlanNumEmptyFilterSegments =
+          metadata.get(MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName());
+      if (explainPlanNumEmptyFilterSegments != null) {
+        _explainPlanNumEmptyFilterSegments += Long.parseLong(explainPlanNumEmptyFilterSegments);
+      }
+
+      String explainPlanNumMatchAllFilterSegments =
+          metadata.get(MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName());
+      if (explainPlanNumMatchAllFilterSegments != null) {
+        _explainPlanNumMatchAllFilterSegments += Long.parseLong(explainPlanNumMatchAllFilterSegments);
+      }
+
       String numTotalDocsString = metadata.get(MetadataKey.TOTAL_DOCS.getName());
       if (numTotalDocsString != null) {
         _numTotalDocs += Long.parseLong(numTotalDocsString);
@@ -265,6 +285,9 @@ public abstract class BaseReduceService {
       brokerResponseNative.setRealtimeResponseSerializationCpuTimeNs(_realtimeResponseSerializationCpuTimeNs);
       brokerResponseNative.setOfflineTotalCpuTimeNs(_offlineTotalCpuTimeNs);
       brokerResponseNative.setRealtimeTotalCpuTimeNs(_realtimeTotalCpuTimeNs);
+      brokerResponseNative.setNumSegmentsPrunedByServer(_numSegmentsPrunedByServer);
+      brokerResponseNative.setExplainPlanNumEmptyFilterSegments(_explainPlanNumEmptyFilterSegments);
+      brokerResponseNative.setExplainPlanNumMatchAllFilterSegments(_explainPlanNumMatchAllFilterSegments);
       if (_numConsumingSegmentsProcessed > 0) {
         brokerResponseNative.setNumConsumingSegmentsQueried(_numConsumingSegmentsProcessed);
         brokerResponseNative.setMinConsumingFreshnessTimeMs(_minConsumingFreshnessTimeMs);

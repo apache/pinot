@@ -67,7 +67,7 @@ public class AndFilterOperator extends BaseFilterOperator {
     for (BaseFilterOperator child : _filterOperators) {
       bitmaps[i++] = child.getBitmaps().reduce();
     }
-    return BufferFastAggregation.and(bitmaps).getCardinality();
+    return BufferFastAggregation.andCardinality(bitmaps);
   }
 
 
