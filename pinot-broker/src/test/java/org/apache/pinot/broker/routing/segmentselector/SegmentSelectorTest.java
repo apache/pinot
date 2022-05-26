@@ -30,10 +30,9 @@ import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.broker.routing.segmentselector.RealtimeSegmentSelector.FORCE_HLC;
-import static org.apache.pinot.broker.routing.segmentselector.RealtimeSegmentSelector.ROUTING_OPTIONS_KEY;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.mockito.Mockito.mock;
@@ -119,7 +118,8 @@ public class SegmentSelectorTest {
     assertEqualsNoOrder(segmentSelector.select(brokerRequest).toArray(), expectedSelectedLLCSegments);
 
     // When HLC is forced, should select the HLC segments from the second group
-    when(pinotQuery.getDebugOptions()).thenReturn(Collections.singletonMap(ROUTING_OPTIONS_KEY, FORCE_HLC));
+    when(pinotQuery.getQueryOptions()).thenReturn(
+        Collections.singletonMap(Request.QueryOptionKey.ROUTING_OPTIONS, Request.QueryOptionValue.ROUTING_FORCE_HLC));
     assertEqualsNoOrder(segmentSelector.select(brokerRequest).toArray(), hlcSegments[1]);
 
     // Remove all the HLC segments from ideal state, should select the LLC segments even when HLC is forced

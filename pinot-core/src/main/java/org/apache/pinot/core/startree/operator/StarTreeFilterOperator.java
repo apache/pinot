@@ -41,6 +41,7 @@ import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.startree.StarTree;
@@ -114,27 +115,23 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       _remainingPredicateColumns = remainingPredicateColumns;
     }
   }
+
   // If (number of matching dictionary ids * threshold) > (number of child nodes), use scan to traverse nodes instead of
   // binary search on each dictionary id
   private static final int USE_SCAN_TO_TRAVERSE_NODES_THRESHOLD = 10;
 
-  // Star-tree
+  private final QueryContext _queryContext;
   private final StarTreeV2 _starTreeV2;
-  // Map from column to predicate evaluators
   private final Map<String, List<CompositePredicateEvaluator>> _predicateEvaluatorsMap;
-  // Set of group-by columns
   private final Set<String> _groupByColumns;
-
-  private final Map<String, String> _debugOptions;
 
   boolean _resultEmpty = false;
 
-  public StarTreeFilterOperator(StarTreeV2 starTreeV2,
-      Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap, Set<String> groupByColumns,
-      @Nullable Map<String, String> debugOptions) {
+  public StarTreeFilterOperator(QueryContext queryContext, StarTreeV2 starTreeV2,
+      Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns) {
+    _queryContext = queryContext;
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
-    _debugOptions = debugOptions;
 
     if (groupByColumns != null) {
       _groupByColumns = new HashSet<>(groupByColumns);
@@ -157,7 +154,6 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   public boolean isResultEmpty() {
     return _resultEmpty;
   }
-
 
   @Override
   public String toExplainString() {
@@ -210,13 +206,13 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
             orChildFilterOperators
                 .add(FilterOperatorUtils.getLeafFilterOperator(childPredicateEvaluator, dataSource, numDocs));
           }
-          childFilterOperators
-              .add(FilterOperatorUtils.getOrFilterOperator(orChildFilterOperators, numDocs, _debugOptions));
+          childFilterOperators.add(
+              FilterOperatorUtils.getOrFilterOperator(_queryContext, orChildFilterOperators, numDocs));
         }
       }
     }
 
-    return FilterOperatorUtils.getAndFilterOperator(childFilterOperators, numDocs, _debugOptions);
+    return FilterOperatorUtils.getAndFilterOperator(_queryContext, childFilterOperators, numDocs);
   }
 
   /**
