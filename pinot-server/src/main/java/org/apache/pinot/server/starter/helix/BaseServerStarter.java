@@ -329,7 +329,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     int grpcPort = serverConf.isEnableGrpcServer() ? serverConf.getGrpcPort() : Integer.MIN_VALUE;
     updated |= updatePortIfNeeded(simpleFields, Instance.GRPC_PORT_KEY, grpcPort);
 
-    // Update instance config with environment properties
+    // Update environment properties
     if (_pinotEnvironmentProvider != null) {
       // Retrieve failure domain information and add to the environment properties map
       String failureDomain = _pinotEnvironmentProvider.getFailureDomain();
@@ -340,6 +340,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
         znRecord.setMapField(CommonConstants.ENVIRONMENT_IDENTIFIER, environmentProperties);
         updated = true;
       }
+    }
+
+    // Update system resource info (CPU, memory, etc)
+    Map<String, String> systemResourceInfoMap = new SystemResourceInfo().toMap();
+    if (!systemResourceInfoMap.equals(znRecord.getMapField(Instance.SYSTEM_RESOURCE_INFO_KEY))) {
+      LOGGER.info("Updating instance: {} with system resource info: {}", _instanceId, systemResourceInfoMap);
+      znRecord.setMapField(Instance.SYSTEM_RESOURCE_INFO_KEY, systemResourceInfoMap);
+      updated = true;
     }
 
     // If 'shutdownInProgress' is not set (new instance, or not shut down properly), set it to prevent brokers routing
@@ -468,9 +476,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
         new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager);
     _helixManager.getStateMachineEngine()
         .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(), stateModelFactory);
-    // Start the server instance as a pre-connect callback so that it starts after connecting to the ZK in order to
-    // access the property store, but before receiving state transitions
-    _helixManager.addPreConnectCallback(_serverInstance::start);
+    // Start the data manager as a pre-connect callback so that it starts after connecting to the ZK in order to access
+    // the property store, but before receiving state transitions
+    _helixManager.addPreConnectCallback(_serverInstance::startDataManager);
 
     LOGGER.info("Connecting Helix manager");
     _helixManager.connect();
@@ -505,14 +513,16 @@ public abstract class BaseServerStarter implements ServiceStartable {
           startTimeMs + _serverConf.getProperty(Server.CONFIG_OF_STARTUP_TIMEOUT_MS, Server.DEFAULT_STARTUP_TIMEOUT_MS);
       startupServiceStatusCheck(endTimeMs);
     }
+
+    // Start the query server after finishing the service status check. If the query server is started before all the
+    // segments are loaded, broker might not have finished processing the callback of routing table update, and start
+    // querying the server pre-maturely.
+    _serverInstance.startQueryServer();
     _helixAdmin.setConfig(_instanceConfigScope,
         Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(false)));
 
     // Throttling for realtime consumption is disabled up to this point to allow maximum consumption during startup time
     RealtimeConsumptionRateManager.getInstance().enableThrottling();
-
-    // Set the system resource info (CPU, Memory, etc) in the InstanceConfig.
-    setInstanceResourceInfo(_helixAdmin, _helixClusterName, _instanceId, new SystemResourceInfo().toMap());
 
     LOGGER.info("Pinot server ready");
 
@@ -739,21 +749,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
   @VisibleForTesting
   public ServerInstance getServerInstance() {
     return _serverInstance;
-  }
-
-  /**
-   * Helper method to set system resource info into instance config.
-   *
-   * @param helixAdmin Helix Admin
-   * @param helixClusterName Name of Helix cluster
-   * @param instanceId Id of instance for which to set the system resource info
-   * @param systemResourceMap Map containing system resource info
-   */
-  protected void setInstanceResourceInfo(HelixAdmin helixAdmin, String helixClusterName, String instanceId,
-      Map<String, String> systemResourceMap) {
-    InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(helixClusterName, instanceId);
-    instanceConfig.getRecord().setMapField(Helix.Instance.SYSTEM_RESOURCE_INFO_KEY, systemResourceMap);
-    helixAdmin.setInstanceConfig(helixClusterName, instanceId, instanceConfig);
   }
 
   /**
