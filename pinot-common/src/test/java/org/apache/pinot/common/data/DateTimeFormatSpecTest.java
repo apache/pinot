@@ -274,8 +274,8 @@ public class DateTimeFormatSpecTest {
 
 
   @Test(dataProvider = "testConstructFormatDataProviderPipe")
-  public void testConstructFormatPipe(String dateTimeFormat, TimeUnit timeUnit, String columnTimeFormat, int size, String timeZone,
-      DateTimeFormatSpec formatExpected1, DateTimeFormatSpec formatExpected2) {
+  public void testConstructFormatPipe(String dateTimeFormat, TimeUnit timeUnit, String columnTimeFormat, int size,
+      String timeZone, DateTimeFormatSpec formatExpected1, DateTimeFormatSpec formatExpected2) {
     DateTimeFormatSpec formatActual1 = null;
 
     try {
@@ -303,19 +303,25 @@ public class DateTimeFormatSpecTest {
     List<Object[]> entries = new ArrayList<>();
 
     entries.add(new Object[]{"EPOCH", TimeUnit.HOURS, null, 1, null, new DateTimeFormatSpec("EPOCH|HOURS"), null});
-    entries.add(new Object[]{"EPOCH", TimeUnit.MINUTES, null, 5, null, new DateTimeFormatSpec("EPOCH|MINUTES|5"), null});
-    entries.add(new Object[]{"EPOCH", TimeUnit.SECONDS, null, 1, null, new DateTimeFormatSpec("EPOCH|SECONDS"), null});
+    entries.add(new Object[]{"EPOCH", TimeUnit.MINUTES, null, 5, null,
+        new DateTimeFormatSpec("EPOCH|MINUTES|5"), null});
+    entries.add(new Object[]{"EPOCH", TimeUnit.SECONDS, null, 1, null,
+        new DateTimeFormatSpec("EPOCH|SECONDS"), null});
     entries.add(new Object[]{"EPOCH", TimeUnit.HOURS, null, 0, null, null, null});
-    entries.add(new Object[]{"EPOCH",null, null, 1, null, null, null});
+    entries.add(new Object[]{"EPOCH", null, null, 1, null, null, null});
     entries.add(new Object[]{null, TimeUnit.HOURS, null, 1, null, null, null});
     entries.add(new Object[]{"DUMMY", TimeUnit.HOURS, null, 1, null, null, null});
     entries.add(new Object[]{"DUMMY", TimeUnit.HOURS, "yyyyMMdd", 1, null, null, null});
-    entries.add(new Object[]{"SIMPLE_DATE_FORMAT", null, "yyyyMMdd", 1, null, null, new DateTimeFormatSpec("SIMPLE_DATE_FORMAT|yyyyMMdd")});
-    entries.add(new Object[]{"SIMPLE_DATE_FORMAT", null, "yyyyMMdd", 1, "America/Los_Angeles", null, new DateTimeFormatSpec("SIMPLE_DATE_FORMAT|yyyyMMdd|America/Los_Angeles")});
+    entries.add(new Object[]{"SIMPLE_DATE_FORMAT", null, "yyyyMMdd", 1, null, null,
+        new DateTimeFormatSpec("SIMPLE_DATE_FORMAT|yyyyMMdd")});
+    entries.add(new Object[]{"SIMPLE_DATE_FORMAT", null, "yyyyMMdd", 1, "America/Los_Angeles", null,
+        new DateTimeFormatSpec("SIMPLE_DATE_FORMAT|yyyyMMdd|America/Los_Angeles")});
     entries.add(new Object[]{"SIMPLE_DATE_FORMAT", TimeUnit.HOURS, null, 1, null, null, null});
     entries.add(new Object[]{"SIMPLE_DATE_FORMAT", TimeUnit.HOURS, null, -1, null, null, null});
-    entries.add(new Object[]{"SIMPLE_DATE_FORMAT", null, "M/d/yyyy h:mm:ss a", 1, null, null, new DateTimeFormatSpec("SIMPLE_DATE_FORMAT|M/d/yyyy h:mm:ss a")});
-    entries.add(new Object[]{"SIMPLE_DATE_FORMAT", null, "M/d/yyyy h:mm:ss a", 1, "IST", null, new DateTimeFormatSpec("SIMPLE_DATE_FORMAT|M/d/yyyy h:mm:ss a|IST")});
+    entries.add(new Object[]{"SIMPLE_DATE_FORMAT", null, "M/d/yyyy h:mm:ss a", 1, null, null,
+        new DateTimeFormatSpec("SIMPLE_DATE_FORMAT|M/d/yyyy h:mm:ss a")});
+    entries.add(new Object[]{"SIMPLE_DATE_FORMAT", null, "M/d/yyyy h:mm:ss a", 1, "IST", null,
+        new DateTimeFormatSpec("SIMPLE_DATE_FORMAT|M/d/yyyy h:mm:ss a|IST")});
 
     return entries.toArray(new Object[entries.size()][]);
   }

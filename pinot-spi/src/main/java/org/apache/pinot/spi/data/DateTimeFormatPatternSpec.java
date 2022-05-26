@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.data;
 
 import com.google.common.base.Preconditions;
-import java.sql.Time;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.TimeZone;
@@ -67,15 +66,18 @@ public class DateTimeFormatPatternSpec {
     }
   }
 
-  public DateTimeFormatPatternSpec(DateTimeFieldSpec.TimeFormat timeFormat, String timeFormatStyle, @Nullable String timeZone) {
+  public DateTimeFormatPatternSpec(DateTimeFieldSpec.TimeFormat timeFormat, String timeFormatStyle,
+      @Nullable String timeZone) {
     _timeFormat = timeFormat;
-    if(_timeFormat.equals(DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT)) {
-      if(Objects.isNull(timeZone)) {
+    if (_timeFormat.equals(DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT)) {
+      if (Objects.isNull(timeZone)) {
         _dateTimeZone = DateTimeZone.UTC;
       } else {
         _dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timeZone));
       }
-      _dateTimeFormatter = DateTimeFormat.forPattern(timeFormatStyle).withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
+      _dateTimeFormatter = DateTimeFormat.forPattern(timeFormatStyle).
+          withZone(_dateTimeZone).
+          withLocale(DEFAULT_LOCALE);
     }
   }
 
