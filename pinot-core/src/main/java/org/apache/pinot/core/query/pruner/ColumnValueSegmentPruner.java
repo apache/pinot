@@ -499,7 +499,7 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
     }
 
     private Comparable getComparableValue(DataType dt) {
-      if (_dt == null || _comparableValue == null) {
+      if (!dt.equals(_dt)) {
         _dt = dt;
         _comparableValue = convertValue(_strValue, dt);
       }
