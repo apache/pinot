@@ -37,7 +37,6 @@ import org.joda.time.format.DateTimeFormatter;
 public class DateTimeFormatSpec {
 
   public static final String NUMBER_REGEX = "[1-9][0-9]*";
-  public static final String COLON_REGEX = "([0-9])(:)(\\w+)(:)(\\w+)(:?)(.+)";
   public static final String COLON_SEPARATOR = ":";
   public static final String PIPE_SEPARATOR = "|";
 
@@ -65,9 +64,8 @@ public class DateTimeFormatSpec {
 
   public DateTimeFormatSpec(String format) {
     _format = format;
-    if (_format.matches(COLON_REGEX)) {
-      validateFormat(format);
-      String[] formatTokens = StringUtils.split(format, COLON_SEPARATOR, MAX_FORMAT_TOKENS);
+    if (Character.isDigit(_format.charAt(0))) {
+      String[] formatTokens = validateFormat(format);
       if (formatTokens.length == MAX_FORMAT_TOKENS) {
         _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION],
             formatTokens[FORMAT_PATTERN_POSITION]);
@@ -83,41 +81,32 @@ public class DateTimeFormatSpec {
         _unitSpec = new DateTimeFormatUnitSpec(formatTokens[FORMAT_UNIT_POSITION]);
       }
     } else {
-      validatePipeFormat(format);
-      String[] formatTokens = StringUtils.split(format, PIPE_SEPARATOR, MAX_FORMAT_TOKENS_PIPE);
-      if (formatTokens.length == MAX_FORMAT_TOKENS_PIPE) { //date with tz or epoch with time-size
-        //for date with tz
-        if (formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString())) {
+      String[] formatTokens = validatePipeFormat(format);
+      if (formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE].equals(TimeFormat.EPOCH.toString())) {
+        _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE]);
+        _unitSpec = new DateTimeFormatUnitSpec(formatTokens[FORMAT_UNIT_POSITION_PIPE]);
+        if (formatTokens.length == MAX_FORMAT_TOKENS_PIPE) {
+          _size = Integer.parseInt(formatTokens[FORMAT_SIZE_POSITION_PIPE]);
+        } else {
+          _size = 1;
+        }
+      } else if (formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString())) {
+        if (formatTokens.length == MAX_FORMAT_TOKENS_PIPE) {
           _patternSpec = new DateTimeFormatPatternSpec(TimeFormat.valueOf(
               formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE]),
               formatTokens[FORMAT_PATTERN_POSITION_PIPE],
               formatTokens[FORMAT_TIMEZONE_POSITION_PIPE]);
         } else {
-          _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE]);
+          _patternSpec = new DateTimeFormatPatternSpec(TimeFormat.valueOf(
+              formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE]),
+              formatTokens[FORMAT_PATTERN_POSITION_PIPE], "UTC");
         }
-      } else {
-        if (formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString())) {
-          // date without tz
-          _patternSpec = new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT,
-              formatTokens[FORMAT_PATTERN_POSITION_PIPE], null);
-        } else {
-          //for epoch/timestamp
-          _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE]);
-        }
-      }
-
-      if (formatTokens.length == MAX_FORMAT_TOKENS_PIPE && _patternSpec.getTimeFormat() == TimeFormat.EPOCH) {
-        _size = Integer.parseInt(formatTokens[FORMAT_SIZE_POSITION_PIPE]);
-      } else {
-        _size = 1;
-      }
-
-      if (_patternSpec.getTimeFormat() == TimeFormat.EPOCH) {
-        _unitSpec = new DateTimeFormatUnitSpec(formatTokens[FORMAT_UNIT_POSITION_PIPE]);
-      } else if (_patternSpec.getTimeFormat() == TimeFormat.TIMESTAMP) {
-        _unitSpec = new DateTimeFormatUnitSpec("MILLISECONDS");
-      } else {
         _unitSpec = new DateTimeFormatUnitSpec("DAYS");
+        _size = 1;
+      } else {
+        _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE]);
+        _unitSpec = new DateTimeFormatUnitSpec("MILLISECONDS");
+        _size = 1;
       }
     }
   }
@@ -257,7 +246,7 @@ public class DateTimeFormatSpec {
   /**
    * Validates the format string in the dateTimeFieldSpec
    */
-  public static void validateFormat(String format) {
+  public static String[] validateFormat(String format) {
     Preconditions.checkNotNull(format, "Format string in dateTimeFieldSpec must not be null");
     String[] formatTokens = StringUtils.split(format, COLON_SEPARATOR, MAX_FORMAT_TOKENS);
     Preconditions.checkState(formatTokens.length >= MIN_FORMAT_TOKENS && formatTokens.length <= MAX_FORMAT_TOKENS,
@@ -276,12 +265,13 @@ public class DateTimeFormatSpec {
               "Incorrect format type: %s in format: %s. Must be of '[0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:pattern'",
               formatTokens[FORMAT_TIMEFORMAT_POSITION], format);
     }
+    return formatTokens;
   }
 
   /**
    * Validates the pipe format string in the dateTimeFieldSpec
    */
-  public static void validatePipeFormat(String format) {
+  public static String[] validatePipeFormat(String format) {
     Preconditions.checkNotNull(format, "Format string in dateTimeFieldSpec must not be null");
     String[] formatTokens = StringUtils.split(format, PIPE_SEPARATOR, MAX_FORMAT_TOKENS_PIPE);
     Preconditions.checkState(formatTokens.length >= MIN_FORMAT_TOKENS_PIPE
@@ -294,6 +284,7 @@ public class DateTimeFormatSpec {
           "Incorrect format size: %s in format: %s. Must be of format 'EPOCH|<timeUnit>|[0-9]+'",
           formatTokens[FORMAT_SIZE_POSITION_PIPE], format);
     }
+    return formatTokens;
   }
 
   @Override
