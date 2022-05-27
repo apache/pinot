@@ -215,7 +215,6 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     // Expecting 87488 to the final time
     String sqlQuery = "SELECT count(*) FROM " + PURGE_FIRST_RUN_TABLE;
     JsonNode expectedJson = postQuery(sqlQuery, _brokerBaseApiUrl);
-    System.out.println(expectedJson);
     assertTrue(expectedJson.toString().contains("\"rows\":[[87488]]"));
 
     // Drop the table
