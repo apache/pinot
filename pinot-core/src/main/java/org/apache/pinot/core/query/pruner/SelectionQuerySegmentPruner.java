@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
@@ -51,13 +50,16 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
   }
 
   @Override
+  public boolean isApplicableTo(QueryContext query) {
+    // Only prune selection queries
+    // If LIMIT is not 0, only prune segments for selection queries without filter
+    return QueryContextUtils.isSelectionQuery(query)
+        && (query.getFilter() == null || query.getLimit() == 0);
+  }
+
+  @Override
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
     if (segments.isEmpty()) {
-      return segments;
-    }
-
-    // Only prune selection queries
-    if (!QueryContextUtils.isSelectionQuery(query)) {
       return segments;
     }
 
@@ -65,12 +67,6 @@ public class SelectionQuerySegmentPruner implements SegmentPruner {
     int limit = query.getLimit();
     if (limit == 0) {
       return Collections.singletonList(segments.get(0));
-    }
-
-    // If LIMIT is not 0, only prune segments for selection queries without filter
-    FilterContext filter = query.getFilter();
-    if (filter != null) {
-      return segments;
     }
 
     // Skip pruning segments for upsert table because valid doc index is equivalent to a filter

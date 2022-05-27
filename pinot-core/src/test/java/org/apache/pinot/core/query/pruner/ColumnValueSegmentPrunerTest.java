@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.core.query.pruner;
 
+import com.google.common.collect.ImmutableSet;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
@@ -49,7 +52,7 @@ public class ColumnValueSegmentPrunerTest {
     PinotConfiguration configuration = new PinotConfiguration(properties);
     PRUNER.init(configuration);
 
-    IndexSegment indexSegment = mock(IndexSegment.class);
+    IndexSegment indexSegment = mockIndexSegment();
 
     DataSource dataSource = mock(DataSource.class);
     when(indexSegment.getDataSource("column")).thenReturn(dataSource);
@@ -106,7 +109,7 @@ public class ColumnValueSegmentPrunerTest {
 
   @Test
   public void testPartitionPruning() {
-    IndexSegment indexSegment = mock(IndexSegment.class);
+    IndexSegment indexSegment = mockIndexSegment();
 
     DataSource dataSource = mock(DataSource.class);
     when(indexSegment.getDataSource("column")).thenReturn(dataSource);
@@ -142,8 +145,7 @@ public class ColumnValueSegmentPrunerTest {
     PinotConfiguration configuration = new PinotConfiguration(properties);
     PRUNER.init(configuration);
 
-    IndexSegment indexSegment = mock(IndexSegment.class);
-
+    IndexSegment indexSegment = mockIndexSegment();
     DataSource dataSource = mock(DataSource.class);
     when(indexSegment.getDataSource("column")).thenReturn(dataSource);
     // Add support for bloom filter
@@ -196,8 +198,17 @@ public class ColumnValueSegmentPrunerTest {
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (8, 10)"));
   }
 
+  private IndexSegment mockIndexSegment() {
+    IndexSegment indexSegment = mock(IndexSegment.class);
+    when(indexSegment.getColumnNames()).thenReturn(ImmutableSet.of("column"));
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(segmentMetadata.getTotalDocs()).thenReturn(20);
+    when(indexSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
+    return indexSegment;
+  }
+
   private boolean runPruner(IndexSegment indexSegment, String query) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
-    return PRUNER.prune(Collections.singletonList(indexSegment), queryContext).isEmpty();
+    return PRUNER.prune(Arrays.asList(indexSegment), queryContext).isEmpty();
   }
 }
