@@ -23,6 +23,7 @@ import java.io.Serializable;
 import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
@@ -70,6 +71,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
   @Deprecated
   public static final String DEPRECATED_USE_LOCAL_DIRECTORY_SEQUENCE_ID = "local.directory.sequence.id";
   public static final String USE_GLOBAL_DIRECTORY_SEQUENCE_ID = "use.global.directory.sequence.id";
+  public static final String USE_UNIQUE_SEGMENT_NAME_POSTFIX = "use_unique.segment.name.postfix";
 
   private final SegmentGenerationTaskSpec _taskSpec;
 
@@ -141,7 +143,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
       case FIXED_SEGMENT_NAME_GENERATOR:
         return new FixedSegmentNameGenerator(segmentNameGeneratorConfigs.get(SEGMENT_NAME));
       case SIMPLE_SEGMENT_NAME_GENERATOR:
-        return new SimpleSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX));
+        return new SimpleSegmentNameGenerator(tableName, getSegmentNamePostfix(segmentNameGeneratorConfigs));
       case NORMALIZED_DATE_SEGMENT_NAME_GENERATOR:
         SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
         DateTimeFormatSpec dateTimeFormatSpec = null;
@@ -157,7 +159,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
             Boolean.parseBoolean(segmentNameGeneratorConfigs.get(EXCLUDE_SEQUENCE_ID)),
             IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig),
             IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), dateTimeFormatSpec,
-            segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX));
+            getSegmentNamePostfix(segmentNameGeneratorConfigs));
       case INPUT_FILE_SEGMENT_NAME_GENERATOR:
         String inputFileUri = _taskSpec.getCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY);
         return new InputFileSegmentNameGenerator(segmentNameGeneratorConfigs.get(FILE_PATH_PATTERN),
@@ -166,5 +168,15 @@ public class SegmentGenerationTaskRunner implements Serializable {
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
     }
+  }
+
+  private String getSegmentNamePostfix(Map<String, String> segmentNameGeneratorConfigs) {
+    String segmentNamePostfix = segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX);
+    if (segmentNamePostfix == null && segmentNameGeneratorConfigs.get(USE_UNIQUE_SEGMENT_NAME_POSTFIX) != null) {
+      if (Boolean.parseBoolean(segmentNameGeneratorConfigs.get(USE_UNIQUE_SEGMENT_NAME_POSTFIX))) {
+        segmentNamePostfix = UUID.randomUUID().toString();
+      }
+    }
+    return segmentNamePostfix;
   }
 }
