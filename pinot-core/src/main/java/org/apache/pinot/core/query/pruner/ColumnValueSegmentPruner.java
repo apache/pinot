@@ -19,11 +19,6 @@
 package org.apache.pinot.core.query.pruner;
 
 import com.google.common.primitives.Longs;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
-import java.lang.invoke.VarHandle;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
