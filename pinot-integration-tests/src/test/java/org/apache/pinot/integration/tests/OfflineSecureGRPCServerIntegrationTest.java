@@ -34,7 +34,6 @@ public class OfflineSecureGRPCServerIntegrationTest extends OfflineGRPCServerInt
 
   @Override
   protected void overrideServerConf(PinotConfiguration serverConf) {
-    serverConf.setProperty(Server.CONFIG_OF_ENABLE_GRPC_SERVER, true);
     serverConf.setProperty(Server.CONFIG_OF_GRPCTLS_SERVER_ENABLED, true);
     serverConf.setProperty("pinot.server.grpctls.client.auth.enabled", true);
     serverConf.setProperty("pinot.server.grpctls.keystore.type", JKS);
