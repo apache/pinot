@@ -117,8 +117,8 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
 
     // Initialize the query generator
     setUpQueryGenerator(avroFiles);
-
     startMinion();
+    setRecordPurger();
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
     _pinotHelixResourceManager = _controllerStarter.getHelixResourceManager();
@@ -149,8 +149,6 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
       segmentZKMetadata.setCustomMap(customSegmentMetadataNotPassed);
       _pinotHelixResourceManager.updateZkMetadata(tablenameOfflineNotPassed, segmentZKMetadata);
     }
-
-    setRecordPurger();
   }
 
 
@@ -178,7 +176,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
 
   private TableTaskConfig getPurgeTaskConfig() {
     Map<String, String> tableTaskConfigs = new HashMap<>();
-    tableTaskConfigs.put("deltaPurgeTimePeriod", "1d");
+    tableTaskConfigs.put(MinionConstants.PurgeTask.LAST_PURGE_TIME_THREESOLD_PERIOD, "1d");
     return new TableTaskConfig(Collections.singletonMap(MinionConstants.PurgeTask.TASK_TYPE, tableTaskConfigs));
   }
 
@@ -201,6 +199,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     assertNull(
         _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.PurgeTask.TASK_TYPE));
     waitForTaskToComplete();
+
     // check that metadat
     for (SegmentZKMetadata metadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
       // Check purgeTimeIn
