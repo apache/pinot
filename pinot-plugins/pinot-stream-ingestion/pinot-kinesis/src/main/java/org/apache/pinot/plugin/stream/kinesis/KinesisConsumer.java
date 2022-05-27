@@ -159,23 +159,23 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
       return new KinesisRecordsBatch(recordList, startShardToSequenceNum.getKey(), isEndOfShard);
     } catch (IllegalStateException e) {
-      LOGGER.warn("Illegal state exception, connection is broken", e);
+      LOGGER.warn("Illegal state exception, connection is broken: {}", e.getMessage());
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (ProvisionedThroughputExceededException e) {
-      LOGGER.warn("The request rate for the stream is too high", e);
+      LOGGER.warn("The request rate for the stream is too high: {}", e.getMessage());
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (ExpiredIteratorException e) {
-      LOGGER.warn("ShardIterator expired while trying to fetch records", e);
+      LOGGER.warn("ShardIterator expired while trying to fetch records: {}", e.getMessage());
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (ResourceNotFoundException | InvalidArgumentException e) {
       // aws errors
-      LOGGER.error("Encountered AWS error while attempting to fetch records", e);
+      LOGGER.error("Encountered AWS error while attempting to fetch records: {}", e.getMessage());
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (KinesisException e) {
-      LOGGER.warn("Encountered unknown unrecoverable AWS exception", e);
+      LOGGER.warn("Encountered unknown unrecoverable AWS exception: {}", e.getMessage());
       throw new RuntimeException(e);
     } catch (AbortedException e) {
-      LOGGER.warn("Task aborted due to exception.", e);
+      LOGGER.warn("Task aborted due to exception: {}", e.getMessage());
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (Throwable e) {
       // non transient errors
