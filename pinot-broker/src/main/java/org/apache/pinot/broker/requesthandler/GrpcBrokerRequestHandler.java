@@ -62,7 +62,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
     super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
-    LOGGER.info("Starting Grpc BrokerRequestHandler.");
+    LOGGER.info("Using Grpc BrokerRequestHandler.");
     _grpcConfig = buildGrpcQueryClientConfig(config);
 
     // create streaming query client

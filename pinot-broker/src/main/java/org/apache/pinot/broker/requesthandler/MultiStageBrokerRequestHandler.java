@@ -53,6 +53,7 @@ import org.apache.pinot.query.service.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -73,7 +74,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics) {
     super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
-    LOGGER.info("Starting Multi-stage BrokerRequestHandler.");
+    LOGGER.info("Using Multi-stage BrokerRequestHandler.");
     String reducerHostname = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (reducerHostname == null) {
       // use broker ID as host name, but remove the
@@ -114,11 +115,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
     }
 
-    if (request.has(CommonConstants.Broker.Request.SQL)) {
+    JsonNode sql = request.get(CommonConstants.Broker.Request.SQL);
+    if (sql == null) {
+      throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
+    } else {
       return handleSQLRequest(requestId, request.get(CommonConstants.Broker.Request.SQL).asText(), request,
           requesterIdentity, requestContext);
-    } else {
-      return new BrokerResponseNative(QueryException.QUERY_EXECUTION_ERROR);
     }
   }
 
