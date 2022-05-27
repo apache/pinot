@@ -87,16 +87,16 @@ public class DateTimeFormatPatternSpec {
   public static void validateFormat(String sdfPatternWithTz) {
     try {
       String sdfPattern;
-      DateTimeZone dateTimeZone = DEFAULT_DATETIMEZONE;
       Matcher m = SDF_PATTERN_WITH_TIMEZONE.matcher(sdfPatternWithTz);
       if (m.find()) {
         sdfPattern = m.group(SDF_PATTERN_GROUP).trim();
         String timezoneString = m.group(TIMEZONE_GROUP).trim();
-        dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timezoneString));
+        DateTimeZone dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timezoneString));
+        DateTimeFormat.forPattern(sdfPattern).withZone(dateTimeZone);
       } else {
         sdfPattern = sdfPatternWithTz;
+        DateTimeFormat.forPattern(sdfPattern);
       }
-      DateTimeFormat.forPattern(sdfPattern).withZone(dateTimeZone);
     } catch (Exception e) {
       throw new IllegalStateException("Unsupported simple date format pattern or time zone: " + sdfPatternWithTz);
     }
