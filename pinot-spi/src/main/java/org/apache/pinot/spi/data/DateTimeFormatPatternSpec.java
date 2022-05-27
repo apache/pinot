@@ -23,6 +23,7 @@ import java.util.Locale;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.joda.time.DateTimeZone;
@@ -79,6 +80,23 @@ public class DateTimeFormatPatternSpec {
 
   public DateTimeFormatter getDateTimeFormatter() {
     return _dateTimeFormatter;
+  }
+
+  /**
+   * Validates the format string in the dateTimeFieldSpec
+   */
+  public static void validateFormat(@Nonnull String sdfPatternWithTz) {
+    String sdfPattern;
+    DateTimeZone dateTimeZone = DEFAULT_DATETIMEZONE;
+    Matcher m = SDF_PATTERN_WITH_TIMEZONE.matcher(sdfPatternWithTz);
+    if (m.find()) {
+      sdfPattern = m.group(SDF_PATTERN_GROUP).trim();
+      String timezoneString = m.group(TIMEZONE_GROUP).trim();
+      dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timezoneString));
+    } else {
+      sdfPattern = sdfPatternWithTz;
+    }
+    DateTimeFormat.forPattern(sdfPattern).withZone(dateTimeZone);
   }
 
   @Override
