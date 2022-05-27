@@ -40,8 +40,24 @@ public interface SegmentPruner {
     if (segments.isEmpty()) {
       return segments;
     }
-    List<IndexSegment> selectedSegments = new ArrayList<>(segments.size());
-    for (IndexSegment segment : segments) {
+    int i = 0;
+    int size = segments.size();
+    List<IndexSegment> selectedSegments = null;
+    // Optimistic loop. Just in case the pruner doesn't actually prune any segment, in which case we can we just return
+    // the same segments received as parameter and avoid the copy (which can be quite large)
+    for (; i < size; i++) {
+      if (prune(segments.get(i), query)) {
+        selectedSegments = new ArrayList<>(size);
+        selectedSegments.addAll(segments.subList(0, i));
+        break;
+      }
+    }
+    if (selectedSegments == null) { // the optimistic loop didn't prune
+      return segments;
+    }
+    i++; // we don't need to check again the one that was pruned
+    for (; i < size; i++) {
+      IndexSegment segment = segments.get(i);
       if (!prune(segment, query)) {
         selectedSegments.add(segment);
       }
