@@ -136,8 +136,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
    */
   @Nullable
   public static ComplexTypeTransformer getComplexTypeTransformer(TableConfig tableConfig) {
-    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null
-    && tableConfig.getIngestionConfig().getComplexTypeConfig().getFieldsToUnnest() != null) {
+    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null) {
       return new ComplexTypeTransformer(tableConfig);
     }
     return null;
