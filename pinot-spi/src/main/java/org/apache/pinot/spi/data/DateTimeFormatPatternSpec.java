@@ -83,7 +83,7 @@ public class DateTimeFormatPatternSpec {
   }
 
   /**
-   * Validates the format string in the dateTimeFieldSpec
+   * Validates the sdf pattern
    */
   public static void validateFormat(@Nonnull String sdfPatternWithTz) {
     String sdfPattern;
