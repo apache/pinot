@@ -208,7 +208,7 @@ public class PinotLLCRealtimeSegmentManager {
     for (String segment : idealState.getRecord().getMapFields().keySet()) {
       // With Pinot upsert table allowing uploads of segments, the segment name of an upsert table segment may not
       // conform to LLCSegment format. We can skip such segments because they are NOT the consuming segments.
-      LLCSegmentName llcSegmentName = LLCSegmentName.getLLCSegmentName(segment);
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
       if (llcSegmentName == null) {
         continue;
       }
@@ -945,7 +945,7 @@ public class PinotLLCRealtimeSegmentManager {
       int partitionId = newLLCSegmentName.getPartitionGroupId();
       int seqNum = newLLCSegmentName.getSequenceNumber();
       for (String segmentNameStr : instanceStatesMap.keySet()) {
-        LLCSegmentName llcSegmentName = LLCSegmentName.getLLCSegmentName(segmentNameStr);
+        LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentNameStr);
         if (llcSegmentName == null) {
           // skip the segment name if the name is not in low-level consumer format
           // such segment name can appear for uploaded segment

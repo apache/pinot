@@ -117,7 +117,7 @@ public class ValidationManagerTest {
     // This should get ignored in the count as it belongs to a different group id
     segmentsZKMetadata.add(SegmentMetadataMockUtils.mockSegmentZKMetadata(segmentName4, 20));
 
-    assertEquals(RealtimeSegmentValidationManager.computeTotalDocumentCount(segmentsZKMetadata, false), 60);
+    assertEquals(RealtimeSegmentValidationManager.computeTotalDocumentCount(segmentsZKMetadata, true), 60);
 
     // Now add some LLC segments (both committed and uploaded)
     String segmentName5 = new LLCSegmentName(TEST_TABLE_NAME, 1, 0, 1000).getSegmentName();
@@ -127,7 +127,7 @@ public class ValidationManagerTest {
     segmentsZKMetadata.add(SegmentMetadataMockUtils.mockSegmentZKMetadata(TEST_SEGMENT_NAME, 15));
 
     // Only the LLC segments should get counted.
-    assertEquals(RealtimeSegmentValidationManager.computeTotalDocumentCount(segmentsZKMetadata, true), 30);
+    assertEquals(RealtimeSegmentValidationManager.computeTotalDocumentCount(segmentsZKMetadata, false), 30);
   }
 
   @Test

@@ -39,7 +39,7 @@ public class SegmentUtils {
   public static Integer getRealtimeSegmentPartitionId(String segmentName, String realtimeTableName,
       HelixManager helixManager, String partitionColumn) {
     // A fast path if the segmentName is an LLC segment name: get the partition id from the name directly
-    LLCSegmentName llcSegmentName = LLCSegmentName.getLLCSegmentName(segmentName);
+    LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
     if (llcSegmentName != null) {
       return llcSegmentName.getPartitionGroupId();
     }

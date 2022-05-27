@@ -221,7 +221,7 @@ public class PinotResourceManagerTest {
     Map<Integer, Set<String>> segmentAssignment = new HashMap<>();
     for (String segment : segments) {
       Integer partitionId;
-      LLCSegmentName llcSegmentName = LLCSegmentName.getLLCSegmentName(segment);
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
       if (llcSegmentName != null) {
         partitionId = llcSegmentName.getPartitionGroupId();
       } else {

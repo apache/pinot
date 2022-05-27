@@ -115,13 +115,14 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
 
     // Update the total document count gauge
-    // Count HLC segments if there is no LLC consumer configured
-    boolean hasLLC = streamConfig.hasLowLevelConsumerType();
+    // Count HLC segments if high level consumer is configured
+    boolean countHLCSegments = streamConfig.hasHighLevelConsumerType();
     _validationMetrics.updateTotalDocumentCountGauge(realtimeTableName,
-        computeTotalDocumentCount(segmentsZKMetadata, hasLLC));
+        computeTotalDocumentCount(segmentsZKMetadata, countHLCSegments));
 
     // Check missing segments and upload them to the deep store
-    if (hasLLC && _llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
+    if (streamConfig.hasLowLevelConsumerType()
+        && _llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
     }
   }
@@ -136,17 +137,9 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   }
 
   @VisibleForTesting
-  static long computeTotalDocumentCount(List<SegmentZKMetadata> segmentsZKMetadata, boolean hasLLC) {
+  static long computeTotalDocumentCount(List<SegmentZKMetadata> segmentsZKMetadata, boolean countHLCSegments) {
     long numTotalDocs = 0;
-    if (hasLLC) {
-      for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
-        String segmentName = segmentZKMetadata.getSegmentName();
-        if (!SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
-          // LLC segments or uploaded segments
-          numTotalDocs += segmentZKMetadata.getTotalDocs();
-        }
-      }
-    } else {
+    if (countHLCSegments) {
       String groupId = null;
       for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
         String segmentName = segmentZKMetadata.getSegmentName();
@@ -162,6 +155,14 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
               numTotalDocs += segmentZKMetadata.getTotalDocs();
             }
           }
+        }
+      }
+    } else {
+      for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+        String segmentName = segmentZKMetadata.getSegmentName();
+        if (!SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
+          // LLC segments or uploaded segments
+          numTotalDocs += segmentZKMetadata.getTotalDocs();
         }
       }
     }

@@ -73,7 +73,7 @@ public class LLCSegmentName extends SegmentName implements Comparable {
    * represent an LLC segment.
    */
   @Nullable
-  public static LLCSegmentName getLLCSegmentName(String segmentName) {
+  public static LLCSegmentName of(String segmentName) {
     String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
     if (parts.length != 4) {
       return null;

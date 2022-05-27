@@ -51,7 +51,7 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements PinotDataBuff
   protected RealtimeIndexOffHeapMemoryManager(ServerMetrics serverMetrics, String segmentName) {
     _serverMetrics = serverMetrics;
     _segmentName = segmentName;
-    LLCSegmentName llcSegmentName = LLCSegmentName.getLLCSegmentName(segmentName);
+    LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
     if (llcSegmentName != null) {
       _tableName = llcSegmentName.getTableName();
     } else if (SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
