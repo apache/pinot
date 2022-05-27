@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.spi.data;
 
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertThrows;
 
 public class DateTimeFormatPatternSpecTest {
 
@@ -36,7 +37,7 @@ public class DateTimeFormatPatternSpecTest {
     DateTimeFormatPatternSpec.validateFormat("yyyyMMddHH tz(HAHA/Chicago)");
 
     // invalid chars will throw
-    Assert.assertThrows(() -> DateTimeFormatPatternSpec.validateFormat("yyyc-MM-dd"));
-    Assert.assertThrows(() -> DateTimeFormatPatternSpec.validateFormat("yyyy-MM-dd ff(a)"));
+    assertThrows(IllegalStateException.class, () -> DateTimeFormatPatternSpec.validateFormat("yyyc-MM-dd"));
+    assertThrows(IllegalStateException.class, () -> DateTimeFormatPatternSpec.validateFormat("yyyy-MM-dd ff(a)"));
   }
 }

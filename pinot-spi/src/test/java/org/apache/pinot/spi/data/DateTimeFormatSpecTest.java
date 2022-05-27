@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.spi.data;
 
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertThrows;
 
 
 public class DateTimeFormatSpecTest {
@@ -31,11 +30,11 @@ public class DateTimeFormatSpecTest {
     DateTimeFormatSpec.validateFormat("1:DAYS:EPOCH");
     DateTimeFormatSpec.validateFormat("1:DAYS:TIMESTAMP");
     DateTimeFormatSpec.validateFormat("1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd");
-    Assert.assertThrows(() -> DateTimeFormatSpec.validateFormat("1:DAY"));
-    Assert.assertThrows(() -> DateTimeFormatSpec.validateFormat("one:DAYS:EPOCH"));
-    Assert.assertThrows(() -> DateTimeFormatSpec.validateFormat("1:DAY:EPOCH"));
-    Assert.assertThrows(() -> DateTimeFormatSpec.validateFormat("1:DAY:EPOCH:yyyyMMdd"));
-    Assert.assertThrows(() -> DateTimeFormatSpec.validateFormat("1:DAY:TIMESTAMP:yyyyMMdd"));
-    Assert.assertThrows(() -> DateTimeFormatSpec.validateFormat("1:DAY:SIMPLE_DATE_FORMAT:yyycMMdd"));
+    assertThrows(IllegalStateException.class, () -> DateTimeFormatSpec.validateFormat("1:DAY"));
+    assertThrows(IllegalStateException.class, () -> DateTimeFormatSpec.validateFormat("one:DAYS:EPOCH"));
+    assertThrows(IllegalStateException.class, () -> DateTimeFormatSpec.validateFormat("1:DAY:EPOCH"));
+    assertThrows(IllegalStateException.class, () -> DateTimeFormatSpec.validateFormat("1:DAY:EPOCH:yyyyMMdd"));
+    assertThrows(IllegalStateException.class, () -> DateTimeFormatSpec.validateFormat("1:DAY:TIMESTAMP:yyyyMMdd"));
+    assertThrows(IllegalStateException.class, () -> DateTimeFormatSpec.validateFormat("1:DAY:SIMPLE_DATE_FORMAT:yyycMMdd"));
   }
 }
