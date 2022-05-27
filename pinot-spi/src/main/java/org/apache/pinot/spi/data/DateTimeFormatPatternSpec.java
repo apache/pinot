@@ -81,6 +81,27 @@ public class DateTimeFormatPatternSpec {
     return _dateTimeFormatter;
   }
 
+  /**
+   * Validates the sdf pattern
+   */
+  public static void validateFormat(String sdfPatternWithTz) {
+    try {
+      String sdfPattern;
+      Matcher m = SDF_PATTERN_WITH_TIMEZONE.matcher(sdfPatternWithTz);
+      if (m.find()) {
+        sdfPattern = m.group(SDF_PATTERN_GROUP).trim();
+        String timezoneString = m.group(TIMEZONE_GROUP).trim();
+        DateTimeZone dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timezoneString));
+        DateTimeFormat.forPattern(sdfPattern).withZone(dateTimeZone);
+      } else {
+        sdfPattern = sdfPatternWithTz;
+        DateTimeFormat.forPattern(sdfPattern);
+      }
+    } catch (Exception e) {
+      throw new IllegalStateException("Unsupported simple date format pattern or time zone: " + sdfPatternWithTz);
+    }
+  }
+
   @Override
   public boolean equals(Object o) {
     if (EqualityUtils.isSameReference(this, o)) {

@@ -40,6 +40,8 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertThrows;
+
 
 /**
  * Tests schema validations
@@ -237,9 +239,8 @@ public class SchemaUtilsTest {
     SchemaUtils.validate(pinotSchema);
 
     // date time field spec using SIMPLE_DATE_FORMAT needs to be valid.
-    pinotSchema = new Schema.SchemaBuilder()
-        .addDateTime("datetime3", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:foo_bar", "1:DAYS").build();
-    checkValidationFails(pinotSchema);
+    assertThrows(IllegalStateException.class, () -> new Schema.SchemaBuilder()
+        .addDateTime("datetime3", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:foo_bar", "1:DAYS").build());
 
     // date time field spec using SIMPLE_DATE_FORMAT needs to be lexicographical order.
     pinotSchema = new Schema.SchemaBuilder()
