@@ -117,18 +117,18 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         continue;
       }
 
-      // Get all segment metadata for completed segments (DONE status).
+      // Get all segment metadata for completed segments (DONE/UPLOADED status).
       List<SegmentZKMetadata> completedSegmentsZKMetadata = new ArrayList<>();
-      Map<Integer, String> partitionToLatestCompletedSegmentName = new HashMap<>();
+      Map<Integer, String> partitionToLatestLLCSegmentName = new HashMap<>();
       Set<Integer> allPartitions = new HashSet<>();
-      getCompletedSegmentsInfo(realtimeTableName, completedSegmentsZKMetadata, partitionToLatestCompletedSegmentName,
+      getCompletedSegmentsInfo(realtimeTableName, completedSegmentsZKMetadata, partitionToLatestLLCSegmentName,
           allPartitions);
       if (completedSegmentsZKMetadata.isEmpty()) {
         LOGGER.info("No realtime-completed segments found for table: {}, skipping task generation: {}",
             realtimeTableName, taskType);
         continue;
       }
-      allPartitions.removeAll(partitionToLatestCompletedSegmentName.keySet());
+      allPartitions.removeAll(partitionToLatestLLCSegmentName.keySet());
       if (!allPartitions.isEmpty()) {
         LOGGER.info(
             "Partitions: {} have no completed segments. Table: {} is not ready for {}. Skipping task generation.",
@@ -158,7 +158,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       // (exclusive)
       List<String> segmentNames = new ArrayList<>();
       List<String> downloadURLs = new ArrayList<>();
-      Set<String> lastCompletedSegmentPerPartition = new HashSet<>(partitionToLatestCompletedSegmentName.values());
+      Set<String> lastLLCSegmentPerPartition = new HashSet<>(partitionToLatestLLCSegmentName.values());
       boolean skipGenerate = false;
       while (true) {
         // Check that execution window is older than bufferTime
@@ -180,7 +180,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
             // If last completed segment is being used, make sure that segment crosses over end of window.
             // In the absence of this check, CONSUMING segments could contain some portion of the window. That data
             // would be skipped forever.
-            if (lastCompletedSegmentPerPartition.contains(segmentName) && segmentEndTimeMs < windowEndMs) {
+            if (lastLLCSegmentPerPartition.contains(segmentName) && segmentEndTimeMs < windowEndMs) {
               LOGGER.info("Window data overflows into CONSUMING segments for partition of segment: {}. Skipping task "
                   + "generation: {}", segmentName, taskType);
               skipGenerate = true;
@@ -243,41 +243,42 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
   }
 
   /**
-   * Fetch completed (non-consuming) segment and partition information
+   * Fetch completed (DONE/UPLOADED) segment and partition information
+   *
    * @param realtimeTableName the realtime table name
-   * @param completedSegmentsZKMetadata list for collecting the completed segments ZK metadata
-   * @param partitionToLatestCompletedSegmentName map for collecting the partitionId to the latest completed segment
-   *                                              name
+   * @param completedSegmentsZKMetadata list for collecting the completed (DONE/UPLOADED) segments ZK metadata
+   * @param partitionToLatestLLCSegmentName map for collecting the partitionId to the latest LLC segment name
    * @param allPartitions set for collecting all partition ids
    */
   private void getCompletedSegmentsInfo(String realtimeTableName, List<SegmentZKMetadata> completedSegmentsZKMetadata,
-      Map<Integer, String> partitionToLatestCompletedSegmentName, Set<Integer> allPartitions) {
+      Map<Integer, String> partitionToLatestLLCSegmentName, Set<Integer> allPartitions) {
     List<SegmentZKMetadata> segmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(realtimeTableName);
 
     Map<Integer, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
-      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
-      allPartitions.add(llcSegmentName.getPartitionGroupId());
-
-      if (segmentZKMetadata.getStatus().equals(Segment.Realtime.Status.DONE)) {
+      Segment.Realtime.Status status = segmentZKMetadata.getStatus();
+      if (status.isCompleted()) {
         completedSegmentsZKMetadata.add(segmentZKMetadata);
-        latestLLCSegmentNameMap.compute(llcSegmentName.getPartitionGroupId(),
-            (partitionGroupId, latestLLCSegmentName) -> {
-              if (latestLLCSegmentName == null) {
-                return llcSegmentName;
-              } else {
-                if (llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
-                  return llcSegmentName;
-                } else {
-                  return latestLLCSegmentName;
-                }
-              }
-            });
+      }
+      LLCSegmentName llcSegmentName = LLCSegmentName.getLLCSegmentName(segmentZKMetadata.getSegmentName());
+      if (llcSegmentName != null) {
+        int partitionId = llcSegmentName.getPartitionGroupId();
+        allPartitions.add(partitionId);
+        if (status.isCompleted()) {
+          latestLLCSegmentNameMap.compute(partitionId, (k, latestLLCSegmentName) -> {
+            if (latestLLCSegmentName == null
+                || llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
+              return llcSegmentName;
+            } else {
+              return latestLLCSegmentName;
+            }
+          });
+        }
       }
     }
 
     for (Map.Entry<Integer, LLCSegmentName> entry : latestLLCSegmentNameMap.entrySet()) {
-      partitionToLatestCompletedSegmentName.put(entry.getKey(), entry.getValue().getSegmentName());
+      partitionToLatestLLCSegmentName.put(entry.getKey(), entry.getValue().getSegmentName());
     }
   }
 

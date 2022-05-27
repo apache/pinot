@@ -118,11 +118,6 @@ public class SegmentCompletionManager {
     return System.currentTimeMillis();
   }
 
-  public StreamPartitionMsgOffsetFactory getStreamPartitionMsgOffsetFactory(String segmentName) {
-    final LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-    return getStreamPartitionMsgOffsetFactory(llcSegmentName);
-  }
-
   protected StreamPartitionMsgOffsetFactory getStreamPartitionMsgOffsetFactory(LLCSegmentName llcSegmentName) {
     final String rawTableName = llcSegmentName.getTableName();
     TableConfig tableConfig = _segmentManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
@@ -149,7 +144,7 @@ public class SegmentCompletionManager {
         final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(segmentName.getTableName());
         SegmentZKMetadata segmentMetadata =
             _segmentManager.getSegmentZKMetadata(realtimeTableName, segmentName.getSegmentName(), null);
-        if (segmentMetadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)) {
+        if (segmentMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
           // Best to go through the state machine for this case as well, so that all code regarding state handling is
           // in one place
           // Also good for synchronization, because it is possible that multiple threads take this path, and we don't

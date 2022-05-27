@@ -156,10 +156,10 @@ public class PinotLLCRealtimeSegmentManager {
   private final Lock[] _idealStateUpdateLocks;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
   private final boolean _isDeepStoreLLCSegmentUploadRetryEnabled;
+  private final FileUploadDownloadClient _fileUploadDownloadClient;
+  private final AtomicInteger _numCompletingSegments = new AtomicInteger(0);
 
   private volatile boolean _isStopping = false;
-  private AtomicInteger _numCompletingSegments = new AtomicInteger(0);
-  private FileUploadDownloadClient _fileUploadDownloadClient;
 
   public PinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics) {
@@ -179,9 +179,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
     _isDeepStoreLLCSegmentUploadRetryEnabled = controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
-    if (_isDeepStoreLLCSegmentUploadRetryEnabled) {
-      _fileUploadDownloadClient = initFileUploadDownloadClient();
-    }
+    _fileUploadDownloadClient = _isDeepStoreLLCSegmentUploadRetryEnabled ? initFileUploadDownloadClient() : null;
   }
 
   public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
@@ -210,10 +208,10 @@ public class PinotLLCRealtimeSegmentManager {
     for (String segment : idealState.getRecord().getMapFields().keySet()) {
       // With Pinot upsert table allowing uploads of segments, the segment name of an upsert table segment may not
       // conform to LLCSegment format. We can skip such segments because they are NOT the consuming segments.
-      if (!LLCSegmentName.isLowLevelConsumerSegmentName(segment)) {
+      LLCSegmentName llcSegmentName = LLCSegmentName.getLLCSegmentName(segment);
+      if (llcSegmentName == null) {
         continue;
       }
-      LLCSegmentName llcSegmentName = new LLCSegmentName(segment);
       int partitionGroupId = llcSegmentName.getPartitionGroupId();
       partitionGroupIdToLatestSegment.compute(partitionGroupId, (k, latestSegment) -> {
         if (latestSegment == null) {
@@ -249,8 +247,8 @@ public class PinotLLCRealtimeSegmentManager {
 
   public void stop() {
     _isStopping = true;
-    LOGGER
-        .info("Awaiting segment metadata commits: maxWaitTimeMillis = {}", MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS);
+    LOGGER.info("Awaiting segment metadata commits: maxWaitTimeMillis = {}",
+        MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS);
     long millisToWait = MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS;
 
     // Busy-wait for all segments that are committing metadata to complete their operation.
@@ -363,11 +361,11 @@ public class PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   InstancePartitions getConsumingInstancePartitions(TableConfig tableConfig) {
     try {
-      return InstancePartitionsUtils
-          .fetchOrComputeInstancePartitions(_helixManager, tableConfig, InstancePartitionsType.CONSUMING);
+      return InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixManager, tableConfig,
+          InstancePartitionsType.CONSUMING);
     } catch (Exception e) {
-      _controllerMetrics
-          .addMeteredTableValue(tableConfig.getTableName(), ControllerMeter.LLC_ZOOKEEPER_FETCH_FAILURES, 1L);
+      _controllerMetrics.addMeteredTableValue(tableConfig.getTableName(), ControllerMeter.LLC_ZOOKEEPER_FETCH_FAILURES,
+          1L);
       throw e;
     }
   }
@@ -399,12 +397,11 @@ public class PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   SegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName, @Nullable Stat stat) {
     try {
-      ZNRecord znRecord = _propertyStore
-          .get(ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segmentName), stat,
-              AccessOption.PERSISTENT);
-      Preconditions
-          .checkState(znRecord != null, "Failed to find segment ZK metadata for segment: %s of table: %s", segmentName,
-              realtimeTableName);
+      ZNRecord znRecord =
+          _propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segmentName),
+              stat, AccessOption.PERSISTENT);
+      Preconditions.checkState(znRecord != null, "Failed to find segment ZK metadata for segment: %s of table: %s",
+          segmentName, realtimeTableName);
       return new SegmentZKMetadata(znRecord);
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ZOOKEEPER_FETCH_FAILURES, 1L);
@@ -417,9 +414,9 @@ public class PinotLLCRealtimeSegmentManager {
     String segmentName = segmentZKMetadata.getSegmentName();
     LOGGER.info("Persisting segment ZK metadata for segment: {}", segmentName);
     try {
-      Preconditions.checkState(_propertyStore
-              .set(ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segmentName),
-                  segmentZKMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT),
+      Preconditions.checkState(
+          _propertyStore.set(ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segmentName),
+              segmentZKMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT),
           "Failed to persist segment ZK metadata for segment: %s of table: %s", segmentName, realtimeTableName);
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1L);
@@ -522,9 +519,9 @@ public class PinotLLCRealtimeSegmentManager {
     TableConfig tableConfig = getTableConfig(realtimeTableName);
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
     IdealState idealState = getIdealState(realtimeTableName);
-    Preconditions
-        .checkState(idealState.getInstanceStateMap(committingSegmentName).containsValue(SegmentStateModel.CONSUMING),
-            "Failed to find instance in CONSUMING state in IdealState for segment: %s", committingSegmentName);
+    Preconditions.checkState(
+        idealState.getInstanceStateMap(committingSegmentName).containsValue(SegmentStateModel.CONSUMING),
+        "Failed to find instance in CONSUMING state in IdealState for segment: %s", committingSegmentName);
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
     /*
@@ -668,9 +665,9 @@ public class PinotLLCRealtimeSegmentManager {
     String segmentName = newLLCSegmentName.getSegmentName();
     String startOffset = committingSegmentDescriptor.getNextOffset();
 
-    LOGGER
-        .info("Creating segment ZK metadata for new CONSUMING segment: {} with start offset: {} and creation time: {}",
-            segmentName, startOffset, creationTimeMs);
+    LOGGER.info(
+        "Creating segment ZK metadata for new CONSUMING segment: {} with start offset: {} and creation time: {}",
+        segmentName, startOffset, creationTimeMs);
 
     SegmentZKMetadata newSegmentZKMetadata = new SegmentZKMetadata(segmentName);
     newSegmentZKMetadata.setCreationTime(creationTimeMs);
@@ -761,8 +758,8 @@ public class PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList) {
-    return PinotTableIdealStateBuilder
-        .getPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
+    return PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfig,
+        currentPartitionGroupConsumptionStatusList);
   }
 
   /**
@@ -869,8 +866,8 @@ public class PinotLLCRealtimeSegmentManager {
    * TODO: We need to find a place to detect and update a gauge for nonConsumingPartitionsCount for a table, and
    * reset it to 0 at the end of validateLLC
    */
-  public void ensureAllPartitionsConsuming(TableConfig tableConfig,
-      PartitionLevelStreamConfig streamConfig, boolean recreateDeletedConsumingSegment) {
+  public void ensureAllPartitionsConsuming(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
+      boolean recreateDeletedConsumingSegment) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
@@ -931,8 +928,8 @@ public class PinotLLCRealtimeSegmentManager {
     if (committingSegmentName != null) {
       // Change committing segment state to ONLINE
       Set<String> instances = instanceStatesMap.get(committingSegmentName).keySet();
-      instanceStatesMap
-          .put(committingSegmentName, SegmentAssignmentUtils.getInstanceStateMap(instances, SegmentStateModel.ONLINE));
+      instanceStatesMap.put(committingSegmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instances, SegmentStateModel.ONLINE));
       LOGGER.info("Updating segment: {} to ONLINE state", committingSegmentName);
     }
 
@@ -948,13 +945,13 @@ public class PinotLLCRealtimeSegmentManager {
       int partitionId = newLLCSegmentName.getPartitionGroupId();
       int seqNum = newLLCSegmentName.getSequenceNumber();
       for (String segmentNameStr : instanceStatesMap.keySet()) {
-        if (!LLCSegmentName.isLowLevelConsumerSegmentName(segmentNameStr)) {
+        LLCSegmentName llcSegmentName = LLCSegmentName.getLLCSegmentName(segmentNameStr);
+        if (llcSegmentName == null) {
           // skip the segment name if the name is not in low-level consumer format
           // such segment name can appear for uploaded segment
           LOGGER.debug("Skip segment name {} not in low-level consumer format", segmentNameStr);
           continue;
         }
-        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentNameStr);
         if (llcSegmentName.getPartitionGroupId() == partitionId && llcSegmentName.getSequenceNumber() == seqNum) {
           String errorMsg =
               String.format("Segment %s is a duplicate of existing segment %s", newSegmentName, segmentNameStr);
@@ -1140,18 +1137,18 @@ public class PinotLLCRealtimeSegmentManager {
                 segmentAssignment, instancePartitionsMap, startOffset);
           } else {
             if (newPartitionGroupSet.contains(partitionGroupId)) {
-              if (recreateDeletedConsumingSegment && Status.DONE.equals(latestSegmentZKMetadata.getStatus())
+              if (recreateDeletedConsumingSegment && latestSegmentZKMetadata.getStatus().isCompleted()
                   && isAllInstancesInState(instanceStateMap, SegmentStateModel.ONLINE)) {
                 // If we get here, that means in IdealState, the latest segment has all replicas ONLINE.
                 // Create a new IN_PROGRESS segment in PROPERTYSTORE,
                 // add it as CONSUMING segment to IDEALSTATE.
                 StreamPartitionMsgOffset startOffset = offsetFactory.create(latestSegmentZKMetadata.getEndOffset());
                 createNewConsumingSegment(tableConfig, streamConfig, latestSegmentZKMetadata, currentTimeMs,
-                    partitionGroupId, newPartitionGroupMetadataList, instancePartitions,
-                    instanceStatesMap, segmentAssignment, instancePartitionsMap, startOffset);
+                    partitionGroupId, newPartitionGroupMetadataList, instancePartitions, instanceStatesMap,
+                    segmentAssignment, instancePartitionsMap, startOffset);
               } else {
-                LOGGER.error("Got unexpected instance state map: {} for segment: {}",
-                    instanceStateMap, latestSegmentName);
+                LOGGER.error("Got unexpected instance state map: {} for segment: {}", instanceStateMap,
+                    latestSegmentName);
               }
             }
             // else, the partition group has reached end of life. This is an acceptable state
@@ -1173,17 +1170,16 @@ public class PinotLLCRealtimeSegmentManager {
           // Find the previous CONSUMING segment
           String previousConsumingSegment = null;
           for (Map.Entry<String, Map<String, String>> segmentEntry : instanceStatesMap.entrySet()) {
-            LLCSegmentName llcSegmentName = new LLCSegmentName(segmentEntry.getKey());
-            if (llcSegmentName.getPartitionGroupId() == partitionGroupId && segmentEntry.getValue()
-                .containsValue(SegmentStateModel.CONSUMING)) {
-              previousConsumingSegment = llcSegmentName.getSegmentName();
+            if (segmentEntry.getValue().containsValue(SegmentStateModel.CONSUMING)
+                && new LLCSegmentName(segmentEntry.getKey()).getPartitionGroupId() == partitionGroupId) {
+              previousConsumingSegment = segmentEntry.getKey();
               break;
             }
           }
           if (previousConsumingSegment == null) {
-            LOGGER
-                .error("Failed to find previous CONSUMING segment for partition: {} of table: {}, potential data loss",
-                    partitionGroupId, realtimeTableName);
+            LOGGER.error(
+                "Failed to find previous CONSUMING segment for partition: {} of table: {}, potential data loss",
+                partitionGroupId, realtimeTableName);
             _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
           }
           updateInstanceStatesForNewConsumingSegment(instanceStatesMap, previousConsumingSegment, latestSegmentName,
@@ -1232,9 +1228,8 @@ public class PinotLLCRealtimeSegmentManager {
 
     CommittingSegmentDescriptor committingSegmentDescriptor =
         new CommittingSegmentDescriptor(latestSegmentZKMetadata.getSegmentName(), startOffset.toString(), 0);
-    createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
-        committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions,
-        numReplicas, newPartitionGroupMetadataList);
+    createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs, committingSegmentDescriptor,
+        latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas, newPartitionGroupMetadataList);
     String newSegmentName = newLLCSegmentName.getSegmentName();
     updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, newSegmentName, segmentAssignment,
         instancePartitionsMap);
@@ -1338,13 +1333,9 @@ public class PinotLLCRealtimeSegmentManager {
    * TODO: Add an on-demand way to upload LLC segment to deep store for a specific table.
    */
   public void uploadToDeepStoreIfMissing(TableConfig tableConfig, List<SegmentZKMetadata> segmentsZKMetadata) {
-    String realtimeTableName = tableConfig.getTableName();
+    Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
-    if (_isStopping) {
-      LOGGER.info("Skipped fixing deep store copy of LLC segments for table {}, because segment manager is stopping.",
-          realtimeTableName);
-      return;
-    }
+    String realtimeTableName = tableConfig.getTableName();
 
     // Use this retention value to avoid the data racing between segment upload and retention management.
     RetentionStrategy retentionStrategy = null;
@@ -1367,11 +1358,8 @@ public class PinotLLCRealtimeSegmentManager {
       //  servers. We may need to rate control the upload request if it is changed to be in parallel.
       String segmentName = segmentZKMetadata.getSegmentName();
       try {
-        if (!LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
-          continue;
-        }
-        // Only fix the committed / externally uploaded llc segment without deep store copy
-        if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS
+        // Only fix the committed (DONE) LLC segment without deep store copy (empty download URL)
+        if (!SegmentName.isLowLevelConsumerSegmentName(segmentName) || segmentZKMetadata.getStatus() != Status.DONE
             || !CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segmentZKMetadata.getDownloadUrl())) {
           continue;
         }
@@ -1386,8 +1374,9 @@ public class PinotLLCRealtimeSegmentManager {
         List<URI> peerSegmentURIs =
             PeerServerSegmentFinder.getPeerServerURIs(segmentName, CommonConstants.HTTP_PROTOCOL, _helixManager);
         if (peerSegmentURIs.isEmpty()) {
-          throw new IllegalStateException(String
-              .format("Failed to upload segment %s to deep store because no online replica is found", segmentName));
+          throw new IllegalStateException(
+              String.format("Failed to upload segment %s to deep store because no online replica is found",
+                  segmentName));
         }
 
         // Randomly ask one server to upload
@@ -1404,8 +1393,8 @@ public class PinotLLCRealtimeSegmentManager {
         LOGGER.info("Successfully uploaded LLC segment {} to deep store with download url: {}", segmentName,
             segmentDownloadUrl);
       } catch (Exception e) {
-        _controllerMetrics
-            .addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR, 1L);
+        _controllerMetrics.addMeteredTableValue(realtimeTableName,
+            ControllerMeter.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR, 1L);
         LOGGER.error("Failed to upload segment {} to deep store", segmentName, e);
       }
     }
