@@ -35,6 +35,7 @@ public class DateTimeFormatSpecTest {
     assertThrows(IllegalStateException.class, () -> DateTimeFormatSpec.validateFormat("1:DAY:EPOCH"));
     assertThrows(IllegalStateException.class, () -> DateTimeFormatSpec.validateFormat("1:DAY:EPOCH:yyyyMMdd"));
     assertThrows(IllegalStateException.class, () -> DateTimeFormatSpec.validateFormat("1:DAY:TIMESTAMP:yyyyMMdd"));
-    assertThrows(IllegalStateException.class, () -> DateTimeFormatSpec.validateFormat("1:DAY:SIMPLE_DATE_FORMAT:yyycMMdd"));
+    assertThrows(IllegalStateException.class,
+        () -> DateTimeFormatSpec.validateFormat("1:DAY:SIMPLE_DATE_FORMAT:yyycMMdd"));
   }
 }
