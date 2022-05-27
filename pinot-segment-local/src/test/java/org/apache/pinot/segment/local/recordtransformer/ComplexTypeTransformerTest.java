@@ -22,12 +22,17 @@ import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -298,8 +303,8 @@ public class ComplexTypeTransformerTest {
     // {
     //   "array":"[1,2]"
     // }
-    transformer = new ComplexTypeTransformer(Arrays.asList(), ".",
-            ComplexTypeConfig.CollectionNotUnnestedToJson.ALL, new HashMap<>());
+    transformer = new ComplexTypeTransformer(Arrays.asList(), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.ALL,
+        new HashMap<>());
     genericRow = new GenericRow();
     array = new Object[]{1, 2};
     genericRow.putValue("array", array);
@@ -344,8 +349,8 @@ public class ComplexTypeTransformerTest {
     array1[0] = ImmutableMap.of("b", "v1");
     map.put("array1", array1);
     genericRow.putValue("t", map);
-    transformer = new ComplexTypeTransformer(Arrays.asList(), ".",
-            ComplexTypeConfig.CollectionNotUnnestedToJson.NONE, new HashMap<>());
+    transformer = new ComplexTypeTransformer(Arrays.asList(), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NONE,
+        new HashMap<>());
     transformer.transform(genericRow);
     Assert.assertTrue(ComplexTypeTransformer.isArray(genericRow.getValue("t.array1")));
   }
@@ -355,8 +360,8 @@ public class ComplexTypeTransformerTest {
     HashMap<String, String> prefixesToRename = new HashMap<>();
     prefixesToRename.put("map1.", "");
     prefixesToRename.put("map2", "test");
-    ComplexTypeTransformer transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
-            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+    ComplexTypeTransformer transformer =
+        new ComplexTypeTransformer(new ArrayList<>(), ".", DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
 
     GenericRow genericRow = new GenericRow();
     genericRow.putValue("a", 1L);
@@ -370,8 +375,7 @@ public class ComplexTypeTransformerTest {
     // name conflict where there becomes duplicate field names after renaming
     prefixesToRename = new HashMap<>();
     prefixesToRename.put("test.", "");
-    transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
-            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+    transformer = new ComplexTypeTransformer(new ArrayList<>(), ".", DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
     genericRow = new GenericRow();
     genericRow.putValue("a", 1L);
     genericRow.putValue("test.a", 2L);
@@ -385,8 +389,7 @@ public class ComplexTypeTransformerTest {
     // name conflict where there becomes an empty field name after renaming
     prefixesToRename = new HashMap<>();
     prefixesToRename.put("test", "");
-    transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
-            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+    transformer = new ComplexTypeTransformer(new ArrayList<>(), ".", DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
     genericRow = new GenericRow();
     genericRow.putValue("a", 1L);
     genericRow.putValue("test", 2L);
@@ -399,8 +402,7 @@ public class ComplexTypeTransformerTest {
 
     // case where nothing gets renamed
     prefixesToRename = new HashMap<>();
-    transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
-            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+    transformer = new ComplexTypeTransformer(new ArrayList<>(), ".", DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
     genericRow = new GenericRow();
     genericRow.putValue("a", 1L);
     genericRow.putValue("test", 2L);
@@ -414,8 +416,8 @@ public class ComplexTypeTransformerTest {
     HashMap<String, String> prefixesToRename = new HashMap<>();
     prefixesToRename.put("map1.", "");
     prefixesToRename.put("map2", "test");
-    ComplexTypeTransformer transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
-            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+    ComplexTypeTransformer transformer =
+        new ComplexTypeTransformer(new ArrayList<>(), ".", DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
 
     // test flatten root-level tuples
     GenericRow genericRow = new GenericRow();
@@ -437,5 +439,27 @@ public class ComplexTypeTransformerTest {
     Assert.assertEquals(genericRow.getValue("im1.aa"), 2);
     Assert.assertEquals(genericRow.getValue("im1.bb"), "u");
     Assert.assertEquals(genericRow.getValue("test.c"), 3);
+  }
+
+  @Test
+  public void getComplexTypeTransformerTest() {
+    ComplexTypeConfig complexTypeConfigWithNullFields = new ComplexTypeConfig(null, null, null, null);
+
+    IngestionConfig ingestionConfig = new IngestionConfig(null, null, null, null, complexTypeConfigWithNullFields);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test_null").setIngestionConfig(ingestionConfig).build();
+
+    ComplexTypeTransformer complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
+    Assert.assertNull(complexTypeTransformer);
+
+    List<String> fieldToUnnest = Collections.singletonList("foo_bar");
+    ComplexTypeConfig complexTypeConfigWithNonNullField =
+        new ComplexTypeConfig(fieldToUnnest, null, null, null);
+    ingestionConfig = new IngestionConfig(null, null, null, null, complexTypeConfigWithNonNullField);
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test_non_null").setIngestionConfig(ingestionConfig)
+            .build();
+    complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
+    Assert.assertNotNull(complexTypeTransformer);
   }
 }
