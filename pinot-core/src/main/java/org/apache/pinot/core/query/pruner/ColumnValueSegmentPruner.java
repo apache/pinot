@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -79,14 +80,16 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
   }
 
   @Override
+  public boolean isApplicableTo(QueryContext query) {
+    return query.getFilter() != null;
+  }
+
+  @Override
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
     if (segments.isEmpty()) {
       return segments;
     }
-    FilterContext filter = query.getFilter();
-    if (filter == null) {
-      return segments;
-    }
+    FilterContext filter = Objects.requireNonNull(query.getFilter());
 
     // Extract EQ/IN/RANGE predicate columns
     Set<String> eqInColumns = new HashSet<>();
@@ -110,8 +113,6 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
           Map<String, List<ColumnIndexType>> columnToIndexList = new HashMap<>();
           for (String column : eqInColumns) {
             DataSource dataSource = segment.getDataSource(column);
-            // NOTE: Column must exist after DataSchemaSegmentPruner
-            assert dataSource != null;
             dataSourceCache.put(column, dataSource);
             if (dataSource.getBloomFilter() != null) {
               columnToIndexList.put(column, Collections.singletonList(ColumnIndexType.BLOOM_FILTER));
