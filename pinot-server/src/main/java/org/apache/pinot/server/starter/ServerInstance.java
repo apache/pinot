@@ -183,7 +183,7 @@ public class ServerInstance {
       _grpcQueryServer.start();
     }
 
-    _dataManagerStarted = true;
+    _queryServerStarted = true;
     LOGGER.info("Finish starting query server");
   }
 
