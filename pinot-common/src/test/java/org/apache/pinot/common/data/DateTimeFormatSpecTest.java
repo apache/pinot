@@ -75,6 +75,36 @@ public class DateTimeFormatSpecTest {
     });
     entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH Z", "20170701 00 -07:00", 1498892400000L});
     entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", "8/7/2017 12:45:50 AM", 1502066750000L});
+    entries.add(new Object[]{"EPOCH|HOURS|1", "416359", 1498892400000L});
+    entries.add(new Object[]{"EPOCH|HOURS", "416359", 1498892400000L});
+    entries.add(new Object[]{"EPOCH|MILLISECONDS|1", "1498892400000", 1498892400000L});
+    entries.add(new Object[]{"EPOCH|MILLISECONDS", "1498892400000", 1498892400000L});
+    entries.add(new Object[]{"EPOCH|HOURS|1", "0", 0L});
+    entries.add(new Object[]{"EPOCH|HOURS", "0", 0L});
+    entries.add(new Object[]{"EPOCH|MINUTES|5", "4996308", 1498892400000L});
+    entries.add(new Object[]{
+        "TIMESTAMP", "2017-07-01 00:00:00", Timestamp.valueOf("2017-07-01 00:00:00").getTime()
+    });
+    entries.add(new Object[]{"TIMESTAMP", "1498892400000", 1498892400000L});
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd", "20170701",
+        DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC().parseMillis("20170701")
+    });
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd|America/Chicago", "20170701", DateTimeFormat.forPattern("yyyyMMdd")
+        .withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("America/Chicago"))).parseMillis("20170701")
+    });
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd HH", "20170701 00",
+        DateTimeFormat.forPattern("yyyyMMdd HH").withZoneUTC().parseMillis("20170701 00")
+    });
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd HH|GMT+0600", "20170701 00", DateTimeFormat.forPattern("yyyyMMdd HH")
+        .withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("GMT+0600"))).parseMillis("20170701 00")
+    });
+    entries.add(new Object[]{"SIMPLE_DATE_FORMAT|yyyyMMdd HH Z", "20170701 00 -07:00", 1498892400000L});
+    entries.add(new Object[]{"SIMPLE_DATE_FORMAT|M/d/yyyy h:mm:ss a", "8/7/2017 12:45:50 AM", 1502066750000L});
+
     return entries.toArray(new Object[entries.size()][]);
   }
 
@@ -127,6 +157,47 @@ public class DateTimeFormatSpecTest {
     });
     entries.add(new Object[]{
         "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h a", 1502066750000L,
+        DateTimeFormat.forPattern("M/d/yyyy h a").withZoneUTC().withLocale(Locale.ENGLISH).print(1502066750000L)
+    });
+    entries.add(new Object[]{"EPOCH|HOURS|1", 1498892400000L, "416359"});
+    entries.add(new Object[]{"EPOCH|MILLISECONDS|1", 1498892400000L, "1498892400000"});
+    entries.add(new Object[]{"EPOCH|HOURS|1", 0L, "0"});
+    entries.add(new Object[]{"EPOCH|MINUTES|5", 1498892400000L, "4996308"});
+    entries.add(new Object[]{
+        "TIMESTAMP", Timestamp.valueOf("2017-07-01 00:00:00").getTime(), "2017-07-01 00:00:00.0"
+    });
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd", 1498892400000L,
+        DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC().print(1498892400000L)
+    });
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd|America/New_York", 1498892400000L, DateTimeFormat.forPattern("yyyyMMdd")
+        .withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("America/New_York"))).print(1498892400000L)
+    });
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd HH", 1498892400000L,
+        DateTimeFormat.forPattern("yyyyMMdd HH").withZoneUTC().print(1498892400000L)
+    });
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd HH|IST", 1498892400000L,
+        DateTimeFormat.forPattern("yyyyMMdd HH").withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))).print(
+            1498892400000L)
+    });
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd HH Z", 1498892400000L,
+        DateTimeFormat.forPattern("yyyyMMdd HH Z").withZoneUTC().print(1498892400000L)
+    });
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd HH Z|GMT+0500", 1498892400000L,
+        DateTimeFormat.forPattern("yyyyMMdd HH Z")
+            .withZone(DateTimeZone.forTimeZone(TimeZone.getTimeZone("GMT+0500"))).print(1498892400000L)
+    });
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|M/d/yyyy h:mm:ss a", 1498892400000L,
+        DateTimeFormat.forPattern("M/d/yyyy h:mm:ss a").withZoneUTC().withLocale(Locale.ENGLISH).print(1498892400000L)
+    });
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|M/d/yyyy h a", 1502066750000L,
         DateTimeFormat.forPattern("M/d/yyyy h a").withZoneUTC().withLocale(Locale.ENGLISH).print(1502066750000L)
     });
     return entries.toArray(new Object[entries.size()][]);
@@ -216,6 +287,61 @@ public class DateTimeFormatSpecTest {
 
     entries.add(new Object[]{
         "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a tz(Asia/Tokyo)", 1, TimeUnit.HOURS,
+        DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "M/d/yyyy h:mm:ss a",
+        DateTimeZone.forTimeZone(TimeZone.getTimeZone("Asia/Tokyo"))
+    });
+
+    //test new format
+    entries.add(
+        new Object[]{"TIMESTAMP", 1, TimeUnit.MILLISECONDS, TimeFormat.TIMESTAMP, null,
+            DateTimeZone.UTC});
+
+    entries.add(
+        new Object[]{"EPOCH|HOURS|1", 1, TimeUnit.HOURS, DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC});
+
+    entries.add(new Object[]{
+        "EPOCH|MINUTES|5", 5, TimeUnit.MINUTES, DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC
+    });
+
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd", 1, TimeUnit.DAYS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+        "yyyyMMdd", DateTimeZone.UTC
+    });
+
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd|IST", 1, TimeUnit.DAYS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+        "yyyyMMdd", DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))
+    });
+
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd|IST", 1, TimeUnit.DAYS,
+        DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd",
+        DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))
+    });
+
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd|IST", 1, TimeUnit.DAYS,
+        DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd",
+        DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))
+    });
+
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd HH", 1, TimeUnit.DAYS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+        "yyyyMMdd HH", DateTimeZone.UTC
+    });
+
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|yyyyMMdd HH|dummy", 1, TimeUnit.DAYS,
+        DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd HH", DateTimeZone.UTC
+    });
+
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|M/d/yyyy h:mm:ss a", 1, TimeUnit.DAYS,
+        DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "M/d/yyyy h:mm:ss a", DateTimeZone.UTC
+    });
+
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT|M/d/yyyy h:mm:ss a|Asia/Tokyo", 1, TimeUnit.DAYS,
         DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "M/d/yyyy h:mm:ss a",
         DateTimeZone.forTimeZone(TimeZone.getTimeZone("Asia/Tokyo"))
     });

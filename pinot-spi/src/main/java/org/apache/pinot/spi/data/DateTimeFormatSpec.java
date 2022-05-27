@@ -50,12 +50,16 @@ public class DateTimeFormatSpec {
   public static final int MAX_FORMAT_TOKENS = 4;
 
   public static final int FORMAT_TIMEFORMAT_POSITION_PIPE = 0;
-  public static final int FORMAT_PATTERN_POSITION_PIPE = 1;
-  public static final int FORMAT_UNIT_POSITION_PIPE = 1;
-  public static final int FORMAT_SIZE_POSITION_PIPE = 2;
-  public static final int FORMAT_TIMEZONE_POSITION_PIPE = 2;
   public static final int MIN_FORMAT_TOKENS_PIPE = 1;
   public static final int MAX_FORMAT_TOKENS_PIPE = 3;
+
+  //Applicable for SDF|<timeFormat>(|<timezone>)
+  public static final int SDF_PATTERN_POSITION = 1;
+  public static final int SDF_TIMEZONE_POSITION = 2;
+
+  //Applicable for EPOCH|<timeUnit>(|<size>)
+  public static final int EPOCH_UNIT_POSITION = 1;
+  public static final int EPOCH_SIZE_POSITION = 2;
 
   private final String _format;
   private final int _size;
@@ -84,9 +88,9 @@ public class DateTimeFormatSpec {
       String[] formatTokens = validatePipeFormat(format);
       if (formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE].equals(TimeFormat.EPOCH.toString())) {
         _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE]);
-        _unitSpec = new DateTimeFormatUnitSpec(formatTokens[FORMAT_UNIT_POSITION_PIPE]);
+        _unitSpec = new DateTimeFormatUnitSpec(formatTokens[EPOCH_UNIT_POSITION]);
         if (formatTokens.length == MAX_FORMAT_TOKENS_PIPE) {
-          _size = Integer.parseInt(formatTokens[FORMAT_SIZE_POSITION_PIPE]);
+          _size = Integer.parseInt(formatTokens[EPOCH_SIZE_POSITION]);
         } else {
           _size = 1;
         }
@@ -94,18 +98,18 @@ public class DateTimeFormatSpec {
         if (formatTokens.length == MAX_FORMAT_TOKENS_PIPE) {
           _patternSpec = new DateTimeFormatPatternSpec(TimeFormat.valueOf(
               formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE]),
-              formatTokens[FORMAT_PATTERN_POSITION_PIPE],
-              formatTokens[FORMAT_TIMEZONE_POSITION_PIPE]);
+              formatTokens[SDF_PATTERN_POSITION],
+              formatTokens[SDF_TIMEZONE_POSITION]);
         } else {
           _patternSpec = new DateTimeFormatPatternSpec(TimeFormat.valueOf(
               formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE]),
-              formatTokens[FORMAT_PATTERN_POSITION_PIPE], "UTC");
+              formatTokens[SDF_PATTERN_POSITION], DateTimeZone.UTC.toString());
         }
-        _unitSpec = new DateTimeFormatUnitSpec("DAYS");
+        _unitSpec = new DateTimeFormatUnitSpec(TimeUnit.DAYS.toString());
         _size = 1;
       } else {
         _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE]);
-        _unitSpec = new DateTimeFormatUnitSpec("MILLISECONDS");
+        _unitSpec = new DateTimeFormatUnitSpec(TimeUnit.MILLISECONDS.toString());
         _size = 1;
       }
     }
@@ -280,9 +284,9 @@ public class DateTimeFormatSpec {
             + " or 'SDF|<timeFormat>(|<timezone>)' or 'TIMESTAMP'");
     if (formatTokens.length == MAX_FORMAT_TOKENS_PIPE
         && formatTokens[FORMAT_SIZE_POSITION].equals(TimeFormat.EPOCH.toString())) {
-      Preconditions.checkState(formatTokens[FORMAT_SIZE_POSITION_PIPE].matches(NUMBER_REGEX),
+      Preconditions.checkState(formatTokens[EPOCH_SIZE_POSITION].matches(NUMBER_REGEX),
           "Incorrect format size: %s in format: %s. Must be of format 'EPOCH|<timeUnit>|[0-9]+'",
-          formatTokens[FORMAT_SIZE_POSITION_PIPE], format);
+          formatTokens[EPOCH_SIZE_POSITION], format);
     }
     return formatTokens;
   }

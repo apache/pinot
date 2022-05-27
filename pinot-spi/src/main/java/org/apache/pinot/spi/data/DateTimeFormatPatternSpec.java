@@ -70,14 +70,13 @@ public class DateTimeFormatPatternSpec {
       @Nullable String timeZone) {
     _timeFormat = timeFormat;
     if (_timeFormat.equals(DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT)) {
-      if (Objects.isNull(timeZone)) {
-        _dateTimeZone = DateTimeZone.UTC;
-      } else {
+      if (Objects.nonNull(timeZone)) {
         _dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timeZone));
       }
       _dateTimeFormatter = DateTimeFormat.forPattern(timeFormatStyle).
           withZone(_dateTimeZone).
           withLocale(DEFAULT_LOCALE);
+      _sdfPattern = timeFormatStyle;
     }
   }
 
