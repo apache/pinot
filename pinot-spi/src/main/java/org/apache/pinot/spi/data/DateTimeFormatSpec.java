@@ -285,11 +285,20 @@ public class DateTimeFormatSpec {
             && formatTokens.length <= MAX_FORMAT_TOKENS_PIPE,
         "Incorrect format: %s. Must be of the format 'EPOCH|<timeUnit>(|<size>)'"
             + " or 'SDF|<timeFormat>(|<timezone>)' or 'TIMESTAMP'");
-    if (formatTokens.length == MAX_FORMAT_TOKENS_PIPE
-        && formatTokens[FORMAT_SIZE_POSITION].equals(TimeFormat.EPOCH.toString())) {
-      Preconditions.checkState(formatTokens[EPOCH_SIZE_POSITION].matches(NUMBER_REGEX),
-          "Incorrect format size: %s in format: %s. Must be of format 'EPOCH|<timeUnit>|[0-9]+'",
-          formatTokens[EPOCH_SIZE_POSITION], format);
+    if (formatTokens.length == MIN_FORMAT_TOKENS_PIPE) {
+      Preconditions.checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE].equals(TimeFormat.TIMESTAMP.toString()),
+          "Incorrect format type: %s. Must be of TIMESTAMP", formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE]);
+    } else {
+      Preconditions.checkState(formatTokens[FORMAT_SIZE_POSITION].equals(TimeFormat.EPOCH.toString())
+              || formatTokens[FORMAT_SIZE_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
+          "Incorrect format %s. Must be of 'EPOCH|<timeUnit>(|<size>)' or" + "'SDF|<timeFormat>(|<timezone>)'");
+
+      if (formatTokens.length == MAX_FORMAT_TOKENS_PIPE
+          && formatTokens[FORMAT_SIZE_POSITION].equals(TimeFormat.EPOCH.toString())) {
+          Preconditions.checkState(formatTokens[EPOCH_SIZE_POSITION].matches(NUMBER_REGEX),
+              "Incorrect format size: %s in format: %s. Must be of format 'EPOCH|<timeUnit>|[0-9]+'",
+              formatTokens[EPOCH_SIZE_POSITION], format);
+      }
     }
     return formatTokens;
   }
