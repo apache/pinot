@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.creator.name;
 import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -46,8 +47,14 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentNameTemplate;
   private final URI _inputFileUri;
   private final String _segmentName;
+  private final boolean _appendUUIDToSegmentName;
 
   public InputFileSegmentNameGenerator(String filePathPattern, String segmentNameTemplate, String inputFileUri) {
+    this(filePathPattern, segmentNameTemplate, inputFileUri, false);
+  }
+
+  public InputFileSegmentNameGenerator(String filePathPattern, String segmentNameTemplate, String inputFileUri,
+      boolean appendUUIDToSegmentName) {
     Preconditions.checkArgument(filePathPattern != null, "Missing filePathPattern for InputFileSegmentNameGenerator");
     try {
       _filePathPattern = Pattern.compile(filePathPattern);
@@ -64,6 +71,7 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
       throw new IllegalArgumentException(
           String.format("Invalid inputFileUri: %s for InputFileSegmentNameGenerator", inputFileUri), e);
     }
+    _appendUUIDToSegmentName = appendUUIDToSegmentName;
     _segmentName = makeSegmentName();
   }
 
@@ -85,7 +93,7 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
 
   @Override
   public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
-    return _segmentName;
+    return JOINER.join(_segmentName, _appendUUIDToSegmentName ? UUID.randomUUID() : null);
   }
 
   private String safeConvertPathToFilename(String inputFilePath) {

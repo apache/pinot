@@ -23,6 +23,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.TimeZone;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
@@ -42,6 +43,7 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   private final boolean _excludeSequenceId;
   private final boolean _appendPushType;
   private final String _segmentNamePostfix;
+  private final boolean _appendUUIDToSegmentName;
 
   // For APPEND tables
   private final SimpleDateFormat _outputSDF;
@@ -53,6 +55,14 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   public NormalizedDateSegmentNameGenerator(String tableName, @Nullable String segmentNamePrefix,
       boolean excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency,
       @Nullable DateTimeFormatSpec dateTimeFormatSpec, @Nullable String segmentNamePostfix) {
+    this(tableName, segmentNamePrefix, excludeSequenceId, pushType, pushFrequency, dateTimeFormatSpec,
+        segmentNamePostfix, false);
+  }
+
+  public NormalizedDateSegmentNameGenerator(String tableName, @Nullable String segmentNamePrefix,
+      boolean excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency,
+      @Nullable DateTimeFormatSpec dateTimeFormatSpec, @Nullable String segmentNamePostfix,
+      boolean appendUUIDToSegmentName) {
     _segmentNamePrefix = segmentNamePrefix != null ? segmentNamePrefix.trim() : tableName;
     Preconditions
         .checkArgument(_segmentNamePrefix != null, "Missing segmentNamePrefix for NormalizedDateSegmentNameGenerator");
@@ -61,6 +71,7 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
     _excludeSequenceId = excludeSequenceId;
     _appendPushType = "APPEND".equalsIgnoreCase(pushType);
     _segmentNamePostfix = segmentNamePostfix != null ? segmentNamePostfix.trim() : null;
+    _appendUUIDToSegmentName = appendUUIDToSegmentName;
     Preconditions.checkArgument(_segmentNamePostfix == null || isValidSegmentName(_segmentNamePostfix),
         "Invalid segmentNamePostfix: %s for NormalizedDateSegmentNameGenerator", _segmentNamePostfix);
 
@@ -104,9 +115,10 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
       Preconditions.checkArgument(minTimeValue != null, "Missing minTimeValue for NormalizedDateSegmentNameGenerator");
       Preconditions.checkArgument(maxTimeValue != null, "Missing maxTimeValue for NormalizedDateSegmentNameGenerator");
       return JOINER.join(_segmentNamePrefix, getNormalizedDate(minTimeValue), getNormalizedDate(maxTimeValue),
-          _segmentNamePostfix, sequenceIdInSegmentName);
+          _segmentNamePostfix, sequenceIdInSegmentName, _appendUUIDToSegmentName ? UUID.randomUUID() : null);
     } else {
-      return JOINER.join(_segmentNamePrefix, _segmentNamePostfix, sequenceIdInSegmentName);
+      return JOINER.join(_segmentNamePrefix, _segmentNamePostfix, sequenceIdInSegmentName,
+          _appendUUIDToSegmentName ? UUID.randomUUID() : null);
     }
   }
 
