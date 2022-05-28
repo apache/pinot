@@ -103,7 +103,7 @@ public class DateTimeFormatSpec {
         } else {
           _patternSpec = new DateTimeFormatPatternSpec(TimeFormat.valueOf(
               formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE]),
-              formatTokens[SDF_PATTERN_POSITION], DateTimeZone.UTC.toString());
+              formatTokens[SDF_PATTERN_POSITION], DateTimeFormatPatternSpec.DEFAULT_DATETIMEZONE.toString());
         }
         _unitSpec = new DateTimeFormatUnitSpec(TimeUnit.DAYS.toString());
         _size = 1;
@@ -159,7 +159,7 @@ public class DateTimeFormatSpec {
 
   public DateTimeFormatSpec(String timeFormat, String columnTimeFormat, @Nullable String timeZone) {
     if (timeZone == null) {
-      timeZone = DateTimeZone.UTC.toString();
+      timeZone = DateTimeFormatPatternSpec.DEFAULT_DATETIMEZONE.toString();
       _format = Joiner.on(PIPE_SEPARATOR).join(timeFormat, columnTimeFormat);
     } else {
       _format = Joiner.on(PIPE_SEPARATOR).join(timeFormat, columnTimeFormat, timeZone);
@@ -258,7 +258,9 @@ public class DateTimeFormatSpec {
     Preconditions.checkState(formatTokens[FORMAT_SIZE_POSITION].matches(NUMBER_REGEX),
         "Incorrect format size: %s in format: %s. Must be of format '[0-9]+:<TimeUnit>:<TimeFormat>(:pattern)'",
         formatTokens[FORMAT_SIZE_POSITION], format);
+
     DateTimeFormatUnitSpec.validateUnitSpec(formatTokens[FORMAT_UNIT_POSITION]);
+
     if (formatTokens.length == MIN_FORMAT_TOKENS) {
       Preconditions.checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString())
               || formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.TIMESTAMP.toString()),
