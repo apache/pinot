@@ -43,24 +43,29 @@ public class KafkaPartitionLevelStreamConfigTest {
 
   private KafkaPartitionLevelStreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
       String socketTimeout, String fetcherSize, String fetcherMinBytes, String isolationLevel) {
+    return getStreamConfig(topic, bootstrapHosts, buffer, socketTimeout, fetcherSize, fetcherMinBytes, isolationLevel,
+        null);
+  }
+
+  private KafkaPartitionLevelStreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
+      String socketTimeout, String fetcherSize, String fetcherMinBytes, String isolationLevel,
+      String populateRowMetadata) {
     Map<String, String> streamConfigMap = new HashMap<>();
     String streamType = "kafka";
     String consumerType = StreamConfig.ConsumerType.LOWLEVEL.toString();
     String consumerFactoryClassName = KafkaConsumerFactory.class.getName();
     String tableNameWithType = "tableName_REALTIME";
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            topic);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
-    streamConfigMap.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        consumerFactoryClassName);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            KAFKA_DECODER_CLASS_NAME);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerType);
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClassName);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        KAFKA_DECODER_CLASS_NAME);
     streamConfigMap.put("stream.kafka.broker.list", bootstrapHosts);
     if (buffer != null) {
       streamConfigMap.put("stream.kafka.buffer.size", buffer);
@@ -76,6 +81,9 @@ public class KafkaPartitionLevelStreamConfigTest {
     }
     if (isolationLevel != null) {
       streamConfigMap.put("stream.kafka.isolation.level", isolationLevel);
+    }
+    if (populateRowMetadata != null) {
+      streamConfigMap.put("stream.kafka.metadata.populate", populateRowMetadata);
     }
     return new KafkaPartitionLevelStreamConfig(new StreamConfig(tableNameWithType, streamConfigMap));
   }
@@ -174,5 +182,18 @@ public class KafkaPartitionLevelStreamConfigTest {
     // correct config
     config = getStreamConfig("topic", "host1", "", "", "", "100", null);
     Assert.assertEquals(100, config.getKafkaFetcherMinBytes());
+  }
+
+  @Test
+  public void testIsPopulateRowMetadata() {
+    // test default
+    KafkaPartitionLevelStreamConfig config = getStreamConfig("topic", "host1", null, null, null, null, null, null);
+    Assert.assertFalse(config.isPopulateMetadata());
+
+    config = getStreamConfig("topic", "host1", null, null, null, null, null, "bad value");
+    Assert.assertFalse(config.isPopulateMetadata());
+
+    config = getStreamConfig("topic", "host1", null, null, null, null, null, "TrUe");
+    Assert.assertTrue(config.isPopulateMetadata());
   }
 }
