@@ -520,7 +520,7 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
       }
 
       private void ensureDataType(DataType dt) {
-        if (!dt.equals(_dt)) {
+        if (dt != _dt) {
           String strValue = _value.toString();
           _dt = dt;
           _comparableValue = convertValue(strValue, dt);
