@@ -50,7 +50,7 @@ public class PartitionDedupMetadataManager {
 
   // TODO(saurabh) : We can replace this with a ocncurrent Set
   @VisibleForTesting
-  final ConcurrentHashMap<Object, Boolean> _primaryKeySet = new ConcurrentHashMap<>();
+  final ConcurrentHashMap<Object, IndexSegment> _primaryKeySet = new ConcurrentHashMap<>();
 
   public PartitionDedupMetadataManager(String tableNameWithType, TableState tableState, List<String> primaryKeyColumns,
       int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction) {
@@ -67,16 +67,22 @@ public class PartitionDedupMetadataManager {
     Iterator<RecordInfo> recordInfoIterator = getRecordInfoIterator(segment);
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
-      _primaryKeySet.put(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), true);
+      _primaryKeySet.put(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), segment);
     }
   }
 
   public void removeSegment(IndexSegment segment) {
-    // Remove all PKs from _primaryKeySet
+    // TODO(saurabh): Explain reload scenario here
     Iterator<RecordInfo> recordInfoIterator = getRecordInfoIterator(segment);
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
-      _primaryKeySet.remove(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction));
+      _primaryKeySet.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
+          (primaryKey, currentSegment) -> {
+        if (currentSegment == segment)
+          return null;
+        else
+          return currentSegment;
+      });
     }
   }
 
@@ -87,7 +93,7 @@ public class PartitionDedupMetadataManager {
     }
     int numTotalDocs = segment.getSegmentMetadata().getTotalDocs();
     int numPrimaryKeyColumns = _primaryKeyColumns.size();
-    return new Iterator<RecordInfo>() {
+    return new Iterator<>() {
       private int _docId = 0;
 
       @Override
@@ -111,8 +117,7 @@ public class PartitionDedupMetadataManager {
     };
   }
 
-
-  public boolean checkRecordPresentOrUpdate(RecordInfo recordInfo) {
+  public boolean checkRecordPresentOrUpdate(RecordInfo recordInfo, IndexSegment indexSegment) {
     while (!_tableState.isAllSegmentsLoaded()) {
       LOGGER.info("Sleeping 1 second waiting for all segments loaded for partial-upsert table: {}", _tableNameWithType);
       try {
@@ -123,8 +128,8 @@ public class PartitionDedupMetadataManager {
       }
     }
 
-    Boolean isPresent =
-        _primaryKeySet.putIfAbsent(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), true);
-    return (isPresent != null);
+    return (
+        _primaryKeySet.putIfAbsent(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), indexSegment)
+            != null);
   }
 }

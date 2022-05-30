@@ -496,7 +496,7 @@ public class MutableSegmentImpl implements MutableSegment {
       recordInfo = getRecordInfo(row, numDocsIndexed);
     }
 
-    if (_dedupEnabled && _partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo)) {
+    if (_dedupEnabled && _partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo, this)) {
       return numDocsIndexed < _capacity;
     }
 
