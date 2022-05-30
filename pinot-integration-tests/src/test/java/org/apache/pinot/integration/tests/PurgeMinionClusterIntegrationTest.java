@@ -46,7 +46,6 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
 
-
 /**
  * Integration test for minion task of type "PurgeTask"
  */
@@ -151,7 +150,6 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     }
   }
 
-
   private void setRecordPurger() {
     MinionContext minionContext = MinionContext.getInstance();
     minionContext.setRecordPurgerFactory(rawTableName -> {
@@ -188,7 +186,10 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
       throws Exception {
     // Expected purge task generation :
     // 1. No previous purge run so all segment should be processed and purge metadata sould be added to the segments
-    //
+    // 2. Check that we cannot run on same time two purge generation ensuring running segment will be skipped
+    // 3. Check segment metadata to ensure purgeTime is updated into the metadata
+    // 4. Check after the first run of the purge if we rerun a purge task generation no task should be scheduled
+    // 5. Check the purge process itself by setting an expecting number of row
 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_FIRST_RUN_TABLE);
 
@@ -232,7 +233,10 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
       throws Exception {
     // Expected purge task generation :
     // 1. The purge time on this test is greater than the threshold expected (863660000 > 1d (86400000) )
-    // purge should be run on all segments
+    // 2. Check that we cannot run on same time two purge generation ensuring running segment will be skipped
+    // 3. Check segment metadata to ensure purgeTime is updated into the metadata
+    // 4. Check after the first run of the purge if we rerun a purge task generation no task should be scheduled
+    // 5. Check the purge process itself by setting an expecting number of row
 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_DELTA_PASSED_TABLE);
     _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.PurgeTask.TASK_TYPE);
@@ -276,9 +280,12 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
   @Test
   public void testNotPassedDelayTimePurge()
       throws Exception {
-    // Expected purge task generation :
+    // Expected no purge task generation :
     // 1. segment purge time is set to System.currentTimeMillis() -
-    // 4000 so a new purge should not be triggered as the default delay is 1d 86400000 ms
+    // 4000 so a new purge should not be triggered as the delay is 1d 86400000 ms
+    // 2. Check no task Have been scheduled
+    // 3. Check segment metadata to ensure purgeTime is not updated into the metadata
+    // 4. Check the purge process itself have not been runned by setting an expecting number of row
 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_DELTA_NOT_PASSED_TABLE);
 
