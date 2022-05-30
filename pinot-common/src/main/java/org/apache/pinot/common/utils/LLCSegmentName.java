@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.google.common.base.Preconditions;
+import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
@@ -35,16 +38,13 @@ public class LLCSegmentName extends SegmentName implements Comparable {
   private final String _segmentName;
 
   public LLCSegmentName(String segmentName) {
-    if (!isLowLevelConsumerSegmentName(segmentName)) {
-      throw new RuntimeException(segmentName + " is not a Low level consumer segment name");
-    }
-
-    _segmentName = segmentName;
     String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
+    Preconditions.checkArgument(parts.length == 4, "Invalid LLC segment name: %s", segmentName);
     _tableName = parts[0];
     _partitionGroupId = Integer.parseInt(parts[1]);
     _sequenceNumber = Integer.parseInt(parts[2]);
     _creationTime = parts[3];
+    _segmentName = segmentName;
   }
 
   public LLCSegmentName(String tableName, int partitionGroupId, int sequenceNumber, long msSinceEpoch) {
@@ -57,6 +57,28 @@ public class LLCSegmentName extends SegmentName implements Comparable {
     // ISO8601 date: 20160120T1234Z
     _creationTime = DATE_FORMATTER.print(msSinceEpoch);
     _segmentName = tableName + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
+  }
+
+  private LLCSegmentName(String tableName, int partitionGroupId, int sequenceNumber, String creationTime,
+      String segmentName) {
+    _tableName = tableName;
+    _partitionGroupId = partitionGroupId;
+    _sequenceNumber = sequenceNumber;
+    _creationTime = creationTime;
+    _segmentName = segmentName;
+  }
+
+  /**
+   * Returns the {@link LLCSegmentName} for the given segment name, or {@code null} if the given segment name does not
+   * represent an LLC segment.
+   */
+  @Nullable
+  public static LLCSegmentName of(String segmentName) {
+    String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
+    if (parts.length != 4) {
+      return null;
+    }
+    return new LLCSegmentName(parts[0], Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), parts[3], segmentName);
   }
 
   /**
@@ -145,32 +167,13 @@ public class LLCSegmentName extends SegmentName implements Comparable {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-
-    LLCSegmentName segName = (LLCSegmentName) o;
-
-    if (_partitionGroupId != segName._partitionGroupId) {
-      return false;
-    }
-    if (_sequenceNumber != segName._sequenceNumber) {
-      return false;
-    }
-    if (_tableName != null ? !_tableName.equals(segName._tableName) : segName._tableName != null) {
-      return false;
-    }
-    if (_creationTime != null ? !_creationTime.equals(segName._creationTime) : segName._creationTime != null) {
-      return false;
-    }
-    return !(_segmentName != null ? !_segmentName.equals(segName._segmentName) : segName._segmentName != null);
+    LLCSegmentName that = (LLCSegmentName) o;
+    return _segmentName.equals(that._segmentName);
   }
 
   @Override
   public int hashCode() {
-    int result = _tableName != null ? _tableName.hashCode() : 0;
-    result = 31 * result + _partitionGroupId;
-    result = 31 * result + _sequenceNumber;
-    result = 31 * result + (_creationTime != null ? _creationTime.hashCode() : 0);
-    result = 31 * result + (_segmentName != null ? _segmentName.hashCode() : 0);
-    return result;
+    return Objects.hash(_segmentName);
   }
 
   @Override

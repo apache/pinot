@@ -25,7 +25,6 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -64,7 +63,7 @@ public class FixedTierSegmentSelector implements TierSegmentSelector {
               segmentName);
       Preconditions.checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: {} of table: {}",
           segmentName, tableNameWithType);
-      return !segmentZKMetadata.getStatus().equals(Realtime.Status.IN_PROGRESS);
+      return segmentZKMetadata.getStatus().isCompleted();
     }
     return false;
   }
