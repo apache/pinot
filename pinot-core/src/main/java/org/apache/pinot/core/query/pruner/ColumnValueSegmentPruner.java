@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.pruner;
 
-import com.google.common.primitives.Longs;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -531,9 +530,10 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
 
       private boolean mightBeContained(BloomFilterReader bloomFilter) {
         if (!_hashed) {
-          byte[] hash = GuavaBloomFilterReaderUtils.hash(_comparableValue.toString());
-          _hash1 = Longs.fromBytes(hash[7], hash[6], hash[5], hash[4], hash[3], hash[2], hash[1], hash[0]);
-          _hash2 = Longs.fromBytes(hash[15], hash[14], hash[13], hash[12], hash[11], hash[10], hash[9], hash[8]);
+          GuavaBloomFilterReaderUtils.Hash128AsLongs hash128AsLongs =
+              GuavaBloomFilterReaderUtils.hashAsLongs(_comparableValue.toString());
+          _hash1 = hash128AsLongs.getHash1();
+          _hash2 = hash128AsLongs.getHash2();
           _hashed = true;
         }
         return bloomFilter.mightContain(_hash1, _hash2);

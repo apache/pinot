@@ -70,12 +70,9 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _starTreeIndexContainer = starTreeIndexContainer;
     _dataSources = new HashMap<>(HashUtil.getHashMapCapacity(segmentMetadata.getColumnMetadataMap().size()));
 
-    for (String colName : segmentMetadata.getColumnMetadataMap().keySet()) {
-      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(colName);
-      Preconditions.checkNotNull(columnMetadata,
-          "ColumnMetadata for %s should not be null. Potentially invalid column name specified.",
-          colName);
-      _dataSources.put(colName, new ImmutableDataSource(columnMetadata, _indexContainerMap.get(colName)));
+    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+      String colName = entry.getKey();
+      _dataSources.put(colName, new ImmutableDataSource(entry.getValue(), _indexContainerMap.get(colName)));
     }
   }
 
