@@ -82,13 +82,10 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
   @Override
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
-    Consumer consumer = null;
-    try {
-      MessageId offset = null;
-      consumer =
-          _pulsarClient.newConsumer().topic(_topic)
-              .subscriptionInitialPosition(PulsarUtils.offsetCriteriaToSubscription(offsetCriteria))
-              .subscriptionName("Pinot_" + UUID.randomUUID()).subscribe();
+    MessageId offset = null;
+    try (Consumer<byte[]> consumer = _pulsarClient.newConsumer().topic(_topic)
+        .subscriptionInitialPosition(PulsarUtils.offsetCriteriaToSubscription(offsetCriteria))
+        .subscriptionName("Pinot_" + UUID.randomUUID()).subscribe()) {
 
       if (offsetCriteria.isLargest()) {
         offset = consumer.getLastMessageId();
@@ -102,8 +99,6 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
       LOGGER.error("Cannot fetch offsets for partition " + _partition + " and topic " + _topic + " and offsetCriteria "
           + offsetCriteria, e);
       return null;
-    } finally {
-      closeConsumer(consumer);
     }
   }
 
