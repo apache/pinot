@@ -70,7 +70,7 @@ public class DateTimeFormatPatternSpec {
       @Nullable String timeZone) {
     _timeFormat = timeFormat;
     if (_timeFormat.equals(DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT)) {
-      if (Objects.nonNull(timeZone)) {
+      if (timeZone != null) {
         _dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timeZone));
       }
       _dateTimeFormatter = DateTimeFormat.forPattern(timeFormatStyle).

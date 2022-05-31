@@ -53,11 +53,11 @@ public class DateTimeFormatSpec {
   public static final int MIN_FORMAT_TOKENS_PIPE = 1;
   public static final int MAX_FORMAT_TOKENS_PIPE = 3;
 
-  //Applicable for SDF|<timeFormat>(|<timezone>)
+  // Applicable for SIMPLE_DATE_FORMAT|<timeFormat>(|<timezone>)
   public static final int SDF_PATTERN_POSITION = 1;
   public static final int SDF_TIMEZONE_POSITION = 2;
 
-  //Applicable for EPOCH|<timeUnit>(|<size>)
+  // Applicable for EPOCH|<timeUnit>(|<size>)
   public static final int EPOCH_UNIT_POSITION = 1;
   public static final int EPOCH_SIZE_POSITION = 2;
 
@@ -103,11 +103,12 @@ public class DateTimeFormatSpec {
         } else {
           _patternSpec = new DateTimeFormatPatternSpec(TimeFormat.valueOf(
               formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE]),
-              formatTokens[SDF_PATTERN_POSITION], DateTimeFormatPatternSpec.DEFAULT_DATETIMEZONE.toString());
+              formatTokens[SDF_PATTERN_POSITION], null);
         }
         _unitSpec = new DateTimeFormatUnitSpec(TimeUnit.DAYS.toString());
         _size = 1;
       } else {
+        // Applicable for TIMESTAMP format
         _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION_PIPE]);
         _unitSpec = new DateTimeFormatUnitSpec(TimeUnit.MILLISECONDS.toString());
         _size = 1;
