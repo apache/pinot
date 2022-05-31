@@ -763,9 +763,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * - Case-insensitive cluster
    * - Table name in the format of [database_name].[table_name]
    *
-   * If the PinotConfiguration does not allow dots in table name, will do the below:
-   * Drop the prefix part for the format of [database_name].[table_name], keep only [table_name].
-   * If the PinotConfiguration allows dots in table name, we will not do the split
    * @param tableName the table name in the query
    * @param tableCache the table case-sensitive cache
    * @return the table name in the format of [database_name].[table_name]
