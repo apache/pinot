@@ -31,11 +31,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationJobUtils;
@@ -70,7 +73,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
   private CountDownLatch _segmentCreationTaskCountDownLatch;
   private Schema _schema;
   private TableConfig _tableConfig;
-
+  private Queue<Pair<Exception, String>> _failures;
+  
   public SegmentGenerationJobRunner() {
   }
 
@@ -160,6 +164,9 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     LOGGER.info("Creating an executor service with {} threads(Job parallelism: {}, available cores: {}.)", numThreads,
         jobParallelism, Runtime.getRuntime().availableProcessors());
     _executorService = Executors.newFixedThreadPool(numThreads);
+    
+    // Set up for recording multiple failures while building segments.
+    _failures = new ConcurrentLinkedQueue<>();
   }
 
   @Override
@@ -222,6 +229,12 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         }
       }
       _segmentCreationTaskCountDownLatch.await();
+      
+      if (!_failures.isEmpty()) {
+        StringBuilder msg = new StringBuilder("Failed to generate Pinot segment for file(s) - ");
+        _failures.forEach(p -> { msg.append(msg.length() > 0 ? ", " : ""); msg.append(p.getRight()); }); 
+        throw new RuntimeException(msg.toString());
+      }
     } finally {
       //clean up
       FileUtils.deleteQuietly(localTempDir);
@@ -282,6 +295,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         }
       } catch (Exception e) {
         LOGGER.error("Failed to generate Pinot segment for file - {}", inputFileURI, e);
+        _failures.add(Pair.of(e, inputFileURI.toString()));
       } finally {
         _segmentCreationTaskCountDownLatch.countDown();
         FileUtils.deleteQuietly(localSegmentDir);
