@@ -62,7 +62,6 @@ public class RealtimeSegmentConfig {
   private final boolean _aggregateMetrics;
   private final boolean _nullHandlingEnabled;
   private final UpsertConfig.Mode _upsertMode;
-  private final boolean _dedupEnabled;
   private final HashFunction _hashFunction;
   private final String _upsertComparisonColumn;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
@@ -79,7 +78,7 @@ public class RealtimeSegmentConfig {
       SegmentZKMetadata segmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
       RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
       int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
-      UpsertConfig.Mode upsertMode, boolean dedupEnabled, String upsertComparisonColumn, HashFunction hashFunction,
+      UpsertConfig.Mode upsertMode, String upsertComparisonColumn, HashFunction hashFunction,
       PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       PartitionDedupMetadataManager partitionDedupMetadataManager, List<FieldConfig> fieldConfigList,
       List<AggregationConfig> ingestionAggregationConfigs) {
@@ -107,7 +106,6 @@ public class RealtimeSegmentConfig {
     _aggregateMetrics = aggregateMetrics;
     _nullHandlingEnabled = nullHandlingEnabled;
     _consumerDir = consumerDir;
-    _dedupEnabled = dedupEnabled;
     _upsertMode = upsertMode != null ? upsertMode : UpsertConfig.Mode.NONE;
     _hashFunction = hashFunction != null ? hashFunction : HashFunction.NONE;
     _upsertComparisonColumn = upsertComparisonColumn;
@@ -223,7 +221,7 @@ public class RealtimeSegmentConfig {
   }
 
   public boolean isDedupEnabled() {
-    return _dedupEnabled;
+    return _partitionDedupMetadataManager != null;
   }
 
   public HashFunction getHashFunction() {
@@ -276,7 +274,6 @@ public class RealtimeSegmentConfig {
     private boolean _nullHandlingEnabled = false;
     private String _consumerDir;
     private UpsertConfig.Mode _upsertMode;
-    private boolean _dedupEnabled;
     private HashFunction _hashFunction;
     private String _upsertComparisonColumn;
     private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
@@ -420,12 +417,6 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setDedupEnabled(boolean dedupEnabled) {
-      _dedupEnabled = dedupEnabled;
-      return this;
-    }
-
-
     public Builder setHashFunction(HashFunction hashFunction) {
       _hashFunction = hashFunction;
       return this;
@@ -461,7 +452,7 @@ public class RealtimeSegmentConfig {
           _capacity, _avgNumMultiValues, _noDictionaryColumns, _varLengthDictionaryColumns, _invertedIndexColumns,
           _textIndexColumns, _fstIndexColumns, _jsonIndexColumns, _h3IndexConfigs, _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
-          _nullHandlingEnabled, _consumerDir, _upsertMode, _dedupEnabled, _upsertComparisonColumn, _hashFunction,
+          _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumn, _hashFunction,
           _partitionUpsertMetadataManager, _partitionDedupMetadataManager, _fieldConfigList,
           _ingestionAggregationConfigs);
     }

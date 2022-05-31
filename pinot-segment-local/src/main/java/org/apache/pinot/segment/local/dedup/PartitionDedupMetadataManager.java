@@ -78,10 +78,11 @@ public class PartitionDedupMetadataManager {
       RecordInfo recordInfo = recordInfoIterator.next();
       _primaryKeySet.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
           (primaryKey, currentSegment) -> {
-        if (currentSegment == segment)
+        if (currentSegment == segment) {
           return null;
-        else
+        } else {
           return currentSegment;
+        }
       });
     }
   }

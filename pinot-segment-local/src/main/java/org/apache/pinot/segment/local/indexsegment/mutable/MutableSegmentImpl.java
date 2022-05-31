@@ -163,7 +163,6 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Map<String, FieldSpec> _newlyAddedPhysicalColumnsFieldMap = new ConcurrentHashMap();
 
   private final UpsertConfig.Mode _upsertMode;
-  private final boolean _dedupEnabled;
   private final String _upsertComparisonColumn;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
@@ -379,13 +378,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // init upsert-related data structure
     _upsertMode = config.getUpsertMode();
-    _dedupEnabled = config.isDedupEnabled();
-
-    if (_dedupEnabled) {
-      _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
-    } else {
-      _partitionDedupMetadataManager = null;
-    }
+    _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
 
     if (isUpsertEnabled()) {
       Preconditions.checkState(!isAggregateMetricsEnabled(),
@@ -492,11 +485,11 @@ public class MutableSegmentImpl implements MutableSegment {
 
     RecordInfo recordInfo = null;
 
-    if (_dedupEnabled || isUpsertEnabled()) {
+    if (isDedupEnabled() || isUpsertEnabled()) {
       recordInfo = getRecordInfo(row, numDocsIndexed);
     }
 
-    if (_dedupEnabled && _partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo, this)) {
+    if (isDedupEnabled() && _partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo, this)) {
       return numDocsIndexed < _capacity;
     }
 
@@ -540,6 +533,10 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private boolean isUpsertEnabled() {
     return _upsertMode != UpsertConfig.Mode.NONE;
+  }
+
+  private boolean isDedupEnabled() {
+    return _partitionDedupMetadataManager != null;
   }
 
   private RecordInfo getRecordInfo(GenericRow row, int docId) {

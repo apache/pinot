@@ -1310,7 +1310,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     Set<String> fstIndexColumns = indexLoadingConfig.getFSTIndexColumns();
     _fstIndexColumns = new ArrayList<>(fstIndexColumns);
 
-    boolean dedupEnabled = (tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled());
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
@@ -1328,7 +1327,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setIngestionAggregationConfigs(IngestionConfigUtils.getAggregationConfigs(tableConfig))
             .setNullHandlingEnabled(_nullHandlingEnabled)
             .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
-            .setDedupEnabled(dedupEnabled)
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
             .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setHashFunction(tableConfig.getHashFunction())

@@ -116,7 +116,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
   private UpsertConfig.Mode _upsertMode;
-  private boolean _isDedupEnabled;
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
   private TableDedupMetadataManager _tableDedupMetadataManager;
   private List<String> _primaryKeyColumns;
@@ -164,7 +163,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
     _upsertMode = tableConfig.getUpsertMode();
     if (tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled()) {
-      _isDedupEnabled = tableConfig.getDedupConfig().isDedupEnabled();
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
       _primaryKeyColumns = schema.getPrimaryKeyColumns();
@@ -261,6 +259,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
 
     return consumerDir.getAbsolutePath();
+  }
+
+  public boolean isDedupEnabled() {
+    return _tableDedupMetadataManager != null;
   }
 
   public boolean isUpsertEnabled() {
@@ -379,19 +381,19 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       handleUpsert((ImmutableSegmentImpl) immutableSegment);
     }
 
-    if (_isDedupEnabled) {
-      buildDedupeMeta((ImmutableSegmentImpl) immutableSegment);
+    if (isDedupEnabled()) {
+      buildDedupMeta((ImmutableSegmentImpl) immutableSegment);
     }
     super.addSegment(immutableSegment);
   }
 
-  private void buildDedupeMeta(ImmutableSegmentImpl immutableSegment) {
+  private void buildDedupMeta(ImmutableSegmentImpl immutableSegment) {
     // TODO(saurabh) refactor commons code with handleUpsert
     String segmentName = immutableSegment.getSegmentName();
     Integer partitionGroupId = SegmentUtils
         .getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, _primaryKeyColumns.get(0));
     Preconditions.checkNotNull(partitionGroupId, String
-        .format("PartitionGroupId is not available for segment: '%s' (upsert-enabled table: %s)", segmentName,
+        .format("PartitionGroupId is not available for segment: '%s' (dedup-enabled table: %s)", segmentName,
             _tableNameWithType));
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId);
