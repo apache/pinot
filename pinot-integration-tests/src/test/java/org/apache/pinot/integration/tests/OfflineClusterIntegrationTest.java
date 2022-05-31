@@ -508,10 +508,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     addInvertedIndex();
     // The table size gets larger for sure, but it does not necessarily equal to tableSizeWithNewIndex, because the
     // order of entries in the index_map file can change when the raw segment adds/deletes indices back and forth.
-    long actualTableSize = getTableSize(getTableName());
-    assertTrue(actualTableSize > tableSizeAfterReloadSegment, String
-        .format("Table size: %d should increase after adding inverted index, as compared with %s", actualTableSize,
-            tableSizeAfterReloadSegment));
+    long tableSizeAfterAddIndex = getTableSize(getTableName());
+    assertTrue(tableSizeAfterAddIndex > tableSizeAfterReloadSegment, String
+        .format("Table size: %d should increase after adding inverted index, as compared with %s",
+            tableSizeAfterAddIndex, tableSizeAfterReloadSegment));
 
     // Force to download the whole table and use the original table config, so the disk usage should get back to
     // initial value.
