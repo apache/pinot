@@ -150,7 +150,8 @@ public final class TableConfigUtils {
   /**
    * Validates the table name with the following rules:
    * <ul>
-   *   <li>Table name can either have no dots, or have only one dot or there is a flag allowing database name in it</li>
+   *   <li>If there is a flag allowing database name in it, table name can have one dot in it.
+   *   <li>Otherwise, there is no dot allowed in table name.</li>
    * </ul>
    */
   public static void validateTableName(TableConfig tableConfig, boolean allowTableNameWithDatabase) {

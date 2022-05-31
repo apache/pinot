@@ -765,7 +765,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    *
    * @param tableName the table name in the query
    * @param tableCache the table case-sensitive cache
-   * @return the table name in the format of [database_name].[table_name]
+   * @return table name if the table name is found in Pinot registry, drop the database_name in the format
+   *  of [database_name].[table_name] if only [table_name] is found in Pinot registry.
    */
   @VisibleForTesting
   static String getActualTableName(String tableName, TableCache tableCache) {
