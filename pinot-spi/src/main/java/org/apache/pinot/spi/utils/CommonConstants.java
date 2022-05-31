@@ -317,7 +317,7 @@ public class CommonConstants {
     public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
     public static final String CONFIG_OF_NETTY_PORT = "pinot.server.netty.port";
     public static final String CONFIG_OF_ENABLE_GRPC_SERVER = "pinot.server.grpc.enable";
-    public static final boolean DEFAULT_ENABLE_GRPC_SERVER = false;
+    public static final boolean DEFAULT_ENABLE_GRPC_SERVER = true;
     public static final String CONFIG_OF_GRPC_PORT = "pinot.server.grpc.port";
     public static final int DEFAULT_GRPC_PORT = 8090;
     public static final String CONFIG_OF_GRPCTLS_SERVER_ENABLED = "pinot.server.grpctls.enabled";
