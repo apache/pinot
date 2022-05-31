@@ -21,7 +21,6 @@ package org.apache.pinot.broker.requesthandler;
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
@@ -125,29 +124,20 @@ public class BaseBrokerRequestHandlerTest {
     configuration.setProperty(CommonConstants.Helix.ALLOW_TABLE_NAME_WITH_DATABASE, false);
 
     TableCache tableCache = Mockito.mock(TableCache.class);
-    BrokerRoutingManager routingManager = Mockito.mock(BrokerRoutingManager.class);
     when(tableCache.isIgnoreCase()).thenReturn(true);
     when(tableCache.getActualTableName("mytable")).thenReturn("mytable");
-    Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("mytable", tableCache, routingManager), "mytable");
+    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("mytable", tableCache), "mytable");
     when(tableCache.getActualTableName("db.mytable")).thenReturn(null);
-    Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache, routingManager),
-        "mytable");
+    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache), "mytable");
 
     when(tableCache.isIgnoreCase()).thenReturn(false);
-    when(routingManager.routingExists("mytable_OFFLINE")).thenReturn(true);
-    when(routingManager.routingExists("mytable_REALTIME")).thenReturn(true);
-    Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache, routingManager),
-        "mytable");
+    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache), "mytable");
   }
 
   @Test
   public void testGetActualTableNameAllowingDots() {
 
     TableCache tableCache = Mockito.mock(TableCache.class);
-    BrokerRoutingManager routingManager = Mockito.mock(BrokerRoutingManager.class);
     when(tableCache.isIgnoreCase()).thenReturn(true);
     // the tableCache should have only "db.mytable" in it since this is the only table
     when(tableCache.getActualTableName("mytable")).thenReturn(null);
@@ -155,27 +145,15 @@ public class BaseBrokerRequestHandlerTest {
     when(tableCache.getActualTableName("other.mytable")).thenReturn(null);
     when(tableCache.getActualTableName("test_table")).thenReturn(null);
 
-    Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("test_table", tableCache, routingManager),
-        "test_table");
-    Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("mytable", tableCache, routingManager), "mytable");
+    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("test_table", tableCache), "test_table");
+    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("mytable", tableCache), "mytable");
 
-    Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache, routingManager),
-        "db.mytable");
-    Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("other.mytable", tableCache, routingManager),
-        "other.mytable");
+    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache), "db.mytable");
+    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("other.mytable", tableCache), "other.mytable");
 
     when(tableCache.isIgnoreCase()).thenReturn(false);
-    when(routingManager.routingExists("db.namespace.mytable_OFFLINE")).thenReturn(true);
-    when(routingManager.routingExists("db.namespace.mytable_REALTIME")).thenReturn(true);
-    Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache, routingManager),
-        "db.mytable");
-    Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualTableName("db.namespace.mytable", tableCache, routingManager),
+    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache), "db.mytable");
+    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.namespace.mytable", tableCache),
         "db.namespace.mytable");
   }
 }

@@ -243,7 +243,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     String tableName =
-        getActualTableName(serverPinotQuery.getDataSource().getTableName(), _tableCache, _routingManager);
+        getActualTableName(serverPinotQuery.getDataSource().getTableName(), _tableCache);
     serverPinotQuery.getDataSource().setTableName(tableName);
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     requestContext.setTableName(rawTableName);
@@ -768,52 +768,22 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * If the PinotConfiguration allows dots in table name, we will not do the split
    * @param tableName the table name in the query
    * @param tableCache the table case-sensitive cache
-   * @param routingManager the routing mananger for testing whether a route exists
    * @return the table name in the format of [database_name].[table_name]
    */
   @VisibleForTesting
-  static String getActualTableName(String tableName, TableCache tableCache, BrokerRoutingManager routingManager) {
-    // Use TableCache to handle case-insensitive table name
-    if (tableCache.isIgnoreCase()) {
-      String actualTableName = tableCache.getActualTableName(tableName);
+  static String getActualTableName(String tableName, TableCache tableCache) {
+    String actualTableName = tableCache.getActualTableName(tableName);
+    if (actualTableName != null) {
+      return actualTableName;
+    }
+
+    // Check if table is in the format of [database_name].[table_name]
+    String[] tableNameSplits = StringUtils.split(tableName, ".", 2);
+    if (tableNameSplits.length == 2) {
+      actualTableName = tableCache.getActualTableName(tableNameSplits[1]);
       if (actualTableName != null) {
         return actualTableName;
       }
-
-      // Check if table is in the format of [database_name].[table_name]
-      String[] tableNameSplits = StringUtils.split(tableName, ".", 2);
-      if (tableNameSplits.length == 2) {
-        actualTableName = tableCache.getActualTableName(tableNameSplits[1]);
-        if (actualTableName != null) {
-          return actualTableName;
-        }
-      }
-
-      return tableName;
-    }
-    // Check if table is in the format of [database_name].[table_name]
-    String[] tableNameSplits = StringUtils.split(tableName, ".", 2);
-    if (tableNameSplits.length != 2) {
-      return tableName;
-    }
-
-    // Use RoutingManager to handle case-sensitive table name
-    // Update table name if there is no existing table in the format of [database_name].[table_name] but only
-    // [table_name]
-    if (TableNameBuilder.isTableResource(tableName)) {
-      if (routingManager.routingExists(tableNameSplits[1]) && !routingManager.routingExists(tableName)) {
-        return tableNameSplits[1];
-      } else {
-        return tableName;
-      }
-    }
-    if (routingManager.routingExists(TableNameBuilder.OFFLINE.tableNameWithType(tableNameSplits[1]))
-        && !routingManager.routingExists(TableNameBuilder.OFFLINE.tableNameWithType(tableName))) {
-      return tableNameSplits[1];
-    }
-    if (routingManager.routingExists(TableNameBuilder.REALTIME.tableNameWithType(tableNameSplits[1]))
-        && !routingManager.routingExists(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
-      return tableNameSplits[1];
     }
     return tableName;
   }
