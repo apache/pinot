@@ -20,7 +20,6 @@ package org.apache.pinot.spi.data;
 
 import com.google.common.base.Preconditions;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
