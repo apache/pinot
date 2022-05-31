@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.util.QueryOptionsUtils;
@@ -50,31 +53,62 @@ import org.apache.pinot.core.util.QueryOptionsUtils;
  */
 public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
-  public ReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics) {
-    super(tableNameWithType, brokerMetrics);
+  public ReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
+      AdaptiveServerSelector adaptiveServerSelector) {
+    super(tableNameWithType, brokerMetrics, adaptiveServerSelector);
   }
 
   @Override
   Map<String, String> select(List<String> segments, int requestId,
-      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions) {
+      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions,
+      @Nullable AdaptiveServerSelector adaptiveServerSelector) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     int replicaOffset = 0;
     Integer replicaGroup = QueryOptionsUtils.getNumReplicaGroupsToQuery(queryOptions);
     int numReplicaGroupsToQuery = replicaGroup == null ? 1 : replicaGroup;
+
+    List<String> serverRankList = new ArrayList<>();
+    if (adaptiveServerSelector != null) {
+      // We fetch serverRankList before looping through all the segments. This is important to make sure that we pick
+      // the least amount of instances for a query by having one snapshot of rankings.
+      serverRankList = adaptiveServerSelector.fetchServerRanking();
+    }
+
     for (String segment : segments) {
-      List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment);
       // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance selector
       // has not been updated (we update all components for routing in sequence)
-      if (enabledInstances != null) {
-        int numEnabledInstances = enabledInstances.size();
-        int instanceToSelect = (requestId + replicaOffset) % numEnabledInstances;
-        segmentToSelectedInstanceMap.put(segment, enabledInstances.get(instanceToSelect));
-        if (numReplicaGroupsToQuery > numEnabledInstances) {
-          numReplicaGroupsToQuery = numEnabledInstances;
-        }
-        replicaOffset = (replicaOffset + 1) % numReplicaGroupsToQuery;
+      List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment);
+      if (enabledInstances == null) {
+        continue;
       }
+
+      // Default logic
+      int numEnabledInstances = enabledInstances.size();
+      int instanceIdx = (requestId + replicaOffset) % numEnabledInstances;
+      String selectedInstance = enabledInstances.get(instanceIdx);
+
+      if (serverRankList.size() > 0) {
+        int minIdx = Integer.MAX_VALUE;
+        for (int ii = 0; ii < numEnabledInstances; ii++) {
+          int idx = serverRankList.indexOf(enabledInstances.get(ii));
+          if (idx < minIdx) {
+            // idx = -1 implies that the server does not have a serverRoutingStatsEntry yet. So pick the server.
+            minIdx = idx;
+            selectedInstance = enabledInstances.get((ii + replicaOffset) % numEnabledInstances);
+            if (idx == -1) {
+              break;
+            }
+          }
+        }
+      }
+
+      if (numReplicaGroupsToQuery > numEnabledInstances) {
+        numReplicaGroupsToQuery = numEnabledInstances;
+      }
+      segmentToSelectedInstanceMap.put(segment, selectedInstance);
+      replicaOffset = (replicaOffset + 1) % numReplicaGroupsToQuery;
     }
+
     return segmentToSelectedInstanceMap;
   }
 }

@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.testng.annotations.AfterClass;
@@ -60,7 +61,7 @@ public class QueryRoutingTest {
 
   @BeforeClass
   public void setUp() {
-    _queryRouter = new QueryRouter("testBroker", mock(BrokerMetrics.class));
+    _queryRouter = new QueryRouter("testBroker", mock(BrokerMetrics.class), mock(ServerRoutingStatsManager.class));
   }
 
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes) {

@@ -288,6 +288,24 @@ public class CommonConstants {
       public static final String CONFIG_OF_MAX_RETRIES = "pinot.broker.failure.detector.max.retries";
       public static final int DEFAULT_MAX_RETIRES = 10;
     }
+
+    public static class AdaptiveServerSelector {
+      public enum Type {
+        // Adaptive Selectors are not used. Use default round-robin
+        NO_OP,
+
+        // Use selector that routes to servers based on number of inflight requests
+        NUM_INFLIGHT_REQ,
+
+        // Use selector that routes to servers based on observed latencies
+        LATENCY
+      }
+
+      public static final String CONFIG_OF_TYPE = "pinot.broker.adaptive.server.selector.type";
+      public static final String DEFAULT_TYPE = Type.NO_OP.name();
+    }
+
+    public static final boolean ENABLE_PER_SERVER_QUERY_STATS = false;
   }
 
   public static class Server {

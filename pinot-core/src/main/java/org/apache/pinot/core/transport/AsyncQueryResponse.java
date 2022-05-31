@@ -96,6 +96,11 @@ public class AsyncQueryResponse implements QueryResponse {
     return stringBuilder.toString();
   }
 
+  @Override
+  public int getServerResponseTime(ServerRoutingInstance serverRoutingInstance) {
+    return _responseMap.get(serverRoutingInstance).getResponseDelayMs();
+  }
+
   @Nullable
   @Override
   public ServerRoutingInstance getFailedServer() {

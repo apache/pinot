@@ -547,6 +547,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // Execute the query
+    // TODO: Replace ServerStats with ServerRoutingStatsEntry.
     ServerStats serverStats = new ServerStats();
     if (serverPinotQuery.isExplain()) {
       // Update routing tables to only send request to 1 server (& generate the plan for 1 segment).

@@ -60,6 +60,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
@@ -110,6 +111,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected ClusterChangeMediator _clusterChangeMediator;
   // Participant Helix manager handles Helix functionality such as state transitions and messages
   protected HelixManager _participantHelixManager;
+  // Handles the server routing stats.
+  protected ServerRoutingStatsManager _serverRoutingStatsManager;
 
   @Override
   public void init(PinotConfiguration brokerConf)
@@ -230,8 +233,14 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS),
         _brokerConf.getProperty(Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, Collections.emptyList()));
     _brokerMetrics.initializeGlobalMeters();
+
     // Set up request handling classes
-    _routingManager = new BrokerRoutingManager(_brokerMetrics);
+    _serverRoutingStatsManager = new ServerRoutingStatsManager();
+    if (Broker.ENABLE_PER_SERVER_QUERY_STATS) {
+      _serverRoutingStatsManager.init();
+    }
+
+    _routingManager = new BrokerRoutingManager(_brokerMetrics, _serverRoutingStatsManager, _brokerConf);
     _routingManager.init(_spectatorHelixManager);
     _accessControlFactory =
         AccessControlFactory.loadFactory(_brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX), _propertyStore);
@@ -256,17 +265,17 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       LOGGER.info("Starting Grpc BrokerRequestHandler.");
       _brokerRequestHandler =
           new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
-              tableCache, _brokerMetrics, null);
+              tableCache, _brokerMetrics, null, _serverRoutingStatsManager);
     } else { // default request handler type, e.g. netty
       LOGGER.info("Starting Netty BrokerRequestHandler.");
       if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
         _brokerRequestHandler =
             new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-                queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, tlsDefaults);
+                queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, tlsDefaults, _serverRoutingStatsManager);
       } else {
         _brokerRequestHandler =
             new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
-                queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, null);
+                queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, null, _serverRoutingStatsManager);
       }
     }
     _brokerRequestHandler.start();
@@ -432,6 +441,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Shutting down request handler and broker admin application");
     _brokerRequestHandler.shutDown();
     _brokerAdminApplication.stop();
+
+    // Stop _serverRoutingStatsManager after shutting down _brokerRequestHandler.
+    LOGGER.info("Shutting down ServerRoutingStatsManager.");
+    _serverRoutingStatsManager.shutDown();
 
     LOGGER.info("Disconnecting spectator Helix manager");
     _spectatorHelixManager.disconnect();

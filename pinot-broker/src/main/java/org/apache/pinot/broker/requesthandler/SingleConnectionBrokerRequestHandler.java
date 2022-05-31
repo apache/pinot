@@ -48,6 +48,7 @@ import org.apache.pinot.core.transport.QueryRouter;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerResponse;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -70,11 +71,12 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
 
   public SingleConnectionBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics, NettyConfig nettyConfig, TlsConfig tlsConfig) {
+      BrokerMetrics brokerMetrics, NettyConfig nettyConfig, TlsConfig tlsConfig,
+      ServerRoutingStatsManager serverRoutingStatsManager) {
     super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
 
     _brokerReduceService = new BrokerReduceService(_config);
-    _queryRouter = new QueryRouter(_brokerId, brokerMetrics, nettyConfig, tlsConfig);
+    _queryRouter = new QueryRouter(_brokerId, brokerMetrics, nettyConfig, tlsConfig, serverRoutingStatsManager);
     _failureDetector = FailureDetectorFactory.getFailureDetector(config, brokerMetrics);
   }
 

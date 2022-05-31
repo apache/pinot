@@ -33,6 +33,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -53,6 +54,7 @@ public class QueryRouter {
   private final ServerChannels _serverChannels;
   private final ServerChannels _serverChannelsTls;
   private final ConcurrentHashMap<Long, AsyncQueryResponse> _asyncQueryResponseMap = new ConcurrentHashMap<>();
+  private final ServerRoutingStatsManager _serverRoutingStatsManager;
 
   /**
    * Creates an unsecured query router.
@@ -60,8 +62,9 @@ public class QueryRouter {
    * @param brokerId broker id
    * @param brokerMetrics broker metrics
    */
-  public QueryRouter(String brokerId, BrokerMetrics brokerMetrics) {
-    this(brokerId, brokerMetrics, null, null);
+  public QueryRouter(String brokerId, BrokerMetrics brokerMetrics,
+      ServerRoutingStatsManager serverRoutingStatsManager) {
+    this(brokerId, brokerMetrics, null, null, serverRoutingStatsManager);
   }
 
   /**
@@ -73,11 +76,12 @@ public class QueryRouter {
    * @param tlsConfig TLS config
    */
   public QueryRouter(String brokerId, BrokerMetrics brokerMetrics, @Nullable NettyConfig nettyConfig,
-      @Nullable TlsConfig tlsConfig) {
+      @Nullable TlsConfig tlsConfig, ServerRoutingStatsManager serverRoutingStatsManager) {
     _brokerId = brokerId;
     _brokerMetrics = brokerMetrics;
     _serverChannels = new ServerChannels(this, brokerMetrics, nettyConfig, null);
     _serverChannelsTls = tlsConfig != null ? new ServerChannels(this, brokerMetrics, nettyConfig, tlsConfig) : null;
+    _serverRoutingStatsManager = serverRoutingStatsManager;
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
@@ -120,6 +124,9 @@ public class QueryRouter {
       try {
         serverChannels.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, entry.getValue(),
             timeoutMs);
+        if (_serverRoutingStatsManager.isEnabled()) {
+          _serverRoutingStatsManager.recordStatsForQuerySubmit(serverRoutingInstance.getInstanceId());
+        }
         asyncQueryResponse.markRequestSubmitted(serverRoutingInstance);
       } catch (TimeoutException e) {
         if (ServerChannels.CHANNEL_LOCK_TIMEOUT_MSG.equals(e.getMessage())) {
@@ -170,9 +177,14 @@ public class QueryRouter {
     long requestId = Long.parseLong(dataTable.getMetadata().get(MetadataKey.REQUEST_ID.getName()));
     AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId);
 
+
     // Query future might be null if the query is already done (maybe due to failure)
     if (asyncQueryResponse != null) {
       asyncQueryResponse.receiveDataTable(serverRoutingInstance, dataTable, responseSize, deserializationTimeMs);
+      if (_serverRoutingStatsManager.isEnabled()) {
+        _serverRoutingStatsManager.recordStatsForQueryCompletion(serverRoutingInstance.getInstanceId(),
+            asyncQueryResponse.getServerResponseTime(serverRoutingInstance));
+      }
     }
   }
 

@@ -21,6 +21,8 @@ package org.apache.pinot.broker.routing.instanceselector;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 
@@ -33,23 +35,32 @@ import org.apache.pinot.common.utils.HashUtil;
  */
 public class BalancedInstanceSelector extends BaseInstanceSelector {
 
-  public BalancedInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics) {
-    super(tableNameWithType, brokerMetrics);
+  public BalancedInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics,
+      AdaptiveServerSelector adaptiveServerSelector) {
+    super(tableNameWithType, brokerMetrics, adaptiveServerSelector);
   }
 
   @Override
   Map<String, String> select(List<String> segments, int requestId,
-      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions) {
+      Map<String, List<String>> segmentToEnabledInstancesMap, Map<String, String> queryOptions,
+      @Nullable AdaptiveServerSelector adaptiveServerSelector) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     for (String segment : segments) {
-      List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment);
       // NOTE: enabledInstances can be null when there is no enabled instances for the segment, or the instance selector
       // has not been updated (we update all components for routing in sequence)
-      if (enabledInstances != null) {
-        int numEnabledInstances = enabledInstances.size();
-        segmentToSelectedInstanceMap.put(segment, enabledInstances.get(requestId++ % numEnabledInstances));
+      List<String> enabledInstances = segmentToEnabledInstancesMap.get(segment);
+      if (enabledInstances == null) {
+        continue;
       }
+
+      String selectedServer = enabledInstances.get(requestId++ % enabledInstances.size());
+      if (adaptiveServerSelector != null) {
+        selectedServer = adaptiveServerSelector.select(enabledInstances);
+      }
+
+      segmentToSelectedInstanceMap.put(segment, selectedServer);
     }
+
     return segmentToSelectedInstanceMap;
   }
 }

@@ -39,6 +39,7 @@ import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
 import org.apache.pinot.core.query.reduce.StreamingReduceService;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -57,7 +58,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   // TODO: Support TLS
   public GrpcBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
+      BrokerMetrics brokerMetrics, TlsConfig tlsConfig, ServerRoutingStatsManager serverRoutingStatsManager) {
     super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
     _grpcConfig = buildGrpcQueryClientConfig(config);
 
