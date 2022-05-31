@@ -1390,7 +1390,8 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-enforcer-plugin</artifactId>
-          <version>3.0.0-M2</version>
+          <!-- Note that 3.0.0, while newer, has bugs w/provided transitive dependencies -->
+          <version>3.0.0-M3</version>
           <executions>
             <execution>
               <id>enforce-dependency-convergence</id>
@@ -1624,6 +1625,7 @@
             <exclude>**/*.avsc</exclude>
             <exclude>**/*.csv</exclude>
             <exclude>**/*.desc</exclude>
+            <exclude>**/*.fst</exclude>
             <exclude>**/*.parquet</exclude>
             <exclude>**/*.gz</exclude>
             <exclude>**/*.orc</exclude>
@@ -1659,6 +1661,9 @@
 
             <!-- files from Eclipse -->
             <exclude>**/maven-eclipse.xml</exclude>
+            <exclude>**/.settings/**</exclude>
+            <exclude>**/.project</exclude>
+            <exclude>**/.classpath</exclude>
             <exclude>.externalToolBuilders/**</exclude>
           </excludes>
           <mapping>
@@ -1732,6 +1737,7 @@
             <exclude>**/*.avsc</exclude>
             <exclude>**/*.csv</exclude>
             <exclude>**/*.desc</exclude>
+            <exclude>**/*.fst</exclude>
             <exclude>**/*.parquet</exclude>
             <exclude>**/*.gz</exclude>
             <exclude>**/*.orc</exclude>
@@ -1756,6 +1762,7 @@
             <exclude>**/maven-eclipse.xml</exclude>
             <exclude>**/.settings/**</exclude>
             <exclude>**/.project</exclude>
+            <exclude>**/.classpath</exclude>
             <exclude>.externalToolBuilders/**</exclude>
 
             <!-- Docker and Kubernetes (not part of the distribution) -->
