@@ -195,6 +195,14 @@
           <groupId>software.amazon.awssdk</groupId>
           <artifactId>*</artifactId>
         </exclusion>
+        <!-- We have to explicitly exclude kinesis, due to a bug in the current
+             version of the maven-enforcer-plugin, where it doesn't handle
+             wildcard exclusions in transitive dependencies. So projects that
+             depend on this project wind up not excluding kinesis. -->
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>kinesis</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 

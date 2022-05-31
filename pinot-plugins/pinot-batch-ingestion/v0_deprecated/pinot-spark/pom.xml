@@ -305,6 +305,14 @@
           <groupId>org.apache.hadoop</groupId>
           <artifactId>*</artifactId>
         </exclusion>
+        <!-- We have to explicitly exclude spark-yarn, due to a bug in the current
+             version of the maven-enforcer-plugin, where it doesn't handle
+             wildcard exclusions in transitive dependencies. So projects that
+             depend on this project wind up not excluding spark-yarn. -->
+        <exclusion>
+          <groupId>org.apache.spark</groupId>
+          <artifactId>spark-yarn_${scala.binary.version}</artifactId>
+        </exclusion>
         <exclusion>
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
