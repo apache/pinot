@@ -506,9 +506,17 @@ public final class TableConfigUtils {
    */
   @VisibleForTesting
   static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema) {
-    if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE && tableConfig.getDedupConfig() == null) {
+    if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE &&
+        (tableConfig.getDedupConfig() == null || !tableConfig.getDedupConfig().isDedupEnabled())) {
       return;
     }
+
+    boolean isUpsertEnabled = tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE;
+    boolean isDedupEnabled = tableConfig.getDedupConfig() == null && tableConfig.getDedupConfig().isDedupEnabled();
+
+    // check both upsert and dedup are not enabled simultaneously
+    Preconditions
+        .checkState(!(isUpsertEnabled && isDedupEnabled), "A table can have either Upsert or Dedup enabled, but not both");
     // check table type is realtime
     Preconditions
         .checkState(tableConfig.getTableType() == TableType.REALTIME, "Upsert/Dedup table is for realtime table only.");
@@ -527,7 +535,7 @@ public final class TableConfigUtils {
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
 
     // specifically for upsert
-    if (tableConfig.getUpsertConfig() != null) {
+    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE) {
 
       // no startree index
       Preconditions.checkState(
