@@ -27,8 +27,8 @@ public class DedupConfig extends BaseJsonConfig {
   private final HashFunction _hashFunction;
 
   @JsonCreator
-  public DedupConfig(@JsonProperty(value = "dedupEnabled", required = true) final boolean dedupEnabled,
-      @JsonProperty(value = "hashFunction") final HashFunction hashFunction
+  public DedupConfig(@JsonProperty(value = "dedupEnabled", required = true) boolean dedupEnabled,
+      @JsonProperty(value = "hashFunction") HashFunction hashFunction
   ) {
     _dedupEnabled = dedupEnabled;
     _hashFunction = hashFunction == null ? HashFunction.NONE : hashFunction;

@@ -67,7 +67,7 @@ public class MutableSegmentImplUpsertComparisonColTest {
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
             false, true, new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "offset", null), "secondsSinceEpoch",
-            _partitionUpsertMetadataManager);
+            _partitionUpsertMetadataManager, null);
     GenericRow reuse = new GenericRow();
     try (RecordReader recordReader = RecordReaderFactory
         .getRecordReader(FileFormat.JSON, jsonFile, _schema.getColumnNames(), null)) {

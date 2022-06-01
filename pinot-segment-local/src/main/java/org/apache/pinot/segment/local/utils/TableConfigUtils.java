@@ -510,7 +510,7 @@ public final class TableConfigUtils {
     }
 
     boolean isUpsertEnabled = tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE;
-    boolean isDedupEnabled = tableConfig.getDedupConfig() == null && tableConfig.getDedupConfig().isDedupEnabled();
+    boolean isDedupEnabled = tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled();
 
     // check both upsert and dedup are not enabled simultaneously
     Preconditions.checkState(!(isUpsertEnabled && isDedupEnabled),

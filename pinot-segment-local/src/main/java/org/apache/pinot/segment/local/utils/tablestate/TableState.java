@@ -36,7 +36,6 @@ public class TableState {
   }
 
   public static boolean isAllSegmentsLoaded(HelixManager helixManager, String tableNameWithType) {
-
     HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
     PropertyKey.Builder keyBuilder = dataAccessor.keyBuilder();
     IdealState idealState = dataAccessor.getProperty(keyBuilder.idealStates(tableNameWithType));

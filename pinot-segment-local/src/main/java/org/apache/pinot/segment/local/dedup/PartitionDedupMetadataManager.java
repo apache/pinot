@@ -28,7 +28,6 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
-import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.local.utils.RecordInfo;
 import org.apache.pinot.segment.local.utils.tablestate.TableState;
@@ -41,7 +40,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class PartitionDedupMetadataManager {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PartitionUpsertMetadataManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PartitionDedupMetadataManager.class);
 
   private final HelixManager _helixManager;
   private final String _tableNameWithType;
@@ -67,7 +66,7 @@ public class PartitionDedupMetadataManager {
 
   public void addSegment(IndexSegment segment) {
     // Add all PKs to _primaryKeySet
-    Iterator<RecordInfo> recordInfoIterator = getRecordInfoIterator(segment);
+    Iterator<RecordInfo> recordInfoIterator = getRecordInfoIterator(segment, _primaryKeyColumns);
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
       _primaryKeySet.put(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), segment);
@@ -78,7 +77,7 @@ public class PartitionDedupMetadataManager {
 
   public void removeSegment(IndexSegment segment) {
     // TODO(saurabh): Explain reload scenario here
-    Iterator<RecordInfo> recordInfoIterator = getRecordInfoIterator(segment);
+    Iterator<RecordInfo> recordInfoIterator = getRecordInfoIterator(segment, _primaryKeyColumns);
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
       _primaryKeySet.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
@@ -94,14 +93,15 @@ public class PartitionDedupMetadataManager {
         _primaryKeySet.size());
   }
 
-  private Iterator<RecordInfo> getRecordInfoIterator(IndexSegment segment) {
+  @VisibleForTesting
+  public static Iterator<RecordInfo> getRecordInfoIterator(IndexSegment segment, List<String> primaryKeyColumns) {
     Map<String, PinotSegmentColumnReader> columnToReaderMap = new HashMap<>();
-    for (String primaryKeyColumn : _primaryKeyColumns) {
+    for (String primaryKeyColumn : primaryKeyColumns) {
       columnToReaderMap.put(primaryKeyColumn, new PinotSegmentColumnReader(segment, primaryKeyColumn));
     }
     int numTotalDocs = segment.getSegmentMetadata().getTotalDocs();
-    int numPrimaryKeyColumns = _primaryKeyColumns.size();
-    return new Iterator<>() {
+    int numPrimaryKeyColumns = primaryKeyColumns.size();
+    return new Iterator<RecordInfo>() {
       private int _docId = 0;
 
       @Override
@@ -113,7 +113,7 @@ public class PartitionDedupMetadataManager {
       public RecordInfo next() {
         Object[] values = new Object[numPrimaryKeyColumns];
         for (int i = 0; i < numPrimaryKeyColumns; i++) {
-          Object value = columnToReaderMap.get(_primaryKeyColumns.get(i)).getValue(_docId);
+          Object value = columnToReaderMap.get(primaryKeyColumns.get(i)).getValue(_docId);
           if (value instanceof byte[]) {
             value = new ByteArray((byte[]) value);
           }
