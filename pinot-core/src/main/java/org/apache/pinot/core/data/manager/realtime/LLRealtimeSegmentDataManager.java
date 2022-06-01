@@ -1329,7 +1329,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
             .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
-            .setHashFunction(tableConfig.getHashFunction())
             .setUpsertComparisonColumn(tableConfig.getUpsertComparisonColumn())
             .setFieldConfigList(tableConfig.getFieldConfigList());
 

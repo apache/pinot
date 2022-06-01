@@ -28,7 +28,6 @@ import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -96,7 +95,6 @@ public class MutableSegmentImplTestUtils {
 
     UpsertConfig.Mode upsertMode = upsertConfig == null ? UpsertConfig.Mode.NONE : upsertConfig.getMode();
     String comparisonColumn = upsertConfig == null ? null : upsertConfig.getComparisonColumn();
-    HashFunction hashFunction = upsertConfig == null ? HashFunction.NONE : upsertConfig.getHashFunction();
     RealtimeSegmentConfig realtimeSegmentConfig =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(TABLE_NAME_WITH_TYPE).setSegmentName(SEGMENT_NAME)
             .setStreamName(STREAM_NAME).setSchema(schema).setTimeColumnName(timeColumnName).setCapacity(100000)
@@ -105,7 +103,7 @@ public class MutableSegmentImplTestUtils {
             .setSegmentZKMetadata(new SegmentZKMetadata(SEGMENT_NAME))
             .setMemoryManager(new DirectMemoryManager(SEGMENT_NAME)).setStatsHistory(statsHistory)
             .setAggregateMetrics(aggregateMetrics).setNullHandlingEnabled(nullHandlingEnabled).setUpsertMode(upsertMode)
-            .setUpsertComparisonColumn(comparisonColumn).setHashFunction(hashFunction)
+            .setUpsertComparisonColumn(comparisonColumn)
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
             .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setIngestionAggregationConfigs(aggregationConfigs).build();

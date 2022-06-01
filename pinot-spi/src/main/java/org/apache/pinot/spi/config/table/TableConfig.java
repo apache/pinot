@@ -303,11 +303,6 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   @JsonIgnore
-  public HashFunction getHashFunction() {
-    return _upsertConfig == null ? HashFunction.NONE : _upsertConfig.getHashFunction();
-  }
-
-  @JsonIgnore
   public UpsertConfig.Mode getUpsertMode() {
     return _upsertConfig == null ? UpsertConfig.Mode.NONE : _upsertConfig.getMode();
   }
