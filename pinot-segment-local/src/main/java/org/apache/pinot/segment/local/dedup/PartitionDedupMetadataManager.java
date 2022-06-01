@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -71,6 +72,8 @@ public class PartitionDedupMetadataManager {
       RecordInfo recordInfo = recordInfoIterator.next();
       _primaryKeySet.put(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), segment);
     }
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
+        _primaryKeySet.size());
   }
 
   public void removeSegment(IndexSegment segment) {
@@ -80,13 +83,15 @@ public class PartitionDedupMetadataManager {
       RecordInfo recordInfo = recordInfoIterator.next();
       _primaryKeySet.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
           (primaryKey, currentSegment) -> {
-        if (currentSegment == segment) {
-          return null;
-        } else {
-          return currentSegment;
-        }
-      });
+            if (currentSegment == segment) {
+              return null;
+            } else {
+              return currentSegment;
+            }
+          });
     }
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
+        _primaryKeySet.size());
   }
 
   private Iterator<RecordInfo> getRecordInfoIterator(IndexSegment segment) {
@@ -138,8 +143,12 @@ public class PartitionDedupMetadataManager {
       waitTillAllSegmentsLoaded();
     }
 
-    return (
-        _primaryKeySet.putIfAbsent(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), indexSegment)
+    boolean result =
+        (_primaryKeySet.putIfAbsent(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), indexSegment)
             != null);
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
+        _primaryKeySet.size());
+
+    return result;
   }
 }
