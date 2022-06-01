@@ -40,22 +40,25 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
   // Use the offset of the first bitmap to support 2 different format of the inverted index:
   //   1. Offset buffer stores the offsets within the whole data buffer (including offset buffer)
   //   2. Offset buffer stores the offsets within the bitmap buffer
-  private final int _firstOffset;
+  private final long _firstOffset;
 
   public BitmapInvertedIndexReader(PinotDataBuffer dataBuffer, int numBitmaps) {
     long offsetBufferEndOffset = (long) (numBitmaps + 1) * Integer.BYTES;
     _offsetBuffer = dataBuffer.view(0, offsetBufferEndOffset, ByteOrder.BIG_ENDIAN);
     _bitmapBuffer = dataBuffer.view(offsetBufferEndOffset, dataBuffer.size());
-
-    _firstOffset = _offsetBuffer.getInt(0);
+    _firstOffset = getOffset(0);
   }
 
   @SuppressWarnings("unchecked")
   @Override
   public ImmutableRoaringBitmap getDocIds(int dictId) {
-    int offset = _offsetBuffer.getInt(dictId * Integer.BYTES);
-    int length = _offsetBuffer.getInt((dictId + 1) * Integer.BYTES) - offset;
-    return new ImmutableRoaringBitmap(_bitmapBuffer.toDirectByteBuffer(offset - _firstOffset, length));
+    long offset = getOffset(dictId);
+    long length = getOffset(dictId + 1) - offset;
+    return new ImmutableRoaringBitmap(_bitmapBuffer.toDirectByteBuffer(offset - _firstOffset, (int) length));
+  }
+
+  private long getOffset(int dictId) {
+    return _offsetBuffer.getInt(dictId * Integer.BYTES) & 0xFFFFFFFFL;
   }
 
   @Override
