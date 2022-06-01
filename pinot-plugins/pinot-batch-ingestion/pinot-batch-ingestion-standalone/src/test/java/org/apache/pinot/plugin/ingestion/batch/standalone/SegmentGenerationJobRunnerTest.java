@@ -20,11 +20,13 @@ package org.apache.pinot.plugin.ingestion.batch.standalone;
 
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Collections;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -37,11 +39,13 @@ import org.apache.pinot.spi.ingestion.batch.spec.ExecutionFrameworkSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.RecordReaderSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -160,12 +164,33 @@ public class SegmentGenerationJobRunnerTest {
     File tableConfigFile = makeTableConfigFile(testDir, schemaName);
     SegmentGenerationJobSpec jobSpec = makeJobSpec(inputDir, outputDir, schemaFile, tableConfigFile);
 
+    // Set up for a segment name that matches our input filename, so we can validate
+    // that only the first input file gets processed.
+    SegmentNameGeneratorSpec nameSpec = new SegmentNameGeneratorSpec();
+    nameSpec.setType(SegmentGenerationTaskRunner.INPUT_FILE_SEGMENT_NAME_GENERATOR);
+    nameSpec.getConfigs().put(SegmentGenerationTaskRunner.FILE_PATH_PATTERN, ".+/(.+)\\.csv");
+    nameSpec.getConfigs().put(SegmentGenerationTaskRunner.SEGMENT_NAME_TEMPLATE, "${filePathPattern:\\1}");
+    jobSpec.setSegmentNameGeneratorSpec(nameSpec);
+
     try {
       SegmentGenerationJobRunner jobRunner = new SegmentGenerationJobRunner(jobSpec);
       jobRunner.run();
       fail("Job should have failed");
     } catch (Exception e) {
       assertTrue(e.getMessage().contains("input2.csv"), "Didn't find filename in exception message");
+
+      // We should only have one output file, since segment generation will
+      // terminate after the second input file.
+      File[] segments = outputDir.listFiles(new FilenameFilter() {
+
+        @Override
+        public boolean accept(File dir, String name) {
+          return name.endsWith(".tar.gz");
+        }
+      });
+
+      assertEquals(segments.length, 1);
+      assertTrue(segments[0].getName().endsWith("input1.tar.gz"));
     }
   }
 

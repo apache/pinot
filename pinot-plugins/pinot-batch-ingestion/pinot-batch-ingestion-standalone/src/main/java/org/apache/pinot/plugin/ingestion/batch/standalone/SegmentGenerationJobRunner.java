@@ -28,17 +28,16 @@ import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationJobUtils;
@@ -73,7 +72,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
   private CountDownLatch _segmentCreationTaskCountDownLatch;
   private Schema _schema;
   private TableConfig _tableConfig;
-  private Queue<Pair<Exception, String>> _failures;
+  private AtomicReference<Exception> _failure;
 
   public SegmentGenerationJobRunner() {
   }
@@ -166,7 +165,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     _executorService = Executors.newFixedThreadPool(numThreads);
 
     // Set up for recording multiple failures while building segments.
-    _failures = new ConcurrentLinkedQueue<>();
+    _failure = new AtomicReference<>();
   }
 
   @Override
@@ -175,7 +174,6 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     //Get list of files to process
     String[] files = _inputDirFS.listFiles(_inputDirURI, true);
 
-    //TODO: sort input files based on creation time
     List<String> filteredFiles = new ArrayList<>();
     PathMatcher includeFilePathMatcher = null;
     if (_spec.getIncludeFileNamePattern() != null) {
@@ -201,6 +199,23 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         filteredFiles.add(file);
       }
     }
+
+    // Sort files based on creation time.
+    Collections.sort(filteredFiles, new Comparator<String>() {
+
+      @Override
+      public int compare(String o1, String o2) {
+        try {
+          long o1Modified = _inputDirFS.lastModified(new URI(o1));
+          long o2Modified = _inputDirFS.lastModified(new URI(o2));
+          return Long.compare(o1Modified, o2Modified);
+        } catch (Exception e) {
+          // We've already called new URI on this path successfully (above)
+          throw new RuntimeException("Impossible exception", e);
+        }
+      }
+    });
+
     File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());
     try {
       int numInputFiles = filteredFiles.size();
@@ -230,13 +245,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
       }
       _segmentCreationTaskCountDownLatch.await();
 
-      if (!_failures.isEmpty()) {
-        StringBuilder msg = new StringBuilder("Failed to generate Pinot segment for file(s) - ");
-        _failures.forEach(p -> {
-          msg.append(msg.length() > 0 ? ", " : "");
-          msg.append(p.getRight());
-        });
-        throw new RuntimeException(msg.toString());
+      if (_failure.get() != null) {
+        throw _failure.get();
       }
     } finally {
       //clean up
@@ -247,6 +257,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
 
   private void submitSegmentGenTask(File localTempDir, URI inputFileURI, int seqId)
       throws Exception {
+
     //create localTempDir for input and output
     File localInputTempDir = new File(localTempDir, "input");
     FileUtils.forceMkdir(localInputTempDir);
@@ -268,6 +279,15 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     taskSpec.setSequenceId(seqId);
     taskSpec.setFailOnEmptySegment(_spec.isFailOnEmptySegment());
     taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
+
+    // If there's already been a failure, log and skip this file. Do this check right before the
+    // submit to reduce odds of starting a new segment when a failure is recorded right before the
+    // submit.
+    if (_failure.get() != null) {
+      LOGGER.info("Skipping Segment Generation Task for {} due to previous failures", inputFileURI);
+      _segmentCreationTaskCountDownLatch.countDown();
+      return;
+    }
 
     LOGGER.info("Submitting one Segment Generation Task for {}", inputFileURI);
     _executorService.submit(() -> {
@@ -297,8 +317,11 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
           _outputDirFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
         }
       } catch (Exception e) {
-        LOGGER.error("Failed to generate Pinot segment for file - {}", inputFileURI, e);
-        _failures.add(Pair.of(e, inputFileURI.toString()));
+        String msg = "Failed to generate Pinot segment for file - " + inputFileURI.toString();
+        _failure.compareAndSet(null, new RuntimeException(msg, e));
+
+        // We have to decrement the latch by the number of pending tasks.
+        _executorService.shutdownNow().forEach(r -> _segmentCreationTaskCountDownLatch.countDown());
       } finally {
         _segmentCreationTaskCountDownLatch.countDown();
         FileUtils.deleteQuietly(localSegmentDir);
