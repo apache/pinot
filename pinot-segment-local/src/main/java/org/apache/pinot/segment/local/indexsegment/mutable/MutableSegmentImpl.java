@@ -490,6 +490,10 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     if (isDedupEnabled() && _partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo, this)) {
+      _logger.info("Dropped row {} since its primary key already exists", row);
+      if (_serverMetrics != null) {
+        _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_DEDUP_DROPPED, 1);
+      }
       return numDocsIndexed < _capacity;
     }
 

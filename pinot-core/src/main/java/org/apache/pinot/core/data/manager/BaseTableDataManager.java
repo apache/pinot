@@ -116,7 +116,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _tableNameWithType = tableDataManagerConfig.getTableName();
     _tableDataDir = tableDataManagerConfig.getDataDir();
     _indexDir = new File(_tableDataDir);
-
     if (!_indexDir.exists()) {
       Preconditions.checkState(_indexDir.mkdirs(),
           "Unable to create index directory at %s. Check that the user has permissions on this directory.", _indexDir);
