@@ -67,6 +67,8 @@ public class MinionConstants {
   // Purges rows inside segment that match chosen criteria
   public static class PurgeTask {
     public static final String TASK_TYPE = "PurgeTask";
+    public static final String LAST_PURGE_TIME_THREESOLD_PERIOD = "lastPurgeTimeThresholdPeriod";
+    public static final String DEFAULT_LAST_PURGE_TIME_THRESHOLD_PERIOD = "14d";
   }
 
   // Common config keys for segment merge tasks.

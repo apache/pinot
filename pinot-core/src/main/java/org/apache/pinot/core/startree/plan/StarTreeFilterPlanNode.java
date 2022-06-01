@@ -23,28 +23,28 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.core.startree.operator.StarTreeFilterOperator;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 public class StarTreeFilterPlanNode implements PlanNode {
+  private final QueryContext _queryContext;
   private final StarTreeV2 _starTreeV2;
   private final Map<String, List<CompositePredicateEvaluator>> _predicateEvaluatorsMap;
   private final Set<String> _groupByColumns;
-  private final Map<String, String> _debugOptions;
 
-  public StarTreeFilterPlanNode(StarTreeV2 starTreeV2,
-      Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns,
-      @Nullable Map<String, String> debugOptions) {
+  public StarTreeFilterPlanNode(QueryContext queryContext, StarTreeV2 starTreeV2,
+      Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns) {
+    _queryContext = queryContext;
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
     _groupByColumns = groupByColumns;
-    _debugOptions = debugOptions;
   }
 
   @Override
   public StarTreeFilterOperator run() {
-    return new StarTreeFilterOperator(_starTreeV2, _predicateEvaluatorsMap, _groupByColumns, _debugOptions);
+    return new StarTreeFilterOperator(_queryContext, _starTreeV2, _predicateEvaluatorsMap, _groupByColumns);
   }
 }

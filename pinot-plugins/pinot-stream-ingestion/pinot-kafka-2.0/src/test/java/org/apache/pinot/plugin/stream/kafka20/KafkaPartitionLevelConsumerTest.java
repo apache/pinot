@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -32,6 +33,7 @@ import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
+import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -49,6 +51,7 @@ public class KafkaPartitionLevelConsumerTest {
   private static final String TEST_TOPIC_1 = "foo";
   private static final String TEST_TOPIC_2 = "bar";
   private static final int NUM_MSG_PRODUCED_PER_PARTITION = 1000;
+  private static final long TIMESTAMP = Instant.now().toEpochMilli();
 
   private MiniKafkaCluster _kafkaCluster;
   private String _kafkaBrokerAddress;
@@ -74,10 +77,10 @@ public class KafkaPartitionLevelConsumerTest {
     props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
     try (KafkaProducer<String, String> producer = new KafkaProducer<>(props)) {
       for (int i = 0; i < NUM_MSG_PRODUCED_PER_PARTITION; i++) {
-        producer.send(new ProducerRecord<>(TEST_TOPIC_1, "sample_msg_" + i));
+        producer.send(new ProducerRecord<>(TEST_TOPIC_1, 0, TIMESTAMP + i, null, "sample_msg_" + i));
         // TEST_TOPIC_2 has 2 partitions
-        producer.send(new ProducerRecord<>(TEST_TOPIC_2, 0, null, "sample_msg_" + i));
-        producer.send(new ProducerRecord<>(TEST_TOPIC_2, 1, null, "sample_msg_" + i));
+        producer.send(new ProducerRecord<>(TEST_TOPIC_2, 0, TIMESTAMP + i, null, "sample_msg_" + i));
+        producer.send(new ProducerRecord<>(TEST_TOPIC_2, 1, TIMESTAMP + i, null, "sample_msg_" + i));
       }
       producer.flush();
     }
@@ -122,10 +125,10 @@ public class KafkaPartitionLevelConsumerTest {
         kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaSocketTimeout());
 
     // test parsing values
-    Assert
-        .assertEquals(10000, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaFetcherSizeBytes());
-    Assert
-        .assertEquals(20000, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaFetcherMinBytes());
+    Assert.assertEquals(10000,
+        kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaFetcherSizeBytes());
+    Assert.assertEquals(20000,
+        kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaFetcherMinBytes());
 
     // test user defined values
     streamConfigMap.put("stream.kafka.buffer.size", "100");
@@ -223,10 +226,11 @@ public class KafkaPartitionLevelConsumerTest {
     for (int partition = 0; partition < numPartitions; partition++) {
       KafkaStreamMetadataProvider kafkaStreamMetadataProvider =
           new KafkaStreamMetadataProvider(clientId, streamConfig, partition);
-      Assert.assertEquals(new LongMsgOffset(0).compareTo(kafkaStreamMetadataProvider
-          .fetchStreamPartitionOffset(new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest(), 10000)), 0);
-      Assert.assertEquals(new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION).compareTo(kafkaStreamMetadataProvider
-          .fetchStreamPartitionOffset(new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest(), 10000)), 0);
+      Assert.assertEquals(new LongMsgOffset(0).compareTo(kafkaStreamMetadataProvider.fetchStreamPartitionOffset(
+          new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest(), 10000)), 0);
+      Assert.assertEquals(new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION).compareTo(
+          kafkaStreamMetadataProvider.fetchStreamPartitionOffset(
+              new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest(), 10000)), 0);
     }
   }
 
@@ -266,6 +270,7 @@ public class KafkaPartitionLevelConsumerTest {
       for (int i = 0; i < batch1.getMessageCount(); i++) {
         final byte[] msg = (byte[]) batch1.getMessageAtIndex(i);
         Assert.assertEquals(new String(msg), "sample_msg_" + i);
+        Assert.assertNull(batch1.getMetadataAtIndex(i));
       }
       // Test second half batch
       final MessageBatch batch2 =
@@ -274,6 +279,7 @@ public class KafkaPartitionLevelConsumerTest {
       for (int i = 0; i < batch2.getMessageCount(); i++) {
         final byte[] msg = (byte[]) batch2.getMessageAtIndex(i);
         Assert.assertEquals(new String(msg), "sample_msg_" + (500 + i));
+        Assert.assertNull(batch1.getMetadataAtIndex(i));
       }
       // Some random range
       final MessageBatch batch3 = consumer.fetchMessages(new LongMsgOffset(10), new LongMsgOffset(35), 10000);
@@ -281,6 +287,66 @@ public class KafkaPartitionLevelConsumerTest {
       for (int i = 0; i < batch3.getMessageCount(); i++) {
         final byte[] msg = (byte[]) batch3.getMessageAtIndex(i);
         Assert.assertEquals(new String(msg), "sample_msg_" + (10 + i));
+        Assert.assertNull(batch1.getMetadataAtIndex(i));
+      }
+    }
+  }
+
+  @Test
+  public void testMessageMetadata()
+      throws Exception {
+    testMessageMetadata(TEST_TOPIC_1);
+    testMessageMetadata(TEST_TOPIC_2);
+  }
+
+  private void testMessageMetadata(String topic)
+      throws TimeoutException {
+    String streamType = "kafka";
+    String streamKafkaBrokerList = _kafkaBrokerAddress;
+    String streamKafkaConsumerType = "simple";
+    String clientId = "clientId";
+    String tableNameWithType = "tableName_REALTIME";
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", topic);
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    streamConfigMap.put("stream.kafka.metadata.populate", "true");
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
+
+    final StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    int numPartitions = new KafkaStreamMetadataProvider(clientId, streamConfig).fetchPartitionCount(10000);
+    for (int partition = 0; partition < numPartitions; partition++) {
+      final PartitionLevelConsumer consumer = streamConsumerFactory.createPartitionLevelConsumer(clientId, partition);
+
+      // Test consume a large batch, only 500 records will be returned.
+      final MessageBatch batch1 =
+          consumer.fetchMessages(new LongMsgOffset(0), new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION), 10000);
+      Assert.assertEquals(batch1.getMessageCount(), 500);
+      for (int i = 0; i < batch1.getMessageCount(); i++) {
+        final RowMetadata metadata = batch1.getMetadataAtIndex(i);
+        Assert.assertNotNull(metadata);
+        Assert.assertEquals(metadata.getIngestionTimeMs(), TIMESTAMP + i);
+      }
+      // Test second half batch
+      final MessageBatch batch2 =
+          consumer.fetchMessages(new LongMsgOffset(500), new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION), 10000);
+      Assert.assertEquals(batch2.getMessageCount(), 500);
+      for (int i = 0; i < batch2.getMessageCount(); i++) {
+        final RowMetadata metadata = batch2.getMetadataAtIndex(i);
+        Assert.assertNotNull(metadata);
+        Assert.assertEquals(metadata.getIngestionTimeMs(), TIMESTAMP + (500 + i));
+      }
+      // Some random range
+      final MessageBatch batch3 = consumer.fetchMessages(new LongMsgOffset(10), new LongMsgOffset(35), 10000);
+      Assert.assertEquals(batch3.getMessageCount(), 25);
+      for (int i = 0; i < batch3.getMessageCount(); i++) {
+        final RowMetadata metadata = batch3.getMetadataAtIndex(i);
+        Assert.assertNotNull(metadata);
+        Assert.assertEquals(metadata.getIngestionTimeMs(), TIMESTAMP + (10 + i));
       }
     }
   }

@@ -20,10 +20,12 @@ package org.apache.pinot.segment.local.indexsegment.immutable;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
@@ -52,6 +54,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private final SegmentMetadataImpl _segmentMetadata;
   private final Map<String, ColumnIndexContainer> _indexContainerMap;
   private final StarTreeIndexContainer _starTreeIndexContainer;
+  private final Map<String, DataSource> _dataSources;
 
   // For upsert
   private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
@@ -65,6 +68,12 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _segmentMetadata = segmentMetadata;
     _indexContainerMap = columnIndexContainerMap;
     _starTreeIndexContainer = starTreeIndexContainer;
+    _dataSources = new HashMap<>(HashUtil.getHashMapCapacity(segmentMetadata.getColumnMetadataMap().size()));
+
+    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+      String colName = entry.getKey();
+      _dataSources.put(colName, new ImmutableDataSource(entry.getValue(), _indexContainerMap.get(colName)));
+    }
   }
 
   /**
@@ -112,10 +121,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public DataSource getDataSource(String column) {
-    ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-    Preconditions.checkNotNull(columnMetadata,
-        "ColumnMetadata for " + column + " should not be null. " + "Potentially invalid column name specified.");
-    return new ImmutableDataSource(columnMetadata, _indexContainerMap.get(column));
+    DataSource result = _dataSources.get(column);
+    Preconditions.checkNotNull(result,
+        "DataSource for %s should not be null. Potentially invalid column name specified.",
+        column);
+    return result;
   }
 
   @Override

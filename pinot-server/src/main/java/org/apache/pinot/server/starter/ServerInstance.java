@@ -63,7 +63,8 @@ public class ServerInstance {
   private final GrpcQueryServer _grpcQueryServer;
   private final AccessControl _accessControl;
 
-  private boolean _started = false;
+  private boolean _dataManagerStarted = false;
+  private boolean _queryServerStarted = false;
 
   public ServerInstance(ServerConf serverConf, HelixManager helixManager, AccessControlFactory accessControlFactory)
       throws Exception {
@@ -99,7 +100,7 @@ public class ServerInstance {
     NettyConfig nettyConfig =
         NettyConfig.extractNettyConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_NETTY_PREFIX);
     accessControlFactory.init(
-      serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL), helixManager);
+        serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL), helixManager);
     _accessControl = accessControlFactory.create();
 
     if (serverConf.isNettyServerEnabled()) {
@@ -143,18 +144,28 @@ public class ServerInstance {
     LOGGER.info("Finish initializing server instance");
   }
 
-  public synchronized void start() {
+  public synchronized void startDataManager() {
     // This method is called when Helix starts a new ZK session, and can be called multiple times. We only need to start
-    // the server instance once, and simply ignore the following invocations.
-    if (_started) {
-      LOGGER.info("Server instance is already running, skipping the start");
+    // the data manager once, and simply ignore the following invocations.
+    if (_dataManagerStarted) {
+      LOGGER.info("Data manager is already running, skipping the start");
       return;
     }
 
-    LOGGER.info("Starting server instance");
-
-    LOGGER.info("Starting instance data manager");
+    LOGGER.info("Starting data manager");
     _instanceDataManager.start();
+    _dataManagerStarted = true;
+    LOGGER.info("Finish starting data manager");
+  }
+
+  public synchronized void startQueryServer() {
+    if (_queryServerStarted) {
+      LOGGER.warn("Query server is already running, skipping the start");
+      return;
+    }
+
+    LOGGER.info("Starting query server");
+
     LOGGER.info("Starting query executor");
     _queryExecutor.start();
     LOGGER.info("Starting query scheduler");
@@ -172,39 +183,48 @@ public class ServerInstance {
       _grpcQueryServer.start();
     }
 
-    _started = true;
-    LOGGER.info("Finish starting server instance");
+    _queryServerStarted = true;
+    LOGGER.info("Finish starting query server");
   }
 
   public synchronized void shutDown() {
-    if (!_started) {
+    if (!_dataManagerStarted) {
       LOGGER.warn("Server instance is not running, skipping the shut down");
       return;
     }
 
     LOGGER.info("Shutting down server instance");
 
-    if (_nettyTlsQueryServer != null) {
-      LOGGER.info("Shutting down TLS-secured Netty query server");
-      _nettyTlsQueryServer.shutDown();
+    if (_queryServerStarted) {
+      LOGGER.info("Shutting down query server");
+
+      if (_nettyQueryServer != null) {
+        LOGGER.info("Shutting down Netty query server");
+        _nettyQueryServer.shutDown();
+      }
+      if (_nettyTlsQueryServer != null) {
+        LOGGER.info("Shutting down TLS-secured Netty query server");
+        _nettyTlsQueryServer.shutDown();
+      }
+      if (_grpcQueryServer != null) {
+        LOGGER.info("Shutting down gRPC query server");
+        _grpcQueryServer.shutdown();
+      }
+      LOGGER.info("Shutting down query scheduler");
+      _queryScheduler.stop();
+      LOGGER.info("Shutting down query executor");
+      _queryExecutor.shutDown();
+
+      _queryServerStarted = false;
+      LOGGER.info("Finish shutting down query server");
     }
-    if (_grpcQueryServer != null) {
-      LOGGER.info("Shutting down gRPC query server");
-      _grpcQueryServer.shutdown();
-    }
-    if (_nettyQueryServer != null) {
-      LOGGER.info("Shutting down Netty query server");
-      _nettyQueryServer.shutDown();
-    }
-    LOGGER.info("Shutting down query scheduler");
-    _queryScheduler.stop();
-    LOGGER.info("Shutting down query executor");
-    _queryExecutor.shutDown();
-    LOGGER.info("Shutting down instance data manager");
+
+    LOGGER.info("Shutting down data manager");
     _instanceDataManager.shutDown();
     LOGGER.info("Shutting down metrics registry");
     _serverMetrics.getMetricsRegistry().shutdown();
-    _started = false;
+
+    _dataManagerStarted = false;
     LOGGER.info("Finish shutting down server instance");
   }
 

@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.spi.config.table.ingestion;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -50,14 +48,11 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs related to record aggregation function applied during ingestion")
   private List<AggregationConfig> _aggregationConfigs;
 
-
-  @JsonCreator
-  public IngestionConfig(@JsonProperty("batchIngestionConfig") @Nullable BatchIngestionConfig batchIngestionConfig,
-      @JsonProperty("streamIngestionConfig") @Nullable StreamIngestionConfig streamIngestionConfig,
-      @JsonProperty("filterConfig") @Nullable FilterConfig filterConfig,
-      @JsonProperty("transformConfigs") @Nullable List<TransformConfig> transformConfigs,
-      @JsonProperty("complexTypeConfig") @Nullable ComplexTypeConfig complexTypeConfig,
-      @JsonProperty("aggregationConfigs") @Nullable List<AggregationConfig> aggregationConfigs) {
+  @Deprecated
+  public IngestionConfig(@Nullable BatchIngestionConfig batchIngestionConfig,
+      @Nullable StreamIngestionConfig streamIngestionConfig, @Nullable FilterConfig filterConfig,
+      @Nullable List<TransformConfig> transformConfigs, @Nullable ComplexTypeConfig complexTypeConfig,
+      @Nullable List<AggregationConfig> aggregationConfigs) {
     _batchIngestionConfig = batchIngestionConfig;
     _streamIngestionConfig = streamIngestionConfig;
     _filterConfig = filterConfig;

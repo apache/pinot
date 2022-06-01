@@ -78,6 +78,8 @@ public class CommonConstants {
     public static final String LEAD_CONTROLLER_RESOURCE_ENABLED_KEY = "RESOURCE_ENABLED";
 
     public static final String ENABLE_CASE_INSENSITIVE_KEY = "enable.case.insensitive";
+    public static final String ALLOW_TABLE_NAME_WITH_DATABASE = "allow.table.name.with.database";
+    public static final boolean DEFAULT_ALLOW_TABLE_NAME_WITH_DATABASE = false;
     @Deprecated
     public static final String DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY = "enable.case.insensitive.pql";
 
@@ -249,7 +251,9 @@ public class CommonConstants {
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
         public static final String SKIP_UPSERT = "skipUpsert";
-        public static final String USE_STAR_TREE_KEY = "useStarTree";
+        public static final String USE_STAR_TREE = "useStarTree";
+        public static final String ROUTING_OPTIONS = "routingOptions";
+        public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
         public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
@@ -263,6 +267,10 @@ public class CommonConstants {
         public static final String RESPONSE_FORMAT = "responseFormat";
         @Deprecated
         public static final String GROUP_BY_MODE = "groupByMode";
+      }
+
+      public static class QueryOptionValue {
+        public static final String ROUTING_FORCE_HLC = "FORCE_HLC";
       }
     }
 
@@ -311,7 +319,7 @@ public class CommonConstants {
     public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
     public static final String CONFIG_OF_NETTY_PORT = "pinot.server.netty.port";
     public static final String CONFIG_OF_ENABLE_GRPC_SERVER = "pinot.server.grpc.enable";
-    public static final boolean DEFAULT_ENABLE_GRPC_SERVER = false;
+    public static final boolean DEFAULT_ENABLE_GRPC_SERVER = true;
     public static final String CONFIG_OF_GRPC_PORT = "pinot.server.grpc.port";
     public static final int DEFAULT_GRPC_PORT = 8090;
     public static final String CONFIG_OF_GRPCTLS_SERVER_ENABLED = "pinot.server.grpctls.enabled";
@@ -538,11 +546,16 @@ public class CommonConstants {
   public static class Segment {
     public static class Realtime {
       public enum Status {
-        // Means the segment is in CONSUMING state.
-        IN_PROGRESS, // Means the segment is in ONLINE state (segment completed consuming and has been saved in
-        // segment store).
-        DONE, // Means the segment is uploaded to a Pinot controller by an external party.
-        UPLOADED
+        IN_PROGRESS, // The segment is still consuming data
+        DONE, // The segment has finished consumption and has been committed to the segment store
+        UPLOADED; // The segment is uploaded by an external party
+
+        /**
+         * Returns {@code true} if the segment is completed (DONE/UPLOADED), {@code false} otherwise.
+         */
+        public boolean isCompleted() {
+          return this != IN_PROGRESS;
+        }
       }
 
       /**

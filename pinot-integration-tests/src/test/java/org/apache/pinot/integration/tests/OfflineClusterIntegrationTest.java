@@ -492,7 +492,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // As query behavior changed, the segment reload must have been done. The new table size should be like below,
     // with only one segment being reloaded with force download and dropping the inverted index.
     long tableSizeAfterReloadSegment = getTableSize(getTableName());
-    assertTrue(tableSizeAfterReloadSegment > DISK_SIZE_IN_BYTES && tableSizeAfterReloadSegment < tableSizeWithNewIndex);
+    assertTrue(tableSizeAfterReloadSegment > DISK_SIZE_IN_BYTES && tableSizeAfterReloadSegment < tableSizeWithNewIndex,
+        String.format("Table size: %d should be between %s and %s after dropping inverted index from one segment",
+            tableSizeAfterReloadSegment, DISK_SIZE_IN_BYTES, tableSizeWithNewIndex));
 
     // Add inverted index back to check if reloading whole table with force download works.
     // Note that because we have force downloaded a segment above, it's important to reset the table state by adding
@@ -506,7 +508,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     addInvertedIndex();
     // The table size gets larger for sure, but it does not necessarily equal to tableSizeWithNewIndex, because the
     // order of entries in the index_map file can change when the raw segment adds/deletes indices back and forth.
-    assertTrue(getTableSize(getTableName()) > tableSizeAfterReloadSegment);
+    long tableSizeAfterAddIndex = getTableSize(getTableName());
+    assertTrue(tableSizeAfterAddIndex > tableSizeAfterReloadSegment, String
+        .format("Table size: %d should increase after adding inverted index, as compared with %s",
+            tableSizeAfterAddIndex, tableSizeAfterReloadSegment));
 
     // Force to download the whole table and use the original table config, so the disk usage should get back to
     // initial value.
@@ -967,10 +972,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     _schemaFileName = SCHEMA_FILE_NAME_WITH_EXTRA_COLUMNS;
     addSchema(createSchema());
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setIngestionConfig(new IngestionConfig(null, null, null,
-        Arrays.asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
-            new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"),
-            new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')")), null, null));
+    List<TransformConfig> transformConfigs = Arrays.asList(
+        new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
+        new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"),
+        new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
+    tableConfig.setIngestionConfig(ingestionConfig);
     updateTableConfig(tableConfig);
 
     // Trigger reload
@@ -1946,8 +1954,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     List<String> queries = new ArrayList<>();
     baseQueries.forEach(
         q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
-    baseQueries.forEach(
-        q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
+    // something like "SELECT MYDB.MYTABLE.DAYSSinceEpOch from MYDB.MYTABLE where MYDB.MYTABLE.DAYSSinceEpOch = 16138"
+    baseQueries.forEach(q -> queries.add(
+        q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
 
     for (String query : queries) {
       JsonNode response = postQuery(query);

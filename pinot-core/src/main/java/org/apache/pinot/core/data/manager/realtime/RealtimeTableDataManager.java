@@ -290,61 +290,52 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // of the index directory and loading segment from it
     LoaderUtils.reloadFailureRecovery(segmentDir);
 
-    boolean isLLCSegment = SegmentName.isLowLevelConsumerSegmentName(segmentName);
-    if (segmentDir.exists()) {
-      // Segment already exists on disk
-      if (segmentZKMetadata.getStatus() == Status.DONE || segmentZKMetadata.getStatus() == Status.UPLOADED) {
-        // Metadata has been committed, load the local segment
+    boolean isHLCSegment = SegmentName.isHighLevelConsumerSegmentName(segmentName);
+    if (segmentZKMetadata.getStatus().isCompleted()) {
+      if (segmentDir.exists()) {
+        // Local segment exists, try to load it
         try {
           addSegment(ImmutableSegmentLoader.load(segmentDir, indexLoadingConfig, schema));
           return;
         } catch (Exception e) {
-          if (isLLCSegment) {
-            // For LLC and segments, delete the local copy and download a new copy from the controller
-            FileUtils.deleteQuietly(segmentDir);
+          if (!isHLCSegment) {
+            // For LLC and uploaded segments, delete the local copy and download a new copy
             _logger.error("Caught exception while loading segment: {}, downloading a new copy", segmentName, e);
+            FileUtils.deleteQuietly(segmentDir);
           } else {
             // For HLC segments, throw out the exception because there is no way to recover (controller does not have a
             // copy of the segment)
-            throw e;
+            throw new RuntimeException("Failed to load local HLC segment: " + segmentName, e);
           }
         }
       } else {
-        // Metadata has not been committed, delete the local segment
-        FileUtils.deleteQuietly(segmentDir);
+        if (isHLCSegment) {
+          throw new RuntimeException("Failed to find local copy for committed HLC segment: " + segmentName);
+        }
       }
-    } else if (segmentZKMetadata.getStatus() == Status.UPLOADED) {
-      // The segment is uploaded to an upsert enabled realtime table. Download the segment and load.
-      String downloadUrl = segmentZKMetadata.getDownloadUrl();
-      Preconditions.checkNotNull(downloadUrl, "Upload segment metadata has no download url");
-      downloadSegmentFromDeepStore(segmentName, indexLoadingConfig, downloadUrl);
-      _logger
-          .info("Downloaded, untarred and add segment {} of table {} from {}", segmentName, tableConfig.getTableName(),
-              downloadUrl);
+      // Local segment doesn't exist or cannot load, download a new copy
+      downloadAndReplaceSegment(segmentName, segmentZKMetadata, indexLoadingConfig, tableConfig);
       return;
+    } else {
+      // Metadata has not been committed, delete the local segment if exists
+      FileUtils.deleteQuietly(segmentDir);
     }
 
-    // Start a new consuming segment or download the segment from the controller
-
+    // Start a new consuming segment
     if (!isValid(schema, tableConfig.getIndexingConfig())) {
       _logger.error("Not adding segment {}", segmentName);
       throw new RuntimeException("Mismatching schema/table config for " + _tableNameWithType);
     }
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
 
-    if (isLLCSegment) {
-      if (segmentZKMetadata.getStatus() == Status.DONE) {
-        downloadAndReplaceSegment(segmentName, segmentZKMetadata, indexLoadingConfig, tableConfig);
-        return;
-      }
-
+    if (!isHLCSegment) {
       // Generates only one semaphore for every partitionGroupId
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
       int partitionGroupId = llcSegmentName.getPartitionGroupId();
       Semaphore semaphore = _partitionGroupIdToSemaphoreMap.computeIfAbsent(partitionGroupId, k -> new Semaphore(1));
       PartitionUpsertMetadataManager partitionUpsertMetadataManager =
-          _tableUpsertMetadataManager != null ? _tableUpsertMetadataManager
-              .getOrCreatePartitionManager(partitionGroupId) : null;
+          _tableUpsertMetadataManager != null ? _tableUpsertMetadataManager.getOrCreatePartitionManager(
+              partitionGroupId) : null;
       segmentDataManager =
           new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
               indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager);
@@ -419,7 +410,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Override
   protected boolean allowDownload(String segmentName, SegmentZKMetadata zkMetadata) {
-    // Only LLC immutable segment allows download.
+    // Cannot download HLC segment or consuming segment
     if (SegmentName.isHighLevelConsumerSegmentName(segmentName) || zkMetadata.getStatus() == Status.IN_PROGRESS) {
       return false;
     }

@@ -88,6 +88,11 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
+  public void setBigDecimal(int docId, BigDecimal value) {
+    setBytes(docId, BigDecimalUtils.serialize(value));
+  }
+
+  @Override
   public void setString(int docId, String value) {
     setBytes(docId, value.getBytes(UTF_8));
   }

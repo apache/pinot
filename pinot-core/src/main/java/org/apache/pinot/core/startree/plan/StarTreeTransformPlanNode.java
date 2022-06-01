@@ -28,6 +28,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
@@ -37,10 +38,9 @@ public class StarTreeTransformPlanNode implements PlanNode {
   private final List<ExpressionContext> _groupByExpressions;
   private final StarTreeProjectionPlanNode _starTreeProjectionPlanNode;
 
-  public StarTreeTransformPlanNode(StarTreeV2 starTreeV2,
+  public StarTreeTransformPlanNode(QueryContext queryContext, StarTreeV2 starTreeV2,
       AggregationFunctionColumnPair[] aggregationFunctionColumnPairs, @Nullable ExpressionContext[] groupByExpressions,
-      Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap,
-      @Nullable Map<String, String> debugOptions) {
+      Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap) {
     Set<String> projectionColumns = new HashSet<>();
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       projectionColumns.add(aggregationFunctionColumnPair.toColumnName());
@@ -58,8 +58,8 @@ public class StarTreeTransformPlanNode implements PlanNode {
       groupByColumns = null;
     }
     _starTreeProjectionPlanNode =
-        new StarTreeProjectionPlanNode(starTreeV2, projectionColumns, predicateEvaluatorsMap, groupByColumns,
-            debugOptions);
+        new StarTreeProjectionPlanNode(queryContext, starTreeV2, projectionColumns, predicateEvaluatorsMap,
+            groupByColumns);
   }
 
   @Override

@@ -198,6 +198,7 @@ public class DateTimeFormatSpec {
           .checkState(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
               "Incorrect format type: %s in format: %s. Must be of '[0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:pattern'",
               formatTokens[FORMAT_TIMEFORMAT_POSITION], format);
+      DateTimeFormatPatternSpec.validateFormat(formatTokens[FORMAT_PATTERN_POSITION]);
     }
   }
 

@@ -21,6 +21,7 @@ package org.apache.pinot.core.util;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
@@ -38,6 +39,8 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertThrows;
 
 
 /**
@@ -91,9 +94,10 @@ public class SchemaUtilsTest {
 
     // schema doesn't have destination columns from transformConfigs
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
-        new IngestionConfig(null, null, null, Lists.newArrayList(new TransformConfig("colA", "round(colB, 1000)")),
-            null, null)).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("colA", "round(colB, 1000)")));
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(ingestionConfig).build();
     try {
       SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
       Assert.fail("Should fail schema validation, as colA is not present in schema");
@@ -140,8 +144,7 @@ public class SchemaUtilsTest {
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS").build();
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
-        .setIngestionConfig(new IngestionConfig(null, null, null,
-            Lists.newArrayList(new TransformConfig("colA", "round(colB, 1000)")), null, null)).build();
+        .setIngestionConfig(ingestionConfig).build();
     try {
       SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
       Assert.fail("Should fail schema validation, as colA is not present in schema");
@@ -236,9 +239,8 @@ public class SchemaUtilsTest {
     SchemaUtils.validate(pinotSchema);
 
     // date time field spec using SIMPLE_DATE_FORMAT needs to be valid.
-    pinotSchema = new Schema.SchemaBuilder()
-        .addDateTime("datetime3", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:foo_bar", "1:DAYS").build();
-    checkValidationFails(pinotSchema);
+    assertThrows(IllegalStateException.class, () -> new Schema.SchemaBuilder()
+        .addDateTime("datetime3", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:foo_bar", "1:DAYS").build());
 
     // date time field spec using SIMPLE_DATE_FORMAT needs to be lexicographical order.
     pinotSchema = new Schema.SchemaBuilder()

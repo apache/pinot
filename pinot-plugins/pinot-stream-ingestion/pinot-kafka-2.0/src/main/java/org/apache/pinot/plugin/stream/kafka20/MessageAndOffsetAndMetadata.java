@@ -16,30 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.pruner;
+package org.apache.pinot.plugin.stream.kafka20;
 
-import java.util.List;
-import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.env.PinotConfiguration;
+import java.nio.ByteBuffer;
+import org.apache.pinot.plugin.stream.kafka.MessageAndOffset;
+import org.apache.pinot.spi.stream.RowMetadata;
 
 
-public interface SegmentPruner {
+public class MessageAndOffsetAndMetadata extends MessageAndOffset {
+  private final RowMetadata _rowMetadata;
 
-  /**
-   * Initializes the segment pruner.
-   */
-  void init(PinotConfiguration config);
+  public MessageAndOffsetAndMetadata(byte[] message, long offset, RowMetadata rowMetadata) {
+    super(message, offset);
+    _rowMetadata = rowMetadata;
+  }
 
-  /**
-   * Inspect the query context to determine if the pruner should be applied
-   * @return true if the pruner applies to the query
-   */
-  boolean isApplicableTo(QueryContext query);
+  public MessageAndOffsetAndMetadata(ByteBuffer message, long offset, RowMetadata rowMetadata) {
+    super(message, offset);
+    _rowMetadata = rowMetadata;
+  }
 
-  /**
-   * Prunes the segments based on the query, returns the segments that are not pruned.
-   * <p>Override this method for the pruner logic.
-   */
-  List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query);
+  public RowMetadata getRowMetadata() {
+    return _rowMetadata;
+  }
 }

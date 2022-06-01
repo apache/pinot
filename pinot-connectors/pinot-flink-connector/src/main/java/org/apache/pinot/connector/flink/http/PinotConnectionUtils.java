@@ -18,8 +18,7 @@
  */
 package org.apache.pinot.connector.flink.http;
 
-import com.google.common.collect.Lists;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +47,7 @@ public final class PinotConnectionUtils {
   }
 
   public static TableConfig getTableConfig(ControllerRequestClient client, String tableName, String tableType) {
-    TableConfig tableConfig = null;
+    TableConfig tableConfig;
     try {
       tableConfig = client.getTableConfig(tableName, TableType.valueOf(tableType));
     } catch (Exception e) {
@@ -57,37 +56,34 @@ public final class PinotConnectionUtils {
 
     LOGGER.info("fetched pinot config {}", tableConfig);
 
-    Map<String, String> newBatchConfigMaps = new HashMap<>();
+    Map<String, String> newBatchConfigMap = new HashMap<>();
     // append the batch config of controller URI
     String controllerBaseUrl = client.getControllerRequestURLBuilder().getBaseUrl();
-    newBatchConfigMaps.put("push.controllerUri", controllerBaseUrl);
-    newBatchConfigMaps.put("outputDirURI", "/tmp/pinotoutput");
+    newBatchConfigMap.put("push.controllerUri", controllerBaseUrl);
+    newBatchConfigMap.put("outputDirURI", "/tmp/pinotoutput");
+
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig == null) {
-      tableConfig.setIngestionConfig(
-          new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(newBatchConfigMaps), "APPEND", "HOURLY"),
-              null, null, null, null, null));
-      return tableConfig;
-    }
-    if (ingestionConfig.getBatchIngestionConfig() == null) {
-      tableConfig.setIngestionConfig(
-          new IngestionConfig(new BatchIngestionConfig(Lists.newArrayList(newBatchConfigMaps), "APPEND", "HOURLY"),
-              null, ingestionConfig.getFilterConfig(), ingestionConfig.getTransformConfigs(),
-              ingestionConfig.getComplexTypeConfig(), ingestionConfig.getAggregationConfigs()));
+      ingestionConfig = new IngestionConfig();
+      ingestionConfig.setBatchIngestionConfig(
+          new BatchIngestionConfig(Collections.singletonList(newBatchConfigMap), "APPEND", "HOURLY"));
+      tableConfig.setIngestionConfig(ingestionConfig);
       return tableConfig;
     }
 
-    List<Map<String, String>> batchConfigMaps =
-        ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps() == null ? new ArrayList<>()
-            : ingestionConfig.getBatchIngestionConfig().getBatchConfigMaps();
-    batchConfigMaps.add(newBatchConfigMaps);
+    BatchIngestionConfig batchIngestionConfig = ingestionConfig.getBatchIngestionConfig();
+    if (batchIngestionConfig == null) {
+      ingestionConfig.setBatchIngestionConfig(
+          new BatchIngestionConfig(Collections.singletonList(newBatchConfigMap), "APPEND", "HOURLY"));
+      return tableConfig;
+    }
 
-    tableConfig.setIngestionConfig(new IngestionConfig(
-        new BatchIngestionConfig(batchConfigMaps, ingestionConfig.getBatchIngestionConfig().getSegmentIngestionType(),
-            ingestionConfig.getBatchIngestionConfig().getSegmentIngestionFrequency()), null,
-        ingestionConfig.getFilterConfig(), ingestionConfig.getTransformConfigs(),
-        ingestionConfig.getComplexTypeConfig(), ingestionConfig.getAggregationConfigs()));
-
+    List<Map<String, String>> batchConfigMaps = batchIngestionConfig.getBatchConfigMaps();
+    if (batchConfigMaps == null) {
+      batchIngestionConfig.setBatchConfigMaps(Collections.singletonList(newBatchConfigMap));
+    } else {
+      batchConfigMaps.add(newBatchConfigMap);
+    }
     return tableConfig;
   }
 }

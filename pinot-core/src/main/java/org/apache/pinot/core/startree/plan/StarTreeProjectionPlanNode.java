@@ -25,6 +25,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
@@ -34,15 +35,14 @@ public class StarTreeProjectionPlanNode implements PlanNode {
   private final Map<String, DataSource> _dataSourceMap;
   private final StarTreeDocIdSetPlanNode _starTreeDocIdSetPlanNode;
 
-  public StarTreeProjectionPlanNode(StarTreeV2 starTreeV2, Set<String> projectionColumns,
-      Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns,
-      @Nullable Map<String, String> debugOptions) {
+  public StarTreeProjectionPlanNode(QueryContext queryContext, StarTreeV2 starTreeV2, Set<String> projectionColumns,
+      Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns) {
     _dataSourceMap = new HashMap<>();
     for (String projectionColumn : projectionColumns) {
       _dataSourceMap.put(projectionColumn, starTreeV2.getDataSource(projectionColumn));
     }
     _starTreeDocIdSetPlanNode =
-        new StarTreeDocIdSetPlanNode(starTreeV2, predicateEvaluatorsMap, groupByColumns, debugOptions);
+        new StarTreeDocIdSetPlanNode(queryContext, starTreeV2, predicateEvaluatorsMap, groupByColumns);
   }
 
   @Override

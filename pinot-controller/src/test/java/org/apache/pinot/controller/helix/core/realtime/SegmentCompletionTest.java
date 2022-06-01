@@ -1349,10 +1349,6 @@ public class SegmentCompletionTest {
       return new LongMsgOffsetFactory();
     }
 
-    public StreamPartitionMsgOffsetFactory getStreamPartitionMsgOffsetFactory(String segmentName) {
-      return new LongMsgOffsetFactory();
-    }
-
     @Override
     protected long getCurrentTimeMs() {
       return _seconds * 1000L;

@@ -33,7 +33,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 public class BatchIngestionConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Configs for all the batch sources to ingest from")
-  private final List<Map<String, String>> _batchConfigMaps;
+  private List<Map<String, String>> _batchConfigMaps;
 
   @JsonPropertyDescription("Ingestion type APPEND or REFRESH")
   private String _segmentIngestionType;
@@ -61,6 +61,10 @@ public class BatchIngestionConfig extends BaseJsonConfig {
 
   public String getSegmentIngestionFrequency() {
     return _segmentIngestionFrequency;
+  }
+
+  public void setBatchConfigMaps(List<Map<String, String>> batchConfigMaps) {
+    _batchConfigMaps = batchConfigMaps;
   }
 
   public void setSegmentIngestionType(String segmentIngestionType) {

@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
@@ -32,11 +33,10 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 public class StarTreeDocIdSetPlanNode implements PlanNode {
   private final StarTreeFilterPlanNode _starTreeFilterPlanNode;
 
-  public StarTreeDocIdSetPlanNode(StarTreeV2 starTreeV2,
-      Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns,
-      @Nullable Map<String, String> debugOptions) {
+  public StarTreeDocIdSetPlanNode(QueryContext queryContext, StarTreeV2 starTreeV2,
+      Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns) {
     _starTreeFilterPlanNode =
-        new StarTreeFilterPlanNode(starTreeV2, predicateEvaluatorsMap, groupByColumns, debugOptions);
+        new StarTreeFilterPlanNode(queryContext, starTreeV2, predicateEvaluatorsMap, groupByColumns);
   }
 
   @Override

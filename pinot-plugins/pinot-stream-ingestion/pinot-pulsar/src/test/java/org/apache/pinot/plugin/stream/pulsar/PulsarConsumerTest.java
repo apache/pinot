@@ -180,9 +180,9 @@ public class PulsarConsumerTest {
         }
         producer.flush();
       }
-      waitForCondition(input -> validatePartitionMessageCount(partition, NUM_RECORDS_PER_PARTITION), 1 * 1000L,
-          5 * 60 * 1000L, "Failed to consume " + NUM_RECORDS_PER_PARTITION + " messages from partition " + partition,
-          true);
+      waitForCondition(input -> validatePartitionMessageCount(partition, NUM_RECORDS_PER_PARTITION, TEST_TOPIC),
+          1 * 1000L, 5 * 60 * 1000L,
+          "Failed to consume " + NUM_RECORDS_PER_PARTITION + " messages from partition " + partition, true);
     }
   }
 
@@ -201,34 +201,39 @@ public class PulsarConsumerTest {
           CompletableFuture<MessageId> messageIdCompletableFuture = producer.sendAsync(MESSAGE_PREFIX + "_" + i);
           messageIdCompletableFuture.thenAccept(messageId -> {
 
-            List<BatchMessageIdImpl> batchMessageIdList = _partitionToMessageIdMapping
-                .getOrDefault(partition, new ArrayList<>());
-            batchMessageIdList.add((BatchMessageIdImpl) messageId);
-            _partitionToMessageIdMapping.put(partition, batchMessageIdList);
-
-            if (!_partitionToFirstMessageIdMapBatch.containsKey(partition)) {
-              _partitionToFirstMessageIdMapBatch.put(partition, messageId);
-            }
+            _partitionToMessageIdMapping.compute(partition, (partitionId, messageIds) -> {
+              if (messageIds == null) {
+                List<BatchMessageIdImpl> messageIdList = new ArrayList<>();
+                messageIdList.add((BatchMessageIdImpl) messageId);
+                if (!_partitionToFirstMessageIdMapBatch.containsKey(partition)) {
+                  _partitionToFirstMessageIdMapBatch.put(partition, messageId);
+                }
+                return messageIdList;
+              } else {
+                messageIds.add((BatchMessageIdImpl) messageId);
+                return messageIds;
+              }
+            });
           });
         }
         producer.flush();
       }
-      waitForCondition(input -> validatePartitionMessageCount(partition, NUM_RECORDS_PER_PARTITION), 1 * 1000L,
-          5 * 60 * 1000L, "Failed to consume " + NUM_RECORDS_PER_PARTITION + " messages from partition " + partition,
-          true);
+      waitForCondition(input -> validatePartitionMessageCount(partition, NUM_RECORDS_PER_PARTITION, TEST_TOPIC_BATCH),
+          1 * 1000L, 5 * 60 * 1000L,
+          "Failed to consume " + NUM_RECORDS_PER_PARTITION + " messages from partition " + partition, true);
     }
   }
 
-  private boolean validatePartitionMessageCount(int partition, int expectedMsgCount) {
-    final PartitionGroupConsumer consumer = StreamConsumerFactoryProvider.create(getStreamConfig(TEST_TOPIC))
+  private boolean validatePartitionMessageCount(int partition, int expectedMsgCount, String topicName) {
+    final PartitionGroupConsumer consumer = StreamConsumerFactoryProvider.create(getStreamConfig(topicName))
         .createPartitionGroupConsumer(CLIENT_ID,
             new PartitionGroupConsumptionStatus(partition, 1, new MessageIdStreamOffset(MessageId.earliest), null,
                 "CONSUMING"));
     try {
       final MessageBatch messageBatch = consumer.fetchMessages(new MessageIdStreamOffset(MessageId.earliest),
-          new MessageIdStreamOffset(getMessageIdForPartitionAndIndex(partition, expectedMsgCount)),
+          null,
           CONSUMER_FETCH_TIMEOUT_MILLIS);
-      System.out.println(
+      LOGGER.info(
           "Partition: " + partition + ", Consumed messageBatch count = " + messageBatch.getMessageCount());
       return messageBatch.getMessageCount() == expectedMsgCount;
     } catch (TimeoutException e) {

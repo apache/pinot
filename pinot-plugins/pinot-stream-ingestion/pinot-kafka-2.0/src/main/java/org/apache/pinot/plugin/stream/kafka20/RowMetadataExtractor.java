@@ -16,30 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.pruner;
+package org.apache.pinot.plugin.stream.kafka20;
 
-import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
 
-/**
- * The <code>DataSchemaSegmentPruner</code> class prunes segment based on whether the all the querying columns exist in
- * the segment schema.
- */
-public class DataSchemaSegmentPruner implements SegmentPruner {
-
-  @Override
-  public void init(PinotConfiguration config) {
+@FunctionalInterface
+public interface RowMetadataExtractor {
+  static RowMetadataExtractor build(boolean populateMetadata) {
+    return populateMetadata ? record -> new StreamMessageMetadata(record.timestamp()) : record -> null;
   }
 
-  @Override
-  public boolean prune(IndexSegment segment, QueryContext query) {
-    return !segment.getColumnNames().containsAll(query.getColumns());
-  }
-
-  @Override
-  public String toString() {
-    return "DataSchemaSegmentPruner";
-  }
+  RowMetadata extract(ConsumerRecord<?, ?> consumerRecord);
 }
