@@ -32,28 +32,19 @@ import org.slf4j.LoggerFactory;
 public class TableState {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableState.class);
 
-  private boolean _allSegmentsLoaded;
-  private final HelixManager _helixManager;
-  private final String _tableNameWithType;
-
-  public TableState(HelixManager helixManager, String tableNameWithType) {
-    _helixManager = helixManager;
-    _tableNameWithType = tableNameWithType;
+  private TableState() {
   }
 
-  public synchronized boolean isAllSegmentsLoaded() {
-    if (_allSegmentsLoaded) {
-      return true;
-    }
+  public static boolean isAllSegmentsLoaded(HelixManager helixManager, String tableNameWithType) {
 
-    HelixDataAccessor dataAccessor = _helixManager.getHelixDataAccessor();
+    HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
     PropertyKey.Builder keyBuilder = dataAccessor.keyBuilder();
-    IdealState idealState = dataAccessor.getProperty(keyBuilder.idealStates(_tableNameWithType));
+    IdealState idealState = dataAccessor.getProperty(keyBuilder.idealStates(tableNameWithType));
     if (idealState == null) {
-      LOGGER.warn("Failed to find ideal state for table: {}", _tableNameWithType);
+      LOGGER.warn("Failed to find ideal state for table: {}", tableNameWithType);
       return false;
     }
-    String instanceName = _helixManager.getInstanceName();
+    String instanceName = helixManager.getInstanceName();
     LiveInstance liveInstance = dataAccessor.getProperty(keyBuilder.liveInstance(instanceName));
     if (liveInstance == null) {
       LOGGER.warn("Failed to find live instance for instance: {}", instanceName);
@@ -61,10 +52,10 @@ public class TableState {
     }
     String sessionId = liveInstance.getEphemeralOwner();
     CurrentState currentState =
-        dataAccessor.getProperty(keyBuilder.currentState(instanceName, sessionId, _tableNameWithType));
+        dataAccessor.getProperty(keyBuilder.currentState(instanceName, sessionId, tableNameWithType));
     if (currentState == null) {
       LOGGER.warn("Failed to find current state for instance: {}, sessionId: {}, table: {}", instanceName, sessionId,
-          _tableNameWithType);
+          tableNameWithType);
       return false;
     }
 
@@ -83,17 +74,16 @@ public class TableState {
       if (!CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(actualState)) {
         if (CommonConstants.Helix.StateModel.SegmentStateModel.ERROR.equals(actualState)) {
           LOGGER
-              .error("Find ERROR segment: {}, table: {}, expected: {}", segmentName, _tableNameWithType, expectedState);
+              .error("Find ERROR segment: {}, table: {}, expected: {}", segmentName, tableNameWithType, expectedState);
         } else {
-          LOGGER.info("Find unloaded segment: {}, table: {}, expected: {}, actual: {}", segmentName, _tableNameWithType,
+          LOGGER.info("Find unloaded segment: {}, table: {}, expected: {}, actual: {}", segmentName, tableNameWithType,
               expectedState, actualState);
         }
         return false;
       }
     }
 
-    LOGGER.info("All segments loaded for table: {}", _tableNameWithType);
-    _allSegmentsLoaded = true;
+    LOGGER.info("All segments loaded for table: {}", tableNameWithType);
     return true;
   }
 }

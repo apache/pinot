@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -41,21 +42,22 @@ import org.slf4j.LoggerFactory;
 public class PartitionDedupMetadataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionUpsertMetadataManager.class);
 
+  private final HelixManager _helixManager;
   private final String _tableNameWithType;
-  private final TableState _tableState;
   private final List<String> _primaryKeyColumns;
   private final int _partitionId;
   private final ServerMetrics _serverMetrics;
   private final HashFunction _hashFunction;
+  private boolean _allSegmentsLoaded;
 
   // TODO(saurabh) : We can replace this with a ocncurrent Set
   @VisibleForTesting
   final ConcurrentHashMap<Object, IndexSegment> _primaryKeySet = new ConcurrentHashMap<>();
 
-  public PartitionDedupMetadataManager(String tableNameWithType, TableState tableState, List<String> primaryKeyColumns,
-      int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction) {
+  public PartitionDedupMetadataManager(HelixManager helixManager, String tableNameWithType,
+      List<String> primaryKeyColumns, int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction) {
+    _helixManager = helixManager;
     _tableNameWithType = tableNameWithType;
-    _tableState = tableState;
     _primaryKeyColumns = primaryKeyColumns;
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
@@ -118,8 +120,8 @@ public class PartitionDedupMetadataManager {
     };
   }
 
-  public boolean checkRecordPresentOrUpdate(RecordInfo recordInfo, IndexSegment indexSegment) {
-    while (!_tableState.isAllSegmentsLoaded()) {
+  private synchronized void waitTillAllSegmentsLoaded() {
+    while (!TableState.isAllSegmentsLoaded(_helixManager, _tableNameWithType)) {
       LOGGER.info("Sleeping 1 second waiting for all segments loaded for partial-upsert table: {}", _tableNameWithType);
       try {
         //noinspection BusyWait
@@ -127,6 +129,13 @@ public class PartitionDedupMetadataManager {
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
       }
+    }
+    _allSegmentsLoaded = true;
+  }
+
+  public boolean checkRecordPresentOrUpdate(RecordInfo recordInfo, IndexSegment indexSegment) {
+    if (!_allSegmentsLoaded) {
+      waitTillAllSegmentsLoaded();
     }
 
     return (

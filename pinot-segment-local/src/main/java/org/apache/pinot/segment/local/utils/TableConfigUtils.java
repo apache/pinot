@@ -142,9 +142,9 @@ public final class TableConfigUtils {
   }
 
   private static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {
-    return typesToSkip == null ? Collections.emptySet() : Arrays.stream(typesToSkip.split(","))
-        .map(s -> ValidationType.valueOf(s.toUpperCase()))
-        .collect(Collectors.toSet());
+    return typesToSkip == null ? Collections.emptySet()
+        : Arrays.stream(typesToSkip.split(",")).map(s -> ValidationType.valueOf(s.toUpperCase()))
+            .collect(Collectors.toSet());
   }
 
   /**
@@ -230,8 +230,8 @@ public final class TableConfigUtils {
 
     String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
     if (peerSegmentDownloadScheme != null) {
-      if (!CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme) && !CommonConstants.HTTPS_PROTOCOL
-          .equalsIgnoreCase(peerSegmentDownloadScheme)) {
+      if (!CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)
+          && !CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)) {
         throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
             + "' for peerSegmentDownloadScheme. Must be one of http or https");
       }
@@ -319,8 +319,7 @@ public final class TableConfigUtils {
       List<AggregationConfig> aggregationConfigs = ingestionConfig.getAggregationConfigs();
       Set<String> aggregationSourceColumns = new HashSet<>();
       if (!CollectionUtils.isEmpty(aggregationConfigs)) {
-        Preconditions.checkState(
-            !tableConfig.getIndexingConfig().isAggregateMetrics(),
+        Preconditions.checkState(!tableConfig.getIndexingConfig().isAggregateMetrics(),
             "aggregateMetrics cannot be set with AggregationConfig");
         Set<String> aggregationColumns = new HashSet<>();
         for (AggregationConfig aggregationConfig : aggregationConfigs) {
@@ -420,8 +419,8 @@ public final class TableConfigUtils {
           for (String prefix : prefixesToRename.keySet()) {
             for (String field : fieldNames) {
               Preconditions.checkState(!field.startsWith(prefix),
-                      "Fields in the schema may not begin with any prefix specified in the prefixesToRename"
-                              + " config. Name conflict with field: " + field + " and prefix: " + prefix);
+                  "Fields in the schema may not begin with any prefix specified in the prefixesToRename"
+                      + " config. Name conflict with field: " + field + " and prefix: " + prefix);
             }
           }
         }
@@ -462,8 +461,8 @@ public final class TableConfigUtils {
           try {
             CronScheduleBuilder.cronSchedule(cronExprStr);
           } catch (Exception e) {
-            throw new IllegalStateException(String.format(
-                "Task %s contains an invalid cron schedule: %s", taskTypeConfigName, cronExprStr), e);
+            throw new IllegalStateException(
+                String.format("Task %s contains an invalid cron schedule: %s", taskTypeConfigName, cronExprStr), e);
           }
         }
         // Task Specific validation for REALTIME_TO_OFFLINE_TASK_TYPE
@@ -477,15 +476,14 @@ public final class TableConfigUtils {
           TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bucketTimePeriod", "1d"));
           TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("roundBucketTimePeriod", "1s"));
           // check mergeType is correct
-          Preconditions.checkState(ImmutableSet.of("CONCAT", "ROLLUP", "DEDUP").contains(
-              taskTypeConfig.getOrDefault("mergeType", "CONCAT").toUpperCase()),
+          Preconditions.checkState(ImmutableSet.of("CONCAT", "ROLLUP", "DEDUP")
+                  .contains(taskTypeConfig.getOrDefault("mergeType", "CONCAT").toUpperCase()),
               "MergeType must be one of [CONCAT, ROLLUP, DEDUP]!");
           // check no mis-configured columns
           Set<String> columnNames = schema.getColumnNames();
           for (Map.Entry<String, String> entry : taskTypeConfig.entrySet()) {
             if (entry.getKey().endsWith(".aggregationType")) {
-              Preconditions.checkState(
-                  columnNames.contains(StringUtils.removeEnd(entry.getKey(), ".aggregationType")),
+              Preconditions.checkState(columnNames.contains(StringUtils.removeEnd(entry.getKey(), ".aggregationType")),
                   String.format("Column \"%s\" not found in schema!", entry.getKey()));
               Preconditions.checkState(ImmutableSet.of("SUM", "MAX", "MIN").contains(entry.getValue().toUpperCase()),
                   String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue()));
@@ -506,8 +504,8 @@ public final class TableConfigUtils {
    */
   @VisibleForTesting
   static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema) {
-    if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE &&
-        (tableConfig.getDedupConfig() == null || !tableConfig.getDedupConfig().isDedupEnabled())) {
+    if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE && (tableConfig.getDedupConfig() == null
+        || !tableConfig.getDedupConfig().isDedupEnabled())) {
       return;
     }
 
@@ -515,11 +513,11 @@ public final class TableConfigUtils {
     boolean isDedupEnabled = tableConfig.getDedupConfig() == null && tableConfig.getDedupConfig().isDedupEnabled();
 
     // check both upsert and dedup are not enabled simultaneously
-    Preconditions
-        .checkState(!(isUpsertEnabled && isDedupEnabled), "A table can have either Upsert or Dedup enabled, but not both");
+    Preconditions.checkState(!(isUpsertEnabled && isDedupEnabled),
+        "A table can have either Upsert or Dedup enabled, but not both");
     // check table type is realtime
-    Preconditions
-        .checkState(tableConfig.getTableType() == TableType.REALTIME, "Upsert/Dedup table is for realtime table only.");
+    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+        "Upsert/Dedup table is for realtime table only.");
     // primary key exists
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert/Dedup table must have primary key columns in the schema");
@@ -529,18 +527,18 @@ public final class TableConfigUtils {
     Preconditions.checkState(streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType(),
         "Upsert/Dedup table must use low-level streaming consumer type");
     // replica group is configured for routing
-    Preconditions.checkState(
-        tableConfig.getRoutingConfig() != null && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE
-            .equalsIgnoreCase(tableConfig.getRoutingConfig().getInstanceSelectorType()),
+    Preconditions.checkState(tableConfig.getRoutingConfig() != null
+            && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
+            tableConfig.getRoutingConfig().getInstanceSelectorType()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
 
     // specifically for upsert
     if (tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE) {
 
       // no startree index
-      Preconditions.checkState(
-          CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs()) && !tableConfig
-              .getIndexingConfig().isEnableDefaultStarTree(), "The upsert table cannot have star-tree index.");
+      Preconditions.checkState(CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs())
+              && !tableConfig.getIndexingConfig().isEnableDefaultStarTree(),
+          "The upsert table cannot have star-tree index.");
 
       // comparison column exists
       if (tableConfig.getUpsertConfig().getComparisonColumn() != null) {
@@ -595,9 +593,8 @@ public final class TableConfigUtils {
         Preconditions.checkState(!schema.getDateTimeNames().contains(column),
             "INCREMENT merger cannot be applied to date time column: %s", column);
       } else if (columnStrategy == UpsertConfig.Strategy.APPEND || columnStrategy == UpsertConfig.Strategy.UNION) {
-        Preconditions
-            .checkState(!fieldSpec.isSingleValueField(), "%s merger cannot be applied to single-value column: %s",
-                columnStrategy.toString(), column);
+        Preconditions.checkState(!fieldSpec.isSingleValueField(),
+            "%s merger cannot be applied to single-value column: %s", columnStrategy.toString(), column);
       }
     }
   }
@@ -621,9 +618,8 @@ public final class TableConfigUtils {
       String segmentSelectorType = tierConfig.getSegmentSelectorType();
       String segmentAge = tierConfig.getSegmentAge();
       if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
-        Preconditions
-            .checkState(segmentAge != null, "Must provide 'segmentAge' for segmentSelectorType: %s in tier: %s",
-                segmentSelectorType, tierName);
+        Preconditions.checkState(segmentAge != null,
+            "Must provide 'segmentAge' for segmentSelectorType: %s in tier: %s", segmentSelectorType, tierName);
         Preconditions.checkState(TimeUtils.isPeriodValid(segmentAge),
             "segmentAge: %s must be a valid period string (eg. 30d, 24h) in tier: %s", segmentAge, tierName);
       } else if (!segmentSelectorType.equalsIgnoreCase(TierFactory.FIXED_SEGMENT_SELECTOR_TYPE)) {
@@ -634,9 +630,8 @@ public final class TableConfigUtils {
       String storageType = tierConfig.getStorageType();
       String serverTag = tierConfig.getServerTag();
       if (storageType.equalsIgnoreCase(TierFactory.PINOT_SERVER_STORAGE_TYPE)) {
-        Preconditions
-            .checkState(serverTag != null, "Must provide 'serverTag' for storageType: %s in tier: %s", storageType,
-                tierName);
+        Preconditions.checkState(serverTag != null, "Must provide 'serverTag' for storageType: %s in tier: %s",
+            storageType, tierName);
         Preconditions.checkState(TagNameUtils.isServerTag(serverTag),
             "serverTag: %s must have a valid server tag format (<tenantName>_OFFLINE or <tenantName>_REALTIME) in "
                 + "tier: %s", serverTag, tierName);
@@ -768,9 +763,8 @@ public final class TableConfigUtils {
     if (indexingConfig.getRangeIndexColumns() != null) {
       for (String rangeIndexCol : indexingConfig.getRangeIndexColumns()) {
         Preconditions.checkState(
-            schema.getFieldSpecFor(rangeIndexCol).getDataType().isNumeric() || !noDictionaryColumnsSet
-                .contains(rangeIndexCol),
-            "Cannot create a range index on non-numeric/no-dictionary column " + rangeIndexCol);
+            schema.getFieldSpecFor(rangeIndexCol).getDataType().isNumeric() || !noDictionaryColumnsSet.contains(
+                rangeIndexCol), "Cannot create a range index on non-numeric/no-dictionary column " + rangeIndexCol);
       }
     }
 
@@ -793,9 +787,9 @@ public final class TableConfigUtils {
     if (indexingConfig.getJsonIndexColumns() != null) {
       for (String jsonIndexCol : indexingConfig.getJsonIndexColumns()) {
         FieldSpec fieldSpec = schema.getFieldSpecFor(jsonIndexCol);
-        Preconditions
-            .checkState(fieldSpec.isSingleValueField() && fieldSpec.getDataType().getStoredType() == DataType.STRING,
-                "Json index can only be created for single value String column. Invalid for column: %s", jsonIndexCol);
+        Preconditions.checkState(
+            fieldSpec.isSingleValueField() && fieldSpec.getDataType().getStoredType() == DataType.STRING,
+            "Json index can only be created for single value String column. Invalid for column: %s", jsonIndexCol);
       }
     }
   }
@@ -868,8 +862,8 @@ public final class TableConfigUtils {
     indexingConfig.setNoDictionaryColumns(sanitizeListBasedIndexingColumns(indexingConfig.getNoDictionaryColumns()));
     indexingConfig.setSortedColumn(sanitizeListBasedIndexingColumns(indexingConfig.getSortedColumn()));
     indexingConfig.setBloomFilterColumns(sanitizeListBasedIndexingColumns(indexingConfig.getBloomFilterColumns()));
-    indexingConfig
-        .setOnHeapDictionaryColumns(sanitizeListBasedIndexingColumns(indexingConfig.getOnHeapDictionaryColumns()));
+    indexingConfig.setOnHeapDictionaryColumns(
+        sanitizeListBasedIndexingColumns(indexingConfig.getOnHeapDictionaryColumns()));
     indexingConfig.setRangeIndexColumns(sanitizeListBasedIndexingColumns(indexingConfig.getRangeIndexColumns()));
     indexingConfig.setVarLengthDictionaryColumns(
         sanitizeListBasedIndexingColumns(indexingConfig.getVarLengthDictionaryColumns()));
@@ -958,8 +952,8 @@ public final class TableConfigUtils {
               tableConfig.getTableName());
         } else {
           if (quotaConfig.getStorageInBytes() > maxAllowedSizeInBytes) {
-            throw new IllegalStateException(String
-                .format("Invalid storage quota: %d, max allowed size: %d", quotaConfig.getStorageInBytes(),
+            throw new IllegalStateException(
+                String.format("Invalid storage quota: %d, max allowed size: %d", quotaConfig.getStorageInBytes(),
                     maxAllowedSizeInBytes));
           }
         }
@@ -972,12 +966,10 @@ public final class TableConfigUtils {
    */
   public static void verifyHybridTableConfigs(String rawTableName, TableConfig offlineTableConfig,
       TableConfig realtimeTableConfig) {
-    Preconditions
-        .checkNotNull(offlineTableConfig, "Found null offline table config in hybrid table check for table: %s",
-            rawTableName);
-    Preconditions
-        .checkNotNull(realtimeTableConfig, "Found null realtime table config in hybrid table check for table: %s",
-            rawTableName);
+    Preconditions.checkNotNull(offlineTableConfig,
+        "Found null offline table config in hybrid table check for table: %s", rawTableName);
+    Preconditions.checkNotNull(realtimeTableConfig,
+        "Found null realtime table config in hybrid table check for table: %s", rawTableName);
     LOGGER.info("Validating realtime and offline configs for the hybrid table: {}", rawTableName);
     SegmentsValidationAndRetentionConfig offlineSegmentConfig = offlineTableConfig.getValidationConfig();
     SegmentsValidationAndRetentionConfig realtimeSegmentConfig = realtimeTableConfig.getValidationConfig();
@@ -1028,8 +1020,7 @@ public final class TableConfigUtils {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     if (indexingConfig != null) {
       Map<String, String> streamConfig = indexingConfig.getStreamConfigs();
-      if (streamConfig != null && KINESIS_STREAM_TYPE.equals(
-          streamConfig.get(StreamConfigProperties.STREAM_TYPE))) {
+      if (streamConfig != null && KINESIS_STREAM_TYPE.equals(streamConfig.get(StreamConfigProperties.STREAM_TYPE))) {
         return true;
       }
     }

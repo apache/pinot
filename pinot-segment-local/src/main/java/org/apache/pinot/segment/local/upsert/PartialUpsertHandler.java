@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMergerFactory;
 import org.apache.pinot.segment.local.utils.tablestate.TableState;
@@ -32,13 +33,16 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 public class PartialUpsertHandler {
   // _column2Mergers maintains the mapping of merge strategies per columns.
+  private final HelixManager _helixManager;
+  private final String _tableNameWithType;
   private final Map<String, PartialUpsertMerger> _column2Mergers = new HashMap<>();
-  private final TableState _tableState;
+  private boolean _allSegmentsLoaded;
 
-  public PartialUpsertHandler(TableState tableState, Schema schema,
+  public PartialUpsertHandler(HelixManager helixManager, String tableNameWithType, Schema schema,
       Map<String, UpsertConfig.Strategy> partialUpsertStrategies, UpsertConfig.Strategy defaultPartialUpsertStrategy,
       String comparisonColumn) {
-    _tableState = tableState;
+    _helixManager = helixManager;
+    _tableNameWithType = tableNameWithType;
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
       _column2Mergers.put(entry.getKey(), PartialUpsertMergerFactory.getMerger(entry.getValue()));
     }
@@ -57,7 +61,11 @@ public class PartialUpsertHandler {
    * Consuming segment should perform this check to ensure all previous records are loaded before inserting new records.
    */
   public synchronized boolean isAllSegmentsLoaded() {
-    return _tableState.isAllSegmentsLoaded();
+    if (_allSegmentsLoaded) {
+      return true;
+    }
+    _allSegmentsLoaded = TableState.isAllSegmentsLoaded(_helixManager, _tableNameWithType);
+    return _allSegmentsLoaded;
   }
 
   /**
