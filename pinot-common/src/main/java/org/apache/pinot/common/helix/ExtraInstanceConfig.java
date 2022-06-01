@@ -20,6 +20,7 @@
 package org.apache.pinot.common.helix;
 
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -43,5 +44,33 @@ public class ExtraInstanceConfig {
 
   public void setTlsPort(String tlsPort) {
     _proxy.getRecord().setSimpleField(PinotInstanceConfigProperty.PINOT_TLS_PORT.toString(), tlsPort);
+  }
+
+  public String getBrokerQueryUrl() {
+    String protocol = null;
+    String hostName = _proxy.getHostName();
+    // Backward-compatible with legacy hostname of format 'Broker_<hostname>'
+    if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
+      hostName = hostName.substring(CommonConstants.Helix.BROKER_INSTANCE_PREFIX_LENGTH);
+    }
+    String port = null;
+    try {
+      if (Integer.parseInt(getTlsPort()) > 0) {
+        protocol = CommonConstants.HTTPS_PROTOCOL;
+        port = getTlsPort();
+      }
+    } catch (Exception e) {
+      try {
+        if (Integer.parseInt(_proxy.getPort()) > 0) {
+          protocol = CommonConstants.HTTP_PROTOCOL;
+          port = _proxy.getPort();
+        }
+      } catch (Exception e2) {
+      }
+    }
+    if (port != null) {
+      return String.format("%s://%s:%s/query/sql", protocol, hostName, port);
+    }
+    return null;
   }
 }

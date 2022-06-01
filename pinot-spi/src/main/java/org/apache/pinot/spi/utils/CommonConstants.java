@@ -243,6 +243,11 @@ public class CommonConstants {
 
     public static final String CONTROLLER_URL = "pinot.broker.controller.url";
 
+    // Turn on this config to allow any Pinot broker route queries to the correct tenant broker.
+    public static final String CONFIG_OF_ROUTE_REQUESTS_TO_OTHER_TENANTS =
+        "pinot.broker.route.requests.to.other.tenants";
+    public static final boolean DEFAULT_ROUTE_REQUESTS_TO_OTHER_TENANTS = false;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String TRACE = "trace";

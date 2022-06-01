@@ -30,15 +30,20 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -46,6 +51,7 @@ import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -62,6 +68,7 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.routing.RoutingTable;
@@ -87,7 +94,6 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 @SuppressWarnings("UnstableApiUsage")
 @ThreadSafe
 public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
@@ -97,6 +103,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
+  private static final HttpClient HTTP_CLIENT = new HttpClient();
 
   protected final PinotConfiguration _config;
   protected final BrokerRoutingManager _routingManager;
@@ -123,6 +130,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final int _defaultHllLog2m;
   private final boolean _enableQueryLimitOverride;
   private final boolean _enableDistinctCountBitmapOverride;
+  private final boolean _routeRequestsToOtherTenants;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
@@ -151,6 +159,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         Broker.DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND));
     _numDroppedLog = new AtomicInteger(0);
     _numDroppedLogRateLimiter = RateLimiter.create(1.0);
+    _routeRequestsToOtherTenants = _config.getProperty(Broker.CONFIG_OF_ROUTE_REQUESTS_TO_OTHER_TENANTS,
+        Broker.DEFAULT_ROUTE_REQUESTS_TO_OTHER_TENANTS);
     LOGGER.info(
         "Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps",
         _brokerId, _brokerTimeoutMs, _queryResponseLimit, _queryLogLength, _queryLogRateLimiter.getRate());
@@ -329,6 +339,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         _tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
 
     if (offlineTableName == null && realtimeTableName == null) {
+      if (_routeRequestsToOtherTenants) {
+        HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
+        // forward client-supplied headers
+        Map<String, String> headers = identity.getHttpHeaders().entries().stream()
+            .map(entry -> Pair.of(entry.getKey(), entry.getValue()))
+            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+        return getQueryResponse(request, headers, tableName);
+      }
       // No table matches the request
       if (realtimeTableConfig == null && offlineTableConfig == null) {
         LOGGER.info("Table not found for request {}: {}", requestId, query);
@@ -589,6 +607,25 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     logBrokerResponse(requestId, query, requestContext, tableName, numUnavailableSegments, serverStats, brokerResponse,
         totalTimeMs);
     return brokerResponse;
+  }
+
+  private BrokerResponseNative getQueryResponse(JsonNode request, Map<String, String> headers, String tableName) {
+    // Get resource table name.
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+
+    // Get brokers for the resource table.
+    List<InstanceConfig> instanceIds = _routingManager.getBrokerInstancesFor(rawTableName);
+    if (instanceIds.isEmpty()) {
+      return new BrokerResponseNative(QueryException.BROKER_INSTANCE_MISSING_ERROR);
+    }
+
+    // Send query to a random broker.
+    ExtraInstanceConfig pinotInstanceConfig = new ExtraInstanceConfig(instanceIds.get(new Random().nextInt(instanceIds.size())));
+    String uri = pinotInstanceConfig.getBrokerQueryUrl();
+    if (uri == null) {
+      return new BrokerResponseNative(QueryException.BROKER_INSTANCE_MISSING_ERROR);
+    }
+    return HTTP_CLIENT.sendQueryToBroker(uri, headers, request);
   }
 
   private void handleTimestampIndexOverride(PinotQuery pinotQuery, @Nullable TableConfig tableConfig) {

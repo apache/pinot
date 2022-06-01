@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
@@ -54,6 +55,8 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -94,6 +97,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   // NOTE: _excludedServers doesn't need to be concurrent because it is only accessed within the synchronized block
   private final Set<String> _excludedServers = new HashSet<>();
 
+  private HelixManager _helixManager;
   private BaseDataAccessor<ZNRecord> _zkDataAccessor;
   private String _externalViewPathPrefix;
   private String _idealStatePathPrefix;
@@ -108,6 +112,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
   @Override
   public void init(HelixManager helixManager) {
+    _helixManager = helixManager;
     HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
     _zkDataAccessor = helixDataAccessor.getBaseDataAccessor();
     _externalViewPathPrefix = helixDataAccessor.keyBuilder().externalViews().getPath() + "/";
@@ -722,5 +727,32 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         return new InstanceSelector.SelectionResult(Collections.emptyMap(), Collections.emptyList(), numPrunedSegments);
       }
     }
+  }
+
+  /**
+   * Get all the broker instances for the given table name.
+   *
+   * @param tableName Table name with or without type suffix
+   * @return List of broker instance Ids
+   */
+  public List<InstanceConfig> getBrokerInstancesFor(String tableName) {
+    String brokerTenantName = null;
+    TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+    if (offlineTableConfig != null) {
+      brokerTenantName = offlineTableConfig.getTenantConfig().getBroker();
+    } else {
+      TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
+      if (realtimeTableConfig != null) {
+        brokerTenantName = realtimeTableConfig.getTenantConfig().getBroker();
+      }
+    }
+    List<InstanceConfig> instanceConfigList =
+        HelixHelper.getInstancesConfigsWithTag(HelixHelper.getInstanceConfigs(_helixManager),
+            TagNameUtils.getBrokerTagForTenant(brokerTenantName));
+    List<String> onlineInstanceList = _helixManager.getHelixDataAccessor()
+        .getChildNames(_helixManager.getHelixDataAccessor().keyBuilder().liveInstances());
+    return instanceConfigList.stream()
+        .filter(instanceConfig -> onlineInstanceList.contains(instanceConfig.getInstanceName()))
+        .collect(Collectors.toList());
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.http;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -42,6 +43,7 @@ import org.apache.http.HttpVersion;
 import org.apache.http.NameValuePair;
 import org.apache.http.StatusLine;
 import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.entity.EntityBuilder;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
@@ -55,8 +57,10 @@ import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.SimpleHttpErrorInfo;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.TlsUtils;
@@ -473,5 +477,25 @@ public class HttpClient implements AutoCloseable {
   public void close()
       throws IOException {
     _httpClient.close();
+  }
+
+  public BrokerResponseNative sendQueryToBroker(String brokerQueryURI, Map<String, String> headers, JsonNode request) {
+    try {
+      RequestBuilder requestBuilder = RequestBuilder.post(brokerQueryURI).setVersion(HttpVersion.HTTP_1_1);
+      this.setTimeout(requestBuilder, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+      requestBuilder.setEntity(EntityBuilder.create().setText(request.toString()).build());
+      if (MapUtils.isNotEmpty(headers)) {
+        for (Map.Entry<String, String> header : headers.entrySet()) {
+          if (!header.getKey().equalsIgnoreCase("content-length")) {
+            requestBuilder.addHeader(header.getKey(), header.getValue());
+          }
+        }
+      }
+      return BrokerResponseNative.fromJsonString(this.sendRequest(requestBuilder.build()).getResponse());
+    } catch (final Exception ex) {
+      LOGGER.error("Caught exception in sendQueryRaw", ex);
+      Utils.rethrowException(ex);
+      throw new AssertionError("Should not reach this");
+    }
   }
 }
