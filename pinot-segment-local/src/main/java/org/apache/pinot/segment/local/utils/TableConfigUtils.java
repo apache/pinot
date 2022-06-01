@@ -150,13 +150,23 @@ public final class TableConfigUtils {
   /**
    * Validates the table name with the following rules:
    * <ul>
-   *   <li>Table name shouldn't contain dot or space in it</li>
+   *   <li>If there is a flag allowing database name in it, table name can have one dot in it.
+   *   <li>Otherwise, there is no dot allowed in table name.</li>
    * </ul>
    */
-  public static void validateTableName(TableConfig tableConfig) {
+  public static void validateTableName(TableConfig tableConfig, boolean allowTableNameWithDatabase) {
     String tableName = tableConfig.getTableName();
-    if (tableName.contains(".") || tableName.contains(" ")) {
-      throw new IllegalStateException("Table name: '" + tableName + "' containing '.' or space is not allowed");
+    int dotCount = StringUtils.countMatches(tableName, '.');
+    // For transitioning into full [database_name].[table_name] support, we allow the table name
+    // with one dot at max, so the admin may create mydb.mytable with a feature knob.
+    if (allowTableNameWithDatabase && dotCount > 1) {
+      throw new IllegalStateException("Table name: '" + tableName + "' containing more than one '.' is not allowed");
+    }
+    if (!allowTableNameWithDatabase && dotCount > 0) {
+      throw new IllegalStateException("Table name: '" + tableName + "' containing '.' is not allowed");
+    }
+    if (StringUtils.containsWhitespace(tableName)) {
+      throw new IllegalStateException("Table name: '" + tableName + "' containing space is not allowed");
     }
   }
 
