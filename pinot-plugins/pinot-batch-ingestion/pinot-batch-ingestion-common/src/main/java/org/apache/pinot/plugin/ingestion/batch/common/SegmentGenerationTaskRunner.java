@@ -138,12 +138,16 @@ public class SegmentGenerationTaskRunner implements Serializable {
     if (segmentNameGeneratorConfigs == null) {
       segmentNameGeneratorConfigs = new HashMap<>();
     }
+
+    boolean appendUUIDToSegmentName =
+        Boolean.parseBoolean(segmentNameGeneratorConfigs.get(APPEND_UUID_TO_SEGMENT_NAME));
+
     switch (segmentNameGeneratorType) {
       case FIXED_SEGMENT_NAME_GENERATOR:
         return new FixedSegmentNameGenerator(segmentNameGeneratorConfigs.get(SEGMENT_NAME));
       case SIMPLE_SEGMENT_NAME_GENERATOR:
         return new SimpleSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX),
-            Boolean.parseBoolean(segmentNameGeneratorConfigs.get(APPEND_UUID_TO_SEGMENT_NAME)));
+            appendUUIDToSegmentName);
       case NORMALIZED_DATE_SEGMENT_NAME_GENERATOR:
         SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
         DateTimeFormatSpec dateTimeFormatSpec = null;
@@ -160,12 +164,13 @@ public class SegmentGenerationTaskRunner implements Serializable {
             IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig),
             IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), dateTimeFormatSpec,
             segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX),
-            Boolean.parseBoolean(segmentNameGeneratorConfigs.get(APPEND_UUID_TO_SEGMENT_NAME)));
+            appendUUIDToSegmentName);
       case INPUT_FILE_SEGMENT_NAME_GENERATOR:
         String inputFileUri = _taskSpec.getCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY);
         return new InputFileSegmentNameGenerator(segmentNameGeneratorConfigs.get(FILE_PATH_PATTERN),
             segmentNameGeneratorConfigs.get(SEGMENT_NAME_TEMPLATE),
-            inputFileUri);
+            inputFileUri,
+            appendUUIDToSegmentName);
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
     }

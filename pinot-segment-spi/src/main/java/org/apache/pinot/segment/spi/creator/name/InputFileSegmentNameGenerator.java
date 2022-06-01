@@ -78,22 +78,23 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
   private String makeSegmentName() {
     String inputFilePath = _inputFileUri.getPath();
     Matcher m = _filePathPattern.matcher(inputFilePath);
+    String segmentName;
+
     if (!m.matches()) {
       LOGGER.warn(String.format("No match for pattern '%s' in '%s'", _filePathPattern, inputFilePath));
-      return safeConvertPathToFilename(inputFilePath);
+      segmentName = safeConvertPathToFilename(inputFilePath);
+    } else {
+      segmentName = _segmentNameTemplate;
+      for (int i = 1; i <= m.groupCount(); i++) {
+        segmentName = segmentName.replace(String.format(PARAMETER_TEMPLATE, i), m.group(i));
+      }
     }
-
-    String segmentName = _segmentNameTemplate;
-    for (int i = 1; i <= m.groupCount(); i++) {
-      segmentName = segmentName.replace(String.format(PARAMETER_TEMPLATE, i), m.group(i));
-    }
-
-    return segmentName;
+    return _appendUUIDToSegmentName ? JOINER.join(segmentName, UUID.randomUUID()) : segmentName;
   }
 
   @Override
   public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
-    return JOINER.join(_segmentName, _appendUUIDToSegmentName ? UUID.randomUUID() : null);
+    return _segmentName;
   }
 
   private String safeConvertPathToFilename(String inputFilePath) {
