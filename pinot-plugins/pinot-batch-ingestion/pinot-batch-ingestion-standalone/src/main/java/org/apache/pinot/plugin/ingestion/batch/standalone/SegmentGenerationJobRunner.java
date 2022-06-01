@@ -74,7 +74,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
   private Schema _schema;
   private TableConfig _tableConfig;
   private Queue<Pair<Exception, String>> _failures;
-  
+
   public SegmentGenerationJobRunner() {
   }
 
@@ -164,7 +164,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     LOGGER.info("Creating an executor service with {} threads(Job parallelism: {}, available cores: {}.)", numThreads,
         jobParallelism, Runtime.getRuntime().availableProcessors());
     _executorService = Executors.newFixedThreadPool(numThreads);
-    
+
     // Set up for recording multiple failures while building segments.
     _failures = new ConcurrentLinkedQueue<>();
   }
@@ -229,10 +229,13 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         }
       }
       _segmentCreationTaskCountDownLatch.await();
-      
+
       if (!_failures.isEmpty()) {
         StringBuilder msg = new StringBuilder("Failed to generate Pinot segment for file(s) - ");
-        _failures.forEach(p -> { msg.append(msg.length() > 0 ? ", " : ""); msg.append(p.getRight()); }); 
+        _failures.forEach(p -> {
+          msg.append(msg.length() > 0 ? ", " : "");
+          msg.append(p.getRight());
+        });
         throw new RuntimeException(msg.toString());
       }
     } finally {

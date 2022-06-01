@@ -19,10 +19,6 @@
 package org.apache.pinot.plugin.ingestion.batch.standalone;
 
 import com.google.common.collect.Lists;
-
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -45,6 +41,9 @@ import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 public class SegmentGenerationJobRunnerTest {
 
@@ -137,7 +136,7 @@ public class SegmentGenerationJobRunnerTest {
     Assert.assertTrue(newSegmentFile2010.isFile());
     Assert.assertTrue(newSegmentFile2010.length() > 0);
   }
-  
+
   @Test
   public void testFailureHandling()
       throws Exception {
@@ -227,8 +226,7 @@ public class SegmentGenerationJobRunnerTest {
     pfsSpec.setScheme("file");
     pfsSpec.setClassName(LocalPinotFS.class.getName());
     jobSpec.setPinotFSSpecs(Collections.singletonList(pfsSpec));
-    
+
     return jobSpec;
   }
-
 }
