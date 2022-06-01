@@ -55,6 +55,7 @@ private[pinot] object PinotUtils {
       case FieldSpec.DataType.DOUBLE => DoubleType
       case FieldSpec.DataType.STRING => StringType
       case FieldSpec.DataType.BYTES => ArrayType(ByteType)
+      case FieldSpec.DataType.TIMESTAMP => TimestampType
       case _ =>
         throw PinotException(s"Unsupported pinot data type '$dataType")
     }
@@ -65,7 +66,7 @@ private[pinot] object PinotUtils {
       sparkSchema: StructType): Seq[InternalRow] = {
     val dataTableColumnNames = dataTable.getDataSchema.getColumnNames
     (0 until dataTable.getNumberOfRows).map { rowIndex =>
-      // spark schema is used to ensure columns order
+      // spark schema is used to ensure colqumns order
       val columns = sparkSchema.fields.map { field =>
         val colIndex = dataTableColumnNames.indexOf(field.name)
         if (colIndex < 0) {
@@ -97,6 +98,8 @@ private[pinot] object PinotUtils {
       dataTable.getFloat(rowIndex, colIndex)
     case ColumnDataType.DOUBLE =>
       dataTable.getDouble(rowIndex, colIndex)
+    case ColumnDataType.TIMESTAMP =>
+      dataTable.getLong(rowIndex, colIndex)
 
     // array column types
     case ColumnDataType.STRING_ARRAY =>
