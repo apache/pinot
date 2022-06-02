@@ -18,34 +18,29 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import com.google.common.hash.Hashing;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.apache.pinot.spi.utils.ByteArray;
 
 
-public class HashUtils {
-  private HashUtils() {
+public final class RecordInfo {
+  private final PrimaryKey _primaryKey;
+  private final int _docId;
+  private final Comparable _comparisonValue;
+
+  public RecordInfo(PrimaryKey primaryKey, int docId, Comparable comparisonValue) {
+    _primaryKey = primaryKey;
+    _docId = docId;
+    _comparisonValue = comparisonValue;
   }
 
-  public static byte[] hashMurmur3(byte[] bytes) {
-    return Hashing.murmur3_128().hashBytes(bytes).asBytes();
+  public PrimaryKey getPrimaryKey() {
+    return _primaryKey;
   }
 
-  public static byte[] hashMD5(byte[] bytes) {
-    return Hashing.md5().hashBytes(bytes).asBytes();
+  public int getDocId() {
+    return _docId;
   }
 
-  public static Object hashPrimaryKey(PrimaryKey primaryKey, HashFunction hashFunction) {
-    switch (hashFunction) {
-      case NONE:
-        return primaryKey;
-      case MD5:
-        return new ByteArray(HashUtils.hashMD5(primaryKey.asBytes()));
-      case MURMUR3:
-        return new ByteArray(HashUtils.hashMurmur3(primaryKey.asBytes()));
-      default:
-        throw new IllegalArgumentException(String.format("Unrecognized hash function %s", hashFunction));
-    }
+  public Comparable getComparisonValue() {
+    return _comparisonValue;
   }
 }

@@ -50,6 +50,8 @@ import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
+import org.apache.pinot.segment.local.dedup.TableDedupMetadataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
@@ -60,9 +62,12 @@ import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvide
 import org.apache.pinot.segment.local.upsert.PartialUpsertHandler;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
+import org.apache.pinot.segment.local.utils.RecordInfo;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -112,6 +117,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   private UpsertConfig.Mode _upsertMode;
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
+  private TableDedupMetadataManager _tableDedupMetadataManager;
   private List<String> _primaryKeyColumns;
   private String _upsertComparisonColumn;
 
@@ -156,6 +162,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
     _upsertMode = tableConfig.getUpsertMode();
+    if (tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled()) {
+      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+      Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
+      _primaryKeyColumns = schema.getPrimaryKeyColumns();
+      DedupConfig dedupConfig = tableConfig.getDedupConfig();
+      HashFunction dedupHashFunction = dedupConfig.getHashFunction();
+      _tableDedupMetadataManager =
+          new TableDedupMetadataManager(_helixManager, _tableNameWithType, _primaryKeyColumns, _serverMetrics,
+              dedupHashFunction);
+    }
+
     if (isUpsertEnabled()) {
       UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
       assert upsertConfig != null;
@@ -172,7 +189,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
             upsertConfig.getPartialUpsertStrategies(), upsertConfig.getDefaultPartialUpsertStrategy(),
             comparisonColumn);
       }
-      UpsertConfig.HashFunction hashFunction = upsertConfig.getHashFunction();
+      HashFunction hashFunction = upsertConfig.getHashFunction();
       _tableUpsertMetadataManager =
           new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics, partialUpsertHandler, hashFunction);
       _primaryKeyColumns = schema.getPrimaryKeyColumns();
@@ -242,6 +259,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
 
     return consumerDir.getAbsolutePath();
+  }
+
+  public boolean isDedupEnabled() {
+    return _tableDedupMetadataManager != null;
   }
 
   public boolean isUpsertEnabled() {
@@ -336,9 +357,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       PartitionUpsertMetadataManager partitionUpsertMetadataManager =
           _tableUpsertMetadataManager != null ? _tableUpsertMetadataManager.getOrCreatePartitionManager(
               partitionGroupId) : null;
+      PartitionDedupMetadataManager partitionDedupMetadataManager =
+          _tableDedupMetadataManager != null ? _tableDedupMetadataManager
+              .getOrCreatePartitionManager(partitionGroupId) : null;
       segmentDataManager =
           new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
-              indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager);
+              indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
+              partitionDedupMetadataManager);
     } else {
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, _instanceId);
       segmentDataManager = new HLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this,
@@ -355,7 +380,25 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (isUpsertEnabled()) {
       handleUpsert((ImmutableSegmentImpl) immutableSegment);
     }
+
+    if (isDedupEnabled()) {
+      buildDedupMeta((ImmutableSegmentImpl) immutableSegment);
+    }
     super.addSegment(immutableSegment);
+  }
+
+  private void buildDedupMeta(ImmutableSegmentImpl immutableSegment) {
+    // TODO(saurabh) refactor commons code with handleUpsert
+    String segmentName = immutableSegment.getSegmentName();
+    Integer partitionGroupId = SegmentUtils
+        .getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, _primaryKeyColumns.get(0));
+    Preconditions.checkNotNull(partitionGroupId, String
+        .format("PartitionGroupId is not available for segment: '%s' (dedup-enabled table: %s)", segmentName,
+            _tableNameWithType));
+    PartitionDedupMetadataManager partitionDedupMetadataManager =
+        _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId);
+    immutableSegment.enableDedup(partitionDedupMetadataManager);
+    partitionDedupMetadataManager.addSegment(immutableSegment);
   }
 
   private void handleUpsert(ImmutableSegmentImpl immutableSegment) {
@@ -378,8 +421,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         .put(_upsertComparisonColumn, new PinotSegmentColumnReader(immutableSegment, _upsertComparisonColumn));
     int numTotalDocs = immutableSegment.getSegmentMetadata().getTotalDocs();
     int numPrimaryKeyColumns = _primaryKeyColumns.size();
-    Iterator<PartitionUpsertMetadataManager.RecordInfo> recordInfoIterator =
-        new Iterator<PartitionUpsertMetadataManager.RecordInfo>() {
+    Iterator<RecordInfo> recordInfoIterator =
+        new Iterator<RecordInfo>() {
           private int _docId = 0;
 
           @Override
@@ -388,7 +431,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           }
 
           @Override
-          public PartitionUpsertMetadataManager.RecordInfo next() {
+          public RecordInfo next() {
             Object[] values = new Object[numPrimaryKeyColumns];
             for (int i = 0; i < numPrimaryKeyColumns; i++) {
               Object value = columnToReaderMap.get(_primaryKeyColumns.get(i)).getValue(_docId);
@@ -401,7 +444,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
             Object upsertComparisonValue = columnToReaderMap.get(_upsertComparisonColumn).getValue(_docId);
             Preconditions.checkState(upsertComparisonValue instanceof Comparable,
                 "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
-            return new PartitionUpsertMetadataManager.RecordInfo(primaryKey, _docId++,
+            return new RecordInfo(primaryKey, _docId++,
                 (Comparable) upsertComparisonValue);
           }
         };

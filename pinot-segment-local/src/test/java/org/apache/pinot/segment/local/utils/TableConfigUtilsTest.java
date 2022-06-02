@@ -29,7 +29,9 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -1177,6 +1179,78 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testValidateDedupConfig() {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setDedupConfig(new DedupConfig(true, HashFunction.NONE)).build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "Upsert/Dedup table is for realtime table only.");
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(new DedupConfig(true, HashFunction.NONE)).build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "Upsert/Dedup table must have primary key columns in the schema");
+    }
+
+    schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    Map<String, String> streamConfigs = getStreamConfigs();
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(new DedupConfig(true, HashFunction.NONE))
+        .setStreamConfigs(streamConfigs).build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "Upsert/Dedup table must use low-level streaming consumer type");
+    }
+
+    streamConfigs.put("stream.kafka.consumer.type", "simple");
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(new DedupConfig(true, HashFunction.NONE))
+        .setStreamConfigs(streamConfigs).build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
+    }
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Lists.newArrayList("myCol"), null, Collections
+        .singletonList(new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "myCol").toColumnName()), 10);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(new DedupConfig(true, HashFunction.NONE))
+        .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+        .setStarTreeIndexConfigs(Lists.newArrayList(starTreeIndexConfig)).setStreamConfigs(streamConfigs).build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+
+    // Dedup and upsert can't be enabled simultaneously
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setDedupConfig(new DedupConfig(true, HashFunction.NONE))
+        .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null, null))
+        .setStreamConfigs(streamConfigs)
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "A table can have either Upsert or Dedup enabled, but not both");
+    }
+  }
+
+  @Test
   public void testValidateUpsertConfig() {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
@@ -1184,26 +1258,26 @@ public class TableConfigUtilsTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null, null)).build();
     try {
-      TableConfigUtils.validateUpsertConfig(tableConfig, schema);
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(), "Upsert table is for realtime table only.");
+      Assert.assertEquals(e.getMessage(), "Upsert/Dedup table is for realtime table only.");
     }
 
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null, null)).build();
     try {
-      TableConfigUtils.validateUpsertConfig(tableConfig, schema);
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(), "Upsert table must have primary key columns in the schema");
+      Assert.assertEquals(e.getMessage(), "Upsert/Dedup table must have primary key columns in the schema");
     }
 
     schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
     try {
-      TableConfigUtils.validateUpsertConfig(tableConfig, schema);
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
       Assert
@@ -1215,10 +1289,10 @@ public class TableConfigUtilsTest {
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null, null))
         .setStreamConfigs(streamConfigs).build();
     try {
-      TableConfigUtils.validateUpsertConfig(tableConfig, schema);
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(), "Upsert table must use low-level streaming consumer type");
+      Assert.assertEquals(e.getMessage(), "Upsert/Dedup table must use low-level streaming consumer type");
     }
 
     streamConfigs.put("stream.kafka.consumer.type", "simple");
@@ -1226,18 +1300,18 @@ public class TableConfigUtilsTest {
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null, null))
         .setStreamConfigs(streamConfigs).build();
     try {
-      TableConfigUtils.validateUpsertConfig(tableConfig, schema);
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
-          "Upsert table must use strict replica-group (i.e. strictReplicaGroup) based routing");
+          "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
     }
 
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null, null))
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setStreamConfigs(streamConfigs).build();
-    TableConfigUtils.validateUpsertConfig(tableConfig, schema);
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
 
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Lists.newArrayList("myCol"), null, Collections
         .singletonList(new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "myCol").toColumnName()), 10);
@@ -1246,7 +1320,7 @@ public class TableConfigUtilsTest {
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setStarTreeIndexConfigs(Lists.newArrayList(starTreeIndexConfig)).setStreamConfigs(streamConfigs).build();
     try {
-      TableConfigUtils.validateUpsertConfig(tableConfig, schema);
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(), "The upsert table cannot have star-tree index.");

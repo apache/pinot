@@ -16,38 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert;
+package org.apache.pinot.segment.local.dedup;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import javax.annotation.Nullable;
-import javax.annotation.concurrent.ThreadSafe;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.config.table.HashFunction;
 
 
-/**
- * The manager of the upsert metadata of a table.
- */
-@ThreadSafe
-public class TableUpsertMetadataManager {
-  private final Map<Integer, PartitionUpsertMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
+public class TableDedupMetadataManager {
+  private final Map<Integer, PartitionDedupMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
+  private final HelixManager _helixManager;
   private final String _tableNameWithType;
+  private final List<String> _primaryKeyColumns;
   private final ServerMetrics _serverMetrics;
-  private final PartialUpsertHandler _partialUpsertHandler;
   private final HashFunction _hashFunction;
 
-  public TableUpsertMetadataManager(String tableNameWithType, ServerMetrics serverMetrics,
-      @Nullable PartialUpsertHandler partialUpsertHandler, HashFunction hashFunction) {
+  public TableDedupMetadataManager(HelixManager helixManager, String tableNameWithType, List<String> primaryKeyColumns,
+      ServerMetrics serverMetrics, HashFunction hashFunction) {
+    _helixManager = helixManager;
     _tableNameWithType = tableNameWithType;
+    _primaryKeyColumns = primaryKeyColumns;
     _serverMetrics = serverMetrics;
-    _partialUpsertHandler = partialUpsertHandler;
     _hashFunction = hashFunction;
   }
 
-  public PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
+  public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {
     return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
-        k -> new PartitionUpsertMetadataManager(_tableNameWithType, k, _serverMetrics, _partialUpsertHandler,
-            _hashFunction));
+        k -> new PartitionDedupMetadataManager(_helixManager, _tableNameWithType, _primaryKeyColumns, k,
+            _serverMetrics, _hashFunction));
   }
 }

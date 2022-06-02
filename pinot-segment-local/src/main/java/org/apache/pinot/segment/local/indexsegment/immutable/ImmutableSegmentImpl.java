@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
@@ -56,6 +57,9 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private final StarTreeIndexContainer _starTreeIndexContainer;
   private final Map<String, DataSource> _dataSources;
 
+  // Dedupe
+  private PartitionDedupMetadataManager _partitionDedupMetadataManager;
+
   // For upsert
   private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private ThreadSafeMutableRoaringBitmap _validDocIds;
@@ -74,6 +78,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       String colName = entry.getKey();
       _dataSources.put(colName, new ImmutableDataSource(entry.getValue(), _indexContainerMap.get(colName)));
     }
+  }
+
+  public void enableDedup(PartitionDedupMetadataManager partitionDedupMetadataManager) {
+    _partitionDedupMetadataManager = partitionDedupMetadataManager;
   }
 
   /**
@@ -158,10 +166,15 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     String segmentName = getSegmentName();
     LOGGER.info("Trying to destroy segment : {}", segmentName);
 
-    // Remove the upsert metadata before closing the readers
+    // Remove the upsert and dedup metadata before closing the readers
     if (_partitionUpsertMetadataManager != null) {
       _partitionUpsertMetadataManager.removeSegment(this);
     }
+
+    if (_partitionDedupMetadataManager != null) {
+      _partitionDedupMetadataManager.removeSegment(this);
+    }
+
     for (Map.Entry<String, ColumnIndexContainer> entry : _indexContainerMap.entrySet()) {
       try {
         entry.getValue().close();

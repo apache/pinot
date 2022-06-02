@@ -36,8 +36,8 @@ public class UpsertConfigTest {
     assertEquals(upsertConfig1.getComparisonColumn(), "comparison");
 
     upsertConfig1 =
-        new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "comparison", UpsertConfig.HashFunction.MURMUR3);
-    assertEquals(upsertConfig1.getHashFunction(), UpsertConfig.HashFunction.MURMUR3);
+        new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "comparison", HashFunction.MURMUR3);
+    assertEquals(upsertConfig1.getHashFunction(), HashFunction.MURMUR3);
 
     Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
     partialUpsertStratgies.put("myCol", UpsertConfig.Strategy.INCREMENT);
