@@ -170,7 +170,10 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
   @Override
   public void run()
       throws Exception {
-    //Get list of files to process
+    // Get list of files to process.
+    // TODO - sort input files by modification timestamp. Though this is problematic because:
+    // a. It can put more load on the external filesystem (e.g. S3), and
+    // b. The call to Collections.sort(siblingFiles) below will reorder files by name.
     String[] files = _inputDirFS.listFiles(_inputDirURI, true);
 
     List<String> filteredFiles = new ArrayList<>();
