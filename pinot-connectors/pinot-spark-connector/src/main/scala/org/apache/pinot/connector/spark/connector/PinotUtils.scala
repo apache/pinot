@@ -66,7 +66,7 @@ private[pinot] object PinotUtils {
       sparkSchema: StructType): Seq[InternalRow] = {
     val dataTableColumnNames = dataTable.getDataSchema.getColumnNames
     (0 until dataTable.getNumberOfRows).map { rowIndex =>
-      // spark schema is used to ensure colqumns order
+      // spark schema is used to ensure columns order
       val columns = sparkSchema.fields.map { field =>
         val colIndex = dataTableColumnNames.indexOf(field.name)
         if (colIndex < 0) {
