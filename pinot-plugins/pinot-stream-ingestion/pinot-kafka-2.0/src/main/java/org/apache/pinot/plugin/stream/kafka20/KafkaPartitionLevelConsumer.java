@@ -57,14 +57,11 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       LOGGER.debug("poll consumer: {}, startOffset: {}, endOffset:{} timeout: {}ms", _topicPartition, startOffset,
           endOffset, timeoutMillis);
     }
-    _consumer.seek(_topicPartition, startOffset);
-    // explicitly check for OutOfRange, where startOffset < beginningOffset
-    // without this, _consumer.poll will auto offset reset to latest, resulting in data loss
     Map<TopicPartition, Long> beginningOffsets = _consumer.beginningOffsets(List.of(_topicPartition));
     Long beginningOffset = beginningOffsets.values().iterator().next();
-    if (startOffset < beginningOffset) {
-      _consumer.seek(_topicPartition, beginningOffset);
-    }
+    // explicitly check for OutOfRange, where startOffset < beginningOffset
+    // without this, _consumer.poll will auto offset reset to latest, resulting in data loss
+    _consumer.seek(_topicPartition, Math.max(startOffset, beginningOffset));
 
     ConsumerRecords<String, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMillis));
     List<ConsumerRecord<String, Bytes>> messageAndOffsets = consumerRecords.records(_topicPartition);
