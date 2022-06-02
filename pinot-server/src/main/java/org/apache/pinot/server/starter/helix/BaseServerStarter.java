@@ -343,10 +343,21 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
 
     // Update system resource info (CPU, memory, etc)
-    Map<String, String> systemResourceInfoMap = new SystemResourceInfo().toMap();
-    if (!systemResourceInfoMap.equals(znRecord.getMapField(Instance.SYSTEM_RESOURCE_INFO_KEY))) {
-      LOGGER.info("Updating instance: {} with system resource info: {}", _instanceId, systemResourceInfoMap);
-      znRecord.setMapField(Instance.SYSTEM_RESOURCE_INFO_KEY, systemResourceInfoMap);
+    Map<String, String> newSystemResourceInfoMap = new SystemResourceInfo().toMap();
+    Map<String, String> existingSystemResourceInfoMap =
+        znRecord.getMapField(CommonConstants.Helix.Instance.SYSTEM_RESOURCE_INFO_KEY);
+    if (!newSystemResourceInfoMap.equals(existingSystemResourceInfoMap)) {
+      LOGGER.info("Updating instance: {} with new system resource info: {}", _instanceId, newSystemResourceInfoMap);
+      if (existingSystemResourceInfoMap == null) {
+        existingSystemResourceInfoMap = newSystemResourceInfoMap;
+      } else {
+        // existingSystemResourceInfoMap may contains more KV pairs than newSystemResourceInfoMap,
+        // we need to preserve those KV pairs and only update the different values.
+        for (Map.Entry<String, String> entry : newSystemResourceInfoMap.entrySet()) {
+          existingSystemResourceInfoMap.put(entry.getKey(), entry.getValue());
+        }
+      }
+      znRecord.setMapField(Instance.SYSTEM_RESOURCE_INFO_KEY, existingSystemResourceInfoMap);
       updated = true;
     }
 
