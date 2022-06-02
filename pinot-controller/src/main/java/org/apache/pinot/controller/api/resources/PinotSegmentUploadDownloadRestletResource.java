@@ -256,7 +256,15 @@ public class PinotSegmentUploadDownloadRestletResource {
             throw new ControllerApplicationException(LOGGER, "Download URI is required for METADATA upload mode",
                 Response.Status.BAD_REQUEST);
           }
-          moveSegmentToFinalLocation = false;
+          // override moveSegmentToFinalLocation if override provided in headers:moveSegmentToDeepStore
+          // else set to false for backward compatibility
+          String moveSegmentToDeepStore =
+              extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.MOVE_SEGMENT_TO_DEEP_STORE);
+          if (moveSegmentToDeepStore != null) {
+            moveSegmentToFinalLocation = Boolean.parseBoolean(moveSegmentToDeepStore);
+          } else {
+            moveSegmentToFinalLocation = false;
+          }
           createSegmentFileFromMultipart(multiPart, destFile);
           try {
             URI segmentURI = new URI(downloadURI);
