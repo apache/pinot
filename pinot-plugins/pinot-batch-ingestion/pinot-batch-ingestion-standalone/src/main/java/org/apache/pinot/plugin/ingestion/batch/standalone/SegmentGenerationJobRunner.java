@@ -28,7 +28,6 @@ import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -200,22 +199,6 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
       }
     }
 
-    // Sort files based on creation time.
-    Collections.sort(filteredFiles, new Comparator<String>() {
-
-      @Override
-      public int compare(String o1, String o2) {
-        try {
-          long o1Modified = _inputDirFS.lastModified(new URI(o1));
-          long o2Modified = _inputDirFS.lastModified(new URI(o2));
-          return Long.compare(o1Modified, o2Modified);
-        } catch (Exception e) {
-          // We've already called new URI on this path successfully (above)
-          throw new RuntimeException("Impossible exception", e);
-        }
-      }
-    });
-
     File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());
     try {
       int numInputFiles = filteredFiles.size();
@@ -246,6 +229,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
       _segmentCreationTaskCountDownLatch.await();
 
       if (_failure.get() != null) {
+        _executorService.shutdownNow();
         throw _failure.get();
       }
     } finally {
@@ -321,7 +305,10 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         _failure.compareAndSet(null, new RuntimeException(msg, e));
 
         // We have to decrement the latch by the number of pending tasks.
-        _executorService.shutdownNow().forEach(r -> _segmentCreationTaskCountDownLatch.countDown());
+        long count = _segmentCreationTaskCountDownLatch.getCount();
+        for (int i = 0; i < count; i++) {
+          _segmentCreationTaskCountDownLatch.countDown();
+        }
       } finally {
         _segmentCreationTaskCountDownLatch.countDown();
         FileUtils.deleteQuietly(localSegmentDir);

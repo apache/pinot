@@ -189,6 +189,8 @@ public class SegmentGenerationJobRunnerTest {
         }
       });
 
+      // We rely on the SegmentGenerationJobRunner doing a sort by name, so "input1.csv" will be the
+      // first file we process, and "input2.csv" (the bad file) will be the second one.
       assertEquals(segments.length, 1);
       assertTrue(segments[0].getName().endsWith("input1.tar.gz"));
     }
