@@ -50,7 +50,10 @@ class PinotUtilsTest extends BaseTest {
       "floatArrayCol",
       "doubleArrayCol",
       "byteType",
-      "timestampType"
+      "timestampArrayCol",
+      "timestampCol",
+      "booleanArrayCol",
+      "booleanCol",
     )
     val columnTypes = Array(
       ColumnDataType.STRING,
@@ -64,7 +67,10 @@ class PinotUtilsTest extends BaseTest {
       ColumnDataType.FLOAT_ARRAY,
       ColumnDataType.DOUBLE_ARRAY,
       ColumnDataType.BYTES,
-      ColumnDataType.TIMESTAMP
+      ColumnDataType.TIMESTAMP_ARRAY,
+      ColumnDataType.TIMESTAMP,
+      ColumnDataType.BOOLEAN_ARRAY,
+      ColumnDataType.BOOLEAN,
     )
     val dataSchema = new DataSchema(columnNames, columnTypes)
 
@@ -81,7 +87,11 @@ class PinotUtilsTest extends BaseTest {
     dataTableBuilder.setColumn(8, Array[Float](0, 15.20f))
     dataTableBuilder.setColumn(9, Array[Double](0, 10.3d))
     dataTableBuilder.setColumn(10, new ByteArray("byte_test".getBytes))
-    dataTableBuilder.setColumn(11, 101L)
+    dataTableBuilder.setColumn(11, Array[Long](123L,456L))
+    dataTableBuilder.setColumn(12, 123L)
+    dataTableBuilder.setColumn(13, Array[Int](1,0,1,0))
+    dataTableBuilder.setColumn(14, 1)
+
     dataTableBuilder.finishRow()
     val dataTable = dataTableBuilder.build()
 
@@ -98,7 +108,10 @@ class PinotUtilsTest extends BaseTest {
         StructField("floatArrayCol", ArrayType(FloatType)),
         StructField("floatCol", FloatType),
         StructField("byteType", ArrayType(ByteType)),
-        StructField("timestampType", TimestampType)
+        StructField("timestampArrayCol", ArrayType(LongType)),
+        StructField("timestampCol", LongType),
+        StructField("booleanArrayCol", ArrayType(BooleanType)),
+        StructField("booleanCol", BooleanType),
       )
     )
 
@@ -116,7 +129,10 @@ class PinotUtilsTest extends BaseTest {
     result.getArray(8) shouldEqual ArrayData.toArrayData(Seq(0f, 15.20f))
     result.getFloat(9) shouldEqual 10.05f
     result.getArray(10) shouldEqual ArrayData.toArrayData("byte_test".getBytes)
-    result.getLong(11) shouldEqual 101L
+    result.getArray(11) shouldEqual ArrayData.toArrayData(Seq(123L,456L))
+    result.getLong(12) shouldEqual 123L
+    result.getArray(13) shouldEqual ArrayData.toArrayData(Seq(true, false, true, false))
+    result.getBoolean(14) shouldEqual true
   }
 
   test("Method should throw field not found exception while converting pinot data table") {
@@ -153,5 +169,4 @@ class PinotUtilsTest extends BaseTest {
     val sparkSchema = DataType.fromJson(sparkSchemaAsString).asInstanceOf[StructType]
     resultSchema.fields should contain theSameElementsAs sparkSchema.fields
   }
-
 }
