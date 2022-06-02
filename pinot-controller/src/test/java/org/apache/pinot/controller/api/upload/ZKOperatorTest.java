@@ -26,6 +26,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -111,8 +112,8 @@ public class ZKOperatorTest {
           URIUtils.getUri("mockPath", OFFLINE_TABLE_NAME, URIUtils.encode(segmentMetadata.getName()));
       File segmentFile = new File(new File("foo/bar"), "mockChild");
 
-      zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, finalSegmentLocationURI, segmentFile,
-          "downloadUrl", "crypter", 10, true, true, httpHeaders);
+      zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, FileUploadDownloadClient.FileUploadType.SEGMENT, finalSegmentLocationURI, segmentFile,
+          "downloadUrl", "downloadUrl", "crypter", 10, true, true, httpHeaders);
       fail();
     } catch (Exception e) {
       // Expected
@@ -124,7 +125,7 @@ public class ZKOperatorTest {
       return segmentZKMetadata == null;
     }, 30_000L, "Failed to delete segmentZkMetadata.");
 
-    zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, "downloadUrl", "crypter", 10,
+    zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, FileUploadDownloadClient.FileUploadType.SEGMENT, null, null, "downloadUrl","downloadUrl", "crypter", 10,
         true, true, httpHeaders);
 
     SegmentZKMetadata segmentZKMetadata = _resourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
@@ -141,7 +142,7 @@ public class ZKOperatorTest {
 
     // Upload the same segment with allowRefresh = false. Validate that an exception is thrown.
     try {
-      zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, "otherDownloadUrl",
+      zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, FileUploadDownloadClient.FileUploadType.SEGMENT, null, null, "otherDownloadUrl","otherDownloadUrl",
           "otherCrypter", 10, true, false, httpHeaders);
       fail();
     } catch (Exception e) {
@@ -151,7 +152,7 @@ public class ZKOperatorTest {
     // Refresh the segment with unmatched IF_MATCH field
     when(httpHeaders.getHeaderString(HttpHeaders.IF_MATCH)).thenReturn("123");
     try {
-      zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, "otherDownloadUrl",
+      zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, FileUploadDownloadClient.FileUploadType.SEGMENT, null, null, "otherDownloadUrl","otherDownloadUrl",
           "otherCrypter", 10, true, true, httpHeaders);
       fail();
     } catch (Exception e) {
@@ -162,7 +163,7 @@ public class ZKOperatorTest {
     // downloadURL and crypter
     when(httpHeaders.getHeaderString(HttpHeaders.IF_MATCH)).thenReturn("12345");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(456L);
-    zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, "otherDownloadUrl",
+    zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, FileUploadDownloadClient.FileUploadType.SEGMENT, null, null, "otherDownloadUrl","otherDownloadUrl",
         "otherCrypter", 10, true, true, httpHeaders);
 
     segmentZKMetadata = _resourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
@@ -185,7 +186,7 @@ public class ZKOperatorTest {
     when(segmentMetadata.getIndexCreationTime()).thenReturn(789L);
     // Add a tiny sleep to guarantee that refresh time is different from the previous round
     Thread.sleep(10);
-    zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, "otherDownloadUrl",
+    zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, FileUploadDownloadClient.FileUploadType.SEGMENT, null, null, "otherDownloadUrl","otherDownloadUrl",
         "otherCrypter", 100, true, true, httpHeaders);
 
     segmentZKMetadata = _resourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
@@ -209,7 +210,7 @@ public class ZKOperatorTest {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
     when(segmentMetadata.getCrc()).thenReturn("12345");
-    zkOperator.completeSegmentOperations(REALTIME_TABLE_NAME, segmentMetadata, null, null, "downloadUrl", null, 10,
+    zkOperator.completeSegmentOperations(REALTIME_TABLE_NAME, segmentMetadata, FileUploadDownloadClient.FileUploadType.SEGMENT, null, null, "downloadUrl","downloadUrl", null, 10,
         true, true, mock(HttpHeaders.class));
 
     SegmentZKMetadata segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, SEGMENT_NAME);
@@ -222,7 +223,7 @@ public class ZKOperatorTest {
     when(segmentMetadata.getName()).thenReturn(LLC_SEGMENT_NAME);
     when(segmentMetadata.getCrc()).thenReturn("23456");
     try {
-      zkOperator.completeSegmentOperations(REALTIME_TABLE_NAME, segmentMetadata, null, null, "downloadUrl", null, 10,
+      zkOperator.completeSegmentOperations(REALTIME_TABLE_NAME, segmentMetadata, FileUploadDownloadClient.FileUploadType.SEGMENT, null, null, "downloadUrl","downloadUrl", null, 10,
           true, true, mock(HttpHeaders.class));
       fail();
     } catch (ControllerApplicationException e) {
@@ -233,7 +234,7 @@ public class ZKOperatorTest {
     // Uploading a segment with LLC segment name and start/end offset should success
     when(segmentMetadata.getStartOffset()).thenReturn("0");
     when(segmentMetadata.getEndOffset()).thenReturn("1234");
-    zkOperator.completeSegmentOperations(REALTIME_TABLE_NAME, segmentMetadata, null, null, "downloadUrl", null, 10,
+    zkOperator.completeSegmentOperations(REALTIME_TABLE_NAME, segmentMetadata, FileUploadDownloadClient.FileUploadType.SEGMENT, null, null, "downloadUrl","downloadUrl", null, 10,
         true, true, mock(HttpHeaders.class));
 
     segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, LLC_SEGMENT_NAME);
@@ -246,7 +247,7 @@ public class ZKOperatorTest {
     when(segmentMetadata.getCrc()).thenReturn("34567");
     when(segmentMetadata.getStartOffset()).thenReturn(null);
     when(segmentMetadata.getEndOffset()).thenReturn(null);
-    zkOperator.completeSegmentOperations(REALTIME_TABLE_NAME, segmentMetadata, null, null, "downloadUrl", null, 10,
+    zkOperator.completeSegmentOperations(REALTIME_TABLE_NAME, segmentMetadata, FileUploadDownloadClient.FileUploadType.SEGMENT, null, null, "downloadUrl","downloadUrl", null, 10,
         true, true, mock(HttpHeaders.class));
 
     segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, LLC_SEGMENT_NAME);
@@ -259,7 +260,7 @@ public class ZKOperatorTest {
     when(segmentMetadata.getCrc()).thenReturn("45678");
     when(segmentMetadata.getStartOffset()).thenReturn("1234");
     when(segmentMetadata.getEndOffset()).thenReturn("2345");
-    zkOperator.completeSegmentOperations(REALTIME_TABLE_NAME, segmentMetadata, null, null, "downloadUrl", null, 10,
+    zkOperator.completeSegmentOperations(REALTIME_TABLE_NAME, segmentMetadata, FileUploadDownloadClient.FileUploadType.SEGMENT, null, null, "downloadUrl","downloadUrl", null, 10,
         true, true, mock(HttpHeaders.class));
 
     segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, LLC_SEGMENT_NAME);

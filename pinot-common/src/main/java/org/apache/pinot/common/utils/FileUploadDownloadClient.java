@@ -73,6 +73,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
     public static final String UPLOAD_TYPE = "UPLOAD_TYPE";
     public static final String REFRESH_ONLY = "REFRESH_ONLY";
     public static final String DOWNLOAD_URI = "DOWNLOAD_URI";
+
+    public static final String MOVE_SEGMENT_TO_DEEP_STORE = "MOVE_SEGMENT_TO_DEEP_STORE";
     public static final String SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER = "Pinot-SegmentZKMetadataCustomMapModifier";
     public static final String CRYPTER = "CRYPTER";
   }
