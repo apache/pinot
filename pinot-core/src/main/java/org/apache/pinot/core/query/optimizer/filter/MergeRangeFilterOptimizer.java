@@ -44,7 +44,8 @@ import org.apache.pinot.sql.FilterKind;
 public class MergeRangeFilterOptimizer implements FilterOptimizer {
 
   @Override
-  public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
+  public Expression optimize(Expression filterExpression, @Nullable Schema schema,
+      @Nullable Map<String, String> queryOptions) {
     if (schema == null || filterExpression.getType() != ExpressionType.FUNCTION) {
       return filterExpression;
     }
@@ -62,7 +63,7 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
         FilterKind filterKind = FilterKind.valueOf(childFunction.getOperator());
         assert filterKind != FilterKind.AND;
         if (filterKind == FilterKind.OR || filterKind == FilterKind.NOT) {
-          childFunction.getOperands().replaceAll(o -> optimize(o, schema));
+          childFunction.getOperands().replaceAll(o -> optimize(o, schema, queryOptions));
           newChildren.add(child);
         } else if (filterKind.isRange()) {
           List<Expression> operands = childFunction.getOperands();
@@ -112,7 +113,7 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
         return filterExpression;
       }
     } else if (operator.equals(FilterKind.OR.name()) || operator.equals(FilterKind.NOT.name())) {
-      function.getOperands().replaceAll(c -> optimize(c, schema));
+      function.getOperands().replaceAll(c -> optimize(c, schema, queryOptions));
       return filterExpression;
     } else {
       return filterExpression;

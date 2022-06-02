@@ -28,6 +28,7 @@ import org.apache.pinot.core.query.optimizer.filter.FilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.FlattenAndOrFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.MergeEqInFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.MergeRangeFilterOptimizer;
+import org.apache.pinot.core.query.optimizer.filter.MergeRegexFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.TimePredicateFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.statement.StatementOptimizer;
@@ -44,7 +45,7 @@ public class QueryOptimizer {
   //   values to the proper format so that they can be properly parsed
   private static final List<FilterOptimizer> FILTER_OPTIMIZERS =
       Arrays.asList(new FlattenAndOrFilterOptimizer(), new MergeEqInFilterOptimizer(), new NumericalFilterOptimizer(),
-          new TimePredicateFilterOptimizer(), new MergeRangeFilterOptimizer());
+          new TimePredicateFilterOptimizer(), new MergeRangeFilterOptimizer(), new MergeRegexFilterOptimizer());
 
   private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS =
       Collections.singletonList(new StringPredicateFilterOptimizer());
@@ -63,7 +64,7 @@ public class QueryOptimizer {
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
       for (FilterOptimizer filterOptimizer : FILTER_OPTIMIZERS) {
-        filterExpression = filterOptimizer.optimize(filterExpression, schema);
+        filterExpression = filterOptimizer.optimize(filterExpression, schema, pinotQuery.getQueryOptions());
       }
       pinotQuery.setFilterExpression(filterExpression);
     }

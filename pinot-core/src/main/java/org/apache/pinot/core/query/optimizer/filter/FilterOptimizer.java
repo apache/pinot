@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.query.optimizer.filter;
 
+import java.util.HashMap;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.spi.data.Schema;
@@ -32,5 +34,9 @@ public interface FilterOptimizer {
   /**
    * Optimizes the given filter, returns the optimized filter.
    */
-  Expression optimize(Expression filterExpression, @Nullable Schema schema);
+  Expression optimize(Expression filterExpression, @Nullable Schema schema, @Nullable Map<String, String> queryOptions);
+
+  default Expression optimize(Expression filterExpression, @Nullable Schema schema) {
+    return optimize(filterExpression, schema, new HashMap<>());
+  }
 }

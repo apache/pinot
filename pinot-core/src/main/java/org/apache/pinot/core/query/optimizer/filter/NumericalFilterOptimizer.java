@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.optimizer.filter;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -66,7 +67,8 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
 
   @Override
-  public Expression optimize(Expression expression, @Nullable Schema schema) {
+  public Expression optimize(Expression expression, @Nullable Schema schema,
+      @Nullable Map<String, String> queryOptions) {
     ExpressionType type = expression.getType();
     if (type != ExpressionType.FUNCTION || schema == null) {
       // We have nothing to rewrite if expression is not a function or schema is null
@@ -81,7 +83,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
       case OR:
       case NOT:
         // Recursively traverse the expression tree to find an operator node that can be rewritten.
-        operands.forEach(operand -> optimize(operand, schema));
+        operands.forEach(operand -> optimize(operand, schema, queryOptions));
 
         // We have rewritten the child operands, so rewrite the parent if needed.
         return optimizeCurrent(expression);

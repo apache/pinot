@@ -644,6 +644,10 @@ public class CommonConstants {
         public static final String SQL = "sql";
         public static final String BROKER_REQUEST = "brokerRequest";
       }
+
+      public static class Optimization {
+        public static final String FUSE_REGEX = "fuseRegex";
+      }
     }
 
     public static class Response {

@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.optimizer.filter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
@@ -34,7 +35,8 @@ import org.apache.pinot.sql.FilterKind;
 public class FlattenAndOrFilterOptimizer implements FilterOptimizer {
 
   @Override
-  public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
+  public Expression optimize(Expression filterExpression, @Nullable Schema schema,
+      @Nullable Map<String, String> queryOptions) {
     return optimize(filterExpression);
   }
 

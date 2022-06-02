@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -60,7 +61,8 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimePredicateFilterOptimizer.class);
 
   @Override
-  public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
+  public Expression optimize(Expression filterExpression, @Nullable Schema schema,
+      @Nullable Map<String, String> queryOptions) {
     return filterExpression.getType() == ExpressionType.FUNCTION ? optimize(filterExpression) : filterExpression;
   }
 

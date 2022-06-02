@@ -50,7 +50,8 @@ import org.apache.pinot.sql.FilterKind;
 public class MergeEqInFilterOptimizer implements FilterOptimizer {
 
   @Override
-  public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
+  public Expression optimize(Expression filterExpression, @Nullable Schema schema,
+      @Nullable Map<String, String> queryOptions) {
     return filterExpression.getType() == ExpressionType.FUNCTION ? optimize(filterExpression) : filterExpression;
   }
 
