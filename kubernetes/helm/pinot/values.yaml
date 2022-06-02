@@ -54,6 +54,18 @@ serviceAccount:
 
 additionalMatchLabels: {}
 
+
+pinotAuth:
+  enabled: false
+  controllerFactoryClass: org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory
+  brokerFactoryClass: org.apache.pinot.broker.broker.BasicAuthAccessControlFactory
+  configs:
+  #  - access.control.principals=admin,user
+  #  - access.control.principals.admin.password=verysecret
+  #  - access.control.principals.user.password=secret
+  #  - access.control.principals.user.tables=baseballStats,otherstuff
+  #  - access.control.principals.user.permissions=READ
+
 # ------------------------------------------------------------------------------
 # Pinot Controller:
 # ------------------------------------------------------------------------------

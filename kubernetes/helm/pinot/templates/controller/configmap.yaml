@@ -32,3 +32,9 @@ data:
     controller.data.dir={{ .Values.controller.data.dir }}
     controller.zk.str={{ include "zookeeper.url" . }}
 {{ .Values.controller.extra.configs | indent 4 }}
+{{- if .Values.pinotAuth.enabled}}
+    controller.admin.access.control.factory.class={{ .Values.pinotAuth.controllerFactoryClass }}
+{{- range $config := .Values.pinotAuth.configs}}
+{{ printf "controller.admin.%s" $config | indent 4 -}}
+{{- end }}
+{{- end }}
