@@ -41,6 +41,7 @@ object ExampleSparkPinotConnectorTest extends Logging {
     readHybridWithSpecificSchema()
     readHybridWithFilters()
     readHybridViaGrpc()
+    readRealtimeViaGrpc()
     readHybridWithFiltersViaGrpc()
     readRealtimeWithSelectionColumns()
     applyJustSomeFilters()
@@ -139,16 +140,27 @@ object ExampleSparkPinotConnectorTest extends Logging {
   }
 
   def readHybridViaGrpc()(implicit spark: SparkSession): Unit = {
-    log.info("## Reading `airlineStats_OFFLINE` table... ##")
+    log.info("## Reading `airlineStats` table... ##")
     val data = spark.read
       .format("pinot")
       .option("table", "airlineStats")
-      .option("tableType", "offline")
+      .option("tableType", "hybrid")
       .option("useGrpcServer", "true")
       .load()
 
     data.show()
-    print(data.count())
+  }
+
+  def readRealtimeViaGrpc()(implicit spark: SparkSession): Unit = {
+    log.info("## Reading `airlineStats_REALTIME` table... ##")
+    val data = spark.read
+      .format("pinot")
+      .option("table", "airlineStats")
+      .option("tableType", "realtime")
+      .option("useGrpcServer", "true")
+      .load()
+
+    data.show()
   }
 
   def readHybridWithFiltersViaGrpc()(implicit spark: SparkSession): Unit = {
@@ -157,13 +169,12 @@ object ExampleSparkPinotConnectorTest extends Logging {
     val data = spark.read
       .format("pinot")
       .option("table", "airlineStats")
-      .option("tableType", "OFFLINE")
+      .option("tableType", "hybrid")
       .option("useGrpcServer", "true")
       .load()
       .filter($"DestStateName" === "Florida")
 
     data.show()
-    print(data.count())
   }
 
 
