@@ -49,7 +49,8 @@ class PinotUtilsTest extends BaseTest {
       "longArrayCol",
       "floatArrayCol",
       "doubleArrayCol",
-      "byteType"
+      "byteType",
+      "timestampType"
     )
     val columnTypes = Array(
       ColumnDataType.STRING,
@@ -62,7 +63,8 @@ class PinotUtilsTest extends BaseTest {
       ColumnDataType.LONG_ARRAY,
       ColumnDataType.FLOAT_ARRAY,
       ColumnDataType.DOUBLE_ARRAY,
-      ColumnDataType.BYTES
+      ColumnDataType.BYTES,
+      ColumnDataType.TIMESTAMP
     )
     val dataSchema = new DataSchema(columnNames, columnTypes)
 
@@ -79,6 +81,7 @@ class PinotUtilsTest extends BaseTest {
     dataTableBuilder.setColumn(8, Array[Float](0, 15.20f))
     dataTableBuilder.setColumn(9, Array[Double](0, 10.3d))
     dataTableBuilder.setColumn(10, new ByteArray("byte_test".getBytes))
+    dataTableBuilder.setColumn(11, 101L)
     dataTableBuilder.finishRow()
     val dataTable = dataTableBuilder.build()
 
@@ -94,7 +97,8 @@ class PinotUtilsTest extends BaseTest {
         StructField("strCol", StringType),
         StructField("floatArrayCol", ArrayType(FloatType)),
         StructField("floatCol", FloatType),
-        StructField("byteType", ArrayType(ByteType))
+        StructField("byteType", ArrayType(ByteType)),
+        StructField("timestampType", TimestampType)
       )
     )
 
@@ -112,6 +116,7 @@ class PinotUtilsTest extends BaseTest {
     result.getArray(8) shouldEqual ArrayData.toArrayData(Seq(0f, 15.20f))
     result.getFloat(9) shouldEqual 10.05f
     result.getArray(10) shouldEqual ArrayData.toArrayData("byte_test".getBytes)
+    result.getLong(11) shouldEqual 101L
   }
 
   test("Method should throw field not found exception while converting pinot data table") {
