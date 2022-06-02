@@ -65,17 +65,17 @@ public class DateTimeFormatPatternSpec {
     }
   }
 
-  public DateTimeFormatPatternSpec(DateTimeFieldSpec.TimeFormat timeFormat, String timeFormatStyle,
+  public DateTimeFormatPatternSpec(DateTimeFieldSpec.TimeFormat timeFormat, @Nullable String sdfPattern,
       @Nullable String timeZone) {
     _timeFormat = timeFormat;
     if (_timeFormat.equals(DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT)) {
       if (timeZone != null) {
         _dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timeZone));
       }
-      _dateTimeFormatter = DateTimeFormat.forPattern(timeFormatStyle).
+      _dateTimeFormatter = DateTimeFormat.forPattern(sdfPattern).
           withZone(_dateTimeZone).
           withLocale(DEFAULT_LOCALE);
-      _sdfPattern = timeFormatStyle;
+      _sdfPattern = sdfPattern;
     }
   }
 

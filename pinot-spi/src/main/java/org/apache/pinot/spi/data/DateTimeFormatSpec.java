@@ -22,7 +22,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import java.sql.Timestamp;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -130,23 +129,6 @@ public class DateTimeFormatSpec {
 
   /**
    * Constructs a dateTimeSpec format, given the components of a format
-   */
-  public DateTimeFormatSpec(String columnTimeFormat, String columnUnit, int columnSize) {
-    if (columnSize != 1) {
-      _format = Joiner.on(PIPE_SEPARATOR).join(columnTimeFormat, columnUnit, columnSize);
-    } else {
-      _format = Joiner.on(PIPE_SEPARATOR).join(columnTimeFormat, columnUnit);
-    }
-
-    validatePipeFormat(_format);
-
-    _size = columnSize;
-    _unitSpec = new DateTimeFormatUnitSpec(columnUnit);
-    _patternSpec = new DateTimeFormatPatternSpec(columnTimeFormat);
-  }
-
-  /**
-   * Constructs a dateTimeSpec format, given the components of a format
    * @param sdfPattern and tz
    */
   public DateTimeFormatSpec(int columnSize, String columnUnit, String columnTimeFormat, String sdfPattern) {
@@ -156,19 +138,6 @@ public class DateTimeFormatSpec {
     _size = columnSize;
     _unitSpec = new DateTimeFormatUnitSpec(columnUnit);
     _patternSpec = new DateTimeFormatPatternSpec(columnTimeFormat, sdfPattern);
-  }
-
-  public DateTimeFormatSpec(String timeFormat, String columnTimeFormat, @Nullable String timeZone) {
-    if (timeZone == null) {
-      timeZone = DateTimeFormatPatternSpec.DEFAULT_DATETIMEZONE.toString();
-      _format = Joiner.on(PIPE_SEPARATOR).join(timeFormat, columnTimeFormat);
-    } else {
-      _format = Joiner.on(PIPE_SEPARATOR).join(timeFormat, columnTimeFormat, timeZone);
-    }
-    validatePipeFormat(_format);
-    _size = 1;
-    _unitSpec = new DateTimeFormatUnitSpec("DAYS");
-    _patternSpec = new DateTimeFormatPatternSpec(TimeFormat.valueOf(timeFormat), columnTimeFormat, timeZone);
   }
 
   public String getFormat() {
