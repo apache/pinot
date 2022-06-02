@@ -539,7 +539,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         }
         for (GenericRow transformedRow : reusedResult.getTransformedRows()) {
           try {
-            // TODO(saurabh): we may have dropped the record due to dedup. Should we increment indexedMessageCount?
             canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
             indexedMessageCount++;
             realtimeRowsConsumedMeter =

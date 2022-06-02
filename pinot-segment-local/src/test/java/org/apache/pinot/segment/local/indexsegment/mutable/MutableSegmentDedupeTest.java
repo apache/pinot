@@ -27,7 +27,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.dedup.TableDedupMetadataManager;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
-import org.apache.pinot.segment.local.utils.tablestate.TableState;
+import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -56,8 +56,8 @@ public class MutableSegmentDedupeTest {
 
   @BeforeClass
   public void init() {
-    MockedStatic mocked = mockStatic(TableState.class);
-    mocked.when(() -> TableState.isAllSegmentsLoaded(any(), any())).thenReturn(true);
+    MockedStatic mocked = mockStatic(TableStateUtils.class);
+    mocked.when(() -> TableStateUtils.isAllSegmentsLoaded(any(), any())).thenReturn(true);
   }
 
   private void setup(boolean dedupEnabled)

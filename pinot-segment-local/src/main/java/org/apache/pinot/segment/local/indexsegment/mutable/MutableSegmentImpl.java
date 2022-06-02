@@ -489,12 +489,12 @@ public class MutableSegmentImpl implements MutableSegment {
       recordInfo = getRecordInfo(row, numDocsIndexed);
     }
 
-    if (isDedupEnabled() && _partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo, this)) {
-      _logger.info("Dropped row {} since its primary key already exists", row);
+    if (isDedupEnabled() && _partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo.getPrimaryKey(),
+        this)) {
       if (_serverMetrics != null) {
         _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_DEDUP_DROPPED, 1);
       }
-      return numDocsIndexed < _capacity;
+      return true;
     }
 
     if (isUpsertEnabled()) {

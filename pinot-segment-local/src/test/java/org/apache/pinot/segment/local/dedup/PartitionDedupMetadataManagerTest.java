@@ -27,7 +27,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.local.utils.RecordInfo;
-import org.apache.pinot.segment.local.utils.tablestate.TableState;
+import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -51,8 +51,8 @@ public class PartitionDedupMetadataManagerTest {
 
   @BeforeClass
   public void init() {
-    MockedStatic mocked = mockStatic(TableState.class);
-    mocked.when(() -> TableState.isAllSegmentsLoaded(any(), any())).thenReturn(true);
+    MockedStatic mocked = mockStatic(TableStateUtils.class);
+    mocked.when(() -> TableStateUtils.isAllSegmentsLoaded(any(), any())).thenReturn(true);
   }
 
   @Test
@@ -61,38 +61,38 @@ public class PartitionDedupMetadataManagerTest {
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         new PartitionDedupMetadataManager(mock(HelixManager.class), REALTIME_TABLE_NAME, null, 0,
             mock(ServerMetrics.class), hashFunction);
-    Map<Object, IndexSegment> recordLocationMap = partitionDedupMetadataManager._primaryKeySet;
+    Map<Object, IndexSegment> recordLocationMap = partitionDedupMetadataManager._primaryKeyToSegmentMap;
 
     // Add the first segment
-    List<RecordInfo> recordInfoList1 = new ArrayList<>();
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 0, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(1), 1, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(2), 2, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 3, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(1), 4, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 5, null));
+    List<PrimaryKey> pkList1 = new ArrayList<>();
+    pkList1.add(getPrimaryKey(0));
+    pkList1.add(getPrimaryKey(1));
+    pkList1.add(getPrimaryKey(2));
+    pkList1.add(getPrimaryKey(0));
+    pkList1.add(getPrimaryKey(1));
+    pkList1.add(getPrimaryKey(0));
     ImmutableSegmentImpl segment1 = mockSegment(1);
     MockedStatic mocked = mockStatic(PartitionDedupMetadataManager.class);
-    mocked.when(() -> PartitionDedupMetadataManager.getRecordInfoIterator(any(), any()))
-        .thenReturn(recordInfoList1.iterator());
+    mocked.when(() -> PartitionDedupMetadataManager.getPrimaryKeyIterator(any(), any()))
+        .thenReturn(pkList1.iterator());
 
     partitionDedupMetadataManager.addSegment(segment1);
     checkRecordLocation(recordLocationMap, 0, segment1, hashFunction);
     checkRecordLocation(recordLocationMap, 1, segment1, hashFunction);
     checkRecordLocation(recordLocationMap, 2, segment1, hashFunction);
 
-    recordInfoList1 = new ArrayList<>();
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 0, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(1), 1, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(2), 2, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 3, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(1), 4, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 5, null));
+    pkList1 = new ArrayList<>();
+    pkList1.add(getPrimaryKey(0));
+    pkList1.add(getPrimaryKey(1));
+    pkList1.add(getPrimaryKey(2));
+    pkList1.add(getPrimaryKey(0));
+    pkList1.add(getPrimaryKey(1));
+    pkList1.add(getPrimaryKey(0));
 
     mocked.close();
     mocked = mockStatic(PartitionDedupMetadataManager.class);
-    mocked.when(() -> PartitionDedupMetadataManager.getRecordInfoIterator(any(), any()))
-        .thenReturn(recordInfoList1.iterator());
+    mocked.when(() -> PartitionDedupMetadataManager.getPrimaryKeyIterator(any(), any()))
+        .thenReturn(pkList1.iterator());
 
     partitionDedupMetadataManager.removeSegment(segment1);
     Assert.assertEquals(recordLocationMap.size(), 0);
@@ -105,37 +105,37 @@ public class PartitionDedupMetadataManagerTest {
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         new PartitionDedupMetadataManager(mock(HelixManager.class), REALTIME_TABLE_NAME, null, 0,
             mock(ServerMetrics.class), hashFunction);
-    Map<Object, IndexSegment> recordLocationMap = partitionDedupMetadataManager._primaryKeySet;
+    Map<Object, IndexSegment> recordLocationMap = partitionDedupMetadataManager._primaryKeyToSegmentMap;
 
     // Add the first segment
-    List<RecordInfo> recordInfoList1 = new ArrayList<>();
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 0, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(1), 1, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(2), 2, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 3, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(1), 4, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 5, null));
+    List<PrimaryKey> pkList1 = new ArrayList<>();
+    pkList1.add(getPrimaryKey(0));
+    pkList1.add(getPrimaryKey(1));
+    pkList1.add(getPrimaryKey(2));
+    pkList1.add(getPrimaryKey(0));
+    pkList1.add(getPrimaryKey(1));
+    pkList1.add(getPrimaryKey(0));
     ImmutableSegmentImpl segment1 = mockSegment(1);
     MockedStatic mocked = mockStatic(PartitionDedupMetadataManager.class);
-    mocked.when(() -> PartitionDedupMetadataManager.getRecordInfoIterator(any(), any()))
-        .thenReturn(recordInfoList1.iterator());
+    mocked.when(() -> PartitionDedupMetadataManager.getPrimaryKeyIterator(any(), any()))
+        .thenReturn(pkList1.iterator());
 
     partitionDedupMetadataManager.addSegment(segment1);
 
     // Remove another segment with same PK rows
-    recordInfoList1 = new ArrayList<>();
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 0, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(1), 1, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(2), 2, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 3, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(1), 4, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 5, null));
+    pkList1 = new ArrayList<>();
+    pkList1.add(getPrimaryKey(0));
+    pkList1.add(getPrimaryKey(1));
+    pkList1.add(getPrimaryKey(2));
+    pkList1.add(getPrimaryKey(0));
+    pkList1.add(getPrimaryKey(1));
+    pkList1.add(getPrimaryKey(0));
     ImmutableSegmentImpl segment2 = mockSegment(1);
 
     mocked.close();
     mocked = mockStatic(PartitionDedupMetadataManager.class);
-    mocked.when(() -> PartitionDedupMetadataManager.getRecordInfoIterator(any(), any()))
-        .thenReturn(recordInfoList1.iterator());
+    mocked.when(() -> PartitionDedupMetadataManager.getPrimaryKeyIterator(any(), any()))
+        .thenReturn(pkList1.iterator());
 
     partitionDedupMetadataManager.removeSegment(segment2);
     Assert.assertEquals(recordLocationMap.size(), 3);
@@ -153,20 +153,20 @@ public class PartitionDedupMetadataManagerTest {
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         new PartitionDedupMetadataManager(mock(HelixManager.class), REALTIME_TABLE_NAME, null, 0,
             mock(ServerMetrics.class), hashFunction);
-    Map<Object, IndexSegment> recordLocationMap = partitionDedupMetadataManager._primaryKeySet;
+    Map<Object, IndexSegment> recordLocationMap = partitionDedupMetadataManager._primaryKeyToSegmentMap;
 
     // Add the first segment
-    List<RecordInfo> recordInfoList1 = new ArrayList<>();
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 0, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(1), 1, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(2), 2, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 3, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(1), 4, null));
-    recordInfoList1.add(new RecordInfo(getPrimaryKey(0), 5, null));
+    List<PrimaryKey> pkList1 = new ArrayList<>();
+    pkList1.add(getPrimaryKey(0));
+    pkList1.add(getPrimaryKey(1));
+    pkList1.add(getPrimaryKey(2));
+    pkList1.add(getPrimaryKey(0));
+    pkList1.add(getPrimaryKey(1));
+    pkList1.add(getPrimaryKey(0));
     ImmutableSegmentImpl segment1 = mockSegment(1);
     MockedStatic mocked = mockStatic(PartitionDedupMetadataManager.class);
-    mocked.when(() -> PartitionDedupMetadataManager.getRecordInfoIterator(any(), any()))
-        .thenReturn(recordInfoList1.iterator());
+    mocked.when(() -> PartitionDedupMetadataManager.getPrimaryKeyIterator(any(), any()))
+        .thenReturn(pkList1.iterator());
     partitionDedupMetadataManager.addSegment(segment1);
     mocked.close();
 
@@ -174,17 +174,17 @@ public class PartitionDedupMetadataManagerTest {
     RecordInfo recordInfo = mock(RecordInfo.class);
     when(recordInfo.getPrimaryKey()).thenReturn(getPrimaryKey(0));
     ImmutableSegmentImpl segment2 = mockSegment(2);
-    Assert.assertTrue(partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo, segment2));
+    Assert.assertTrue(partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo.getPrimaryKey(), segment2));
     checkRecordLocation(recordLocationMap, 0, segment1, hashFunction);
 
     // New PK
     when(recordInfo.getPrimaryKey()).thenReturn(getPrimaryKey(3));
-    Assert.assertFalse(partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo, segment2));
+    Assert.assertFalse(partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo.getPrimaryKey(), segment2));
     checkRecordLocation(recordLocationMap, 3, segment2, hashFunction);
 
     // Same PK as the one recently ingested
     when(recordInfo.getPrimaryKey()).thenReturn(getPrimaryKey(3));
-    Assert.assertTrue(partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo, segment2));
+    Assert.assertTrue(partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo.getPrimaryKey(), segment2));
   }
 
   private static ImmutableSegmentImpl mockSegment(int sequenceNumber) {

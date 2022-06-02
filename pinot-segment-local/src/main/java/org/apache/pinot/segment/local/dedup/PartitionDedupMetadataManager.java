@@ -29,8 +29,7 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
-import org.apache.pinot.segment.local.utils.RecordInfo;
-import org.apache.pinot.segment.local.utils.tablestate.TableState;
+import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -41,6 +40,7 @@ import org.slf4j.LoggerFactory;
 
 public class PartitionDedupMetadataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionDedupMetadataManager.class);
+  private static boolean _allSegmentsLoaded;
 
   private final HelixManager _helixManager;
   private final String _tableNameWithType;
@@ -48,11 +48,9 @@ public class PartitionDedupMetadataManager {
   private final int _partitionId;
   private final ServerMetrics _serverMetrics;
   private final HashFunction _hashFunction;
-  private boolean _allSegmentsLoaded;
 
-  // TODO(saurabh) : We can replace this with a ocncurrent Set
   @VisibleForTesting
-  final ConcurrentHashMap<Object, IndexSegment> _primaryKeySet = new ConcurrentHashMap<>();
+  final ConcurrentHashMap<Object, IndexSegment> _primaryKeyToSegmentMap = new ConcurrentHashMap<>();
 
   public PartitionDedupMetadataManager(HelixManager helixManager, String tableNameWithType,
       List<String> primaryKeyColumns, int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction) {
@@ -65,22 +63,22 @@ public class PartitionDedupMetadataManager {
   }
 
   public void addSegment(IndexSegment segment) {
-    // Add all PKs to _primaryKeySet
-    Iterator<RecordInfo> recordInfoIterator = getRecordInfoIterator(segment, _primaryKeyColumns);
-    while (recordInfoIterator.hasNext()) {
-      RecordInfo recordInfo = recordInfoIterator.next();
-      _primaryKeySet.put(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), segment);
+    // Add all PKs to _primaryKeyToSegmentMap
+    Iterator<PrimaryKey> primaryKeyIterator = getPrimaryKeyIterator(segment, _primaryKeyColumns);
+    while (primaryKeyIterator.hasNext()) {
+      PrimaryKey pk = primaryKeyIterator.next();
+      _primaryKeyToSegmentMap.put(HashUtils.hashPrimaryKey(pk, _hashFunction), segment);
     }
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-        _primaryKeySet.size());
+        _primaryKeyToSegmentMap.size());
   }
 
   public void removeSegment(IndexSegment segment) {
     // TODO(saurabh): Explain reload scenario here
-    Iterator<RecordInfo> recordInfoIterator = getRecordInfoIterator(segment, _primaryKeyColumns);
-    while (recordInfoIterator.hasNext()) {
-      RecordInfo recordInfo = recordInfoIterator.next();
-      _primaryKeySet.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
+    Iterator<PrimaryKey> primaryKeyIterator = getPrimaryKeyIterator(segment, _primaryKeyColumns);
+    while (primaryKeyIterator.hasNext()) {
+      PrimaryKey pk = primaryKeyIterator.next();
+      _primaryKeyToSegmentMap.compute(HashUtils.hashPrimaryKey(pk, _hashFunction),
           (primaryKey, currentSegment) -> {
             if (currentSegment == segment) {
               return null;
@@ -90,18 +88,18 @@ public class PartitionDedupMetadataManager {
           });
     }
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-        _primaryKeySet.size());
+        _primaryKeyToSegmentMap.size());
   }
 
   @VisibleForTesting
-  public static Iterator<RecordInfo> getRecordInfoIterator(IndexSegment segment, List<String> primaryKeyColumns) {
+  public static Iterator<PrimaryKey> getPrimaryKeyIterator(IndexSegment segment, List<String> primaryKeyColumns) {
     Map<String, PinotSegmentColumnReader> columnToReaderMap = new HashMap<>();
     for (String primaryKeyColumn : primaryKeyColumns) {
       columnToReaderMap.put(primaryKeyColumn, new PinotSegmentColumnReader(segment, primaryKeyColumn));
     }
     int numTotalDocs = segment.getSegmentMetadata().getTotalDocs();
     int numPrimaryKeyColumns = primaryKeyColumns.size();
-    return new Iterator<RecordInfo>() {
+    return new Iterator<PrimaryKey>() {
       private int _docId = 0;
 
       @Override
@@ -110,7 +108,7 @@ public class PartitionDedupMetadataManager {
       }
 
       @Override
-      public RecordInfo next() {
+      public PrimaryKey next() {
         Object[] values = new Object[numPrimaryKeyColumns];
         for (int i = 0; i < numPrimaryKeyColumns; i++) {
           Object value = columnToReaderMap.get(primaryKeyColumns.get(i)).getValue(_docId);
@@ -119,14 +117,18 @@ public class PartitionDedupMetadataManager {
           }
           values[i] = value;
         }
-        PrimaryKey primaryKey = new PrimaryKey(values);
-        return new RecordInfo(primaryKey, _docId++, null);
+        _docId++;
+        return new PrimaryKey(values);
       }
     };
   }
 
   private synchronized void waitTillAllSegmentsLoaded() {
-    while (!TableState.isAllSegmentsLoaded(_helixManager, _tableNameWithType)) {
+    if (_allSegmentsLoaded) {
+      return;
+    }
+
+    while (!TableStateUtils.isAllSegmentsLoaded(_helixManager, _tableNameWithType)) {
       LOGGER.info("Sleeping 1 second waiting for all segments loaded for partial-upsert table: {}", _tableNameWithType);
       try {
         //noinspection BusyWait
@@ -138,16 +140,16 @@ public class PartitionDedupMetadataManager {
     _allSegmentsLoaded = true;
   }
 
-  public boolean checkRecordPresentOrUpdate(RecordInfo recordInfo, IndexSegment indexSegment) {
+  public boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) {
     if (!_allSegmentsLoaded) {
       waitTillAllSegmentsLoaded();
     }
 
     boolean result =
-        (_primaryKeySet.putIfAbsent(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), indexSegment)
+        (_primaryKeyToSegmentMap.putIfAbsent(HashUtils.hashPrimaryKey(pk, _hashFunction), indexSegment)
             != null);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-        _primaryKeySet.size());
+        _primaryKeyToSegmentMap.size());
 
     return result;
   }

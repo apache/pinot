@@ -29,10 +29,10 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TableState {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TableState.class);
+public class TableStateUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableStateUtils.class);
 
-  private TableState() {
+  private TableStateUtils() {
   }
 
   public static boolean isAllSegmentsLoaded(HelixManager helixManager, String tableNameWithType) {

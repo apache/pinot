@@ -23,7 +23,7 @@ import java.util.Map;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMergerFactory;
-import org.apache.pinot.segment.local.utils.tablestate.TableState;
+import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -64,7 +64,7 @@ public class PartialUpsertHandler {
     if (_allSegmentsLoaded) {
       return true;
     }
-    _allSegmentsLoaded = TableState.isAllSegmentsLoaded(_helixManager, _tableNameWithType);
+    _allSegmentsLoaded = TableStateUtils.isAllSegmentsLoaded(_helixManager, _tableNameWithType);
     return _allSegmentsLoaded;
   }
 
