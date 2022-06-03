@@ -116,9 +116,10 @@ public class SqlQueryExecutor {
   }
 
   private MinionClient getMinionClient() {
+    // NOTE: using null auth provider here as auth headers injected by caller in "executeDMLStatement()"
     if (_helixManager != null) {
-      return new MinionClient(getControllerBaseUrl(_helixManager));
+      return new MinionClient(getControllerBaseUrl(_helixManager), null);
     }
-    return new MinionClient(_controllerUrl);
+    return new MinionClient(_controllerUrl, null);
   }
 }

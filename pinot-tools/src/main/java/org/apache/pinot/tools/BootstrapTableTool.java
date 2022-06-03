@@ -68,7 +68,8 @@ public class BootstrapTableTool {
     _controllerHost = controllerHost;
     _controllerPort = controllerPort;
     _tableDir = tableDir;
-    _minionClient = new MinionClient(controllerHost, String.valueOf(controllerPort));
+    _minionClient = new MinionClient(String.format("%s://%s:%s", controllerProtocol, controllerHost, controllerPort),
+        authProvider);
     _authProvider = authProvider;
   }
 
