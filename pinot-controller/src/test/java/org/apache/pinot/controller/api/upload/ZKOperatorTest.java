@@ -131,11 +131,11 @@ public class ZKOperatorTest {
     return segmentTar;
   }
 
-  private void checkSegmentZkMetadata() {
-    SegmentZKMetadata segmentZKMetadata = _resourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
+  private void checkSegmentZkMetadata(String segmentName, long crc, long creationTime) {
+    SegmentZKMetadata segmentZKMetadata = _resourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, segmentName);
     assertNotNull(segmentZKMetadata);
-    assertEquals(segmentZKMetadata.getCrc(), 12345L);
-    assertEquals(segmentZKMetadata.getCreationTime(), 123L);
+    assertEquals(segmentZKMetadata.getCrc(), crc);
+    assertEquals(segmentZKMetadata.getCreationTime(), creationTime);
     long pushTime = segmentZKMetadata.getPushTime();
     assertTrue(pushTime > 0);
     assertEquals(segmentZKMetadata.getRefreshTime(), Long.MIN_VALUE);
@@ -148,11 +148,12 @@ public class ZKOperatorTest {
   @Test
   public void testMetadataUploadType()
       throws Exception {
+    String segmentName = "metadataTest";
     FileUtils.deleteQuietly(TEMP_DIR);
     ZKOperator zkOperator = new ZKOperator(_resourceManager, mock(ControllerConf.class), mock(ControllerMetrics.class));
 
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
+    when(segmentMetadata.getName()).thenReturn(segmentName);
     when(segmentMetadata.getCrc()).thenReturn("12345");
     when(segmentMetadata.getIndexCreationTime()).thenReturn(123L);
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
@@ -162,19 +163,19 @@ public class ZKOperatorTest {
     File segmentFile = new File("metadataOnly");
 
     // with finalSegmentLocation not null
-    File finalSegmentLocation = new File(DATA_DIR, SEGMENT_NAME);
+    File finalSegmentLocation = new File(DATA_DIR, segmentName);
     Assert.assertFalse(finalSegmentLocation.exists());
     zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, FileUploadType.METADATA,
         finalSegmentLocation.toURI(), segmentFile, sourceDownloadURIStr, "downloadUrl", "crypter", 10, true, true,
         httpHeaders);
     Assert.assertTrue(finalSegmentLocation.exists());
     Assert.assertTrue(segmentTar.exists());
-    checkSegmentZkMetadata();
+    checkSegmentZkMetadata(segmentName, 12345L, 123L);
 
-    _resourceManager.deleteSegment(OFFLINE_TABLE_NAME, SEGMENT_NAME);
+    _resourceManager.deleteSegment(OFFLINE_TABLE_NAME, segmentName);
     // Wait for the segment Zk entry to be deleted.
     TestUtils.waitForCondition(aVoid -> {
-      SegmentZKMetadata segmentZKMetadata = _resourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
+      SegmentZKMetadata segmentZKMetadata = _resourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, segmentName);
       return segmentZKMetadata == null;
     }, 30_000L, "Failed to delete segmentZkMetadata.");
 
@@ -184,7 +185,7 @@ public class ZKOperatorTest {
         segmentFile, sourceDownloadURIStr, "downloadUrl", "crypter", 10, true, true, httpHeaders);
     Assert.assertFalse(finalSegmentLocation.exists());
     Assert.assertTrue(segmentTar.exists());
-    checkSegmentZkMetadata();
+    checkSegmentZkMetadata(segmentName, 12345L, 123L);
   }
 
   @Test
