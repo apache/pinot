@@ -24,6 +24,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.core.minion.SegmentPurger;
+import org.apache.pinot.spi.auth.AuthProvider;
 
 
 /**
@@ -45,7 +46,7 @@ public class MinionContext {
 
   // For segment upload
   private SSLContext _sslContext;
-  private String _taskAuthToken;
+  private AuthProvider _taskAuthProvider;
 
   // For PurgeTask
   private SegmentPurger.RecordPurgerFactory _recordPurgerFactory;
@@ -99,11 +100,11 @@ public class MinionContext {
     _recordModifierFactory = recordModifierFactory;
   }
 
-  public String getTaskAuthToken() {
-    return _taskAuthToken;
+  public AuthProvider getTaskAuthProvider() {
+    return _taskAuthProvider;
   }
 
-  public void setTaskAuthToken(String taskAuthToken) {
-    _taskAuthToken = taskAuthToken;
+  public void setTaskAuthProvider(AuthProvider taskAuthProvider) {
+    _taskAuthProvider = taskAuthProvider;
   }
 }
