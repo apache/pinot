@@ -41,7 +41,9 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
 import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.MultiStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.Utils;
@@ -251,24 +253,38 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
     NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
 
-    if (_brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE)
-        .equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
-      LOGGER.info("Starting Grpc BrokerRequestHandler.");
-      _brokerRequestHandler =
+    // Create Broker request handler.
+    String brokerRequestHandlerType =
+        _brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE);
+    BrokerRequestHandler singleStageBrokerRequestHandler = null;
+    if (brokerRequestHandlerType.equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
+      singleStageBrokerRequestHandler =
           new GrpcBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
               tableCache, _brokerMetrics, null);
     } else { // default request handler type, e.g. netty
-      LOGGER.info("Starting Netty BrokerRequestHandler.");
       if (_brokerConf.getProperty(Broker.BROKER_NETTYTLS_ENABLED, false)) {
-        _brokerRequestHandler =
+        singleStageBrokerRequestHandler =
             new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
                 queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, tlsDefaults);
       } else {
-        _brokerRequestHandler =
+        singleStageBrokerRequestHandler =
             new SingleConnectionBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory,
                 queryQuotaManager, tableCache, _brokerMetrics, nettyDefaults, null);
       }
     }
+
+    MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
+    if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
+      // multi-stage request handler uses both Netty and GRPC ports.
+      // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.
+      // TODO: decouple protocol and engine selection.
+      multiStageBrokerRequestHandler =
+          new MultiStageBrokerRequestHandler(_brokerConf, _routingManager, _accessControlFactory, queryQuotaManager,
+              tableCache, _brokerMetrics);
+    }
+
+    _brokerRequestHandler = new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler,
+        multiStageBrokerRequestHandler);
     _brokerRequestHandler.start();
     String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
     if (controllerUrl != null) {

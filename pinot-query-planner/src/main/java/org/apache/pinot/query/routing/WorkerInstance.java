@@ -36,16 +36,21 @@ public class WorkerInstance extends ServerInstance {
     super(instanceConfig);
   }
 
-  public WorkerInstance(String hostname, int serverPort, int mailboxPort) {
-    super(toInstanceConfig(hostname, serverPort, mailboxPort));
+  public WorkerInstance(String hostname, int nettyPort, int grpcPort, int servicePort, int mailboxPort) {
+    super(toInstanceConfig(hostname, nettyPort, grpcPort, servicePort, mailboxPort));
   }
 
-  private static InstanceConfig toInstanceConfig(String hostname, int serverPort, int mailboxPort) {
-    String server = String.format("%s%s_%d", CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE, hostname, serverPort);
+  private static InstanceConfig toInstanceConfig(String hostname, int nettyPort, int grpcPort, int servicePort,
+      int mailboxPort) {
+    String server = String.format("%s%s_%d", CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE, hostname, nettyPort);
     InstanceConfig instanceConfig = InstanceConfig.toInstanceConfig(server);
     ZNRecord znRecord = instanceConfig.getRecord();
     Map<String, String> simpleFields = znRecord.getSimpleFields();
-    simpleFields.put(CommonConstants.Helix.Instance.GRPC_PORT_KEY, String.valueOf(mailboxPort));
+    simpleFields.put(CommonConstants.Helix.Instance.GRPC_PORT_KEY, String.valueOf(grpcPort));
+    simpleFields.put(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY,
+        String.valueOf(servicePort));
+    simpleFields.put(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
+        String.valueOf(mailboxPort));
     return instanceConfig;
   }
 }

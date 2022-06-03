@@ -228,7 +228,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     String brokerToUntag = taggedBrokers.remove(ThreadLocalRandom.current().nextInt(3));
     Instance instance =
         new Instance("localhost", brokerToUntag.charAt(brokerToUntag.length() - 1) - '0', InstanceType.BROKER,
-            Collections.singletonList(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE), null, 0, 0, false);
+            Collections.singletonList(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE), null, 0, 0, 0, 0, false);
     assertTrue(_helixResourceManager.updateInstance(brokerToUntag, instance, true).isSuccessful());
     untaggedBrokers.add(brokerToUntag);
     checkBrokerResource(taggedBrokers);
@@ -241,7 +241,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Add a new broker instance
     Instance newBrokerInstance =
-        new Instance("localhost", 5, InstanceType.BROKER, Collections.singletonList(brokerTag), null, 0, 0, false);
+        new Instance("localhost", 5, InstanceType.BROKER, Collections.singletonList(brokerTag), null, 0, 0, 0, 0,
+            false);
     assertTrue(_helixResourceManager.addInstance(newBrokerInstance, true).isSuccessful());
     String newBrokerId = InstanceUtils.getHelixInstanceId(newBrokerInstance);
     taggedBrokers.add(newBrokerId);

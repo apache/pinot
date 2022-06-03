@@ -39,7 +39,7 @@ public class InstanceUtilsTest {
 
   @Test
   public void testToHelixInstanceConfig() {
-    Instance instance = new Instance("localhost", 1234, InstanceType.CONTROLLER, null, null, 0, 0, false);
+    Instance instance = new Instance("localhost", 1234, InstanceType.CONTROLLER, null, null, 0, 0, 0, 0, false);
     InstanceConfig instanceConfig = InstanceUtils.toHelixInstanceConfig(instance);
     assertEquals(instanceConfig.getInstanceName(), "Controller_localhost_1234");
     assertTrue(instanceConfig.getInstanceEnabled());
@@ -50,10 +50,12 @@ public class InstanceUtilsTest {
     assertNull(znRecord.getMapField(InstanceUtils.POOL_KEY));
     assertNull(znRecord.getSimpleField(CommonConstants.Helix.Instance.GRPC_PORT_KEY));
     assertNull(znRecord.getSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY));
+    assertNull(znRecord.getSimpleField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY));
+    assertNull(znRecord.getSimpleField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY));
     assertNull(znRecord.getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
 
     List<String> tags = Collections.singletonList("DefaultTenant_BROKER");
-    instance = new Instance("localhost", 2345, InstanceType.BROKER, tags, null, 0, 0, false);
+    instance = new Instance("localhost", 2345, InstanceType.BROKER, tags, null, 0, 0, 0, 0, false);
     instanceConfig = InstanceUtils.toHelixInstanceConfig(instance);
     assertEquals(instanceConfig.getInstanceName(), "Broker_localhost_2345");
     assertTrue(instanceConfig.getInstanceEnabled());
@@ -64,13 +66,15 @@ public class InstanceUtilsTest {
     assertNull(znRecord.getMapField(InstanceUtils.POOL_KEY));
     assertNull(znRecord.getSimpleField(CommonConstants.Helix.Instance.GRPC_PORT_KEY));
     assertNull(znRecord.getSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY));
+    assertNull(znRecord.getSimpleField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY));
+    assertNull(znRecord.getSimpleField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY));
     assertNull(znRecord.getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
 
     tags = Arrays.asList("T1_OFFLINE", "T2_REALTIME");
     Map<String, Integer> poolMap = new TreeMap<>();
     poolMap.put("T1_OFFLINE", 0);
     poolMap.put("T2_REALTIME", 1);
-    instance = new Instance("localhost", 3456, InstanceType.SERVER, tags, poolMap, 123, 234, true);
+    instance = new Instance("localhost", 3456, InstanceType.SERVER, tags, poolMap, 123, 234, 345, 456, true);
     instanceConfig = InstanceUtils.toHelixInstanceConfig(instance);
     assertEquals(instanceConfig.getInstanceName(), "Server_localhost_3456");
     assertTrue(instanceConfig.getInstanceEnabled());
@@ -84,10 +88,14 @@ public class InstanceUtilsTest {
     assertEquals(znRecord.getMapField(InstanceUtils.POOL_KEY), expectedPoolMap);
     assertEquals(znRecord.getSimpleField(CommonConstants.Helix.Instance.GRPC_PORT_KEY), "123");
     assertEquals(znRecord.getSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY), "234");
+    assertEquals(znRecord.getSimpleField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY),
+        "345");
+    assertEquals(znRecord.getSimpleField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY),
+        "456");
     assertEquals(znRecord.getSimpleField(CommonConstants.Helix.QUERIES_DISABLED), "true");
 
     tags = Collections.singletonList("minion_untagged");
-    instance = new Instance("localhost", 4567, InstanceType.MINION, tags, null, 0, 0, false);
+    instance = new Instance("localhost", 4567, InstanceType.MINION, tags, null, 0, 0, 0, 0, false);
     instanceConfig = InstanceUtils.toHelixInstanceConfig(instance);
     assertEquals(instanceConfig.getInstanceName(), "Minion_localhost_4567");
     assertTrue(instanceConfig.getInstanceEnabled());
@@ -98,6 +106,8 @@ public class InstanceUtilsTest {
     assertNull(znRecord.getMapField(InstanceUtils.POOL_KEY));
     assertNull(znRecord.getSimpleField(CommonConstants.Helix.Instance.GRPC_PORT_KEY));
     assertNull(znRecord.getSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY));
+    assertNull(znRecord.getSimpleField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY));
+    assertNull(znRecord.getSimpleField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY));
     assertNull(znRecord.getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
   }
 
@@ -105,7 +115,7 @@ public class InstanceUtilsTest {
   public void testUpdateHelixInstanceConfig() {
     Instance instance =
         new Instance("localhost", 1234, InstanceType.SERVER, Collections.singletonList("DefaultTenant_OFFLINE"), null,
-            0, 123, false);
+            0, 123, 234, 345, false);
     InstanceConfig instanceConfig = InstanceUtils.toHelixInstanceConfig(instance);
 
     // Put some custom fields, which should not be updated
@@ -120,7 +130,7 @@ public class InstanceUtilsTest {
     Map<String, Integer> poolMap = new TreeMap<>();
     poolMap.put("T1_OFFLINE", 0);
     poolMap.put("T2_REALTIME", 1);
-    instance = new Instance("myHost", 2345, InstanceType.SERVER, tags, poolMap, 123, 234, true);
+    instance = new Instance("myHost", 2345, InstanceType.SERVER, tags, poolMap, 123, 234, 345, 456, true);
     InstanceUtils.updateHelixInstanceConfig(instanceConfig, instance);
 
     // Instance name should not change
@@ -136,6 +146,10 @@ public class InstanceUtilsTest {
     assertEquals(znRecord.getMapField(InstanceUtils.POOL_KEY), expectedPoolMap);
     assertEquals(znRecord.getSimpleField(CommonConstants.Helix.Instance.GRPC_PORT_KEY), "123");
     assertEquals(znRecord.getSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY), "234");
+    assertEquals(znRecord.getSimpleField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY),
+        "345");
+    assertEquals(znRecord.getSimpleField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY),
+        "456");
     assertEquals(znRecord.getSimpleField(CommonConstants.Helix.QUERIES_DISABLED), "true");
 
     // Custom fields should be preserved

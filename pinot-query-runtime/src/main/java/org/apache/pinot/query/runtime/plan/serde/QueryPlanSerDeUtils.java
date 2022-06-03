@@ -59,12 +59,15 @@ public class QueryPlanSerDeUtils {
 
   public static ServerInstance stringToInstance(String serverInstanceString) {
     String[] s = StringUtils.split(serverInstanceString, '_');
-    return new WorkerInstance(s[0], Integer.parseInt(s[1]), Integer.parseInt(s[2]));
+    // Skipped netty and grpc port as they are not used in worker instance.
+    return new WorkerInstance(s[0], Integer.parseInt(s[1]), Integer.parseInt(s[2]), Integer.parseInt(s[3]),
+        Integer.parseInt(s[4]));
   }
 
   public static String instanceToString(ServerInstance serverInstance) {
     return StringUtils.join(serverInstance.getHostname(), '_', serverInstance.getPort(), '_',
-        serverInstance.getGrpcPort());
+        serverInstance.getGrpcPort(), '_', serverInstance.getQueryServicePort(), '_',
+        serverInstance.getQueryMailboxPort());
   }
 
   public static Map<Integer, StageMetadata> protoMapToStageMetadataMap(Map<Integer, Worker.StageMetadata> protoMap) {
