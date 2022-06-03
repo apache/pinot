@@ -248,7 +248,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadAllSegments(String tableNameWithType, boolean forceDownload,
+  public void reloadAllSegments(String taskId, String tableNameWithType, boolean forceDownload,
       SegmentRefreshSemaphore segmentRefreshSemaphore)
       throws Exception {
     LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
@@ -258,6 +258,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
     List<String> failedSegments = new ArrayList<>();
     List<SegmentMetadata> segmentsMetadata = getAllSegmentsMetadata(tableNameWithType);
+    SegmentReloadTaskStatusCache.addTask(taskId, segmentsMetadata.size());
     ExecutorService workers = Executors.newCachedThreadPool();
     final AtomicReference<Exception> sampleException = new AtomicReference<>();
     //calling thread hasn't acquired any permit so we don't reload any segments using it.
@@ -267,6 +268,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         segmentRefreshSemaphore.acquireSema(segmentMetadata.getName(), LOGGER);
         try {
           reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
+          SegmentReloadTaskStatusCache.incrementSuccess(taskId);
         } finally {
           segmentRefreshSemaphore.releaseSema();
         }

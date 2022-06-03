@@ -103,7 +103,7 @@ public interface InstanceDataManager {
    * Reloads all segments of a table.
    * @param segmentRefreshSemaphore semaphore to control concurrent segment reloads/refresh
    */
-  void reloadAllSegments(String tableNameWithType, boolean forceDownload,
+  void reloadAllSegments(String taskId, String tableNameWithType, boolean forceDownload,
       SegmentRefreshSemaphore segmentRefreshSemaphore)
       throws Exception;
 
