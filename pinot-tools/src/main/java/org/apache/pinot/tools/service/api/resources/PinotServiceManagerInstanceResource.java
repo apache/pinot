@@ -93,8 +93,8 @@ public class PinotServiceManagerInstanceResource {
   @Path("/instances/{instanceName}")
   @ApiOperation(value = "Get Pinot Instance Status")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Instance Status"), @ApiResponse(code = 404, message = "Instance Not Found")
-      , @ApiResponse(code = 500, message = "Internal server error")
+      @ApiResponse(code = 200, message = "Instance Status"), @ApiResponse(code = 404, message = "Instance Not Found"),
+      @ApiResponse(code = 500, message = "Internal server error")
   })
   public PinotInstanceStatus getPinotInstanceStatus(
       @ApiParam(value = "Name of the instance") @PathParam("instanceName") String instanceName) {
