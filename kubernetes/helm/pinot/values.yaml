@@ -441,6 +441,16 @@ zookeeper:
   ## Replicas
   replicaCount: 1
 
+  ## Ongoing data directory cleanup configuration
+  autopurge:
+
+    ## The time interval (in hours) for which the purge task has to be triggered
+    ## Set to a positive integer to enable the auto purging
+    purgeInterval: 1
+
+    ## The most recent snapshots amount (and corresponding transaction logs) to retain
+    snapRetainCount: 5
+
   ## Environmental variables to set in Zookeeper
   env:
     ## The JVM heap size to allocate to Zookeeper
