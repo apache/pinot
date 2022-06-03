@@ -939,7 +939,8 @@ public class InstanceAssignmentTest {
               new InstanceAssignmentConfig(tagPoolConfig, null, replicaPartitionConfig, "ILLEGAL_SELECTOR"))).build();
     } catch (IllegalArgumentException e) {
       assertEquals(e.getMessage(),
-          "No enum constant org.apache.pinot.spi.config.table.assignment.Constants.PartitionSelector.ILLEGAL_SELECTOR");
+          "No enum constant org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig.PartitionSelector"
+              + ".ILLEGAL_SELECTOR");
     }
 
     // The total num instances cannot be assigned evenly to replica groups
