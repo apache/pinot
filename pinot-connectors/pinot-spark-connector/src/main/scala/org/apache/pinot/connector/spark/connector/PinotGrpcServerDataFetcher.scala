@@ -25,7 +25,6 @@ import org.apache.pinot.common.utils.DataTable
 import org.apache.pinot.connector.spark.exceptions.PinotException
 import org.apache.pinot.connector.spark.utils.Logging
 import org.apache.pinot.core.common.datatable.DataTableFactory
-import org.apache.pinot.spi.config.table.TableType
 
 import scala.collection.JavaConverters._
 
@@ -47,14 +46,7 @@ private[pinot] class PinotGrpcServerDataFetcher(pinotSplit: PinotSplit)
     val request = ServerRequest.newBuilder()
       .putMetadata("enableStreaming", "true")
       .addAllSegments(pinotSplit.serverAndSegments.segments.asJava)
-      .setSql(
-        pinotSplit.serverAndSegments.serverType match {
-          case TableType.OFFLINE =>
-            pinotSplit.generatedSQLs.offlineSelectQuery
-          case TableType.REALTIME =>
-            pinotSplit.generatedSQLs.realtimeSelectQuery
-        }
-      )
+      .setSql(pinotSplit.generatedSQLs.offlineSelectQuery)
       .build()
     val serverResponse = pinotServerBlockingStub.submit(request)
     logInfo(s"Pinot server total response time in millis: ${System.nanoTime() - requestStartTime}")
@@ -63,7 +55,7 @@ private[pinot] class PinotGrpcServerDataFetcher(pinotSplit: PinotSplit)
       val dataTables = (for {
         serverResponse <- serverResponse.asScala.toList
         if serverResponse.getMetadataMap.get("responseType") == "data"
-      } yield DataTableFactory.getDataTable(serverResponse.getPayload.toByteArray))
+      } yield DataTableFactory.getDataTable(serverResponse.getPayload().toByteArray))
         .filter(_.getNumberOfRows > 0)
 
       if (dataTables.isEmpty) {
