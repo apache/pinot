@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.service;
 
+import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.ArrayList;
 import java.util.List;
@@ -80,14 +81,15 @@ public class QueryDispatcher {
         List<ServerInstance> serverInstances = stage.getValue().getServerInstances();
         for (ServerInstance serverInstance : serverInstances) {
           String host = serverInstance.getHostname();
-          int port = serverInstance.getPort();
-          DispatchClient client = getOrCreateDispatchClient(host, port);
+          int servicePort = serverInstance.getQueryServicePort();
+          int mailboxPort = serverInstance.getQueryMailboxPort();
+          DispatchClient client = getOrCreateDispatchClient(host, servicePort);
           Worker.QueryResponse response = client.submit(Worker.QueryRequest.newBuilder()
               .setStagePlan(QueryPlanSerDeUtils.serialize(constructDistributedStagePlan(queryPlan, stageId,
                   serverInstance)))
               .putMetadata("REQUEST_ID", String.valueOf(requestId))
               .putMetadata("SERVER_INSTANCE_HOST", serverInstance.getHostname())
-              .putMetadata("SERVER_INSTANCE_PORT", String.valueOf(serverInstance.getGrpcPort())).build());
+              .putMetadata("SERVER_INSTANCE_PORT", String.valueOf(mailboxPort)).build());
           if (response.containsMetadata("ERROR")) {
             throw new RuntimeException(
                 String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s", stageId,
@@ -134,12 +136,21 @@ public class QueryDispatcher {
     return mailboxReceiveOperator;
   }
 
+  public void shutdown() {
+    for (DispatchClient dispatchClient : _dispatchClientMap.values()) {
+      dispatchClient._managedChannel.shutdown();
+    }
+    _dispatchClientMap.clear();
+  }
+
   public static class DispatchClient {
     private final PinotQueryWorkerGrpc.PinotQueryWorkerBlockingStub _blockingStub;
+    private final ManagedChannel _managedChannel;
 
     public DispatchClient(String host, int port) {
       ManagedChannelBuilder managedChannelBuilder = ManagedChannelBuilder.forAddress(host, port).usePlaintext();
-      _blockingStub = PinotQueryWorkerGrpc.newBlockingStub(managedChannelBuilder.build());
+      _managedChannel = managedChannelBuilder.build();
+      _blockingStub = PinotQueryWorkerGrpc.newBlockingStub(_managedChannel);
     }
 
     public Worker.QueryResponse submit(Worker.QueryRequest request) {

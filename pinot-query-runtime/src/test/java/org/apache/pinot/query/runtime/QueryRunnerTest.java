@@ -87,8 +87,10 @@ public class QueryRunnerTest {
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
     // this is only use for test identifier purpose.
-    _servers.put(new WorkerInstance("localhost", server1.getPort(), server1.getPort()), server1);
-    _servers.put(new WorkerInstance("localhost", server2.getPort(), server2.getPort()), server2);
+    int port1 = server1.getPort();
+    int port2 = server2.getPort();
+    _servers.put(new WorkerInstance("localhost", port1, port1, port1, port1), server1);
+    _servers.put(new WorkerInstance("localhost", port2, port2, port2, port2), server2);
   }
 
   @AfterClass

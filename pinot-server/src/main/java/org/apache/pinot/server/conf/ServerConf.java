@@ -96,6 +96,11 @@ public class ServerConf {
     return _serverConf.getProperty(Server.CONFIG_OF_GRPCTLS_SERVER_ENABLED, Server.DEFAULT_GRPCTLS_SERVER_ENABLED);
   }
 
+  public boolean isMultiStageServerEnabled() {
+    return _serverConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED,
+        Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED);
+  }
+
   public boolean isEnableSwagger() {
     return _serverConf.getProperty(CONFIG_OF_SWAGGER_SERVER_ENABLED, DEFAULT_SWAGGER_SERVER_ENABLED);
   }

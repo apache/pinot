@@ -72,6 +72,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics, NettyConfig nettyConfig, TlsConfig tlsConfig) {
     super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
+    LOGGER.info("Using Netty BrokerRequestHandler.");
 
     _brokerReduceService = new BrokerReduceService(_config);
     _queryRouter = new QueryRouter(_brokerId, brokerMetrics, nettyConfig, tlsConfig);
