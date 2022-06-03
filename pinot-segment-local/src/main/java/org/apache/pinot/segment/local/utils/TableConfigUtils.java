@@ -556,19 +556,24 @@ public final class TableConfigUtils {
         Preconditions.checkState(schema.hasColumn(comparisonCol), "The comparison column does not exist on schema");
       }
     }
-    Preconditions.checkState(isAggregateMetricsEnabled(tableConfig),
-            "Metrics aggregation and upsert cannot be enabled together");
+    validateAggregateMetricsForUpsertConfig(tableConfig);
   }
 
   /**
-   * Checks if Metrics aggregation is enabled.
+   * Validates metrics aggregation when upsert config is enabled
+   * - Metrics aggregation cannot be enabled when Upsert Config is enabled.
+   * - Aggregation cannot be enabled in the Ingestion Config and Indexing Config at the same time.
    */
-  @VisibleForTesting
-  static boolean isAggregateMetricsEnabled(TableConfig config) {
-    if(config.getIndexingConfig() == null || config.getIngestionConfig() == null) {
-      return false;
-    }
-    return config.getIndexingConfig().isAggregateMetrics() && CollectionUtils.isEmpty(config.getIngestionConfig().getAggregationConfigs());
+  private static void validateAggregateMetricsForUpsertConfig(TableConfig config) {
+    boolean isAggregateMetricsEnabledInIndexingConfig = config.getIndexingConfig().isAggregateMetrics();
+    boolean hasAggregationConfigs = config.getIngestionConfig() != null && CollectionUtils.isNotEmpty(
+        config.getIngestionConfig().getAggregationConfigs());
+    boolean bothAggregationConfigsEnabled = isAggregateMetricsEnabledInIndexingConfig && hasAggregationConfigs;
+    boolean anyOneAggregationConfigsEnabled = isAggregateMetricsEnabledInIndexingConfig || hasAggregationConfigs;
+    Preconditions.checkState(!bothAggregationConfigsEnabled,
+        "Metrics aggregation cannot be enabled in the Indexing Config and Ingestion Config at the same time");
+    Preconditions.checkState(!anyOneAggregationConfigsEnabled,
+        "Metrics aggregation and upsert cannot be enabled together");
   }
 
   /**
