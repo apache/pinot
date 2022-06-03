@@ -19,10 +19,14 @@
 package org.apache.pinot.broker.api.resources;
 
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import io.swagger.annotations.Authorization;
+import io.swagger.annotations.SecurityDefinition;
+import io.swagger.annotations.SwaggerDefinition;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -33,6 +37,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
@@ -43,8 +48,12 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_SWAGGER_AUTHORIZATION_VALUE;
 
-@Api(tags = "Debug")
+
+@Api(tags = "Debug", authorizations = {@Authorization(value = DEFAULT_SWAGGER_AUTHORIZATION_VALUE)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
+    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = "oauth")))
 @Path("/")
 // TODO: Add APIs to return the RoutingTable (with unavailable segments)
 public class PinotBrokerDebug {

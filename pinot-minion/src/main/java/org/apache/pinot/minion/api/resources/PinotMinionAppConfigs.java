@@ -19,22 +19,31 @@
 package org.apache.pinot.minion.api.resources;
 
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiKeyAuthDefinition;
+import io.swagger.annotations.Authorization;
+import io.swagger.annotations.SecurityDefinition;
+import io.swagger.annotations.SwaggerDefinition;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.minion.MinionAdminApiApplication;
 import org.apache.pinot.spi.env.PinotConfiguration;
+
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_SWAGGER_AUTHORIZATION_VALUE;
 
 
 /**
  * Resource for getting the app configs {@link PinotAppConfigs} for
  * Pinot Minion instance.
  */
-@Api(tags = "AppConfig")
+@Api(tags = "AppConfig", authorizations = {@Authorization(value = DEFAULT_SWAGGER_AUTHORIZATION_VALUE)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
+    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = "oauth")))
 @Path("/")
 public class PinotMinionAppConfigs {
   @Context
