@@ -19,10 +19,14 @@
 package org.apache.pinot.controller.api.resources;
 
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import io.swagger.annotations.Authorization;
+import io.swagger.annotations.SecurityDefinition;
+import io.swagger.annotations.SwaggerDefinition;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -36,8 +40,12 @@ import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_SWAGGER_AUTHORIZATION_VALUE;
 
-@Api(tags = "Auth")
+
+@Api(tags = "Auth", authorizations = {@Authorization(value = DEFAULT_SWAGGER_AUTHORIZATION_VALUE)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
+    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = "oauth")))
 @Path("/")
 public class PinotControllerAuthResource {
 

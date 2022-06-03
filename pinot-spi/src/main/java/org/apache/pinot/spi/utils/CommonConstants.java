@@ -41,6 +41,7 @@ public class CommonConstants {
   public static final String DEFAULT_METRICS_FACTORY_CLASS_NAME =
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
 
+  public static final String DEFAULT_SWAGGER_AUTHORIZATION_VALUE = "oauth";
   /**
    * The state of the consumer for a given segment
    */

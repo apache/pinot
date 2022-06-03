@@ -20,21 +20,30 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import io.swagger.annotations.Authorization;
+import io.swagger.annotations.SecurityDefinition;
+import io.swagger.annotations.SwaggerDefinition;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.utils.JsonUtils;
+
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_SWAGGER_AUTHORIZATION_VALUE;
 
 
 /**
  * API endpoint that returns the versions of Pinot components.
  */
-@Api(tags = Constants.VERSION_TAG)
+@Api(tags = Constants.VERSION_TAG, authorizations = {@Authorization(value = DEFAULT_SWAGGER_AUTHORIZATION_VALUE)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
+    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = "oauth")))
 @Path("/version")
 public class PinotVersionRestletResource {
 

@@ -19,15 +19,20 @@
 package org.apache.pinot.controller.api.resources;
 
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import io.swagger.annotations.Authorization;
+import io.swagger.annotations.SecurityDefinition;
+import io.swagger.annotations.SwaggerDefinition;
 import javax.inject.Inject;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -39,12 +44,15 @@ import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_SWAGGER_AUTHORIZATION_VALUE;
+
 
 @Path("/")
 @Api(tags = {
-    Constants.TABLE_TAG,
-    Constants.TENANT_TAG
-})
+    Constants.TABLE_TAG, Constants.TENANT_TAG
+}, authorizations = {@Authorization(value = DEFAULT_SWAGGER_AUTHORIZATION_VALUE)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
+    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = "oauth")))
 public class PinotTableTenantConfigs {
 
   @Inject
@@ -58,9 +66,9 @@ public class PinotTableTenantConfigs {
   @Path("/tables/{tableName}/rebuildBrokerResourceFromHelixTags")
   @ApiOperation(value = "Rebuild broker resource for table", notes = "when new brokers are added")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 400, message = "Bad request: table name has to be with table type"),
-      @ApiResponse(code = 500, message = "Internal error rebuilding broker resource or serializing response")
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Bad request: table name has "
+      + "to be with table type"), @ApiResponse(code = 500, message = "Internal error rebuilding broker resource or "
+      + "serializing response")
   })
   public SuccessResponse rebuildBrokerResource(
       @ApiParam(value = "Table name (with type)", required = true) @PathParam("tableName") String tableNameWithType) {

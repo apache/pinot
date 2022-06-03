@@ -22,6 +22,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import io.swagger.annotations.Authorization;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.GET;
@@ -37,8 +38,10 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_SWAGGER_AUTHORIZATION_VALUE;
 
-@Api(tags = Constants.HEALTH_TAG)
+
+@Api(tags = Constants.HEALTH_TAG, authorizations = {@Authorization(value = DEFAULT_SWAGGER_AUTHORIZATION_VALUE)})
 @Path("/")
 public class PinotControllerHealthCheck {
 
