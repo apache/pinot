@@ -30,8 +30,10 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -50,17 +52,11 @@ public class MinionClient {
   private static final String HTTP = "http";
 
   private final String _controllerUrl;
+  private final AuthProvider _authProvider;
 
-  public MinionClient(String controllerHost, String controllerPort) {
-    this(HTTP, controllerHost, controllerPort);
-  }
-
-  public MinionClient(String scheme, String controllerHost, String controllerPort) {
-    this(String.format("%s://%s:%s", scheme, controllerHost, controllerPort));
-  }
-
-  public MinionClient(String controllerUrl) {
+  public MinionClient(String controllerUrl, AuthProvider authProvider) {
     _controllerUrl = controllerUrl;
+    _authProvider = authProvider;
   }
 
   public String getControllerUrl() {
@@ -70,7 +66,7 @@ public class MinionClient {
   public Map<String, String> scheduleMinionTasks(@Nullable String taskType, @Nullable String tableNameWithType)
       throws IOException {
     HttpPost httpPost = createHttpPostRequest(
-        MinionRequestURLBuilder.baseUrl(getControllerUrl()).forTaskSchedule(taskType, tableNameWithType));
+        MinionRequestURLBuilder.baseUrl(_controllerUrl).forTaskSchedule(taskType, tableNameWithType));
     HttpResponse response = HTTP_CLIENT.execute(httpPost);
     int statusCode = response.getStatusLine().getStatusCode();
     final String responseString = IOUtils.toString(response.getEntity().getContent());
@@ -85,7 +81,7 @@ public class MinionClient {
   public Map<String, String> getTasksStates(String taskType)
       throws IOException {
     HttpGet httpGet =
-        createHttpGetRequest(MinionRequestURLBuilder.baseUrl(getControllerUrl()).forTasksStates(taskType));
+        createHttpGetRequest(MinionRequestURLBuilder.baseUrl(_controllerUrl).forTasksStates(taskType));
     HttpResponse response = HTTP_CLIENT.execute(httpGet);
     int statusCode = response.getStatusLine().getStatusCode();
     final String responseString = IOUtils.toString(response.getEntity().getContent());
@@ -99,7 +95,7 @@ public class MinionClient {
 
   public String getTaskState(String taskName)
       throws IOException {
-    HttpGet httpGet = createHttpGetRequest(MinionRequestURLBuilder.baseUrl(getControllerUrl()).forTaskState(taskName));
+    HttpGet httpGet = createHttpGetRequest(MinionRequestURLBuilder.baseUrl(_controllerUrl).forTaskState(taskName));
     HttpResponse response = HTTP_CLIENT.execute(httpGet);
     int statusCode = response.getStatusLine().getStatusCode();
     String responseString = IOUtils.toString(response.getEntity().getContent());
@@ -113,7 +109,7 @@ public class MinionClient {
 
   public Map<String, String> executeTask(AdhocTaskConfig adhocTaskConfig, @Nullable Map<String, String> headers)
       throws IOException {
-    HttpPost httpPost = createHttpPostRequest(MinionRequestURLBuilder.baseUrl(getControllerUrl()).forTaskExecute());
+    HttpPost httpPost = createHttpPostRequest(MinionRequestURLBuilder.baseUrl(_controllerUrl).forTaskExecute());
     httpPost.setEntity(new StringEntity(adhocTaskConfig.toJsonString()));
     if (headers != null) {
       headers.remove("content-length");
@@ -133,12 +129,14 @@ public class MinionClient {
   private HttpGet createHttpGetRequest(String uri) {
     HttpGet httpGet = new HttpGet(uri);
     httpGet.setHeader(ACCEPT, APPLICATION_JSON);
+    AuthProviderUtils.toRequestHeaders(_authProvider).forEach(httpGet::setHeader);
     return httpGet;
   }
 
   private HttpPost createHttpPostRequest(String uri) {
     HttpPost httpPost = new HttpPost(uri);
     httpPost.setHeader(ACCEPT, APPLICATION_JSON);
+    AuthProviderUtils.toRequestHeaders(_authProvider).forEach(httpPost::setHeader);
     return httpPost;
   }
 }
