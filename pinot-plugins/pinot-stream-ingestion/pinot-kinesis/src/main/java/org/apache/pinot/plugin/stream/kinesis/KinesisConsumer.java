@@ -159,23 +159,23 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
       return new KinesisRecordsBatch(recordList, startShardToSequenceNum.getKey(), isEndOfShard);
     } catch (IllegalStateException e) {
-      debugAndLogWarning("Illegal state exception, connection is broken", e);
+      debugOrLogWarning("Illegal state exception, connection is broken", e);
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (ProvisionedThroughputExceededException e) {
-      debugAndLogWarning("The request rate for the stream is too high", e);
+      debugOrLogWarning("The request rate for the stream is too high", e);
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (ExpiredIteratorException e) {
-      debugAndLogWarning("ShardIterator expired while trying to fetch records", e);
+      debugOrLogWarning("ShardIterator expired while trying to fetch records", e);
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (ResourceNotFoundException | InvalidArgumentException e) {
       // aws errors
-      LOGGER.error("Encountered AWS error while attempting to fetch records: {}", e.getMessage());
+      LOGGER.error("Encountered AWS error while attempting to fetch records", e);
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (KinesisException e) {
-      debugAndLogWarning("Encountered unknown unrecoverable AWS exception", e);
+      debugOrLogWarning("Encountered unknown unrecoverable AWS exception", e);
       throw new RuntimeException(e);
     } catch (AbortedException e) {
-      debugAndLogWarning("Task aborted due to exception", e);
+      debugOrLogWarning("Task aborted due to exception", e);
       return handleException(kinesisStartCheckpoint, recordList);
     } catch (Throwable e) {
       // non transient errors
@@ -184,11 +184,12 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     }
   }
 
-  private void debugAndLogWarning(String message, Throwable throwable) {
+  private void debugOrLogWarning(String message, Throwable throwable) {
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug(message, throwable);
+    } else {
+      LOGGER.warn(message + ": " + throwable.getMessage());
     }
-    LOGGER.warn(message + ": " + throwable.getMessage());
   }
 
   private KinesisRecordsBatch handleException(KinesisPartitionGroupOffset start, List<Record> recordList) {
