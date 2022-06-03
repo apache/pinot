@@ -122,7 +122,7 @@ public class MinionClient {
       throw new HttpException(String
           .format("Unable to get tasks states map. Error code %d, Error message: %s", statusCode, responseString));
     }
-    return JsonUtils.stringToObject(responseString, new TypeReference<>() {
+    return JsonUtils.stringToObject(responseString, new TypeReference<Map<String, String>>() {
     });
   }
 
