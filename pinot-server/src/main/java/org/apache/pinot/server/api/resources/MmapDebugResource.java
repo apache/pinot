@@ -52,8 +52,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 /**
  * Debug endpoint to check memory allocation.
  */
-@Api(value = "debug", description = "Debug information", tags = "Debug", authorizations =
-    {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
+@Api(value = "debug", description = "Debug information", tags = "Debug",
+    authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
 @Path("debug")
@@ -75,10 +75,11 @@ public class MmapDebugResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/memory/offheap/table/{tableName}")
-  @ApiOperation(value = "Show off heap memory consumed by latest mutable segment", notes = "Returns off heap memory "
-      + "consumed by latest consuming segment of realtime table")
+  @ApiOperation(value = "Show off heap memory consumed by latest mutable segment",
+      notes = "Returns off heap memory consumed by latest consuming segment of realtime table")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error"),
       @ApiResponse(code = 404, message = "Table not found")
   })
   public String getTableSize(

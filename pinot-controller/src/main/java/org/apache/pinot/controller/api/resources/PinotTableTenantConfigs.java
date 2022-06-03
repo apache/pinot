@@ -66,9 +66,9 @@ public class PinotTableTenantConfigs {
   @Path("/tables/{tableName}/rebuildBrokerResourceFromHelixTags")
   @ApiOperation(value = "Rebuild broker resource for table", notes = "when new brokers are added")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Bad request: table name has "
-      + "to be with table type"), @ApiResponse(code = 500, message = "Internal error rebuilding broker resource or "
-      + "serializing response")
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Bad request: table name has to be with table type"),
+      @ApiResponse(code = 500, message = "Internal error rebuilding broker resource or serializing response")
   })
   public SuccessResponse rebuildBrokerResource(
       @ApiParam(value = "Table name (with type)", required = true) @PathParam("tableName") String tableNameWithType) {
