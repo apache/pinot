@@ -34,16 +34,16 @@ import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.minion.MinionAdminApiApplication;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
-import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_SWAGGER_AUTHORIZATION_VALUE;
+import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
 /**
  * Resource for getting the app configs {@link PinotAppConfigs} for
  * Pinot Minion instance.
  */
-@Api(tags = "AppConfig", authorizations = {@Authorization(value = DEFAULT_SWAGGER_AUTHORIZATION_VALUE)})
+@Api(tags = "AppConfig", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = "oauth")))
+    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
 @Path("/")
 public class PinotMinionAppConfigs {
   @Context
