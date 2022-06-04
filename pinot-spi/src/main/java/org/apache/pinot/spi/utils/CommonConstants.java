@@ -538,7 +538,7 @@ public class CommonConstants {
      * Service token for accessing protected controller APIs.
      * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
      */
-    public static final String CONFIG_OF_TASK_AUTH_TOKEN = "task.auth.token";
+    public static final String CONFIG_TASK_AUTH_NAMESPACE = "task.auth";
     public static final String MINION_TLS_PREFIX = "pinot.minion.tls";
     public static final String CONFIG_OF_MINION_QUERY_REWRITER_CLASS_NAMES = "pinot.minion.query.rewriter.class.names";
   }
