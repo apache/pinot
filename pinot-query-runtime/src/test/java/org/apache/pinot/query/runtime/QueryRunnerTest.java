@@ -142,28 +142,30 @@ public class QueryRunnerTest {
   @DataProvider(name = "testDataWithSqlToFinalRowCount")
   private Object[][] provideTestSqlAndRowCount() {
     return new Object[][] {
-//        new Object[]{"SELECT * FROM b", 5},
-//        new Object[]{"SELECT * FROM a", 15},
-//
-//        // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
-//        // thus the final JOIN result will be 15 x 1 = 15.
-//        // Next join with table C which has (5 on server1 and 10 on server2), since data is identical. each of the row
-//        // of the A JOIN B will have identical value of col3 as table C.col3 has. Since the values are cycling between
-//        // (1, 2, 42, 1, 2). we will have 6 1s, 6 2s, and 3 42s, total result count will be 36 + 36 + 9 = 81
-//        new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 JOIN c ON a.col3 = c.col3", 81},
-//
-//        // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
-//        // thus the final JOIN result will be 15 x 1 = 15.
-//        new Object[]{"SELECT * FROM a JOIN b on a.col1 = b.col2", 15},
-//
-//        // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
-//        // but only 1 out of 5 rows from table A will be selected out; and all in table B will be selected.
-//        // thus the final JOIN result will be 1 x 3 x 1 = 3.
-//        new Object[]{"SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
-//            + " WHERE a.col3 >= 0 AND a.col2 = 'foo' AND b.col3 >= 0", 3},
-//
-//        new Object[]{"SELECT a.col1, a.col3 + a.col3 FROM a WHERE a.col3 >= 0 AND a.col2 = 'foo'", 3},
+        new Object[]{"SELECT * FROM b", 5},
+        new Object[]{"SELECT * FROM a", 15},
 
+        // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
+        // thus the final JOIN result will be 15 x 1 = 15.
+        // Next join with table C which has (5 on server1 and 10 on server2), since data is identical. each of the row
+        // of the A JOIN B will have identical value of col3 as table C.col3 has. Since the values are cycling between
+        // (1, 2, 42, 1, 2). we will have 6 1s, 6 2s, and 3 42s, total result count will be 36 + 36 + 9 = 81
+        new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 JOIN c ON a.col3 = c.col3", 81},
+
+        // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
+        // thus the final JOIN result will be 15 x 1 = 15.
+        new Object[]{"SELECT * FROM a JOIN b on a.col1 = b.col2", 15},
+
+        // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
+        // but only 1 out of 5 rows from table A will be selected out; and all in table B will be selected.
+        // thus the final JOIN result will be 1 x 3 x 1 = 3.
+        new Object[]{"SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
+            + " WHERE a.col3 >= 0 AND a.col2 = 'foo' AND b.col3 >= 0", 3},
+
+        // Projection pushdown
+        new Object[]{"SELECT a.col1, a.col3 + a.col3 FROM a WHERE a.col3 >= 0 AND a.col2 = 'foo'", 3},
+
+        // Aggregation with group by
         new Object[]{"SELECT a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'foo' GROUP BY a.col1", 1},
     };
   }

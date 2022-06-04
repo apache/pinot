@@ -20,7 +20,6 @@ package org.apache.pinot.query.rules;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Range;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
