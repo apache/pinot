@@ -204,7 +204,7 @@ public class SegmentMetadataPushIntegrationTest extends BaseClusterIntegrationTe
   }
 
   protected void testCountStar(final long countStarResult) {
-    TestUtils.waitForCondition(new Function<>() {
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
       @Nullable
       @Override
       public Boolean apply(@Nullable Void aVoid) {
