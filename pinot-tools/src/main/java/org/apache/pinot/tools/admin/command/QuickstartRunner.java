@@ -50,6 +50,7 @@ public class QuickstartRunner {
   private static final int DEFAULT_BROKER_PORT = 8000;
   private static final int DEFAULT_SERVER_ADMIN_API_PORT = 7500;
   private static final int DEFAULT_SERVER_NETTY_PORT = 7000;
+  private static final int DEFAULT_SERVER_GRPC_PORT = 7100;
   private static final int DEFAULT_MINION_PORT = 6000;
 
   private static final String DEFAULT_ZK_DIR = "PinotZkDir";
@@ -145,6 +146,7 @@ public class QuickstartRunner {
     for (int i = 0; i < _numServers; i++) {
       StartServerCommand serverStarter = new StartServerCommand();
       serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
+          .setGrpcPort(DEFAULT_SERVER_GRPC_PORT + i)
           .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
           .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath())
