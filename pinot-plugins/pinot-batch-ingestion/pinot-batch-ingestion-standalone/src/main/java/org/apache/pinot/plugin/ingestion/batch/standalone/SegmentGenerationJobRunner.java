@@ -163,7 +163,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         jobParallelism, Runtime.getRuntime().availableProcessors());
     _executorService = Executors.newFixedThreadPool(numThreads);
 
-    // Set up for recording multiple failures while building segments.
+    // Currently we're only saving the first failure, as fast fail is consistent with
+    // how the distributed batch (Hadoop/Spark) workflows act today.
     _failure = new AtomicReference<>();
   }
 
@@ -171,10 +172,11 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
   public void run()
       throws Exception {
     // Get list of files to process.
+    String[] files = _inputDirFS.listFiles(_inputDirURI, true);
+
     // TODO - sort input files by modification timestamp. Though this is problematic because:
     // a. It can put more load on the external filesystem (e.g. S3), and
     // b. The call to Collections.sort(siblingFiles) below will reorder files by name.
-    String[] files = _inputDirFS.listFiles(_inputDirURI, true);
 
     List<String> filteredFiles = new ArrayList<>();
     PathMatcher includeFilePathMatcher = null;
@@ -272,7 +274,6 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     // submit.
     if (_failure.get() != null) {
       LOGGER.info("Skipping Segment Generation Task for {} due to previous failures", inputFileURI);
-      _segmentCreationTaskCountDownLatch.countDown();
       return;
     }
 
