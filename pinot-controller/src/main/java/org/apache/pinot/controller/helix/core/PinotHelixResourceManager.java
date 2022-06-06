@@ -173,6 +173,8 @@ public class PinotHelixResourceManager {
   // TODO: make this configurable
   public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
   public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
+  public static final long SEGMENT_CLEANUP_TIMEOUT_MS = 20 * 60_000L; // 20 minutes
+  public static final long SEGMENT_CLEANUP_CHECK_INTERVAL_MS = 1_000L; // 1 second
 
   private static final SimpleDateFormat SIMPLE_DATE_FORMAT = new SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'");
 
@@ -3165,6 +3167,7 @@ public class PinotHelixResourceManager {
           if (!segmentsToCleanUp.isEmpty()) {
             LOGGER.info("Cleaning up the segments while startReplaceSegments: {}", segmentsToCleanUp);
             deleteSegments(tableNameWithType, segmentsToCleanUp);
+            waitForSegmentsToDelete(tableNameWithType, segmentsToCleanUp, SEGMENT_CLEANUP_TIMEOUT_MS);
           }
           return true;
         } else {
@@ -3183,6 +3186,22 @@ public class PinotHelixResourceManager {
             + "segmentsTo = {}, segmentLineageEntryId = {})", tableNameWithType, segmentsFrom, segmentsTo,
         segmentLineageEntryId);
     return segmentLineageEntryId;
+  }
+
+  private void waitForSegmentsToDelete(String tableNameWithType, List<String> segments, long timeOutInMillis)
+      throws InterruptedException {
+    LOGGER.info("Waiting for {} segments to delete for table: {}. timeout = {}ms, segments = {}", segments.size(),
+        tableNameWithType, timeOutInMillis, segments);
+    long endTimeMs = System.currentTimeMillis() + timeOutInMillis;
+    do {
+      if (Collections.disjoint(getSegmentsFor(tableNameWithType, false), segments)) {
+        return;
+      } else {
+        Thread.sleep(SEGMENT_CLEANUP_CHECK_INTERVAL_MS);
+      }
+    } while (System.currentTimeMillis() < endTimeMs);
+    throw new RuntimeException("Timeout while waiting for segments to be deleted for table: " + tableNameWithType
+        + ", timeout: " + timeOutInMillis + "ms");
   }
 
   /**
