@@ -127,8 +127,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
         _skipStarNodeCreationForDimensions.add(i);
       }
       _dimensionReaders[i] = new PinotSegmentColumnReader(segment, dimension);
-      Preconditions
-          .checkState(_dimensionReaders[i].hasDictionary(), "Dimension: " + dimension + " does not have dictionary");
+      Preconditions.checkState(_dimensionReaders[i].hasDictionary(),
+          "Dimension: " + dimension + " does not have dictionary");
     }
 
     Set<AggregationFunctionColumnPair> functionColumnPairs = builderConfig.getFunctionColumnPairs();
@@ -405,49 +405,53 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
 
   private Record createAggregatedDocs(TreeNode node)
       throws IOException {
+    Record aggregatedRecord = null;
     if (node._children == null) {
-      // For leaf node, aggregate all records under it
-      Record record = null;
-      for (int i = node._startDocId; i < node._endDocId; i++) {
-        record = mergeStarTreeRecord(record, getStarTreeRecord(i));
+      // For leaf node
+
+      if (node._startDocId == node._endDocId - 1) {
+        // If it has only one document, use it as the aggregated document
+        aggregatedRecord = getStarTreeRecord(node._startDocId);
+        node._aggregatedDocId = node._startDocId;
+      } else {
+        // If it has multiple documents, aggregate all of them
+        for (int i = node._startDocId; i < node._endDocId; i++) {
+          aggregatedRecord = mergeStarTreeRecord(aggregatedRecord, getStarTreeRecord(i));
+        }
+        assert aggregatedRecord != null;
+        for (int i = node._dimensionId + 1; i < _numDimensions; i++) {
+          aggregatedRecord._dimensions[i] = StarTreeV2Constants.STAR_IN_FORWARD_INDEX;
+        }
+        node._aggregatedDocId = _numDocs;
+        appendToStarTree(aggregatedRecord);
       }
-      assert record != null;
-      for (int i = node._dimensionId + 1; i < _numDimensions; i++) {
-        record._dimensions[i] = StarTreeV2Constants.STAR_IN_FORWARD_INDEX;
-      }
-      node._aggregatedDocId = _numDocs;
-      appendToStarTree(record);
-      return record;
     } else {
       // For non-leaf node
 
       if (node._children.containsKey(StarTreeNode.ALL)) {
         // If it has star child, use the star child aggregated document directly
-        Record record = null;
         for (TreeNode child : node._children.values()) {
           if (child._dimensionValue == StarTreeNode.ALL) {
-            record = createAggregatedDocs(child);
+            aggregatedRecord = createAggregatedDocs(child);
             node._aggregatedDocId = child._aggregatedDocId;
           } else {
             createAggregatedDocs(child);
           }
         }
-        return record;
       } else {
         // If no star child exists, aggregate all aggregated documents from non-star children
-        Record record = null;
         for (TreeNode child : node._children.values()) {
-          record = mergeStarTreeRecord(record, createAggregatedDocs(child));
+          aggregatedRecord = mergeStarTreeRecord(aggregatedRecord, createAggregatedDocs(child));
         }
-        assert record != null;
+        assert aggregatedRecord != null;
         for (int i = node._dimensionId + 1; i < _numDimensions; i++) {
-          record._dimensions[i] = StarTreeV2Constants.STAR_IN_FORWARD_INDEX;
+          aggregatedRecord._dimensions[i] = StarTreeV2Constants.STAR_IN_FORWARD_INDEX;
         }
         node._aggregatedDocId = _numDocs;
-        appendToStarTree(record);
-        return record;
+        appendToStarTree(aggregatedRecord);
       }
     }
+    return aggregatedRecord;
   }
 
   private void createForwardIndexes()
