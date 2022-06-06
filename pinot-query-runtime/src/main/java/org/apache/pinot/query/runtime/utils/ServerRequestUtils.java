@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.utils;
 
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
@@ -36,6 +35,7 @@ import org.apache.pinot.query.planner.stage.ProjectNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 
 
 /**
