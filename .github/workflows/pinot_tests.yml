@@ -34,7 +34,6 @@ on:
   pull_request:
     branches:
       - master
-      - multi_stage_query_engine
     paths-ignore:
       - "contrib/**"
       - "docs/**"

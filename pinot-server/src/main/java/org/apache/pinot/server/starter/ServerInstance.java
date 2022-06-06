@@ -107,41 +107,36 @@ public class ServerInstance {
     _accessControl = accessControlFactory.create();
 
     if (serverConf.isMultiStageServerEnabled()) {
-      // WorkerQueryServer initialization
-      // because worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport,
-      // we can't enable any of the other 2 servers
-      // TODO: decouple server protocol and engine type.
+      LOGGER.info("Initializing Multi-stage query engine");
       _workerQueryServer = new WorkerQueryServer(serverConf.getPinotConfig(), _instanceDataManager, _serverMetrics);
-      _nettyQueryServer = null;
-      _nettyTlsQueryServer = null;
-      _grpcQueryServer = null;
     } else {
       _workerQueryServer = null;
-      if (serverConf.isNettyServerEnabled()) {
-        int nettyPort = serverConf.getNettyPort();
-        LOGGER.info("Initializing Netty query server on port: {}", nettyPort);
-        _nettyQueryServer = new QueryServer(nettyPort, _queryScheduler, _serverMetrics, nettyConfig);
-      } else {
-        _nettyQueryServer = null;
-      }
+    }
 
-      if (serverConf.isNettyTlsServerEnabled()) {
-        int nettySecPort = serverConf.getNettyTlsPort();
-        LOGGER.info("Initializing TLS-secured Netty query server on port: {}", nettySecPort);
-        _nettyTlsQueryServer =
-            new QueryServer(nettySecPort, _queryScheduler, _serverMetrics, nettyConfig, tlsConfig, _accessControl);
-      } else {
-        _nettyTlsQueryServer = null;
-      }
-      if (serverConf.isEnableGrpcServer()) {
-        int grpcPort = serverConf.getGrpcPort();
-        LOGGER.info("Initializing gRPC query server on port: {}", grpcPort);
-        _grpcQueryServer = new GrpcQueryServer(grpcPort,
-            serverConf.isGrpcTlsServerEnabled() ? TlsUtils.extractTlsConfig(serverConf.getPinotConfig(),
-                CommonConstants.Server.SERVER_GRPCTLS_PREFIX) : null, _queryExecutor, _serverMetrics, _accessControl);
-      } else {
-        _grpcQueryServer = null;
-      }
+    if (serverConf.isNettyServerEnabled()) {
+      int nettyPort = serverConf.getNettyPort();
+      LOGGER.info("Initializing Netty query server on port: {}", nettyPort);
+      _nettyQueryServer = new QueryServer(nettyPort, _queryScheduler, _serverMetrics, nettyConfig);
+    } else {
+      _nettyQueryServer = null;
+    }
+
+    if (serverConf.isNettyTlsServerEnabled()) {
+      int nettySecPort = serverConf.getNettyTlsPort();
+      LOGGER.info("Initializing TLS-secured Netty query server on port: {}", nettySecPort);
+      _nettyTlsQueryServer =
+          new QueryServer(nettySecPort, _queryScheduler, _serverMetrics, nettyConfig, tlsConfig, _accessControl);
+    } else {
+      _nettyTlsQueryServer = null;
+    }
+    if (serverConf.isEnableGrpcServer()) {
+      int grpcPort = serverConf.getGrpcPort();
+      LOGGER.info("Initializing gRPC query server on port: {}", grpcPort);
+      _grpcQueryServer = new GrpcQueryServer(grpcPort,
+          serverConf.isGrpcTlsServerEnabled() ? TlsUtils.extractTlsConfig(serverConf.getPinotConfig(),
+              CommonConstants.Server.SERVER_GRPCTLS_PREFIX) : null, _queryExecutor, _serverMetrics, _accessControl);
+    } else {
+      _grpcQueryServer = null;
     }
 
     LOGGER.info("Initializing transform functions");

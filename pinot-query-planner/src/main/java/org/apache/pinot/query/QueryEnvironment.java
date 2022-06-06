@@ -19,6 +19,9 @@
 package org.apache.pinot.query;
 
 import java.util.Collection;
+import java.util.Properties;
+import org.apache.calcite.config.CalciteConnectionConfigImpl;
+import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.plan.Contexts;
 import org.apache.calcite.plan.RelOptCluster;
@@ -84,7 +87,10 @@ public class QueryEnvironment {
     _planner = new PlannerImpl(_config);
 
     // catalog
-    _catalogReader = new CalciteCatalogReader(_rootSchema, _rootSchema.path(null), _typeFactory, null);
+    Properties catalogReaderConfigProperties = new Properties();
+    catalogReaderConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
+    _catalogReader = new CalciteCatalogReader(_rootSchema, _rootSchema.path(null), _typeFactory,
+        new CalciteConnectionConfigImpl(catalogReaderConfigProperties));
     _validator = new Validator(SqlStdOperatorTable.instance(), _catalogReader, _typeFactory);
 
     // optimizer rules
