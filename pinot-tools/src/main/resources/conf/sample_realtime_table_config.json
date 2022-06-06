@@ -9,7 +9,8 @@
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "schemaName": "schemaName",
-    "replication": "3"
+    "replication": "3",
+    "replicasPerPartition": "1"
   },
   "tenants": {
     "broker": "brokerOne",
@@ -23,11 +24,15 @@
     ],
     "streamConfigs": {
       "streamType": "kafka",
-      "stream.kafka.consumer.type": "highLevel",
+      "stream.kafka.consumer.type": "lowLevel",
       "stream.kafka.topic.name": "kafkaTopicName",
       "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder",
-      "stream.kafka.hlc.zk.connect.string": "localhost:1111/zkConnect",
-      "stream.kafka.decoder.prop.schema.registry.rest.url": "http://localhost:2222/schemaRegistry"
+      "stream.kafka.decoder.prop.schema.registry.rest.url": "http://localhost:2222/schemaRegistry",
+      "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+      "stream.kafka.consumer.prop.auto.offset.reset": "largest",
+      "stream.kafka.broker.list": "localhost:19092",
+      "realtime.segment.flush.threshold.time": "12h",
+      "realtime.segment.flush.threshold.size": "100M"
     }
   },
   "metadata": {
