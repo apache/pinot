@@ -69,7 +69,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -269,39 +268,6 @@ public class ClusterIntegrationTestUtils {
         future.get();
       }
     }
-  }
-
-  /**
-   * Builds Pinot segments from the given Avro files. Each segment will be built using a separate thread.
-   *
-   * @param jsonFile Json file
-   * @param tableConfig Pinot table config
-   * @param schema Pinot schema
-   * @param segmentIndex segment index number
-   * @param segmentDir Output directory for the un-tarred segments
-   * @param tarDir Output directory for the tarred segments
-   */
-  public static void buildSegmentFromJson(File jsonFile,  TableConfig tableConfig,
-      org.apache.pinot.spi.data.Schema schema, int segmentIndex, File segmentDir, File tarDir)
-      throws Exception {
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
-    segmentGeneratorConfig.setInputFilePath(jsonFile.getPath());
-    segmentGeneratorConfig.setOutDir(segmentDir.getPath());
-    segmentGeneratorConfig.setFormat(FileFormat.JSON);
-    segmentGeneratorConfig.setTableName(tableConfig.getTableName());
-    // Test segment with space and special character in the file name
-    segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
-
-    // Build the segment
-    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig);
-    driver.build();
-
-    // Tar the segment
-    String segmentName = driver.getSegmentName();
-    File indexDir = new File(segmentDir, segmentName);
-    File segmentTarFile = new File(tarDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
   }
 
   /**
