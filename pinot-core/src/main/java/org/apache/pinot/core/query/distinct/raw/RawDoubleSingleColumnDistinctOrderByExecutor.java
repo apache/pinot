@@ -47,25 +47,37 @@ public class RawDoubleSingleColumnDistinctOrderByExecutor extends BaseRawDoubleS
   @Override
   public boolean process(TransformBlock transformBlock) {
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
-    double[] values = blockValueSet.getDoubleValuesSV();
     int numDocs = transformBlock.getNumDocs();
-    for (int i = 0; i < numDocs; i++) {
-      double value = values[i];
-      if (!_valueSet.contains(value)) {
-        if (_valueSet.size() < _limit) {
-          _valueSet.add(value);
-          _priorityQueue.enqueue(value);
-        } else {
-          double firstValue = _priorityQueue.firstDouble();
-          if (_priorityQueue.comparator().compare(value, firstValue) > 0) {
-            _valueSet.remove(firstValue);
-            _valueSet.add(value);
-            _priorityQueue.dequeueDouble();
-            _priorityQueue.enqueue(value);
-          }
+    if (blockValueSet.isSingleValue()) {
+      double[] values = blockValueSet.getDoubleValuesSV();
+      for (int i = 0; i < numDocs; i++) {
+        add(values[i]);
+      }
+    } else {
+      double[][] values = blockValueSet.getDoubleValuesMV();
+      for (int i = 0; i < numDocs; i++) {
+        for (double value : values[i]) {
+          add(value);
         }
       }
     }
     return false;
+  }
+
+  private void add(double value) {
+    if (!_valueSet.contains(value)) {
+      if (_valueSet.size() < _limit) {
+        _valueSet.add(value);
+        _priorityQueue.enqueue(value);
+      } else {
+        double firstValue = _priorityQueue.firstDouble();
+        if (_priorityQueue.comparator().compare(value, firstValue) > 0) {
+          _valueSet.remove(firstValue);
+          _valueSet.add(value);
+          _priorityQueue.dequeueDouble();
+          _priorityQueue.enqueue(value);
+        }
+      }
+    }
   }
 }

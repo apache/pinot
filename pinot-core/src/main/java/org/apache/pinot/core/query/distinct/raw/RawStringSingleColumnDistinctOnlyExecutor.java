@@ -37,12 +37,24 @@ public class RawStringSingleColumnDistinctOnlyExecutor extends BaseRawStringSing
   @Override
   public boolean process(TransformBlock transformBlock) {
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
-    String[] values = blockValueSet.getStringValuesSV();
     int numDocs = transformBlock.getNumDocs();
-    for (int i = 0; i < numDocs; i++) {
-      _valueSet.add(values[i]);
-      if (_valueSet.size() >= _limit) {
-        return true;
+    if (blockValueSet.isSingleValue()) {
+      String[] values = blockValueSet.getStringValuesSV();
+      for (int i = 0; i < numDocs; i++) {
+        _valueSet.add(values[i]);
+        if (_valueSet.size() >= _limit) {
+          return true;
+        }
+      }
+    } else {
+      String[][] values = blockValueSet.getStringValuesMV();
+      for (int i = 0; i < numDocs; i++) {
+        for (String value : values[i]) {
+          _valueSet.add(value);
+          if (_valueSet.size() >= _limit) {
+            return true;
+          }
+        }
       }
     }
     return false;

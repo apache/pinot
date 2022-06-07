@@ -37,12 +37,24 @@ public class RawFloatSingleColumnDistinctOnlyExecutor extends BaseRawFloatSingle
   @Override
   public boolean process(TransformBlock transformBlock) {
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
-    float[] values = blockValueSet.getFloatValuesSV();
     int numDocs = transformBlock.getNumDocs();
-    for (int i = 0; i < numDocs; i++) {
-      _valueSet.add(values[i]);
-      if (_valueSet.size() >= _limit) {
-        return true;
+    if (blockValueSet.isSingleValue()) {
+      float[] values = blockValueSet.getFloatValuesSV();
+      for (int i = 0; i < numDocs; i++) {
+        _valueSet.add(values[i]);
+        if (_valueSet.size() >= _limit) {
+          return true;
+        }
+      }
+    } else {
+      float[][] values = blockValueSet.getFloatValuesMV();
+      for (int i = 0; i < numDocs; i++) {
+        for (float value : values[i]) {
+          _valueSet.add(value);
+          if (_valueSet.size() >= _limit) {
+            return true;
+          }
+        }
       }
     }
     return false;
