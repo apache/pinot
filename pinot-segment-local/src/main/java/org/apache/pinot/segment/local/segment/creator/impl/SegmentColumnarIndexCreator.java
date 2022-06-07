@@ -390,7 +390,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           bloomFilterCreator.add(columnValueToIndex.toString());
         } else {
           Object[] values = (Object[]) columnValueToIndex;
-          for (Object value: values) {
+          for (Object value : values) {
             bloomFilterCreator.add(value.toString());
           }
         }
