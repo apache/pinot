@@ -1,0 +1,359 @@
+swagger: '2.0'
+info:
+  description: APIs for accessing Pinot Controller information
+  version: '1.0'
+  title: Pinot Controller API
+  contact:
+    name: https://github.com/apache/pinot
+basePath: /
+tags:
+  - name: Broker
+schemes:
+  - http
+  - https
+paths:
+  /v2/brokers/tables/{tableName}:
+    get:
+      tags:
+        - Broker
+      summary: List brokers for a given table
+      description: List brokers for a given table
+      operationId: getBrokersForTableV2
+      produces:
+        - application/json
+      parameters:
+        - name: tableName
+          in: path
+          description: Name of the table
+          required: true
+          type: string
+        - name: type
+          in: query
+          description: OFFLINE|REALTIME
+          required: false
+          type: string
+        - name: state
+          in: query
+          description: ONLINE|OFFLINE
+          required: false
+          type: string
+      responses:
+        '200':
+          description: successful operation
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/InstanceInfo'
+      security:
+        - oauth: []
+  /brokers/tables/{tableName}:
+    get:
+      tags:
+        - Broker
+      summary: List brokers for a given table
+      description: List brokers for a given table
+      operationId: getBrokersForTable
+      produces:
+        - application/json
+      parameters:
+        - name: tableName
+          in: path
+          description: Name of the table
+          required: true
+          type: string
+        - name: type
+          in: query
+          description: OFFLINE|REALTIME
+          required: false
+          type: string
+        - name: state
+          in: query
+          description: ONLINE|OFFLINE
+          required: false
+          type: string
+      responses:
+        '200':
+          description: successful operation
+          schema:
+            type: array
+            items:
+              type: string
+      security:
+        - oauth: []
+  /brokers/instances/{instanceName}/qps:
+    post:
+      tags:
+        - Broker
+      summary: Enable/disable the query rate limiting for a broker instance
+      description: Enable/disable the query rate limiting for a broker instance
+      operationId: toggleQueryRateLimiting
+      consumes:
+        - text/plain
+      produces:
+        - application/json
+      parameters:
+        - name: instanceName
+          in: path
+          description: Broker instance name
+          required: true
+          type: string
+          x-example: Broker_my.broker.com_30000
+        - name: state
+          in: query
+          description: ENABLE|DISABLE
+          required: true
+          type: string
+          enum:
+            - ENABLE
+            - DISABLE
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad Request
+        '404':
+          description: Instance not found
+        '500':
+          description: Internal error
+      security:
+        - oauth: []
+  /v2/brokers/tenants/{tenantName}:
+    get:
+      tags:
+        - Broker
+      summary: List brokers for a given tenant
+      description: List brokers for a given tenant
+      operationId: getBrokersForTenantV2
+      produces:
+        - application/json
+      parameters:
+        - name: tenantName
+          in: path
+          description: Name of the tenant
+          required: true
+          type: string
+        - name: state
+          in: query
+          description: ONLINE|OFFLINE
+          required: false
+          type: string
+      responses:
+        '200':
+          description: successful operation
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/InstanceInfo'
+      security:
+        - oauth: []
+  /brokers/tenants/{tenantName}:
+    get:
+      tags:
+        - Broker
+      summary: List brokers for a given tenant
+      description: List brokers for a given tenant
+      operationId: getBrokersForTenant
+      produces:
+        - application/json
+      parameters:
+        - name: tenantName
+          in: path
+          description: Name of the tenant
+          required: true
+          type: string
+        - name: state
+          in: query
+          description: ONLINE|OFFLINE
+          required: false
+          type: string
+      responses:
+        '200':
+          description: successful operation
+          schema:
+            type: array
+            items:
+              type: string
+      security:
+        - oauth: []
+  /brokers/tenants:
+    get:
+      tags:
+        - Broker
+      summary: List tenants to brokers mappings
+      description: List tenants to brokers mappings
+      operationId: getTenantsToBrokersMapping
+      produces:
+        - application/json
+      parameters:
+        - name: state
+          in: query
+          description: ONLINE|OFFLINE
+          required: false
+          type: string
+      responses:
+        '200':
+          description: successful operation
+          schema:
+            type: object
+            additionalProperties:
+              type: array
+              items:
+                type: string
+      security:
+        - oauth: []
+  /v2/brokers:
+    get:
+      tags:
+        - Broker
+      summary: List tenants and tables to brokers mappings
+      description: List tenants and tables to brokers mappings
+      operationId: listBrokersMappingV2
+      produces:
+        - application/json
+      parameters:
+        - name: state
+          in: query
+          description: ONLINE|OFFLINE
+          required: false
+          type: string
+      responses:
+        '200':
+          description: successful operation
+          schema:
+            type: object
+            additionalProperties:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  $ref: '#/definitions/InstanceInfo'
+      security:
+        - oauth: []
+  /brokers/tables:
+    get:
+      tags:
+        - Broker
+      summary: List tables to brokers mappings
+      description: List tables to brokers mappings
+      operationId: getTablesToBrokersMapping
+      produces:
+        - application/json
+      parameters:
+        - name: state
+          in: query
+          description: ONLINE|OFFLINE
+          required: false
+          type: string
+      responses:
+        '200':
+          description: successful operation
+          schema:
+            type: object
+            additionalProperties:
+              type: array
+              items:
+                type: string
+      security:
+        - oauth: []
+  /brokers:
+    get:
+      tags:
+        - Broker
+      summary: List tenants and tables to brokers mappings
+      description: List tenants and tables to brokers mappings
+      operationId: listBrokersMapping
+      produces:
+        - application/json
+      parameters:
+        - name: state
+          in: query
+          description: ONLINE|OFFLINE
+          required: false
+          type: string
+      responses:
+        '200':
+          description: successful operation
+          schema:
+            type: object
+            additionalProperties:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+      security:
+        - oauth: []
+  /v2/brokers/tenants:
+    get:
+      tags:
+        - Broker
+      summary: List tenants to brokers mappings
+      description: List tenants to brokers mappings
+      operationId: getTenantsToBrokersMappingV2
+      produces:
+        - application/json
+      parameters:
+        - name: state
+          in: query
+          description: ONLINE|OFFLINE
+          required: false
+          type: string
+      responses:
+        '200':
+          description: successful operation
+          schema:
+            type: object
+            additionalProperties:
+              type: array
+              items:
+                $ref: '#/definitions/InstanceInfo'
+      security:
+        - oauth: []
+  /v2/brokers/tables:
+    get:
+      tags:
+        - Broker
+      summary: List tables to brokers mappings
+      description: List tables to brokers mappings
+      operationId: getTablesToBrokersMappingV2
+      produces:
+        - application/json
+      parameters:
+        - name: state
+          in: query
+          description: ONLINE|OFFLINE
+          required: false
+          type: string
+      responses:
+        '200':
+          description: successful operation
+          schema:
+            type: object
+            additionalProperties:
+              type: array
+              items:
+                $ref: '#/definitions/InstanceInfo'
+      security:
+        - oauth: []
+securityDefinitions:
+  oauth:
+    description: ''
+    type: apiKey
+    name: Authorization
+    in: header
+definitions:
+  SuccessResponse:
+    type: object
+    properties:
+      status:
+        type: string
+  InstanceInfo:
+    type: object
+    properties:
+      instanceName:
+        type: string
+      port:
+        type: integer
+        format: int32
+      host:
+        type: string
