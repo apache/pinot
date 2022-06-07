@@ -249,7 +249,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         }
       }
 
-      if (rangeIndexColumns.contains(columnName)) {
+      if (!columnIndexCreationInfo.isSorted() && rangeIndexColumns.contains(columnName)) {
         _rangeIndexFilterCreatorMap.put(columnName,
             _indexCreatorProvider.newRangeIndexCreator(context.forRangeIndex(rangeIndexVersion)));
       }
