@@ -147,7 +147,7 @@ public class AggregationFunctionFactory {
       } else {
         switch (AggregationFunctionType.valueOf(upperCaseFunctionName)) {
           case COUNT:
-            return new CountAggregationFunction();
+            return new CountAggregationFunction(firstArgument);
           case MIN:
             return new MinAggregationFunction(firstArgument);
           case MAX:

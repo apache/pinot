@@ -79,28 +79,30 @@ public class TableResizer {
     _numOrderByExpressions = orderByExpressions.size();
     _orderByValueExtractors = new OrderByValueExtractor[_numOrderByExpressions];
     Comparator[] comparators = new Comparator[_numOrderByExpressions];
-    int[] comparisonSign = new int[_numGroupByExpressions];
+    int[] multiplier = new int[_numOrderByExpressions];
     for (int i = 0; i < _numOrderByExpressions; i++) {
       OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
       _orderByValueExtractors[i] = getOrderByValueExtractor(orderByExpression.getExpression());
       if (orderByExpression.isAsc()) {
         comparators[i] = Comparator.naturalOrder();
-        comparisonSign[i] = 1;
+        multiplier[i] = 1;
       } else {
         comparators[i] = Comparator.reverseOrder();
-        comparisonSign[i] = -1;
+        multiplier[i] = -1;
       }
     }
-    // todo(nhejazi): return a diff. comparator that does not handle nulls when column does not contain any nulls
-    //  or when the column represents an aggregation that does not return null.
+    // TODO: return a diff. comparator that does not handle nulls when column does not contain any null values.
     _intermediateRecordComparator = (o1, o2) -> {
       for (int i = 0; i < _numOrderByExpressions; i++) {
         Object v1 = o1._values[i];
         Object v2 = o2._values[i];
         if (v1 == null) {
-          return v2 == null ? 0 : comparisonSign[i];
+          if (v2 != null) {
+            // The default null ordering is NULLS LAST, regardless of the ordering direction.
+            return 1;
+          }
         } else if (v2 == null) {
-          return -comparisonSign[i];
+          return -1;
         }
         int result = comparators[i].compare(v1, v2);
         if (result != 0) {

@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -95,19 +96,22 @@ public class DataTableImplV4 extends DataTableImplV3 {
   }
 
   @Override
-  public MutableRoaringBitmap getColumnNullBitmap(int colId) {
+  public MutableRoaringBitmap getNullRowIds(int colId) {
     // _fixedSizeNullVectorData stores two ints per col: offset, and length.
-    _fixedSizeNullVectorData.position(colId * Integer.BYTES * 2);
-    int offset = _fixedSizeNullVectorData.getInt();
-    int bitmapLength = _fixedSizeNullVectorData.getInt();
-    MutableRoaringBitmap mutableRoaringBitmap = new MutableRoaringBitmap();
-    if (bitmapLength > 0) {
-      _variableSizeNullVectorData.position(offset);
-      for (int i = 0; i < bitmapLength; i++) {
-        mutableRoaringBitmap.add(_variableSizeNullVectorData.getInt());
+    if (_fixedSizeNullVectorData != null) {
+      _fixedSizeNullVectorData.position(colId * Integer.BYTES * 2);
+      int offset = _fixedSizeNullVectorData.getInt();
+      int bitmapLength = _fixedSizeNullVectorData.getInt();
+      MutableRoaringBitmap mutableRoaringBitmap = new MutableRoaringBitmap();
+      if (bitmapLength > 0) {
+        _variableSizeNullVectorData.position(offset);
+        for (int i = 0; i < bitmapLength; i++) {
+          mutableRoaringBitmap.add(_variableSizeNullVectorData.getInt());
+        }
       }
+      return mutableRoaringBitmap;
     }
-    return mutableRoaringBitmap;
+    return null;
   }
 
   /**
@@ -220,6 +224,26 @@ public class DataTableImplV4 extends DataTableImplV3 {
   }
 
   @Override
+  public int getVersion() {
+    return DataTableBuilder.VERSION_4;
+  }
+
+  @Override
+  public void addException(ProcessingException processingException) {
+    _errCodeToExceptionMap.put(processingException.getErrorCode(), processingException.getMessage());
+  }
+
+  @Override
+  public void addException(int errCode, String errMsg) {
+    _errCodeToExceptionMap.put(errCode, errMsg);
+  }
+
+  @Override
+  public Map<Integer, String> getExceptions() {
+    return _errCodeToExceptionMap;
+  }
+
+  @Override
   public byte[] toBytes()
       throws IOException {
     ThreadTimer threadTimer = new ThreadTimer();
@@ -268,7 +292,7 @@ public class DataTableImplV4 extends DataTableImplV3 {
     // Write exceptions section offset(START|SIZE).
     dataOutputStream.writeInt(dataOffset);
     byte[] exceptionsBytes;
-    exceptionsBytes = serializeExceptions();
+    exceptionsBytes = serializeExceptions(_errCodeToExceptionMap);
     dataOutputStream.writeInt(exceptionsBytes.length);
     dataOffset += exceptionsBytes.length;
 

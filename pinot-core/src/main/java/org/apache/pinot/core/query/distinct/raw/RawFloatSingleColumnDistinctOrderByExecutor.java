@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -48,20 +49,25 @@ public class RawFloatSingleColumnDistinctOrderByExecutor extends BaseRawFloatSin
   public boolean process(TransformBlock transformBlock) {
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
     float[] values = blockValueSet.getFloatValuesSV();
+    ImmutableRoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
     int numDocs = transformBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
-      float value = values[i];
-      if (!_valueSet.contains(value)) {
-        if (_valueSet.size() < _limit) {
-          _valueSet.add(value);
-          _priorityQueue.enqueue(value);
-        } else {
-          float firstValue = _priorityQueue.firstFloat();
-          if (_priorityQueue.comparator().compare(value, firstValue) > 0) {
-            _valueSet.remove(firstValue);
+      if (nullBitmap != null && nullBitmap.contains(i)) {
+        _numNulls = 1;
+      } else {
+        float value = values[i];
+        if (!_valueSet.contains(value)) {
+          if (_valueSet.size() < _limit - _numNulls) {
             _valueSet.add(value);
-            _priorityQueue.dequeueFloat();
             _priorityQueue.enqueue(value);
+          } else {
+            float firstValue = _priorityQueue.firstFloat();
+            if (_priorityQueue.comparator().compare(value, firstValue) > 0) {
+              _valueSet.remove(firstValue);
+              _valueSet.add(value);
+              _priorityQueue.dequeueFloat();
+              _priorityQueue.enqueue(value);
+            }
           }
         }
       }

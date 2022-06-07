@@ -81,11 +81,6 @@ public class RequestContextUtils {
    */
   public static FunctionContext getFunction(Function thriftFunction) {
     String functionName = thriftFunction.getOperator();
-    if (functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-      // NOTE: COUNT always take one single argument "*"
-      return new FunctionContext(FunctionContext.Type.AGGREGATION, AggregationFunctionType.COUNT.getName(),
-          new ArrayList<>(Collections.singletonList(ExpressionContext.forIdentifier("*"))));
-    }
     FunctionContext.Type functionType =
         AggregationFunctionType.isAggregationFunction(functionName) ? FunctionContext.Type.AGGREGATION
             : FunctionContext.Type.TRANSFORM;

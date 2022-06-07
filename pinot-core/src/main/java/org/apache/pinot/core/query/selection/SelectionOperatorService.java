@@ -29,6 +29,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -79,8 +80,7 @@ public class SelectionOperatorService {
     _offset = queryContext.getOffset();
     _numRowsToKeep = _offset + queryContext.getLimit();
     assert queryContext.getOrderByExpressions() != null;
-    _rows = new PriorityQueue<Object[]>(Math.min(_numRowsToKeep,
-        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
+    _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
         getTypeCompatibleComparator(queryContext.getOrderByExpressions()));
   }
 
@@ -116,7 +116,7 @@ public class SelectionOperatorService {
       multipliers[i] = orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
     }
 
-    // todo(nhejazi): returns separate comparator when null handling is not needed.
+    // TODO(nhejazi): returns separate comparator when null handling is not needed.
     return (o1, o2) -> {
       for (int i = 0; i < numValuesToCompare; i++) {
         int index = valueIndices[i];
@@ -125,9 +125,9 @@ public class SelectionOperatorService {
 
         if (v1 == null) {
           // The default null ordering is: 'NULLS LAST'.
-          return v2 == null ? 0 : 1;
+          return v2 == null ? 0 : -multipliers[i];
         } else if (v2 == null) {
-          return -1;
+          return multipliers[i];
         }
 
         int result;
@@ -159,20 +159,22 @@ public class SelectionOperatorService {
    * (Broker side)
    */
   public void reduceWithOrdering(Collection<DataTable> dataTables) {
-    MutableRoaringBitmap[] columnNullBitmaps = null;
+    MutableRoaringBitmap[] nullBitmaps = null;
     for (DataTable dataTable : dataTables) {
-      if (columnNullBitmaps == null) {
-        columnNullBitmaps = new MutableRoaringBitmap[dataTable.getDataSchema().size()];
-      }
-      // todo: we are storing bitmaps by column but need them here per row!!
-      for (int colId = 0; colId < columnNullBitmaps.length; colId++) {
-        columnNullBitmaps[colId] = dataTable.getColumnNullBitmap(colId);
+      if (dataTable.getVersion() >= DataTableBuilder.VERSION_4) {
+        if (nullBitmaps == null) {
+          nullBitmaps = new MutableRoaringBitmap[dataTable.getDataSchema().size()];
+        }
+        for (int colId = 0; colId < nullBitmaps.length; colId++) {
+          nullBitmaps[colId] = dataTable.getNullRowIds(colId);
+        }
       }
       int numRows = dataTable.getNumberOfRows();
       for (int rowId = 0; rowId < numRows; rowId++) {
         Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-        for (int colId = 0; colId < columnNullBitmaps.length; colId++) {
-          if (columnNullBitmaps[colId].contains(rowId)) {
+        int len = nullBitmaps == null ? 0 : nullBitmaps.length;
+        for (int colId = 0; colId < len; colId++) {
+          if (nullBitmaps[colId].contains(rowId)) {
             row[colId] = null;
           }
         }

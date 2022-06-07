@@ -135,16 +135,15 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
-  // todo(nhejazi): Null handling for Dictionary-based columns is not supported yet.
-//  @Test
-//  public void testQueriesWithDictColumn()
-//      throws Exception {
-//    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-//        .setTableName(RAW_TABLE_NAME)
-//        .build();
-//    setUp(tableConfig);
-//    testQueries();
-//  }
+  @Test
+  public void testQueriesWithDictColumn()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .build();
+    setUp(tableConfig);
+    testQueries();
+  }
 
   @Test(priority = 1)
   public void testQueriesWithNoDictColumn()
@@ -163,7 +162,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     Map<String, Object> pinotConfigProperties = new HashMap<>();
     pinotConfigProperties.put(CommonConstants.Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, 4);
     {
-      String query = "SELECT * FROM testTable"; // todo: test with 1
+      String query = "SELECT * FROM testTable";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
@@ -180,7 +179,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      String query = String.format("SELECT * FROM testTable ORDER BY %s DESC LIMIT 2000", BIG_DECIMAL_COLUMN);
+      String query = String.format("SELECT * FROM testTable ORDER BY %s DESC LIMIT 4000", BIG_DECIMAL_COLUMN);
       // getBrokerResponseForSqlQuery(query) runs SQL query on multiple index segments. The result should be equivalent
       // to querying 4 identical index segments.
       BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
@@ -189,17 +188,12 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       assertEquals(dataSchema,
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
       List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 2000);
+      assertEquals(rows.size(), 4000);
       // Note 1: we inserted 250 nulls in _records, and since we query 4 identical index segments, the number of null
       //  values is: 250 * 4 = 1000.
-      // Note 2: The default null ordering is 'NULLS LAST'.
-      for (int i = 0; i < 1000; i++) {
-        Object[] values = rows.get(i);
-        assertEquals(values.length, 1);
-        assertNull(values[0]);
-      }
+      // Note 2: The default null ordering is 'NULLS LAST', regardless of the ordering direction.
       int k = 0;
-      for (int i = 1000; i < 2000; i += 4) {
+      for (int i = 0; i < 4000; i += 4) {
         // Null values are inserted at indices where: index % 4 equals 3. Skip null values.
         if ((NUM_RECORDS - 1 - k) % 4 == 3) {
           k++;
@@ -207,7 +201,11 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
         for (int j = 0; j < 4; j++) {
           Object[] values = rows.get(i + j);
           assertEquals(values.length, 1);
-          assertEquals(values[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - 1 - k)));
+          if (k >= NUM_RECORDS) {
+            assertNull(values[0]);
+          } else {
+            assertEquals(values[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - 1 - k)));
+          }
         }
         k++;
       }
@@ -223,8 +221,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 10);
       int i = 0;
-      int index = 0;
-      while (index < rows.size() - 1) {
+      for (int index = 0; index < rows.size() - 1; index++) {
         Object[] row = rows.get(index);
         assertEquals(row.length, 1);
         // Null values are inserted at indices where: index % 4 equals 3. All null values are grouped into a single null
@@ -234,7 +231,6 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
         }
         assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)));
         i++;
-        index++;
       }
       // The default null ordering is 'NULLS LAST'. Therefore, null will appear as the last record.
       assertNull(rows.get(rows.size() - 1)[0]);
@@ -315,7 +311,8 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      String query = String.format("SELECT COUNT(*) AS count, %s FROM testTable GROUP BY %s ORDER BY %s DESC",
+      String query = String.format(
+          "SELECT COUNT(*) AS count, %s FROM testTable GROUP BY %s ORDER BY %s DESC LIMIT 1000",
           BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
       ResultTable resultTable = brokerResponse.getResultTable();
@@ -323,25 +320,23 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       assertEquals(dataSchema, new DataSchema(new String[]{"count", BIG_DECIMAL_COLUMN},
           new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.BIG_DECIMAL}));
       List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 10);
+      assertEquals(rows.size(), 751);
       int i = 0;
-      for (int index = 0; index < 10; index++) {
+      for (int index = 0; index < 750; index++) {
         Object[] row = rows.get(index);
         assertEquals(row.length, 2);
-        if (index == 0) {
-          // The default null ordering is 'NULLS LAST'.
-          assertEquals(row[0], 1000L);
-          assertNull(row[1]);
-        } else {
-          if ((NUM_RECORDS - i - 1) % 4 == 3) {
-            // Null values are inserted at: index % 4 == 3. All null values are grouped into a single null.
-            i++;
-          }
-          assertEquals(row[0], 4L);
-          assertEquals(row[1], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - i - 1)).toPlainString());
+        if ((NUM_RECORDS - i - 1) % 4 == 3) {
+          // Null values are inserted at: index % 4 == 3. All null values are grouped into a single null.
+          i++;
         }
+        assertEquals(row[0], 4L);
+        assertEquals(row[1], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - i - 1)).toPlainString());
         i++;
       }
+      // The default null ordering is 'NULLS LAST'.
+      Object[] lastRow = rows.get(750);
+      assertEquals(lastRow[0], 1000L);
+      assertNull(lastRow[1]);
     }
     {
       String query = String.format("SELECT SUMPRECISION(%s) AS sum FROM testTable", BIG_DECIMAL_COLUMN);
@@ -363,25 +358,18 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
-      // Pinot loops through the column values from smallest to biggest and find every null bigger than lowerLimit and
-      // hence returns many nulls.
+      // Pinot loops through the column values from smallest to biggest. Null comparison always returns false.
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 30);
-      for (int i = 0; i < 17; i++) {
-        Object[] row = rows.get(i);
-        assertEquals(row.length, 1);
-        assertNull(row[0]);
-      }
       int i = 0;
-      for (int index = 17; index < 30; index++) {
+      for (int index = 0; index < 30; index++) {
         Object[] row = rows.get(index);
         assertEquals(row.length, 1);
         if ((69 + i + 1) % 4 == 3) {
           // Null values are inserted at: index % 4 == 3.
-          assertNull(row[0]);
-        } else {
-          assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69 + i + 1)));
+          i++;
         }
+        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69 + i + 1)));
         i++;
       }
     }
@@ -437,7 +425,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       assertEquals(dataSchema,
           new DataSchema(new String[]{"maxValue"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
       List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 7);
+      assertEquals(rows.size(), 6);
       int i = lowerLimit;
       for (int index = 0; index < 6; index++) {
         if (i % 4 == 3) {
@@ -449,10 +437,6 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
         assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)).doubleValue());
         i++;
       }
-      // The default null ordering is: 'NULLS LAST'. This is why the last record value is null.
-      Object[] row = rows.get(rows.size() - 1);
-      assertEquals(row.length, 1);
-      assertNull(row[0]);
     }
     {
       // This returns currently 25 rows instead of a single row!

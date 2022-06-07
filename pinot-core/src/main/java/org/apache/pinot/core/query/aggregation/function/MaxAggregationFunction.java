@@ -33,6 +33,8 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
   private static final double DEFAULT_INITIAL_VALUE = Double.NEGATIVE_INFINITY;
+  // stores id of the groupKey where the corresponding value is null.
+  private Integer _groupKeyForNullValue = null;
 
   public MaxAggregationFunction(ExpressionContext expression) {
     super(expression);
@@ -57,51 +59,77 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    // Nulls should be ignored in aggregation functions (similar to Presto).
+    ImmutableRoaringBitmap nullBitmap = blockValSet.getNullBitmap();
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
         int[] values = blockValSet.getIntValuesSV();
-        int max = values[0];
-        for (int i = 0; i < length & i < values.length; i++) {
-          max = Math.max(values[i], max);
+        // First value can be null.
+        int max = Integer.MIN_VALUE;
+        if (nullBitmap == null || nullBitmap.getCardinality() < values.length) {
+          for (int i = 0; i < length & i < values.length; i++) {
+            if (nullBitmap == null || !nullBitmap.contains(i)) {
+              max = Math.max(values[i], max);
+            }
+          }
         }
+        // TODO: When all input values are null (nullBitmap.getCardinality() == values.length), Pinot returns
+        //  Integer.MIN_VALUE while Presto returns null. Same for other stored types.
         aggregationResultHolder.setValue(Math.max(max, aggregationResultHolder.getDoubleResult()));
         break;
       }
       case LONG: {
         long[] values = blockValSet.getLongValuesSV();
-        long max = values[0];
-        for (int i = 0; i < length & i < values.length; i++) {
-          max = Math.max(values[i], max);
+        long max = Long.MIN_VALUE;
+        if (nullBitmap == null || nullBitmap.getCardinality() < values.length) {
+          for (int i = 0; i < length & i < values.length; i++) {
+            if (nullBitmap == null || !nullBitmap.contains(i)) {
+              max = Math.max(values[i], max);
+            }
+          }
         }
         aggregationResultHolder.setValue(Math.max(max, aggregationResultHolder.getDoubleResult()));
         break;
       }
       case FLOAT: {
         float[] values = blockValSet.getFloatValuesSV();
-        float max = values[0];
-        for (int i = 0; i < length & i < values.length; i++) {
-          max = Math.max(values[i], max);
+        float max = Float.NEGATIVE_INFINITY;
+        if (nullBitmap == null || nullBitmap.getCardinality() < values.length) {
+          for (int i = 0; i < length & i < values.length; i++) {
+            if (nullBitmap == null || !nullBitmap.contains(i)) {
+              max = Math.max(values[i], max);
+            }
+          }
         }
         aggregationResultHolder.setValue(Math.max(max, aggregationResultHolder.getDoubleResult()));
         break;
       }
       case DOUBLE: {
         double[] values = blockValSet.getDoubleValuesSV();
-        double max = values[0];
-        for (int i = 0; i < length & i < values.length; i++) {
-          max = Math.max(values[i], max);
+        double max = Double.NEGATIVE_INFINITY;
+        if (nullBitmap == null || nullBitmap.getCardinality() < values.length) {
+          for (int i = 0; i < length & i < values.length; i++) {
+            if (nullBitmap == null || !nullBitmap.contains(i)) {
+              max = Math.max(values[i], max);
+            }
+          }
         }
         aggregationResultHolder.setValue(Math.max(max, aggregationResultHolder.getDoubleResult()));
         break;
       }
       case BIG_DECIMAL: {
         BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
-        BigDecimal max = values[0];
-        for (int i = 0; i < length & i < values.length; i++) {
-          max = values[i].max(max);
+        BigDecimal max = null;
+        if (nullBitmap == null || nullBitmap.getCardinality() < values.length) {
+          for (int i = 0; i < length & i < values.length; i++) {
+            if (nullBitmap == null || !nullBitmap.contains(i)) {
+              max = max == null ? values[i] : values[i].max(max);
+            }
+          }
         }
         // TODO: even though the source data has BIG_DECIMAL type, we still only support double precision.
-        aggregationResultHolder.setValue(Math.max(max.doubleValue(), aggregationResultHolder.getDoubleResult()));
+        aggregationResultHolder.setValue(Math.max(max == null ? Double.NEGATIVE_INFINITY : max.doubleValue(),
+            aggregationResultHolder.getDoubleResult()));
         break;
       }
       default:
@@ -114,19 +142,24 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     double[] valueArray = blockValSet.getDoubleValuesSV();
-    // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
     ImmutableRoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-    for (int i = 0; i < length; i++) {
-      double value = valueArray[i];
-      int groupKey = groupKeyArray[i];
-      Double result = groupByResultHolder.getDoubleResult(groupKey);
-      if (result != null && value > groupByResultHolder.getDoubleResult(groupKey)) {
-        if (nullBitmap.contains(i)) {
-          groupByResultHolder.setValueForKey(groupKey, null);
-        } else {
+    if (nullBitmap == null || nullBitmap.getCardinality() < length) {
+      for (int i = 0; i < length; i++) {
+        double value = valueArray[i];
+        int groupKey = groupKeyArray[i];
+        double result = groupByResultHolder.getDoubleResult(groupKey);
+        // Preserve null group key.
+        if (nullBitmap != null && nullBitmap.contains(i)) {
+          // The default value of un-initialized result could be -Infinity (dim column), so don't compare value w/ result.
+          // There should be only one groupKey for the null value.
+          assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKey;
+          _groupKeyForNullValue = groupKey;
+        } else if (value > result) {
           groupByResultHolder.setValueForKey(groupKey, value);
         }
       }
+    } else {
+      _groupKeyForNullValue = groupKeyArray[0];
     }
   }
 
@@ -151,21 +184,25 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public Double extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+    if (_groupKeyForNullValue != null && _groupKeyForNullValue == groupKey) {
+      return null;
+    }
     return groupByResultHolder.getDoubleResult(groupKey);
   }
 
   @Override
-  public Double merge(Double intermediateResult1, Double intermediateResult2) {
-    if (intermediateResult1 == null) {
-      return intermediateResult1;
-    } else if (intermediateResult2 == null) {
-      return intermediateResult2;
+  public Double merge(Double intermediateMaxResult1, Double intermediateMaxResult2) {
+    if (intermediateMaxResult1 == null) {
+      return intermediateMaxResult2;
+    }
+    if (intermediateMaxResult2 == null) {
+      return intermediateMaxResult1;
     }
 
-    if (intermediateResult1 > intermediateResult2) {
-      return intermediateResult1;
+    if (intermediateMaxResult1 > intermediateMaxResult2) {
+      return intermediateMaxResult1;
     } else {
-      return intermediateResult2;
+      return intermediateMaxResult2;
     }
   }
 

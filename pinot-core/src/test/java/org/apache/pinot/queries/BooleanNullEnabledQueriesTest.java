@@ -50,25 +50,25 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
- * Queries test for BOOLEAN data type with nullHandlingEnabled and no dictionary column.
+ * Queries test for BOOLEAN data type with nullHandlingEnabled.
  */
-public class BooleanNullEnabledNoDictQueriesTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "BooleanQueriesTest");
+public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "BooleanNullEnabledQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
 
   private static final int NUM_RECORDS = 1000;
+  private static List<GenericRow> _records;
 
   private static final String BOOLEAN_COLUMN = "booleanColumn";
   private static final Schema SCHEMA =
       new Schema.SchemaBuilder().addSingleValueDimension(BOOLEAN_COLUMN, DataType.BOOLEAN).build();
-  private static final TableConfig TABLE_CONFIG =
-      new TableConfigBuilder(TableType.OFFLINE).setNoDictionaryColumns(Arrays.asList(BOOLEAN_COLUMN))
-          .setTableName(RAW_TABLE_NAME).build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -93,7 +93,7 @@ public class BooleanNullEnabledNoDictQueriesTest extends BaseQueriesTest {
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
 
-    List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
+    _records = new ArrayList<>(NUM_RECORDS);
     for (int i = 0; i < NUM_RECORDS; i++) {
       GenericRow record = new GenericRow();
       // Insert data in 6 different formats
@@ -122,17 +122,22 @@ public class BooleanNullEnabledNoDictQueriesTest extends BaseQueriesTest {
         default:
           break;
       }
-      records.add(record);
+      _records.add(record);
     }
+  }
 
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
+  private void setUp(TableConfig tableConfig)
+      throws Exception {
+    FileUtils.deleteDirectory(INDEX_DIR);
+
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setNullHandlingEnabled(true);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(_records));
     driver.build();
 
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.mmap);
@@ -141,6 +146,28 @@ public class BooleanNullEnabledNoDictQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testQueriesWithDictColumn()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .build();
+    setUp(tableConfig);
+    testQueries();
+  }
+
+  @Test(priority = 1)
+  public void testQueriesWithNoDictColumn()
+      throws Exception {
+    List<String> noDictionaryColumns = new ArrayList<String>();
+    noDictionaryColumns.add(BOOLEAN_COLUMN);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(noDictionaryColumns)
+        .build();
+    setUp(tableConfig);
+    testQueries();
+  }
+
   public void testQueries() {
     Map<String, Object> pinotConfigProperties = new HashMap<>();
     pinotConfigProperties.put(CommonConstants.Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, 4);
@@ -197,18 +224,28 @@ public class BooleanNullEnabledNoDictQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      String query = "SELECT * FROM testTable ORDER BY booleanColumn DESC LIMIT 20";
+      String query = "SELECT * FROM testTable ORDER BY booleanColumn DESC LIMIT 4000";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{"booleanColumn"}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
       List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 20);
-      for (int i = 0; i < 20; i++) {
+      assertEquals(rows.size(), 4000);
+      for (int i = 0; i < 1716; i++) {
         Object[] row = rows.get(i);
         assertEquals(row.length, 1);
-        // Note 2: The default null ordering is 'NULLS LAST'.
+        assertTrue((boolean) row[0]);
+      }
+      for (int i = 1716; i < 3432; i++) {
+        Object[] row = rows.get(i);
+        assertEquals(row.length, 1);
+        assertFalse((boolean) row[0]);
+      }
+      for (int i = 3432; i < 4000; i++) {
+        Object[] row = rows.get(i);
+        assertEquals(row.length, 1);
+        // Note 2: The default null ordering is 'NULLS LAST', regardless of the ordering direction.
         assertNull(row[0]);
       }
     }

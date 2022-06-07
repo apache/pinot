@@ -67,6 +67,8 @@ public interface SegmentMetadata {
 
   int getTotalDocs();
 
+  int getTotalNonNullDocs();
+
   File getIndexDir();
 
   @Nullable

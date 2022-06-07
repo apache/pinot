@@ -46,6 +46,7 @@ import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
@@ -185,14 +186,22 @@ public class AggregationPlanNode implements PlanNode {
     if (filterOperator.isResultMatchingAll()) {
       if (isFitForNonScanBasedPlan(aggregationFunctions, _indexSegment)) {
         DataSource[] dataSources = new DataSource[aggregationFunctions.length];
+        boolean skipNonScanBasedAggregation = false;
         for (int i = 0; i < aggregationFunctions.length; i++) {
           List<?> inputExpressions = aggregationFunctions[i].getInputExpressions();
           if (!inputExpressions.isEmpty()) {
             String column = ((ExpressionContext) inputExpressions.get(0)).getIdentifier();
             dataSources[i] = _indexSegment.getDataSource(column);
+            NullValueVectorReader nullValueReader = dataSources[i].getNullValueVector();
+            if (nullValueReader != null && nullValueReader.getNullBitmap().getCardinality() > 0) {
+              skipNonScanBasedAggregation = true;
+              break;
+            }
           }
         }
-        return new NonScanBasedAggregationOperator(aggregationFunctions, dataSources, numTotalDocs);
+        if (!skipNonScanBasedAggregation) {
+          return new NonScanBasedAggregationOperator(aggregationFunctions, dataSources, numTotalDocs);
+        }
       }
     }
 

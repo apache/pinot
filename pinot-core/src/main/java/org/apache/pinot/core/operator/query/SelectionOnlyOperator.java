@@ -65,20 +65,14 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
     _blockValSets = new BlockValSet[numExpressions];
     String[] columnNames = new String[numExpressions];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
-    FieldSpec[] columnFieldSpecs = new FieldSpec[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
       ExpressionContext expression = _expressions.get(i);
       TransformResultMetadata expressionMetadata = _transformOperator.getResultMetadata(expression);
       columnNames[i] = expression.toString();
       columnDataTypes[i] =
           DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
-      columnFieldSpecs[i] = _transformOperator.getFieldSpec(expression);
-      if (columnFieldSpecs[i] == null) {
-        columnFieldSpecs[i] = new MetricFieldSpec(columnNames[i], columnDataTypes[i].toDataType().getStoredType(),
-            null);
-      }
     }
-    _dataSchema = new DataSchema(columnNames, columnDataTypes, columnFieldSpecs);
+    _dataSchema = new DataSchema(columnNames, columnDataTypes);
 
     _numRowsToKeep = queryContext.getLimit();
     _rows = new ArrayList<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
@@ -106,7 +100,6 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
 
       int numExpressions = _expressions.size();
       for (int i = 0; i < numExpressions; i++) {
-        // todo: how to concatenate NullBitmap from diff. blocks?
         _blockValSets[i] = transformBlock.getBlockValueSet(_expressions.get(i));
         _nullBitmaps[i] = _blockValSets[i].getNullBitmap();
       }
@@ -116,7 +109,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
       for (int docId = 0; docId < numDocsToAdd; docId++) {
         Object[] values = blockValueFetcher.getRow(docId);
         for (int colId = 0; colId < numExpressions; colId++) {
-          if (_nullBitmaps[colId].contains(docId)) {
+          if (_nullBitmaps[colId] != null && _nullBitmaps[colId].contains(docId)) {
             values[colId] = null;
           }
         }

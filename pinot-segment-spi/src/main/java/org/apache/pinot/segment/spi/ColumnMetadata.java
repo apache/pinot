@@ -67,8 +67,6 @@ public interface ColumnMetadata {
 
   Comparable getMaxValue();
 
-  boolean hasNull();
-
   @JsonProperty
   boolean hasDictionary();
 

@@ -31,7 +31,9 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
  */
 public interface BlockValSet {
 
-  // todo(nhejazi): add documentation.
+  /**
+   * Returns the null value bitmap in the value set.
+   */
   ImmutableRoaringBitmap getNullBitmap();
 
   /**

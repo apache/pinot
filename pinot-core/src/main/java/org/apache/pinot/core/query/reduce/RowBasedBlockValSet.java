@@ -55,7 +55,9 @@ public class RowBasedBlockValSet implements BlockValSet {
 
   @Override
   public ImmutableRoaringBitmap getNullBitmap() {
-    throw new NotImplementedException();
+    // TODO: The assumption for now is that the rows in RowBasedBlockValSet contain non-null values.
+    //  Update to pass nullBitmap in constructor if rows have null values. Alternatively, compute nullBitmap on the fly.
+    return null;
   }
 
   @Override

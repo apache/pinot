@@ -33,6 +33,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -48,6 +49,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationFunction<BigDecimal, BigDecimal> {
   private final Integer _precision;
   private final Integer _scale;
+  private Integer _groupKeyForNullValue = null;
 
   public SumPrecisionAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
@@ -87,37 +89,82 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BigDecimal sum = getDefaultResult(aggregationResultHolder);
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    ImmutableRoaringBitmap nullBitmap = blockValSet.getNullBitmap();
     switch (blockValSet.getValueType().getStoredType()) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
-        for (int i = 0; i < length; i++) {
-          sum = sum.add(BigDecimal.valueOf(intValues[i]));
+        if (nullBitmap == null || nullBitmap.getCardinality() < length) {
+          for (int i = 0; i < length; i++) {
+            if (nullBitmap == null || !nullBitmap.contains(i)) {
+              sum = sum.add(BigDecimal.valueOf(intValues[i]));
+            }
+          }
         }
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
-        for (int i = 0; i < length; i++) {
-          sum = sum.add(BigDecimal.valueOf(longValues[i]));
+        if (nullBitmap == null || nullBitmap.getCardinality() < length) {
+          for (int i = 0; i < length; i++) {
+            if (nullBitmap == null || !nullBitmap.contains(i)) {
+              sum = sum.add(BigDecimal.valueOf(longValues[i]));
+            }
+          }
         }
         break;
       case FLOAT:
+        float[] floatValues = blockValSet.getFloatValuesSV();
+        if (nullBitmap == null || nullBitmap.getCardinality() < length) {
+          for (int i = 0; i < length; i++) {
+            if (nullBitmap == null || !nullBitmap.contains(i)) {
+              if (Float.isFinite(floatValues[i])) {
+                sum = sum.add(BigDecimal.valueOf(floatValues[i]));
+              }
+            }
+          }
+        }
+        break;
       case DOUBLE:
+        double[] doubleValues = blockValSet.getDoubleValuesSV();
+        if (nullBitmap == null || nullBitmap.getCardinality() < length) {
+          for (int i = 0; i < length; i++) {
+            if (nullBitmap == null || !nullBitmap.contains(i)) {
+              // If nullHandlingEnabled is set to false, and the column is a dimension, check that double is Finite.
+              // TODO: thorw an exception here instead of ignoring infinite values?
+              if (Double.isFinite(doubleValues[i])) {
+                sum = sum.add(BigDecimal.valueOf(doubleValues[i]));
+              }
+            }
+          }
+        }
+        break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
-        for (int i = 0; i < length; i++) {
-          sum = sum.add(new BigDecimal(stringValues[i]));
+        if (nullBitmap == null || nullBitmap.getCardinality() < length) {
+          for (int i = 0; i < length; i++) {
+            if (nullBitmap == null || !nullBitmap.contains(i)) {
+              sum = sum.add(new BigDecimal(stringValues[i]));
+            }
+          }
         }
         break;
       case BIG_DECIMAL:
         BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
-        for (int i = 0; i < length; i++) {
-          sum = sum.add(bigDecimalValues[i]);
+        if (nullBitmap == null || nullBitmap.getCardinality() < length) {
+          for (int i = 0; i < length; i++) {
+            if (nullBitmap == null || !nullBitmap.contains(i)) {
+              sum = sum.add(bigDecimalValues[i]);
+            }
+          }
         }
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        for (int i = 0; i < length; i++) {
-          sum = sum.add(BigDecimalUtils.deserialize(bytesValues[i]));
+        if (nullBitmap == null || nullBitmap.getCardinality() < length) {
+          for (int i = 0; i < length; i++) {
+            if (nullBitmap == null || !nullBitmap.contains(i)) {
+              sum = sum.add(BigDecimalUtils.deserialize(bytesValues[i]));
+            }
+          }
         }
         break;
       default:
@@ -130,52 +177,99 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    ImmutableRoaringBitmap nullBitmap = blockValSet.getNullBitmap();
     switch (blockValSet.getValueType().getStoredType()) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
-        for (int i = 0; i < length; i++) {
-          int groupKey = groupKeyArray[i];
-          BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-          sum = sum.add(BigDecimal.valueOf(intValues[i]));
-          groupByResultHolder.setValueForKey(groupKey, sum);
+        if (nullBitmap == null || nullBitmap.getCardinality() < length) {
+          for (int i = 0; i < length; i++) {
+            int groupKey = groupKeyArray[i];
+            if (nullBitmap != null && nullBitmap.contains(i)) {
+              // There should be only one groupKey for the null value.
+              assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKey;
+              _groupKeyForNullValue = groupKey;
+            } else {
+              BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
+              sum = sum.add(BigDecimal.valueOf(intValues[i]));
+              groupByResultHolder.setValueForKey(groupKey, sum);
+            }
+          }
+        } else {
+          _groupKeyForNullValue = groupKeyArray[0];
         }
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
-        for (int i = 0; i < length; i++) {
-          int groupKey = groupKeyArray[i];
-          BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-          sum = sum.add(BigDecimal.valueOf(longValues[i]));
-          groupByResultHolder.setValueForKey(groupKey, sum);
+        if (nullBitmap == null || nullBitmap.getCardinality() < length) {
+          for (int i = 0; i < length; i++) {
+            int groupKey = groupKeyArray[i];
+            if (nullBitmap != null && nullBitmap.contains(i)) {
+              assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKey;
+              _groupKeyForNullValue = groupKey;
+            } else {
+              BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
+              sum = sum.add(BigDecimal.valueOf(longValues[i]));
+              groupByResultHolder.setValueForKey(groupKey, sum);
+            }
+          }
+        } else {
+          _groupKeyForNullValue = groupKeyArray[0];
         }
         break;
       case FLOAT:
       case DOUBLE:
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
-        for (int i = 0; i < length; i++) {
-          int groupKey = groupKeyArray[i];
-          BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-          sum = sum.add(new BigDecimal(stringValues[i]));
-          groupByResultHolder.setValueForKey(groupKey, sum);
+        if (nullBitmap == null || nullBitmap.getCardinality() < length) {
+          for (int i = 0; i < length; i++) {
+            int groupKey = groupKeyArray[i];
+            if (nullBitmap != null && nullBitmap.contains(i)) {
+              assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKey;
+              _groupKeyForNullValue = groupKey;
+            } else {
+              BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
+              sum = sum.add(new BigDecimal(stringValues[i]));
+              groupByResultHolder.setValueForKey(groupKey, sum);
+            }
+          }
+        } else {
+          _groupKeyForNullValue = groupKeyArray[0];
         }
         break;
       case BIG_DECIMAL:
         BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
-        for (int i = 0; i < length; i++) {
-          int groupKey = groupKeyArray[i];
-          BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-          sum = sum.add(bigDecimalValues[i]);
-          groupByResultHolder.setValueForKey(groupKey, sum);
+        if (nullBitmap == null || nullBitmap.getCardinality() < length) {
+          for (int i = 0; i < length; i++) {
+            int groupKey = groupKeyArray[i];
+            if (nullBitmap != null && nullBitmap.contains(i)) {
+              assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKey;
+              _groupKeyForNullValue = groupKey;
+            } else {
+              BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
+              sum = sum.add(bigDecimalValues[i]);
+              groupByResultHolder.setValueForKey(groupKey, sum);
+            }
+          }
+        } else {
+          _groupKeyForNullValue = groupKeyArray[0];
         }
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        for (int i = 0; i < length; i++) {
-          int groupKey = groupKeyArray[i];
-          BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-          sum = sum.add(BigDecimalUtils.deserialize(bytesValues[i]));
-          groupByResultHolder.setValueForKey(groupKey, sum);
+        if (nullBitmap == null || nullBitmap.getCardinality() < length) {
+          for (int i = 0; i < length; i++) {
+            int groupKey = groupKeyArray[i];
+            if (nullBitmap != null && nullBitmap.contains(i)) {
+              assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKey;
+              _groupKeyForNullValue = groupKey;
+            } else {
+              BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
+              sum = sum.add(BigDecimalUtils.deserialize(bytesValues[i]));
+              groupByResultHolder.setValueForKey(groupKey, sum);
+            }
+          }
+        } else {
+          _groupKeyForNullValue = groupKeyArray[0];
         }
         break;
       default:
@@ -257,11 +351,20 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
 
   @Override
   public BigDecimal extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+    if (_groupKeyForNullValue != null && _groupKeyForNullValue == groupKey) {
+      return null;
+    }
     return getDefaultResult(groupByResultHolder, groupKey);
   }
 
   @Override
   public BigDecimal merge(BigDecimal intermediateResult1, BigDecimal intermediateResult2) {
+    if (intermediateResult1 == null) {
+      return intermediateResult2;
+    }
+    if (intermediateResult2 == null) {
+      return intermediateResult1;
+    }
     return intermediateResult1.add(intermediateResult2);
   }
 
@@ -277,6 +380,9 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
 
   @Override
   public BigDecimal extractFinalResult(BigDecimal intermediateResult) {
+    if (intermediateResult == null) {
+      return null;
+    }
     if (_precision == null) {
       return intermediateResult;
     }

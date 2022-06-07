@@ -353,6 +353,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
+  public int getTotalNonNullDocs() {
+    return 0;
+  }
+
+  @Override
   public File getIndexDir() {
     return _indexDir;
   }

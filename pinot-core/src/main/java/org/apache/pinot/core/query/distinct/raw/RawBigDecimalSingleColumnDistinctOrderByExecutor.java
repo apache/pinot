@@ -26,7 +26,7 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
@@ -36,9 +36,9 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 public class RawBigDecimalSingleColumnDistinctOrderByExecutor extends BaseRawBigDecimalSingleColumnDistinctExecutor {
   private final PriorityQueue<BigDecimal> _priorityQueue;
 
-  public RawBigDecimalSingleColumnDistinctOrderByExecutor(ExpressionContext expression, FieldSpec fieldSpec,
+  public RawBigDecimalSingleColumnDistinctOrderByExecutor(ExpressionContext expression, DataType dataType,
       OrderByExpressionContext orderByExpression, int limit) {
-    super(expression, fieldSpec, limit);
+    super(expression, dataType, limit);
 
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;
@@ -53,7 +53,7 @@ public class RawBigDecimalSingleColumnDistinctOrderByExecutor extends BaseRawBig
     ImmutableRoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
     int numDocs = transformBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
-      BigDecimal value = nullBitmap.contains(i) ? null : values[i];
+      BigDecimal value = nullBitmap != null && nullBitmap.contains(i) ? null : values[i];
       if (!_valueSet.contains(value)) {
         if (_valueSet.size() < _limit) {
           _valueSet.add(value);

@@ -36,6 +36,8 @@ public interface DataTable {
   // TODO: remove this when we stop supporting DataTable V2.
   String EXCEPTION_METADATA_KEY = "Exception";
 
+  int getVersion();
+
   void addException(ProcessingException processingException);
 
   void addException(int exceptionCode, String exceptionMsg);
@@ -77,7 +79,7 @@ public interface DataTable {
 
   String[] getStringArray(int rowId, int colId);
 
-  MutableRoaringBitmap getColumnNullBitmap(int colId);
+  MutableRoaringBitmap getNullRowIds(int colId);
 
   DataTable toMetadataOnlyDataTable();
 

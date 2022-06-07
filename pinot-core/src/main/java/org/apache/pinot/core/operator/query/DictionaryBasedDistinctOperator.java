@@ -108,8 +108,6 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
     } else {
       if (_dictionary.isSorted()) {
         records = new ArrayList<>(actualLimit);
-        // todo(nhejazi): cannot persist the fact that dictionary stores a null value since dictionary
-        //  serialization format is not easily upgradable. Handle in separate PR.
         if (_isAscending) {
           _numDocsScanned = actualLimit;
           for (int i = 0; i < actualLimit; i++) {

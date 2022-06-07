@@ -94,27 +94,26 @@ public class SelectionOperatorUtils {
     }
 
     List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-    if (selectExpressions.size() == 1 && selectExpressions.get(0).equals(IDENTIFIER_STAR)) {
-      // For 'SELECT *', sort all columns (ignore columns that start with '$') so that the order is deterministic
-      Set<String> allColumns = indexSegment.getColumnNames();
-      List<String> selectColumns = new ArrayList<>(allColumns.size());
-      for (String column : allColumns) {
-        if (column.charAt(0) != '$') {
-          selectColumns.add(column);
+    for (ExpressionContext selectExpression : selectExpressions) {
+      // Handle a case like: SELECT *, 1 FROM table.
+      if (selectExpression.equals(IDENTIFIER_STAR)) {
+        // For 'SELECT *', sort all columns (ignore columns that start with '$') so that the order is deterministic
+        Set<String> allColumns = indexSegment.getColumnNames();
+        List<String> selectColumns = new ArrayList<>(allColumns.size());
+        for (String column : allColumns) {
+          if (column.charAt(0) != '$') {
+            selectColumns.add(column);
+          }
         }
-      }
-      selectColumns.sort(null);
-      for (String column : selectColumns) {
-        ExpressionContext expression = ExpressionContext.forIdentifier(column);
-        if (!expressionSet.contains(expression)) {
-          expressions.add(expression);
+        selectColumns.sort(null);
+        for (String column : selectColumns) {
+          ExpressionContext expression = ExpressionContext.forIdentifier(column);
+          if (!expressionSet.contains(expression)) {
+            expressions.add(expression);
+          }
         }
-      }
-    } else {
-      for (ExpressionContext selectExpression : selectExpressions) {
-        if (expressionSet.add(selectExpression)) {
-          expressions.add(selectExpression);
-        }
+      } else if (expressionSet.add(selectExpression)) {
+        expressions.add(selectExpression);
       }
     }
 
@@ -239,14 +238,15 @@ public class SelectionOperatorUtils {
 
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
 
-    // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
-    FieldSpec[] columnFieldSpecs = dataSchema.getColumnFieldSpecs();
-    assert columnFieldSpecs != null;
+    // TODO(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
     Object[] columnDefaultNullValues = new Object[numColumns];
-    RoaringBitmap[] columnNullBitmap = new RoaringBitmap[numColumns];
+    RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
     for (int colId = 0; colId < numColumns; colId++) {
-      columnDefaultNullValues[colId] = columnFieldSpecs[colId].getDefaultNullValue();
-      columnNullBitmap[colId] = new RoaringBitmap();
+      if (storedColumnDataTypes[colId] != ColumnDataType.OBJECT && !storedColumnDataTypes[colId].isArray()) {
+        columnDefaultNullValues[colId] = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC,
+            storedColumnDataTypes[colId].toDataType(), null);
+      }
+      nullBitmaps[colId] = new RoaringBitmap();
     }
 
     int rowId = 0;
@@ -256,7 +256,7 @@ public class SelectionOperatorUtils {
         Object columnValue = row[i];
         if (columnValue == null) {
           columnValue = columnDefaultNullValues[i];
-          columnNullBitmap[i].add(rowId);
+          nullBitmaps[i].add(rowId);
         }
         switch (storedColumnDataTypes[i]) {
           // Single-value column
@@ -339,9 +339,11 @@ public class SelectionOperatorUtils {
       rowId++;
     }
 
-    // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
-    for (int colId = 0; colId < numColumns; colId++) {
-      dataTableBuilder.setColumnNullBitmap(columnNullBitmap[colId].toMutableRoaringBitmap());
+    // TODO(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
+    if (DataTableBuilder.getCurrentDataTableVersion() >= DataTableBuilder.VERSION_4) {
+      for (int colId = 0; colId < numColumns; colId++) {
+        dataTableBuilder.setNullRowIds(nullBitmaps[colId].toMutableRoaringBitmap());
+      }
     }
     return dataTableBuilder.build();
   }
@@ -420,13 +422,15 @@ public class SelectionOperatorUtils {
     List<Object[]> rows = new ArrayList<>(Math.min(limit, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
     MutableRoaringBitmap[] columnNullBitmaps = null;
     for (DataTable dataTable : dataTables) {
-      // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
       int numColumns = dataTable.getDataSchema().size();
-      if (columnNullBitmaps == null) {
-        columnNullBitmaps = new MutableRoaringBitmap[numColumns];
-      }
-      for (int coldId = 0; coldId < numColumns; coldId++) {
-        columnNullBitmaps[coldId] = dataTable.getColumnNullBitmap(coldId);
+      // TODO(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
+      if (dataTable.getVersion() >= DataTableBuilder.VERSION_4) {
+        if (columnNullBitmaps == null) {
+          columnNullBitmaps = new MutableRoaringBitmap[numColumns];
+        }
+        for (int coldId = 0; coldId < numColumns; coldId++) {
+          columnNullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
+        }
       }
 
       int numRows = dataTable.getNumberOfRows();
@@ -434,7 +438,8 @@ public class SelectionOperatorUtils {
         if (rows.size() < limit) {
           Object[] row = extractRowFromDataTable(dataTable, rowId);
           for (int colId = 0; colId < numColumns; colId++) {
-            if (columnNullBitmaps[colId].contains(rowId)) {
+            if (columnNullBitmaps != null && columnNullBitmaps[colId] != null
+                && columnNullBitmaps[colId].contains(rowId)) {
               row[colId] = null;
             }
           }

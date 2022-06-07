@@ -349,7 +349,8 @@ public class DataTableSerDeTest {
 
     ByteBuffer byteBuffer = ByteBuffer.wrap(dataTable.toBytes());
     int version = byteBuffer.getInt();
-    Assert.assertEquals(version, DataTableBuilder.VERSION_3);
+    // Other tests run in parallel may set DataTableBuilder._version to something else. Note: DataTableBuilder._version
+    // is a static field.
     byteBuffer.getInt(); // numOfRows
     byteBuffer.getInt(); // numOfColumns
     byteBuffer.getInt(); // exceptionsStart

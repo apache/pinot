@@ -27,6 +27,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 
 /**
@@ -36,11 +37,13 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 public class IdentifierTransformFunction implements TransformFunction, PushDownTransformFunction {
   private final String _columnName;
   private final Dictionary _dictionary;
+  private final NullValueVectorReader _nullValueVectorReader;
   private final TransformResultMetadata _resultMetadata;
 
   public IdentifierTransformFunction(String columnName, DataSource dataSource) {
     _columnName = columnName;
     _dictionary = dataSource.getDictionary();
+    _nullValueVectorReader = dataSource.getNullValueVector();
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     _resultMetadata = new TransformResultMetadata(dataSourceMetadata.getDataType(), dataSourceMetadata.isSingleValue(),
         _dictionary != null);
@@ -68,6 +71,11 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   @Override
   public Dictionary getDictionary() {
     return _dictionary;
+  }
+
+  @Override
+  public NullValueVectorReader getNullValueVectorReader() {
+    return _nullValueVectorReader;
   }
 
   @Override

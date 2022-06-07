@@ -24,6 +24,7 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -39,8 +40,12 @@ public class RawBytesSingleColumnDistinctOnlyExecutor extends BaseRawBytesSingle
   public boolean process(TransformBlock transformBlock) {
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
     byte[][] values = blockValueSet.getBytesValuesSV();
+    ImmutableRoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
     int numDocs = transformBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
+      if (nullBitmap != null && nullBitmap.contains(i)) {
+        values[i] = null;
+      }
       _valueSet.add(new ByteArray(values[i]));
       if (_valueSet.size() >= _limit) {
         return true;

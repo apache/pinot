@@ -38,14 +38,14 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public class BaseRawBigDecimalSingleColumnDistinctExecutor implements DistinctExecutor {
   final ExpressionContext _expression;
-  final FieldSpec _fieldSpec;
+  final FieldSpec.DataType _dataType;
   final int _limit;
 
   final ObjectSet<BigDecimal> _valueSet;
 
-  BaseRawBigDecimalSingleColumnDistinctExecutor(ExpressionContext expression, FieldSpec fieldSpec, int limit) {
+  BaseRawBigDecimalSingleColumnDistinctExecutor(ExpressionContext expression, FieldSpec.DataType dataType, int limit) {
     _expression = expression;
-    _fieldSpec = fieldSpec;
+    _dataType = dataType;
     _limit = limit;
 
     _valueSet = new ObjectOpenHashSet<>(Math.min(limit, MAX_INITIAL_CAPACITY));
@@ -59,8 +59,7 @@ public class BaseRawBigDecimalSingleColumnDistinctExecutor implements DistinctEx
   @Override
   public DistinctTable getResult() {
     DataSchema dataSchema = new DataSchema(new String[]{_expression.toString()},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.fromDataTypeSV(_fieldSpec.getDataType())},
-        new FieldSpec[] {_fieldSpec});
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.fromDataTypeSV(_dataType)});
     List<Record> records = new ArrayList<>(_valueSet.size());
     for (BigDecimal value : _valueSet) {
       records.add(new Record(new Object[]{value}));

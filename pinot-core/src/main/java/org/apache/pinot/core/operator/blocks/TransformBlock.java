@@ -54,9 +54,8 @@ public class TransformBlock implements Block {
   public BlockValSet getBlockValueSet(ExpressionContext expression) {
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
       return _projectionBlock.getBlockValueSet(expression.getIdentifier());
-    } else {
-      return new TransformBlockValSet(_projectionBlock, _transformFunctionMap.get(expression), expression);
     }
+    return new TransformBlockValSet(_projectionBlock, _transformFunctionMap.get(expression), expression);
   }
 
   public BlockValSet getBlockValueSet(String column) {

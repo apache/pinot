@@ -235,11 +235,15 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     }
 
     IndexedTable indexedTable = _indexedTable;
-    indexedTable.finish(false);
+    if (indexedTable != null) {
+      indexedTable.finish(false);
+    }
     IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(indexedTable);
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
-    mergedBlock.setNumResizes(indexedTable.getNumResizes());
-    mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
+    if (indexedTable != null) {
+      mergedBlock.setNumResizes(indexedTable.getNumResizes());
+      mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
+    }
 
     // Set the processing exceptions.
     if (!_mergedProcessingExceptions.isEmpty()) {

@@ -23,7 +23,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
@@ -32,8 +32,8 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
  */
 public class RawBigDecimalSingleColumnDistinctOnlyExecutor extends BaseRawBigDecimalSingleColumnDistinctExecutor {
 
-  public RawBigDecimalSingleColumnDistinctOnlyExecutor(ExpressionContext expression, FieldSpec fieldSpec, int limit) {
-    super(expression, fieldSpec, limit);
+  public RawBigDecimalSingleColumnDistinctOnlyExecutor(ExpressionContext expression, DataType dataType, int limit) {
+    super(expression, dataType, limit);
   }
 
   @Override
@@ -43,7 +43,7 @@ public class RawBigDecimalSingleColumnDistinctOnlyExecutor extends BaseRawBigDec
     ImmutableRoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
     int numDocs = transformBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
-      if (nullBitmap.contains(i)) {
+      if (nullBitmap != null && nullBitmap.contains(i)) {
         values[i] = null;
       }
       _valueSet.add(values[i]);

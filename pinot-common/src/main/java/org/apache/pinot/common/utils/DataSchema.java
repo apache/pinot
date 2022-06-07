@@ -32,10 +32,7 @@ import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.EnumSet;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -50,7 +47,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class DataSchema {
   private final String[] _columnNames;
   private final ColumnDataType[] _columnDataTypes;
-  private final FieldSpec[] _columnFieldSpecs;
   private ColumnDataType[] _storedColumnDataTypes;
 
   /** Used by both Broker and Server to generate results for EXPLAIN PLAN queries. */
@@ -64,13 +60,6 @@ public class DataSchema {
       @JsonProperty("columnDataTypes") ColumnDataType[] columnDataTypes) {
     _columnNames = columnNames;
     _columnDataTypes = columnDataTypes;
-    _columnFieldSpecs = null;
-  }
-
-  public DataSchema(String[] columnNames, ColumnDataType[] columnDataTypes, FieldSpec[] columnFieldSpecs) {
-    _columnNames = columnNames;
-    _columnDataTypes = columnDataTypes;
-    _columnFieldSpecs = columnFieldSpecs;
   }
 
   public int size() {
@@ -91,10 +80,6 @@ public class DataSchema {
 
   public ColumnDataType[] getColumnDataTypes() {
     return _columnDataTypes;
-  }
-
-  public FieldSpec[] getColumnFieldSpecs() {
-    return _columnFieldSpecs;
   }
 
   @JsonIgnore
@@ -189,25 +174,6 @@ public class DataSchema {
       dataOutputStream.writeInt(bytes.length);
       dataOutputStream.write(bytes);
     }
-
-    // Write colum field specs.
-    // todo: consider serializing only defaultNullValues since this is the only required info.
-    int fieldSpecsSize = _columnFieldSpecs == null ? 0 : _columnFieldSpecs.length;
-    dataOutputStream.writeInt(fieldSpecsSize);
-    for (int i = 0; i < fieldSpecsSize; i++) {
-      FieldSpec fieldSpec = _columnFieldSpecs[i];
-      dataOutputStream.writeInt(fieldSpec == null ? 1 : 0);
-      if (fieldSpec != null) {
-        // todo: serialize defaultNullValue if not null?
-        byte[] bytes = fieldSpec.getName().getBytes(UTF_8);
-        dataOutputStream.writeInt(bytes.length);
-        dataOutputStream.write(bytes);
-        // Note: requires preserving enum ordering. Serialize enum string value (name)?
-        dataOutputStream.writeInt(fieldSpec.getFieldType().ordinal());
-        dataOutputStream.writeInt(fieldSpec.getDataType().ordinal());
-        dataOutputStream.writeInt(fieldSpec.isSingleValueField() ? 1 : 0);
-      }
-    }
     return byteArrayOutputStream.toByteArray();
   }
 
@@ -233,33 +199,6 @@ public class DataSchema {
       byte[] bytes = new byte[length];
       buffer.get(bytes);
       columnDataTypes[i] = ColumnDataType.valueOf(new String(bytes, UTF_8));
-    }
-    // Read colum field specs.
-    int fieldSpecsSize = buffer.getInt();
-    if (fieldSpecsSize > 0) {
-      FieldSpec[] columnFieldSpecs = new FieldSpec[fieldSpecsSize];
-      FieldSpec.FieldType[] fieldTypes = FieldSpec.FieldType.values();
-      FieldSpec.DataType[] fieldDataTypes = FieldSpec.DataType.values();
-      for (int i = 0; i < fieldSpecsSize; i++) {
-        boolean isNull = buffer.getInt() == 1;
-        if (!isNull) {
-          int length = buffer.getInt();
-          byte[] bytes = new byte[length];
-          buffer.get(bytes);
-          String name = new String(bytes, UTF_8);
-
-          FieldSpec.FieldType fieldType = fieldTypes[buffer.getInt()];
-          FieldSpec.DataType dataType = fieldDataTypes[buffer.getInt()];
-          boolean isSingleValueField = buffer.getInt() == 1;
-          if (fieldType == FieldSpec.FieldType.METRIC) {
-            columnFieldSpecs[i] = new MetricFieldSpec(name, dataType);
-            columnFieldSpecs[i].setSingleValueField(isSingleValueField);
-          } else {
-            columnFieldSpecs[i] = new DimensionFieldSpec(name, dataType, isSingleValueField);
-          }
-        }
-      }
-      return new DataSchema(columnNames, columnDataTypes, columnFieldSpecs);
     }
     return new DataSchema(columnNames, columnDataTypes);
   }
@@ -476,24 +415,24 @@ public class DataSchema {
     public Serializable convertAndFormat(Object value) {
       switch (this) {
         case INT:
-          return ((Number) value).intValue();
+          return value == null ? null : ((Number) value).intValue();
         case LONG:
-          return ((Number) value).longValue();
+          return value == null ? null : ((Number) value).longValue();
         case FLOAT:
-          return ((Number) value).floatValue();
+          return value == null ? null : ((Number) value).floatValue();
         case DOUBLE:
-          return ((Number) value).doubleValue();
+          return value == null ? null : ((Number) value).doubleValue();
         case BIG_DECIMAL:
           return (BigDecimal) value;
         case BOOLEAN:
           return value == null ? null : (Integer) value == 1;
         case TIMESTAMP:
-          return new Timestamp((long) value).toString();
+          return value == null ? null : new Timestamp((long) value).toString();
         case STRING:
         case JSON:
-          return value.toString();
+          return value == null ? null : value.toString();
         case BYTES:
-          return ((ByteArray) value).toHexString();
+          return value == null ? null : ((ByteArray) value).toHexString();
         case INT_ARRAY:
           return (int[]) value;
         case LONG_ARRAY:

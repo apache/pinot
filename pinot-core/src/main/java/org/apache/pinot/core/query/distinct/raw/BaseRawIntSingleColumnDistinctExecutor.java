@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.core.query.distinct.raw;
 
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
+import it.unimi.dsi.fastutil.ints.IntIterator;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -28,7 +29,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctTable;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -36,27 +37,35 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 abstract class BaseRawIntSingleColumnDistinctExecutor implements DistinctExecutor {
   final ExpressionContext _expression;
-  final FieldSpec _fieldSpec;
+  final DataType _dataType;
   final int _limit;
 
-  final ObjectSet<Integer> _valueSet;
+  final IntSet _valueSet;
+  // Stored outside _valueSet to continue to use an IntSet instead of ObjectOpenHashSet (avoid boxing/unboxing).
+  int _numNulls;
 
-  BaseRawIntSingleColumnDistinctExecutor(ExpressionContext expression, FieldSpec fieldSpec, int limit) {
+  BaseRawIntSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit) {
     _expression = expression;
-    _fieldSpec = fieldSpec;
+    _dataType = dataType;
     _limit = limit;
+    _numNulls = 0;
 
-    _valueSet = new ObjectOpenHashSet<>(Math.min(limit, MAX_INITIAL_CAPACITY));
+    _valueSet = new IntOpenHashSet(Math.min(limit, MAX_INITIAL_CAPACITY));
   }
 
   @Override
   public DistinctTable getResult() {
     DataSchema dataSchema = new DataSchema(new String[]{_expression.toString()},
-        new ColumnDataType[]{ColumnDataType.fromDataTypeSV(_fieldSpec.getDataType())}, new FieldSpec[] {_fieldSpec});
+        new ColumnDataType[]{ColumnDataType.fromDataTypeSV(_dataType)});
     List<Record> records = new ArrayList<>(_valueSet.size());
-    for (Integer i : _valueSet) {
-      records.add(new Record(new Object[]{i}));
+    IntIterator valueIterator = _valueSet.iterator();
+    while (valueIterator.hasNext()) {
+      records.add(new Record(new Object[]{valueIterator.nextInt()}));
     }
+    if (_numNulls == 1) {
+      records.add(new Record(new Object[]{null}));
+    }
+    assert records.size() <= _limit;
     return new DistinctTable(dataSchema, records);
   }
 }

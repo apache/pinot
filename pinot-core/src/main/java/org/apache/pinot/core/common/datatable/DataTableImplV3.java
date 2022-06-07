@@ -165,6 +165,11 @@ public class DataTableImplV3 extends BaseDataTable {
   }
 
   @Override
+  public int getVersion() {
+    return DataTableBuilder.VERSION_3;
+  }
+
+  @Override
   public void addException(ProcessingException processingException) {
     _errCodeToExceptionMap.put(processingException.getErrorCode(), processingException.getMessage());
   }
@@ -227,7 +232,7 @@ public class DataTableImplV3 extends BaseDataTable {
     // Write exceptions section offset(START|SIZE).
     dataOutputStream.writeInt(dataOffset);
     byte[] exceptionsBytes;
-    exceptionsBytes = serializeExceptions();
+    exceptionsBytes = serializeExceptions(_errCodeToExceptionMap);
     dataOutputStream.writeInt(exceptionsBytes.length);
     dataOffset += exceptionsBytes.length;
 
@@ -367,14 +372,14 @@ public class DataTableImplV3 extends BaseDataTable {
     return metadata;
   }
 
-  protected byte[] serializeExceptions()
+  protected static byte[] serializeExceptions(Map<Integer, String> errCodeToExceptionMap)
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 
-    dataOutputStream.writeInt(_errCodeToExceptionMap.size());
+    dataOutputStream.writeInt(errCodeToExceptionMap.size());
 
-    for (Map.Entry<Integer, String> entry : _errCodeToExceptionMap.entrySet()) {
+    for (Map.Entry<Integer, String> entry : errCodeToExceptionMap.entrySet()) {
       int key = entry.getKey();
       String value = entry.getValue();
       byte[] valueBytes = value.getBytes(UTF_8);

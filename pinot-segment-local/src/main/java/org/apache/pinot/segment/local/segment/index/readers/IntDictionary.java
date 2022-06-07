@@ -31,6 +31,8 @@ public class IntDictionary extends BaseImmutableDictionary {
 
   @Override
   public int insertionIndexOf(String stringValue) {
+    // TODO: Integer.parseInt throws java.lang.NumberFormatException for input string "69.0".
+    //  Use Double.parseDouble instead?
     return binarySearch(Integer.parseInt(stringValue));
   }
 

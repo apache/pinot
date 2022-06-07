@@ -209,7 +209,6 @@ public class InPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(int value) {
-      // todo(nhejazi): handle and test other data types.
       return _matchingValues.contains(value);
     }
 

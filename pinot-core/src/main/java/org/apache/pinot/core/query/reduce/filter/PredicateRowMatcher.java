@@ -43,7 +43,10 @@ public class PredicateRowMatcher implements RowMatcher {
   @Override
   public boolean isMatch(Object[] row) {
     Object value = _valueExtractor.extract(row);
-    boolean isNull = value == null;
+    if (value == null) {
+      // Any comparison (equality, inequality, IN) with null returns false (similar to Presto behavior).
+      return false;
+    }
     switch (_valueType) {
       case INT:
         return _predicateEvaluator.applySV((int) value);
@@ -52,10 +55,7 @@ public class PredicateRowMatcher implements RowMatcher {
       case FLOAT:
         return _predicateEvaluator.applySV((float) value);
       case DOUBLE:
-        // todo(nhejazi): handle nulls for other data types.
-
-        // The default null ordering is: 'NULLS LAST'.
-        return _predicateEvaluator.applySV(isNull ? Double.POSITIVE_INFINITY : (double) value);
+        return _predicateEvaluator.applySV((double) value);
       case BIG_DECIMAL:
         return _predicateEvaluator.applySV((BigDecimal) value);
       case BOOLEAN:

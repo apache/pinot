@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
-import java.math.BigDecimal;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -37,7 +36,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
-  private final ForwardIndexReader _forwardIndexReader;
+  private final ForwardIndexReader _reader;
   // TODO: Figure out a way to close the reader context
   //       ChunkReaderContext should be closed explicitly to release the off-heap buffer
   private final ForwardIndexReaderContext _readerContext;
@@ -53,7 +52,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader forwardIndexReader,
       NullValueVectorReader nullValueReader, int numDocs) {
     _predicateEvaluator = predicateEvaluator;
-    _forwardIndexReader = forwardIndexReader;
+    _reader = forwardIndexReader;
     _readerContext = forwardIndexReader.createContext();
     _numDocs = numDocs;
     _valueMatcher = getValueMatcher(nullValueReader);
@@ -62,7 +61,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader forwardIndexReader,
       int numDocs) {
     _predicateEvaluator = predicateEvaluator;
-    _forwardIndexReader = forwardIndexReader;
+    _reader = forwardIndexReader;
     _readerContext = forwardIndexReader.createContext();
     _numDocs = numDocs;
     _valueMatcher = getValueMatcher(null);
@@ -135,24 +134,24 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   private ValueMatcher getValueMatcher(NullValueVectorReader nullValueReader) {
-    if (_forwardIndexReader.isDictionaryEncoded()) {
-      return new DictIdMatcher();
+    if (_reader.isDictionaryEncoded()) {
+      return new DictIdMatcher(nullValueReader);
     } else {
-      switch (_forwardIndexReader.getValueType()) {
+      switch (_reader.getValueType()) {
         case INT:
           return new IntMatcher(nullValueReader);
         case LONG:
-          return new LongMatcher();
+          return new LongMatcher(nullValueReader);
         case FLOAT:
-          return new FloatMatcher();
+          return new FloatMatcher(nullValueReader);
         case DOUBLE:
-          return new DoubleMatcher();
+          return new DoubleMatcher(nullValueReader);
         case BIG_DECIMAL:
           return new BigDecimalMatcher(nullValueReader);
         case STRING:
-          return new StringMatcher();
+          return new StringMatcher(nullValueReader);
         case BYTES:
-          return new BytesMatcher();
+          return new BytesMatcher(nullValueReader);
         default:
           throw new UnsupportedOperationException();
       }
@@ -187,121 +186,211 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private class DictIdMatcher implements ValueMatcher {
 
     private final int[] _buffer = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
+    private final NullValueVectorReader _nullValueReader;
+    private final boolean _nullValueReaderPresent;
+
+    public DictIdMatcher(NullValueVectorReader nullValueReader) {
+      _nullValueReader = nullValueReader;
+      _nullValueReaderPresent = _nullValueReader != null;
+    }
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_forwardIndexReader.getDictId(docId, _readerContext));
+      if (_nullValueReaderPresent && _nullValueReader.isNull(docId)) {
+        return false;
+      }
+      return _predicateEvaluator.applySV(_reader.getDictId(docId, _readerContext));
     }
 
     @Override
     public int matchValues(int limit, int[] docIds) {
       _reader.readDictIds(docIds, limit, _buffer, _readerContext);
+      if (MatcherUtils.hasNullDoc(docIds, limit, _nullValueReader)) {
+        return _predicateEvaluator.applySV(limit, docIds, _buffer, _nullValueReader);
+      }
       return _predicateEvaluator.applySV(limit, docIds, _buffer);
     }
   }
 
-  // todo(nhejazi): null handling has been implemented for int/BigDecimal data types. Implement for other data types.
+  private static class MatcherUtils {
+    public static boolean hasNullDoc(int[] docIds, int limit, NullValueVectorReader nullValueReader) {
+      if (nullValueReader != null && nullValueReader.getNullBitmap().getCardinality() > 0) {
+        for (int i = 0; i < limit; i++) {
+          int docId = docIds[i];
+          if (nullValueReader.isNull(docId)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+  }
+
   private class IntMatcher implements ValueMatcher {
     private final NullValueVectorReader _nullValueReader;
+    private final boolean _nullValueReaderPresent;
+    private final int[] _buffer = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
 
     public IntMatcher(NullValueVectorReader nullValueReader) {
       _nullValueReader = nullValueReader;
+      _nullValueReaderPresent = _nullValueReader != null;
     }
-
-    private final int[] _buffer = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
 
     @Override
     public boolean doesValueMatch(int docId) {
-      if (_nullValueReader != null && _nullValueReader.isNull(docId)) {
-        return _predicateEvaluator.applySV((Integer) null);
+      if (_nullValueReaderPresent && _nullValueReader.isNull(docId)) {
+        // Any comparison (equality or inequality) with null results in false (similar to Presto) even if the compared
+        //  with value was null and comparison is equality.
+        return false;
       }
-      return _predicateEvaluator.applySV(_forwardIndexReader.getInt(docId, _readerContext));
+      return _predicateEvaluator.applySV(_reader.getInt(docId, _readerContext));
     }
 
     @Override
     public int matchValues(int limit, int[] docIds) {
       _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
+      if (MatcherUtils.hasNullDoc(docIds, limit, _nullValueReader)) {
+        return _predicateEvaluator.applySV(limit, docIds, _buffer, _nullValueReader);
+      }
       return _predicateEvaluator.applySV(limit, docIds, _buffer);
     }
   }
 
   private class LongMatcher implements ValueMatcher {
-
+    private final NullValueVectorReader _nullValueReader;
+    private final boolean _nullValueReaderPresent;
     private final long[] _buffer = new long[OPTIMAL_ITERATOR_BATCH_SIZE];
+
+    public LongMatcher(NullValueVectorReader nullValueReader) {
+      _nullValueReader = nullValueReader;
+      _nullValueReaderPresent = _nullValueReader != null;
+    }
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_forwardIndexReader.getLong(docId, _readerContext));
+      if (_nullValueReaderPresent && _nullValueReader.isNull(docId)) {
+        return false;
+      }
+      return _predicateEvaluator.applySV(_reader.getLong(docId, _readerContext));
     }
 
     @Override
     public int matchValues(int limit, int[] docIds) {
       _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
+      if (MatcherUtils.hasNullDoc(docIds, limit, _nullValueReader)) {
+        return _predicateEvaluator.applySV(limit, docIds, _buffer, _nullValueReader);
+      }
       return _predicateEvaluator.applySV(limit, docIds, _buffer);
     }
   }
 
   private class FloatMatcher implements ValueMatcher {
-
+    private final NullValueVectorReader _nullValueReader;
+    private final boolean _nullValueReaderPresent;
     private final float[] _buffer = new float[OPTIMAL_ITERATOR_BATCH_SIZE];
+
+    public FloatMatcher(NullValueVectorReader nullValueReader) {
+      _nullValueReader = nullValueReader;
+      _nullValueReaderPresent = _nullValueReader != null;
+    }
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_forwardIndexReader.getFloat(docId, _readerContext));
+      if (_nullValueReaderPresent && _nullValueReader.isNull(docId)) {
+        return false;
+      }
+      return _predicateEvaluator.applySV(_reader.getFloat(docId, _readerContext));
     }
 
     @Override
     public int matchValues(int limit, int[] docIds) {
       _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
+      if (MatcherUtils.hasNullDoc(docIds, limit, _nullValueReader)) {
+        return _predicateEvaluator.applySV(limit, docIds, _buffer, _nullValueReader);
+      }
       return _predicateEvaluator.applySV(limit, docIds, _buffer);
     }
   }
 
   private class DoubleMatcher implements ValueMatcher {
-
+    private final NullValueVectorReader _nullValueReader;
+    private final boolean _nullValueReaderPresent;
     private final double[] _buffer = new double[OPTIMAL_ITERATOR_BATCH_SIZE];
+
+    public DoubleMatcher(NullValueVectorReader nullValueReader) {
+      _nullValueReader = nullValueReader;
+      _nullValueReaderPresent = _nullValueReader != null;
+    }
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_forwardIndexReader.getDouble(docId, _readerContext));
+      if (_nullValueReaderPresent && _nullValueReader.isNull(docId)) {
+        return false;
+      }
+      return _predicateEvaluator.applySV(_reader.getDouble(docId, _readerContext));
     }
 
     @Override
     public int matchValues(int limit, int[] docIds) {
       _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
+      if (MatcherUtils.hasNullDoc(docIds, limit, _nullValueReader)) {
+        return _predicateEvaluator.applySV(limit, docIds, _buffer, _nullValueReader);
+      }
       return _predicateEvaluator.applySV(limit, docIds, _buffer);
     }
   }
 
   private class BigDecimalMatcher implements ValueMatcher {
     private final NullValueVectorReader _nullValueReader;
+    private final boolean _nullValueReaderPresent;
 
     public BigDecimalMatcher(NullValueVectorReader nullValueReader) {
       _nullValueReader = nullValueReader;
+      _nullValueReaderPresent = _nullValueReader != null;
     }
 
     @Override
     public boolean doesValueMatch(int docId) {
-      if (_nullValueReader != null && _nullValueReader.isNull(docId)) {
-        return _predicateEvaluator.applySV((BigDecimal) null);
+      if (_nullValueReaderPresent && _nullValueReader.isNull(docId)) {
+       return false;
       }
-      return _predicateEvaluator.applySV(_forwardIndexReader.getBigDecimal(docId, _readerContext));
+      return _predicateEvaluator.applySV(_reader.getBigDecimal(docId, _readerContext));
     }
   }
 
   private class StringMatcher implements ValueMatcher {
+    private final NullValueVectorReader _nullValueReader;
+    private final boolean _nullValueReaderPresent;
+
+    public StringMatcher(NullValueVectorReader nullValueReader) {
+      _nullValueReader = nullValueReader;
+      _nullValueReaderPresent = _nullValueReader != null;
+    }
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_forwardIndexReader.getString(docId, _readerContext));
+      if (_nullValueReaderPresent && _nullValueReader.isNull(docId)) {
+        return false;
+      }
+      return _predicateEvaluator.applySV(_reader.getString(docId, _readerContext));
     }
   }
 
   private class BytesMatcher implements ValueMatcher {
+    private final NullValueVectorReader _nullValueReader;
+    private final boolean _nullValueReaderPresent;
+
+    public BytesMatcher(NullValueVectorReader nullValueReader) {
+      _nullValueReader = nullValueReader;
+      _nullValueReaderPresent = _nullValueReader != null;
+    }
 
     @Override
     public boolean doesValueMatch(int docId) {
-      return _predicateEvaluator.applySV(_forwardIndexReader.getBytes(docId, _readerContext));
+      if (_nullValueReaderPresent && _nullValueReader.isNull(docId)) {
+        return false;
+      }
+      return _predicateEvaluator.applySV(_reader.getBytes(docId, _readerContext));
     }
   }
 }

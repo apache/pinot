@@ -50,7 +50,6 @@ public class RowBasedBlockValueFetcher {
 
   public void getRow(int docId, Object[] buffer, int startIndex) {
     for (ValueFetcher valueFetcher : _valueFetchers) {
-      // todo: don't forget to set null for these copied values.
       buffer[startIndex++] = valueFetcher.getValue(docId);
     }
   }
@@ -110,7 +109,7 @@ public class RowBasedBlockValueFetcher {
       return _nullBitmap;
     }
 
-    abstract public int getRowsCount();
+    abstract public int getRowCount();
   }
 
   private static class IntSingleValueFetcher extends ValueFetcher {
@@ -126,7 +125,7 @@ public class RowBasedBlockValueFetcher {
     }
 
     @Override
-    public int getRowsCount() {
+    public int getRowCount() {
       return _values.length;
     }
   }
@@ -144,7 +143,7 @@ public class RowBasedBlockValueFetcher {
     }
 
     @Override
-    public int getRowsCount() {
+    public int getRowCount() {
       return _values.length;
     }
   }
@@ -162,7 +161,7 @@ public class RowBasedBlockValueFetcher {
     }
 
     @Override
-    public int getRowsCount() {
+    public int getRowCount() {
       return _values.length;
     }
   }
@@ -180,7 +179,7 @@ public class RowBasedBlockValueFetcher {
     }
 
     @Override
-    public int getRowsCount() {
+    public int getRowCount() {
       return _values.length;
     }
   }
@@ -198,7 +197,7 @@ public class RowBasedBlockValueFetcher {
     }
 
     @Override
-    public int getRowsCount() {
+    public int getRowCount() {
       return _values.length;
     }
   }
@@ -216,7 +215,7 @@ public class RowBasedBlockValueFetcher {
     }
 
     @Override
-    public int getRowsCount() {
+    public int getRowCount() {
       return _values.length;
     }
   }
@@ -234,7 +233,7 @@ public class RowBasedBlockValueFetcher {
     }
 
     @Override
-    public int getRowsCount() {
+    public int getRowCount() {
       return _values.length;
     }
   }
@@ -252,7 +251,7 @@ public class RowBasedBlockValueFetcher {
     }
 
     @Override
-    public int getRowsCount() {
+    public int getRowCount() {
       return _values.length;
     }
   }
@@ -270,7 +269,7 @@ public class RowBasedBlockValueFetcher {
     }
 
     @Override
-    public int getRowsCount() {
+    public int getRowCount() {
       return _values.length;
     }
   }
@@ -288,7 +287,7 @@ public class RowBasedBlockValueFetcher {
     }
 
     @Override
-    public int getRowsCount() {
+    public int getRowCount() {
       return _values.length;
     }
   }
@@ -306,7 +305,7 @@ public class RowBasedBlockValueFetcher {
     }
 
     @Override
-    public int getRowsCount() {
+    public int getRowCount() {
       return _values.length;
     }
   }
@@ -324,7 +323,7 @@ public class RowBasedBlockValueFetcher {
     }
 
     @Override
-    public int getRowsCount() {
+    public int getRowCount() {
       return _values.length;
     }
   }

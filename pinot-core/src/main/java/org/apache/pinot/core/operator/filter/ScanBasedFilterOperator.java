@@ -47,10 +47,9 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
     if (dataSourceMetadata.isSingleValue()) {
       return new FilterBlock(new SVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs));
-    } else {
-      return new FilterBlock(new MVScanDocIdSet(_predicateEvaluator, _dataSource.getForwardIndex(), _numDocs,
-          dataSourceMetadata.getMaxNumValuesPerMVEntry()));
     }
+    return new FilterBlock(new MVScanDocIdSet(_predicateEvaluator, _dataSource.getForwardIndex(), _numDocs,
+      dataSourceMetadata.getMaxNumValuesPerMVEntry()));
   }
 
 

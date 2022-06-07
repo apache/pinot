@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -29,7 +27,6 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class CountMVAggregationFunction extends CountAggregationFunction {
-  private final ExpressionContext _expression;
 
   /**
    * Constructor for the class.
@@ -37,27 +34,12 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
    * @param expression Expression to aggregate on.
    */
   public CountMVAggregationFunction(ExpressionContext expression) {
-    _expression = expression;
+    super(expression);
   }
 
   @Override
   public AggregationFunctionType getType() {
     return AggregationFunctionType.COUNTMV;
-  }
-
-  @Override
-  public String getColumnName() {
-    return AggregationFunctionType.COUNTMV.getName() + "_" + _expression;
-  }
-
-  @Override
-  public String getResultColumnName() {
-    return AggregationFunctionType.COUNTMV.getName().toLowerCase() + "(" + _expression + ")";
-  }
-
-  @Override
-  public List<ExpressionContext> getInputExpressions() {
-    return Collections.singletonList(_expression);
   }
 
   @Override

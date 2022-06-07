@@ -227,7 +227,6 @@ public class NotInPredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(int value) {
-      // todo(nhejazi): handle and test other data types.
       return !_nonMatchingValues.contains(value);
     }
 

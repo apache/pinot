@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -48,20 +49,25 @@ public class RawLongSingleColumnDistinctOrderByExecutor extends BaseRawLongSingl
   public boolean process(TransformBlock transformBlock) {
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
     long[] values = blockValueSet.getLongValuesSV();
+    ImmutableRoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
     int numDocs = transformBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
-      long value = values[i];
-      if (!_valueSet.contains(value)) {
-        if (_valueSet.size() < _limit) {
-          _valueSet.add(value);
-          _priorityQueue.enqueue(value);
-        } else {
-          long firstValue = _priorityQueue.firstLong();
-          if (_priorityQueue.comparator().compare(value, firstValue) > 0) {
-            _valueSet.remove(firstValue);
+      if (nullBitmap != null && nullBitmap.contains(i)) {
+        _numNulls = 1;
+      } else {
+        long value = values[i];
+        if (!_valueSet.contains(value)) {
+          if (_valueSet.size() < _limit - _numNulls) {
             _valueSet.add(value);
-            _priorityQueue.dequeueLong();
             _priorityQueue.enqueue(value);
+          } else {
+            long firstValue = _priorityQueue.firstLong();
+            if (_priorityQueue.comparator().compare(value, firstValue) > 0) {
+              _valueSet.remove(firstValue);
+              _valueSet.add(value);
+              _priorityQueue.dequeueLong();
+              _priorityQueue.enqueue(value);
+            }
           }
         }
       }

@@ -37,7 +37,6 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.trace.Tracing;
 
 
@@ -75,7 +74,6 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
     int numColumns = numGroupByExpressions + numAggregationFunctions;
     String[] columnNames = new String[numColumns];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
-    FieldSpec[] fieldSpecs = new FieldSpec[numColumns];
 
     // Extract column names and data types for group-by columns
     for (int i = 0; i < numGroupByExpressions; i++) {
@@ -83,7 +81,6 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       columnNames[i] = groupByExpression.toString();
       columnDataTypes[i] = DataSchema.ColumnDataType.fromDataTypeSV(
           _transformOperator.getResultMetadata(groupByExpression).getDataType());
-      fieldSpecs[i] = _transformOperator.getFieldSpec(groupByExpression);
     }
 
     // Extract column names and data types for aggregation functions
@@ -94,7 +91,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
     }
 
-    _dataSchema = new DataSchema(columnNames, columnDataTypes, fieldSpecs);
+    _dataSchema = new DataSchema(columnNames, columnDataTypes);
   }
 
   @Override

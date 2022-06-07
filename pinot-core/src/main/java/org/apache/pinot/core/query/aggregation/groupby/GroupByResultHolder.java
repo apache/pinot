@@ -47,7 +47,7 @@ public interface GroupByResultHolder {
    * @param groupKey
    * @return
    */
-  Double getDoubleResult(int groupKey);
+  double getDoubleResult(int groupKey);
 
   /**
    * Returns the result (ResultType) for the given group key.

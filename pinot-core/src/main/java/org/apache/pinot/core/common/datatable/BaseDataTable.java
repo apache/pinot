@@ -25,7 +25,6 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import javax.ws.rs.NotSupportedException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
@@ -201,6 +200,10 @@ public abstract class BaseDataTable implements DataTable {
   public <T> T getObject(int rowId, int colId) {
     int size = positionCursorInVariableBuffer(rowId, colId);
     int objectTypeValue = _variableSizeData.getInt();
+    if (size == 0) {
+      assert objectTypeValue == ObjectSerDeUtils.ObjectType.Missing.getValue();
+      return null;
+    }
     ByteBuffer byteBuffer = _variableSizeData.slice();
     byteBuffer.limit(size);
     return ObjectSerDeUtils.deserialize(byteBuffer, objectTypeValue);
@@ -258,8 +261,8 @@ public abstract class BaseDataTable implements DataTable {
   }
 
   @Override
-  public MutableRoaringBitmap getColumnNullBitmap(int colId) {
-    throw new NotSupportedException("column null bitmaps is not stored in DataTable versions: 2, 3");
+  public MutableRoaringBitmap getNullRowIds(int colId) {
+    throw new UnsupportedOperationException("column null bitmaps is not stored in DataTable versions: 2, 3");
   }
 
   private int positionCursorInVariableBuffer(int rowId, int colId) {

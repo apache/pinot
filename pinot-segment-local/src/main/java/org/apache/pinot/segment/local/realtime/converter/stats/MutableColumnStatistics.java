@@ -37,7 +37,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class MutableColumnStatistics implements ColumnStatistics {
   private final DataSource _dataSource;
   private final int[] _sortedDocIdIterationOrder;
-  private boolean _hasNull = false;
 
   // NOTE: For new added columns during the ingestion, this will be constant value dictionary instead of mutable
   //       dictionary.

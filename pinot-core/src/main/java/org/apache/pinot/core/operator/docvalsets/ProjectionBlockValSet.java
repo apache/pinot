@@ -55,9 +55,8 @@ public class ProjectionBlockValSet implements BlockValSet {
     _column = column;
     _dataSource = dataSource;
     NullValueVectorReader nullValueReader = _dataSource.getNullValueVector();
-    if (nullValueReader != null) {
+    if (nullValueReader != null && nullValueReader.getNullBitmap().getCardinality() > 0) {
       MutableRoaringBitmap projectedNullBitmap = new MutableRoaringBitmap();
-      // todo: handle the case when we need all of nullValueReader without any filtering.
       int[] docIds = _dataBlockCache.getDocIds();
       // Project null bitmap.
       for (int i = 0; i < _dataBlockCache.getNumDocs(); i++) {

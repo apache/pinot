@@ -37,7 +37,6 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
   private int _maxRowLength = 0;
   private BigDecimal[] _sortedValues;
   private boolean _sealed = false;
-  private boolean _hasNull = false;
 
   // todo: remove this class if not needed.
   public BigDecimalColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {

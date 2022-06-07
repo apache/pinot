@@ -113,10 +113,13 @@ public class DataTableBuilder {
     if (_version == VERSION_2) {
       return new DataTableImplV2();
     }
+    if (_version == VERSION_3) {
+      return new DataTableImplV3();
+    }
     if (_version == VERSION_4) {
       return new DataTableImplV4();
     }
-    return new DataTableImplV3();
+    throw new UnsupportedOperationException("Only DataTable versions: 2, 3 and 4 are supported");
   }
 
   public static void setCurrentDataTableVersion(int version) {
@@ -126,12 +129,16 @@ public class DataTableBuilder {
     _version = version;
   }
 
+  public static int getCurrentDataTableVersion() {
+    return _version;
+  }
+
   public void startRow() {
     _numRows++;
     _currentRowDataByteBuffer = ByteBuffer.allocate(_rowSizeInBytes);
   }
 
-  public void setColumnNullBitmap(ImmutableRoaringBitmap nullBitmap)
+  public void setNullRowIds(ImmutableRoaringBitmap nullBitmap)
       throws IOException {
     assert _version >= VERSION_4;
     _fixedSizeNullVectorOutputStream.writeInt(_variableSizeNullVectorOutputStream.size());
@@ -241,10 +248,15 @@ public class DataTableBuilder {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
-    byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);
-    _currentRowDataByteBuffer.putInt(bytes.length);
-    _variableSizeDataOutputStream.writeInt(objectTypeValue);
-    _variableSizeDataByteArrayOutputStream.write(bytes);
+    if (objectTypeValue == ObjectSerDeUtils.ObjectType.Missing.getValue()) {
+      _currentRowDataByteBuffer.putInt(0);
+      _variableSizeDataOutputStream.writeInt(objectTypeValue);
+    } else {
+      byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);
+      _currentRowDataByteBuffer.putInt(bytes.length);
+      _variableSizeDataOutputStream.writeInt(objectTypeValue);
+      _variableSizeDataByteArrayOutputStream.write(bytes);
+    }
   }
 
   public void setColumn(int colId, int[] values)
@@ -322,14 +334,16 @@ public class DataTableBuilder {
       return new DataTableImplV2(_numRows, _dataSchema, _reverseDictionaryMap,
           _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
     }
+    if (_version == VERSION_3) {
+    return new DataTableImplV3(_numRows, _dataSchema, _reverseDictionaryMap,
+        _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
+    }
     if (_version == VERSION_4) {
       return new DataTableImplV4(_numRows, _dataSchema, _reverseDictionaryMap,
           _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray(),
           _fixedSizeNullVectorByteArrayOutputStream.toByteArray(),
           _variableSizeNullVectorByteArrayOutputStream.toByteArray());
     }
-
-    return new DataTableImplV3(_numRows, _dataSchema, _reverseDictionaryMap,
-        _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
+    throw new UnsupportedOperationException("Only DataTable versions: 2, 3 and 4 are supported");
   }
 }

@@ -501,14 +501,12 @@ public class RangePredicateEvaluatorFactory {
     final BigDecimal _upperBound;
     final int _lowerComparisonValue;
     final int _upperComparisonValue;
-    final boolean _upperInclusive;
 
     BigDecimalRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate, BigDecimal lowerBound,
         BigDecimal upperBound, boolean lowerInclusive, boolean upperInclusive) {
       super(rangePredicate);
       _lowerBound = lowerBound;
       _upperBound = upperBound;
-      _upperInclusive = upperInclusive;
       _lowerComparisonValue = lowerInclusive ? 0 : 1;
       _upperComparisonValue = upperInclusive ? 0 : -1;
     }
@@ -520,18 +518,8 @@ public class RangePredicateEvaluatorFactory {
 
     @Override
     public boolean applySV(BigDecimal value) {
-      // todo(nhejazi): handle and test other data types.
-      boolean result = true;
-      boolean isValueNull = value == null;
-      if (_lowerBound != null && !isValueNull) {
-        result = value.compareTo(_lowerBound) >= _lowerComparisonValue;
-      }
-      if (_upperBound != null) {
-        result &= isValueNull || value.compareTo(_upperBound) <= _upperComparisonValue;
-      } else if (!_upperInclusive) {
-        return false;
-      }
-      return result;
+      return (_lowerBound == null || value.compareTo(_lowerBound) >= _lowerComparisonValue) && (_upperBound == null
+          || value.compareTo(_upperBound) <= _upperComparisonValue);
     }
   }
 

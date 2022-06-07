@@ -73,7 +73,6 @@ public class TransformBlockValSet implements BlockValSet {
     // Examples:
     //  CAST(null as STRING) -> null. This is similar to Presto behaviour.
     //  YEAR(null) -> null. This is similar to Presto behaviour.
-    //  todo(nhejazi): add more details. Handle all transforms.
     return _nullBitmap;
   }
 

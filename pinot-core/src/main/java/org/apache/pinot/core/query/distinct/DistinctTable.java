@@ -95,7 +95,7 @@ public class DistinctTable {
         orderByExpressionIndices[i] = columnNames.indexOf(orderByExpression.getExpression().toString());
         comparisonFactors[i] = orderByExpression.isAsc() ? -1 : 1;
       }
-      // todo(nhejazi): returns separate priorityQueue when null handling is not needed.
+      // TODO(nhejazi): returns separate priorityQueue when null handling is not needed.
       _priorityQueue = new ObjectHeapPriorityQueue<>(initialCapacity, (r1, r2) -> {
         Object[] values1 = r1.getValues();
         Object[] values2 = r2.getValues();
@@ -253,14 +253,13 @@ public class DistinctTable {
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
 
-    // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
-    FieldSpec[] columnFieldSpecs = _dataSchema.getColumnFieldSpecs();
-    assert columnFieldSpecs != null;
-    Object[] columnDefaultNullValues = new Object[numColumns];
-    RoaringBitmap[] columnNullRoaringBitmap = new RoaringBitmap[numColumns];
+    // TODO(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
+    Object[] colDefaultNullValues = new Object[numColumns];
+    RoaringBitmap[] nullBitmap = new RoaringBitmap[numColumns];
     for (int colId = 0; colId < numColumns; colId++) {
-      columnDefaultNullValues[colId] = columnFieldSpecs[colId].getDefaultNullValue();
-      columnNullRoaringBitmap[colId] = new RoaringBitmap();
+      colDefaultNullValues[colId] = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC,
+          storedColumnDataTypes[colId].toDataType(), null);
+      nullBitmap[colId] = new RoaringBitmap();
     }
 
     int rowId = 0;
@@ -269,8 +268,8 @@ public class DistinctTable {
       Object[] values = record.getValues();
       for (int colId = 0; colId < numColumns; colId++) {
         if (values[colId] == null) {
-          values[colId] = columnDefaultNullValues[colId];
-          columnNullRoaringBitmap[colId].add(rowId);
+          values[colId] = colDefaultNullValues[colId];
+          nullBitmap[colId].add(rowId);
         }
         switch (storedColumnDataTypes[colId]) {
           case INT:
@@ -302,9 +301,11 @@ public class DistinctTable {
       dataTableBuilder.finishRow();
       rowId++;
     }
-    // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
+    // TODO(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
     for (int colId = 0; colId < numColumns; colId++) {
-      dataTableBuilder.setColumnNullBitmap(columnNullRoaringBitmap[colId].toMutableRoaringBitmap());
+      if (nullBitmap[colId].getCardinality() > 0) {
+        dataTableBuilder.setNullRowIds(nullBitmap[colId].toMutableRoaringBitmap());
+      }
     }
     return dataTableBuilder.build().toBytes();
   }
@@ -320,17 +321,21 @@ public class DistinctTable {
     int numRecords = dataTable.getNumberOfRows();
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
-    // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
-    MutableRoaringBitmap[] colNullBitmaps = new MutableRoaringBitmap[numColumns];
-    for (int colId = 0; colId < numColumns; colId++) {
-      colNullBitmaps[colId] = dataTable.getColumnNullBitmap(colId);
+    // TODO(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
+    MutableRoaringBitmap[] nullBitmaps = null;
+    // TODO: alternatively check: DataTableBuilder.getVersion()
+    if (dataTable.getVersion() >= DataTableBuilder.VERSION_4) {
+      nullBitmaps = new MutableRoaringBitmap[numColumns];
+      for (int colId = 0; colId < numColumns; colId++) {
+        nullBitmaps[colId] = dataTable.getNullRowIds(colId);
+      }
     }
 
     List<Record> records = new ArrayList<>(numRecords);
     for (int i = 0; i < numRecords; i++) {
       Object[] values = new Object[numColumns];
       for (int j = 0; j < numColumns; j++) {
-        if (colNullBitmaps[j].contains(i)) {
+        if (nullBitmaps != null && nullBitmaps[j] != null && nullBitmaps[j].contains(i)) {
           values[j] = null;
           continue;
         }

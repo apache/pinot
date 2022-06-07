@@ -40,6 +40,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
@@ -137,23 +138,23 @@ public class GroupByDataTableReducer implements DataTableReducer {
     if (havingFilter != null) {
       HavingFilterHandler havingFilterHandler = new HavingFilterHandler(havingFilter, postAggregationHandler);
       while (rows.size() < limit && sortedIterator.hasNext()) {
-        Object[] values = sortedIterator.next().getValues();
-        extractFinalAggregationResults(values);
+        Object[] row = sortedIterator.next().getValues();
+        extractFinalAggregationResults(row);
         for (int i = 0; i < numColumns; i++) {
-          values[i] = columnDataTypes[i].convert(values[i]);
+          row[i] = columnDataTypes[i].convert(row[i]);
         }
-        if (havingFilterHandler.isMatch(values)) {
-          rows.add(values);
+        if (havingFilterHandler.isMatch(row)) {
+          rows.add(row);
         }
       }
     } else {
       for (int i = 0; i < limit && sortedIterator.hasNext(); i++) {
-        Object[] values = sortedIterator.next().getValues();
-        extractFinalAggregationResults(values);
+        Object[] row = sortedIterator.next().getValues();
+        extractFinalAggregationResults(row);
         for (int j = 0; j < numColumns; j++) {
-          values[j] = columnDataTypes[j].convert(values[j]);
+          row[j] = columnDataTypes[j].convert(row[j]);
         }
-        rows.add(values);
+        rows.add(row);
       }
     }
     DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
@@ -162,11 +163,11 @@ public class GroupByDataTableReducer implements DataTableReducer {
     int numResultRows = rows.size();
     List<Object[]> resultRows = new ArrayList<>(numResultRows);
     for (Object[] row : rows) {
-      Object[] resultValues = postAggregationHandler.getResult(row);
+      Object[] resultRow = postAggregationHandler.getResult(row);
       for (int i = 0; i < numResultColumns; i++) {
-        resultValues[i] = resultColumnDataTypes[i].format(resultValues[i]);
+        resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
       }
-      resultRows.add(resultValues);
+      resultRows.add(resultRow);
     }
     brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, resultRows));
   }
@@ -181,7 +182,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     }
   }
 
-  /**oo
+  /**
    * Constructs the DataSchema for the rows before the post-aggregation (SQL mode).
    */
   private DataSchema getPrePostAggregationDataSchema(DataSchema dataSchema) {
@@ -251,10 +252,13 @@ public class GroupByDataTableReducer implements DataTableReducer {
               return;
             }
             try {
-              // todo(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
-              MutableRoaringBitmap[] columnNullBitmaps = new MutableRoaringBitmap[_numColumns];
-              for (int i = 0; i < _numColumns; i++) {
-                columnNullBitmaps[i] = dataTable.getColumnNullBitmap(i);
+              // TODO(nhejazi): hide null handling behind a flag (nullHandlingEnabledInSelect).
+              MutableRoaringBitmap[] nullBitmaps = null;
+              if (dataTable.getVersion() >= DataTableBuilder.VERSION_4) {
+                nullBitmaps = new MutableRoaringBitmap[_numColumns];
+                for (int i = 0; i < _numColumns; i++) {
+                  nullBitmaps[i] = dataTable.getNullRowIds(i);
+                }
               }
 
               int numRows = dataTable.getNumberOfRows();
@@ -290,7 +294,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
                     default:
                       throw new IllegalStateException();
                   }
-                  if (columnNullBitmaps[colId].contains(rowId)) {
+                  if (nullBitmaps != null && nullBitmaps[colId].contains(rowId)) {
                     values[colId] = null;
                   }
                 }

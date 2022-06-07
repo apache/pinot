@@ -31,6 +31,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BytesUtils;
 
@@ -139,6 +140,11 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public Dictionary getDictionary() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public NullValueVectorReader getNullValueVectorReader() {
     throw new UnsupportedOperationException();
   }
 

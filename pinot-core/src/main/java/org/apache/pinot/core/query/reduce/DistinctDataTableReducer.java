@@ -99,11 +99,11 @@ public class DistinctDataTableReducer implements DataTableReducer {
     Iterator<Record> iterator = distinctTable.getFinalResult();
     while (iterator.hasNext()) {
       Object[] values = iterator.next().getValues();
-      Object[] rowValues = new Object[numColumns];
+      Object[] row = new Object[numColumns];
       for (int i = 0; i < numColumns; i++) {
-        rowValues[i] = columnDataTypes[i].convertAndFormat(values[i]);
+        row[i] = columnDataTypes[i].convertAndFormat(values[i]);
       }
-      rows.add(rowValues);
+      rows.add(row);
     }
     return new ResultTable(dataSchema, rows);
   }
