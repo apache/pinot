@@ -58,7 +58,8 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/brokers")
-  @ApiOperation(value = "List tenants and tables to brokers mappings", notes = "List tenants and tables to brokers mappings")
+  @ApiOperation(value = "List tenants and tables to brokers mappings",
+      notes = "List tenants and tables to brokers mappings")
   Map<String, Map<String, List<String>>> listBrokersMapping(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state);
 
@@ -96,7 +97,8 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers")
-  @ApiOperation(value = "List tenants and tables to brokers mappings", notes = "List tenants and tables to brokers mappings")
+  @ApiOperation(value = "List tenants and tables to brokers mappings",
+      notes = "List tenants and tables to brokers mappings")
   Map<String, Map<String, List<InstanceInfo>>> listBrokersMappingV2(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state);
 
@@ -136,9 +138,11 @@ public interface PinotBrokerService {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
-  @ApiOperation(value = "Enable/disable the query rate limiting for a broker instance", notes = "Enable/disable the query rate limiting for a broker instance")
+  @ApiOperation(value = "Enable/disable the query rate limiting for a broker instance",
+      notes = "Enable/disable the query rate limiting for a broker instance")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Bad Request"), @ApiResponse(code = 404, message = "Instance not found"), @ApiResponse(code = 500, message = "Internal error")
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 404, message = "Instance not found"), @ApiResponse(code = 500, message = "Internal error")
   })
   SuccessResponse toggleQueryRateLimiting(
       @ApiParam(value = "Broker instance name", required = true, example = "Broker_my.broker.com_30000")
