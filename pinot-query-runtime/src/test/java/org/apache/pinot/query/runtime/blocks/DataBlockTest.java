@@ -18,17 +18,28 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.datatable.DataTableImplV3;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class DataBlockTest {
-  private static final int TEST_ROW_COUNT = 2;
+  private static final List<DataSchema.ColumnDataType> EXCLUDE_DATA_TYPES = ImmutableList.of(
+      DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.BYTES, DataSchema.ColumnDataType.BYTES_ARRAY);
+  private static final int TEST_ROW_COUNT = 5;
 
   @Test
   public void testException()
@@ -51,9 +62,46 @@ public class DataBlockTest {
         originalException.getMessage());
   }
 
+  /**
+   * This test is only here to ensure that {@link org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl}
+   * producing {@link DataTableImplV3} can actually be wrapped and sent via mailbox in the {@link RowDataBlock} format.
+   *
+   * @see org.apache.pinot.query.runtime.QueryRunner#processQuery(DistributedStagePlan, ExecutorService, Map)
+   * @throws Exception
+   */
+  @Test
+  public void testRowDataBlockCompatibleWithDataTableV3()
+      throws Exception {
+    DataSchema.ColumnDataType[] allDataTypes = DataSchema.ColumnDataType.values();
+    List<DataSchema.ColumnDataType> columnDataTypes = new ArrayList<DataSchema.ColumnDataType>();
+    List<String> columnNames = new ArrayList<String>();
+    for (int i = 0; i < allDataTypes.length; i++) {
+      if (!EXCLUDE_DATA_TYPES.contains(allDataTypes[i])) {
+        columnNames.add(allDataTypes[i].name());
+        columnDataTypes.add(allDataTypes[i]);
+      }
+    }
+
+    DataSchema dataSchema = new DataSchema(columnNames.toArray(new String[0]),
+        columnDataTypes.toArray(new DataSchema.ColumnDataType[0]));
+    List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TEST_ROW_COUNT);
+    DataTable dataTableImpl = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema);
+    DataTable dataBlockFromDataTable = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTableImpl.toBytes()));
+
+    for (int rowId = 0; rowId < TEST_ROW_COUNT; rowId++) {
+      Object[] rowFromDataTable = SelectionOperatorUtils.extractRowFromDataTable(dataTableImpl, rowId);
+      Object[] rowFromBlock = SelectionOperatorUtils.extractRowFromDataTable(dataBlockFromDataTable, rowId);
+      for (int colId = 0; colId < dataSchema.getColumnNames().length; colId++) {
+        Assert.assertEquals(rowFromBlock[colId], rowFromDataTable[colId], "Error comparing Row/Column Block "
+            + " at (" + rowId + "," + colId + ") of Type: " + dataSchema.getColumnDataType(colId) + "! "
+            + " from DataBlock: [" + rowFromBlock[rowId] + "], from DataTable: [" + rowFromDataTable[colId] + "]");
+      }
+    }
+  }
+
   @Test
   public void testAllDataTypes()
-      throws IOException {
+      throws Exception {
     DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
     int numColumns = columnDataTypes.length;
     String[] columnNames = new String[numColumns];

@@ -93,8 +93,10 @@ public class DataBlockBuilder {
           case LONG:
             byteBuffer.putLong(((Number) value).longValue());
             break;
+          // TODO: fix float size (should be 4). For backward compatible, DON'T CHANGE for now.
           case FLOAT:
             byteBuffer.putFloat(((Number) value).floatValue());
+            byteBuffer.position(byteBuffer.position() + 4);
             break;
           case DOUBLE:
             byteBuffer.putDouble(((Number) value).doubleValue());
@@ -190,9 +192,11 @@ public class DataBlockBuilder {
             byteBuffer.putLong(((Number) value).longValue());
           }
           break;
+        // TODO: fix float size (should be 4). For backward compatible, DON'T CHANGE for now.
         case FLOAT:
           for (Object value : column) {
             byteBuffer.putFloat(((Number) value).floatValue());
+            byteBuffer.position(byteBuffer.position() + 4);
           }
           break;
         case DOUBLE:

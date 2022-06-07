@@ -34,6 +34,7 @@ public final class DataBlockUtils {
 
   private static final DataSchema EMPTY_SCHEMA = new DataSchema(new String[0], new DataSchema.ColumnDataType[0]);
   private static final MetadataBlock EOS_DATA_BLOCK = new MetadataBlock(EMPTY_SCHEMA);
+
   static {
     EOS_DATA_BLOCK._metadata.put(DataTable.MetadataKey.TABLE.getName(), "END_OF_STREAM");
   }
@@ -116,8 +117,9 @@ public final class DataBlockUtils {
         case LONG:
           rowSizeInBytes += 8;
           break;
+        // TODO: fix float size (should be 4). For backward compatible, DON'T CHANGE for now.
         case FLOAT:
-          rowSizeInBytes += 4;
+          rowSizeInBytes += 8;
           break;
         case DOUBLE:
           rowSizeInBytes += 8;
@@ -155,8 +157,9 @@ public final class DataBlockUtils {
         case LONG:
           columnSizes[i] = 8;
           break;
+        // TODO: fix float size (should be 4). For backward compatible, DON'T CHANGE for now.
         case FLOAT:
-          columnSizes[i] = 4;
+          columnSizes[i] = 8;
           break;
         case DOUBLE:
           columnSizes[i] = 8;

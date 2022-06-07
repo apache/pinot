@@ -71,8 +71,7 @@ public class DataTableUtils {
         case LONG:
           rowSizeInBytes += 8;
           break;
-        // TODO: fix float size (should be 4).
-        // For backward compatible, DON'T CHANGE.
+        // TODO: fix float size (should be 4). For backward compatible, DON'T CHANGE for now.
         case FLOAT:
           rowSizeInBytes += 8;
           break;
