@@ -33,6 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
+    <openapi-generator.version>6.0.0</openapi-generator.version>
   </properties>
   <dependencies>
     <dependency>
@@ -197,6 +198,16 @@
       <groupId>org.quartz-scheduler</groupId>
       <artifactId>quartz</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.datatype</groupId>
+      <artifactId>jackson-datatype-jsr310</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.jaxrs</groupId>
+      <artifactId>jackson-jaxrs-json-provider</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
   </dependencies>
   <build>
     <resources>
@@ -222,7 +233,33 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
       </plugin>
-
+      <plugin>
+        <groupId>org.openapitools</groupId>
+        <artifactId>openapi-generator-maven-plugin</artifactId>
+        <version>${openapi-generator.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+            <configuration>
+              <!--              <inputSpec>-->
+              <!--                ${project.basedir}/src/main/resources/petstore.yml-->
+              <!--              </inputSpec>-->
+              <inputSpec>
+                ${project.basedir}/src/main/openapi/pinotbroker.yaml
+              </inputSpec>
+              <generatorName>jaxrs-jersey</generatorName>
+              <templateDirectory>${project.basedir}/src/main/openapi/templates</templateDirectory>
+              <apiPackage>org.apache.pinot.controller.api.resources</apiPackage>
+              <modelPackage>org.apache.pinot.controller.api.model</modelPackage>
+              <configOptions>
+                <sourceFolder>src/main/java</sourceFolder>
+              </configOptions>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>com.github.eirslett</groupId>
         <artifactId>frontend-maven-plugin</artifactId>
@@ -286,6 +323,7 @@
           </suiteXmlFiles>
         </configuration>
       </plugin>
+
     </plugins>
   </build>
 </project>
