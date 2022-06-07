@@ -243,14 +243,11 @@
               <goal>generate</goal>
             </goals>
             <configuration>
-              <!--              <inputSpec>-->
-              <!--                ${project.basedir}/src/main/resources/petstore.yml-->
-              <!--              </inputSpec>-->
               <inputSpec>
                 ${project.basedir}/src/main/openapi/pinotbroker.yaml
               </inputSpec>
               <generatorName>jaxrs-jersey</generatorName>
-              <templateDirectory>${project.basedir}/src/main/openapi/templates</templateDirectory>
+              <templateDirectory>src/main/openapi/templates</templateDirectory>
               <apiPackage>org.apache.pinot.controller.api.resources</apiPackage>
               <modelPackage>org.apache.pinot.controller.api.model</modelPackage>
               <configOptions>

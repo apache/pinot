@@ -1660,6 +1660,9 @@
             <!-- files from Eclipse -->
             <exclude>**/maven-eclipse.xml</exclude>
             <exclude>.externalToolBuilders/**</exclude>
+            <!-- OpenAPI template files -->
+            <exclude>**/*.mustache</exclude>
+
           </excludes>
           <mapping>
             <java>JAVADOC_STYLE</java>

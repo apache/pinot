@@ -43,10 +43,12 @@ import org.apache.pinot.controller.api.resources.SuccessResponse;
 import org.apache.pinot.controller.api.resources.V2ApiService;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.jvnet.hk2.annotations.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+@Service
 public class V2ApiServiceImpl implements V2ApiService, BrokersApiService {
   public static final Logger LOGGER = LoggerFactory.getLogger(V2ApiServiceImpl.class);
 

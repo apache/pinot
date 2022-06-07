@@ -18,5 +18,9 @@
  */
 package org.apache.pinot.controller.api.resources.services;
 
+import org.jvnet.hk2.annotations.Service;
+
+
+@Service
 public class BrokersApiServiceImpl extends V2ApiServiceImpl {
 }
