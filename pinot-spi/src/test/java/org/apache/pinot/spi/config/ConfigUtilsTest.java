@@ -132,11 +132,13 @@ public class ConfigUtilsTest {
     map.put("my.authToken", "secrettoken");
 
     Map<String, Object> nestedMap = new HashMap<>();
-    map.put("credentials", map);
+    nestedMap.put("credentials", map);
 
     PinotConfiguration config = new PinotConfiguration(nestedMap);
 
-    Assert.assertFalse(config.toString().contains("verysecret"));
-    Assert.assertFalse(config.toString().contains("secrettoken"));
+    String configString = config.toString();
+    Assert.assertTrue(configString.contains("credentials"));
+    Assert.assertFalse(configString.contains("verysecret"));
+    Assert.assertFalse(configString.contains("secrettoken"));
   }
 }
