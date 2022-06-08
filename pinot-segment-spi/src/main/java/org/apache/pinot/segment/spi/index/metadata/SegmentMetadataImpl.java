@@ -97,6 +97,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Deprecated
   private String _rawTableName;
 
+  // This is a runtime info set by server when loading the segment.
+  private String _tier;
+
   /**
    * For segments that can only provide the inputstream to the metadata
    */
@@ -461,6 +464,16 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
 
     return segmentMetadata;
+  }
+
+  @Override
+  public String getTier() {
+    return _tier;
+  }
+
+  @Override
+  public void setTier(String tier) {
+    _tier = tier;
   }
 
   @Override

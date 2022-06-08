@@ -119,4 +119,8 @@ public interface SegmentMetadata {
    * @return json representation of segment metadata.
    */
   JsonNode toJson(@Nullable Set<String> columnFilter);
+
+  String getTier();
+
+  void setTier(String tier);
 }
