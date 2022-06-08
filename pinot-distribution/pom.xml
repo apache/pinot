@@ -199,6 +199,10 @@
                   <pattern>org.apache.hadoop</pattern>
                   <shadedPattern>${shade.prefix}.org.apache.hadoop</shadedPattern>
                 </relocation>
+                <relocation>
+                  <pattern>org.apache.commons</pattern>
+                  <shadedPattern>shaded.org.apache.commons</shadedPattern>
+                </relocation>
               </relocations>
             </configuration>
           </execution>

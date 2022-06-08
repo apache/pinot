@@ -19,11 +19,11 @@
 
 executionFrameworkSpec:
   name: 'spark'
-  segmentGenerationJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark.SparkSegmentGenerationJobRunner'
-  segmentTarPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark.SparkSegmentTarPushJobRunner'
-  segmentUriPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark.SparkSegmentUriPushJobRunner'
-  segmentMetadataPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark.SparkSegmentMetadataPushJobRunner'
-jobType: SegmentUriPush
+  segmentGenerationJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark3.SparkSegmentGenerationJobRunner'
+  segmentTarPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark3.SparkSegmentTarPushJobRunner'
+  segmentUriPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark3.SparkSegmentUriPushJobRunner'
+  segmentMetadataPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark3.SparkSegmentMetadataPushJobRunner'
+jobType: SegmentCreationAndMetadataPush
 inputDirURI: 'file:///path/to/input'
 includeFileNamePattern: 'glob:**/*.parquet'
 excludeFileNamePattern: 'glob:**/*.avro'
@@ -42,5 +42,12 @@ tableSpec:
 pinotClusterSpecs:
   - controllerURI: 'localhost:9000'
 pushJobSpec:
-  segmentUriPrefix: 'file://'
-  segmentUriSuffix: ''
+
+  # pushParallelism: push job parallelism, default is 1.
+  pushParallelism: 2
+
+  # pushAttempts: number of attempts for push job, default is 1, which means no retry.
+  pushAttempts: 2
+
+  # pushRetryIntervalMillis: retry wait Ms, default to 1 second.
+  pushRetryIntervalMillis: 1000

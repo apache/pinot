@@ -19,11 +19,11 @@
 
 executionFrameworkSpec:
   name: 'spark'
-  segmentGenerationJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark.SparkSegmentGenerationJobRunner'
-  segmentTarPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark.SparkSegmentTarPushJobRunner'
-  segmentUriPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark.SparkSegmentUriPushJobRunner'
-  segmentMetadataPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark.SparkSegmentMetadataPushJobRunner'
-jobType: SegmentCreationAndUriPush
+  segmentGenerationJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark3.SparkSegmentGenerationJobRunner'
+  segmentTarPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark3.SparkSegmentTarPushJobRunner'
+  segmentUriPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark3.SparkSegmentUriPushJobRunner'
+  segmentMetadataPushJobRunnerClassName: 'org.apache.pinot.plugin.ingestion.batch.spark3.SparkSegmentMetadataPushJobRunner'
+jobType: SegmentCreation
 inputDirURI: 'file:///path/to/input'
 includeFileNamePattern: 'glob:**/*.parquet'
 excludeFileNamePattern: 'glob:**/*.avro'
@@ -41,6 +41,3 @@ tableSpec:
   tableConfigURI: 'http://localhost:9000/tables/myTable'
 pinotClusterSpecs:
   - controllerURI: 'localhost:9000'
-pushJobSpec:
-  segmentUriPrefix: 'file://'
-  segmentUriSuffix: ''
