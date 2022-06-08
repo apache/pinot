@@ -61,7 +61,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     // TODO See ControllerResponseFilter
     // register(new LoggingFeature());
     _useHttps = Boolean.parseBoolean(conf.getProperty(ControllerConf.CONSOLE_SWAGGER_USE_HTTPS));
-    if (conf.getProperty(CommonConstants.Controller.CONTROLLER_SERVICE_AUTO_DISCOVERY, false)) {
+    if (conf.getProperty(CommonConstants.Controller.CONTROLLER_SERVICE_AUTO_DISCOVERY, true)) {
       register(ServiceAutoDiscoveryFeature.class);
     }
     register(JacksonFeature.class);
