@@ -1005,13 +1005,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
   }
 
   /**
-   * Download and untar a file.
+   * Download and untar a file in a streamed way with rate limit
    *
    * @param uri URI
    * @param dest File destination
    * @param authProvider auth token
    * @param httpHeaders http headers
-   * @param rateLimit
+   * @param rateLimit limit the rate to write download-untar stream to disk, in bytes
+   *                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
    * @return Response status code
    * @throws IOException
    * @throws HttpErrorStatusException

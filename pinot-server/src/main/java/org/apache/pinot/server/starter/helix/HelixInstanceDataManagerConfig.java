@@ -81,11 +81,13 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final int DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS = -1;
 
   // Key of server segment download rate limit
+  // limit the rate to write download-untar stream to disk, in bytes
+  // -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
   private static final String SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT
-      = "segment.download.untar.rate.limit";
+      = "segment.download.untar.rate.limit.bytes.per.sec";
   private static final long DEFAULT_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT = TarGzCompressionUtils.NO_RATE_LIMIT;
 
-  // Key of streamed server segment download-untar
+  // Key of whether to use streamed server segment download-untar
   private static final String IS_SEGMENT_DOWNLOAD_UNTAR_STREAMED = "segment.download.streamed.untar";
   private static final boolean DEFAULT_IS_SEGMENT_DOWNLOAD_UNTAR_STREAMED = false;
 

@@ -423,7 +423,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     FileUtils.forceMkdir(tempRootDir);
     if (_isSegmentDownloadUntarStreamed && zkMetadata.getCrypterName() == null) {
       try {
-        File untaredSegDir = streamedDownloadUntarRateLimit(segmentName, zkMetadata, tempRootDir,
+        File untaredSegDir = downloadAndStreamUntarRateLimit(segmentName, zkMetadata, tempRootDir,
             _segmentDownloadUntarRateLimit);
         return moveSegment(segmentName, untaredSegDir);
       } finally {
@@ -483,7 +483,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private File streamedDownloadUntarRateLimit(String segmentName, SegmentZKMetadata zkMetadata, File tempRootDir,
+  private File downloadAndStreamUntarRateLimit(String segmentName, SegmentZKMetadata zkMetadata, File tempRootDir,
       long rateLimit)
       throws Exception {
     if (_segmentDownloadSemaphore != null) {
@@ -498,8 +498,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
         rateLimit);
     String uri = zkMetadata.getDownloadUrl();
     try {
-      File ret = SegmentFetcherFactory.fetchUntarToLocalStreamed(uri, tempRootDir, rateLimit);
-      LOGGER.info("Downloaded tarred segment: {} for table: {} from: {}", segmentName, _tableNameWithType, uri);
+      File ret = SegmentFetcherFactory.fetchAndStreamUntarToLocal(uri, tempRootDir, rateLimit);
+      LOGGER.info("Download and untarred segment: {} for table: {} from: {}", segmentName, _tableNameWithType, uri);
       return ret;
     } catch (AttemptsExceededException e) {
       LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from: {} to: {}", segmentName,

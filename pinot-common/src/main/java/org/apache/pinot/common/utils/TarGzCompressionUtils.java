@@ -42,6 +42,8 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -49,9 +51,24 @@ import org.apache.commons.lang3.StringUtils;
  */
 public class TarGzCompressionUtils {
   public static final long NO_RATE_LIMIT = -1;
-  public static final long MATCH_UNTAR_RATE = 0;
+  /* Don't limit write speed to disk. The OS will buffer multiple writes to a large IO and can write up to several GBs
+   * at a time, which saturates disk bandwidth.
+   */
+  public static final long MATCH_UPSTREAM_RATE = 0;
+  /* Match the upstream rate, but will do a sync operation for each write of DEFAULT_BUFFER_SIZE
+   * to flush the buffer to disk. This avoids saturating disk I/O bandwidth.
+   */
   private static final int DEFAULT_BUFFER_SIZE = 4 * 1024 * 1024;
-  // multiple of SSD block size for efficient write
+  /* 4MB is large enough, page aligned, and multiple of SSD block size for efficient write:
+   * Common page sizes are 2K, 4K, 8K, or 16K, with 128 to 256 pages per block.
+   * Block size therefore typically varies between 256KB and 4MB.
+   * https://codecapsule.com/2014/02/12
+   * /coding-for-ssds-part-6-a-summary-what-every-programmer-should-know-about-solid-state-drives/
+   *
+   * It is also sufficient for HDDs
+   */
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(TarGzCompressionUtils.class);
 
   private TarGzCompressionUtils() {
   }
@@ -132,7 +149,7 @@ public class TarGzCompressionUtils {
    */
   public static List<File> untar(InputStream inputStream, File outputDir)
       throws IOException {
-      return untarRateLimit(inputStream, outputDir, NO_RATE_LIMIT);
+    return untarWithRateLimiter(inputStream, outputDir, NO_RATE_LIMIT);
   }
 
   /**
@@ -140,7 +157,7 @@ public class TarGzCompressionUtils {
    * RateLimit limits the untar rate
    * <p>For security reason, the untarred files must reside in the output directory.
    */
-  public static List<File> untarRateLimit(InputStream inputStream, File outputDir, long rateLimit)
+  public static List<File> untarWithRateLimiter(InputStream inputStream, File outputDir, long rateLimit)
       throws IOException {
     String outputDirCanonicalPath = outputDir.getCanonicalPath();
     // Prevent partial path traversal
@@ -184,7 +201,7 @@ public class TarGzCompressionUtils {
           }
           try (FileOutputStream out = new FileOutputStream(outputFile.toPath().toString())) {
             if (rateLimit != NO_RATE_LIMIT) {
-              copyLarge(tarGzIn, out, rateLimit);
+              streamCopyWithRateLimiter(tarGzIn, out, rateLimit);
             } else {
               IOUtils.copy(tarGzIn, out);
             }
@@ -222,20 +239,21 @@ public class TarGzCompressionUtils {
     }
   }
 
-  public static long copyLarge(InputStream inputStream, FileOutputStream outputStream, long rateLimit)
+  public static long streamCopyWithRateLimiter(InputStream inputStream, FileOutputStream outputStream, long rateLimit)
       throws IOException {
     Objects.requireNonNull(inputStream, "inputStream is null");
     Objects.requireNonNull(outputStream, "outputStream is null");
     FileDescriptor fd = outputStream.getFD();
+    LOGGER.info("Using rate limiter for stream copy, target limit {} bytes/s", rateLimit);
     byte[] buffer = new byte[DEFAULT_BUFFER_SIZE];
     RateLimiter rateLimiter = RateLimiter.create(rateLimit);
     long count;
     int n;
 
-    if (rateLimit == MATCH_UNTAR_RATE) {
+    if (rateLimit == MATCH_UPSTREAM_RATE) {
       for (count = 0L; -1 != (n = inputStream.read(buffer)); count += (long) n) {
         outputStream.write(buffer, 0, n);
-        fd.sync();
+        fd.sync(); // flush the buffer timely to the disk so that the disk bandwidth wouldn't get saturated
       }
     } else {
       for (count = 0L; -1 != (n = inputStream.read(buffer)); count += (long) n) {

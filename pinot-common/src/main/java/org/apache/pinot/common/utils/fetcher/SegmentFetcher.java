@@ -38,7 +38,7 @@ public interface SegmentFetcher {
       throws Exception;
 
   /**
-   * Fetches a segment from URI location to local.
+   * Fetches a segment from URI location and untar to local in a streamed manner
    */
   File fetchUntarSegmentToLocalStreamed(URI uri, File dest, long rateLimit)
       throws Exception;
