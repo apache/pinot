@@ -99,9 +99,6 @@ public class NativeAndLuceneMutableTextIndexTest {
   }
 
   private void testSelectionResults(String nativeQuery, String luceneQuery) {
-    MutableRoaringBitmap resultset = _realtimeLuceneTextIndex.getDocIds(luceneQuery);
-    MutableRoaringBitmap resultset2 = _nativeMutableTextIndex.getDocIds(nativeQuery);
-
     assertEquals(_nativeMutableTextIndex.getDocIds(nativeQuery), _realtimeLuceneTextIndex.getDocIds(luceneQuery));
   }
 }
