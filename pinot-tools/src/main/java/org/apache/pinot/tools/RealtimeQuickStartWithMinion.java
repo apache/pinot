@@ -25,6 +25,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -63,7 +64,7 @@ public class RealtimeQuickStartWithMinion extends QuickStartBase {
   }
 
   public Map<String, Object> getConfigOverrides() {
-    Map<String, Object> properties = super.getConfigOverrides();
+    Map<String, Object> properties = new HashMap<>();
     properties.putIfAbsent("controller.task.scheduler.enabled", true);
     return properties;
   }
