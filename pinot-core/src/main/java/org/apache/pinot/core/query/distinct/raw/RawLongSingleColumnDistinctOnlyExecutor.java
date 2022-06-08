@@ -37,12 +37,24 @@ public class RawLongSingleColumnDistinctOnlyExecutor extends BaseRawLongSingleCo
   @Override
   public boolean process(TransformBlock transformBlock) {
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
-    long[] values = blockValueSet.getLongValuesSV();
     int numDocs = transformBlock.getNumDocs();
-    for (int i = 0; i < numDocs; i++) {
-      _valueSet.add(values[i]);
-      if (_valueSet.size() >= _limit) {
-        return true;
+    if (blockValueSet.isSingleValue()) {
+      long[] values = blockValueSet.getLongValuesSV();
+      for (int i = 0; i < numDocs; i++) {
+        _valueSet.add(values[i]);
+        if (_valueSet.size() >= _limit) {
+          return true;
+        }
+      }
+    } else {
+      long[][] values = blockValueSet.getLongValuesMV();
+      for (int i = 0; i < numDocs; i++) {
+        for (long value : values[i]) {
+          _valueSet.add(value);
+          if (_valueSet.size() >= _limit) {
+            return true;
+          }
+        }
       }
     }
     return false;

@@ -37,12 +37,24 @@ public class RawIntSingleColumnDistinctOnlyExecutor extends BaseRawIntSingleColu
   @Override
   public boolean process(TransformBlock transformBlock) {
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
-    int[] values = blockValueSet.getIntValuesSV();
     int numDocs = transformBlock.getNumDocs();
-    for (int i = 0; i < numDocs; i++) {
-      _valueSet.add(values[i]);
-      if (_valueSet.size() >= _limit) {
-        return true;
+    if (blockValueSet.isSingleValue()) {
+      int[] values = blockValueSet.getIntValuesSV();
+      for (int i = 0; i < numDocs; i++) {
+        _valueSet.add(values[i]);
+        if (_valueSet.size() >= _limit) {
+          return true;
+        }
+      }
+    } else {
+      int[][] values = blockValueSet.getIntValuesMV();
+      for (int i = 0; i < numDocs; i++) {
+        for (int value : values[i]) {
+          _valueSet.add(value);
+          if (_valueSet.size() >= _limit) {
+            return true;
+          }
+        }
       }
     }
     return false;

@@ -47,25 +47,37 @@ public class RawStringSingleColumnDistinctOrderByExecutor extends BaseRawStringS
   @Override
   public boolean process(TransformBlock transformBlock) {
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
-    String[] values = blockValueSet.getStringValuesSV();
     int numDocs = transformBlock.getNumDocs();
-    for (int i = 0; i < numDocs; i++) {
-      String value = values[i];
-      if (!_valueSet.contains(value)) {
-        if (_valueSet.size() < _limit) {
-          _valueSet.add(value);
-          _priorityQueue.enqueue(value);
-        } else {
-          String firstValue = _priorityQueue.first();
-          if (_priorityQueue.comparator().compare(value, firstValue) > 0) {
-            _valueSet.remove(firstValue);
-            _valueSet.add(value);
-            _priorityQueue.dequeue();
-            _priorityQueue.enqueue(value);
-          }
+    if (blockValueSet.isSingleValue()) {
+      String[] values = blockValueSet.getStringValuesSV();
+      for (int i = 0; i < numDocs; i++) {
+        add(values[i]);
+      }
+    } else {
+      String[][] values = blockValueSet.getStringValuesMV();
+      for (int i = 0; i < numDocs; i++) {
+        for (String value : values[i]) {
+          add(value);
         }
       }
     }
     return false;
+  }
+
+  private void add(String value) {
+    if (!_valueSet.contains(value)) {
+      if (_valueSet.size() < _limit) {
+        _valueSet.add(value);
+        _priorityQueue.enqueue(value);
+      } else {
+        String firstValue = _priorityQueue.first();
+        if (_priorityQueue.comparator().compare(value, firstValue) > 0) {
+          _valueSet.remove(firstValue);
+          _valueSet.add(value);
+          _priorityQueue.dequeue();
+          _priorityQueue.enqueue(value);
+        }
+      }
+    }
   }
 }

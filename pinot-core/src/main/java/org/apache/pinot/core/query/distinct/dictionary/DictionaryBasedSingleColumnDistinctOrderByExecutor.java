@@ -50,24 +50,36 @@ public class DictionaryBasedSingleColumnDistinctOrderByExecutor
   public boolean process(TransformBlock transformBlock) {
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
     int numDocs = transformBlock.getNumDocs();
-    int[] dictIds = blockValueSet.getDictionaryIdsSV();
-    for (int i = 0; i < numDocs; i++) {
-      int dictId = dictIds[i];
-      if (!_dictIdSet.contains(dictId)) {
-        if (_dictIdSet.size() < _limit) {
-          _dictIdSet.add(dictId);
-          _priorityQueue.enqueue(dictId);
-        } else {
-          int firstDictId = _priorityQueue.firstInt();
-          if (_priorityQueue.comparator().compare(dictId, firstDictId) > 0) {
-            _dictIdSet.remove(firstDictId);
-            _dictIdSet.add(dictId);
-            _priorityQueue.dequeueInt();
-            _priorityQueue.enqueue(dictId);
-          }
+    if (blockValueSet.isSingleValue()) {
+      int[] dictIds = blockValueSet.getDictionaryIdsSV();
+      for (int i = 0; i < numDocs; i++) {
+        add(dictIds[i]);
+      }
+    } else {
+      int[][] dictIds = blockValueSet.getDictionaryIdsMV();
+      for (int i = 0; i < numDocs; i++) {
+        for (int dictId : dictIds[i]) {
+          add(dictId);
         }
       }
     }
     return false;
+  }
+
+  private void add(int dictId) {
+    if (!_dictIdSet.contains(dictId)) {
+      if (_dictIdSet.size() < _limit) {
+        _dictIdSet.add(dictId);
+        _priorityQueue.enqueue(dictId);
+      } else {
+        int firstDictId = _priorityQueue.firstInt();
+        if (_priorityQueue.comparator().compare(dictId, firstDictId) > 0) {
+          _dictIdSet.remove(firstDictId);
+          _dictIdSet.add(dictId);
+          _priorityQueue.dequeueInt();
+          _priorityQueue.enqueue(dictId);
+        }
+      }
+    }
   }
 }

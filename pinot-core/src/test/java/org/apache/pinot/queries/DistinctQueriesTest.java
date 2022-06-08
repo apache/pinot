@@ -19,6 +19,7 @@
 package org.apache.pinot.queries;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -76,26 +77,63 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   private static final String LONG_COLUMN = "longColumn";
   private static final String FLOAT_COLUMN = "floatColumn";
   private static final String DOUBLE_COLUMN = "doubleColumn";
+  private static final String BIG_DECIMAL_COLUMN = "bigDecimalColumn";
   private static final String STRING_COLUMN = "stringColumn";
   private static final String BYTES_COLUMN = "bytesColumn";
   private static final String RAW_INT_COLUMN = "rawIntColumn";
   private static final String RAW_LONG_COLUMN = "rawLongColumn";
   private static final String RAW_FLOAT_COLUMN = "rawFloatColumn";
   private static final String RAW_DOUBLE_COLUMN = "rawDoubleColumn";
+  private static final String RAW_BIG_DECIMAL_COLUMN = "rawBigDecimalColumn";
   private static final String RAW_STRING_COLUMN = "rawStringColumn";
   private static final String RAW_BYTES_COLUMN = "rawBytesColumn";
-  private static final Schema SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, DataType.INT)
-      .addSingleValueDimension(LONG_COLUMN, DataType.LONG).addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
-      .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE).addSingleValueDimension(STRING_COLUMN, DataType.STRING)
-      .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES).addSingleValueDimension(RAW_INT_COLUMN, DataType.INT)
-      .addSingleValueDimension(RAW_LONG_COLUMN, DataType.LONG).addSingleValueDimension(RAW_FLOAT_COLUMN, DataType.FLOAT)
+  private static final String INT_MV_COLUMN = "intMVColumn";
+  private static final String LONG_MV_COLUMN = "longMVColumn";
+  private static final String FLOAT_MV_COLUMN = "floatMVColumn";
+  private static final String DOUBLE_MV_COLUMN = "doubleMVColumn";
+  private static final String STRING_MV_COLUMN = "stringMVColumn";
+
+  // TODO: Fix raw index for MV column then add tests for them
+//  private static final String RAW_INT_MV_COLUMN = "rawIntMVColumn";
+//  private static final String RAW_LONG_MV_COLUMN = "rawLongMVColumn";
+//  private static final String RAW_FLOAT_MV_COLUMN = "rawFloatMVColumn";
+//  private static final String RAW_DOUBLE_MV_COLUMN = "rawDoubleMVColumn";
+//  private static final String RAW_STRING_MV_COLUMN = "rawStringMVColumn";
+
+  //@formatter:off
+  private static final Schema SCHEMA = new Schema.SchemaBuilder()
+      .addSingleValueDimension(INT_COLUMN, DataType.INT)
+      .addSingleValueDimension(LONG_COLUMN, DataType.LONG)
+      .addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
+      .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
+      .addMetric(BIG_DECIMAL_COLUMN, DataType.BIG_DECIMAL)
+      .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
+      .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES)
+      .addSingleValueDimension(RAW_INT_COLUMN, DataType.INT)
+      .addSingleValueDimension(RAW_LONG_COLUMN, DataType.LONG)
+      .addSingleValueDimension(RAW_FLOAT_COLUMN, DataType.FLOAT)
       .addSingleValueDimension(RAW_DOUBLE_COLUMN, DataType.DOUBLE)
+      .addMetric(RAW_BIG_DECIMAL_COLUMN, DataType.BIG_DECIMAL)
       .addSingleValueDimension(RAW_STRING_COLUMN, DataType.STRING)
-      .addSingleValueDimension(RAW_BYTES_COLUMN, DataType.BYTES).build();
+      .addSingleValueDimension(RAW_BYTES_COLUMN, DataType.BYTES)
+      .addMultiValueDimension(INT_MV_COLUMN, DataType.INT)
+      .addMultiValueDimension(LONG_MV_COLUMN, DataType.LONG)
+      .addMultiValueDimension(FLOAT_MV_COLUMN, DataType.FLOAT)
+      .addMultiValueDimension(DOUBLE_MV_COLUMN, DataType.DOUBLE)
+      .addMultiValueDimension(STRING_MV_COLUMN, DataType.STRING)
+//      .addMultiValueDimension(RAW_INT_MV_COLUMN, DataType.INT)
+//      .addMultiValueDimension(RAW_LONG_MV_COLUMN, DataType.LONG)
+//      .addMultiValueDimension(RAW_FLOAT_MV_COLUMN, DataType.FLOAT)
+//      .addMultiValueDimension(RAW_DOUBLE_MV_COLUMN, DataType.DOUBLE)
+//      .addMultiValueDimension(RAW_STRING_MV_COLUMN, DataType.STRING)
+      .build();
+  //@formatter:on
+
   private static final TableConfig TABLE = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setNoDictionaryColumns(
-          Arrays.asList(RAW_INT_COLUMN, RAW_LONG_COLUMN, RAW_FLOAT_COLUMN, RAW_DOUBLE_COLUMN, RAW_STRING_COLUMN,
-              RAW_BYTES_COLUMN)).build();
+          Arrays.asList(RAW_INT_COLUMN, RAW_LONG_COLUMN, RAW_FLOAT_COLUMN, RAW_DOUBLE_COLUMN, RAW_BIG_DECIMAL_COLUMN,
+              RAW_STRING_COLUMN, RAW_BYTES_COLUMN/*, RAW_INT_MV_COLUMN, RAW_LONG_MV_COLUMN, RAW_FLOAT_MV_COLUMN,
+              RAW_DOUBLE_MV_COLUMN, RAW_STRING_MV_COLUMN*/)).build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -147,18 +185,30 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       int value = baseValue + i;
       GenericRow record = new GenericRow();
       record.putValue(INT_COLUMN, value);
-      record.putValue(LONG_COLUMN, (long) value);
-      record.putValue(FLOAT_COLUMN, (float) value);
-      record.putValue(DOUBLE_COLUMN, (double) value);
-      String stringValue = Integer.toString(value);
-      record.putValue(STRING_COLUMN, stringValue);
-      record.putValue(BYTES_COLUMN, StringUtils.leftPad(stringValue, 4).getBytes(UTF_8));
+      record.putValue(LONG_COLUMN, value);
+      record.putValue(FLOAT_COLUMN, value);
+      record.putValue(DOUBLE_COLUMN, value);
+      record.putValue(BIG_DECIMAL_COLUMN, value);
+      record.putValue(STRING_COLUMN, value);
+      record.putValue(BYTES_COLUMN, StringUtils.leftPad(Integer.toString(value), 4).getBytes(UTF_8));
       record.putValue(RAW_INT_COLUMN, value);
-      record.putValue(RAW_LONG_COLUMN, (long) value);
-      record.putValue(RAW_FLOAT_COLUMN, (float) value);
-      record.putValue(RAW_DOUBLE_COLUMN, (double) value);
-      record.putValue(RAW_STRING_COLUMN, stringValue);
-      record.putValue(RAW_BYTES_COLUMN, stringValue.getBytes(UTF_8));
+      record.putValue(RAW_LONG_COLUMN, value);
+      record.putValue(RAW_FLOAT_COLUMN, value);
+      record.putValue(RAW_DOUBLE_COLUMN, value);
+      record.putValue(RAW_BIG_DECIMAL_COLUMN, value);
+      record.putValue(RAW_STRING_COLUMN, value);
+      record.putValue(RAW_BYTES_COLUMN, Integer.toString(value).getBytes(UTF_8));
+      Integer[] mvValue = new Integer[]{value, value + NUM_UNIQUE_RECORDS_PER_SEGMENT};
+      record.putValue(INT_MV_COLUMN, mvValue);
+      record.putValue(LONG_MV_COLUMN, mvValue);
+      record.putValue(FLOAT_MV_COLUMN, mvValue);
+      record.putValue(DOUBLE_MV_COLUMN, mvValue);
+      record.putValue(STRING_MV_COLUMN, mvValue);
+//      record.putValue(RAW_INT_MV_COLUMN, mvValue);
+//      record.putValue(RAW_LONG_MV_COLUMN, mvValue);
+//      record.putValue(RAW_FLOAT_MV_COLUMN, mvValue);
+//      record.putValue(RAW_DOUBLE_MV_COLUMN, mvValue);
+//      record.putValue(RAW_STRING_MV_COLUMN, mvValue);
       uniqueRecords.add(record);
     }
 
@@ -196,20 +246,19 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           "SELECT DISTINCT(longColumn) FROM testTable",
           "SELECT DISTINCT(floatColumn) FROM testTable",
           "SELECT DISTINCT(doubleColumn) FROM testTable",
+          "SELECT DISTINCT(bigDecimalColumn) FROM testTable",
           "SELECT DISTINCT(rawIntColumn) FROM testTable",
           "SELECT DISTINCT(rawLongColumn) FROM testTable",
           "SELECT DISTINCT(rawFloatColumn) FROM testTable",
           "SELECT DISTINCT(rawDoubleColumn) FROM testTable",
-          "SELECT DISTINCT(intColumn) FROM testTable ORDER BY intColumn",
-          "SELECT DISTINCT(longColumn) FROM testTable ORDER BY longColumn",
-          "SELECT DISTINCT(floatColumn) FROM testTable ORDER BY floatColumn",
-          "SELECT DISTINCT(doubleColumn) FROM testTable ORDER BY doubleColumn",
-          "SELECT DISTINCT(rawIntColumn) FROM testTable ORDER BY rawIntColumn",
-          "SELECT DISTINCT(rawLongColumn) FROM testTable ORDER BY rawLongColumn",
-          "SELECT DISTINCT(rawFloatColumn) FROM testTable ORDER BY rawFloatColumn",
-          "SELECT DISTINCT(rawDoubleColumn) FROM testTable ORDER BY rawDoubleColumn"
+          "SELECT DISTINCT(rawBigDecimalColumn) FROM testTable",
+          "SELECT DISTINCT(intMVColumn) FROM testTable",
+          "SELECT DISTINCT(longMVColumn) FROM testTable",
+          "SELECT DISTINCT(floatMVColumn) FROM testTable",
+          "SELECT DISTINCT(doubleMVColumn) FROM testTable"
       );
       //@formatter:on
+      // Query should be solved with dictionary, so it should return the 10 smallest values
       Set<Integer> expectedValues = new HashSet<>();
       for (int i = 0; i < 10; i++) {
         expectedValues.add(i);
@@ -231,7 +280,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      // String column
+      // String SV column
       String query = "SELECT DISTINCT(stringColumn) FROM testTable";
       // We define a specific result set here since the data read from dictionary is in alphabetically sorted order
       Set<Integer> expectedValues = new HashSet<>(Arrays.asList(0, 1, 10, 11, 12, 13, 14, 15, 16, 17));
@@ -250,7 +299,26 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      // Raw String column
+      // String MV column
+      String query = "SELECT DISTINCT(stringMVColumn) FROM testTable";
+      // We define a specific result set here since the data read from dictionary is in alphabetically sorted order
+      Set<Integer> expectedValues = new HashSet<>(Arrays.asList(0, 1, 10, 100, 101, 102, 103, 104, 105, 106));
+      DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
+      DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
+      for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
+        assertEquals(distinctTable.size(), 10);
+        Set<Integer> actualValues = new HashSet<>();
+        for (Record record : distinctTable.getRecords()) {
+          Object[] values = record.getValues();
+          assertEquals(values.length, 1);
+          assertTrue(values[0] instanceof String);
+          actualValues.add(Integer.parseInt((String) values[0]));
+        }
+        assertEquals(actualValues, expectedValues);
+      }
+    }
+    {
+      // Raw string SV column
       String query = "SELECT DISTINCT(rawStringColumn) FROM testTable";
       Set<Integer> expectedValues = new HashSet<>();
       for (int i = 0; i < 10; i++) {
@@ -304,17 +372,59 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   public void testSingleColumnDistinctOrderByInnerSegment()
       throws Exception {
     {
-      // Numeric columns
+      // Numeric columns ASC
+      //@formatter:off
+      List<String> queries = Arrays.asList(
+          "SELECT DISTINCT(intColumn) FROM testTable ORDER BY intColumn",
+          "SELECT DISTINCT(longColumn) FROM testTable ORDER BY longColumn",
+          "SELECT DISTINCT(floatColumn) FROM testTable ORDER BY floatColumn",
+          "SELECT DISTINCT(doubleColumn) FROM testTable ORDER BY doubleColumn",
+          "SELECT DISTINCT(bigDecimalColumn) FROM testTable ORDER BY bigDecimalColumn",
+          "SELECT DISTINCT(rawIntColumn) FROM testTable ORDER BY rawIntColumn",
+          "SELECT DISTINCT(rawLongColumn) FROM testTable ORDER BY rawLongColumn",
+          "SELECT DISTINCT(rawFloatColumn) FROM testTable ORDER BY rawFloatColumn",
+          "SELECT DISTINCT(rawDoubleColumn) FROM testTable ORDER BY rawDoubleColumn",
+          "SELECT DISTINCT(rawBigDecimalColumn) FROM testTable ORDER BY rawBigDecimalColumn",
+          "SELECT DISTINCT(intMVColumn) FROM testTable ORDER BY intMVColumn",
+          "SELECT DISTINCT(longMVColumn) FROM testTable ORDER BY longMVColumn",
+          "SELECT DISTINCT(floatMVColumn) FROM testTable ORDER BY floatMVColumn",
+          "SELECT DISTINCT(doubleMVColumn) FROM testTable ORDER BY doubleMVColumn"
+      );
+      //@formatter:on
+      Set<Integer> expectedValues = new HashSet<>();
+      for (int i = 0; i < 10; i++) {
+        expectedValues.add(i);
+      }
+      for (String query : queries) {
+        DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
+        DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
+        for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
+          assertEquals(distinctTable.size(), 10);
+          Set<Integer> actualValues = new HashSet<>();
+          for (Record record : distinctTable.getRecords()) {
+            Object[] values = record.getValues();
+            assertEquals(values.length, 1);
+            assertTrue(values[0] instanceof Number);
+            actualValues.add(((Number) values[0]).intValue());
+          }
+          assertEquals(actualValues, expectedValues);
+        }
+      }
+    }
+    {
+      // Numeric SV columns DESC
       //@formatter:off
       List<String> queries = Arrays.asList(
           "SELECT DISTINCT(intColumn) FROM testTable ORDER BY intColumn DESC",
           "SELECT DISTINCT(longColumn) FROM testTable ORDER BY longColumn DESC",
           "SELECT DISTINCT(floatColumn) FROM testTable ORDER BY floatColumn DESC",
           "SELECT DISTINCT(doubleColumn) FROM testTable ORDER BY doubleColumn DESC",
+          "SELECT DISTINCT(bigDecimalColumn) FROM testTable ORDER BY bigDecimalColumn DESC",
           "SELECT DISTINCT(rawIntColumn) FROM testTable ORDER BY rawIntColumn DESC",
           "SELECT DISTINCT(rawLongColumn) FROM testTable ORDER BY rawLongColumn DESC",
           "SELECT DISTINCT(rawFloatColumn) FROM testTable ORDER BY rawFloatColumn DESC",
-          "SELECT DISTINCT(rawDoubleColumn) FROM testTable ORDER BY rawDoubleColumn DESC"
+          "SELECT DISTINCT(rawDoubleColumn) FROM testTable ORDER BY rawDoubleColumn DESC",
+          "SELECT DISTINCT(rawBigDecimalColumn) FROM testTable ORDER BY rawBigDecimalColumn DESC"
       );
       //@formatter:on
       Set<Integer> expectedValues = new HashSet<>();
@@ -338,7 +448,37 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      // String columns
+      // Numeric MV columns DESC
+      //@formatter:off
+      List<String> queries = Arrays.asList(
+          "SELECT DISTINCT(intMVColumn) FROM testTable ORDER BY intMVColumn DESC",
+          "SELECT DISTINCT(longMVColumn) FROM testTable ORDER BY longMVColumn DESC",
+          "SELECT DISTINCT(floatMVColumn) FROM testTable ORDER BY floatMVColumn DESC",
+          "SELECT DISTINCT(doubleMVColumn) FROM testTable ORDER BY doubleMVColumn DESC"
+      );
+      //@formatter:on
+      Set<Integer> expectedValues = new HashSet<>();
+      for (int i = 2 * NUM_UNIQUE_RECORDS_PER_SEGMENT - 10; i < 2 * NUM_UNIQUE_RECORDS_PER_SEGMENT; i++) {
+        expectedValues.add(i);
+      }
+      for (String query : queries) {
+        DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
+        DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
+        for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
+          assertEquals(distinctTable.size(), 10);
+          Set<Integer> actualValues = new HashSet<>();
+          for (Record record : distinctTable.getRecords()) {
+            Object[] values = record.getValues();
+            assertEquals(values.length, 1);
+            assertTrue(values[0] instanceof Number);
+            actualValues.add(((Number) values[0]).intValue());
+          }
+          assertEquals(actualValues, expectedValues);
+        }
+      }
+    }
+    {
+      // String SV columns
       //@formatter:off
       List<String> queries = Arrays.asList(
           "SELECT DISTINCT(stringColumn) FROM testTable ORDER BY stringColumn",
@@ -361,6 +501,25 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           }
           assertEquals(actualValues, expectedValues);
         }
+      }
+    }
+    {
+      // String MV column
+      String query = "SELECT DISTINCT(stringMVColumn) FROM testTable ORDER BY stringMVColumn";
+      Set<String> expectedValues =
+          new HashSet<>(Arrays.asList("0", "1", "10", "100", "101", "102", "103", "104", "105", "106"));
+      DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
+      DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
+      for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
+        assertEquals(distinctTable.size(), 10);
+        Set<String> actualValues = new HashSet<>();
+        for (Record record : distinctTable.getRecords()) {
+          Object[] values = record.getValues();
+          assertEquals(values.length, 1);
+          assertTrue(values[0] instanceof String);
+          actualValues.add((String) values[0]);
+        }
+        assertEquals(actualValues, expectedValues);
       }
     }
     {
@@ -422,12 +581,12 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       DistinctTable distinctTable = getDistinctTableInnerSegment(queries[0]);
 
       // Check data schema
-      DataSchema expectedDataSchema = new DataSchema(
-          new String[]{"intColumn", "longColumn", "floatColumn", "doubleColumn", "stringColumn", "bytesColumn"},
-          new ColumnDataType[]{
-              ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
-              ColumnDataType.STRING, ColumnDataType.BYTES
-          });
+      DataSchema expectedDataSchema = new DataSchema(new String[]{
+          "intColumn", "longColumn", "floatColumn", "doubleColumn", "bigDecimalColumn", "stringColumn", "bytesColumn"
+      }, new ColumnDataType[]{
+          ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
+          ColumnDataType.BIG_DECIMAL, ColumnDataType.STRING, ColumnDataType.BYTES
+      });
       assertEquals(distinctTable.getDataSchema(), expectedDataSchema);
 
       // Check values, where all 100 unique values should be returned
@@ -444,8 +603,9 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals(((Long) values[1]).intValue(), intValue);
         assertEquals(((Float) values[2]).intValue(), intValue);
         assertEquals(((Double) values[3]).intValue(), intValue);
-        assertEquals(Integer.parseInt((String) values[4]), intValue);
-        assertEquals(new String(((ByteArray) values[5]).getBytes(), UTF_8).trim(), values[4]);
+        assertEquals(((BigDecimal) values[4]).intValue(), intValue);
+        assertEquals(Integer.parseInt((String) values[5]), intValue);
+        assertEquals(new String(((ByteArray) values[6]).getBytes(), UTF_8).trim(), values[5]);
         actualValues.add(intValue);
       }
       assertEquals(actualValues, expectedValues);
@@ -551,8 +711,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   public void testDistinctInnerSegment() {
     //@formatter:off
     testDistinctInnerSegmentHelper(new String[]{
-        "SELECT DISTINCT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn FROM testTable "
-            + "LIMIT 10000",
+        "SELECT DISTINCT intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn "
+            + "FROM testTable LIMIT 10000",
         "SELECT DISTINCT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000",
         "SELECT DISTINCT intColumn, rawBytesColumn FROM testTable ORDER BY rawBytesColumn LIMIT 5",
         "SELECT DISTINCT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 "
@@ -578,8 +738,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   public void testNonAggGroupByRewriteToDistinctInnerSegment() {
     //@formatter:off
     testDistinctInnerSegmentHelper(new String[]{
-        "SELECT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn FROM testTable "
-            + "GROUP BY intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn LIMIT 10000",
+        "SELECT intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn "
+            + "FROM testTable "
+            + "GROUP BY intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn "
+            + "LIMIT 10000",
         "SELECT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 "
             + "GROUP BY stringColumn, bytesColumn, floatColumn LIMIT 10000",
         "SELECT intColumn, rawBytesColumn FROM testTable "
@@ -630,12 +792,12 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       ResultTable resultTable = getBrokerResponse(queries[0]).getResultTable();
 
       // Check data schema
-      DataSchema expectedDataSchema = new DataSchema(
-          new String[]{"intColumn", "longColumn", "floatColumn", "doubleColumn", "stringColumn", "bytesColumn"},
-          new ColumnDataType[]{
-              ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
-              ColumnDataType.STRING, ColumnDataType.BYTES
-          });
+      DataSchema expectedDataSchema = new DataSchema(new String[]{
+          "intColumn", "longColumn", "floatColumn", "doubleColumn", "bigDecimalColumn", "stringColumn", "bytesColumn"
+      }, new ColumnDataType[]{
+          ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
+          ColumnDataType.BIG_DECIMAL, ColumnDataType.STRING, ColumnDataType.BYTES
+      });
       assertEquals(resultTable.getDataSchema(), expectedDataSchema);
 
       // Check values, where all 200 unique values should be returned
@@ -646,17 +808,18 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         expectedValues.add(i);
         expectedValues.add(1000 + i);
       }
-      Set<Integer> values = new HashSet<>();
+      Set<Integer> actualValues = new HashSet<>();
       for (Object[] row : rows) {
         int intValue = (Integer) row[0];
         assertEquals(((Long) row[1]).intValue(), intValue);
         assertEquals(((Float) row[2]).intValue(), intValue);
         assertEquals(((Double) row[3]).intValue(), intValue);
-        assertEquals(Integer.parseInt((String) row[4]), intValue);
-        assertEquals(new String(BytesUtils.toBytes((String) row[5]), UTF_8).trim(), row[4]);
-        values.add(intValue);
+        assertEquals(((BigDecimal) row[4]).intValue(), intValue);
+        assertEquals(Integer.parseInt((String) row[5]), intValue);
+        assertEquals(new String(BytesUtils.toBytes((String) row[6]), UTF_8).trim(), row[5]);
+        actualValues.add(intValue);
       }
-      assertEquals(values, expectedValues);
+      assertEquals(actualValues, expectedValues);
     }
     {
       // Test selecting some columns with filter
@@ -801,7 +964,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   public void testDistinctInterSegment() {
     //@formatter:off
     String[] queries = new String[]{
-        "SELECT DISTINCT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn "
+        "SELECT DISTINCT intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn "
             + "FROM testTable LIMIT 10000",
         "SELECT DISTINCT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000",
         "SELECT DISTINCT intColumn, rawBytesColumn FROM testTable ORDER BY rawBytesColumn LIMIT 5",
@@ -839,8 +1002,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   public void testNonAggGroupByRewriteToDistinctInterSegment() {
     //@formatter:off
     String[] queries = new String[]{
-        "SELECT intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn FROM testTable "
-            + "GROUP BY intColumn, longColumn, floatColumn, doubleColumn, stringColumn, bytesColumn LIMIT 10000",
+        "SELECT intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn "
+            + "FROM testTable "
+            + "GROUP BY intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn "
+            + "LIMIT 10000",
         "SELECT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 "
             + "GROUP BY stringColumn, bytesColumn, floatColumn LIMIT 10000",
         "SELECT intColumn, rawBytesColumn FROM testTable GROUP BY intColumn, rawBytesColumn "
