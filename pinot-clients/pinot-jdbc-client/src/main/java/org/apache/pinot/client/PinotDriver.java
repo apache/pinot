@@ -34,14 +34,12 @@ import java.util.Properties;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.utils.DriverUtils;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.slf4j.LoggerFactory;
 
 
@@ -52,11 +50,6 @@ public class PinotDriver implements Driver {
   public static final String DEFAULT_TENANT = "DefaultTenant";
   public static final String INFO_SCHEME = "scheme";
   public static final String INFO_HEADERS = "headers";
-
-  // Used for authorization
-  public static final String USER_PROPERTY = "user";
-  public static final String PASSWORD_PROPERTY = "password";
-  public static final String AUTH_HEADER = "Authorization";
 
   private SSLContext _sslContext = null;
 
@@ -77,7 +70,7 @@ public class PinotDriver implements Driver {
    * password - Password associated with the user for which auth is enabled.
    * You can also specify username and password in the URL, e.g. jdbc:pinot://localhost:9000?user=Foo&password=Bar
    * If username and password are specified at multiple places, the precedence takes place in the following order
-   * (header.Authorization property) > (user and password specified in properties) > (username and password in URL)
+   * (header.Authorization property) > (username and password in URL) > (user and password specified in properties)
    * @param url  jdbc connection url containing pinot controller machine host:port.
    * example - jdbc:pinot://localhost:9000
    * @param info properties required for creating connection
@@ -108,7 +101,7 @@ public class PinotDriver implements Driver {
 
       Map<String, String> headers = getHeadersFromProperties(info);
 
-      handleAuth(url, info, headers);
+      DriverUtils.handleAuth(url, info, headers);
 
       if (!headers.isEmpty()) {
         factory.setHeaders(headers);
@@ -122,40 +115,6 @@ public class PinotDriver implements Driver {
       return new PinotConnection(info, controllerUrl, pinotClientTransport, tenant, pinotControllerTransport);
     } catch (Exception e) {
       throw new SQLException(String.format("Failed to connect to url : %s", url), e);
-    }
-  }
-
-  private void handleAuth(String url, Properties info, Map<String, String> headers)
-      throws SQLException {
-    handleAuthFromProperties(info, headers);
-
-    handleAuthFromURLParams(url, headers);
-  }
-
-  private void handleAuthFromURLParams(String url, Map<String, String> headers)
-      throws SQLException {
-    Map<String, String> urlParams = DriverUtils.getURLParams(url);
-    if (urlParams.containsKey(USER_PROPERTY) && !headers.containsKey(AUTH_HEADER)) {
-      String username = urlParams.get(USER_PROPERTY);
-      String password = urlParams.getOrDefault(PASSWORD_PROPERTY, "");
-      if (StringUtils.isEmpty(password)) {
-        throw new SQLException("Empty username or password provided.");
-      }
-      String authToken = BasicAuthUtils.toBasicAuthToken(username, password);
-      headers.put(AUTH_HEADER, authToken);
-    }
-  }
-
-  private void handleAuthFromProperties(Properties info, Map<String, String> headers)
-      throws SQLException {
-    if (info.contains(USER_PROPERTY) && !headers.containsKey(AUTH_HEADER)) {
-      String username = info.getProperty(USER_PROPERTY);
-      String password = info.getProperty(PASSWORD_PROPERTY, "");
-      if (StringUtils.isEmpty(password)) {
-        throw new SQLException("Empty username or password provided.");
-      }
-      String authToken = BasicAuthUtils.toBasicAuthToken(username, password);
-      headers.put(AUTH_HEADER, authToken);
     }
   }
 
