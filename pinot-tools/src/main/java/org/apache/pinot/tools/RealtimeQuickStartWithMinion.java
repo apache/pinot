@@ -64,7 +64,7 @@ public class RealtimeQuickStartWithMinion extends QuickStartBase {
   }
 
   public Map<String, Object> getConfigOverrides() {
-    Map<String, Object> properties = new HashMap<>();
+    Map<String, Object> properties = new HashMap<>(super.getConfigOverrides());
     properties.putIfAbsent("controller.task.scheduler.enabled", true);
     return properties;
   }

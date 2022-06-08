@@ -41,7 +41,7 @@ public class AuthQuickstart extends Quickstart {
 
   @Override
   public Map<String, Object> getConfigOverrides() {
-    Map<String, Object> properties = new HashMap<>();
+    Map<String, Object> properties = new HashMap<>(super.getConfigOverrides());
 
     // controller
     properties.put("pinot.controller.segment.fetcher.auth.token", "Basic YWRtaW46dmVyeXNlY3JldA==");
