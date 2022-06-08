@@ -43,6 +43,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.segment.local.aggregator.CountValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -597,7 +598,11 @@ public class MutableSegmentImpl implements MutableSegment {
         FieldSpec fieldSpec = indexContainer._fieldSpec;
 
         DataType dataType = fieldSpec.getDataType();
-        value = indexContainer._valueAggregator.getInitialAggregatedValue(value);
+        if (indexContainer._valueAggregator instanceof CountValueAggregator) {
+          value = indexContainer._valueAggregator.getInitialAggregatedValue(null);
+        } else {
+          value = indexContainer._valueAggregator.getInitialAggregatedValue(value);
+        }
         switch (dataType.getStoredType()) {
           case INT:
             forwardIndex.setInt(docId, ((Number) value).intValue());
@@ -814,7 +819,13 @@ public class MutableSegmentImpl implements MutableSegment {
               break;
             case LONG:
               oldDoubleValue = ((Long) forwardIndex.getLong(docId)).doubleValue();
-              newDoubleValue = (Double) valueAggregator.applyRawValue(oldDoubleValue, value);
+
+              if (valueAggregator instanceof CountValueAggregator) {
+                newDoubleValue = (Double) valueAggregator.applyRawValue(oldDoubleValue, null);
+              } else {
+                newDoubleValue = (Double) valueAggregator.applyRawValue(oldDoubleValue, value);
+              }
+
               forwardIndex.setLong(docId, newDoubleValue.longValue());
               break;
             case FLOAT:
@@ -841,7 +852,11 @@ public class MutableSegmentImpl implements MutableSegment {
               break;
             case LONG:
               oldLongValue = forwardIndex.getLong(docId);
-              newLongValue = (Long) valueAggregator.applyRawValue(oldLongValue, value);
+              if (valueAggregator instanceof CountValueAggregator) {
+                newLongValue = (Long) valueAggregator.applyRawValue(oldLongValue, null);
+              } else {
+                newLongValue = (Long) valueAggregator.applyRawValue(oldLongValue, value);
+              }
               forwardIndex.setLong(docId, newLongValue);
               break;
             case FLOAT:
