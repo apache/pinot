@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.creator.name;
 import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -46,8 +47,14 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentNameTemplate;
   private final URI _inputFileUri;
   private final String _segmentName;
+  private final boolean _appendUUIDToSegmentName;
 
   public InputFileSegmentNameGenerator(String filePathPattern, String segmentNameTemplate, String inputFileUri) {
+    this(filePathPattern, segmentNameTemplate, inputFileUri, false);
+  }
+
+  public InputFileSegmentNameGenerator(String filePathPattern, String segmentNameTemplate, String inputFileUri,
+      boolean appendUUIDToSegmentName) {
     Preconditions.checkArgument(filePathPattern != null, "Missing filePathPattern for InputFileSegmentNameGenerator");
     try {
       _filePathPattern = Pattern.compile(filePathPattern);
@@ -64,23 +71,25 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
       throw new IllegalArgumentException(
           String.format("Invalid inputFileUri: %s for InputFileSegmentNameGenerator", inputFileUri), e);
     }
+    _appendUUIDToSegmentName = appendUUIDToSegmentName;
     _segmentName = makeSegmentName();
   }
 
   private String makeSegmentName() {
     String inputFilePath = _inputFileUri.getPath();
     Matcher m = _filePathPattern.matcher(inputFilePath);
+    String segmentName;
+
     if (!m.matches()) {
       LOGGER.warn(String.format("No match for pattern '%s' in '%s'", _filePathPattern, inputFilePath));
-      return safeConvertPathToFilename(inputFilePath);
+      segmentName = safeConvertPathToFilename(inputFilePath);
+    } else {
+      segmentName = _segmentNameTemplate;
+      for (int i = 1; i <= m.groupCount(); i++) {
+        segmentName = segmentName.replace(String.format(PARAMETER_TEMPLATE, i), m.group(i));
+      }
     }
-
-    String segmentName = _segmentNameTemplate;
-    for (int i = 1; i <= m.groupCount(); i++) {
-      segmentName = segmentName.replace(String.format(PARAMETER_TEMPLATE, i), m.group(i));
-    }
-
-    return segmentName;
+    return _appendUUIDToSegmentName ? JOINER.join(segmentName, UUID.randomUUID()) : segmentName;
   }
 
   @Override

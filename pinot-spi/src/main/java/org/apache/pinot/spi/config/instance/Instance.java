@@ -46,6 +46,8 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 public class Instance extends BaseJsonConfig {
   public static final int NOT_SET_GRPC_PORT_VALUE = -1;
   public static final int NOT_SET_ADMIN_PORT_VALUE = -1;
+  public static final int NOT_SET_QUERY_SERVER_PORT_VALUE = -1;
+  public static final int NOT_SET_QUERY_MAILBOX_PORT_VALUE = -1;
 
   private final String _host;
   private final int _port;
@@ -54,6 +56,8 @@ public class Instance extends BaseJsonConfig {
   private final Map<String, Integer> _pools;
   private final int _grpcPort;
   private final int _adminPort;
+  private final int _queryServicePort;
+  private final int _queryMailboxPort;
   private final boolean _queriesDisabled;
 
   @JsonCreator
@@ -62,6 +66,7 @@ public class Instance extends BaseJsonConfig {
       @JsonProperty(value = "type", required = true) InstanceType type,
       @JsonProperty("tags") @Nullable List<String> tags, @JsonProperty("pools") @Nullable Map<String, Integer> pools,
       @JsonProperty("grpcPort") int grpcPort, @JsonProperty("adminPort") int adminPort,
+      @JsonProperty("queryServicePort") int queryServicePort, @JsonProperty("queryMailboxPort") int queryMailboxPort,
       @JsonProperty("queriesDisabled") boolean queriesDisabled) {
     Preconditions.checkArgument(host != null, "'host' must be configured");
     Preconditions.checkArgument(type != null, "'type' must be configured");
@@ -79,6 +84,16 @@ public class Instance extends BaseJsonConfig {
       _adminPort = NOT_SET_ADMIN_PORT_VALUE;
     } else {
       _adminPort = adminPort;
+    }
+    if (queryServicePort == 0) {
+      _queryServicePort = NOT_SET_QUERY_SERVER_PORT_VALUE;
+    } else {
+      _queryServicePort = queryServicePort;
+    }
+    if (queryMailboxPort == 0) {
+      _queryMailboxPort = NOT_SET_QUERY_MAILBOX_PORT_VALUE;
+    } else {
+      _queryMailboxPort = queryMailboxPort;
     }
     _queriesDisabled = queriesDisabled;
   }
@@ -111,6 +126,14 @@ public class Instance extends BaseJsonConfig {
 
   public int getAdminPort() {
     return _adminPort;
+  }
+
+  public int getQueryServicePort() {
+    return _queryServicePort;
+  }
+
+  public int getQueryMailboxPort() {
+    return _queryMailboxPort;
   }
 
   public boolean isQueriesDisabled() {

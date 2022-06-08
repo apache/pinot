@@ -42,6 +42,8 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -49,6 +51,7 @@ import org.apache.pinot.spi.trace.RequestContext;
  */
 @ThreadSafe
 public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcBrokerRequestHandler.class);
 
   private final GrpcQueryClient.Config _grpcConfig;
   private final StreamingReduceService _streamingReduceService;
@@ -59,6 +62,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
     super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
+    LOGGER.info("Using Grpc BrokerRequestHandler.");
     _grpcConfig = buildGrpcQueryClientConfig(config);
 
     // create streaming query client

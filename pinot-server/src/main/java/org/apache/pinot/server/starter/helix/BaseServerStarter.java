@@ -329,6 +329,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     int grpcPort = serverConf.isEnableGrpcServer() ? serverConf.getGrpcPort() : Integer.MIN_VALUE;
     updated |= updatePortIfNeeded(simpleFields, Instance.GRPC_PORT_KEY, grpcPort);
 
+    // Update multi-stage query engine ports
+    if (serverConf.isMultiStageServerEnabled()) {
+      updated |= updatePortIfNeeded(simpleFields,
+          Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY, serverConf.getMultiStageServicePort());
+      updated |= updatePortIfNeeded(simpleFields,
+          Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY, serverConf.getMultiStageMailboxPort());
+    }
+
     // Update environment properties
     if (_pinotEnvironmentProvider != null) {
       // Retrieve failure domain information and add to the environment properties map

@@ -38,6 +38,7 @@ import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.conf.ServerConf;
+import org.apache.pinot.server.worker.WorkerQueryServer;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
@@ -62,6 +63,8 @@ public class ServerInstance {
   private final QueryServer _nettyTlsQueryServer;
   private final GrpcQueryServer _grpcQueryServer;
   private final AccessControl _accessControl;
+
+  private final WorkerQueryServer _workerQueryServer;
 
   private boolean _dataManagerStarted = false;
   private boolean _queryServerStarted = false;
@@ -102,6 +105,13 @@ public class ServerInstance {
     accessControlFactory.init(
         serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL), helixManager);
     _accessControl = accessControlFactory.create();
+
+    if (serverConf.isMultiStageServerEnabled()) {
+      LOGGER.info("Initializing Multi-stage query engine");
+      _workerQueryServer = new WorkerQueryServer(serverConf.getPinotConfig(), _instanceDataManager, _serverMetrics);
+    } else {
+      _workerQueryServer = null;
+    }
 
     if (serverConf.isNettyServerEnabled()) {
       int nettyPort = serverConf.getNettyPort();
@@ -182,6 +192,10 @@ public class ServerInstance {
       LOGGER.info("Starting gRPC query server");
       _grpcQueryServer.start();
     }
+    if (_workerQueryServer != null) {
+      LOGGER.info("Starting worker query server");
+      _workerQueryServer.start();
+    }
 
     _queryServerStarted = true;
     LOGGER.info("Finish starting query server");
@@ -209,6 +223,10 @@ public class ServerInstance {
       if (_grpcQueryServer != null) {
         LOGGER.info("Shutting down gRPC query server");
         _grpcQueryServer.shutdown();
+      }
+      if (_workerQueryServer != null) {
+        LOGGER.info("Shutting down worker query server");
+        _workerQueryServer.shutDown();
       }
       LOGGER.info("Shutting down query scheduler");
       _queryScheduler.stop();

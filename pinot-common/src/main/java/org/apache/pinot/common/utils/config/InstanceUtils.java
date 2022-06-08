@@ -91,6 +91,18 @@ public class InstanceUtils {
     } else {
       simpleFields.remove(Helix.Instance.ADMIN_PORT_KEY);
     }
+    int queryServicePort = instance.getQueryServicePort();
+    if (queryServicePort > 0) {
+      simpleFields.put(Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY, Integer.toString(queryServicePort));
+    } else {
+      simpleFields.remove(Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY);
+    }
+    int queryMailboxPort = instance.getQueryMailboxPort();
+    if (queryMailboxPort > 0) {
+      simpleFields.put(Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY, Integer.toString(queryMailboxPort));
+    } else {
+      simpleFields.remove(Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY);
+    }
     boolean queriesDisabled = instance.isQueriesDisabled();
     if (queriesDisabled) {
       simpleFields.put(Helix.QUERIES_DISABLED, Boolean.toString(true));

@@ -163,11 +163,11 @@ public final class IngestionUtils {
         }
         return new NormalizedDateSegmentNameGenerator(rawTableName, batchConfig.getSegmentNamePrefix(),
             batchConfig.isExcludeSequenceId(), pushType, pushFrequency, dateTimeFormatSpec,
-            batchConfig.getSegmentNamePostfix());
+            batchConfig.getSegmentNamePostfix(), batchConfig.isAppendUUIDToSegmentName());
 
       case BatchConfigProperties.SegmentNameGeneratorType.SIMPLE:
-        return new SimpleSegmentNameGenerator(rawTableName, batchConfig.getSegmentNamePostfix());
-
+        return new SimpleSegmentNameGenerator(rawTableName, batchConfig.getSegmentNamePostfix(),
+            batchConfig.isAppendUUIDToSegmentName());
       default:
         throw new IllegalStateException(String
             .format("Unsupported segmentNameGeneratorType: %s for table: %s", segmentNameGeneratorType,

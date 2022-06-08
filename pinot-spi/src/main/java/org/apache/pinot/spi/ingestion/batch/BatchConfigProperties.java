@@ -61,6 +61,7 @@ public class BatchConfigProperties {
   public static final String PUSH_SEGMENT_URI_SUFFIX = "push.segmentUriSuffix";
   public static final String FAIL_ON_EMPTY_SEGMENT = "fail.on.empty.segment";
   public static final String AUTH_TOKEN = "authToken";
+  public static final String APPEND_UUID_TO_SEGMENT_NAME = "append.uuid.to.segment.name";
 
   public static final String OUTPUT_SEGMENT_DIR_URI = "output.segment.dir.uri";
 
@@ -72,6 +73,7 @@ public class BatchConfigProperties {
     public static final String SIMPLE = "simple";
     public static final String NORMALIZED_DATE = "normalizedDate";
     public static final String FIXED = "fixed";
+    public static final String INPUT_FILE = "inputFile";
   }
 
   public enum SegmentPushType {
