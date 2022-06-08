@@ -50,6 +50,7 @@ public class BatchConfig {
   private final String _segmentNamePrefix;
   private final String _segmentNamePostfix;
   private final boolean _excludeSequenceId;
+  private final boolean _appendUUIDToSegmentName;
   private final String _sequenceId;
 
   private final String _pushMode;
@@ -96,6 +97,8 @@ public class BatchConfig {
     _segmentNamePostfix = segmentNameGeneratorProps.get(BatchConfigProperties.SEGMENT_NAME_POSTFIX);
     _excludeSequenceId = Boolean.parseBoolean(segmentNameGeneratorProps.get(BatchConfigProperties.EXCLUDE_SEQUENCE_ID));
     _sequenceId = batchConfigsMap.get(BatchConfigProperties.SEQUENCE_ID);
+    _appendUUIDToSegmentName =
+        Boolean.parseBoolean(segmentNameGeneratorProps.get(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME));
 
     _pushMode = IngestionConfigUtils.getPushMode(batchConfigsMap);
     _pushAttempts = IngestionConfigUtils.getPushAttempts(batchConfigsMap);
@@ -181,6 +184,10 @@ public class BatchConfig {
 
   public String getSequenceId() {
     return _sequenceId;
+  }
+
+  public boolean isAppendUUIDToSegmentName() {
+    return _appendUUIDToSegmentName;
   }
 
   public String getPushMode() {
