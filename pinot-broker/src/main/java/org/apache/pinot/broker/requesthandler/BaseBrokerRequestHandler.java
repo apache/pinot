@@ -242,13 +242,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     }
 
-    String tableName = getActualTableName(serverPinotQuery.getDataSource().getTableName());
+    String tableName =
+        getActualTableName(serverPinotQuery.getDataSource().getTableName(), _tableCache);
     serverPinotQuery.getDataSource().setTableName(tableName);
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     requestContext.setTableName(rawTableName);
 
     try {
-      boolean isCaseInsensitive = _tableCache.isCaseInsensitive();
+      boolean isCaseInsensitive = _tableCache.isIgnoreCase();
       Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
       if (columnNameMap != null) {
         updateColumnNames(rawTableName, serverPinotQuery, isCaseInsensitive, columnNameMap);
@@ -762,52 +763,25 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * - Case-insensitive cluster
    * - Table name in the format of [database_name].[table_name]
    *
-   * Drop the database part if there is no existing table in the format of [database_name].[table_name], but only
-   * [table_name].
+   * @param tableName the table name in the query
+   * @param tableCache the table case-sensitive cache
+   * @return table name if the table name is found in Pinot registry, drop the database_name in the format
+   *  of [database_name].[table_name] if only [table_name] is found in Pinot registry.
    */
-  private String getActualTableName(String tableName) {
-    // Use TableCache to handle case-insensitive table name
-    if (_tableCache.isCaseInsensitive()) {
-      String actualTableName = _tableCache.getActualTableName(tableName);
-      if (actualTableName != null) {
-        return actualTableName;
-      }
-
-      // Check if table is in the format of [database_name].[table_name]
-      String[] tableNameSplits = StringUtils.split(tableName, ".", 2);
-      if (tableNameSplits.length == 2) {
-        actualTableName = _tableCache.getActualTableName(tableNameSplits[1]);
-        if (actualTableName != null) {
-          return actualTableName;
-        }
-      }
-
-      return tableName;
+  @VisibleForTesting
+  static String getActualTableName(String tableName, TableCache tableCache) {
+    String actualTableName = tableCache.getActualTableName(tableName);
+    if (actualTableName != null) {
+      return actualTableName;
     }
 
     // Check if table is in the format of [database_name].[table_name]
     String[] tableNameSplits = StringUtils.split(tableName, ".", 2);
-    if (tableNameSplits.length != 2) {
-      return tableName;
-    }
-
-    // Use RoutingManager to handle case-sensitive table name
-    // Update table name if there is no existing table in the format of [database_name].[table_name] but only
-    // [table_name]
-    if (TableNameBuilder.isTableResource(tableName)) {
-      if (_routingManager.routingExists(tableNameSplits[1]) && !_routingManager.routingExists(tableName)) {
-        return tableNameSplits[1];
-      } else {
-        return tableName;
+    if (tableNameSplits.length == 2) {
+      actualTableName = tableCache.getActualTableName(tableNameSplits[1]);
+      if (actualTableName != null) {
+        return actualTableName;
       }
-    }
-    if (_routingManager.routingExists(TableNameBuilder.OFFLINE.tableNameWithType(tableNameSplits[1]))
-        && !_routingManager.routingExists(TableNameBuilder.OFFLINE.tableNameWithType(tableName))) {
-      return tableNameSplits[1];
-    }
-    if (_routingManager.routingExists(TableNameBuilder.REALTIME.tableNameWithType(tableNameSplits[1]))
-        && !_routingManager.routingExists(TableNameBuilder.REALTIME.tableNameWithType(tableName))) {
-      return tableNameSplits[1];
     }
     return tableName;
   }
@@ -1374,21 +1348,20 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Fixes the column names to the actual column names in the given expression.
    */
   private static void fixColumnName(String rawTableName, Expression expression, Map<String, String> columnNameMap,
-      Map<String, String> aliasMap, boolean isCaseInsensitive) {
+      Map<String, String> aliasMap, boolean ignoreCase) {
     ExpressionType expressionType = expression.getType();
     if (expressionType == ExpressionType.IDENTIFIER) {
       Identifier identifier = expression.getIdentifier();
-      identifier.setName(
-          getActualColumnName(rawTableName, identifier.getName(), columnNameMap, aliasMap, isCaseInsensitive));
+      identifier.setName(getActualColumnName(rawTableName, identifier.getName(), columnNameMap, aliasMap, ignoreCase));
     } else if (expressionType == ExpressionType.FUNCTION) {
       final Function functionCall = expression.getFunctionCall();
       switch (functionCall.getOperator()) {
         case "as":
-          fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, aliasMap, isCaseInsensitive);
+          fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, aliasMap, ignoreCase);
           final Expression rightAsExpr = functionCall.getOperands().get(1);
           if (rightAsExpr.isSetIdentifier()) {
             String rightColumn = rightAsExpr.getIdentifier().getName();
-            if (isCaseInsensitive) {
+            if (ignoreCase) {
               aliasMap.put(rightColumn.toLowerCase(), rightColumn);
             } else {
               aliasMap.put(rightColumn, rightColumn);
@@ -1400,7 +1373,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           break;
         default:
           for (Expression operand : functionCall.getOperands()) {
-            fixColumnName(rawTableName, operand, columnNameMap, aliasMap, isCaseInsensitive);
+            fixColumnName(rawTableName, operand, columnNameMap, aliasMap, ignoreCase);
           }
           break;
       }
@@ -1412,26 +1385,19 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * - Case-insensitive cluster
    * - Column name in the format of [table_name].[column_name]
    */
-  private static String getActualColumnName(String rawTableName, String columnName,
-      @Nullable Map<String, String> columnNameMap, @Nullable Map<String, String> aliasMap, boolean isCaseInsensitive) {
+  @VisibleForTesting
+  static String getActualColumnName(String rawTableName, String columnName, @Nullable Map<String, String> columnNameMap,
+      @Nullable Map<String, String> aliasMap, boolean ignoreCase) {
     if ("*".equals(columnName)) {
       return columnName;
     }
-    // Check if column is in the format of [table_name].[column_name]
-    String[] splits = StringUtils.split(columnName, ".", 2);
     String columnNameToCheck;
-    if (isCaseInsensitive) {
-      if (splits.length == 2 && rawTableName.equalsIgnoreCase(splits[0])) {
-        columnNameToCheck = splits[1].toLowerCase();
-      } else {
-        columnNameToCheck = columnName.toLowerCase();
-      }
+    if (columnName.regionMatches(ignoreCase, 0, rawTableName, 0, rawTableName.length())
+        && columnName.length() > rawTableName.length() && columnName.charAt(rawTableName.length()) == '.') {
+      columnNameToCheck = ignoreCase ? columnName.substring(rawTableName.length() + 1).toLowerCase()
+          : columnName.substring(rawTableName.length() + 1);
     } else {
-      if (splits.length == 2 && rawTableName.equals(splits[0])) {
-        columnNameToCheck = splits[1];
-      } else {
-        columnNameToCheck = columnName;
-      }
+      columnNameToCheck = ignoreCase ? columnName.toLowerCase() : columnName;
     }
     if (columnNameMap != null) {
       String actualColumnName = columnNameMap.get(columnNameToCheck);
@@ -1480,6 +1446,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   @VisibleForTesting
   static void setOptions(PinotQuery pinotQuery, long requestId, String query, JsonNode jsonRequest) {
     Map<String, String> queryOptions = new HashMap<>();
+    if (jsonRequest.has(Broker.Request.DEBUG_OPTIONS)) {
+      Map<String, String> debugOptions = getOptionsFromJson(jsonRequest, Broker.Request.DEBUG_OPTIONS);
+      if (!debugOptions.isEmpty()) {
+        // TODO: Do not set debug options after releasing 0.11.0. Currently we kept it for backward compatibility.
+        LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
+        pinotQuery.setDebugOptions(debugOptions);
+
+        // NOTE: Debug options are deprecated. Put all debug options into query options for backward compatibility.
+        queryOptions.putAll(debugOptions);
+      }
+    }
     if (jsonRequest.has(Broker.Request.QUERY_OPTIONS)) {
       Map<String, String> queryOptionsFromJson = getOptionsFromJson(jsonRequest, Broker.Request.QUERY_OPTIONS);
       queryOptions.putAll(queryOptionsFromJson);
@@ -1496,14 +1473,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     pinotQuery.setQueryOptions(queryOptions);
     if (!queryOptions.isEmpty()) {
       LOGGER.debug("Query options are set to: {} for request {}: {}", queryOptions, requestId, query);
-    }
-
-    if (jsonRequest.has(Broker.Request.DEBUG_OPTIONS)) {
-      Map<String, String> debugOptions = getOptionsFromJson(jsonRequest, Broker.Request.DEBUG_OPTIONS);
-      if (!debugOptions.isEmpty()) {
-        LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
-        pinotQuery.setDebugOptions(debugOptions);
-      }
     }
   }
 

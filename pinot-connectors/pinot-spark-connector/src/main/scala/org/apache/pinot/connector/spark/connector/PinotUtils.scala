@@ -55,6 +55,8 @@ private[pinot] object PinotUtils {
       case FieldSpec.DataType.DOUBLE => DoubleType
       case FieldSpec.DataType.STRING => StringType
       case FieldSpec.DataType.BYTES => ArrayType(ByteType)
+      case FieldSpec.DataType.TIMESTAMP => LongType
+      case FieldSpec.DataType.BOOLEAN => BooleanType
       case _ =>
         throw PinotException(s"Unsupported pinot data type '$dataType")
     }
@@ -97,6 +99,10 @@ private[pinot] object PinotUtils {
       dataTable.getFloat(rowIndex, colIndex)
     case ColumnDataType.DOUBLE =>
       dataTable.getDouble(rowIndex, colIndex)
+    case ColumnDataType.TIMESTAMP =>
+      dataTable.getLong(rowIndex, colIndex)
+    case ColumnDataType.BOOLEAN =>
+      dataTable.getInt(rowIndex, colIndex) == 1
 
     // array column types
     case ColumnDataType.STRING_ARRAY =>
@@ -113,6 +119,12 @@ private[pinot] object PinotUtils {
       ArrayData.toArrayData(dataTable.getDoubleArray(rowIndex, colIndex).toSeq)
     case ColumnDataType.BYTES =>
       ArrayData.toArrayData(dataTable.getBytes(rowIndex, colIndex).getBytes)
+    case ColumnDataType.TIMESTAMP_ARRAY =>
+      ArrayData.toArrayData(dataTable.getLongArray(rowIndex, colIndex).toSeq)
+    case ColumnDataType.BOOLEAN_ARRAY =>
+      ArrayData.toArrayData(
+        dataTable.getIntArray(rowIndex, colIndex).map(i => i == 1).toSeq
+      )
 
     case _ =>
       throw PinotException(s"'$columnDataType' is not supported")

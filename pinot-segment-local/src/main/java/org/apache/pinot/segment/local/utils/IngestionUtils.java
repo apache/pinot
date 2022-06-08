@@ -240,7 +240,7 @@ public final class IngestionUtils {
           }
           PinotFS outputFileFS = getOutputPinotFS(batchConfig, outputSegmentDirURI);
           Map<String, String> segmentUriToTarPathMap = SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI,
-              segmentUploadSpec.getPushJobSpec(), new String[] { segmentTarURIs.toString() });
+              segmentUploadSpec.getPushJobSpec(), segmentTarURIStrs.toArray(new String[0]));
           SegmentPushUtils.sendSegmentUriAndMetadata(segmentUploadSpec, outputFileFS, segmentUriToTarPathMap);
         } catch (RetriableOperationException | AttemptsExceededException e) {
           throw new RuntimeException(String

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.pruner;
 
-import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -33,27 +32,14 @@ public interface SegmentPruner {
   void init(PinotConfiguration config);
 
   /**
-   * Prunes the segments based on the query, returns the segments that are not pruned.
-   * <p>Override this method or {@link #prune(IndexSegment, QueryContext)} for the pruner logic.
+   * Inspect the query context to determine if the pruner should be applied
+   * @return true if the pruner applies to the query
    */
-  default List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query) {
-    if (segments.isEmpty()) {
-      return segments;
-    }
-    List<IndexSegment> selectedSegments = new ArrayList<>(segments.size());
-    for (IndexSegment segment : segments) {
-      if (!prune(segment, query)) {
-        selectedSegments.add(segment);
-      }
-    }
-    return selectedSegments;
-  }
+  boolean isApplicableTo(QueryContext query);
 
   /**
-   * Returns {@code true} if the segment can be pruned based on the query.
-   * <p>Override this method or {@link #prune(List, QueryContext)} for the pruner logic.
+   * Prunes the segments based on the query, returns the segments that are not pruned.
+   * <p>Override this method for the pruner logic.
    */
-  default boolean prune(IndexSegment segment, QueryContext query) {
-    throw new UnsupportedOperationException();
-  }
+  List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query);
 }

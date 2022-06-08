@@ -16,30 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.pruner;
+package org.apache.pinot.segment.local.utils;
 
-import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
-/**
- * The <code>DataSchemaSegmentPruner</code> class prunes segment based on whether the all the querying columns exist in
- * the segment schema.
- */
-public class DataSchemaSegmentPruner implements SegmentPruner {
+public final class RecordInfo {
+  private final PrimaryKey _primaryKey;
+  private final int _docId;
+  private final Comparable _comparisonValue;
 
-  @Override
-  public void init(PinotConfiguration config) {
+  public RecordInfo(PrimaryKey primaryKey, int docId, Comparable comparisonValue) {
+    _primaryKey = primaryKey;
+    _docId = docId;
+    _comparisonValue = comparisonValue;
   }
 
-  @Override
-  public boolean prune(IndexSegment segment, QueryContext query) {
-    return !segment.getColumnNames().containsAll(query.getColumns());
+  public PrimaryKey getPrimaryKey() {
+    return _primaryKey;
   }
 
-  @Override
-  public String toString() {
-    return "DataSchemaSegmentPruner";
+  public int getDocId() {
+    return _docId;
+  }
+
+  public Comparable getComparisonValue() {
+    return _comparisonValue;
   }
 }

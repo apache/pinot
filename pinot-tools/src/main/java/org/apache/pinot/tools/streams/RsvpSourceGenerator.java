@@ -53,12 +53,12 @@ public class RsvpSourceGenerator implements PinotSourceDataGenerator {
     json.put("event_name", "event_name" + ThreadLocalRandom.current().nextInt());
     json.put("event_id", eventId);
     json.put("event_time", DATE_TIME_FORMATTER.format(LocalDateTime.now().plusDays(10)));
-    json.put("group_city", "group_city" + ThreadLocalRandom.current().nextInt());
-    json.put("group_country", "group_country" + ThreadLocalRandom.current().nextInt());
+    json.put("group_city", "group_city" + ThreadLocalRandom.current().nextInt(1000));
+    json.put("group_country", "group_country" + ThreadLocalRandom.current().nextInt(100));
     json.put("group_id", Math.abs(ThreadLocalRandom.current().nextLong()));
     json.put("group_name", "group_name" + ThreadLocalRandom.current().nextInt());
-    json.put("group_lat", ThreadLocalRandom.current().nextFloat());
-    json.put("group_lon", ThreadLocalRandom.current().nextFloat());
+    json.put("group_lat", ThreadLocalRandom.current().nextDouble(-90.0, 90.0));
+    json.put("group_lon", ThreadLocalRandom.current().nextDouble(180.0));
     json.put("mtime", DATE_TIME_FORMATTER.format(LocalDateTime.now()));
     json.put("rsvp_count", 1);
     return new RSVP(eventId, eventId, json);

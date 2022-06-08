@@ -20,15 +20,24 @@ package org.apache.pinot.controller.api.upload;
 
 import java.io.File;
 import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -38,32 +47,57 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 
 public class ZKOperatorTest {
-  private static final String TABLE_NAME = "operatorTestTable";
-  private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
+  private static final String RAW_TABLE_NAME = "testTable";
+  private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
+  private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
+  private static final String TIME_COLUMN = "timeColumn";
   private static final String SEGMENT_NAME = "testSegment";
+  // NOTE: The FakeStreamConsumerFactory will create 2 stream partitions. Use partition 2 to avoid conflict.
+  private static final String LLC_SEGMENT_NAME =
+      new LLCSegmentName(RAW_TABLE_NAME, 2, 0, System.currentTimeMillis()).getSegmentName();
   private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
+
+  private PinotHelixResourceManager _resourceManager;
 
   @BeforeClass
   public void setUp()
       throws Exception {
     TEST_INSTANCE.setupSharedStateAndValidate();
+    _resourceManager = TEST_INSTANCE.getHelixResourceManager();
 
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    TEST_INSTANCE.getHelixResourceManager().addTable(tableConfig);
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addDateTime(TIME_COLUMN, DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS").build();
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    TableConfig realtimeTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+            .setStreamConfigs(getStreamConfigs()).setLLC(true).setNumReplicas(1).build();
+
+    _resourceManager.addSchema(schema, false);
+    _resourceManager.addTable(offlineTableConfig);
+    _resourceManager.addTable(realtimeTableConfig);
+  }
+
+  private Map<String, String> getStreamConfigs() {
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "kafka");
+    streamConfigs.put("stream.kafka.topic.name", "kafkaTopic");
+    streamConfigs.put("stream.kafka.consumer.type", "simple");
+    streamConfigs.put("stream.kafka.decoder.class.name",
+        "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder");
+    streamConfigs.put("stream.kafka.consumer.factory.class.name",
+        "org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory");
+    return streamConfigs;
   }
 
   @Test
   public void testCompleteSegmentOperations()
       throws Exception {
-    ZKOperator zkOperator = new ZKOperator(TEST_INSTANCE.getHelixResourceManager(), mock(ControllerConf.class),
-        mock(ControllerMetrics.class));
+    ZKOperator zkOperator = new ZKOperator(_resourceManager, mock(ControllerConf.class), mock(ControllerMetrics.class));
+
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
     when(segmentMetadata.getCrc()).thenReturn("12345");
@@ -86,16 +120,14 @@ public class ZKOperatorTest {
 
     // Wait for the segment Zk entry to be deleted.
     TestUtils.waitForCondition(aVoid -> {
-      SegmentZKMetadata segmentZKMetadata =
-          TEST_INSTANCE.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
+      SegmentZKMetadata segmentZKMetadata = _resourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
       return segmentZKMetadata == null;
     }, 30_000L, "Failed to delete segmentZkMetadata.");
 
     zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, "downloadUrl", "crypter", 10,
         true, true, httpHeaders);
 
-    SegmentZKMetadata segmentZKMetadata =
-        TEST_INSTANCE.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
+    SegmentZKMetadata segmentZKMetadata = _resourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
     assertNotNull(segmentZKMetadata);
     assertEquals(segmentZKMetadata.getCrc(), 12345L);
     assertEquals(segmentZKMetadata.getCreationTime(), 123L);
@@ -132,8 +164,8 @@ public class ZKOperatorTest {
     when(segmentMetadata.getIndexCreationTime()).thenReturn(456L);
     zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, "otherDownloadUrl",
         "otherCrypter", 10, true, true, httpHeaders);
-    segmentZKMetadata =
-        TEST_INSTANCE.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
+
+    segmentZKMetadata = _resourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
     assertNotNull(segmentZKMetadata);
     assertEquals(segmentZKMetadata.getCrc(), 12345L);
     // Push time should not change
@@ -155,8 +187,8 @@ public class ZKOperatorTest {
     Thread.sleep(10);
     zkOperator.completeSegmentOperations(OFFLINE_TABLE_NAME, segmentMetadata, null, null, "otherDownloadUrl",
         "otherCrypter", 100, true, true, httpHeaders);
-    segmentZKMetadata =
-        TEST_INSTANCE.getHelixResourceManager().getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
+
+    segmentZKMetadata = _resourceManager.getSegmentZKMetadata(OFFLINE_TABLE_NAME, SEGMENT_NAME);
     assertNotNull(segmentZKMetadata);
     assertEquals(segmentZKMetadata.getCrc(), 23456L);
     // Push time should not change
@@ -167,6 +199,74 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getDownloadUrl(), "otherDownloadUrl");
     assertEquals(segmentZKMetadata.getCrypterName(), "otherCrypter");
     assertEquals(segmentZKMetadata.getSizeInBytes(), 100);
+  }
+
+  @Test
+  public void testPushToRealtimeTable()
+      throws Exception {
+    ZKOperator zkOperator = new ZKOperator(_resourceManager, mock(ControllerConf.class), mock(ControllerMetrics.class));
+
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
+    when(segmentMetadata.getCrc()).thenReturn("12345");
+    zkOperator.completeSegmentOperations(REALTIME_TABLE_NAME, segmentMetadata, null, null, "downloadUrl", null, 10,
+        true, true, mock(HttpHeaders.class));
+
+    SegmentZKMetadata segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, SEGMENT_NAME);
+    assertNotNull(segmentZKMetadata);
+    assertEquals(segmentZKMetadata.getStatus(), Status.UPLOADED);
+    assertNull(segmentMetadata.getStartOffset());
+    assertNull(segmentMetadata.getEndOffset());
+
+    // Uploading a segment with LLC segment name but without start/end offset should fail
+    when(segmentMetadata.getName()).thenReturn(LLC_SEGMENT_NAME);
+    when(segmentMetadata.getCrc()).thenReturn("23456");
+    try {
+      zkOperator.completeSegmentOperations(REALTIME_TABLE_NAME, segmentMetadata, null, null, "downloadUrl", null, 10,
+          true, true, mock(HttpHeaders.class));
+      fail();
+    } catch (ControllerApplicationException e) {
+      assertEquals(e.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    }
+    assertNull(_resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, LLC_SEGMENT_NAME));
+
+    // Uploading a segment with LLC segment name and start/end offset should success
+    when(segmentMetadata.getStartOffset()).thenReturn("0");
+    when(segmentMetadata.getEndOffset()).thenReturn("1234");
+    zkOperator.completeSegmentOperations(REALTIME_TABLE_NAME, segmentMetadata, null, null, "downloadUrl", null, 10,
+        true, true, mock(HttpHeaders.class));
+
+    segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, LLC_SEGMENT_NAME);
+    assertNotNull(segmentZKMetadata);
+    assertEquals(segmentZKMetadata.getStatus(), Status.UPLOADED);
+    assertEquals(segmentZKMetadata.getStartOffset(), "0");
+    assertEquals(segmentZKMetadata.getEndOffset(), "1234");
+
+    // Refreshing a segment with LLC segment name but without start/end offset should success
+    when(segmentMetadata.getCrc()).thenReturn("34567");
+    when(segmentMetadata.getStartOffset()).thenReturn(null);
+    when(segmentMetadata.getEndOffset()).thenReturn(null);
+    zkOperator.completeSegmentOperations(REALTIME_TABLE_NAME, segmentMetadata, null, null, "downloadUrl", null, 10,
+        true, true, mock(HttpHeaders.class));
+
+    segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, LLC_SEGMENT_NAME);
+    assertNotNull(segmentZKMetadata);
+    assertEquals(segmentZKMetadata.getStatus(), Status.UPLOADED);
+    assertEquals(segmentZKMetadata.getStartOffset(), "0");
+    assertEquals(segmentZKMetadata.getEndOffset(), "1234");
+
+    // Refreshing a segment with LLC segment name and start/end offset should override the offsets
+    when(segmentMetadata.getCrc()).thenReturn("45678");
+    when(segmentMetadata.getStartOffset()).thenReturn("1234");
+    when(segmentMetadata.getEndOffset()).thenReturn("2345");
+    zkOperator.completeSegmentOperations(REALTIME_TABLE_NAME, segmentMetadata, null, null, "downloadUrl", null, 10,
+        true, true, mock(HttpHeaders.class));
+
+    segmentZKMetadata = _resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, LLC_SEGMENT_NAME);
+    assertNotNull(segmentZKMetadata);
+    assertEquals(segmentZKMetadata.getStatus(), Status.UPLOADED);
+    assertEquals(segmentZKMetadata.getStartOffset(), "1234");
+    assertEquals(segmentZKMetadata.getEndOffset(), "2345");
   }
 
   @AfterClass

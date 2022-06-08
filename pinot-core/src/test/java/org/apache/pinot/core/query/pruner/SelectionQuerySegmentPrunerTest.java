@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.pruner;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -207,6 +208,7 @@ public class SelectionQuerySegmentPrunerTest {
   private IndexSegment getIndexSegment(@Nullable Long minValue, @Nullable Long maxValue, int totalDocs,
       boolean upsert) {
     IndexSegment indexSegment = mock(IndexSegment.class);
+    when(indexSegment.getColumnNames()).thenReturn(ImmutableSet.of("foo", "testColumn"));
     DataSource dataSource = mock(DataSource.class);
     when(indexSegment.getDataSource(ORDER_BY_COLUMN)).thenReturn(dataSource);
     DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);

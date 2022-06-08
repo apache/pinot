@@ -54,6 +54,18 @@ serviceAccount:
 
 additionalMatchLabels: {}
 
+
+pinotAuth:
+  enabled: false
+  controllerFactoryClass: org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory
+  brokerFactoryClass: org.apache.pinot.broker.broker.BasicAuthAccessControlFactory
+  configs:
+  #  - access.control.principals=admin,user
+  #  - access.control.principals.admin.password=verysecret
+  #  - access.control.principals.user.password=secret
+  #  - access.control.principals.user.tables=baseballStats,otherstuff
+  #  - access.control.principals.user.permissions=READ
+
 # ------------------------------------------------------------------------------
 # Pinot Controller:
 # ------------------------------------------------------------------------------
@@ -428,6 +440,16 @@ zookeeper:
 
   ## Replicas
   replicaCount: 1
+
+  ## Ongoing data directory cleanup configuration
+  autopurge:
+
+    ## The time interval (in hours) for which the purge task has to be triggered
+    ## Set to a positive integer to enable the auto purging
+    purgeInterval: 1
+
+    ## The most recent snapshots amount (and corresponding transaction logs) to retain
+    snapRetainCount: 5
 
   ## Environmental variables to set in Zookeeper
   env:

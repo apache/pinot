@@ -451,7 +451,7 @@ public class PinotConfiguration {
 
   @Override
   public String toString() {
-    return new Obfuscator().toJsonString(this);
+    return new Obfuscator().toJsonString(toMap());
   }
 
   public boolean isEmpty() {

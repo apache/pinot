@@ -242,9 +242,16 @@ public class ZKOperator {
       long segmentSizeInBytes, boolean enableParallelPushProtection, HttpHeaders headers)
       throws Exception {
     String segmentName = segmentMetadata.getName();
-    SegmentZKMetadata newSegmentZKMetadata =
-        ZKMetadataUtils.createSegmentZKMetadata(tableNameWithType, segmentMetadata, downloadUrl, crypterName,
-            segmentSizeInBytes);
+    SegmentZKMetadata newSegmentZKMetadata;
+    try {
+      newSegmentZKMetadata =
+          ZKMetadataUtils.createSegmentZKMetadata(tableNameWithType, segmentMetadata, downloadUrl, crypterName,
+              segmentSizeInBytes);
+    } catch (IllegalArgumentException e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Got invalid segment metadata when adding segment: %s for table: %s, reason: %s", segmentName,
+              tableNameWithType, e.getMessage()), Response.Status.BAD_REQUEST);
+    }
 
     // Lock if enableParallelPushProtection is true.
     if (enableParallelPushProtection) {

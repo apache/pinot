@@ -187,6 +187,10 @@
                   <pattern>org.apache.parquet</pattern>
                   <shadedPattern>shaded.org.apache.parquet</shadedPattern>
                 </relocation>
+                <relocation>
+                  <pattern>org.apache.hadoop</pattern>
+                  <shadedPattern>shaded.org.apache.hadoop</shadedPattern>
+                </relocation>
               </relocations>
             </configuration>
           </execution>

@@ -161,7 +161,7 @@ public class PinotConfigUtils {
   }
 
   public static Map<String, Object> generateServerConf(String clusterName, String zkAddress, String serverHost,
-      int serverPort, int serverAdminPort, String serverDataDir, String serverSegmentDir)
+      int serverPort, int serverAdminPort, int serverGrpcPort, String serverDataDir, String serverSegmentDir)
       throws SocketException, UnknownHostException {
     if (serverHost == null) {
       serverHost = NetUtils.getHostAddress();
@@ -184,6 +184,7 @@ public class PinotConfigUtils {
     properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, serverHost);
     properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, serverPort);
     properties.put(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, serverAdminPort);
+    properties.put(CommonConstants.Server.CONFIG_OF_GRPC_PORT, serverGrpcPort);
     properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR, serverDataDir);
     properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, serverSegmentDir);
 

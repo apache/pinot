@@ -222,7 +222,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
       case SERVER:
         return PinotConfigUtils
             .generateServerConf(_clusterName, _zkAddress, null, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT,
-                CommonConstants.Server.DEFAULT_ADMIN_API_PORT, null, null);
+                CommonConstants.Server.DEFAULT_ADMIN_API_PORT, CommonConstants.Server.DEFAULT_GRPC_PORT, null, null);
       default:
         throw new RuntimeException("No default config found for service role: " + serviceRole);
     }

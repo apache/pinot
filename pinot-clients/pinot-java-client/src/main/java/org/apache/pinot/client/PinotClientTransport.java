@@ -24,7 +24,7 @@ import java.util.concurrent.Future;
 /**
  * Interface for plugging different client transports.
  */
-interface PinotClientTransport {
+public interface PinotClientTransport {
 
   BrokerResponse executeQuery(String brokerAddress, String query)
       throws PinotClientException;

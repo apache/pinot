@@ -19,10 +19,14 @@
 package org.apache.pinot.server.api.resources;
 
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import io.swagger.annotations.Authorization;
+import io.swagger.annotations.SecurityDefinition;
+import io.swagger.annotations.SwaggerDefinition;
 import java.util.Collections;
 import java.util.List;
 import javax.inject.Inject;
@@ -31,6 +35,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
@@ -41,11 +46,16 @@ import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
+import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
+
 
 /**
  * Debug endpoint to check memory allocation.
  */
-@Api(value = "debug", description = "Debug information", tags = "Debug")
+@Api(value = "debug", description = "Debug information", tags = "Debug",
+    authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
+    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
 @Path("debug")
 public class MmapDebugResource {
 
@@ -54,8 +64,8 @@ public class MmapDebugResource {
 
   @GET
   @Path("memory/offheap")
-  @ApiOperation(value = "View current off-heap allocations",
-      notes = "Lists all off-heap allocations and their associated sizes")
+  @ApiOperation(value = "View current off-heap allocations", notes = "Lists all off-heap allocations and their "
+      + "associated sizes")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success")})
   @Produces(MediaType.APPLICATION_JSON)
   public List<String> getOffHeapSizes() {

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.inv;
 
+import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -55,7 +56,7 @@ public final class BitmapInvertedIndexWriter implements Closeable {
   private final FileChannel _fileChannel;
   private final ByteBuffer _offsetBuffer;
   private ByteBuffer _bitmapBuffer;
-  private int _bytesWritten;
+  private long _bytesWritten;
 
   public BitmapInvertedIndexWriter(File outputFile, int numBitmaps)
       throws IOException {
@@ -71,7 +72,7 @@ public final class BitmapInvertedIndexWriter implements Closeable {
       throws IOException {
     int length = bitmap.serializedSizeInBytes();
     resizeIfNecessary(length);
-    _offsetBuffer.putInt(_bytesWritten);
+    _offsetBuffer.putInt(asUnsignedInt(_bytesWritten));
     bitmap.serialize(_bitmapBuffer);
     _bytesWritten += length;
   }
@@ -84,7 +85,7 @@ public final class BitmapInvertedIndexWriter implements Closeable {
   public void add(byte[] bitmapBytes, int length)
       throws IOException {
     resizeIfNecessary(length);
-    _offsetBuffer.putInt(_bytesWritten);
+    _offsetBuffer.putInt(asUnsignedInt(_bytesWritten));
     _bitmapBuffer.put(bitmapBytes, 0, length);
     _bytesWritten += length;
   }
@@ -113,8 +114,8 @@ public final class BitmapInvertedIndexWriter implements Closeable {
   @Override
   public void close()
       throws IOException {
-    int fileLength = _bytesWritten;
-    _offsetBuffer.putInt(fileLength);
+    long fileLength = _bytesWritten;
+    _offsetBuffer.putInt(asUnsignedInt(fileLength));
     _fileChannel.truncate(fileLength);
     _fileChannel.close();
     if (CleanerUtil.UNMAP_SUPPORTED) {
@@ -122,5 +123,10 @@ public final class BitmapInvertedIndexWriter implements Closeable {
       cleaner.freeBuffer(_offsetBuffer);
       cleanBitmapBuffer();
     }
+  }
+
+  private int asUnsignedInt(long value) {
+    Preconditions.checkArgument(value >>> 32 == 0, "overflowed 4GB");
+    return (int) (value & 0xFFFFFFFFL);
   }
 }

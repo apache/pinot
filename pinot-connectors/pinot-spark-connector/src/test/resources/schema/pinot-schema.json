@@ -17,6 +17,9 @@
     "name" : "longDim",
     "dataType" : "LONG"
   }, {
+    "name": "boolDim",
+    "dataType": "BOOLEAN"
+  }, {
     "name" : "stringArrayDim",
     "dataType" : "STRING",
     "singleValueField" : false
@@ -24,6 +27,10 @@
     "name" : "floatArrayDim",
     "dataType" : "FLOAT",
     "singleValueField" : false
+  }, {
+    "name": "boolArrayDim",
+    "dataType": "BOOLEAN",
+    "singleValueField": false
   } ],
   "metricFieldSpecs" : [ {
     "name" : "floatMetric",
@@ -56,5 +63,13 @@
       "dataType" : "INT",
       "timeType" : "DAYS"
     }
-  }
+  },
+  "dateTimeFieldSpecs": [
+    {
+      "name": "timestampField",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:SECONDS"
+    }
+  ]
 }

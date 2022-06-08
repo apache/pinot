@@ -249,7 +249,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         }
       }
 
-      if (rangeIndexColumns.contains(columnName)) {
+      if (!columnIndexCreationInfo.isSorted() && rangeIndexColumns.contains(columnName)) {
         _rangeIndexFilterCreatorMap.put(columnName,
             _indexCreatorProvider.newRangeIndexCreator(context.forRangeIndex(rangeIndexVersion)));
       }
@@ -386,30 +386,78 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       // bloom filter
       BloomFilterCreator bloomFilterCreator = _bloomFilterCreatorMap.get(columnName);
       if (bloomFilterCreator != null) {
-        bloomFilterCreator.add(columnValueToIndex.toString());
+        if (fieldSpec.isSingleValueField()) {
+          bloomFilterCreator.add(columnValueToIndex.toString());
+        } else {
+          Object[] values = (Object[]) columnValueToIndex;
+          for (Object value : values) {
+            bloomFilterCreator.add(value.toString());
+          }
+        }
       }
 
       // range index
       CombinedInvertedIndexCreator combinedInvertedIndexCreator = _rangeIndexFilterCreatorMap.get(columnName);
       if (combinedInvertedIndexCreator != null) {
         if (dictionaryCreator != null) {
-          combinedInvertedIndexCreator.add(dictionaryCreator.indexOfSV(columnValueToIndex));
+          if (fieldSpec.isSingleValueField()) {
+            combinedInvertedIndexCreator.add(dictionaryCreator.indexOfSV(columnValueToIndex));
+          } else {
+            int[] dictIds = dictionaryCreator.indexOfMV(columnValueToIndex);
+            combinedInvertedIndexCreator.add(dictIds, dictIds.length);
+          }
         } else {
-          switch (fieldSpec.getDataType()) {
-            case INT:
-              combinedInvertedIndexCreator.add((Integer) columnValueToIndex);
-              break;
-            case LONG:
-              combinedInvertedIndexCreator.add((Long) columnValueToIndex);
-              break;
-            case FLOAT:
-              combinedInvertedIndexCreator.add((Float) columnValueToIndex);
-              break;
-            case DOUBLE:
-              combinedInvertedIndexCreator.add((Double) columnValueToIndex);
-              break;
-            default:
-              throw new RuntimeException("Unsupported data type " + fieldSpec.getDataType() + " for range index");
+          if (fieldSpec.isSingleValueField()) {
+            switch (fieldSpec.getDataType()) {
+              case INT:
+                combinedInvertedIndexCreator.add((Integer) columnValueToIndex);
+                break;
+              case LONG:
+                combinedInvertedIndexCreator.add((Long) columnValueToIndex);
+                break;
+              case FLOAT:
+                combinedInvertedIndexCreator.add((Float) columnValueToIndex);
+                break;
+              case DOUBLE:
+                combinedInvertedIndexCreator.add((Double) columnValueToIndex);
+                break;
+              default:
+                throw new RuntimeException("Unsupported data type " + fieldSpec.getDataType() + " for range index");
+            }
+          } else {
+            Object[] values = (Object[]) columnValueToIndex;
+            switch (fieldSpec.getDataType()) {
+              case INT:
+                int[] intValues = new int[values.length];
+                for (int i = 0; i < values.length; i++) {
+                  intValues[i] = (Integer) values[i];
+                }
+                combinedInvertedIndexCreator.add(intValues, values.length);
+                break;
+              case LONG:
+                long[] longValues = new long[values.length];
+                for (int i = 0; i < values.length; i++) {
+                  longValues[i] = (Long) values[i];
+                }
+                combinedInvertedIndexCreator.add(longValues, values.length);
+                break;
+              case FLOAT:
+                float[] floatValues = new float[values.length];
+                for (int i = 0; i < values.length; i++) {
+                  floatValues[i] = (Float) values[i];
+                }
+                combinedInvertedIndexCreator.add(floatValues, values.length);
+                break;
+              case DOUBLE:
+                double[] doubleValues = new double[values.length];
+                for (int i = 0; i < values.length; i++) {
+                  doubleValues[i] = (Double) values[i];
+                }
+                combinedInvertedIndexCreator.add(doubleValues, values.length);
+                break;
+              default:
+                throw new RuntimeException("Unsupported data type " + fieldSpec.getDataType() + " for range index");
+            }
           }
         }
       }

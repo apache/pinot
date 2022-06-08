@@ -29,6 +29,7 @@ import org.apache.helix.task.TaskConfig;
 import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskFactory;
 import org.apache.helix.task.TaskResult;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metrics.MinionGauge;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
@@ -99,7 +100,8 @@ public class TaskFactoryRegistry {
               PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(_taskConfig);
               if (StringUtils.isBlank(pinotTaskConfig.getConfigs().get(MinionConstants.AUTH_TOKEN))) {
                 pinotTaskConfig.getConfigs()
-                    .put(MinionConstants.AUTH_TOKEN, MinionContext.getInstance().getTaskAuthToken());
+                    .put(MinionConstants.AUTH_TOKEN,
+                        AuthProviderUtils.toStaticToken(MinionContext.getInstance().getTaskAuthProvider()));
               }
 
               _eventObserver.notifyTaskStart(pinotTaskConfig);

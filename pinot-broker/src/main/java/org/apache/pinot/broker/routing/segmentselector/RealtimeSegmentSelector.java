@@ -33,6 +33,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 
 
@@ -49,9 +50,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
  * </ul>
  */
 public class RealtimeSegmentSelector implements SegmentSelector {
-  public static final String ROUTING_OPTIONS_KEY = "routingOptions";
-  public static final String FORCE_HLC = "FORCE_HLC";
-
   private final AtomicLong _requestId = new AtomicLong();
   private volatile List<Set<String>> _hlcSegments;
   private volatile Set<String> _llcSegments;
@@ -150,14 +148,8 @@ public class RealtimeSegmentSelector implements SegmentSelector {
     }
 
     // Handle HLC and LLC coexisting scenario, select HLC segments only if it is forced in the routing options
-    Map<String, String> debugOptions = brokerRequest.getPinotQuery().getDebugOptions();
-    if (debugOptions != null) {
-      String routingOptions = debugOptions.get(ROUTING_OPTIONS_KEY);
-      if (routingOptions != null && routingOptions.toUpperCase().contains(FORCE_HLC)) {
-        return selectHLCSegments();
-      }
-    }
-    return selectLLCSegments();
+    return QueryOptionsUtils.isRoutingForceHLC(brokerRequest.getPinotQuery().getQueryOptions()) ? selectHLCSegments()
+        : selectLLCSegments();
   }
 
   private Set<String> selectHLCSegments() {

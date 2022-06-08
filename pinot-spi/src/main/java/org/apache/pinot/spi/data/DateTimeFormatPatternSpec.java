@@ -65,6 +65,20 @@ public class DateTimeFormatPatternSpec {
     }
   }
 
+  public DateTimeFormatPatternSpec(DateTimeFieldSpec.TimeFormat timeFormat, @Nullable String sdfPattern,
+      @Nullable String timeZone) {
+    _timeFormat = timeFormat;
+    if (_timeFormat.equals(DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT)) {
+      if (timeZone != null) {
+        _dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timeZone));
+      }
+      _dateTimeFormatter = DateTimeFormat.forPattern(sdfPattern).
+          withZone(_dateTimeZone).
+          withLocale(DEFAULT_LOCALE);
+      _sdfPattern = sdfPattern;
+    }
+  }
+
   public DateTimeFieldSpec.TimeFormat getTimeFormat() {
     return _timeFormat;
   }
@@ -79,6 +93,27 @@ public class DateTimeFormatPatternSpec {
 
   public DateTimeFormatter getDateTimeFormatter() {
     return _dateTimeFormatter;
+  }
+
+  /**
+   * Validates the sdf pattern
+   */
+  public static void validateFormat(String sdfPatternWithTz) {
+    try {
+      String sdfPattern;
+      Matcher m = SDF_PATTERN_WITH_TIMEZONE.matcher(sdfPatternWithTz);
+      if (m.find()) {
+        sdfPattern = m.group(SDF_PATTERN_GROUP).trim();
+        String timezoneString = m.group(TIMEZONE_GROUP).trim();
+        DateTimeZone dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timezoneString));
+        DateTimeFormat.forPattern(sdfPattern).withZone(dateTimeZone);
+      } else {
+        sdfPattern = sdfPatternWithTz;
+        DateTimeFormat.forPattern(sdfPattern);
+      }
+    } catch (Exception e) {
+      throw new IllegalStateException("Unsupported simple date format pattern or time zone: " + sdfPatternWithTz);
+    }
   }
 
   @Override

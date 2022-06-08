@@ -55,6 +55,10 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
       description = "Port number to serve the server admin API at.")
   private int _serverAdminPort = CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 
+  @CommandLine.Option(names = {"-serverGrpcPort"}, required = false,
+      description = "Port number to serve the grpc query.")
+  private int _serverGrpcPort = CommonConstants.Server.DEFAULT_GRPC_PORT;
+
   @CommandLine.Option(names = {"-dataDir"}, required = false, description = "Path to directory containing data.")
   private String _dataDir = PinotConfigUtils.TMP_DIR + "data/pinotServerData";
 
@@ -70,7 +74,7 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
 
   @CommandLine.Option(names = {"-configFileName", "-config", "-configFile", "-serverConfig", "-serverConf"},
       required = false, description = "Server Starter Config file.")
-      // TODO support forbids = {"-serverHost", "-serverPort", "-dataDir", "-segmentDir"}
+  // TODO support forbids = {"-serverHost", "-serverPort", "-dataDir", "-segmentDir"}
   private String _configFileName;
 
   private Map<String, Object> _configOverrides = new HashMap<>();
@@ -90,6 +94,10 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
 
   public int getServerAdminPort() {
     return _serverAdminPort;
+  }
+
+  public int getServerGrpcPort() {
+    return _serverGrpcPort;
   }
 
   public String getDataDir() {
@@ -136,6 +144,11 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
     return this;
   }
 
+  public StartServerCommand setGrpcPort(int grpcPort) {
+    _serverGrpcPort = grpcPort;
+    return this;
+  }
+
   public StartServerCommand setDataDir(String dataDir) {
     _dataDir = dataDir;
     return this;
@@ -160,12 +173,12 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
   public String toString() {
     if (_configFileName != null) {
       return ("StartServer -clusterName " + _clusterName + " -serverHost " + _serverHost + " -serverPort " + _serverPort
-          + " -serverAdminPort " + _serverAdminPort + " -configFileName " + _configFileName + " -zkAddress "
-          + _zkAddress);
+          + " -serverAdminPort " + _serverAdminPort + " -serverGrpcPort " + _serverGrpcPort + " -configFileName "
+          + _configFileName + " -zkAddress " + _zkAddress);
     } else {
       return ("StartServer -clusterName " + _clusterName + " -serverHost " + _serverHost + " -serverPort " + _serverPort
-          + " -serverAdminPort " + _serverAdminPort + " -dataDir " + _dataDir + " -segmentDir " + _segmentDir
-          + " -zkAddress " + _zkAddress);
+          + " -serverAdminPort " + _serverAdminPort + " -serverGrpcPort " + _serverGrpcPort + " -dataDir " + _dataDir
+          + " -segmentDir " + _segmentDir + " -zkAddress " + _zkAddress);
     }
   }
 
@@ -215,8 +228,8 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
       _clusterName = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     } else {
       properties.putAll(PinotConfigUtils
-          .generateServerConf(_clusterName, _zkAddress, _serverHost, _serverPort, _serverAdminPort, _dataDir,
-              _segmentDir));
+          .generateServerConf(_clusterName, _zkAddress, _serverHost, _serverPort, _serverAdminPort, _serverGrpcPort,
+              _dataDir, _segmentDir));
     }
     if (_configOverrides != null) {
       properties.putAll(_configOverrides);

@@ -186,13 +186,15 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   private void applyQueryOptions(QueryContext queryContext) {
     Map<String, String> queryOptions = queryContext.getQueryOptions();
-    Map<String, String> debugOptions = queryContext.getDebugOptions();
 
     // Set skipUpsert
     queryContext.setSkipUpsert(QueryOptionsUtils.isSkipUpsert(queryOptions));
 
     // Set skipStarTree
-    queryContext.setSkipStarTree(QueryOptionsUtils.isSkipStarTree(queryOptions, debugOptions));
+    queryContext.setSkipStarTree(QueryOptionsUtils.isSkipStarTree(queryOptions));
+
+    // Set skipScanFilterReorder
+    queryContext.setSkipScanFilterReorder(QueryOptionsUtils.isSkipScanFilterReorder(queryOptions));
 
     // Set maxExecutionThreads
     int maxExecutionThreads;

@@ -20,12 +20,15 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.Arrays;
 import java.util.Collections;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertTrue;
 
 
 public class FilterOperatorUtilsTest {
+  private static final QueryContext QUERY_CONTEXT = mock(QueryContext.class);
   private static final int NUM_DOCS = 10;
   private static final BaseFilterOperator EMPTY_FILTER_OPERATOR = EmptyFilterOperator.getInstance();
   private static final BaseFilterOperator MATCH_ALL_FILTER_OPERATOR = new MatchAllFilterOperator(NUM_DOCS);
@@ -34,62 +37,68 @@ public class FilterOperatorUtilsTest {
   @Test
   public void testGetAndFilterOperator() {
     BaseFilterOperator filterOperator =
-        FilterOperatorUtils.getAndFilterOperator(Collections.emptyList(), NUM_DOCS, null);
+        FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT, Collections.emptyList(), NUM_DOCS);
     assertTrue(filterOperator instanceof MatchAllFilterOperator);
 
     filterOperator =
-        FilterOperatorUtils.getAndFilterOperator(Collections.singletonList(EMPTY_FILTER_OPERATOR), NUM_DOCS, null);
+        FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT, Collections.singletonList(EMPTY_FILTER_OPERATOR),
+            NUM_DOCS);
     assertTrue(filterOperator instanceof EmptyFilterOperator);
 
     filterOperator =
-        FilterOperatorUtils.getAndFilterOperator(Collections.singletonList(MATCH_ALL_FILTER_OPERATOR), NUM_DOCS, null);
+        FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT, Collections.singletonList(MATCH_ALL_FILTER_OPERATOR),
+            NUM_DOCS);
     assertTrue(filterOperator instanceof MatchAllFilterOperator);
 
     filterOperator =
-        FilterOperatorUtils.getAndFilterOperator(Collections.singletonList(REGULAR_FILTER_OPERATOR), NUM_DOCS, null);
+        FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT, Collections.singletonList(REGULAR_FILTER_OPERATOR),
+            NUM_DOCS);
     assertTrue(filterOperator instanceof TestFilterOperator);
 
-    filterOperator = FilterOperatorUtils
-        .getAndFilterOperator(Arrays.asList(EMPTY_FILTER_OPERATOR, MATCH_ALL_FILTER_OPERATOR), NUM_DOCS, null);
+    filterOperator = FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT,
+        Arrays.asList(EMPTY_FILTER_OPERATOR, MATCH_ALL_FILTER_OPERATOR), NUM_DOCS);
     assertTrue(filterOperator instanceof EmptyFilterOperator);
 
-    filterOperator = FilterOperatorUtils
-        .getAndFilterOperator(Arrays.asList(EMPTY_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR), NUM_DOCS, null);
+    filterOperator = FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT,
+        Arrays.asList(EMPTY_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR), NUM_DOCS);
     assertTrue(filterOperator instanceof EmptyFilterOperator);
 
-    filterOperator = FilterOperatorUtils
-        .getAndFilterOperator(Arrays.asList(MATCH_ALL_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR), NUM_DOCS, null);
+    filterOperator = FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT,
+        Arrays.asList(MATCH_ALL_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR), NUM_DOCS);
     assertTrue(filterOperator instanceof TestFilterOperator);
   }
 
   @Test
   public void testGetOrFilterOperator() {
     BaseFilterOperator filterOperator =
-        FilterOperatorUtils.getOrFilterOperator(Collections.emptyList(), NUM_DOCS, null);
+        FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT, Collections.emptyList(), NUM_DOCS);
     assertTrue(filterOperator instanceof EmptyFilterOperator);
 
     filterOperator =
-        FilterOperatorUtils.getOrFilterOperator(Collections.singletonList(EMPTY_FILTER_OPERATOR), NUM_DOCS, null);
+        FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT, Collections.singletonList(EMPTY_FILTER_OPERATOR),
+            NUM_DOCS);
     assertTrue(filterOperator instanceof EmptyFilterOperator);
 
     filterOperator =
-        FilterOperatorUtils.getOrFilterOperator(Collections.singletonList(MATCH_ALL_FILTER_OPERATOR), NUM_DOCS, null);
+        FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT, Collections.singletonList(MATCH_ALL_FILTER_OPERATOR),
+            NUM_DOCS);
     assertTrue(filterOperator instanceof MatchAllFilterOperator);
 
     filterOperator =
-        FilterOperatorUtils.getOrFilterOperator(Collections.singletonList(REGULAR_FILTER_OPERATOR), NUM_DOCS, null);
+        FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT, Collections.singletonList(REGULAR_FILTER_OPERATOR),
+            NUM_DOCS);
     assertTrue(filterOperator instanceof TestFilterOperator);
 
-    filterOperator = FilterOperatorUtils
-        .getOrFilterOperator(Arrays.asList(EMPTY_FILTER_OPERATOR, MATCH_ALL_FILTER_OPERATOR), NUM_DOCS, null);
+    filterOperator = FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT,
+        Arrays.asList(EMPTY_FILTER_OPERATOR, MATCH_ALL_FILTER_OPERATOR), NUM_DOCS);
     assertTrue(filterOperator instanceof MatchAllFilterOperator);
 
-    filterOperator = FilterOperatorUtils
-        .getOrFilterOperator(Arrays.asList(EMPTY_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR), NUM_DOCS, null);
+    filterOperator = FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT,
+        Arrays.asList(EMPTY_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR), NUM_DOCS);
     assertTrue(filterOperator instanceof TestFilterOperator);
 
-    filterOperator = FilterOperatorUtils
-        .getOrFilterOperator(Arrays.asList(MATCH_ALL_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR), NUM_DOCS, null);
+    filterOperator = FilterOperatorUtils.getOrFilterOperator(QUERY_CONTEXT,
+        Arrays.asList(MATCH_ALL_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR), NUM_DOCS);
     assertTrue(filterOperator instanceof MatchAllFilterOperator);
   }
 }

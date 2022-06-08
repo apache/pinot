@@ -18,15 +18,27 @@
  */
 package org.apache.pinot.core.query.pruner;
 
+import com.google.common.base.Charsets;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.segment.index.readers.bloom.OnHeapGuavaBloomFilterReader;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -49,7 +61,7 @@ public class ColumnValueSegmentPrunerTest {
     PinotConfiguration configuration = new PinotConfiguration(properties);
     PRUNER.init(configuration);
 
-    IndexSegment indexSegment = mock(IndexSegment.class);
+    IndexSegment indexSegment = mockIndexSegment();
 
     DataSource dataSource = mock(DataSource.class);
     when(indexSegment.getDataSource("column")).thenReturn(dataSource);
@@ -106,7 +118,7 @@ public class ColumnValueSegmentPrunerTest {
 
   @Test
   public void testPartitionPruning() {
-    IndexSegment indexSegment = mock(IndexSegment.class);
+    IndexSegment indexSegment = mockIndexSegment();
 
     DataSource dataSource = mock(DataSource.class);
     when(indexSegment.getDataSource("column")).thenReturn(dataSource);
@@ -135,69 +147,100 @@ public class ColumnValueSegmentPrunerTest {
   }
 
   @Test
-  public void testBloomFilterInPredicatePruning() {
+  public void testBloomFilterPredicatePruning()
+      throws IOException {
     Map<String, Object> properties = new HashMap<>();
     // override default value
     properties.put(ColumnValueSegmentPruner.IN_PREDICATE_THRESHOLD, 5);
     PinotConfiguration configuration = new PinotConfiguration(properties);
     PRUNER.init(configuration);
 
-    IndexSegment indexSegment = mock(IndexSegment.class);
-
+    IndexSegment indexSegment = mockIndexSegment();
     DataSource dataSource = mock(DataSource.class);
     when(indexSegment.getDataSource("column")).thenReturn(dataSource);
     // Add support for bloom filter
     DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
-    BloomFilterReader bloomFilterReader = mock(BloomFilterReader.class);
+    BloomFilterReader bloomFilterReader = new BloomFilterReaderBuilder()
+        .put("1.0")
+        .put("2.0")
+        .put("3.0")
+        .put("5.0")
+        .put("7.0")
+        .put("21.0")
+        .build();
 
-    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.DOUBLE);
     when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
     when(dataSource.getBloomFilter()).thenReturn(bloomFilterReader);
-    when(bloomFilterReader.mightContain("1")).thenReturn(true);
-    when(bloomFilterReader.mightContain("2")).thenReturn(true);
-    when(bloomFilterReader.mightContain("3")).thenReturn(true);
-    when(bloomFilterReader.mightContain("5")).thenReturn(true);
-    when(bloomFilterReader.mightContain("7")).thenReturn(true);
-    when(bloomFilterReader.mightContain("21")).thenReturn(true);
-    when(dataSourceMetadata.getMinValue()).thenReturn(5);
-    when(dataSourceMetadata.getMaxValue()).thenReturn(10);
+    when(dataSourceMetadata.getMinValue()).thenReturn(5.0);
+    when(dataSourceMetadata.getMaxValue()).thenReturn(10.0);
 
     // all out the bloom filter and out of range
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0)"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0, 3, 4)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0.0)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0.0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0.0, 3.0, 4.0)"));
 
     // some in the bloom filter but all out of range
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 1"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (1)"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (21)"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (21, 30)"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21 AND column = 30"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21 OR column = 30"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 1.0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (1.0)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21.0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (21.0)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (21.0, 30.0)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21.0 AND column = 30.0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 21.0 OR column = 30.0"));
 
     // all out the bloom filter but some in range
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 6"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (6)"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 OR column = 6"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 6.0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (6.0)"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0.0 OR column = 6.0"));
 
     // all in the bloom filter and in range
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (5)"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5 OR column = 7"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (5, 7)"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5 AND column = 7"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5.0"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (5.0)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5.0 OR column = 7.0"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (5.0, 7.0)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5.0 AND column = 7.0"));
 
     // some in the bloom filter and in range
     assertFalse(
-        runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)"));
-    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5 OR column = 0"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5 AND column = 0"));
-    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (8, 10)"));
+        runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (0.0, 5.0)"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5.0 OR column = 0.0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 5.0 AND column = 0.0"));
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (8.0, 10.0)"));
+  }
+
+  private IndexSegment mockIndexSegment() {
+    IndexSegment indexSegment = mock(IndexSegment.class);
+    when(indexSegment.getColumnNames()).thenReturn(ImmutableSet.of("column"));
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(segmentMetadata.getTotalDocs()).thenReturn(20);
+    when(indexSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
+    return indexSegment;
   }
 
   private boolean runPruner(IndexSegment indexSegment, String query) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
-    return PRUNER.prune(Collections.singletonList(indexSegment), queryContext).isEmpty();
+    return PRUNER.prune(Arrays.asList(indexSegment), queryContext).isEmpty();
+  }
+
+  private static class BloomFilterReaderBuilder {
+    private BloomFilter<String> _bloomfilter = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100, 0.01);
+    public BloomFilterReaderBuilder put(String value) {
+      _bloomfilter.put(value);
+      return this;
+    }
+
+    public BloomFilterReader build() throws IOException {
+      File file = Files.createTempFile("test", ".bloom").toFile();
+      try (FileOutputStream fos = new FileOutputStream(file)) {
+        _bloomfilter.writeTo(fos);
+        try (PinotDataBuffer pinotDataBuffer = PinotDataBuffer.loadBigEndianFile(file)) {
+          // on heap filter should never use the buffer, so we can close it and delete the file
+          return new OnHeapGuavaBloomFilterReader(pinotDataBuffer);
+        }
+      } finally {
+        file.delete();
+      }
+    }
   }
 }

@@ -26,3 +26,9 @@ data:
     pinot.broker.client.queryPort={{ .Values.broker.service.port }}
     pinot.broker.routing.table.builder.class={{ .Values.broker.routingTable.builderClass }}
 {{ .Values.broker.extra.configs | indent 4 }}
+{{- if .Values.pinotAuth.enabled}}
+    pinot.broker.access.control.class={{ .Values.pinotAuth.brokerFactoryClass }}
+{{- range $config := .Values.pinotAuth.configs}}
+{{ printf "pinot.broker.%s" $config | indent 4 -}}
+{{- end }}
+{{- end }}

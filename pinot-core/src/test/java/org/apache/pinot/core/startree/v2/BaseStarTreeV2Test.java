@@ -257,7 +257,7 @@ abstract class BaseStarTreeV2Test<R, A> {
 
     // Extract values with star-tree
     PlanNode starTreeFilterPlanNode =
-        new StarTreeFilterPlanNode(_starTreeV2, predicateEvaluatorsMap, groupByColumnSet, null);
+        new StarTreeFilterPlanNode(queryContext, _starTreeV2, predicateEvaluatorsMap, groupByColumnSet);
     List<ForwardIndexReader> starTreeAggregationColumnReaders = new ArrayList<>(numAggregations);
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       starTreeAggregationColumnReaders.add(

@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -131,6 +132,12 @@ public class TableConfigUtils {
       upsertConfig = JsonUtils.stringToObject(upsertConfigString, UpsertConfig.class);
     }
 
+    DedupConfig dedupConfig = null;
+    String dedupConfigString = simpleFields.get(TableConfig.DEDUP_CONFIG_KEY);
+    if (dedupConfigString != null) {
+      dedupConfig = JsonUtils.stringToObject(dedupConfigString, DedupConfig.class);
+    }
+
     IngestionConfig ingestionConfig = null;
     String ingestionConfigString = simpleFields.get(TableConfig.INGESTION_CONFIG_KEY);
     if (ingestionConfigString != null) {
@@ -153,7 +160,7 @@ public class TableConfigUtils {
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
-        ingestionConfig, tierConfigList, isDimTable, tunerConfigList);
+        dedupConfig, ingestionConfig, tierConfigList, isDimTable, tunerConfigList);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -199,6 +206,10 @@ public class TableConfigUtils {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     if (upsertConfig != null) {
       simpleFields.put(TableConfig.UPSERT_CONFIG_KEY, JsonUtils.objectToString(upsertConfig));
+    }
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
+    if (dedupConfig != null) {
+      simpleFields.put(TableConfig.DEDUP_CONFIG_KEY, JsonUtils.objectToString(dedupConfig));
     }
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig != null) {

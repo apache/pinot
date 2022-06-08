@@ -45,6 +45,7 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
+import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
@@ -64,6 +65,7 @@ import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.IdMap;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.local.utils.RecordInfo;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -163,6 +165,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final UpsertConfig.Mode _upsertMode;
   private final String _upsertComparisonColumn;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
+  private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   // The valid doc ids are maintained locally instead of in the upsert metadata manager because:
   // 1. There is only one consuming segment per partition, the committed segments do not need to modify the valid doc
   //    ids for the consuming segment.
@@ -375,6 +378,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // init upsert-related data structure
     _upsertMode = config.getUpsertMode();
+    _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
+
     if (isUpsertEnabled()) {
       Preconditions.checkState(!isAggregateMetricsEnabled(),
           "Metrics aggregation and upsert cannot be enabled together");
@@ -477,8 +482,22 @@ public class MutableSegmentImpl implements MutableSegment {
       throws IOException {
     boolean canTakeMore;
     int numDocsIndexed = _numDocsIndexed;
+
+    RecordInfo recordInfo = null;
+
+    if (isDedupEnabled() || isUpsertEnabled()) {
+      recordInfo = getRecordInfo(row, numDocsIndexed);
+    }
+
+    if (isDedupEnabled() && _partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo.getPrimaryKey(),
+        this)) {
+      if (_serverMetrics != null) {
+        _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_DEDUP_DROPPED, 1);
+      }
+      return true;
+    }
+
     if (isUpsertEnabled()) {
-      PartitionUpsertMetadataManager.RecordInfo recordInfo = getRecordInfo(row, numDocsIndexed);
       GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
       updateDictionary(updatedRow);
       addNewRow(numDocsIndexed, updatedRow);
@@ -520,12 +539,21 @@ public class MutableSegmentImpl implements MutableSegment {
     return _upsertMode != UpsertConfig.Mode.NONE;
   }
 
-  private PartitionUpsertMetadataManager.RecordInfo getRecordInfo(GenericRow row, int docId) {
+  private boolean isDedupEnabled() {
+    return _partitionDedupMetadataManager != null;
+  }
+
+  private RecordInfo getRecordInfo(GenericRow row, int docId) {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
-    Object upsertComparisonValue = row.getValue(_upsertComparisonColumn);
-    Preconditions.checkState(upsertComparisonValue instanceof Comparable,
-        "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
-    return new PartitionUpsertMetadataManager.RecordInfo(primaryKey, docId, (Comparable) upsertComparisonValue);
+
+    if (isUpsertEnabled()) {
+      Object upsertComparisonValue = row.getValue(_upsertComparisonColumn);
+      Preconditions.checkState(upsertComparisonValue instanceof Comparable,
+          "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
+      return new RecordInfo(primaryKey, docId, (Comparable) upsertComparisonValue);
+    }
+
+    return new RecordInfo(primaryKey, docId, null);
   }
 
   private void updateDictionary(GenericRow row) {

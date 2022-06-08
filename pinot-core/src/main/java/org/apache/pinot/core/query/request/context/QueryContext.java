@@ -80,7 +80,6 @@ public class QueryContext {
   private final int _limit;
   private final int _offset;
   private final Map<String, String> _queryOptions;
-  private final Map<String, String> _debugOptions;
   private final Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
   private final boolean _explain;
 
@@ -103,6 +102,8 @@ public class QueryContext {
   private boolean _skipUpsert;
   // Whether to skip star-tree index for the query
   private boolean _skipStarTree;
+  // Whether to skip reordering scan filters for the query
+  private boolean _skipScanFilterReorder;
   // Maximum number of threads used to execute the query
   private int _maxExecutionThreads = InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS;
   // The following properties apply to group-by queries
@@ -121,8 +122,8 @@ public class QueryContext {
       List<ExpressionContext> selectExpressions, List<String> aliasList, @Nullable FilterContext filter,
       @Nullable List<ExpressionContext> groupByExpressions, @Nullable FilterContext havingFilter,
       @Nullable List<OrderByExpressionContext> orderByExpressions, int limit, int offset,
-      Map<String, String> queryOptions, @Nullable Map<String, String> debugOptions,
-      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, boolean explain) {
+      Map<String, String> queryOptions, @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints,
+      boolean explain) {
     _tableName = tableName;
     _subquery = subquery;
     _selectExpressions = selectExpressions;
@@ -134,7 +135,6 @@ public class QueryContext {
     _limit = limit;
     _offset = offset;
     _queryOptions = queryOptions;
-    _debugOptions = debugOptions;
     _expressionOverrideHints = expressionOverrideHints;
     _explain = explain;
   }
@@ -230,14 +230,6 @@ public class QueryContext {
   }
 
   /**
-   * Returns the debug options of the query, or {@code null} if not exist.
-   */
-  @Nullable
-  public Map<String, String> getDebugOptions() {
-    return _debugOptions;
-  }
-
-  /**
    * Returns {@code true} if the query is an EXPLAIN query, {@code false} otherwise.
    */
   public boolean isExplain() {
@@ -324,6 +316,14 @@ public class QueryContext {
     _skipStarTree = skipStarTree;
   }
 
+  public boolean isSkipScanFilterReorder() {
+    return _skipScanFilterReorder;
+  }
+
+  public void setSkipScanFilterReorder(boolean skipScanFilterReorder) {
+    _skipScanFilterReorder = skipScanFilterReorder;
+  }
+
   public int getMaxExecutionThreads() {
     return _maxExecutionThreads;
   }
@@ -394,8 +394,8 @@ public class QueryContext {
     return "QueryContext{" + "_tableName='" + _tableName + '\'' + ", _subquery=" + _subquery + ", _selectExpressions="
         + _selectExpressions + ", _aliasList=" + _aliasList + ", _filter=" + _filter + ", _groupByExpressions="
         + _groupByExpressions + ", _havingFilter=" + _havingFilter + ", _orderByExpressions=" + _orderByExpressions
-        + ", _limit=" + _limit + ", _offset=" + _offset + ", _queryOptions=" + _queryOptions + ", _debugOptions="
-        + _debugOptions + ", _expressionOverrideHints=" + _expressionOverrideHints + ", _explain=" + _explain + '}';
+        + ", _limit=" + _limit + ", _offset=" + _offset + ", _queryOptions=" + _queryOptions
+        + ", _expressionOverrideHints=" + _expressionOverrideHints + ", _explain=" + _explain + '}';
   }
 
   public static class Builder {
@@ -469,11 +469,6 @@ public class QueryContext {
       return this;
     }
 
-    public Builder setDebugOptions(Map<String, String> debugOptions) {
-      _debugOptions = debugOptions;
-      return this;
-    }
-
     public Builder setExpressionOverrideHints(Map<ExpressionContext, ExpressionContext> expressionOverrideHints) {
       _expressionOverrideHints = expressionOverrideHints;
       return this;
@@ -492,8 +487,7 @@ public class QueryContext {
       }
       QueryContext queryContext =
           new QueryContext(_tableName, _subquery, _selectExpressions, _aliasList, _filter, _groupByExpressions,
-              _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions, _debugOptions,
-              _expressionOverrideHints, _explain);
+              _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions, _expressionOverrideHints, _explain);
 
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);

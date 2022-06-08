@@ -159,7 +159,7 @@ public class QueryContextConverterUtils {
         .setSelectExpressions(selectExpressions).setAliasList(aliasList).setFilter(filter)
         .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions)
         .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
-        .setQueryOptions(pinotQuery.getQueryOptions()).setDebugOptions(pinotQuery.getDebugOptions())
-        .setExpressionOverrideHints(expressionContextOverrideHints).setExplain(pinotQuery.isExplain()).build();
+        .setQueryOptions(pinotQuery.getQueryOptions()).setExpressionOverrideHints(expressionContextOverrideHints)
+        .setExplain(pinotQuery.isExplain()).build();
   }
 }
