@@ -134,7 +134,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         LOGGER.info(
             "Partitions: {} have no completed segments. Table: {} is not ready for {}. Skipping task generation.",
             allPartitions, realtimeTableName, taskType);
-        continue;
       }
 
       TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
