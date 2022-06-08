@@ -19,22 +19,22 @@
 package org.apache.pinot.controller.api.resources;
 
 public class ServerReloadTaskStatusResponse {
-  private int totalSegmentCount;
-  private int successCount;
+  private int _totalSegmentCount;
+  private int _successCount;
 
   public int getTotalSegmentCount() {
-    return totalSegmentCount;
+    return _totalSegmentCount;
   }
 
   public void setTotalSegmentCount(int totalSegmentCount) {
-    this.totalSegmentCount = totalSegmentCount;
+    _totalSegmentCount = totalSegmentCount;
   }
 
   public int getSuccessCount() {
-    return successCount;
+    return _successCount;
   }
 
   public void setSuccessCount(int successCount) {
-    this.successCount = successCount;
+    _successCount = successCount;
   }
 }
