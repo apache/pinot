@@ -1538,10 +1538,10 @@
               <include>src/main/java/**/*.java</include>
               <include>src/test/java/**/*.java</include>
             </includes>
-            <importOrder>
-              <order>,\#</order>
-            </importOrder>
-            <removeUnusedImports />
+<!--            <importOrder>-->
+<!--              <order>,\#</order>-->
+<!--            </importOrder>-->
+<!--            <removeUnusedImports />-->
           </java>
         </configuration>
       </plugin>
