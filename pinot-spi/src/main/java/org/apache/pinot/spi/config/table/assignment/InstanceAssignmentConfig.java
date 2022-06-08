@@ -29,7 +29,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 public class InstanceAssignmentConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Configuration for the strategy to assign instances to partitions")
-  public final PartitionSelector _partitionSelector;
+  private final PartitionSelector _partitionSelector;
   @JsonPropertyDescription("Configuration for the instance tag and pool of the instance assignment (mandatory)")
   private final InstanceTagPoolConfig _tagPoolConfig;
 
