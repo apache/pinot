@@ -150,8 +150,8 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
         double result = groupByResultHolder.getDoubleResult(groupKey);
         // Preserve null group key.
         if (nullBitmap != null && nullBitmap.contains(i)) {
-          // The default value of un-initialized result could be -Infinity (dim column), so don't compare value w/ result.
-          // There should be only one groupKey for the null value.
+          // The default value of un-initialized result could be -Infinity (dim column), so don't compare value
+          // w/ result. There should be only one groupKey for the null value.
           assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKey;
           _groupKeyForNullValue = groupKey;
         } else if (value > result) {

@@ -115,14 +115,14 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
 
-    Schema SCHEMA;
+    Schema schema;
     if (dataType == DataType.BIG_DECIMAL) {
-      SCHEMA = new Schema.SchemaBuilder().addMetric(COLUMN_NAME, dataType).build();
+      schema = new Schema.SchemaBuilder().addMetric(COLUMN_NAME, dataType).build();
     } else {
-      SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN_NAME, dataType).build();
+      schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN_NAME, dataType).build();
     }
 
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, SCHEMA);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setNullHandlingEnabled(true);
@@ -216,7 +216,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       // count(col) returns the count of non-nullable docs.
       assertEquals((long) row[1], 500 * 4);
       assertEquals(row[2], baseValue.doubleValue());
-      assertTrue(Math.abs((Double) row[3]- (baseValue.doubleValue() + 998)) < 1e-1);
+      assertTrue(Math.abs((Double) row[3] - (baseValue.doubleValue() + 998)) < 1e-1);
     }
     {
       String query = "SELECT *, 1 FROM testTable";
@@ -290,7 +290,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         if (i % 2 == 1) {
           i++;
         }
-        assertTrue(Math.abs(((Number)row[0]).doubleValue() - (baseValue.doubleValue() + i)) < 1e-1);
+        assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + i)) < 1e-1);
         i++;
         index++;
       }
@@ -317,7 +317,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         if (i % 2 == 1) {
           i++;
         }
-        assertTrue(Math.abs(((Number)row[0]).doubleValue() - (baseValue.doubleValue() + i)) < 1e-1);
+        assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + i)) < 1e-1);
         i++;
         index++;
       }
@@ -351,9 +351,9 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       int count = 4 * 500;
       assertEquals((long) rows.get(0)[0], count);
       double min = baseValue.doubleValue();
-      assertTrue(Math.abs((Double)rows.get(0)[1] - min) < 1e-1);
+      assertTrue(Math.abs((Double) rows.get(0)[1] - min) < 1e-1);
       double max = baseValue.doubleValue() + 998;
-      assertTrue(Math.abs((Double)rows.get(0)[2] - max) < 1e-1);
+      assertTrue(Math.abs((Double) rows.get(0)[2] - max) < 1e-1);
       double avg = _sum / (double) _records.size();
       assertTrue(Math.abs((Double) rows.get(0)[3] - avg) < 1e-1);
       assertTrue(Math.abs((Double) rows.get(0)[4] - (4 * _sum)) < 1e-1);
@@ -377,7 +377,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         }
         Object[] row = rows.get(index);
         assertEquals(row.length, 1);
-        assertTrue(Math.abs(((Number)row[0]).doubleValue() - (baseValue.doubleValue() + (NUM_RECORDS - i - 1)))
+        assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + (NUM_RECORDS - i - 1)))
             < 1e-1);
         index++;
         i++;
@@ -403,7 +403,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
           i++;
         }
         assertEquals(row[0], 4L);
-        assertTrue(Math.abs(((Number)row[1]).doubleValue() - (baseValue.doubleValue() + (NUM_RECORDS - i - 1)))
+        assertTrue(Math.abs(((Number) row[1]).doubleValue() - (baseValue.doubleValue() + (NUM_RECORDS - i - 1)))
             < 1e-1);
         i++;
       }
@@ -420,8 +420,8 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       assertEquals(dataSchema, new DataSchema(new String[]{"sum"}, new ColumnDataType[]{ColumnDataType.STRING}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 1);
-      assertTrue(Math.abs((new BigDecimal((String) rows.get(0)[0])).doubleValue() -
-          _sumPrecision.multiply(BigDecimal.valueOf(4)).doubleValue()) < 1e-1);
+      assertTrue(Math.abs((new BigDecimal((String) rows.get(0)[0])).doubleValue()
+          - _sumPrecision.multiply(BigDecimal.valueOf(4)).doubleValue()) < 1e-1);
     }
     {
       // Note: in Presto, inequality, equality, and IN comparison with nulls always returns false:
@@ -474,7 +474,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
           // Null values are inserted at: index % 2 == 1. However, nulls are not retuned by an comparison operator.
           i++;
         }
-        assertTrue(Math.abs(((Number)row[0]).doubleValue() - (baseValue.doubleValue() + (69 + i + 1))) < 1e-1);
+        assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + (69 + i + 1))) < 1e-1);
         i++;
       }
     }
@@ -490,7 +490,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       for (int i = 0; i < 4; i++) {
         Object[] row = rows.get(i);
         assertEquals(row.length, 1);
-        assertTrue(Math.abs(((Number)row[0]).doubleValue() - (baseValue.floatValue() + 68)) < 1e-1);
+        assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.floatValue() + 68)) < 1e-1);
       }
     }
     {
@@ -599,7 +599,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         Object[] row = rows.get(index);
         assertEquals(row.length, 2);
         assertTrue(Math.abs((Double) row[0] - (baseValue.doubleValue() + i)) < 1e-1);
-        assertTrue(Math.abs(((Number)row[1]).doubleValue() - (baseValue.doubleValue() + i)) < 1e-1);
+        assertTrue(Math.abs(((Number) row[1]).doubleValue() - (baseValue.doubleValue() + i)) < 1e-1);
         i++;
       }
       assertNull(rows.get(rows.size() - 1)[0]);

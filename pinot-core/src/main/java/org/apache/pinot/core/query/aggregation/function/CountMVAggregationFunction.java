@@ -43,6 +43,16 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
   }
 
   @Override
+  public String getColumnName() {
+    return AggregationFunctionType.COUNTMV.getName() + "_" + _expression;
+  }
+
+  @Override
+  public String getResultColumnName() {
+    return AggregationFunctionType.COUNTMV.getName().toLowerCase() + "(" + _expression + ")";
+  }
+
+  @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     int[] valueArray = blockValSetMap.get(_expression).getNumMVEntries();

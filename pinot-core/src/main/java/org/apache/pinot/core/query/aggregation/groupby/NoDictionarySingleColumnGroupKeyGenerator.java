@@ -30,6 +30,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -88,9 +89,8 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
             }
           }
         } else {
-          // There is an implicit assumption here is that groupKeys is initialized to all zeros and that _numGroups is
-          // initialized to zero.
           _groupIdForNullValue = _numGroups++;
+          Arrays.fill(groupKeys, _groupIdForNullValue);
         }
         break;
       case LONG:
@@ -105,6 +105,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
           }
         } else {
           _groupIdForNullValue = _numGroups++;
+          Arrays.fill(groupKeys, _groupIdForNullValue);
         }
         break;
       case FLOAT:
@@ -119,6 +120,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
           }
         } else {
           _groupIdForNullValue = _numGroups++;
+          Arrays.fill(groupKeys, _groupIdForNullValue);
         }
         break;
       case DOUBLE:
@@ -133,6 +135,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
           }
         } else {
           _groupIdForNullValue = _numGroups++;
+          Arrays.fill(groupKeys, _groupIdForNullValue);
         }
         break;
       case BIG_DECIMAL:
@@ -142,7 +145,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
             groupKeys[i] = getKeyForValue(nullBitmap != null && nullBitmap.contains(i) ? null : bigDecimalValues[i]);
           }
         } else if (numDocs > 0) {
-          groupKeys[0] = getKeyForValue((BigDecimal) null);
+          Arrays.fill(groupKeys, getKeyForValue((BigDecimal) null));
         }
         break;
       case STRING:
@@ -152,7 +155,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
             groupKeys[i] = getKeyForValue(nullBitmap != null && nullBitmap.contains(i) ? null : stringValues[i]);
           }
         } else if (numDocs > 0) {
-          groupKeys[0] = getKeyForValue((String) null);
+          Arrays.fill(groupKeys, getKeyForValue((String) null));
         }
         break;
       case BYTES:
@@ -163,7 +166,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
                 : new ByteArray(bytesValues[i]));
           }
         } else if (numDocs > 0) {
-          groupKeys[0] = getKeyForValue((ByteArray) null);
+          Arrays.fill(groupKeys, getKeyForValue((ByteArray) null));
         }
         break;
       default:

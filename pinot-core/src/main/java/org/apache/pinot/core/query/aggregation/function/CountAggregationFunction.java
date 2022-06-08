@@ -35,8 +35,8 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class CountAggregationFunction extends BaseSingleInputAggregationFunction<Long, Long> {
-  private static final String COLUMN_NAME = "count_star";
-  private static final String RESULT_COLUMN_NAME = "count(*)";
+  private final String _columnName;
+  private final String _resultColumnName;
   private static final double DEFAULT_INITIAL_VALUE = 0.0;
   // Special expression used by star-tree to pass in BlockValSet
   private static final ExpressionContext STAR_TREE_COUNT_STAR_EXPRESSION =
@@ -44,6 +44,9 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
 
   public CountAggregationFunction(ExpressionContext expression) {
     super(expression);
+    String expStr = expression.toString();
+    _columnName = expStr.equals("*") ? "star" : expStr;
+    _resultColumnName = expStr.equals("*") ? "*" : expStr;
   }
 
   @Override
@@ -53,12 +56,12 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
 
   @Override
   public String getColumnName() {
-    return COLUMN_NAME;
+    return getType().getName() + "_" + _columnName;
   }
 
   @Override
   public String getResultColumnName() {
-    return RESULT_COLUMN_NAME;
+    return getType().getName().toLowerCase() + "(" + _resultColumnName + ")";
   }
 
   @Override

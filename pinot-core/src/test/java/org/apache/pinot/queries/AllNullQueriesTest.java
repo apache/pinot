@@ -45,7 +45,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -59,7 +58,6 @@ import static org.testng.Assert.assertTrue;
  * where all input values are nulls.
  */
 public class AllNullQueriesTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "AllNullQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
 
@@ -92,8 +90,6 @@ public class AllNullQueriesTest extends BaseQueriesTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    FileUtils.deleteDirectory(INDEX_DIR);
-
     _records = new ArrayList<>(NUM_RECORDS);
     for (int i = 0; i < NUM_RECORDS; i++) {
       GenericRow record = new GenericRow();
@@ -104,28 +100,28 @@ public class AllNullQueriesTest extends BaseQueriesTest {
     _sum = 0;
   }
 
-  private void setUp(TableConfig tableConfig, DataType dataType)
+  private void setUp(TableConfig tableConfig, DataType dataType, File indexDir)
       throws Exception {
-    FileUtils.deleteDirectory(INDEX_DIR);
+    FileUtils.deleteDirectory(indexDir);
 
-    Schema SCHEMA;
+    Schema schema;
     if (dataType == DataType.BIG_DECIMAL) {
-      SCHEMA = new Schema.SchemaBuilder().addMetric(COLUMN_NAME, dataType).build();
+      schema = new Schema.SchemaBuilder().addMetric(COLUMN_NAME, dataType).build();
     } else {
-      SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN_NAME, dataType).build();
+      schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN_NAME, dataType).build();
     }
 
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, SCHEMA);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setNullHandlingEnabled(true);
-    segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
+    segmentGeneratorConfig.setOutDir(indexDir.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(_records));
     driver.build();
 
-    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.mmap);
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(indexDir, SEGMENT_NAME), ReadMode.mmap);
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
@@ -137,8 +133,9 @@ public class AllNullQueriesTest extends BaseQueriesTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .build();
-    setUp(tableConfig, columnDataType.toDataType());
-    testQueries(columnDataType);
+    File indexDir = new File(FileUtils.getTempDirectory(), "AllNullWithDictLongColumnQueriesTest");
+    setUp(tableConfig, columnDataType.toDataType(), indexDir);
+    testQueries(columnDataType, indexDir);
   }
 
   @Test(priority = 1)
@@ -151,8 +148,9 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         .setTableName(RAW_TABLE_NAME)
         .setNoDictionaryColumns(noDictionaryColumns)
         .build();
-    setUp(tableConfig, columnDataType.toDataType());
-    testQueries(columnDataType);
+    File indexDir = new File(FileUtils.getTempDirectory(), "AllNullWithNoDictLongColumnQueriesTest");
+    setUp(tableConfig, columnDataType.toDataType(), indexDir);
+    testQueries(columnDataType, indexDir);
   }
 
   @Test(priority = 2)
@@ -162,8 +160,9 @@ public class AllNullQueriesTest extends BaseQueriesTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .build();
-    setUp(tableConfig, columnDataType.toDataType());
-    testQueries(columnDataType);
+    File indexDir = new File(FileUtils.getTempDirectory(), "AllNullWithDictFloatColumnQueriesTest");
+    setUp(tableConfig, columnDataType.toDataType(), indexDir);
+    testQueries(columnDataType, indexDir);
   }
 
   @Test(priority = 3)
@@ -176,8 +175,9 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         .setTableName(RAW_TABLE_NAME)
         .setNoDictionaryColumns(noDictionaryColumns)
         .build();
-    setUp(tableConfig, columnDataType.toDataType());
-    testQueries(columnDataType);
+    File indexDir = new File(FileUtils.getTempDirectory(), "AllNullWithNoDictFloatColumnQueriesTest");
+    setUp(tableConfig, columnDataType.toDataType(), indexDir);
+    testQueries(columnDataType, indexDir);
   }
 
   @Test(priority = 4)
@@ -187,8 +187,9 @@ public class AllNullQueriesTest extends BaseQueriesTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .build();
-    setUp(tableConfig, columnDataType.toDataType());
-    testQueries(columnDataType);
+    File indexDir = new File(FileUtils.getTempDirectory(), "AllNullWithDictDoubleColumnQueriesTest");
+    setUp(tableConfig, columnDataType.toDataType(), indexDir);
+    testQueries(columnDataType, indexDir);
   }
 
   @Test(priority = 5)
@@ -201,8 +202,9 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         .setTableName(RAW_TABLE_NAME)
         .setNoDictionaryColumns(noDictionaryColumns)
         .build();
-    setUp(tableConfig, columnDataType.toDataType());
-    testQueries(columnDataType);
+    File indexDir = new File(FileUtils.getTempDirectory(), "AllNullWithNoDictDoubleColumnQueriesTest");
+    setUp(tableConfig, columnDataType.toDataType(), indexDir);
+    testQueries(columnDataType, indexDir);
   }
 
   @Test(priority = 6)
@@ -212,8 +214,9 @@ public class AllNullQueriesTest extends BaseQueriesTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .build();
-    setUp(tableConfig, columnDataType.toDataType());
-    testQueries(columnDataType);
+    File indexDir = new File(FileUtils.getTempDirectory(), "AllNullWithDictIntColumnQueriesTest");
+    setUp(tableConfig, columnDataType.toDataType(), indexDir);
+    testQueries(columnDataType, indexDir);
   }
 
   @Test(priority = 7)
@@ -226,8 +229,9 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         .setTableName(RAW_TABLE_NAME)
         .setNoDictionaryColumns(noDictionaryColumns)
         .build();
-    setUp(tableConfig, columnDataType.toDataType());
-    testQueries(columnDataType);
+    File indexDir = new File(FileUtils.getTempDirectory(), "AllNullWithNoDictIntColumnQueriesTest");
+    setUp(tableConfig, columnDataType.toDataType(), indexDir);
+    testQueries(columnDataType, indexDir);
   }
 
   @Test(priority = 8)
@@ -237,8 +241,9 @@ public class AllNullQueriesTest extends BaseQueriesTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .build();
-    setUp(tableConfig, columnDataType.toDataType());
-    testQueries(columnDataType);
+    File indexDir = new File(FileUtils.getTempDirectory(), "AllNullWithDictBigDecimalColumnQueriesTest");
+    setUp(tableConfig, columnDataType.toDataType(), indexDir);
+    testQueries(columnDataType, indexDir);
   }
 
   @Test(priority = 9)
@@ -251,11 +256,13 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         .setTableName(RAW_TABLE_NAME)
         .setNoDictionaryColumns(noDictionaryColumns)
         .build();
-    setUp(tableConfig, columnDataType.toDataType());
-    testQueries(columnDataType);
+    File indexDir = new File(FileUtils.getTempDirectory(), "AllNullWithNoDictBigDecimalColumnQueriesTest");
+    setUp(tableConfig, columnDataType.toDataType(), indexDir);
+    testQueries(columnDataType, indexDir);
   }
 
-  public void testQueries(ColumnDataType columnDataType) {
+  public void testQueries(ColumnDataType columnDataType, File indexDir)
+      throws IOException {
     DataType dataType = columnDataType.toDataType();
     Map<String, Object> pinotConfigProperties = new HashMap<>();
     pinotConfigProperties.put(CommonConstants.Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, 4);
@@ -509,13 +516,14 @@ public class AllNullQueriesTest extends BaseQueriesTest {
     {
       // MODE cannot handle BIG_DECIMAL yet.
       if (dataType != DataType.BIG_DECIMAL) {
-        String query = String.format("SELECT AVG(%s) AS avg, MODE(%s) AS mode, DISTINCTCOUNT(%s) as distinct_count" +
-                " FROM testTable GROUP BY %s ORDER BY %s LIMIT 200", COLUMN_NAME, COLUMN_NAME, COLUMN_NAME, COLUMN_NAME,
+        String query = String.format("SELECT AVG(%s) AS avg, MODE(%s) AS mode, DISTINCTCOUNT(%s) as distinct_count FROM"
+                + " testTable GROUP BY %s ORDER BY %s LIMIT 200", COLUMN_NAME, COLUMN_NAME, COLUMN_NAME, COLUMN_NAME,
             COLUMN_NAME);
         BrokerResponseNative brokerResponse = getBrokerResponse(query, pinotConfigProperties);
         ResultTable resultTable = brokerResponse.getResultTable();
         DataSchema dataSchema = resultTable.getDataSchema();
-        assertEquals(dataSchema, new DataSchema(new String[]{"avg", "mode", "distinct_count"}, new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.INT}));
+        assertEquals(dataSchema, new DataSchema(new String[]{"avg", "mode", "distinct_count"},
+            new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.INT}));
         List<Object[]> rows = resultTable.getRows();
         assertEquals(rows.size(), 1);
         Object[] row = rows.get(0);
@@ -543,12 +551,7 @@ public class AllNullQueriesTest extends BaseQueriesTest {
       assertEquals(rows.size(), 1);
       assertNull(rows.get(0)[0]);
     }
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws IOException {
     _indexSegment.destroy();
-    FileUtils.deleteDirectory(INDEX_DIR);
+    FileUtils.deleteDirectory(indexDir);
   }
 }

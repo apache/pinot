@@ -434,7 +434,7 @@ public class IntermediateResultsBlock implements Block {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
       columnNames[i] = aggregationFunction.getColumnName();
       columnDataTypes[i] = aggregationFunction.getIntermediateResultColumnType();
-      // todo(nhejazi): hide null handling code behind a configuration (nullHandlingEnabledInSelect).
+      // TODO(nhejazi): hide null handling code behind a configuration (nullHandlingEnabledInSelect).
       if (columnDefaultNullValues == null) {
         columnDefaultNullValues = new Object[numAggregationFunctions];
         columnNullBitmap = new RoaringBitmap[numAggregationFunctions];
