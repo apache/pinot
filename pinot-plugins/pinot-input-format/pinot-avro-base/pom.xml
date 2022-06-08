@@ -73,11 +73,11 @@
                   <relocations>
                     <relocation>
                       <pattern>com.google.common.base</pattern>
-                      <shadedPattern>shaded.com.google.common.base</shadedPattern>
+                      <shadedPattern>${shade.prefix}.com.google.common.base</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>com.fasterxml.jackson</pattern>
-                      <shadedPattern>shaded.com.fasterxml.jackson</shadedPattern>
+                      <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
                     </relocation>
                   </relocations>
                 </configuration>

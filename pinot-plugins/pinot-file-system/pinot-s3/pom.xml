@@ -241,11 +241,11 @@
                   <relocations>
                     <relocation>
                       <pattern>com.google.common</pattern>
-                      <shadedPattern>shaded.com.google.common</shadedPattern>
+                      <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>com.fasterxml.jackson</pattern>
-                      <shadedPattern>shaded.com.fasterxml.jackson</shadedPattern>
+                      <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
                     </relocation>
                   </relocations>
                 </configuration>

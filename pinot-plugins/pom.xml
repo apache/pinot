@@ -99,39 +99,39 @@
                   <relocations>
                     <relocation>
                       <pattern>com.google.common</pattern>
-                      <shadedPattern>shaded.com.google.common</shadedPattern>
+                      <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>com.fasterxml.jackson</pattern>
-                      <shadedPattern>shaded.com.fasterxml.jackson</shadedPattern>
+                      <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>org.apache.http</pattern>
-                      <shadedPattern>shaded.org.apache.http</shadedPattern>
+                      <shadedPattern>${shade.prefix}.org.apache.http</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>software.amazon</pattern>
-                      <shadedPattern>shaded.software.amazon</shadedPattern>
+                      <shadedPattern>${shade.prefix}.software.amazon</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>org.reflections</pattern>
-                      <shadedPattern>shaded.org.reflections</shadedPattern>
+                      <shadedPattern>${shade.prefix}.org.reflections</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>io.netty</pattern>
-                      <shadedPattern>shaded.io.netty</shadedPattern>
+                      <shadedPattern>${shade.prefix}.io.netty</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>org.apache.parquet</pattern>
-                      <shadedPattern>shaded.org.apache.parquet</shadedPattern>
+                      <shadedPattern>${shade.prefix}.org.apache.parquet</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>org.apache.hadoop</pattern>
-                      <shadedPattern>shaded.org.apache.hadoop</shadedPattern>
+                      <shadedPattern>${shade.prefix}.org.apache.hadoop</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>org.apache.kafka</pattern>
-                      <shadedPattern>shaded.org.apache.kafka</shadedPattern>
+                      <shadedPattern>${shade.prefix}.org.apache.kafka</shadedPattern>
                     </relocation>
                   </relocations>
                 </configuration>

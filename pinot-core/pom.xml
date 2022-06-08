@@ -309,11 +309,11 @@
                   <relocations>
                     <relocation>
                       <pattern>com.google.common.base</pattern>
-                      <shadedPattern>shaded.com.google.common.base</shadedPattern>
+                      <shadedPattern>${shade.prefix}.com.google.common.base</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>org.apache.http</pattern>
-                      <shadedPattern>shaded.org.apache.http</shadedPattern>
+                      <shadedPattern>${shade.prefix}.org.apache.http</shadedPattern>
                     </relocation>
                   </relocations>
                 </configuration>
