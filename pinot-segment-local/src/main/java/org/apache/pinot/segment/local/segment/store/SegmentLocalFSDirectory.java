@@ -59,10 +59,10 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   private final File _indexDir;
   private final File _segmentDirectory;
   private final SegmentLock _segmentLock;
-  private SegmentMetadataImpl _segmentMetadata;
   private final ReadMode _readMode;
-
+  private SegmentMetadataImpl _segmentMetadata;
   private ColumnIndexDirectory _columnIndexDirectory;
+  private String _tier;
 
   // Create an empty SegmentLocalFSDirectory object mainly used to
   // prepare env for subsequent processing on the segment.
@@ -116,6 +116,16 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     if (src.exists() && !src.equals(dest)) {
       FileUtils.copyDirectory(src, dest);
     }
+  }
+
+  @Override
+  public String getTier() {
+    return _tier;
+  }
+
+  @Override
+  public void setTier(String tier) {
+    _tier = tier;
   }
 
   @Override

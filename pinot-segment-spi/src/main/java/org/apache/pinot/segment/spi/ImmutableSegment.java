@@ -55,4 +55,13 @@ public interface ImmutableSegment extends IndexSegment {
    * @return Size of the segment in bytes
    */
   long getSegmentSizeBytes();
+
+  /**
+   * Get the storage tier of the immutable segment.
+   *
+   * @return storage tier, null by default.
+   */
+  default String getTier() {
+    return null;
+  }
 }

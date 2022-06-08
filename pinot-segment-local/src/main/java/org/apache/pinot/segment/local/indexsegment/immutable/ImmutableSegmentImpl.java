@@ -118,6 +118,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
+  public String getTier() {
+    return _segmentDirectory.getTier();
+  }
+
+  @Override
   public String getSegmentName() {
     return _segmentMetadata.getName();
   }

@@ -150,6 +150,18 @@ public abstract class SegmentDirectory implements Closeable {
   }
 
   /**
+   * Get the storage tier where the segment directory is placed by server.
+   *
+   * @return storage tier, null by default.
+   */
+  public abstract String getTier();
+
+  /**
+   * Set the storage tier where the segment directory is placed by server.
+   */
+  public abstract void setTier(String tier);
+
+  /**
    * Reader for columnar index buffers from segment directory
    */
   public abstract class Reader implements Closeable {
