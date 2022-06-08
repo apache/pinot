@@ -20,6 +20,7 @@
 package org.apache.pinot.common.helix;
 
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -43,5 +44,43 @@ public class ExtraInstanceConfig {
 
   public void setTlsPort(String tlsPort) {
     _proxy.getRecord().setSimpleField(PinotInstanceConfigProperty.PINOT_TLS_PORT.toString(), tlsPort);
+  }
+
+  /**
+   * Returns an instance URL from the InstanceConfig. Will set the appropriate protocol and port.
+   */
+  public String getComponentUrl() {
+    String hostName = _proxy.getHostName();
+    // Backward-compatible with legacy hostname of format 'Controller_<hostname>'
+    if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE)) {
+      hostName = hostName.substring(CommonConstants.Helix.CONTROLLER_INSTANCE_PREFIX_LENGTH);
+    } else if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      hostName = hostName.substring(CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+    } else if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
+      hostName = hostName.substring(CommonConstants.Helix.BROKER_INSTANCE_PREFIX_LENGTH);
+    } else if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE)) {
+      hostName = hostName.substring(CommonConstants.Helix.MINION_INSTANCE_PREFIX_LENGTH);
+    }
+
+    String protocol = null;
+    String port = null;
+    try {
+      if (Integer.parseInt(getTlsPort()) > 0) {
+        protocol = CommonConstants.HTTPS_PROTOCOL;
+        port = getTlsPort();
+      }
+    } catch (Exception e) {
+      try {
+        if (Integer.parseInt(_proxy.getPort()) > 0) {
+          protocol = CommonConstants.HTTP_PROTOCOL;
+          port = _proxy.getPort();
+        }
+      } catch (Exception e2) {
+      }
+    }
+    if (port != null) {
+      return String.format("%s://%s:%s", protocol, hostName, port);
+    }
+    return null;
   }
 }
