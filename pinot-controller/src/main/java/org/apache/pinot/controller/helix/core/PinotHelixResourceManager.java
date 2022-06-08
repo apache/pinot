@@ -56,6 +56,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -2166,7 +2167,7 @@ public class PinotHelixResourceManager {
     sendSegmentRefreshMessage(tableNameWithType, segmentName, true, true);
   }
 
-  public int reloadAllSegments(String tableNameWithType, boolean forceDownload) {
+  public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload) {
     LOGGER.info("Sending reload message for table: {} with forceDownload: {}", tableNameWithType, forceDownload);
 
     if (forceDownload) {
@@ -2193,7 +2194,7 @@ public class PinotHelixResourceManager {
       LOGGER.warn("No reload message sent for table: {}", tableNameWithType);
     }
 
-    return numMessagesSent;
+    return Pair.of(numMessagesSent, segmentReloadMessage.getReloadTaskId());
   }
 
   public int reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload) {

@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.BiMap;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -35,9 +36,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -57,8 +60,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -71,6 +75,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.controller.util.TableTierReader;
@@ -568,13 +573,61 @@ public class PinotSegmentRestletResource {
   @Path("tables/{tableName}/segments/{segmentName}/reload")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)",
-      notes = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)")
+  @ApiOperation(value = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)"
+      , notes = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)")
   public SuccessResponse reloadSegmentDeprecated2(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
     return reloadSegmentDeprecated1(tableName, segmentName, tableTypeStr);
+  }
+
+  @GET
+  @Path("tables/{tableName}/segmentReloadStatus/{taskId}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get status for a submitted reload operation", notes = "Get status for a submitted reload "
+      + "operation")
+  public ServerReloadTaskStatusResponse getReloadTaskStatus(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Reload task id", required = true) @PathParam("taskId") String reloadTaskId)
+      throws Exception {
+    // Call all servers to get status, collate and return
+    List<String> tableNamesWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, null, LOGGER);
+
+    Set<String> instances = new HashSet<>();
+    for (String tableNameWithType : tableNamesWithType) {
+      Map<String, List<String>> serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+      instances.addAll(serverToSegments.keySet());
+    }
+
+    BiMap<String, String> serverEndPoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(instances);
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
+
+    List<String> serverUrls = new ArrayList<>();
+    BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
+    for (String endpoint : endpointsToServers.keySet()) {
+      String reloadTaskStatusEndpoint = endpoint + "/task/status/" + reloadTaskId;
+      serverUrls.add(reloadTaskStatusEndpoint);
+    }
+
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 1000);
+
+    ServerReloadTaskStatusResponse serverReloadTaskStatusResponse = new ServerReloadTaskStatusResponse();
+    serverReloadTaskStatusResponse.setSuccessCount(0);
+    serverReloadTaskStatusResponse.setTotalSegmentCount(0);
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+      ServerReloadTaskStatusResponse response =
+          JsonUtils.stringToObject(streamResponse.getValue(), ServerReloadTaskStatusResponse.class);
+      serverReloadTaskStatusResponse.setTotalSegmentCount(
+          serverReloadTaskStatusResponse.getTotalSegmentCount() + response.getTotalSegmentCount());
+      serverReloadTaskStatusResponse.setSuccessCount(
+          serverReloadTaskStatusResponse.getSuccessCount() + response.getSuccessCount());
+    }
+
+    return serverReloadTaskStatusResponse;
   }
 
   @POST
@@ -597,14 +650,15 @@ public class PinotSegmentRestletResource {
     if (forceDownload && (tableTypeFromTableName == null && tableTypeFromRequest == null)) {
       tableTypeFromRequest = TableType.OFFLINE;
     }
-    List<String> tableNamesWithType = ResourceUtils
-        .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest, LOGGER);
-    Map<String, Integer> numMessagesSentPerTable = new LinkedHashMap<>();
+    List<String> tableNamesWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
+            LOGGER);
+    Map<String, Pair<Integer, String>> perTableMsgData = new LinkedHashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
-      int numMsgSent = _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload);
-      numMessagesSentPerTable.put(tableNameWithType, numMsgSent);
+      Pair<Integer, String> msgInfo = _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload);
+      perTableMsgData.put(tableNameWithType, msgInfo);
     }
-    return new SuccessResponse("Sent " + numMessagesSentPerTable + " reload messages");
+    return new SuccessResponse("Sent " + perTableMsgData + " reload messages");
   }
 
   @Deprecated
@@ -622,7 +676,7 @@ public class PinotSegmentRestletResource {
             LOGGER);
     int numMessagesSent = 0;
     for (String tableNameWithType : tableNamesWithType) {
-      numMessagesSent += _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, false);
+      numMessagesSent += _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, false).getLeft();
     }
     return new SuccessResponse("Sent " + numMessagesSent + " reload messages");
   }

@@ -111,11 +111,13 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
 
   private class SegmentReloadMessageHandler extends DefaultMessageHandler {
     private final boolean _forceDownload;
+    private final String _reloadTaskId;
 
     SegmentReloadMessageHandler(SegmentReloadMessage segmentReloadMessage, ServerMetrics metrics,
         NotificationContext context) {
       super(segmentReloadMessage, metrics, context);
       _forceDownload = segmentReloadMessage.shouldForceDownload();
+      _reloadTaskId = segmentReloadMessage.getReloadTaskId();
     }
 
     @Override
@@ -128,7 +130,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
           // NOTE: the method aborts if any segment reload encounters an unhandled exception,
           // and can lead to inconsistent state across segments.
           //we don't acquire any permit here as they'll be acquired by worked threads later
-          _instanceDataManager.reloadAllSegments(_message.getMsgId(), _tableNameWithType, _forceDownload,
+          _instanceDataManager.reloadAllSegments(_reloadTaskId, _tableNameWithType, _forceDownload,
               _segmentRefreshSemaphore);
         } else {
           // Reload one segment
