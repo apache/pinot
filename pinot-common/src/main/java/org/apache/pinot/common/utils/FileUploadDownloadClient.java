@@ -1011,17 +1011,17 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * @param dest File destination
    * @param authProvider auth token
    * @param httpHeaders http headers
-   * @param maxDownloadRateInByte limit the rate to write download-untar stream to disk, in bytes
+   * @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
    *                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
    * @return Response status code
    * @throws IOException
    * @throws HttpErrorStatusException
    */
   public File downloadUntarFileStreamed(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders,
-      long maxDownloadRateInByte)
+      long maxStreamRateInByte)
       throws IOException, HttpErrorStatusException {
     return _httpClient.downloadUntarFileStreamed(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authProvider,
-        httpHeaders, maxDownloadRateInByte);
+        httpHeaders, maxStreamRateInByte);
   }
 
   /**

@@ -153,7 +153,7 @@ public class TarGzCompressionUtils {
    * RateLimit limits the untar rate
    * <p>For security reason, the untarred files must reside in the output directory.
    */
-  public static List<File> untarWithRateLimiter(InputStream inputStream, File outputDir, long maxDownloadRateInByte)
+  public static List<File> untarWithRateLimiter(InputStream inputStream, File outputDir, long maxStreamRateInByte)
       throws IOException {
     String outputDirCanonicalPath = outputDir.getCanonicalPath();
     // Prevent partial path traversal
@@ -196,8 +196,8 @@ public class TarGzCompressionUtils {
             throw new IOException(String.format("Failed to create directory: %s", parentFile));
           }
           try (FileOutputStream out = new FileOutputStream(outputFile.toPath().toString())) {
-            if (maxDownloadRateInByte != NO_DISK_WRITE_RATE_LIMIT) {
-              copyWithRateLimiter(tarGzIn, out, maxDownloadRateInByte);
+            if (maxStreamRateInByte != NO_DISK_WRITE_RATE_LIMIT) {
+              copyWithRateLimiter(tarGzIn, out, maxStreamRateInByte);
             } else {
               IOUtils.copy(tarGzIn, out);
             }
@@ -236,7 +236,7 @@ public class TarGzCompressionUtils {
   }
 
   public static long copyWithRateLimiter(InputStream inputStream, FileOutputStream outputStream,
-      long maxDownloadRateInByte)
+      long maxStreamRateInByte)
       throws IOException {
     Preconditions.checkState(inputStream != null, "inputStream is null");
     Preconditions.checkState(outputStream != null, "outputStream is null");
@@ -245,13 +245,13 @@ public class TarGzCompressionUtils {
     long count;
     int n;
 
-    if (maxDownloadRateInByte == SYNC_DISK_WRITE_WITH_UPSTREAM_RATE) {
+    if (maxStreamRateInByte == SYNC_DISK_WRITE_WITH_UPSTREAM_RATE) {
       for (count = 0L; -1 != (n = inputStream.read(buffer)); count += (long) n) {
         outputStream.write(buffer, 0, n);
         fd.sync(); // flush the buffer timely to the disk so that the disk bandwidth wouldn't get saturated
       }
     } else {
-      RateLimiter rateLimiter = RateLimiter.create(maxDownloadRateInByte);
+      RateLimiter rateLimiter = RateLimiter.create(maxStreamRateInByte);
       for (count = 0L; -1 != (n = inputStream.read(buffer)); count += (long) n) {
         rateLimiter.acquire(n);
         outputStream.write(buffer, 0, n);

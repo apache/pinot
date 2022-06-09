@@ -403,14 +403,14 @@ public class HttpClient implements AutoCloseable {
    * @param dest File destination
    * @param authProvider auth provider
    * @param httpHeaders http headers
-   * @param maxDownloadRateInByte limit the rate to write download-untar stream to disk, in bytes
+   * @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
    *                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
    * @return The untarred directory
    * @throws IOException
    * @throws HttpErrorStatusException
    */
   public File downloadUntarFileStreamed(URI uri, int socketTimeoutMs, File dest, AuthProvider authProvider,
-      List<Header> httpHeaders, long maxDownloadRateInByte)
+      List<Header> httpHeaders, long maxStreamRateInByte)
       throws IOException, HttpErrorStatusException {
     HttpUriRequest request = getDownloadFileRequest(uri, socketTimeoutMs, authProvider, httpHeaders);
     File ret;
@@ -422,7 +422,7 @@ public class HttpClient implements AutoCloseable {
       }
 
       try (InputStream inputStream = response.getEntity().getContent()) {
-        ret = TarGzCompressionUtils.untarWithRateLimiter(inputStream, dest, maxDownloadRateInByte).get(0);
+        ret = TarGzCompressionUtils.untarWithRateLimiter(inputStream, dest, maxStreamRateInByte).get(0);
       }
 
       LOGGER.info("Downloaded from: {} to: {} with rate limiter; Response status code: {}", uri, dest,

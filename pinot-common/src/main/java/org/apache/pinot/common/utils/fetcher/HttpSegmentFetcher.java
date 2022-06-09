@@ -93,7 +93,7 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
   }
 
   @Override
-  public File fetchUntarSegmentToLocalStreamed(URI downloadURI, File dest, long maxDownloadRateInByte)
+  public File fetchUntarSegmentToLocalStreamed(URI downloadURI, File dest, long maxStreamRateInByte)
       throws Exception {
     // Create a RoundRobinURIProvider to round robin IP addresses when retry uploading. Otherwise may always try to
     // download from a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
@@ -114,7 +114,7 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
         if (!InetAddresses.isInetAddress(hostName)) {
           httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + port));
         }
-        ret.set(_httpClient.downloadUntarFileStreamed(uri, dest, _authProvider, httpHeaders, maxDownloadRateInByte));
+        ret.set(_httpClient.downloadUntarFileStreamed(uri, dest, _authProvider, httpHeaders, maxStreamRateInByte));
 
         return true;
       } catch (HttpErrorStatusException e) {

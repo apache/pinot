@@ -157,19 +157,19 @@ public class SegmentFetcherFactory {
    * Fetches a segment from URI location to local and untar it in a streamed manner.
    * @param uri URI
    * @param tempRootDir Tmp dir to download
-   * @param maxDownloadRateInByte limit the rate to write download-untar stream to disk, in bytes
+   * @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
    *                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
    * @return the untared directory
    * @throws Exception
    */
-  public static File fetchAndStreamUntarToLocal(String uri, File tempRootDir, long maxDownloadRateInByte)
+  public static File fetchAndStreamUntarToLocal(String uri, File tempRootDir, long maxStreamRateInByte)
       throws Exception {
-    return getInstance().fetchAndStreamUntarToLocalInternal(new URI(uri), tempRootDir, maxDownloadRateInByte);
+    return getInstance().fetchAndStreamUntarToLocalInternal(new URI(uri), tempRootDir, maxStreamRateInByte);
   }
 
-  private File fetchAndStreamUntarToLocalInternal(URI uri, File tempRootDir, long maxDownloadRateInByte)
+  private File fetchAndStreamUntarToLocalInternal(URI uri, File tempRootDir, long maxStreamRateInByte)
       throws Exception {
-    return getSegmentFetcher(uri.getScheme()).fetchUntarSegmentToLocalStreamed(uri, tempRootDir, maxDownloadRateInByte);
+    return getSegmentFetcher(uri.getScheme()).fetchUntarSegmentToLocalStreamed(uri, tempRootDir, maxStreamRateInByte);
   }
 
   /**
