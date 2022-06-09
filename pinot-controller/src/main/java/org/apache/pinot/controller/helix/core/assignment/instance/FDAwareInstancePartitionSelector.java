@@ -88,8 +88,8 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
       int numInstancesToSelect = numInstancesPerReplicaGroup * numReplicaGroups;
 
       Preconditions.checkState(numInstancesToSelect <= numTotalInstances,
-          "Not enough qualified instances, ask for: (numInstancesPerReplicaGroup: %d) * "
-              + "(numReplicaGroups: %d) = %d, having only %d",
+          "Not enough qualified instances, ask for: (numInstancesPerReplicaGroup: %s) * "
+              + "(numReplicaGroups: %s) = %s, having only %s",
           numInstancesPerReplicaGroup, numReplicaGroups, numInstancesToSelect, numTotalInstances);
     } else {
       Preconditions.checkState(numTotalInstances % numReplicaGroups == 0,

@@ -1003,7 +1003,8 @@ public class InstanceAssignmentTest {
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(),
-          "Not enough qualified instances (21 in all FDs, asked for 24)");
+          "Not enough qualified instances, ask for: (numInstancesPerReplicaGroup: 6) * \"\n"
+              + "              + \"(numReplicaGroups: 4) = 24, having only 21");
     }
 
     numInstances = 10;
