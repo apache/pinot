@@ -101,7 +101,8 @@ public class QueryRunner {
       BaseDataBlock dataBlock;
       try {
         DataTable dataTable = _serverExecutor.processQuery(serverQueryRequest, executorService, null);
-        // this works because default DataTableImplV3 will have ordinal 0, which maps to ROW(0)
+        // this works because default DataTableImplV3 will have a version number at beginning,
+        // which maps to ROW type of version 3.
         dataBlock = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTable.toBytes()));
       } catch (IOException e) {
         throw new RuntimeException("Unable to convert byte buffer", e);
