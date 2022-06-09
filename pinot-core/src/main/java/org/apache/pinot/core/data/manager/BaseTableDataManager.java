@@ -502,8 +502,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       LOGGER.info("Download and untarred segment: {} for table: {} from: {}", segmentName, _tableNameWithType, uri);
       return ret;
     } catch (AttemptsExceededException e) {
-      LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from: {} to: {}", segmentName,
-          _tableNameWithType, uri, tempRootDir);
+      LOGGER.error("Attempts exceeded when stream download-untarring segment: {} for table: {} from: {} to: {}",
+          segmentName, _tableNameWithType, uri, tempRootDir);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES, 1L);
       throw e;
     } finally {

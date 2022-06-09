@@ -20,6 +20,7 @@ package org.apache.pinot.common.utils.fetcher;
 
 import com.google.common.net.InetAddresses;
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.util.LinkedList;
 import java.util.List;
@@ -131,6 +132,10 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
               statusCode, uri, dest, e);
           throw e;
         }
+      } catch (IOException e) {
+        _logger.warn("Caught IOException while stream download-untarring segment from: {} to: {}, retrying",
+            uri, dest, e);
+        return false;
       } catch (Exception e) {
         _logger.warn("Caught exception while downloading segment from: {} to: {}", uri, dest, e);
         return false;
