@@ -26,6 +26,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
@@ -40,6 +41,8 @@ public interface DataTable {
   void addException(int exceptionCode, String exceptionMsg);
 
   Map<Integer, String> getExceptions();
+
+  int getVersion();
 
   byte[] toBytes()
       throws IOException;
@@ -75,6 +78,8 @@ public interface DataTable {
   double[] getDoubleArray(int rowId, int colId);
 
   String[] getStringArray(int rowId, int colId);
+
+  MutableRoaringBitmap getNullRowIds(int colId);
 
   DataTable toMetadataOnlyDataTable();
 

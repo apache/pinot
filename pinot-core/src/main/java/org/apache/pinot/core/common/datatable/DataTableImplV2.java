@@ -137,6 +137,11 @@ public class DataTableImplV2 extends BaseDataTable {
   }
 
   @Override
+  public int getVersion() {
+    return DataTableBuilder.VERSION_2;
+  }
+
+  @Override
   public void addException(ProcessingException processingException) {
     _metadata.put(EXCEPTION_METADATA_KEY + processingException.getErrorCode(), processingException.getMessage());
   }

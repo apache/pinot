@@ -119,7 +119,8 @@ public class ObjectSerDeUtils {
     LongLongPair(28),
     FloatLongPair(29),
     DoubleLongPair(30),
-    StringLongPair(31);
+    StringLongPair(31),
+    Missing(100);
     private final int _value;
 
     ObjectType(int value) {
@@ -131,6 +132,10 @@ public class ObjectSerDeUtils {
     }
 
     public static ObjectType getObjectType(Object value) {
+      if (value == null) {
+        return ObjectType.Missing;
+      }
+
       if (value instanceof String) {
         return ObjectType.String;
       } else if (value instanceof Long) {

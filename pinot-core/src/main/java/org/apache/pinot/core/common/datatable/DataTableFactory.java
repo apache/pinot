@@ -35,6 +35,8 @@ public class DataTableFactory {
         return new DataTableImplV2(byteBuffer);
       case DataTableBuilder.VERSION_3:
         return new DataTableImplV3(byteBuffer);
+      case DataTableBuilder.VERSION_4:
+        return new DataTableImplV4(byteBuffer);
       default:
         throw new UnsupportedOperationException("Unsupported data table version: " + version);
     }

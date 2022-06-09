@@ -31,10 +31,12 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableUtils;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -199,6 +201,13 @@ public abstract class BaseDataBlock implements DataTable {
     }
   }
 
+  @Override
+  public int getVersion() {
+    // Keep in sync with version in {@link org.apache.pinot.core.common.datatable.DataTableImplV3} since Null handling
+    // code checks for specific data table version number.
+    return DataTableBuilder.VERSION_3;
+  }
+
   /**
    * Return the int serialized form of the data block version and type.
    * @return
@@ -235,6 +244,11 @@ public abstract class BaseDataBlock implements DataTable {
   @Override
   public int getNumberOfRows() {
     return _numRows;
+  }
+
+  @Override
+  public MutableRoaringBitmap getNullRowIds(int colId) {
+    throw new UnsupportedOperationException("Null bitmaps are not stored in DataTable version 3");
   }
 
   // --------------------------------------------------------------------------
