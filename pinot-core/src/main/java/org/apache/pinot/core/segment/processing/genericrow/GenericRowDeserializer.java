@@ -61,95 +61,8 @@ public class GenericRowDeserializer {
    */
   public void deserialize(long offset, GenericRow buffer) {
     for (int i = 0; i < _numFields; i++) {
-      String fieldName = _fieldNames[i];
-
-      if (_isSingleValueFields[i]) {
-        switch (_storedTypes[i]) {
-          case INT:
-            buffer.putValue(fieldName, _dataBuffer.getInt(offset));
-            offset += Integer.BYTES;
-            break;
-          case LONG:
-            buffer.putValue(fieldName, _dataBuffer.getLong(offset));
-            offset += Long.BYTES;
-            break;
-          case FLOAT:
-            buffer.putValue(fieldName, _dataBuffer.getFloat(offset));
-            offset += Float.BYTES;
-            break;
-          case DOUBLE:
-            buffer.putValue(fieldName, _dataBuffer.getDouble(offset));
-            offset += Double.BYTES;
-            break;
-          case STRING: {
-            int numBytes = _dataBuffer.getInt(offset);
-            offset += Integer.BYTES;
-            byte[] stringBytes = new byte[numBytes];
-            _dataBuffer.copyTo(offset, stringBytes);
-            offset += numBytes;
-            buffer.putValue(fieldName, new String(stringBytes, UTF_8));
-            break;
-          }
-          case BYTES: {
-            int numBytes = _dataBuffer.getInt(offset);
-            offset += Integer.BYTES;
-            byte[] bytes = new byte[numBytes];
-            _dataBuffer.copyTo(offset, bytes);
-            offset += numBytes;
-            buffer.putValue(fieldName, bytes);
-            break;
-          }
-          default:
-            throw new IllegalStateException("Unsupported SV stored type: " + _storedTypes[i]);
-        }
-      } else {
-        int numValues = _dataBuffer.getInt(offset);
-        offset += Integer.BYTES;
-        Object[] multiValue = new Object[numValues];
-
-        switch (_storedTypes[i]) {
-          case INT:
-            for (int j = 0; j < numValues; j++) {
-              multiValue[j] = _dataBuffer.getInt(offset);
-              offset += Integer.BYTES;
-            }
-            break;
-          case LONG:
-            for (int j = 0; j < numValues; j++) {
-              multiValue[j] = _dataBuffer.getLong(offset);
-              offset += Long.BYTES;
-            }
-            break;
-          case FLOAT:
-            for (int j = 0; j < numValues; j++) {
-              multiValue[j] = _dataBuffer.getFloat(offset);
-              offset += Float.BYTES;
-            }
-            break;
-          case DOUBLE:
-            for (int j = 0; j < numValues; j++) {
-              multiValue[j] = _dataBuffer.getDouble(offset);
-              offset += Double.BYTES;
-            }
-            break;
-          case STRING:
-            for (int j = 0; j < numValues; j++) {
-              int numBytes = _dataBuffer.getInt(offset);
-              offset += Integer.BYTES;
-              byte[] stringBytes = new byte[numBytes];
-              _dataBuffer.copyTo(offset, stringBytes);
-              offset += numBytes;
-              multiValue[j] = new String(stringBytes, UTF_8);
-            }
-            break;
-          default:
-            throw new IllegalStateException("Unsupported MV stored type: " + _storedTypes[i]);
-        }
-
-        buffer.putValue(fieldName, multiValue);
-      }
+      offset = deserializeField(_dataBuffer, offset, buffer, i);
     }
-
     // Deserialize null fields if enabled
     if (_includeNullFields) {
       int numNullFields = _dataBuffer.getInt(offset);
@@ -159,6 +72,97 @@ public class GenericRowDeserializer {
         offset += Integer.BYTES;
       }
     }
+  }
+
+  public long deserializeField(PinotDataBuffer dataBuffer, long offset, GenericRow buffer, int fieldIndex) {
+    String fieldName = _fieldNames[fieldIndex];
+
+    if (_isSingleValueFields[fieldIndex]) {
+      switch (_storedTypes[fieldIndex]) {
+        case INT:
+          buffer.putValue(fieldName, dataBuffer.getInt(offset));
+          offset += Integer.BYTES;
+          break;
+        case LONG:
+          buffer.putValue(fieldName, dataBuffer.getLong(offset));
+          offset += Long.BYTES;
+          break;
+        case FLOAT:
+          buffer.putValue(fieldName, dataBuffer.getFloat(offset));
+          offset += Float.BYTES;
+          break;
+        case DOUBLE:
+          buffer.putValue(fieldName, dataBuffer.getDouble(offset));
+          offset += Double.BYTES;
+          break;
+        case STRING: {
+          int numBytes = dataBuffer.getInt(offset);
+          offset += Integer.BYTES;
+          byte[] stringBytes = new byte[numBytes];
+          dataBuffer.copyTo(offset, stringBytes);
+          offset += numBytes;
+          buffer.putValue(fieldName, new String(stringBytes, UTF_8));
+          break;
+        }
+        case BYTES: {
+          int numBytes = dataBuffer.getInt(offset);
+          offset += Integer.BYTES;
+          byte[] bytes = new byte[numBytes];
+          dataBuffer.copyTo(offset, bytes);
+          offset += numBytes;
+          buffer.putValue(fieldName, bytes);
+          break;
+        }
+        default:
+          throw new IllegalStateException("Unsupported SV stored type: " + _storedTypes[fieldIndex]);
+      }
+    } else {
+      int numValues = dataBuffer.getInt(offset);
+      offset += Integer.BYTES;
+      Object[] multiValue = new Object[numValues];
+
+      switch (_storedTypes[fieldIndex]) {
+        case INT:
+          for (int j = 0; j < numValues; j++) {
+            multiValue[j] = dataBuffer.getInt(offset);
+            offset += Integer.BYTES;
+          }
+          break;
+        case LONG:
+          for (int j = 0; j < numValues; j++) {
+            multiValue[j] = dataBuffer.getLong(offset);
+            offset += Long.BYTES;
+          }
+          break;
+        case FLOAT:
+          for (int j = 0; j < numValues; j++) {
+            multiValue[j] = dataBuffer.getFloat(offset);
+            offset += Float.BYTES;
+          }
+          break;
+        case DOUBLE:
+          for (int j = 0; j < numValues; j++) {
+            multiValue[j] = dataBuffer.getDouble(offset);
+            offset += Double.BYTES;
+          }
+          break;
+        case STRING:
+          for (int j = 0; j < numValues; j++) {
+            int numBytes = dataBuffer.getInt(offset);
+            offset += Integer.BYTES;
+            byte[] stringBytes = new byte[numBytes];
+            dataBuffer.copyTo(offset, stringBytes);
+            offset += numBytes;
+            multiValue[j] = new String(stringBytes, UTF_8);
+          }
+          break;
+        default:
+          throw new IllegalStateException("Unsupported MV stored type: " + _storedTypes[fieldIndex]);
+      }
+
+      buffer.putValue(fieldName, multiValue);
+    }
+    return offset;
   }
 
   /**
@@ -312,6 +316,145 @@ public class GenericRowDeserializer {
           default:
             throw new IllegalStateException("Unsupported MV stored type: " + _storedTypes[i]);
         }
+      }
+    }
+    return 0;
+  }
+
+  public int compareField(PinotDataBuffer dataBuffer, long offset1, long offset2, int fieldIndex) {
+    if (_isSingleValueFields[fieldIndex]) {
+      switch (_storedTypes[fieldIndex]) {
+        case INT: {
+          int result = Integer.compare(dataBuffer.getInt(offset1), dataBuffer.getInt(offset2));
+          if (result != 0) {
+            return result;
+          }
+          break;
+        }
+        case LONG: {
+          int result = Long.compare(dataBuffer.getLong(offset1), dataBuffer.getLong(offset2));
+          if (result != 0) {
+            return result;
+          }
+          break;
+        }
+        case FLOAT: {
+          int result = Float.compare(dataBuffer.getFloat(offset1), dataBuffer.getFloat(offset2));
+          if (result != 0) {
+            return result;
+          }
+          break;
+        }
+        case DOUBLE: {
+          int result = Double.compare(dataBuffer.getDouble(offset1), dataBuffer.getDouble(offset2));
+          if (result != 0) {
+            return result;
+          }
+          break;
+        }
+        case STRING: {
+          int numBytes1 = dataBuffer.getInt(offset1);
+          offset1 += Integer.BYTES;
+          byte[] stringBytes1 = new byte[numBytes1];
+          dataBuffer.copyTo(offset1, stringBytes1);
+          int numBytes2 = dataBuffer.getInt(offset2);
+          offset2 += Integer.BYTES;
+          byte[] stringBytes2 = new byte[numBytes2];
+          dataBuffer.copyTo(offset2, stringBytes2);
+          int result = new String(stringBytes1, UTF_8).compareTo(new String(stringBytes2, UTF_8));
+          if (result != 0) {
+            return result;
+          }
+          break;
+        }
+        case BYTES: {
+          int numBytes1 = dataBuffer.getInt(offset1);
+          offset1 += Integer.BYTES;
+          byte[] bytes1 = new byte[numBytes1];
+          dataBuffer.copyTo(offset1, bytes1);
+          int numBytes2 = dataBuffer.getInt(offset2);
+          offset2 += Integer.BYTES;
+          byte[] bytes2 = new byte[numBytes2];
+          dataBuffer.copyTo(offset2, bytes2);
+          int result = ByteArray.compare(bytes1, bytes2);
+          if (result != 0) {
+            return result;
+          }
+          break;
+        }
+        default:
+          throw new IllegalStateException("Unsupported SV stored type: " + _storedTypes[fieldIndex]);
+      }
+    } else {
+      int numValues = dataBuffer.getInt(offset1);
+      int numValues2 = dataBuffer.getInt(offset2);
+      if (numValues != numValues2) {
+        return Integer.compare(numValues, numValues2);
+      }
+      offset1 += Integer.BYTES;
+      offset2 += Integer.BYTES;
+
+      switch (_storedTypes[fieldIndex]) {
+        case INT:
+          for (int j = 0; j < numValues; j++) {
+            int result = Integer.compare(dataBuffer.getInt(offset1), dataBuffer.getInt(offset2));
+            if (result != 0) {
+              return result;
+            }
+            offset1 += Integer.BYTES;
+            offset2 += Integer.BYTES;
+          }
+          break;
+        case LONG:
+          for (int j = 0; j < numValues; j++) {
+            int result = Long.compare(dataBuffer.getLong(offset1), dataBuffer.getLong(offset2));
+            if (result != 0) {
+              return result;
+            }
+            offset1 += Long.BYTES;
+            offset2 += Long.BYTES;
+          }
+          break;
+        case FLOAT:
+          for (int j = 0; j < numValues; j++) {
+            int result = Float.compare(dataBuffer.getFloat(offset1), dataBuffer.getFloat(offset2));
+            if (result != 0) {
+              return result;
+            }
+            offset1 += Float.BYTES;
+            offset2 += Float.BYTES;
+          }
+          break;
+        case DOUBLE:
+          for (int j = 0; j < numValues; j++) {
+            int result = Double.compare(dataBuffer.getDouble(offset1), dataBuffer.getDouble(offset2));
+            if (result != 0) {
+              return result;
+            }
+            offset1 += Double.BYTES;
+            offset2 += Double.BYTES;
+          }
+          break;
+        case STRING:
+          for (int j = 0; j < numValues; j++) {
+            int numBytes1 = dataBuffer.getInt(offset1);
+            offset1 += Integer.BYTES;
+            byte[] stringBytes1 = new byte[numBytes1];
+            dataBuffer.copyTo(offset1, stringBytes1);
+            int numBytes2 = dataBuffer.getInt(offset2);
+            offset2 += Integer.BYTES;
+            byte[] stringBytes2 = new byte[numBytes2];
+            dataBuffer.copyTo(offset2, stringBytes2);
+            int result = new String(stringBytes1, UTF_8).compareTo(new String(stringBytes2, UTF_8));
+            if (result != 0) {
+              return result;
+            }
+            offset1 += numBytes1;
+            offset2 += numBytes2;
+          }
+          break;
+        default:
+          throw new IllegalStateException("Unsupported MV stored type: " + _storedTypes[fieldIndex]);
       }
     }
     return 0;
