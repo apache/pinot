@@ -25,12 +25,14 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
 import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
@@ -63,8 +65,8 @@ public class RealtimeQuickStartWithMinion extends QuickStartBase {
   }
 
   public Map<String, Object> getConfigOverrides() {
-    Map<String, Object> properties = super.getConfigOverrides();
-    properties.putIfAbsent("controller.task.scheduler.enabled", true);
+    Map<String, Object> properties = new HashMap<>(super.getConfigOverrides());
+    properties.putIfAbsent(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     return properties;
   }
 
