@@ -94,7 +94,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected Logger _logger;
   protected HelixManager _helixManager;
   protected AuthProvider _authProvider;
-  protected long _streamSegmentDownloadUntarRateLimit;
+  protected long _streamSegmentDownloadUntarRateLimitBytesPerSec;
   protected boolean _isStreamSegmentDownloadUntar;
 
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related
@@ -134,12 +134,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _resourceTmpDir);
     }
     _errorCache = errorCache;
-    _streamSegmentDownloadUntarRateLimit = tableDataManagerParams.getStreamSegmentDownloadUntarRateLimit();
+    _streamSegmentDownloadUntarRateLimitBytesPerSec =
+        tableDataManagerParams.getStreamSegmentDownloadUntarRateLimitBytesPerSec();
     _isStreamSegmentDownloadUntar = tableDataManagerParams.isStreamSegmentDownloadUntar();
     if (_isStreamSegmentDownloadUntar) {
-      LOGGER.info("Using streamed download-untar for segment download!");
-      LOGGER.info("The rate limit interval for streamed download-untar is {} ms",
-          _streamSegmentDownloadUntarRateLimit);
+      LOGGER.info("Using streamed download-untar for segment download! "
+              + "The rate limit interval for streamed download-untar is {} ms",
+          _streamSegmentDownloadUntarRateLimitBytesPerSec);
     }
     int maxParallelSegmentDownloads = tableDataManagerParams.getMaxParallelSegmentDownloads();
     if (maxParallelSegmentDownloads > 0) {
@@ -423,8 +424,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     FileUtils.forceMkdir(tempRootDir);
     if (_isStreamSegmentDownloadUntar && zkMetadata.getCrypterName() == null) {
       try {
-        File untaredSegDir = downloadAndStreamUntarRateLimit(segmentName, zkMetadata, tempRootDir,
-            _streamSegmentDownloadUntarRateLimit);
+        File untaredSegDir = downloadAndStreamUntarWithRateLimit(segmentName, zkMetadata, tempRootDir,
+            _streamSegmentDownloadUntarRateLimitBytesPerSec);
         return moveSegment(segmentName, untaredSegDir);
       } finally {
         FileUtils.deleteQuietly(tempRootDir);
@@ -483,8 +484,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private File downloadAndStreamUntarRateLimit(String segmentName, SegmentZKMetadata zkMetadata, File tempRootDir,
-      long rateLimit)
+  private File downloadAndStreamUntarWithRateLimit(String segmentName, SegmentZKMetadata zkMetadata, File tempRootDir,
+      long maxDownloadRateInByte)
       throws Exception {
     if (_segmentDownloadSemaphore != null) {
       long startTime = System.currentTimeMillis();
@@ -494,11 +495,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
       LOGGER.info("Acquired segment download semaphore for: {} (lock-time={}ms, queue-length={}).", segmentName,
           System.currentTimeMillis() - startTime, _segmentDownloadSemaphore.getQueueLength());
     }
-    LOGGER.info("Trying to download segment {} using streamed download-untar with rateLimit {}", segmentName,
-        rateLimit);
+    LOGGER.info("Trying to download segment {} using streamed download-untar with maxDownloadRateInByte {}",
+        segmentName, maxDownloadRateInByte);
     String uri = zkMetadata.getDownloadUrl();
     try {
-      File ret = SegmentFetcherFactory.fetchAndStreamUntarToLocal(uri, tempRootDir, rateLimit);
+      File ret = SegmentFetcherFactory.fetchAndStreamUntarToLocal(uri, tempRootDir, maxDownloadRateInByte);
       LOGGER.info("Download and untarred segment: {} for table: {} from: {}", segmentName, _tableNameWithType, uri);
       return ret;
     } catch (AttemptsExceededException e) {

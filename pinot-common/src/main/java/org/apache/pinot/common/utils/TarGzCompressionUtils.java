@@ -31,7 +31,6 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -42,8 +41,6 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -68,7 +65,6 @@ public class TarGzCompressionUtils {
    * It is also sufficient for HDDs
    */
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(TarGzCompressionUtils.class);
 
   private TarGzCompressionUtils() {
   }
@@ -157,7 +153,7 @@ public class TarGzCompressionUtils {
    * RateLimit limits the untar rate
    * <p>For security reason, the untarred files must reside in the output directory.
    */
-  public static List<File> untarWithRateLimiter(InputStream inputStream, File outputDir, long rateLimit)
+  public static List<File> untarWithRateLimiter(InputStream inputStream, File outputDir, long maxDownloadRateInByte)
       throws IOException {
     String outputDirCanonicalPath = outputDir.getCanonicalPath();
     // Prevent partial path traversal
@@ -200,8 +196,8 @@ public class TarGzCompressionUtils {
             throw new IOException(String.format("Failed to create directory: %s", parentFile));
           }
           try (FileOutputStream out = new FileOutputStream(outputFile.toPath().toString())) {
-            if (rateLimit != NO_DISK_WRITE_RATE_LIMIT) {
-              copyWithRateLimiter(tarGzIn, out, rateLimit);
+            if (maxDownloadRateInByte != NO_DISK_WRITE_RATE_LIMIT) {
+              copyWithRateLimiter(tarGzIn, out, maxDownloadRateInByte);
             } else {
               IOUtils.copy(tarGzIn, out);
             }
@@ -239,23 +235,23 @@ public class TarGzCompressionUtils {
     }
   }
 
-  public static long copyWithRateLimiter(InputStream inputStream, FileOutputStream outputStream, long rateLimit)
+  public static long copyWithRateLimiter(InputStream inputStream, FileOutputStream outputStream,
+      long maxDownloadRateInByte)
       throws IOException {
-    Objects.requireNonNull(inputStream, "inputStream is null");
-    Objects.requireNonNull(outputStream, "outputStream is null");
+    Preconditions.checkState(inputStream != null, "inputStream is null");
+    Preconditions.checkState(outputStream != null, "outputStream is null");
     FileDescriptor fd = outputStream.getFD();
-    LOGGER.info("Using rate limiter for stream copy, target limit {} bytes/s", rateLimit);
     byte[] buffer = new byte[DEFAULT_BUFFER_SIZE];
-    RateLimiter rateLimiter = RateLimiter.create(rateLimit);
     long count;
     int n;
 
-    if (rateLimit == SYNC_DISK_WRITE_WITH_UPSTREAM_RATE) {
+    if (maxDownloadRateInByte == SYNC_DISK_WRITE_WITH_UPSTREAM_RATE) {
       for (count = 0L; -1 != (n = inputStream.read(buffer)); count += (long) n) {
         outputStream.write(buffer, 0, n);
         fd.sync(); // flush the buffer timely to the disk so that the disk bandwidth wouldn't get saturated
       }
     } else {
+      RateLimiter rateLimiter = RateLimiter.create(maxDownloadRateInByte);
       for (count = 0L; -1 != (n = inputStream.read(buffer)); count += (long) n) {
         rateLimiter.acquire(n);
         outputStream.write(buffer, 0, n);

@@ -22,37 +22,38 @@ import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 
 
 public class TableDataManagerParams {
-  private boolean _isStreamSegmentDownloadUntar;
-  private long _streamSegmentDownloadUntarRateLimit;
-  private int _maxParallelSegmentDownloads;
+  private boolean _isStreamSegmentDownloadUntar; // whether to turn on stream segment download-untar
+  private long _streamSegmentDownloadUntarRateLimitBytesPerSec; // the per segment rate limit for stream download-untar
+  private int _maxParallelSegmentDownloads; // max number of segment download in parallel per table
 
   public TableDataManagerParams(int maxParallelSegmentDownloads, boolean isStreamSegmentDownloadUntar,
-      long streamSegmentDownloadUntarRateLimit) {
+      long streamSegmentDownloadUntarRateLimitBytesPerSec) {
     _maxParallelSegmentDownloads = maxParallelSegmentDownloads;
     _isStreamSegmentDownloadUntar = isStreamSegmentDownloadUntar;
-    _streamSegmentDownloadUntarRateLimit = streamSegmentDownloadUntarRateLimit;
+    _streamSegmentDownloadUntarRateLimitBytesPerSec = streamSegmentDownloadUntarRateLimitBytesPerSec;
   }
 
   public TableDataManagerParams(InstanceDataManagerConfig instanceDataManagerConfig) {
     _maxParallelSegmentDownloads = instanceDataManagerConfig.getMaxParallelSegmentDownloads();
     _isStreamSegmentDownloadUntar = instanceDataManagerConfig.isStreamSegmentDownloadUntar();
-    _streamSegmentDownloadUntarRateLimit = instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit();
+    _streamSegmentDownloadUntarRateLimitBytesPerSec =
+        instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit();
   }
 
   public boolean isStreamSegmentDownloadUntar() {
     return _isStreamSegmentDownloadUntar;
   }
 
-  public long getStreamSegmentDownloadUntarRateLimit() {
-    return _streamSegmentDownloadUntarRateLimit;
+  public long getStreamSegmentDownloadUntarRateLimitBytesPerSec() {
+    return _streamSegmentDownloadUntarRateLimitBytesPerSec;
   }
 
   public void setStreamSegmentDownloadUntar(boolean streamSegmentDownloadUntar) {
     _isStreamSegmentDownloadUntar = streamSegmentDownloadUntar;
   }
 
-  public void setStreamSegmentDownloadUntarRateLimit(long streamSegmentDownloadUntarRateLimit) {
-    _streamSegmentDownloadUntarRateLimit = streamSegmentDownloadUntarRateLimit;
+  public void setStreamSegmentDownloadUntarRateLimitBytesPerSec(long streamSegmentDownloadUntarRateLimitBytesPerSec) {
+    _streamSegmentDownloadUntarRateLimitBytesPerSec = streamSegmentDownloadUntarRateLimitBytesPerSec;
   }
 
   public int getMaxParallelSegmentDownloads() {
