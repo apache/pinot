@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -118,13 +119,14 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     }
   }
 
+  @Nullable
   @Override
   public String getTier() {
     return _tier;
   }
 
   @Override
-  public void setTier(String tier) {
+  public void setTier(@Nullable String tier) {
     _tier = tier;
   }
 
