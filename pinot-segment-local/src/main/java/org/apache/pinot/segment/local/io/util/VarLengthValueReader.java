@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.io.util;
 
+import com.google.common.base.Preconditions;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -25,6 +26,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * The value reader for var-length values (STRING and BYTES). See {@link VarLengthValueWriter} for the file layout.
+ * TODO: Support file length larger than 2G
  */
 public class VarLengthValueReader implements ValueReader {
   private final PinotDataBuffer _dataBuffer;
@@ -37,6 +39,7 @@ public class VarLengthValueReader implements ValueReader {
   private final int _dataSectionStartOffSet;
 
   public VarLengthValueReader(PinotDataBuffer dataBuffer) {
+    Preconditions.checkArgument(dataBuffer.size() <= Integer.MAX_VALUE, "File size exceeds 2GB");
     _dataBuffer = dataBuffer;
     _numValues = dataBuffer.getInt(VarLengthValueWriter.NUM_VALUES_OFFSET);
     _dataSectionStartOffSet = dataBuffer.getInt(VarLengthValueWriter.DATA_SECTION_OFFSET_POSITION);
@@ -112,6 +115,28 @@ public class VarLengthValueReader implements ValueReader {
     byte[] value = new byte[length];
     _dataBuffer.copyTo(startOffset, value);
     return value;
+  }
+
+  @Override
+  public int compare(int index, int numBytesPerValue, byte[] value, int paddingByte) {
+    return compare(index, numBytesPerValue, value);
+  }
+
+  @Override
+  public int compare(int index, int numBytesPerValue, byte[] value) {
+    int offsetPosition = _dataSectionStartOffSet + Integer.BYTES * index;
+    int startOffset = _dataBuffer.getInt(offsetPosition);
+    int endOffset = _dataBuffer.getInt(offsetPosition + Integer.BYTES);
+    int length = endOffset - startOffset;
+    int compareLength = Math.min(length, value.length);
+    for (int i = 0; i < compareLength; i++) {
+      int i1 = Byte.toUnsignedInt(_dataBuffer.getByte(startOffset + i));
+      int i2 = Byte.toUnsignedInt(value[i]);
+      if (i1 != i2) {
+        return i1 - i2;
+      }
+    }
+    return Integer.compare(length, value.length);
   }
 
   @Override

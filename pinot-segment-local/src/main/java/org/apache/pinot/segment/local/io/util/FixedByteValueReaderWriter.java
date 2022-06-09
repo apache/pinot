@@ -111,6 +111,42 @@ public final class FixedByteValueReaderWriter implements ValueReader {
     return value;
   }
 
+  @Override
+  public int compare(int index, int numBytesPerValue, byte[] value, int paddingByte) {
+    long startOffset = (long) index * numBytesPerValue;
+    int compareLength = Math.min(numBytesPerValue, value.length);
+    for (int i = 0; i < compareLength; i++) {
+      int i1 = Byte.toUnsignedInt(_dataBuffer.getByte(startOffset + i));
+      int i2 = Byte.toUnsignedInt(value[i]);
+      if (i1 != i2) {
+        return i1 - i2;
+      }
+    }
+    if (numBytesPerValue == value.length) {
+      return 0;
+    } else if (numBytesPerValue < value.length) {
+      return -1;
+    } else {
+      // If the given value length is smaller than numBytesPerValue, check if the remaining bytes in the buffer are
+      // paddings
+      return _dataBuffer.getByte(startOffset + compareLength) == paddingByte ? 0 : 1;
+    }
+  }
+
+  @Override
+  public int compare(int index, int numBytesPerValue, byte[] value) {
+    long startOffset = (long) index * numBytesPerValue;
+    int compareLength = Math.min(numBytesPerValue, value.length);
+    for (int i = 0; i < compareLength; i++) {
+      int i1 = Byte.toUnsignedInt(_dataBuffer.getByte(startOffset + i));
+      int i2 = Byte.toUnsignedInt(value[i]);
+      if (i1 != i2) {
+        return i1 - i2;
+      }
+    }
+    return Integer.compare(numBytesPerValue, value.length);
+  }
+
   public void writeInt(int index, int value) {
     _dataBuffer.putInt((long) index * Integer.BYTES, value);
   }

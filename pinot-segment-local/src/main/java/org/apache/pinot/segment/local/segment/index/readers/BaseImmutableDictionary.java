@@ -28,7 +28,6 @@ import org.apache.pinot.segment.local.io.util.ValueReader;
 import org.apache.pinot.segment.local.io.util.VarLengthValueReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.spi.utils.ByteArray;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -219,35 +218,18 @@ public abstract class BaseImmutableDictionary implements Dictionary {
    * TODO: Clean up the segments with legacy non-zero padding byte, and remove the support for non-zero padding byte
    */
   protected int binarySearch(String value) {
-    byte[] buffer = getBuffer();
+    byte[] valueBytes = value.getBytes(UTF_8);
     int low = 0;
     int high = _length - 1;
-    if (_paddingByte == 0) {
-      while (low <= high) {
-        int mid = (low + high) >>> 1;
-        String midValue = _valueReader.getUnpaddedString(mid, _numBytesPerValue, _paddingByte, buffer);
-        int compareResult = midValue.compareTo(value);
-        if (compareResult < 0) {
-          low = mid + 1;
-        } else if (compareResult > 0) {
-          high = mid - 1;
-        } else {
-          return mid;
-        }
-      }
-    } else {
-      String paddedValue = padString(value);
-      while (low <= high) {
-        int mid = (low + high) >>> 1;
-        String midValue = _valueReader.getPaddedString(mid, _numBytesPerValue, buffer);
-        int compareResult = midValue.compareTo(paddedValue);
-        if (compareResult < 0) {
-          low = mid + 1;
-        } else if (compareResult > 0) {
-          high = mid - 1;
-        } else {
-          return mid;
-        }
+    while (low <= high) {
+      int mid = (low + high) >>> 1;
+      int compareResult = _valueReader.compare(mid, _numBytesPerValue, valueBytes, _paddingByte);
+      if (compareResult < 0) {
+        low = mid + 1;
+      } else if (compareResult > 0) {
+        high = mid - 1;
+      } else {
+        return mid;
       }
     }
     return -(low + 1);
@@ -256,11 +238,9 @@ public abstract class BaseImmutableDictionary implements Dictionary {
   protected int binarySearch(byte[] value) {
     int low = 0;
     int high = _length - 1;
-
     while (low <= high) {
       int mid = (low + high) >>> 1;
-      byte[] midValue = _valueReader.getBytes(mid, _numBytesPerValue);
-      int compareResult = ByteArray.compare(midValue, value);
+      int compareResult = _valueReader.compare(mid, _numBytesPerValue, value);
       if (compareResult < 0) {
         low = mid + 1;
       } else if (compareResult > 0) {

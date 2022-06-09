@@ -18,13 +18,24 @@
  */
 package org.apache.pinot.perf;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Random;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.StringOffHeapMutableDictionary;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.StringOnHeapMutableDictionary;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
+import org.apache.pinot.segment.local.segment.index.readers.OnHeapStringDictionary;
+import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
+import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -41,8 +52,6 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -51,6 +60,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @Fork(1)
 @State(Scope.Benchmark)
 public class BenchmarkStringDictionary {
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "BenchmarkStringDictionary");
   private static final int NUM_RECORDS = 1_000_000;
   private static final int CARDINALITY = 200_000;
   private static final Random RANDOM = new Random();
@@ -60,50 +70,58 @@ public class BenchmarkStringDictionary {
 
   private PinotDataBufferMemoryManager _memoryManager;
   private String[] _values;
-  private StringOffHeapMutableDictionary _offHeapDictionary;
-  private StringOnHeapMutableDictionary _onHeapDictionary;
+  private StringDictionary _stringDictionary;
+  private OnHeapStringDictionary _onHeapStringDictionary;
+  private StringOffHeapMutableDictionary _offHeapMutableDictionary;
+  private StringOnHeapMutableDictionary _onHeapMutableDictionary;
 
   @Setup
-  public void setUp() {
+  public void setUp()
+      throws IOException {
+    FileUtils.deleteDirectory(INDEX_DIR);
+    FileUtils.forceMkdir(INDEX_DIR);
     _memoryManager = new DirectMemoryManager("");
-    _offHeapDictionary =
+    _offHeapMutableDictionary =
         new StringOffHeapMutableDictionary(CARDINALITY, CARDINALITY / 10, _memoryManager, null, _maxValueLength / 2);
-    _onHeapDictionary = new StringOnHeapMutableDictionary();
-    String[] uniqueValues = new String[CARDINALITY];
-    for (int i = 0; i < CARDINALITY; i++) {
-      String value = generateRandomString(RANDOM.nextInt(_maxValueLength + 1));
-      uniqueValues[i] = value;
-      _offHeapDictionary.index(value);
-      _onHeapDictionary.index(value);
+    _onHeapMutableDictionary = new StringOnHeapMutableDictionary();
+    TreeSet<String> uniqueValues = new TreeSet<>();
+    while (uniqueValues.size() < CARDINALITY) {
+      String value = RandomStringUtils.randomAscii(RANDOM.nextInt(_maxValueLength + 1));
+      if (uniqueValues.add(value)) {
+        _offHeapMutableDictionary.index(value);
+        _onHeapMutableDictionary.index(value);
+      }
+    }
+    String[] sortedUniqueValues = uniqueValues.toArray(new String[0]);
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(sortedUniqueValues,
+        new DimensionFieldSpec("string", DataType.STRING, true), INDEX_DIR)) {
+      dictionaryCreator.build();
+      PinotDataBuffer dataBuffer =
+          PinotDataBuffer.mapReadOnlyBigEndianFile(new File(INDEX_DIR, "string" + V1Constants.Dict.FILE_EXTENSION));
+      int numBytesPerValue = dictionaryCreator.getNumBytesPerEntry();
+      _stringDictionary = new StringDictionary(dataBuffer, CARDINALITY, numBytesPerValue, (byte) 0);
+      _onHeapStringDictionary = new OnHeapStringDictionary(dataBuffer, CARDINALITY, numBytesPerValue, (byte) 0);
     }
     _values = new String[NUM_RECORDS];
     for (int i = 0; i < NUM_RECORDS; i++) {
-      _values[i] = uniqueValues[RANDOM.nextInt(CARDINALITY)];
+      _values[i] = sortedUniqueValues[RANDOM.nextInt(CARDINALITY)];
     }
   }
 
   @TearDown
   public void tearDown()
       throws Exception {
-    _onHeapDictionary.close();
-    _offHeapDictionary.close();
+    _onHeapMutableDictionary.close();
+    _offHeapMutableDictionary.close();
     _memoryManager.close();
-  }
-
-  // Generates a ascii displayable string of the given length
-  private String generateRandomString(int length) {
-    byte[] bytes = new byte[length];
-    for (int i = 0; i < length; i++) {
-      bytes[i] = (byte) (RANDOM.nextInt(0x7F - 0x20) + 0x20);
-    }
-    return new String(bytes, UTF_8);
+    FileUtils.deleteDirectory(INDEX_DIR);
   }
 
   @Benchmark
-  public int offHeapStringDictionaryRead() {
+  public int stringDictionaryRead() {
     int sum = 0;
     for (String stringValue : _values) {
-      sum += _offHeapDictionary.indexOf(stringValue);
+      sum += _stringDictionary.indexOf(stringValue);
     }
     return sum;
   }
@@ -112,7 +130,25 @@ public class BenchmarkStringDictionary {
   public int onHeapStringDictionaryRead() {
     int sum = 0;
     for (String stringValue : _values) {
-      sum += _onHeapDictionary.indexOf(stringValue);
+      sum += _onHeapStringDictionary.indexOf(stringValue);
+    }
+    return sum;
+  }
+
+  @Benchmark
+  public int offHeapMutableDictionaryRead() {
+    int sum = 0;
+    for (String stringValue : _values) {
+      sum += _offHeapMutableDictionary.indexOf(stringValue);
+    }
+    return sum;
+  }
+
+  @Benchmark
+  public int onHeapMutableDictionaryRead() {
+    int sum = 0;
+    for (String stringValue : _values) {
+      sum += _onHeapMutableDictionary.indexOf(stringValue);
     }
     return sum;
   }
