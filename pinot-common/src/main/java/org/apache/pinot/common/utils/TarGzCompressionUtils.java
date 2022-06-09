@@ -54,7 +54,7 @@ public class TarGzCompressionUtils {
   /* Don't limit write rate to disk. The OS will buffer multiple writes and can write up to several GBs
    * at a time, which saturates disk bandwidth.
    */
-  public static final long SYNC_WRITE_WITH_UPSTREAM_RATE = 0;
+  public static final long SYNC_DISK_WRITE_WITH_UPSTREAM_RATE = 0;
   /* Match the upstream rate, but will do a file sync for each write of DEFAULT_BUFFER_SIZE
    * to flush the buffer to disk. This avoids saturating disk I/O bandwidth.
    */
@@ -201,7 +201,7 @@ public class TarGzCompressionUtils {
           }
           try (FileOutputStream out = new FileOutputStream(outputFile.toPath().toString())) {
             if (rateLimit != NO_DISK_WRITE_RATE_LIMIT) {
-              streamCopyWithRateLimiter(tarGzIn, out, rateLimit);
+              copyWithRateLimiter(tarGzIn, out, rateLimit);
             } else {
               IOUtils.copy(tarGzIn, out);
             }
@@ -239,7 +239,7 @@ public class TarGzCompressionUtils {
     }
   }
 
-  public static long streamCopyWithRateLimiter(InputStream inputStream, FileOutputStream outputStream, long rateLimit)
+  public static long copyWithRateLimiter(InputStream inputStream, FileOutputStream outputStream, long rateLimit)
       throws IOException {
     Objects.requireNonNull(inputStream, "inputStream is null");
     Objects.requireNonNull(outputStream, "outputStream is null");
@@ -250,7 +250,7 @@ public class TarGzCompressionUtils {
     long count;
     int n;
 
-    if (rateLimit == SYNC_WRITE_WITH_UPSTREAM_RATE) {
+    if (rateLimit == SYNC_DISK_WRITE_WITH_UPSTREAM_RATE) {
       for (count = 0L; -1 != (n = inputStream.read(buffer)); count += (long) n) {
         outputStream.write(buffer, 0, n);
         fd.sync(); // flush the buffer timely to the disk so that the disk bandwidth wouldn't get saturated
