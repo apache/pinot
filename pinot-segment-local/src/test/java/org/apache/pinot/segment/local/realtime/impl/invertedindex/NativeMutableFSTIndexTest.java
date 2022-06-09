@@ -28,6 +28,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class NativeMutableFSTIndexTest {
@@ -64,6 +65,10 @@ public class NativeMutableFSTIndexTest {
     nativeQuery = ".*ed";
     resultList = Arrays.asList(6);
     testSelectionResults(nativeQuery, 1, resultList);
+
+    nativeQuery = ".*m.*";
+    resultList = Arrays.asList(6, 7, 8);
+    testSelectionResults(nativeQuery, 3, resultList);
   }
 
   private List<String> getTextData() {
@@ -76,7 +81,7 @@ public class NativeMutableFSTIndexTest {
 
     if (results != null) {
       for (int result : results) {
-        assertEquals(resultMap.contains(result), true);
+        assertTrue(resultMap.contains(result));
       }
     }
   }

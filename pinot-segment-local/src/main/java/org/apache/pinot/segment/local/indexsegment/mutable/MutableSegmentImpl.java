@@ -243,7 +243,6 @@ public class MutableSegmentImpl implements MutableSegment {
     Set<String> noDictionaryColumns = config.getNoDictionaryColumns();
     Set<String> invertedIndexColumns = config.getInvertedIndexColumns();
     Set<String> textIndexColumns = config.getTextIndexColumns();
-    // TODO: Add mutable FST and wire it up
     Set<String> fstIndexColumns = config.getFSTIndexColumns();
     Set<String> jsonIndexColumns = config.getJsonIndexColumns();
     Map<String, H3IndexConfig> h3IndexConfigs = config.getH3IndexConfigs();
@@ -308,15 +307,13 @@ public class MutableSegmentImpl implements MutableSegment {
           invertedIndexColumns.contains(column) ? indexProvider.newInvertedIndex(context.forInvertedIndex()) : null;
 
       MutableTextIndex fstIndex = null;
-      //FST Index
-      if (fstIndexColumns.contains(column)) {
-        if (_fieldConfigList != null) {
-          for (FieldConfig fieldConfig : _fieldConfigList) {
-            if (fieldConfig.getName().equals(column)) {
-              Map<String, String> properties = fieldConfig.getProperties();
-              if (TextIndexUtils.isFstTypeNative(properties)) {
-                fstIndex = new NativeMutableFSTIndex(column);
-              }
+      // FST Index
+      if (_fieldConfigList != null && fstIndexColumns.contains(column)) {
+        for (FieldConfig fieldConfig : _fieldConfigList) {
+          if (fieldConfig.getName().equals(column)) {
+            Map<String, String> properties = fieldConfig.getProperties();
+            if (TextIndexUtils.isFstTypeNative(properties)) {
+              fstIndex = new NativeMutableFSTIndex(column);
             }
           }
         }
@@ -1327,10 +1324,9 @@ public class MutableSegmentImpl implements MutableSegment {
         @Nullable Set<Integer> partitions, NumValuesInfo numValuesInfo, MutableForwardIndex forwardIndex,
         @Nullable MutableDictionary dictionary, @Nullable MutableInvertedIndex invertedIndex,
         @Nullable RangeIndexReader rangeIndex, @Nullable MutableTextIndex textIndex,
-        @Nullable MutableTextIndex fstIndex, @Nullable MutableJsonIndex jsonIndex,
-        @Nullable MutableH3Index h3Index, @Nullable BloomFilterReader bloomFilter,
-        @Nullable MutableNullValueVector nullValueVector, @Nullable String sourceColumn,
-        @Nullable ValueAggregator valueAggregator) {
+        @Nullable MutableTextIndex fstIndex, @Nullable MutableJsonIndex jsonIndex, @Nullable MutableH3Index h3Index,
+        @Nullable BloomFilterReader bloomFilter, @Nullable MutableNullValueVector nullValueVector,
+        @Nullable String sourceColumn, @Nullable ValueAggregator valueAggregator) {
       _fieldSpec = fieldSpec;
       _partitionFunction = partitionFunction;
       _partitions = partitions;

@@ -32,9 +32,9 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public class NativeMutableFSTIndex implements MutableTextIndex {
   private final String _column;
   private final MutableFST _fst;
-  private int _dictId;
   private final ReentrantReadWriteLock.ReadLock _readLock;
   private final ReentrantReadWriteLock.WriteLock _writeLock;
+  private int _dictId;
 
   public NativeMutableFSTIndex(String column) {
     _column = column;
@@ -70,7 +70,7 @@ public class NativeMutableFSTIndex implements MutableTextIndex {
 
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
-    return null;
+    throw new UnsupportedOperationException("getDocIds is not supported for NativeMutableFSTIndex");
   }
 
   @Override
