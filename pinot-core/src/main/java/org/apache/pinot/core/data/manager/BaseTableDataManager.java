@@ -94,8 +94,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected Logger _logger;
   protected HelixManager _helixManager;
   protected AuthProvider _authProvider;
-  protected long _segmentDownloadUntarRateLimit;
-  protected boolean _isSegmentDownloadUntarStreamed;
+  protected long _StreamSegmentDownloadUntarRateLimit;
+  protected boolean _isStreamSegmentDownloadUntar;
 
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related
   // errors as the value.
@@ -134,12 +134,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _resourceTmpDir);
     }
     _errorCache = errorCache;
-    _segmentDownloadUntarRateLimit = tableDataManagerParams.getSegmentDownloadUntarRateLimit();
-    _isSegmentDownloadUntarStreamed = tableDataManagerParams.getSegmentDownloadUntarStreamed();
-    if (_isSegmentDownloadUntarStreamed) {
+    _StreamSegmentDownloadUntarRateLimit = tableDataManagerParams.getStreamSegmentDownloadUntarRateLimit();
+    _isStreamSegmentDownloadUntar = tableDataManagerParams.isStreamSegmentDownloadUntar();
+    if (_isStreamSegmentDownloadUntar) {
       LOGGER.info("Using streamed download-untar for segment download!");
       LOGGER.info("The rate limit interval for streamed download-untar is {} ms",
-          _segmentDownloadUntarRateLimit);
+          _StreamSegmentDownloadUntarRateLimit);
     }
     int maxParallelSegmentDownloads = tableDataManagerParams.getMaxParallelSegmentDownloads();
     if (maxParallelSegmentDownloads > 0) {
@@ -421,10 +421,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
       throws Exception {
     File tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
     FileUtils.forceMkdir(tempRootDir);
-    if (_isSegmentDownloadUntarStreamed && zkMetadata.getCrypterName() == null) {
+    if (_isStreamSegmentDownloadUntar && zkMetadata.getCrypterName() == null) {
       try {
         File untaredSegDir = downloadAndStreamUntarRateLimit(segmentName, zkMetadata, tempRootDir,
-            _segmentDownloadUntarRateLimit);
+            _StreamSegmentDownloadUntarRateLimit);
         return moveSegment(segmentName, untaredSegDir);
       } finally {
         FileUtils.deleteQuietly(tempRootDir);

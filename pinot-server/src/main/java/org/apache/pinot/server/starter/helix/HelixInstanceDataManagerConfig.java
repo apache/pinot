@@ -83,13 +83,14 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Key of server segment download rate limit
   // limit the rate to write download-untar stream to disk, in bytes
   // -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
-  private static final String SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT
-      = "segment.download.untar.rate.limit.bytes.per.sec";
-  private static final long DEFAULT_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT = TarGzCompressionUtils.NO_RATE_LIMIT;
+  private static final String STREAM_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT
+      = "segment.stream.download.untar.rate.limit.bytes.per.sec";
+  private static final long DEFAULT_STREAM_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT
+      = TarGzCompressionUtils.NO_DISK_WRITE_RATE_LIMIT;
 
   // Key of whether to use streamed server segment download-untar
-  private static final String IS_SEGMENT_DOWNLOAD_UNTAR_STREAMED = "segment.download.streamed.untar";
-  private static final boolean DEFAULT_IS_SEGMENT_DOWNLOAD_UNTAR_STREAMED = false;
+  private static final String ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR = "segment.stream.download.untar";
+  private static final boolean DEFAULT_ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR = false;
 
   // Key of whether to enable split commit
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
@@ -245,15 +246,15 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
-  public boolean isSegmentDownloadUntarStreamed() {
-    return _instanceDataManagerConfiguration.getProperty(IS_SEGMENT_DOWNLOAD_UNTAR_STREAMED,
-        DEFAULT_IS_SEGMENT_DOWNLOAD_UNTAR_STREAMED);
+  public boolean isStreamSegmentDownloadUntar() {
+    return _instanceDataManagerConfiguration.getProperty(ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR,
+        DEFAULT_ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR);
   }
 
   @Override
-  public long getSegmentDownloadUntarRateLimit() {
-    return _instanceDataManagerConfiguration.getProperty(SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT,
-        DEFAULT_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT);
+  public long getStreamSegmentDownloadUntarRateLimit() {
+    return _instanceDataManagerConfiguration.getProperty(STREAM_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT,
+        DEFAULT_STREAM_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT);
   }
 
   @Override

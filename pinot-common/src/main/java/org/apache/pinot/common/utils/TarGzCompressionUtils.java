@@ -50,12 +50,12 @@ import org.slf4j.LoggerFactory;
  * Utility class to compress/de-compress tar.gz files.
  */
 public class TarGzCompressionUtils {
-  public static final long NO_RATE_LIMIT = -1;
-  /* Don't limit write speed to disk. The OS will buffer multiple writes to a large IO and can write up to several GBs
+  public static final long NO_DISK_WRITE_RATE_LIMIT = -1;
+  /* Don't limit write rate to disk. The OS will buffer multiple writes and can write up to several GBs
    * at a time, which saturates disk bandwidth.
    */
-  public static final long MATCH_UPSTREAM_RATE = 0;
-  /* Match the upstream rate, but will do a sync operation for each write of DEFAULT_BUFFER_SIZE
+  public static final long SYNC_WRITE_WITH_UPSTREAM_RATE = 0;
+  /* Match the upstream rate, but will do a file sync for each write of DEFAULT_BUFFER_SIZE
    * to flush the buffer to disk. This avoids saturating disk I/O bandwidth.
    */
   private static final int DEFAULT_BUFFER_SIZE = 4 * 1024 * 1024;
@@ -149,7 +149,7 @@ public class TarGzCompressionUtils {
    */
   public static List<File> untar(InputStream inputStream, File outputDir)
       throws IOException {
-    return untarWithRateLimiter(inputStream, outputDir, NO_RATE_LIMIT);
+    return untarWithRateLimiter(inputStream, outputDir, NO_DISK_WRITE_RATE_LIMIT);
   }
 
   /**
@@ -200,7 +200,7 @@ public class TarGzCompressionUtils {
             throw new IOException(String.format("Failed to create directory: %s", parentFile));
           }
           try (FileOutputStream out = new FileOutputStream(outputFile.toPath().toString())) {
-            if (rateLimit != NO_RATE_LIMIT) {
+            if (rateLimit != NO_DISK_WRITE_RATE_LIMIT) {
               streamCopyWithRateLimiter(tarGzIn, out, rateLimit);
             } else {
               IOUtils.copy(tarGzIn, out);
@@ -250,7 +250,7 @@ public class TarGzCompressionUtils {
     long count;
     int n;
 
-    if (rateLimit == MATCH_UPSTREAM_RATE) {
+    if (rateLimit == SYNC_WRITE_WITH_UPSTREAM_RATE) {
       for (count = 0L; -1 != (n = inputStream.read(buffer)); count += (long) n) {
         outputStream.write(buffer, 0, n);
         fd.sync(); // flush the buffer timely to the disk so that the disk bandwidth wouldn't get saturated

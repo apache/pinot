@@ -22,37 +22,37 @@ import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 
 
 public class TableDataManagerParams {
-  private boolean _isSegmentDownloadUntarStreamed;
-  private long _segmentDownloadUntarRateLimit;
+  private boolean _isStreamSegmentDownloadUntar;
+  private long _StreamSegmentDownloadUntarRateLimit;
   private int _maxParallelSegmentDownloads;
 
-  public TableDataManagerParams(int maxParallelSegmentDownloads, boolean isSegmentDownloadUntarStreamed,
-      long segmentDownloadUntarRateLimit) {
+  public TableDataManagerParams(int maxParallelSegmentDownloads, boolean isStreamSegmentDownloadUntar,
+      long streamSegmentDownloadUntarRateLimit) {
     _maxParallelSegmentDownloads = maxParallelSegmentDownloads;
-    _isSegmentDownloadUntarStreamed = isSegmentDownloadUntarStreamed;
-    _segmentDownloadUntarRateLimit = segmentDownloadUntarRateLimit;
+    _isStreamSegmentDownloadUntar = isStreamSegmentDownloadUntar;
+    _StreamSegmentDownloadUntarRateLimit = streamSegmentDownloadUntarRateLimit;
   }
 
   public TableDataManagerParams(InstanceDataManagerConfig instanceDataManagerConfig) {
     _maxParallelSegmentDownloads = instanceDataManagerConfig.getMaxParallelSegmentDownloads();
-    _isSegmentDownloadUntarStreamed = instanceDataManagerConfig.isSegmentDownloadUntarStreamed();
-    _segmentDownloadUntarRateLimit = instanceDataManagerConfig.getSegmentDownloadUntarRateLimit();
+    _isStreamSegmentDownloadUntar = instanceDataManagerConfig.isStreamSegmentDownloadUntar();
+    _StreamSegmentDownloadUntarRateLimit = instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit();
   }
 
-  public boolean getSegmentDownloadUntarStreamed() {
-    return _isSegmentDownloadUntarStreamed;
+  public boolean isStreamSegmentDownloadUntar() {
+    return _isStreamSegmentDownloadUntar;
   }
 
-  public long getSegmentDownloadUntarRateLimit() {
-    return _segmentDownloadUntarRateLimit;
+  public long getStreamSegmentDownloadUntarRateLimit() {
+    return _StreamSegmentDownloadUntarRateLimit;
   }
 
-  public void setSegmentDownloadUntarStreamed(boolean segmentDownloadUntarStreamed) {
-    _isSegmentDownloadUntarStreamed = segmentDownloadUntarStreamed;
+  public void setStreamSegmentDownloadUntar(boolean streamSegmentDownloadUntar) {
+    _isStreamSegmentDownloadUntar = streamSegmentDownloadUntar;
   }
 
-  public void setSegmentDownloadUntarRateLimit(long segmentDownloadUntarRateLimit) {
-    _segmentDownloadUntarRateLimit = segmentDownloadUntarRateLimit;
+  public void setStreamSegmentDownloadUntarRateLimit(long streamSegmentDownloadUntarRateLimit) {
+    _StreamSegmentDownloadUntarRateLimit = streamSegmentDownloadUntarRateLimit;
   }
 
   public int getMaxParallelSegmentDownloads() {

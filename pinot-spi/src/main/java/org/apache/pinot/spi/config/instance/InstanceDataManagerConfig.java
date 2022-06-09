@@ -59,7 +59,7 @@ public interface InstanceDataManagerConfig {
 
   long getErrorCacheSize();
 
-  boolean isSegmentDownloadUntarStreamed();
+  boolean isStreamSegmentDownloadUntar();
 
-  long getSegmentDownloadUntarRateLimit();
+  long getStreamSegmentDownloadUntarRateLimit();
 }

@@ -136,9 +136,9 @@ public class QueryExecutorExceptionsTest {
     when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getMaxParallelSegmentBuilds()).thenReturn(4);
-    when(instanceDataManagerConfig.getSegmentDownloadUntarRateLimit()).thenReturn(-1L);
+    when(instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit()).thenReturn(-1L);
     when(instanceDataManagerConfig.getMaxParallelSegmentDownloads()).thenReturn(-1);
-    when(instanceDataManagerConfig.isSegmentDownloadUntarStreamed()).thenReturn(false);
+    when(instanceDataManagerConfig.isStreamSegmentDownloadUntar()).thenReturn(false);
     TableDataManagerProvider.init(instanceDataManagerConfig);
     @SuppressWarnings("unchecked")
     TableDataManager tableDataManager =
