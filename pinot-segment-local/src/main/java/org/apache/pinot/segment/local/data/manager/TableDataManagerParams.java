@@ -23,20 +23,20 @@ import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 
 public class TableDataManagerParams {
   private boolean _isStreamSegmentDownloadUntar;
-  private long _StreamSegmentDownloadUntarRateLimit;
+  private long _streamSegmentDownloadUntarRateLimit;
   private int _maxParallelSegmentDownloads;
 
   public TableDataManagerParams(int maxParallelSegmentDownloads, boolean isStreamSegmentDownloadUntar,
       long streamSegmentDownloadUntarRateLimit) {
     _maxParallelSegmentDownloads = maxParallelSegmentDownloads;
     _isStreamSegmentDownloadUntar = isStreamSegmentDownloadUntar;
-    _StreamSegmentDownloadUntarRateLimit = streamSegmentDownloadUntarRateLimit;
+    _streamSegmentDownloadUntarRateLimit = streamSegmentDownloadUntarRateLimit;
   }
 
   public TableDataManagerParams(InstanceDataManagerConfig instanceDataManagerConfig) {
     _maxParallelSegmentDownloads = instanceDataManagerConfig.getMaxParallelSegmentDownloads();
     _isStreamSegmentDownloadUntar = instanceDataManagerConfig.isStreamSegmentDownloadUntar();
-    _StreamSegmentDownloadUntarRateLimit = instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit();
+    _streamSegmentDownloadUntarRateLimit = instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit();
   }
 
   public boolean isStreamSegmentDownloadUntar() {
@@ -44,7 +44,7 @@ public class TableDataManagerParams {
   }
 
   public long getStreamSegmentDownloadUntarRateLimit() {
-    return _StreamSegmentDownloadUntarRateLimit;
+    return _streamSegmentDownloadUntarRateLimit;
   }
 
   public void setStreamSegmentDownloadUntar(boolean streamSegmentDownloadUntar) {
@@ -52,7 +52,7 @@ public class TableDataManagerParams {
   }
 
   public void setStreamSegmentDownloadUntarRateLimit(long streamSegmentDownloadUntarRateLimit) {
-    _StreamSegmentDownloadUntarRateLimit = streamSegmentDownloadUntarRateLimit;
+    _streamSegmentDownloadUntarRateLimit = streamSegmentDownloadUntarRateLimit;
   }
 
   public int getMaxParallelSegmentDownloads() {
