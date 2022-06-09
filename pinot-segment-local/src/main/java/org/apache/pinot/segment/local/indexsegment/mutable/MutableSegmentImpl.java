@@ -50,6 +50,7 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import org.apache.pinot.segment.local.realtime.impl.geospatial.MutableH3Index;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableFSTIndex;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableTextIndex;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
@@ -242,7 +243,6 @@ public class MutableSegmentImpl implements MutableSegment {
     Set<String> noDictionaryColumns = config.getNoDictionaryColumns();
     Set<String> invertedIndexColumns = config.getInvertedIndexColumns();
     Set<String> textIndexColumns = config.getTextIndexColumns();
-    // TODO: Add mutable FST and wire it up
     Set<String> fstIndexColumns = config.getFSTIndexColumns();
     Set<String> jsonIndexColumns = config.getJsonIndexColumns();
     Map<String, H3IndexConfig> h3IndexConfigs = config.getH3IndexConfigs();
@@ -306,6 +306,19 @@ public class MutableSegmentImpl implements MutableSegment {
       MutableInvertedIndex invertedIndexReader =
           invertedIndexColumns.contains(column) ? indexProvider.newInvertedIndex(context.forInvertedIndex()) : null;
 
+      MutableTextIndex fstIndex = null;
+      // FST Index
+      if (_fieldConfigList != null && fstIndexColumns.contains(column)) {
+        for (FieldConfig fieldConfig : _fieldConfigList) {
+          if (fieldConfig.getName().equals(column)) {
+            Map<String, String> properties = fieldConfig.getProperties();
+            if (TextIndexUtils.isFstTypeNative(properties)) {
+              fstIndex = new NativeMutableFSTIndex(column);
+            }
+          }
+        }
+      }
+
       // Text index
       MutableTextIndex textIndex;
       if (textIndexColumns.contains(column)) {
@@ -365,7 +378,7 @@ public class MutableSegmentImpl implements MutableSegment {
       // TODO: Support range index and bloom filter for mutable segment
       _indexContainerMap.put(column,
           new IndexContainer(fieldSpec, partitionFunction, partitions, new NumValuesInfo(), forwardIndex, dictionary,
-              invertedIndexReader, null, textIndex, jsonIndex, h3Index, null, nullValueVector, sourceColumn,
+              invertedIndexReader, null, textIndex, fstIndex, jsonIndex, h3Index, null, nullValueVector, sourceColumn,
               valueAggregator));
     }
 
@@ -1293,6 +1306,7 @@ public class MutableSegmentImpl implements MutableSegment {
     final RangeIndexReader _rangeIndex;
     final MutableH3Index _h3Index;
     final MutableTextIndex _textIndex;
+    final MutableTextIndex _fstIndex;
     final MutableJsonIndex _jsonIndex;
     final BloomFilterReader _bloomFilter;
     final MutableNullValueVector _nullValueVector;
@@ -1310,9 +1324,9 @@ public class MutableSegmentImpl implements MutableSegment {
         @Nullable Set<Integer> partitions, NumValuesInfo numValuesInfo, MutableForwardIndex forwardIndex,
         @Nullable MutableDictionary dictionary, @Nullable MutableInvertedIndex invertedIndex,
         @Nullable RangeIndexReader rangeIndex, @Nullable MutableTextIndex textIndex,
-        @Nullable MutableJsonIndex jsonIndex, @Nullable MutableH3Index h3Index, @Nullable BloomFilterReader bloomFilter,
-        @Nullable MutableNullValueVector nullValueVector, @Nullable String sourceColumn,
-        @Nullable ValueAggregator valueAggregator) {
+        @Nullable MutableTextIndex fstIndex, @Nullable MutableJsonIndex jsonIndex, @Nullable MutableH3Index h3Index,
+        @Nullable BloomFilterReader bloomFilter, @Nullable MutableNullValueVector nullValueVector,
+        @Nullable String sourceColumn, @Nullable ValueAggregator valueAggregator) {
       _fieldSpec = fieldSpec;
       _partitionFunction = partitionFunction;
       _partitions = partitions;
@@ -1324,6 +1338,7 @@ public class MutableSegmentImpl implements MutableSegment {
       _h3Index = h3Index;
 
       _textIndex = textIndex;
+      _fstIndex = fstIndex;
       _jsonIndex = jsonIndex;
       _bloomFilter = bloomFilter;
       _nullValueVector = nullValueVector;
@@ -1334,7 +1349,8 @@ public class MutableSegmentImpl implements MutableSegment {
     DataSource toDataSource() {
       return new MutableDataSource(_fieldSpec, _numDocsIndexed, _numValuesInfo._numValues,
           _numValuesInfo._maxNumValuesPerMVEntry, _partitionFunction, _partitions, _minValue, _maxValue, _forwardIndex,
-          _dictionary, _invertedIndex, _rangeIndex, _textIndex, _jsonIndex, _h3Index, _bloomFilter, _nullValueVector);
+          _dictionary, _invertedIndex, _rangeIndex, _textIndex, _fstIndex, _jsonIndex, _h3Index, _bloomFilter,
+          _nullValueVector);
     }
 
     @Override
@@ -1372,6 +1388,13 @@ public class MutableSegmentImpl implements MutableSegment {
           _textIndex.close();
         } catch (Exception e) {
           _logger.error("Caught exception while closing text index for column: {}, continuing with error", column, e);
+        }
+      }
+      if (_fstIndex != null) {
+        try {
+          _fstIndex.close();
+        } catch (Exception e) {
+          _logger.error("Caught exception while closing fst index for column: {}, continuing with error", column, e);
         }
       }
       if (_jsonIndex != null) {
