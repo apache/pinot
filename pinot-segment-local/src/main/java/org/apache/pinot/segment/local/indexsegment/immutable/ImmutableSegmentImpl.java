@@ -117,6 +117,12 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     return _segmentDirectory.getDiskSizeBytes();
   }
 
+  @Nullable
+  @Override
+  public String getTier() {
+    return _segmentDirectory.getTier();
+  }
+
   @Override
   public String getSegmentName() {
     return _segmentMetadata.getName();
