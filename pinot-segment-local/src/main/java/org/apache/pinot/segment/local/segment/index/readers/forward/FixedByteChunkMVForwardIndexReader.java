@@ -30,14 +30,14 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * fixed length data type (INT, LONG, FLOAT, DOUBLE).
  * <p>For data layout, please refer to the documentation for {@link VarByteChunkSVForwardIndexWriter}
  */
-public final class FixedByteChunkMVForwardIndexReader extends BaseChunkSVForwardIndexReader {
+public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIndexReader {
 
   private static final int ROW_OFFSET_SIZE = VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
   private final int _maxChunkSize;
 
-  public FixedByteChunkMVForwardIndexReader(PinotDataBuffer dataBuffer, DataType valueType) {
-    super(dataBuffer, valueType);
+  public FixedByteChunkMVForwardIndexReader(PinotDataBuffer dataBuffer, DataType storedType) {
+    super(dataBuffer, storedType, false);
     _maxChunkSize = _numDocsPerChunk * (ROW_OFFSET_SIZE + _lengthOfLongestEntry);
   }
 

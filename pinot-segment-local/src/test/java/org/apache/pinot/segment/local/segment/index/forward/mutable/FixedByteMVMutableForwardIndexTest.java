@@ -50,15 +50,18 @@ public class FixedByteMVMutableForwardIndexTest {
     Random r = new Random();
     final long seed = r.nextLong();
     try {
-      testIntArray(seed);
-      testWithZeroSize(seed);
+      testIntArray(seed, true);
+      testIntArray(seed, false);
+      testWithZeroSize(seed, true);
+      testWithZeroSize(seed, false);
     } catch (Throwable e) {
       e.printStackTrace();
       Assert.fail("Failed with seed " + seed);
     }
     for (int mvs = 10; mvs < 1000; mvs += 10) {
       try {
-        testIntArrayFixedSize(mvs, seed);
+        testIntArrayFixedSize(mvs, seed, true);
+        testIntArrayFixedSize(mvs, seed, false);
       } catch (Throwable e) {
         e.printStackTrace();
         Assert.fail("Failed with seed " + seed + ", mvs " + mvs);
@@ -66,7 +69,7 @@ public class FixedByteMVMutableForwardIndexTest {
     }
   }
 
-  public void testIntArray(final long seed)
+  public void testIntArray(final long seed, boolean isDictionaryEncoded)
       throws IOException {
     FixedByteMVMutableForwardIndex readerWriter;
     int rows = 1000;
@@ -74,7 +77,7 @@ public class FixedByteMVMutableForwardIndexTest {
     int maxNumberOfMultiValuesPerRow = 2000;
     readerWriter =
         new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 2, rows / 2, columnSizeInBytes, _memoryManager,
-            "IntArray");
+            "IntArray", isDictionaryEncoded, FieldSpec.DataType.INT);
 
     Random r = new Random(seed);
     int[][] data = new int[rows][];
@@ -94,7 +97,7 @@ public class FixedByteMVMutableForwardIndexTest {
     readerWriter.close();
   }
 
-  public void testIntArrayFixedSize(int multiValuesPerRow, long seed)
+  public void testIntArrayFixedSize(int multiValuesPerRow, long seed, boolean isDictionaryEncoded)
       throws IOException {
     FixedByteMVMutableForwardIndex readerWriter;
     int rows = 1000;
@@ -102,7 +105,7 @@ public class FixedByteMVMutableForwardIndexTest {
     // Keep the rowsPerChunk as a multiple of multiValuesPerRow to check the cases when both data and header buffers
     // transition to new ones
     readerWriter = new FixedByteMVMutableForwardIndex(multiValuesPerRow, multiValuesPerRow, multiValuesPerRow * 2,
-        columnSizeInBytes, _memoryManager, "IntArrayFixedSize");
+        columnSizeInBytes, _memoryManager, "IntArrayFixedSize", isDictionaryEncoded, FieldSpec.DataType.INT);
 
     Random r = new Random(seed);
     int[][] data = new int[rows][];
@@ -122,7 +125,7 @@ public class FixedByteMVMutableForwardIndexTest {
     readerWriter.close();
   }
 
-  public void testWithZeroSize(long seed)
+  public void testWithZeroSize(long seed, boolean isDictionaryEncoded)
       throws IOException {
     FixedByteMVMutableForwardIndex readerWriter;
     final int maxNumberOfMultiValuesPerRow = 5;
@@ -131,7 +134,7 @@ public class FixedByteMVMutableForwardIndexTest {
     Random r = new Random(seed);
     readerWriter =
         new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 3, r.nextInt(rows) + 1, columnSizeInBytes,
-            _memoryManager, "ZeroSize");
+            _memoryManager, "ZeroSize", isDictionaryEncoded, FieldSpec.DataType.INT);
 
     int[][] data = new int[rows][];
     for (int i = 0; i < rows; i++) {
@@ -156,12 +159,12 @@ public class FixedByteMVMutableForwardIndexTest {
   }
 
   private FixedByteMVMutableForwardIndex createReaderWriter(FieldSpec.DataType dataType, Random r, int rows,
-      int maxNumberOfMultiValuesPerRow) {
+      int maxNumberOfMultiValuesPerRow, boolean isDictionaryEncoded) {
     final int avgMultiValueCount = r.nextInt(maxNumberOfMultiValuesPerRow) + 1;
     final int rowCountPerChunk = r.nextInt(rows) + 1;
 
     return new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, avgMultiValueCount, rowCountPerChunk,
-        dataType.size(), _memoryManager, "ReaderWriter");
+        dataType.size(), _memoryManager, "ReaderWriter", isDictionaryEncoded, dataType);
   }
 
   private long generateSeed() {
@@ -172,12 +175,18 @@ public class FixedByteMVMutableForwardIndexTest {
   @Test
   public void testLongArray()
       throws IOException {
+    testLongArray(true);
+    testLongArray(false);
+  }
+
+  private void testLongArray(boolean isDictionaryEncoded)
+      throws IOException {
     final long seed = generateSeed();
     Random r = new Random(seed);
     int rows = 1000;
     final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
     FixedByteMVMutableForwardIndex readerWriter =
-        createReaderWriter(FieldSpec.DataType.LONG, r, rows, maxNumberOfMultiValuesPerRow);
+        createReaderWriter(FieldSpec.DataType.LONG, r, rows, maxNumberOfMultiValuesPerRow, isDictionaryEncoded);
 
     long[][] data = new long[rows][];
     for (int i = 0; i < rows; i++) {
@@ -204,12 +213,18 @@ public class FixedByteMVMutableForwardIndexTest {
   @Test
   public void testFloatArray()
       throws IOException {
+    testFloatArray(true);
+    testFloatArray(false);
+  }
+
+  private void testFloatArray(boolean isDictoinaryEncoded)
+      throws IOException {
     final long seed = generateSeed();
     Random r = new Random(seed);
     int rows = 1000;
     final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
     FixedByteMVMutableForwardIndex readerWriter =
-        createReaderWriter(FieldSpec.DataType.FLOAT, r, rows, maxNumberOfMultiValuesPerRow);
+        createReaderWriter(FieldSpec.DataType.FLOAT, r, rows, maxNumberOfMultiValuesPerRow, isDictoinaryEncoded);
 
     float[][] data = new float[rows][];
     for (int i = 0; i < rows; i++) {
@@ -236,12 +251,18 @@ public class FixedByteMVMutableForwardIndexTest {
   @Test
   public void testDoubleArray()
       throws IOException {
+    testDoubleArray(true);
+    testDoubleArray(false);
+  }
+
+  private void testDoubleArray(boolean isDictonaryEncoded)
+      throws IOException {
     final long seed = generateSeed();
     Random r = new Random(seed);
     int rows = 1000;
     final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
     FixedByteMVMutableForwardIndex readerWriter =
-        createReaderWriter(FieldSpec.DataType.DOUBLE, r, rows, maxNumberOfMultiValuesPerRow);
+        createReaderWriter(FieldSpec.DataType.DOUBLE, r, rows, maxNumberOfMultiValuesPerRow, isDictonaryEncoded);
 
     double[][] data = new double[rows][];
     for (int i = 0; i < rows; i++) {

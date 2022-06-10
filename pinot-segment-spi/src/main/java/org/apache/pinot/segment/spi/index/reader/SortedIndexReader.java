@@ -45,7 +45,7 @@ public interface SortedIndexReader<T extends ForwardIndexReaderContext>
   }
 
   @Override
-  default DataType getValueType() {
+  default DataType getStoredType() {
     return DataType.INT;
   }
 }

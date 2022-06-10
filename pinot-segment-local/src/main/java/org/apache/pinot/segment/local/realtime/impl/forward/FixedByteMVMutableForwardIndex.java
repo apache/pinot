@@ -26,6 +26,7 @@ import org.apache.pinot.segment.local.io.writer.impl.FixedByteSingleValueMultiCo
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,6 +115,8 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   private final int _rowCountPerChunk;
   private final PinotDataBufferMemoryManager _memoryManager;
   private final String _context;
+  private final boolean _isDictionaryEncoded;
+  private final FieldSpec.DataType _storedType;
 
   private FixedByteSingleValueMultiColWriter _curHeaderWriter;
   private FixedByteSingleValueMultiColWriter _currentDataWriter;
@@ -122,7 +125,8 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   private int _prevRowLength = 0;  // Number of values in the column for the last row added.
 
   public FixedByteMVMutableForwardIndex(int maxNumberOfMultiValuesPerRow, int avgMultiValueCount, int rowCountPerChunk,
-      int columnSizeInBytes, PinotDataBufferMemoryManager memoryManager, String context) {
+      int columnSizeInBytes, PinotDataBufferMemoryManager memoryManager, String context, boolean isDictionaryEncoded,
+      FieldSpec.DataType storedType) {
     _memoryManager = memoryManager;
     _context = context;
     int initialCapacity = Math.max(maxNumberOfMultiValuesPerRow, rowCountPerChunk * avgMultiValueCount);
@@ -137,6 +141,8 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     _incrementalCapacity = incrementalCapacity;
     addDataBuffer(initialCapacity);
     //init(_rowCountPerChunk, _columnSizeInBytes, _maxNumberOfMultiValuesPerRow, initialCapacity, _incrementalCapacity);
+    _isDictionaryEncoded = isDictionaryEncoded;
+    _storedType = storedType;
   }
 
   private void addHeaderBuffer() {
@@ -206,12 +212,9 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     return newStartIndex;
   }
 
-  /**
-   * TODO: Currently we only support dictionary-encoded forward index on multi-value columns.
-   */
   @Override
   public boolean isDictionaryEncoded() {
-    return true;
+    return _isDictionaryEncoded;
   }
 
   @Override
@@ -220,8 +223,8 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.INT;
+  public DataType getStoredType() {
+    return _storedType;
   }
 
   @Override

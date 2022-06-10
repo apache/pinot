@@ -90,7 +90,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
-  public DataType getValueType() {
+  public DataType getStoredType() {
     return _valueType;
   }
 

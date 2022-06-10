@@ -32,14 +32,14 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * (STRING, BYTES).
  * <p>For data layout, please refer to the documentation for {@link VarByteChunkSVForwardIndexWriter}
  */
-public final class VarByteChunkMVForwardIndexReader extends BaseChunkSVForwardIndexReader {
+public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardIndexReader {
 
   private static final int ROW_OFFSET_SIZE = VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
   private final int _maxChunkSize;
 
-  public VarByteChunkMVForwardIndexReader(PinotDataBuffer dataBuffer, DataType valueType) {
-    super(dataBuffer, valueType);
+  public VarByteChunkMVForwardIndexReader(PinotDataBuffer dataBuffer, DataType storedType) {
+    super(dataBuffer, storedType, false);
     _maxChunkSize = _numDocsPerChunk * (ROW_OFFSET_SIZE + _lengthOfLongestEntry);
   }
 

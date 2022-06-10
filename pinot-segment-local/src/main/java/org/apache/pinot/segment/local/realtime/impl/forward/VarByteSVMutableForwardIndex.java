@@ -58,7 +58,7 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
-  public DataType getValueType() {
+  public DataType getStoredType() {
     return _valueType;
   }
 

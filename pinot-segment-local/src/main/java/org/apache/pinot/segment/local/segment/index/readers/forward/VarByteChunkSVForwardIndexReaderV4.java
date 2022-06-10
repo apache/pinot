@@ -79,7 +79,7 @@ public class VarByteChunkSVForwardIndexReaderV4
   }
 
   @Override
-  public FieldSpec.DataType getValueType() {
+  public FieldSpec.DataType getStoredType() {
     return _valueType;
   }
 
