@@ -28,8 +28,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
@@ -61,6 +59,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.Pairs;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
+import org.apache.pinot.sql.parsers.parser.SqlOptions;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -74,20 +73,6 @@ public class CalciteSqlParser {
 
   public static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(QueryRewriterFactory.getQueryRewriters());
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
-
-  // To Keep the backward compatibility with 'OPTION' Functionality in PQL, which is used to
-  // provide more hints for query processing.
-  //
-  // PQL syntax is: `OPTION (<key> = <value>)`
-  //
-  // Multiple OPTIONs is also supported by:
-  // either
-  //   `OPTION (<k1> = <v1>, <k2> = <v2>, <k3> = <v3>)`
-  // or
-  //   `OPTION (<k1> = <v1>) OPTION (<k2> = <v2>) OPTION (<k3> = <v3>)`
-  // TODO: move to use parser syntax extension: `OPTION` `(` `<key>` = `<value>` [, `<key>` = `<value>`]* `)`
-  private static final Pattern OPTIONS_REGEX_PATTEN =
-      Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
 
   /**
    * Checks for the presence of semicolon in the sql query and modifies the query accordingly
@@ -116,30 +101,51 @@ public class CalciteSqlParser {
     // Remove the terminating semicolon from the query
     sql = removeTerminatingSemicolon(sql);
 
-    // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
-    List<String> options = extractOptionsFromSql(sql);
-    if (!options.isEmpty()) {
-      sql = removeOptionsFromSql(sql);
-    }
-
     try (StringReader inStream = new StringReader(sql)) {
       SqlParserImpl sqlParser = newSqlParser(inStream);
-      return new SqlNodeAndOptions(sqlParser.parseSqlStmtEof(), options);
+      SqlNodeList sqlNodeList = sqlParser.SqlStmtsEof();
+      // Extract OPTION statements from sql.
+      return extractSqlNodeAndOptions(sqlNodeList);
     } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
     }
   }
 
-  public static PinotSqlType extractSqlType(SqlNode sqlNode) {
-    switch (sqlNode.getKind()) {
-      case OTHER_DDL:
-        if (sqlNode instanceof SqlInsertFromFile) {
-          return PinotSqlType.DML;
+  public static SqlNodeAndOptions extractSqlNodeAndOptions(SqlNodeList sqlNodeList) {
+    PinotSqlType sqlType = null;
+    SqlNode statementNode = null;
+    Map<String, String> options = new HashMap<>();
+    for (SqlNode sqlNode : sqlNodeList) {
+      if (sqlNode instanceof SqlInsertFromFile) {
+        // extract insert statement (execution statement)
+        if (sqlType == null) {
+          sqlType = PinotSqlType.DML;
+          statementNode = sqlNode;
+        } else {
+          throw new SqlCompilationException("SqlNode with statement already exist with type: " + sqlType);
         }
-        throw new SqlCompilationException("Unsupported SqlNode type - " + sqlNode.getKind());
-      default:
-        return PinotSqlType.DQL;
+      } else if (sqlNode instanceof SqlOptions) {
+        // extract options, these are non-execution statements
+        for (SqlNode optionDef : ((SqlOptions) sqlNode).getOperandList()) {
+          SqlNodeList optionKeyValue = (SqlNodeList) optionDef;
+          SqlNode key = optionKeyValue.get(0);
+          SqlNode value = optionKeyValue.get(1);
+          options.put(key.toString(), value.toString());
+        }
+      } else {
+        // default extract query statement (execution statement)
+        if (sqlType == null) {
+          sqlType = PinotSqlType.DQL;
+          statementNode = sqlNode;
+        } else {
+          throw new SqlCompilationException("SqlNode with statement already exist with type: " + sqlType);
+        }
+      }
     }
+    if (sqlType == null) {
+      throw new SqlCompilationException("SqlNode with statement not found!");
+    }
+    return new SqlNodeAndOptions(statementNode, sqlType, options);
   }
 
   public static PinotQuery compileToPinotQuery(String sql)
@@ -150,25 +156,21 @@ public class CalciteSqlParser {
     // Remove the terminating semicolon from the query
     sql = removeTerminatingSemicolon(sql);
 
-    // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
-    List<String> options = extractOptionsFromSql(sql);
-    if (!options.isEmpty()) {
-      sql = removeOptionsFromSql(sql);
-    }
-
-    SqlNode sqlNode;
+    SqlNodeAndOptions sqlNodeAndOptions;
     try (StringReader inStream = new StringReader(sql)) {
       SqlParserImpl sqlParser = newSqlParser(inStream);
-      sqlNode = sqlParser.parseSqlStmtEof();
+      SqlNodeList sqlNodeList = sqlParser.SqlStmtsEof();
+       sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
+      // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
     } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
     }
 
     // Compile Sql without OPTION statements.
-    PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNode);
+    PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode());
 
     // Set Option statements to PinotQuery.
-    setOptions(pinotQuery, options);
+    pinotQuery.setQueryOptions(sqlNodeAndOptions.getOptions());
     return pinotQuery;
   }
 
@@ -359,27 +361,6 @@ public class CalciteSqlParser {
     return sqlParser;
   }
 
-  public static Map<String, String> extractOptionsMap(List<String> optionsStatements) {
-    Map<String, String> options = new HashMap<>();
-    for (String optionsStatement : optionsStatements) {
-      for (String option : optionsStatement.split(",")) {
-        final String[] splits = option.split("=");
-        if (splits.length != 2) {
-          throw new SqlCompilationException("OPTION statement requires two parts separated by '='");
-        }
-        options.put(splits[0].trim(), splits[1].trim());
-      }
-    }
-    return options;
-  }
-
-  private static void setOptions(PinotQuery pinotQuery, List<String> optionsStatements) {
-    if (optionsStatements.isEmpty()) {
-      return;
-    }
-    pinotQuery.setQueryOptions(extractOptionsMap(optionsStatements));
-  }
-
   public static PinotQuery compileSqlNodeToPinotQuery(SqlNode sqlNode) {
     PinotQuery pinotQuery = new PinotQuery();
     if (sqlNode instanceof SqlExplain) {
@@ -462,20 +443,6 @@ public class CalciteSqlParser {
     }
     // Validate
     validate(pinotQuery);
-  }
-
-  private static List<String> extractOptionsFromSql(String sql) {
-    List<String> results = new ArrayList<>();
-    Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
-    while (matcher.find()) {
-      results.add(matcher.group(1));
-    }
-    return results;
-  }
-
-  private static String removeOptionsFromSql(String sql) {
-    Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
-    return matcher.replaceAll("");
   }
 
   /**

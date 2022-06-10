@@ -18,16 +18,18 @@
  */
 package org.apache.pinot.sql.parsers;
 
-import java.util.List;
+import java.util.Map;
 import org.apache.calcite.sql.SqlNode;
 
 
 public class SqlNodeAndOptions {
   private final SqlNode _sqlNode;
-  private final List<String> _options;
+  private final PinotSqlType _sqlType;
+  private final Map<String, String> _options;
 
-  public SqlNodeAndOptions(SqlNode sqlNode, List<String> options) {
+  public SqlNodeAndOptions(SqlNode sqlNode, PinotSqlType sqlType, Map<String, String> options) {
     _sqlNode = sqlNode;
+    _sqlType = sqlType;
     _options = options;
   }
 
@@ -35,7 +37,7 @@ public class SqlNodeAndOptions {
     return _sqlNode;
   }
 
-  public List<String> getOptions() {
+  public Map<String, String> getOptions() {
     return _options;
   }
 }

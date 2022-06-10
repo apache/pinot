@@ -73,7 +73,74 @@ SqlInsertFromFile SqlInsertFromFile() :
     }
 }
 
-/* define the rest of the sql into SqlStmtList
+
+/**
+ * Support option key value:
+ *   key = 'value'
+ */
+private void OptionKeyValueDef(List<SqlNode> list) :
+{
+    final SqlNode key;
+    final SqlNode value;
+}
+{
+    (
+        key = SimpleIdentifier()
+    |
+        key = StringLiteral()
+    )
+    <EQ>
+    value = StringLiteral() {
+        list.add(key);
+        list.add(value);
+    }
+}
+
+
+/**
+ * Support option key value parenthesized list.
+ *   (key = 'value' [, key = 'value'])
+ */
+SqlNodeList ParenthesizedOptionKeyValueCommaList() :
+{
+    final Span s;
+    final List<SqlNode> list = new ArrayList<SqlNode>();
+}
+{
+    { s = span(); }
+    <LPAREN>
+    KeyValueOption(list)
+    (
+        <COMMA>
+        KeyValueOption(list)
+    )*
+    <RPAREN>
+    {
+        return new SqlNodeList(list, s.end(this));
+    }
+}
+
+/**
+ * OPTION(key = 'value' [, key = 'value'])
+ */
+SqlOptions SqlOptions() :
+{
+    SqlParserPos pos;
+    SqlNodeList optionList = null;
+}
+{
+    <OPTION> { pos = getPos(); }
+    [
+        optionList = ParenthesizedKeyValueOptionCommaList()
+    ]
+    {
+        return new SqlOptions(pos, optionList);
+    }
+}
+
+
+/**
+ * define the rest of the sql into SqlStmtList
  */
 private void SqlStatementList(SqlNodeList list) :
 {
