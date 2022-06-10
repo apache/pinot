@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
@@ -55,4 +56,12 @@ public interface ImmutableSegment extends IndexSegment {
    * @return Size of the segment in bytes
    */
   long getSegmentSizeBytes();
+
+  /**
+   * Get the storage tier of the immutable segment.
+   *
+   * @return storage tier, null by default.
+   */
+  @Nullable
+  String getTier();
 }
