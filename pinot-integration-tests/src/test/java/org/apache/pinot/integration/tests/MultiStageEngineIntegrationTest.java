@@ -110,7 +110,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
         new Object[]{"SELECT * FROM mytable_OFFLINE", 10, 73},
         new Object[]{"SELECT CarrierDelay, ArrDelay FROM mytable_OFFLINE WHERE CarrierDelay=15 AND ArrDelay>20", 10, 2},
         new Object[]{"SELECT * FROM mytable_OFFLINE AS a JOIN mytable_OFFLINE AS b ON a.AirlineID = b.AirlineID "
-            + " WHERE a.CarrierDelay=15 AND a.ArrDelay>20 AND b.ArrDelay<20", 14, 146}
+            + " WHERE a.CarrierDelay=15 AND a.ArrDelay>20 AND b.ArrDelay<20", 10, 146}
     };
   }
 }

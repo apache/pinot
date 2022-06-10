@@ -175,7 +175,7 @@ public class DataTableSerDeTest {
 
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    // Verify V3 broker can deserialize data table (has data, but has no metadata) send by V2 server
+    // Verify V4 broker can deserialize data table (has data, but has no metadata) send by V3 server
     DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_3);
     DataTableBuilder dataTableBuilderV3WithDataOnly = new DataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilderV3WithDataOnly, columnDataTypes, numColumns);
@@ -188,7 +188,7 @@ public class DataTableSerDeTest {
     verifyDataIsSame(newDataTable, columnDataTypes, numColumns);
     Assert.assertEquals(newDataTable.getMetadata().size(), 0);
 
-    // Verify V4 broker can deserialize data table (has data and metadata) send by V2 server
+    // Verify V4 broker can deserialize data table (has data and metadata) send by V3 server
     for (String key : EXPECTED_METADATA.keySet()) {
       dataTableV3.getMetadata().put(key, EXPECTED_METADATA.get(key));
     }
@@ -200,7 +200,7 @@ public class DataTableSerDeTest {
 
     // Verify V4 broker can deserialize data table (only has metadata) send by V3 server
     DataTableBuilder dataTableBuilderV3WithMetadataDataOnly = new DataTableBuilder(dataSchema);
-    dataTableV3 = dataTableBuilderV3WithMetadataDataOnly.build(); // create a V2 data table
+    dataTableV3 = dataTableBuilderV3WithMetadataDataOnly.build(); // create a V3 data table
     for (String key : EXPECTED_METADATA.keySet()) {
       dataTableV3.getMetadata().put(key, EXPECTED_METADATA.get(key));
     }
@@ -478,7 +478,7 @@ public class DataTableSerDeTest {
 
     ByteBuffer byteBuffer = ByteBuffer.wrap(dataTable.toBytes());
     int version = byteBuffer.getInt();
-    Assert.assertEquals(version, DataTableBuilder.VERSION_4);
+    Assert.assertEquals(version, DataTableBuilder.VERSION_3);
     byteBuffer.getInt(); // numOfRows
     byteBuffer.getInt(); // numOfColumns
     byteBuffer.getInt(); // exceptionsStart

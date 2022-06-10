@@ -82,7 +82,7 @@ public class DataTableBuilder {
   public static final int VERSION_2 = 2;
   public static final int VERSION_3 = 3;
   public static final int VERSION_4 = 4;
-  private static int _version = VERSION_4;
+  private static int _version = VERSION_3;
   private final DataSchema _dataSchema;
   private final int[] _columnOffsets;
   private final int _rowSizeInBytes;
