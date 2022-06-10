@@ -126,11 +126,11 @@ public class CalciteSqlParser {
         }
       } else if (sqlNode instanceof SqlOptions) {
         // extract options, these are non-execution statements
-        for (SqlNode optionDef : ((SqlOptions) sqlNode).getOperandList()) {
-          SqlNodeList optionKeyValue = (SqlNodeList) optionDef;
-          SqlNode key = optionKeyValue.get(0);
-          SqlNode value = optionKeyValue.get(1);
-          options.put(key.toString(), value.toString());
+        List<SqlNode> operandList = ((SqlOptions) sqlNode).getOperandList();
+        for (int i = 0; i < operandList.size(); i += 2) {
+          SqlIdentifier key = (SqlIdentifier) operandList.get(i);
+          SqlLiteral value = (SqlLiteral) operandList.get(i + 1);
+          options.put(key.getSimple(), value.toValue());
         }
       } else {
         // default extract query statement (execution statement)
@@ -160,7 +160,7 @@ public class CalciteSqlParser {
     try (StringReader inStream = new StringReader(sql)) {
       SqlParserImpl sqlParser = newSqlParser(inStream);
       SqlNodeList sqlNodeList = sqlParser.SqlStmtsEof();
-       sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
+      sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
       // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
     } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
@@ -170,7 +170,10 @@ public class CalciteSqlParser {
     PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode());
 
     // Set Option statements to PinotQuery.
-    pinotQuery.setQueryOptions(sqlNodeAndOptions.getOptions());
+    Map<String, String> options = sqlNodeAndOptions.getOptions();
+    if (!options.isEmpty()) {
+      pinotQuery.setQueryOptions(options);
+    }
     return pinotQuery;
   }
 

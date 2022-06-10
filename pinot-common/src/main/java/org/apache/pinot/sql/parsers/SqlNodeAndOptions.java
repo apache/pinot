@@ -40,4 +40,8 @@ public class SqlNodeAndOptions {
   public Map<String, String> getOptions() {
     return _options;
   }
+
+  public PinotSqlType getSqlType() {
+    return _sqlType;
+  }
 }

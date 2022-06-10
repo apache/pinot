@@ -86,7 +86,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
   public void testGrpcQueryServer()
       throws Exception {
     GrpcQueryClient queryClient = getGrpcQueryClient();
-    String sql = "SELECT * FROM mytable_OFFLINE LIMIT 1000000 OPTION(timeoutMs=30000)";
+    String sql = "SELECT * FROM mytable_OFFLINE LIMIT 1000000; OPTION(timeoutMs=30000);";
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(sql);
     List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", false);
 
