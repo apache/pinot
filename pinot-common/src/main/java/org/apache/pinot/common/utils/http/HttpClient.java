@@ -59,6 +59,7 @@ import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpErrorInfo;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -391,6 +392,43 @@ public class HttpClient implements AutoCloseable {
       }
 
       return statusCode;
+    }
+  }
+
+  /**
+   * Download and untar in a streamed manner a file using default settings, with an optional auth token
+   *
+   * @param uri URI
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @param dest File destination
+   * @param authProvider auth provider
+   * @param httpHeaders http headers
+   * @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
+   *                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
+   * @return The untarred directory
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public File downloadUntarFileStreamed(URI uri, int socketTimeoutMs, File dest, AuthProvider authProvider,
+      List<Header> httpHeaders, long maxStreamRateInByte)
+      throws IOException, HttpErrorStatusException {
+    HttpUriRequest request = getDownloadFileRequest(uri, socketTimeoutMs, authProvider, httpHeaders);
+    File ret;
+    try (CloseableHttpResponse response = _httpClient.execute(request)) {
+      StatusLine statusLine = response.getStatusLine();
+      int statusCode = statusLine.getStatusCode();
+      if (statusCode >= 300) {
+        throw new HttpErrorStatusException(HttpClient.getErrorMessage(request, response), statusCode);
+      }
+
+      try (InputStream inputStream = response.getEntity().getContent()) {
+        ret = TarGzCompressionUtils.untarWithRateLimiter(inputStream, dest, maxStreamRateInByte).get(0);
+      }
+
+      LOGGER.info("Downloaded from: {} to: {} with rate limiter; Response status code: {}", uri, dest,
+              statusCode);
+
+      return ret;
     }
   }
 
