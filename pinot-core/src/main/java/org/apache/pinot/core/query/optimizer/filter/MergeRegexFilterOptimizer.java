@@ -31,8 +31,10 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.FilterKind;
 
@@ -43,6 +45,7 @@ import org.apache.pinot.sql.FilterKind;
  *   <li>regexp_like(col1, "r1") or regexp_like(col1, "r2") is merged into regexp_like(col1, "(?:r1)|(?:r2)")</li>
  *   <li>regexp_like(col1, "r1") and regexp_like(col1, "r2") is merged into regexp_like(col1, "(?=r1)(?=r2)")</li>
  *   <li>not regexp_like(col1, "r1") is merged into regexp_like(col1, "(?!r1)")</li>
+ *   <li>col LIKE expr is translated to regexp_like(col1, r1), where r1 is likeToRegexpLike(expr)</li>
  * </ul>
  *
  * This optimization breaks the semantic in some advanced regex. For example, when they use backreferences. Therefore,
@@ -63,7 +66,7 @@ public class MergeRegexFilterOptimizer implements FilterOptimizer {
       @Nullable Map<String, String> queryOptions) {
     boolean fuseRegex = queryOptions != null && Boolean.parseBoolean(
         queryOptions.get(CommonConstants.Query.Request.Optimization.FUSE_REGEX));
-    if (schema == null || filterExpression.getType() != ExpressionType.FUNCTION || !fuseRegex) {
+    if (filterExpression.getType() != ExpressionType.FUNCTION || !fuseRegex) {
       return filterExpression;
     }
     return optimize(filterExpression);
@@ -91,10 +94,32 @@ public class MergeRegexFilterOptimizer implements FilterOptimizer {
       case NOT: {
         return optimizeNot(filterExpression);
       }
+      case LIKE: {
+        return translateLike(filterExpression);
+      }
       default: {
         return filterExpression;
       }
     }
+  }
+
+  private Expression translateLike(Expression filterExpression) {
+    Expression newExpr = RequestUtils.getFunctionExpression(FilterKind.REGEXP_LIKE.name());
+    ArrayList<Expression> operands = new ArrayList<>(2);
+    operands.add(filterExpression.getFunctionCall().getOperands().get(0));
+
+    Expression predicateExpr = filterExpression.getFunctionCall().getOperands().get(1);
+
+    if (predicateExpr.getType() != ExpressionType.LITERAL) {
+      throw new BadQueryRequestException(
+          "Pinot does not support column or function on the right-hand side of the predicate");
+    }
+    String predicateStr = predicateExpr.getLiteral().getFieldValue().toString();
+    operands.add(RequestUtils.getLiteralExpression(RegexpPatternConverterUtils.likeToRegexpLike(predicateStr)));
+
+    newExpr.getFunctionCall().setOperands(operands);
+
+    return newExpr;
   }
 
   private Expression optimizeOr(Expression filterExpression) {

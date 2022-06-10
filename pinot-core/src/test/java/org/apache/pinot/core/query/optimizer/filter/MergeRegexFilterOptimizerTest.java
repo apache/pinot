@@ -60,6 +60,11 @@ public class MergeRegexFilterOptimizerTest {
   }
 
   @Test
+  public void notWithLike() {
+    assertOptimizedTo("not col1 LIKE 'r1'", "REGEXP_LIKE(col1, '(?!^r1$)')");
+  }
+
+  @Test
   public void notWithAnd() {
     assertOptimizedTo("not (REGEXP_LIKE(col1, 'r1') and REGEXP_LIKE(col1, 'r2'))",
         "REGEXP_LIKE(col1, '(?!(?=r1)(?=r2))')");
@@ -133,6 +138,12 @@ public class MergeRegexFilterOptimizerTest {
         "REGEXP_LIKE(col1, '(?=r1)(?=(?!r2))')");
     assertOptimizedTo("not REGEXP_LIKE(col1, 'r2') and REGEXP_LIKE(col1, 'r1')",
         "REGEXP_LIKE(col1, '(?=(?!r2))(?=r1)')");
+  }
+
+  @Test
+  public void andWithLike() {
+    assertOptimizedTo("col1 LIKE 'r1' and REGEXP_LIKE(col1, 'r2')", "REGEXP_LIKE(col1, '(?=^r1$)(?=r2)')");
+    assertOptimizedTo("REGEXP_LIKE(col1, 'r2') and col1 LIKE 'r1'", "REGEXP_LIKE(col1, '(?=r2)(?=^r1$)')");
   }
 
   @Test
@@ -215,6 +226,12 @@ public class MergeRegexFilterOptimizerTest {
   }
 
   @Test
+  public void orWithLike() {
+    assertOptimizedTo("col1 LIKE 'r1' or REGEXP_LIKE(col1, 'r2')", "REGEXP_LIKE(col1, '(?:^r1$)|(?:r2)')");
+    assertOptimizedTo("REGEXP_LIKE(col1, 'r2') or col1 LIKE 'r1'", "REGEXP_LIKE(col1, '(?:r2)|(?:^r1$)')");
+  }
+
+  @Test
   public void orWithAnd() {
     assertOptimizedTo("REGEXP_LIKE(col1, 'r1') or (REGEXP_LIKE(col1, 'r2') and REGEXP_LIKE(col1, 'r3'))",
         "REGEXP_LIKE(col1, '(?:r1)|(?:(?=r2)(?=r3))')");
@@ -227,7 +244,6 @@ public class MergeRegexFilterOptimizerTest {
     assertOptimizedTo("REGEXP_LIKE(col1, 'r1') or REGEXP_LIKE(col1, 'r2') or REGEXP_LIKE(col1, 'r3')",
         "REGEXP_LIKE(col1, '(?:r1)|(?:r2)|(?:r3)')");
   }
-
 
   private static void assertNotOptimized(String unoptimized) {
     assertOptimizedTo(unoptimized, unoptimized);
