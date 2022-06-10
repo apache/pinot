@@ -102,6 +102,11 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
     });
   }
 
+  public File fetchUntarSegmentToLocalStreamed(URI uri, File dest, long rateLimit)
+      throws Exception {
+    throw new UnsupportedOperationException();
+  }
+
   /**
    * Fetches a segment from URI location to local without retry. Sub-class should override this or
    * {@link #fetchSegmentToLocal(URI, File)}.
