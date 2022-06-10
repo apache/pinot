@@ -176,6 +176,7 @@ public class DataTableSerDeTest {
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
     // Verify V4 broker can deserialize data table (has data, but has no metadata) send by V3 server
+    ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
     DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_3);
     DataTableBuilder dataTableBuilderV3WithDataOnly = new DataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilderV3WithDataOnly, columnDataTypes, numColumns);
@@ -305,6 +306,7 @@ public class DataTableSerDeTest {
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
     // Verify V3 broker can deserialize data table (has data, but has no metadata) send by V2 server
+    ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
     DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_2);
     DataTableBuilder dataTableBuilderV2WithDataOnly = new DataTableBuilder(dataSchema);
     fillDataTableWithRandomData(dataTableBuilderV2WithDataOnly, columnDataTypes, numColumns);
