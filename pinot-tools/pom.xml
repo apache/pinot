@@ -177,6 +177,10 @@
           <groupId>io.netty</groupId>
           <artifactId>netty-codec</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.dataformat</groupId>
+          <artifactId>jackson-dataformat-cbor</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
