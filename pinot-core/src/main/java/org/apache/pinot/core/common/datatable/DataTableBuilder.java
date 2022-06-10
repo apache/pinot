@@ -81,7 +81,8 @@ import org.apache.pinot.spi.utils.ByteArray;
 public class DataTableBuilder {
   public static final int VERSION_2 = 2;
   public static final int VERSION_3 = 3;
-  private static int _version = VERSION_3;
+  public static final int VERSION_4 = 4;
+  private static int _version = VERSION_4;
   private final DataSchema _dataSchema;
   private final int[] _columnOffsets;
   private final int _rowSizeInBytes;
@@ -98,15 +99,24 @@ public class DataTableBuilder {
   public DataTableBuilder(DataSchema dataSchema) {
     _dataSchema = dataSchema;
     _columnOffsets = new int[dataSchema.size()];
-    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets);
+    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets, _version);
   }
 
   public static DataTable getEmptyDataTable() {
-    return _version == VERSION_2 ? new DataTableImplV2() : new DataTableImplV3();
+    switch (_version) {
+      case VERSION_2:
+        return new DataTableImplV2();
+      case VERSION_3:
+        return new DataTableImplV3();
+      case VERSION_4:
+        return new DataTableImplV4();
+      default:
+        throw new IllegalStateException("Unexpected value: " + _version);
+    }
   }
 
   public static void setCurrentDataTableVersion(int version) {
-    if (version != VERSION_2 && version != VERSION_3) {
+    if (version != VERSION_2 && version != VERSION_3 && version != VERSION_4) {
       throw new IllegalArgumentException("Unsupported version: " + version);
     }
     _version = version;
@@ -191,19 +201,16 @@ public class DataTableBuilder {
 
   public void setColumn(int colId, ByteArray value)
       throws IOException {
-    // NOTE: Use String to store bytes value in DataTable V2 for backward-compatibility
-    setColumn(colId, value.toHexString());
-
-    /*
-    TODO: Store bytes as variable size data instead of String. Make the change for the next version data table for
-          backward-compatibility
-
-    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
-    byte[] bytes = value.getBytes();
-    _currentRowDataByteBuffer.putInt(bytes.length);
-    _variableSizeDataByteArrayOutputStream.write(bytes);
-     */
+    if (_version >= 4) {
+      _currentRowDataByteBuffer.position(_columnOffsets[colId]);
+      _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+      byte[] bytes = value.getBytes();
+      _currentRowDataByteBuffer.putInt(bytes.length);
+      _variableSizeDataByteArrayOutputStream.write(bytes);
+    } else {
+      // NOTE: Use String to store bytes value in DataTable V2 for backward-compatibility
+      setColumn(colId, value.toHexString());
+    }
   }
 
   public void setColumn(int colId, Object value)
@@ -288,9 +295,18 @@ public class DataTableBuilder {
   }
 
   public DataTable build() {
-    return _version == VERSION_2 ? new DataTableImplV2(_numRows, _dataSchema, _reverseDictionaryMap,
-        _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray())
-        : new DataTableImplV3(_numRows, _dataSchema, _reverseDictionaryMap,
+    switch (_version) {
+      case VERSION_2:
+        return new DataTableImplV2(_numRows, _dataSchema, _reverseDictionaryMap,
             _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
+      case VERSION_3:
+        return new DataTableImplV3(_numRows, _dataSchema, _reverseDictionaryMap,
+            _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
+      case VERSION_4:
+        return new DataTableImplV4(_numRows, _dataSchema, _reverseDictionaryMap,
+            _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
+      default:
+        throw new IllegalStateException("Unexpected value: " + _version);
+    }
   }
 }

@@ -128,7 +128,7 @@ public class DataTableImplV3 extends BaseDataTable {
       byteBuffer.position(dataSchemaStart);
       _dataSchema = DataSchema.fromBytes(byteBuffer);
       _columnOffsets = new int[_dataSchema.size()];
-      _rowSizeInBytes = DataTableUtils.computeColumnOffsets(_dataSchema, _columnOffsets);
+      _rowSizeInBytes = DataTableUtils.computeColumnOffsets(_dataSchema, _columnOffsets, getVersion());
     } else {
       _dataSchema = null;
       _columnOffsets = null;
@@ -162,6 +162,11 @@ public class DataTableImplV3 extends BaseDataTable {
     if (metadataLength != 0) {
       _metadata = deserializeMetadata(byteBuffer);
     }
+  }
+
+  @Override
+  public int getVersion() {
+    return DataTableBuilder.VERSION_3;
   }
 
   @Override

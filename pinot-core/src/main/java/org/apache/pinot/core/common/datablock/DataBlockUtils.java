@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.blocks;
+package org.apache.pinot.core.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -37,11 +37,6 @@ public final class DataBlockUtils {
   static {
     EOS_DATA_BLOCK._metadata.put(DataTable.MetadataKey.TABLE.getName(), "END_OF_STREAM");
   }
-  private static final TransferableBlock EOS_TRANSFERABLE_BLOCK = new TransferableBlock(EOS_DATA_BLOCK);
-
-  public static TransferableBlock getEndOfStreamTransferableBlock() {
-    return EOS_TRANSFERABLE_BLOCK;
-  }
 
   public static MetadataBlock getEndOfStreamDataBlock() {
     return EOS_DATA_BLOCK;
@@ -58,22 +53,8 @@ public final class DataBlockUtils {
     return errorBlock;
   }
 
-  public static TransferableBlock getErrorTransferableBlock(Exception e) {
-    return new TransferableBlock(getErrorDataBlock(e));
-  }
-
   public static MetadataBlock getEmptyDataBlock(DataSchema dataSchema) {
     return dataSchema == null ? EOS_DATA_BLOCK : new MetadataBlock(dataSchema);
-  }
-
-  public static TransferableBlock getEmptyTransferableBlock(DataSchema dataSchema) {
-    return new TransferableBlock(getEmptyDataBlock(dataSchema));
-  }
-
-  public static boolean isEndOfStream(TransferableBlock transferableBlock) {
-    return transferableBlock.getType().equals(BaseDataBlock.Type.METADATA)
-        && "END_OF_STREAM".equals(transferableBlock.getDataBlock().getMetadata()
-            .get(DataTable.MetadataKey.TABLE.getName()));
   }
 
   public static BaseDataBlock getDataBlock(ByteBuffer byteBuffer)

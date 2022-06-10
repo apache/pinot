@@ -36,8 +36,8 @@ import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
 import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.runtime.blocks.DataBlockUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -88,7 +88,7 @@ public class WorkerQueryExecutor {
       @Override
       public void runJob() {
         ThreadTimer executionThreadTimer = new ThreadTimer();
-        while (!DataBlockUtils.isEndOfStream(rootOperator.nextBlock())) {
+        while (!TransferableBlockUtils.isEndOfStream(rootOperator.nextBlock())) {
           LOGGER.debug("Result Block acquired");
         }
         LOGGER.info("Execution time:" + executionThreadTimer.getThreadTimeNs());

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.blocks;
+package org.apache.pinot.core.common.datablock;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;

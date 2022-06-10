@@ -24,6 +24,9 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.datablock.BaseDataBlock;
+import org.apache.pinot.core.common.datablock.ColumnarDataBlock;
+import org.apache.pinot.core.common.datablock.RowDataBlock;
 
 
 /**

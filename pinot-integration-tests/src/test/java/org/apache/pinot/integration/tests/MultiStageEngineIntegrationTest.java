@@ -88,6 +88,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
   @Override
   protected void overrideServerConf(PinotConfiguration serverConf) {
     serverConf.setProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, true);
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, 4);
     serverConf.setProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, 8842);
     serverConf.setProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, 8422);
   }
@@ -109,7 +110,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
         new Object[]{"SELECT * FROM mytable_OFFLINE", 10, 73},
         new Object[]{"SELECT CarrierDelay, ArrDelay FROM mytable_OFFLINE WHERE CarrierDelay=15 AND ArrDelay>20", 10, 2},
         new Object[]{"SELECT * FROM mytable_OFFLINE AS a JOIN mytable_OFFLINE AS b ON a.AirlineID = b.AirlineID "
-            + " WHERE a.CarrierDelay=15 AND a.ArrDelay>20 AND b.ArrDelay<20", 10, 146}
+            + " WHERE a.CarrierDelay=15 AND a.ArrDelay>20 AND b.ArrDelay<20", 14, 146}
     };
   }
 }

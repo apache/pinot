@@ -16,30 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.blocks;
+package org.apache.pinot.core.common.datablock;
 
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datatable.DataTableImplV3;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
-import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class DataBlockTest {
   private static final List<DataSchema.ColumnDataType> EXCLUDE_DATA_TYPES = ImmutableList.of(
-      DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.FLOAT, DataSchema.ColumnDataType.BYTES,
-      DataSchema.ColumnDataType.BYTES_ARRAY);
+      DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.BYTES_ARRAY);
   private static final int TEST_ROW_COUNT = 5;
 
   @Test
@@ -65,13 +60,12 @@ public class DataBlockTest {
 
   /**
    * This test is only here to ensure that {@link org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl}
-   * producing {@link DataTableImplV3} can actually be wrapped and sent via mailbox in the {@link RowDataBlock} format.
+   * producing data table can actually be wrapped and sent via mailbox in the {@link RowDataBlock} format.
    *
-   * @see org.apache.pinot.query.runtime.QueryRunner#processQuery(DistributedStagePlan, ExecutorService, Map)
    * @throws Exception
    */
   @Test
-  public void testRowDataBlockCompatibleWithDataTableV3()
+  public void testRowDataBlockCompatibleWithDataTableV4()
       throws Exception {
     DataSchema.ColumnDataType[] allDataTypes = DataSchema.ColumnDataType.values();
     List<DataSchema.ColumnDataType> columnDataTypes = new ArrayList<DataSchema.ColumnDataType>();

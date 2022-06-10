@@ -16,34 +16,39 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.core.common.datatable;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import org.apache.pinot.common.utils.DataTable;
+import java.util.Map;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.datablock.RowDataBlock;
+import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
-public class DataTableFactory {
-  private DataTableFactory() {
+/**
+ * Datatable V4 Implementation is a wrapper around the Row-based data block.
+ */
+@InterfaceStability.Evolving
+public class DataTableImplV4 extends RowDataBlock {
+
+  public DataTableImplV4() {
+    super();
   }
 
-  public static DataTable getDataTable(ByteBuffer byteBuffer)
+  public DataTableImplV4(ByteBuffer byteBuffer)
       throws IOException {
-    int version = byteBuffer.getInt();
-    switch (version) {
-      case DataTableBuilder.VERSION_2:
-        return new DataTableImplV2(byteBuffer);
-      case DataTableBuilder.VERSION_3:
-        return new DataTableImplV3(byteBuffer);
-      case DataTableBuilder.VERSION_4:
-        return new DataTableImplV4(byteBuffer);
-      default:
-        throw new UnsupportedOperationException("Unsupported data table version: " + version);
-    }
+    super(byteBuffer);
   }
 
-  public static DataTable getDataTable(byte[] bytes)
-      throws IOException {
-    return getDataTable(ByteBuffer.wrap(bytes));
+  public DataTableImplV4(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
+      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
+    super(numRows, dataSchema, dictionaryMap, fixedSizeDataBytes, variableSizeDataBytes);
+  }
+
+  @Override
+  protected int getDataBlockVersionType() {
+    return DataTableBuilder.VERSION_4;
   }
 }

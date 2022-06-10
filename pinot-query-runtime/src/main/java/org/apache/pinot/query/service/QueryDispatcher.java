@@ -29,14 +29,14 @@ import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.runtime.blocks.BaseDataBlock;
-import org.apache.pinot.query.runtime.blocks.DataBlockUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
@@ -117,7 +117,7 @@ public class QueryDispatcher {
     TransferableBlock transferableBlock;
     while (true) {
       transferableBlock = mailboxReceiveOperator.nextBlock();
-      if (DataBlockUtils.isEndOfStream(transferableBlock)) {
+      if (TransferableBlockUtils.isEndOfStream(transferableBlock)) {
         break;
       }
       if (transferableBlock.getDataBlock() != null) {
