@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.distinct;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -106,12 +105,13 @@ public class DistinctExecutorFactory {
       }
     } else {
       // Multiple columns
+      boolean hasMVExpression = false;
       List<DataType> dataTypes = new ArrayList<>(numExpressions);
       for (ExpressionContext expression : expressions) {
         TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(expression);
-        // TODO: Support MV expression
-        Preconditions.checkArgument(expressionMetadata.isSingleValue(),
-            "DISTINCT cannot be applied to multiple expressions with MV expression: %s", expression);
+        if (!expressionMetadata.isSingleValue()) {
+          hasMVExpression = true;
+        }
         dataTypes.add(expressionMetadata.getDataType());
       }
       List<Dictionary> dictionaries = new ArrayList<>(numExpressions);
@@ -127,10 +127,11 @@ public class DistinctExecutorFactory {
       }
       if (dictionaryBased) {
         // Dictionary based
-        return new DictionaryBasedMultiColumnDistinctOnlyExecutor(expressions, dictionaries, dataTypes, limit);
+        return new DictionaryBasedMultiColumnDistinctOnlyExecutor(expressions, hasMVExpression, dictionaries, dataTypes,
+            limit);
       } else {
         // Raw value based
-        return new RawMultiColumnDistinctExecutor(expressions, dataTypes, null, limit);
+        return new RawMultiColumnDistinctExecutor(expressions, hasMVExpression, dataTypes, null, limit);
       }
     }
   }
@@ -174,12 +175,13 @@ public class DistinctExecutorFactory {
       }
     } else {
       // Multiple columns
+      boolean hasMVExpression = false;
       List<DataType> dataTypes = new ArrayList<>(numExpressions);
       for (ExpressionContext expression : expressions) {
         TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(expression);
-        // TODO: Support MV expression
-        Preconditions.checkArgument(expressionMetadata.isSingleValue(),
-            "DISTINCT cannot be applied to multiple expressions with MV expression: %s", expression);
+        if (!expressionMetadata.isSingleValue()) {
+          hasMVExpression = true;
+        }
         dataTypes.add(expressionMetadata.getDataType());
       }
       List<Dictionary> dictionaries = new ArrayList<>(numExpressions);
@@ -196,11 +198,11 @@ public class DistinctExecutorFactory {
       }
       if (dictionaryBased) {
         // Dictionary based
-        return new DictionaryBasedMultiColumnDistinctOrderByExecutor(expressions, dictionaries, dataTypes,
-            orderByExpressions, limit);
+        return new DictionaryBasedMultiColumnDistinctOrderByExecutor(expressions, hasMVExpression, dictionaries,
+            dataTypes, orderByExpressions, limit);
       } else {
         // Raw value based
-        return new RawMultiColumnDistinctExecutor(expressions, dataTypes, orderByExpressions, limit);
+        return new RawMultiColumnDistinctExecutor(expressions, hasMVExpression, dataTypes, orderByExpressions, limit);
       }
     }
   }
