@@ -20,15 +20,6 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiKeyAuthDefinition;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
-import io.swagger.annotations.ApiResponse;
-import io.swagger.annotations.ApiResponses;
-import io.swagger.annotations.Authorization;
-import io.swagger.annotations.SecurityDefinition;
-import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -36,61 +27,34 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
 import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
-import org.apache.pinot.controller.api.access.AccessType;
-import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.api.services.PinotClusterConfigService;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
-
-@Api(tags = Constants.CLUSTER_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
-@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
 @Path("/")
-public class PinotClusterConfigs {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotClusterConfigs.class);
+public class PinotClusterConfigResource implements PinotClusterConfigService {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotClusterConfigResource.class);
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
 
-  @GET
-  @Path("/cluster/info")
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get cluster Info", notes = "Get cluster Info")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
+  @Override
   public String getClusterInfo() {
     ObjectNode ret = JsonUtils.newObjectNode();
     ret.put("clusterName", _pinotHelixResourceManager.getHelixClusterName());
     return ret.toString();
   }
 
-  @GET
-  @Path("/cluster/configs")
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "List cluster configurations", notes = "List cluster level configurations")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
+  @Override
   public String listClusterConfigs() {
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
@@ -104,15 +68,8 @@ public class PinotClusterConfigs {
     return ret.toString();
   }
 
-  @POST
-  @Path("/cluster/configs")
-  @Authenticate(AccessType.UPDATE)
-  @ApiOperation(value = "Update cluster configuration")
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Server error updating configuration")
-  })
+
+  @Override
   public SuccessResponse updateClusterConfig(String body) {
     try {
       JsonNode jsonNode = JsonUtils.stringToJsonNode(body);
@@ -135,17 +92,8 @@ public class PinotClusterConfigs {
     }
   }
 
-  @DELETE
-  @Path("/cluster/configs/{configName}")
-  @Authenticate(AccessType.DELETE)
-  @ApiOperation(value = "Delete cluster configuration")
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Server error deleting configuration")
-  })
-  public SuccessResponse deleteClusterConfig(
-      @ApiParam(value = "Name of the config to delete", required = true) @PathParam("configName") String configName) {
+  @Override
+  public SuccessResponse deleteClusterConfig(String configName) {
     try {
       HelixAdmin admin = _pinotHelixResourceManager.getHelixAdmin();
       HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
