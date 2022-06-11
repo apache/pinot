@@ -104,7 +104,7 @@ public class BrokerRequestOptionsTest {
     Assert.assertEquals(pinotQuery.getQueryOptions().get("queryOption1"), "foo");
 
     // Has queryOptions in query
-    pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from testTable option(queryOption1=foo)");
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from testTable; option(queryOption1='foo')");
     BaseBrokerRequestHandler.setOptions(pinotQuery, requestId, query, jsonRequest);
     Assert.assertNull(pinotQuery.getDebugOptions());
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
@@ -120,7 +120,7 @@ public class BrokerRequestOptionsTest {
 
     // Has query options in both json payload and pinotQuery, pinotQuery takes priority
     jsonRequest.put(Request.QUERY_OPTIONS, "queryOption1=bar;queryOption2=moo");
-    pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from testTable option(queryOption1=foo)");
+    pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from testTable; option(queryOption1='foo')");
     BaseBrokerRequestHandler.setOptions(pinotQuery, requestId, query, jsonRequest);
     Assert.assertNull(pinotQuery.getDebugOptions());
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 2);

@@ -141,7 +141,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
   }
 
   private long getCurrentCountStarResultWithoutUpsert() {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName() + " OPTION(skipUpsert=true)")
+    return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName() + "; OPTION(skipUpsert='true')")
         .getResultSet(0).getLong(0);
   }
 

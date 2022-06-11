@@ -129,7 +129,7 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
     assertEquals(rowCnt, 70);
 
     String insertFileStatement =
-        String.format("INSERT INTO %s FROM FILE '%s' OPTION(taskName=%s)", tableName, inputDir.getAbsolutePath(),
+        String.format("INSERT INTO %s FROM FILE '%s'; OPTION(taskName='%s')", tableName, inputDir.getAbsolutePath(),
             taskName);
     TestUtils.waitForCondition(aVoid -> {
       try {
