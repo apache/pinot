@@ -160,7 +160,7 @@ public class ClusterInfoAccessor {
   }
 
   /**
-   * Gets the data dir.
+   * Get the data dir.
    *
    * @return the data dir.
    */
