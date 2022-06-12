@@ -30,9 +30,9 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 
 
 /**
- * Calcite extension for creating an INSERT sql node from a File object.
+ * Calcite extension for creating Pinot SQL options.
  *
- * <p>Syntax: INSERT INTO [db_name.]table_name FROM [ FILE | ARCHIVE ] 'file_uri' [, [ FILE | ARCHIVE ] 'file_uri' ]
+ * <p>Syntax: OPTION ( Identifier = StringLiteral [, Identifier = StringLiteral]* )
  */
 public class SqlOptions extends SqlCall {
   private static final SqlSpecialOperator OPERATOR = new SqlSpecialOperator("OPTION", SqlKind.OTHER_DDL);

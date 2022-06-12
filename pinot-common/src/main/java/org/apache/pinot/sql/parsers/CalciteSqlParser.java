@@ -19,6 +19,7 @@
 package org.apache.pinot.sql.parsers;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -127,7 +128,9 @@ public class CalciteSqlParser {
       } else if (sqlNode instanceof SqlOptions) {
         // extract options, these are non-execution statements
         List<SqlNode> operandList = ((SqlOptions) sqlNode).getOperandList();
-        for (int i = 0; i < operandList.size(); i += 2) {
+        int operandSize = operandList.size();
+        Preconditions.checkArgument((operandSize & 1) == 0, "option operands length must be a multiple of 2");
+        for (int i = 0; i < operandSize; i += 2) {
           SqlIdentifier key = (SqlIdentifier) operandList.get(i);
           SqlLiteral value = (SqlLiteral) operandList.get(i + 1);
           options.put(key.getSimple(), value.toValue());

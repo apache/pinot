@@ -726,6 +726,23 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("bar"), "'potato'");
+
+    // test invalid options
+    try {
+      CalciteSqlParser.compileToPinotQuery("select * from vegetables OPTION (delicious='yes', foo='1234') "
+          + "where name <> 'Brussels sprouts'");
+      Assert.fail("SQL should not be compiled");
+    } catch (SqlCompilationException sce) {
+      // expected.
+    }
+
+    try {
+      CalciteSqlParser.compileToPinotQuery("select * from vegetables where name <> 'Brussels sprouts'; "
+          + "OPTION (delicious='yes', foo=1234)");
+      Assert.fail("SQL should not be compiled");
+    } catch (SqlCompilationException sce) {
+      // expected.
+    }
   }
 
   @Test
