@@ -35,9 +35,12 @@ public class SegmentPrunerProvider {
 
   private static final Map<String, Class<? extends SegmentPruner>> PRUNER_MAP = new HashMap<>();
 
+  public static final String COLUMN_VALUE_SEGMENT_PRUNER_NAME = "columnvaluesegmentpruner";
+  public static final String SELECTION_QUERY_SEGMENT_PRUNER_NAME = "selectionquerysegmentpruner";
+
   static {
-    PRUNER_MAP.put("columnvaluesegmentpruner", ColumnValueSegmentPruner.class);
-    PRUNER_MAP.put("selectionquerysegmentpruner", SelectionQuerySegmentPruner.class);
+    PRUNER_MAP.put(COLUMN_VALUE_SEGMENT_PRUNER_NAME, ColumnValueSegmentPruner.class);
+    PRUNER_MAP.put(SELECTION_QUERY_SEGMENT_PRUNER_NAME, SelectionQuerySegmentPruner.class);
   }
 
   @Nullable
