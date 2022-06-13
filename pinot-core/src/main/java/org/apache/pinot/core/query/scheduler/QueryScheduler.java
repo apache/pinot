@@ -240,7 +240,7 @@ public abstract class QueryScheduler {
 
     // Please keep the format as name=value comma-separated with no spaces
     // Please add new entries at the end
-    if (_queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned)) {
+    if (_queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned, numSegmentsPrunedInvalid)) {
       LOGGER.info("Processed requestId={},table={},"
               + "segments(queried/processed/matched/consuming/invalid/limit/value)={}/{}/{}/{}/{}/{}/{},"
               + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},minConsumingFreshnessMs={},"
@@ -293,9 +293,14 @@ public abstract class QueryScheduler {
    * TODO: come up with other criteria for forcing a log and come up with better numbers
    *
    */
-  private boolean forceLog(long schedulerWaitMs, long numDocsScanned) {
+  private boolean forceLog(long schedulerWaitMs, long numDocsScanned, long numSegmentsPrunedInvalid) {
     // If scheduler wait time is larger than 100ms, force the log
     if (schedulerWaitMs > 100L) {
+      return true;
+    }
+
+    // If there are invalid segments, force the log
+    if (numSegmentsPrunedInvalid > 0) {
       return true;
     }
 
