@@ -871,8 +871,6 @@ public class PinotLLCRealtimeSegmentManager {
     HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
       assert idealState != null;
       if (idealState.isEnabled()) {
-        new MissingConsumingSegmentFinder(realtimeTableName, _propertyStore, _controllerMetrics)
-            .findAndEmitMetrics(idealState);
         List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
             getPartitionGroupConsumptionStatusList(idealState, streamConfig);
         // Read the smallest offset when a new partition is detected

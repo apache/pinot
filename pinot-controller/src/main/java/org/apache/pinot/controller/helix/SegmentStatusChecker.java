@@ -27,9 +27,11 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
@@ -41,6 +43,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
+import org.apache.pinot.controller.helix.core.realtime.MissingConsumingSegmentFinder;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -157,7 +160,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
    * TODO: revisit the logic and reduce the ZK access
    */
   private void updateSegmentMetrics(String tableNameWithType, Context context) {
-    if (TableNameBuilder.getTableTypeFromTableName(tableNameWithType) == TableType.OFFLINE) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType == TableType.OFFLINE) {
       context._offlineTableCount++;
     } else {
       context._realTimeTableCount++;
@@ -197,8 +201,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     // Get the segments excluding the replaced segments which are specified in the segment lineage entries and cannot
     // be queried from the table.
     Set<String> segmentsExcludeReplaced = new HashSet<>(idealState.getPartitionSet());
-    SegmentLineage segmentLineage =
-        SegmentLineageAccessHelper.getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+    SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(propertyStore, tableNameWithType);
     SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(segmentsExcludeReplaced, segmentLineage);
     _controllerMetrics
         .setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
@@ -298,6 +302,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     if (nReplicasExternal < nReplicasIdealMax) {
       LOGGER.warn("Table {} has {} replicas, below replication threshold :{}", tableNameWithType, nReplicasExternal,
           nReplicasIdealMax);
+    }
+
+    if (tableType == TableType.REALTIME) {
+      new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics)
+          .findAndEmitMetrics(idealState);
     }
   }
 

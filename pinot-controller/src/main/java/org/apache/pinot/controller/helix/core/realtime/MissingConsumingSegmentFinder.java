@@ -35,6 +35,8 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.zookeeper.data.Stat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -44,6 +46,7 @@ import org.apache.zookeeper.data.Stat;
  *   - Maximum duration (in minutes) that a partition hasn't had a consuming segment
  */
 public class MissingConsumingSegmentFinder {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MissingConsumingSegmentFinder.class);
 
   private String _realtimeTableName;
   private ControllerMetrics _controllerMetrics;
@@ -96,6 +99,7 @@ public class MissingConsumingSegmentFinder {
         if (duration > missingSegmentInfo._maxDurationInMinutes) {
           missingSegmentInfo._maxDurationInMinutes = duration;
         }
+        LOGGER.warn("Partition group id {} hasn't had a consuming segment for {} minutes!", partitionGroupId, duration);
       }
     });
     return missingSegmentInfo;
