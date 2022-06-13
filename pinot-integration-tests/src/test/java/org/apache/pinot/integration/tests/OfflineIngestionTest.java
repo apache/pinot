@@ -1,19 +1,3 @@
-package org.apache.pinot.integration.tests;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-
-import static org.testng.Assert.assertTrue;
-
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,6 +16,21 @@ import static org.testng.Assert.assertTrue;
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.integration.tests;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertTrue;
+
 public class OfflineIngestionTest extends BaseClusterIntegrationTestSet {
 
   @Override
@@ -72,8 +71,10 @@ public class OfflineIngestionTest extends BaseClusterIntegrationTestSet {
         .setTableName(getTableName())
         .setSchemaName(getSchemaName())
         .setTimeColumnName(getTimeColumnName())
-        .setRangeIndexColumns(List.of("intSV", "intMV", "longSV", "longMV", "floatSV", "floatMV", "doubleSV", "doubleMV"))
+        .setRangeIndexColumns(List.of("intSV", "intMV", "longSV", "longMV", "floatSV", "floatMV", "doubleSV",
+            "doubleMV"))
         .setBloomFilterColumns(List.of("stringSV", "stringMV"))
+        .setNoDictionaryColumns(List.of("intMV", "longMV", "floatMV", "stringMV", "doubleMV"))
         .build();
     addTableConfig(tableConfig);
 
@@ -85,7 +86,8 @@ public class OfflineIngestionTest extends BaseClusterIntegrationTestSet {
 
     // Create and upload segments. For exhaustive testing, concurrently upload multiple segments with the same name
     // and validate correctness with parallel push protection enabled.
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir,
+        _tarDir);
     List<File> tarDirs = new ArrayList<>();
     tarDirs.add(_tarDir);
     try {
@@ -115,7 +117,9 @@ public class OfflineIngestionTest extends BaseClusterIntegrationTestSet {
   public void testIntMVRangeQuery()
       throws Exception {
     testQuery("SELECT count(*) FROM offlineIngestionTestTable WHERE intMV > 3 AND intMV < 6",
-        "SELECT count(*) FROM offlineIngestionTestTable WHERE (intMV__MV0 > 3 AND intMV__MV0 < 6) OR (intMV__MV1 > 3 AND intMV__MV1 < 6) OR (intMV__MV2 > 3 AND intMV__MV2 < 6) OR (intMV__MV3 > 3 AND intMV__MV3 < 6) OR (intMV__MV4 > 3 AND intMV__MV4 < 6)");
+        "SELECT count(*) FROM offlineIngestionTestTable WHERE (intMV__MV0 > 3 AND intMV__MV0 < 6)"
+            + " OR (intMV__MV1 > 3 AND intMV__MV1 < 6) OR (intMV__MV2 > 3 AND intMV__MV2 < 6)"
+            + " OR (intMV__MV3 > 3 AND intMV__MV3 < 6) OR (intMV__MV4 > 3 AND intMV__MV4 < 6)");
   }
 
   @Test
@@ -129,7 +133,9 @@ public class OfflineIngestionTest extends BaseClusterIntegrationTestSet {
   public void testLongMVRangeQuery()
       throws Exception {
     testQuery("SELECT count(*) FROM offlineIngestionTestTable WHERE longMV > 3 AND longMV < 6",
-        "SELECT count(*) FROM offlineIngestionTestTable WHERE (longMV__MV0 > 3 AND longMV__MV0 < 6) OR (longMV__MV1 > 3 AND longMV__MV1 < 6) OR (longMV__MV2 > 3 AND longMV__MV2 < 6) OR (longMV__MV3 > 3 AND longMV__MV3 < 6) OR (longMV__MV4 > 3 AND longMV__MV4 < 6)");
+        "SELECT count(*) FROM offlineIngestionTestTable WHERE (longMV__MV0 > 3 AND longMV__MV0 < 6)"
+            + " OR (longMV__MV1 > 3 AND longMV__MV1 < 6) OR (longMV__MV2 > 3 AND longMV__MV2 < 6)"
+            + " OR (longMV__MV3 > 3 AND longMV__MV3 < 6) OR (longMV__MV4 > 3 AND longMV__MV4 < 6)");
   }
 
   @Test
@@ -143,6 +149,7 @@ public class OfflineIngestionTest extends BaseClusterIntegrationTestSet {
   public void testStringMVBloomFilterSelectQuery()
       throws Exception {
     testQuery("SELECT count(*) FROM offlineIngestionTestTable WHERE stringMV = 'str1'",
-        "SELECT count(*) FROM offlineIngestionTestTable WHERE stringMV__MV0 = 'str1' OR stringMV__MV1 = 'str1' OR stringMV__MV2 = 'str1' OR stringMV__MV3 = 'str1' OR stringMV__MV4 = 'str1'");
+        "SELECT count(*) FROM offlineIngestionTestTable WHERE stringMV__MV0 = 'str1' OR stringMV__MV1 = 'str1'"
+            + " OR stringMV__MV2 = 'str1' OR stringMV__MV3 = 'str1' OR stringMV__MV4 = 'str1'");
   }
 }

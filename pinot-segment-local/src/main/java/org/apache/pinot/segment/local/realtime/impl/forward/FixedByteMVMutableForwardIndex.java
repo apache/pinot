@@ -254,6 +254,21 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
+  public int[] getIntMV(int docId) {
+    FixedByteSingleValueMultiColReader headerReader = getCurrentReader(docId);
+    int rowInCurrentHeader = getRowInCurrentHeader(docId);
+    int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
+    int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
+    int length = headerReader.getInt(rowInCurrentHeader, 2);
+    FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
+    int[] buffer = new int[length];
+    for (int i = 0; i < length; i++) {
+      buffer[i] = dataReader.getInt(startIndex + i, 0);
+    }
+    return buffer;
+  }
+
+  @Override
   public int getLongMV(int docId, long[] valueBuffer) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(docId);
     int rowInCurrentHeader = getRowInCurrentHeader(docId);
@@ -265,6 +280,21 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
       valueBuffer[i] = dataReader.getLong(startIndex + i, 0);
     }
     return length;
+  }
+
+  @Override
+  public long[] getLongMV(int docId) {
+    FixedByteSingleValueMultiColReader headerReader = getCurrentReader(docId);
+    int rowInCurrentHeader = getRowInCurrentHeader(docId);
+    int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
+    int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
+    int length = headerReader.getInt(rowInCurrentHeader, 2);
+    FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
+    long[] valueBuffer = new long[length];
+    for (int i = 0; i < length; i++) {
+      valueBuffer[i] = dataReader.getLong(startIndex + i, 0);
+    }
+    return valueBuffer;
   }
 
   @Override
@@ -282,6 +312,21 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
+  public float[] getFloatMV(int docId) {
+    FixedByteSingleValueMultiColReader headerReader = getCurrentReader(docId);
+    int rowInCurrentHeader = getRowInCurrentHeader(docId);
+    int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
+    int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
+    int length = headerReader.getInt(rowInCurrentHeader, 2);
+    FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
+    float[] valueBuffer = new float[length];
+    for (int i = 0; i < length; i++) {
+      valueBuffer[i] = dataReader.getFloat(startIndex + i, 0);
+    }
+    return valueBuffer;
+  }
+
+  @Override
   public int getDoubleMV(int docId, double[] valueBuffer) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(docId);
     int rowInCurrentHeader = getRowInCurrentHeader(docId);
@@ -293,6 +338,21 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
       valueBuffer[i] = dataReader.getDouble(startIndex + i, 0);
     }
     return length;
+  }
+
+  @Override
+  public double[] getDoubleMV(int docId) {
+    FixedByteSingleValueMultiColReader headerReader = getCurrentReader(docId);
+    int rowInCurrentHeader = getRowInCurrentHeader(docId);
+    int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
+    int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
+    int length = headerReader.getInt(rowInCurrentHeader, 2);
+    FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
+    double[] valueBuffer = new double[length];
+    for (int i = 0; i < length; i++) {
+      valueBuffer[i] = dataReader.getDouble(startIndex + i, 0);
+    }
+    return valueBuffer;
   }
 
   @Override

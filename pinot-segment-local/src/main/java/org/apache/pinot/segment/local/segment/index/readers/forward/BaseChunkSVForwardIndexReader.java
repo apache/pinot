@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.DoubleBuffer;
@@ -68,9 +67,6 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
     headerOffset += Integer.BYTES;
 
     _lengthOfLongestEntry = _dataBuffer.getInt(headerOffset);
-    if (valueType.isFixedWidth()) {
-      Preconditions.checkState(_lengthOfLongestEntry == valueType.size());
-    }
     headerOffset += Integer.BYTES;
 
     int dataHeaderStart = headerOffset;

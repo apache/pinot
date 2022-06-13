@@ -77,6 +77,29 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkSVForwardIn
   }
 
   @Override
+  public String[] getStringMV(final int docId, final ChunkReaderContext context) {
+    byte[] compressedBytes;
+    if (_isCompressed) {
+      compressedBytes = getBytesCompressed(docId, context);
+    } else {
+      compressedBytes = getBytesUncompressed(docId);
+    }
+    ByteBuffer byteBuffer = ByteBuffer.wrap(compressedBytes);
+    int numValues = byteBuffer.getInt();
+    String[] valueBuffer = new String[numValues];
+    int contentOffset = (numValues + 1) * Integer.BYTES;
+    for (int i = 0; i < numValues; i++) {
+      int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
+      byte[] bytes = new byte[length];
+      byteBuffer.position(contentOffset);
+      byteBuffer.get(bytes, 0, length);
+      valueBuffer[i] = new String(bytes, StandardCharsets.UTF_8);
+      contentOffset += length;
+    }
+    return valueBuffer;
+  }
+
+  @Override
   public int getBytesMV(final int docId, final byte[][] valueBuffer,
       final ChunkReaderContext context) {
     byte[] compressedBytes;

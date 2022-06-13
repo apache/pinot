@@ -428,6 +428,16 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   }
 
   /**
+   * Reads and returns the INT type multi-value at the given document id
+   * @param docId Document id
+   * @param context Reader context
+   * @return Array of INT MV values
+   */
+  default int[] getIntMV(int docId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
    * Reads the LONG type multi-value at the given document id into the passed in value buffer (the buffer size must be
    * enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
    * entry.
@@ -438,6 +448,16 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @return Number of values within the multi-value entry
    */
   default int getLongMV(int docId, long[] valueBuffer, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Reads and returns the LONG type multi-value at the given document id
+   * @param docId Document id
+   * @param context Reader context
+   * @return Array of LONG MV values
+   */
+  default long[] getLongMV(int docId, T context) {
     throw new UnsupportedOperationException();
   }
 
@@ -456,6 +476,16 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   }
 
   /**
+   * Reads and returns the FLOAT type multi-value at the given document id
+   * @param docId Document id
+   * @param context Reader context
+   * @return Array of FLOAT MV values
+   */
+  default float[] getFloatMV(int docId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
    * Reads the DOUBLE type multi-value at the given document id into the passed in value buffer (the buffer size must
    * be enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
    * entry.
@@ -470,6 +500,17 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   }
 
   /**
+   * Reads and return the DOUBLE type multi-value at the given document id
+   *
+   * @param docId Document id
+   * @param context Reader context
+   * @return Array of DOUBLE MV values
+   */
+  default double[] getDoubleMV(int docId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
    * Reads the STRING type multi-value at the given document id into the passed in value buffer (the buffer size must
    * be enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
    * entry.
@@ -480,6 +521,16 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @return Number of values within the multi-value entry
    */
   default int getStringMV(int docId, String[] valueBuffer, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Reads and returns the STRING type multi-value at the given document id
+   * @param docId Document id
+   * @param context Reader context
+   * @return Array of string MV column values
+   */
+  default String[] getStringMV(int docId, T context) {
     throw new UnsupportedOperationException();
   }
 
