@@ -193,6 +193,9 @@ public class GenericRowSerializer {
           break;
         case STRING:
           byte[] stringBytes = (byte[]) _stringBytes[fieldIndex];
+          if (stringBytes == null) {
+            stringBytes = ((String) value).getBytes(UTF_8);
+          }
           byteBuffer.putInt(stringBytes.length);
           byteBuffer.put(stringBytes);
           break;
@@ -231,9 +234,17 @@ public class GenericRowSerializer {
           break;
         case STRING:
           byte[][] stringBytesArray = (byte[][]) _stringBytes[fieldIndex];
-          for (byte[] stringBytes : stringBytesArray) {
-            byteBuffer.putInt(stringBytes.length);
-            byteBuffer.put(stringBytes);
+          if (stringBytesArray == null) {
+            for (Object element : multiValue) {
+              byte[] stringBytes = ((String) element).getBytes(UTF_8);
+              byteBuffer.putInt(stringBytes.length);
+              byteBuffer.put(stringBytes);
+            }
+          } else {
+            for (byte[] stringBytes : stringBytesArray) {
+              byteBuffer.putInt(stringBytes.length);
+              byteBuffer.put(stringBytes);
+            }
           }
           break;
         default:
