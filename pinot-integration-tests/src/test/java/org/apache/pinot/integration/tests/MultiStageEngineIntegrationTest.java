@@ -23,6 +23,8 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -31,6 +33,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -77,6 +80,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+
+    // Setting data table version to 4
+    DataTableBuilder.setCurrentDataTableVersion(4);
   }
 
   @Override
@@ -88,7 +94,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
   @Override
   protected void overrideServerConf(PinotConfiguration serverConf) {
     serverConf.setProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, true);
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, 4);
     serverConf.setProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, 8842);
     serverConf.setProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, 8422);
   }
@@ -112,5 +117,22 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
         new Object[]{"SELECT * FROM mytable_OFFLINE AS a JOIN mytable_OFFLINE AS b ON a.AirlineID = b.AirlineID "
             + " WHERE a.CarrierDelay=15 AND a.ArrDelay>20 AND b.ArrDelay<20", 10, 146}
     };
+  }
+
+
+  @AfterClass
+  public void tearDown()
+      throws Exception {
+    // Setting data table version to 4
+    DataTableBuilder.setCurrentDataTableVersion(3);
+
+    dropOfflineTable(DEFAULT_TABLE_NAME);
+
+    stopServer();
+    stopBroker();
+    stopController();
+    stopZk();
+
+    FileUtils.deleteDirectory(_tempDir);
   }
 }

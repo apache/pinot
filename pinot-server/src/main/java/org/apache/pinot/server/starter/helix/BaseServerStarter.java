@@ -180,8 +180,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
             Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
 
     // Set data table version send to broker.
-    DataTableBuilder.setCurrentDataTableVersion(_serverConf.getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION,
-        Server.DEFAULT_CURRENT_DATA_TABLE_VERSION));
+    int dataTableVersion =
+        _serverConf.getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, Server.DEFAULT_CURRENT_DATA_TABLE_VERSION);
+    if (dataTableVersion > Server.DEFAULT_CURRENT_DATA_TABLE_VERSION) {
+      throw new UnsupportedOperationException("Setting experimental DataTable version newer than default via config "
+          + "is not allowed. Current default DataTable version: " + Server.DEFAULT_CURRENT_DATA_TABLE_VERSION);
+    }
+    DataTableBuilder.setCurrentDataTableVersion(dataTableVersion);
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
