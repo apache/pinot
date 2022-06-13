@@ -190,6 +190,8 @@ const QueryPage = () => {
     records: [],
   });
 
+  const [warnings, setWarnings] = useState<Array<string>>([]);
+
   const [checked, setChecked] = React.useState({
     tracing: queryParam.get('tracing') === 'true',
     showResultJSON: false,
@@ -295,9 +297,21 @@ const QueryPage = () => {
     setResultData(results.result || { columns: [], records: [] });
     setQueryStats(results.queryStats || { columns: responseStatCols, records: [] });
     setOutputResult(JSON.stringify(results.data, null, 2) || '');
+    setWarnings(extractWarnings(results));
     setQueryLoader(false);
     queryExecuted.current = false;
   };
+
+  const extractWarnings = (result) => {
+    const warnings: Array<string> = [];
+    const numSegmentsPrunedInvalid = result.data.numSegmentsPrunedInvalid;
+    if (numSegmentsPrunedInvalid) {
+      warnings.push(`There are ${numSegmentsPrunedInvalid} invalid segment/s. This usually means that they were `
+         + `created with an older schema. `
+         + `Data wasn't lost, but these segments will be ignored by some queries until the table is reloaded.`);
+    }
+    return warnings;
+  }
 
   const fetchSQLData = async (tableName) => {
     setQueryLoader(true);
@@ -517,6 +531,13 @@ const QueryPage = () => {
                   </Alert>
                 ) : (
                   <>
+                    {
+                    warnings.map(warn =>
+                        <Alert severity="warning" className={classes.sqlError}>
+                          {warn}
+                        </Alert>
+                      )
+                    }
                     <Grid item xs style={{ backgroundColor: 'white' }}>
                       {resultData.columns.length ? (
                         <>
