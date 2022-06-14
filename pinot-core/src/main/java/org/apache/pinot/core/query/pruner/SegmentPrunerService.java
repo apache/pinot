@@ -68,12 +68,12 @@ public class SegmentPrunerService {
       } else {
         LOGGER.warn("could not create segment pruner: {}", segmentPrunerName);
       }
-      assert _segmentPruners.stream()
-          .anyMatch(_prunerStatsUpdaters::containsKey)
-          : "No defined stats updater for pruner " + _segmentPruners.stream()
-          .filter(_prunerStatsUpdaters::containsKey)
-          .findAny().orElseThrow(IllegalStateException::new);
     }
+    assert _segmentPruners.stream()
+        .allMatch(_prunerStatsUpdaters::containsKey)
+        : "No defined stats updater for pruner " + _segmentPruners.stream()
+        .filter(p -> !_prunerStatsUpdaters.containsKey(p))
+        .findAny().orElseThrow(IllegalStateException::new);
   }
 
   /**
