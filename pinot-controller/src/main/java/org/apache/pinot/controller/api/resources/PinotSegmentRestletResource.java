@@ -634,28 +634,6 @@ public class PinotSegmentRestletResource {
     return serverReloadTaskStatusResponse;
   }
 
-  @GET
-  @Path("segments/{tableName}/tasks")
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get list of tasks for this table", notes = "Get list of tasks for this table")
-  public List<TaskZKMetadata> getTasks(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr
-  ) {
-    TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
-    List<String> tableNamesWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
-            LOGGER);
-
-    List<TaskZKMetadata> result = new ArrayList<>();
-    for (String tableNameWithType : tableNamesWithType) {
-      result.addAll(_pinotHelixResourceManager.getAllTasksForTable(tableNameWithType));
-    }
-
-    return result;
-  }
-
-
   @POST
   @Path("segments/{tableName}/reload")
   @Authenticate(AccessType.UPDATE)
