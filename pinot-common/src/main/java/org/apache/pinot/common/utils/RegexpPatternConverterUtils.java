@@ -33,7 +33,16 @@ public class RegexpPatternConverterUtils {
    * Converts a LIKE pattern into REGEXP_LIKE pattern.
    */
   public static String likeToRegexpLike(String likePattern) {
-    return "^" + escapeMetaCharacters(likePattern).replace('_', '.').replace("%", ".*") + "$";
+    String converted = "^" + escapeMetaCharacters(likePattern).replace('_', '.').replace("%", ".*") + "$";
+
+    if (converted.startsWith("^.*")) {
+      converted = converted.substring(3);
+    }
+    if (converted.endsWith(".*$")) {
+      converted = converted.substring(0, converted.length() - 3);
+    }
+
+    return converted;
   }
 
   /**

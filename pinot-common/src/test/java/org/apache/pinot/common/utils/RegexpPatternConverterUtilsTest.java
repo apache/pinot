@@ -39,7 +39,7 @@ public class RegexpPatternConverterUtilsTest {
   @Test
   public void testLeadingWildcard() {
     String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike(LEADING_WILDCARD);
-    assertEquals(regexpLikePattern, "^.*\\+\\+$");
+    assertEquals(regexpLikePattern, "\\+\\+$");
     String luceneRegExpPattern = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePattern);
     assertEquals(luceneRegExpPattern, ".*\\+\\+");
   }
@@ -47,7 +47,7 @@ public class RegexpPatternConverterUtilsTest {
   @Test
   public void testTrailingWildcard() {
     String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike(TRAILING_WILDCARD);
-    assertEquals(regexpLikePattern, "^C\\+.*$");
+    assertEquals(regexpLikePattern, "^C\\+");
     String luceneRegExpPattern = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePattern);
     assertEquals(luceneRegExpPattern, "C\\+.*");
   }
@@ -55,7 +55,7 @@ public class RegexpPatternConverterUtilsTest {
   @Test
   public void testBothSidesWildcard() {
     String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike(BOTH_SIDES_WILDCARD);
-    assertEquals(regexpLikePattern, "^.*\\+.*$");
+    assertEquals(regexpLikePattern, "\\+");
     String luceneRegExpPattern = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePattern);
     assertEquals(luceneRegExpPattern, ".*\\+.*");
   }
@@ -97,7 +97,7 @@ public class RegexpPatternConverterUtilsTest {
   @Test
   public void testCombinationPattern() {
     String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike(COMBINATION_PATTERN);
-    assertEquals(regexpLikePattern, "^C..*$");
+    assertEquals(regexpLikePattern, "^C.");
     String luceneRegExpPattern = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePattern);
     assertEquals(luceneRegExpPattern, "C..*");
   }
