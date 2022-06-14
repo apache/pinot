@@ -25,7 +25,6 @@ import org.apache.pinot.core.common.datablock.DataBlockUtils;
 
 
 public final class TransferableBlockUtils {
-  protected static final int VERSION_TYPE_SHIFT = 5;
   private TransferableBlockUtils() {
     // do not instantiate.
   }

@@ -105,6 +105,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
         sendPostRequest(_brokerBaseApiUrl + "/query/sql", "{\"useMultistageEngine\": true, \"sql\":\"" + sql + "\"}"));
     Assert.assertTrue(multiStageResponse.has("resultTable"));
     ArrayNode jsonNode = (ArrayNode) multiStageResponse.get("resultTable").get("rows");
+    // TODO: assert actual result data payload.
     Assert.assertEquals(jsonNode.size(), expectedNumOfRows);
     Assert.assertEquals(jsonNode.get(0).size(), expectedNumOfColumns);
   }

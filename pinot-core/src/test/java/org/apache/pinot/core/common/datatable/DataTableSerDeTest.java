@@ -175,6 +175,9 @@ public class DataTableSerDeTest {
 
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
+    // TODO: verify data table compatibility across multi-stage and normal query engine.
+    // TODO: see https://github.com/apache/pinot/pull/8874/files#r894806085
+
     // Verify V4 broker can deserialize data table (has data, but has no metadata) send by V3 server
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
     DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_3);
