@@ -62,9 +62,9 @@ public class ZKOperator {
   }
 
   public void completeSegmentOperations(String tableNameWithType, SegmentMetadata segmentMetadata,
-      FileUploadType uploadType, @Nullable URI finalSegmentLocationURI, File segmentFile, String sourceDownloadURIStr,
-      String segmentDownloadURIStr, @Nullable String crypterName, long segmentSizeInBytes,
-      boolean enableParallelPushProtection, boolean allowRefresh, HttpHeaders headers)
+      FileUploadType uploadType, @Nullable URI finalSegmentLocationURI, File segmentFile,
+      @Nullable String sourceDownloadURIStr, String segmentDownloadURIStr, @Nullable String crypterName,
+      long segmentSizeInBytes, boolean enableParallelPushProtection, boolean allowRefresh, HttpHeaders headers)
       throws Exception {
     String segmentName = segmentMetadata.getName();
     ZNRecord existingSegmentMetadataZNRecord =
@@ -101,8 +101,8 @@ public class ZKOperator {
 
   private void processExistingSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
       FileUploadType uploadType, ZNRecord existingSegmentMetadataZNRecord, @Nullable URI finalSegmentLocationURI,
-      File segmentFile, String sourceDownloadURIStr, String segmentDownloadURIStr, @Nullable String crypterName,
-      long segmentSizeInBytes, boolean enableParallelPushProtection, HttpHeaders headers)
+      File segmentFile, @Nullable String sourceDownloadURIStr, String segmentDownloadURIStr,
+      @Nullable String crypterName, long segmentSizeInBytes, boolean enableParallelPushProtection, HttpHeaders headers)
       throws Exception {
     String segmentName = segmentMetadata.getName();
     int expectedVersion = existingSegmentMetadataZNRecord.getVersion();
@@ -183,7 +183,7 @@ public class ZKOperator {
             "New segment crc {} is different than the existing segment crc {}. Updating ZK metadata and refreshing "
                 + "segment {}", newCrc, existingCrc, segmentName);
         if (finalSegmentLocationURI != null) {
-          segmentToFinalLocation(tableNameWithType, segmentName, uploadType, segmentFile, sourceDownloadURIStr,
+          copySegmentToDeepStore(tableNameWithType, segmentName, uploadType, segmentFile, sourceDownloadURIStr,
               finalSegmentLocationURI);
         }
 
@@ -241,7 +241,7 @@ public class ZKOperator {
   }
 
   private void processNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata, FileUploadType uploadType,
-      @Nullable URI finalSegmentLocationURI, File segmentFile, String sourceDownloadURIStr,
+      @Nullable URI finalSegmentLocationURI, File segmentFile, @Nullable String sourceDownloadURIStr,
       String segmentDownloadURIStr, @Nullable String crypterName, long segmentSizeInBytes,
       boolean enableParallelPushProtection, HttpHeaders headers)
       throws Exception {
@@ -278,7 +278,7 @@ public class ZKOperator {
 
     if (finalSegmentLocationURI != null) {
       try {
-        segmentToFinalLocation(tableNameWithType, segmentName, uploadType, segmentFile, sourceDownloadURIStr,
+        copySegmentToDeepStore(tableNameWithType, segmentName, uploadType, segmentFile, sourceDownloadURIStr,
             finalSegmentLocationURI);
       } catch (Exception e) {
         // Cleanup the Zk entry and the segment from the permanent directory if it exists.
@@ -313,34 +313,39 @@ public class ZKOperator {
     }
   }
 
-  private void segmentToFinalLocation(String tableNameWithType, String segmentName, FileUploadType uploadType,
+  private void copySegmentToDeepStore(String tableNameWithType, String segmentName, FileUploadType uploadType,
       File segmentFile, String sourceDownloadURIStr, URI finalSegmentLocationURI)
       throws Exception {
     if (uploadType == FileUploadType.METADATA) {
       // In Metadata push, local segmentFile only contains metadata.
       // Copy segment over from sourceDownloadURI to final location.
-      copySegmentToPermanentDirectory(new URI(sourceDownloadURIStr), finalSegmentLocationURI);
+      copyFromSegmentURIToDeepStore(new URI(sourceDownloadURIStr), finalSegmentLocationURI);
       LOGGER.info("Copied segment: {} of table: {} to final location: {}", segmentName, tableNameWithType,
           finalSegmentLocationURI);
     } else {
       // In push types other than METADATA, local segmentFile contains the complete segment.
       // Move local segment to final location
-      moveSegmentToPermanentDirectory(segmentFile, finalSegmentLocationURI);
-      LOGGER.info("Moved segment: {} of table: {} to final location: {}", segmentName, tableNameWithType,
+      copyFromSegmentFileToDeepStore(segmentFile, finalSegmentLocationURI);
+      LOGGER.info("Copied segment: {} of table: {} to final location: {}", segmentName, tableNameWithType,
           finalSegmentLocationURI);
     }
   }
 
-  private void moveSegmentToPermanentDirectory(File segmentFile, URI finalSegmentLocationURI)
+  private void copyFromSegmentFileToDeepStore(File segmentFile, URI finalSegmentLocationURI)
       throws Exception {
     LOGGER.info("Copying segment from: {} to: {}", segmentFile.getAbsolutePath(), finalSegmentLocationURI);
     PinotFSFactory.create(finalSegmentLocationURI.getScheme()).copyFromLocalFile(segmentFile, finalSegmentLocationURI);
   }
 
-  private void copySegmentToPermanentDirectory(URI sourceDownloadURI, URI finalSegmentLocationURI)
+  private void copyFromSegmentURIToDeepStore(URI sourceDownloadURI, URI finalSegmentLocationURI)
       throws Exception {
-    Preconditions.checkState(sourceDownloadURI.getScheme().equals(finalSegmentLocationURI.getScheme()));
-    LOGGER.info("Copying segment from: {} to: {}", sourceDownloadURI, finalSegmentLocationURI);
-    PinotFSFactory.create(finalSegmentLocationURI.getScheme()).copy(sourceDownloadURI, finalSegmentLocationURI);
+    if (sourceDownloadURI.equals(finalSegmentLocationURI)) {
+      LOGGER.info("Skip copying segment as sourceDownloadURI: {} is the same as finalSegmentLocationURI",
+          sourceDownloadURI);
+    } else {
+      Preconditions.checkState(sourceDownloadURI.getScheme().equals(finalSegmentLocationURI.getScheme()));
+      LOGGER.info("Copying segment from: {} to: {}", sourceDownloadURI, finalSegmentLocationURI);
+      PinotFSFactory.create(finalSegmentLocationURI.getScheme()).copy(sourceDownloadURI, finalSegmentLocationURI);
+    }
   }
 }

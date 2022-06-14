@@ -49,7 +49,7 @@ import org.testng.annotations.Test;
  * Currently only tests METADATA push type.
  * todo: add test for URI push
  */
-public class SegmentMetadataPushIntegrationTest extends BaseClusterIntegrationTest {
+public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
 
   @Override
   protected Map<String, String> getStreamConfigs() {
