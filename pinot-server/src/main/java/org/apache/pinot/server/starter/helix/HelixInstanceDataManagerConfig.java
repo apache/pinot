@@ -20,6 +20,7 @@ package org.apache.pinot.server.starter.helix;
 
 import java.util.Optional;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -78,6 +79,18 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // causing controllers unavailable for that period of time.
   private static final String MAX_PARALLEL_SEGMENT_DOWNLOADS = "table.level.max.parallel.segment.downloads";
   private static final int DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS = -1;
+
+  // Key of server segment download rate limit
+  // limit the rate to write download-untar stream to disk, in bytes
+  // -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
+  private static final String STREAM_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT
+      = "segment.stream.download.untar.rate.limit.bytes.per.sec";
+  private static final long DEFAULT_STREAM_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT
+      = TarGzCompressionUtils.NO_DISK_WRITE_RATE_LIMIT;
+
+  // Key of whether to use streamed server segment download-untar
+  private static final String ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR = "segment.stream.download.untar";
+  private static final boolean DEFAULT_ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR = false;
 
   // Key of whether to enable split commit
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
@@ -230,6 +243,18 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public long getErrorCacheSize() {
     return _instanceDataManagerConfiguration.getProperty(ERROR_CACHE_SIZE, DEFAULT_ERROR_CACHE_SIZE);
+  }
+
+  @Override
+  public boolean isStreamSegmentDownloadUntar() {
+    return _instanceDataManagerConfiguration.getProperty(ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR,
+        DEFAULT_ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR);
+  }
+
+  @Override
+  public long getStreamSegmentDownloadUntarRateLimit() {
+    return _instanceDataManagerConfiguration.getProperty(STREAM_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT,
+        DEFAULT_STREAM_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT);
   }
 
   @Override

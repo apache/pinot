@@ -26,6 +26,8 @@ import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.datablock.BaseDataBlock;
+import org.apache.pinot.core.common.datablock.DataBlockUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -34,8 +36,6 @@ import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
-import org.apache.pinot.query.runtime.blocks.BaseDataBlock;
-import org.apache.pinot.query.runtime.blocks.DataBlockUtils;
 import org.apache.pinot.query.runtime.executor.WorkerQueryExecutor;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -101,7 +101,8 @@ public class QueryRunner {
       BaseDataBlock dataBlock;
       try {
         DataTable dataTable = _serverExecutor.processQuery(serverQueryRequest, executorService, null);
-        // this works because default DataTableImplV3 will have ordinal 0, which maps to ROW(0)
+        // this works because default DataTableImplV3 will have a version number at beginning,
+        // which maps to ROW type of version 3.
         dataBlock = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTable.toBytes()));
       } catch (IOException e) {
         throw new RuntimeException("Unable to convert byte buffer", e);

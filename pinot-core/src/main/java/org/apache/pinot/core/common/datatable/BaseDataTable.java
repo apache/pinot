@@ -59,7 +59,7 @@ public abstract class BaseDataTable implements DataTable {
     _numColumns = dataSchema.size();
     _dataSchema = dataSchema;
     _columnOffsets = new int[_numColumns];
-    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets);
+    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets, getVersion());
     _dictionaryMap = dictionaryMap;
     _fixedSizeDataBytes = fixedSizeDataBytes;
     _fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
@@ -84,6 +84,11 @@ public abstract class BaseDataTable implements DataTable {
     _variableSizeData = null;
     _metadata = new HashMap<>();
   }
+
+  /**
+   * get the current data table version.
+   */
+  public abstract int getVersion();
 
   /**
    * Helper method to serialize dictionary map.

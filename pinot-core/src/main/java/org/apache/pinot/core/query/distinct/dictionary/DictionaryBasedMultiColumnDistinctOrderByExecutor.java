@@ -26,6 +26,7 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
+import org.apache.pinot.core.query.distinct.DistinctExecutorUtils;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -34,12 +35,14 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * {@link DistinctExecutor} for distinct order-by queries with multiple dictionary-encoded columns.
  */
 public class DictionaryBasedMultiColumnDistinctOrderByExecutor extends BaseDictionaryBasedMultiColumnDistinctExecutor {
+  private final boolean _hasMVExpression;
   private final PriorityQueue<DictIds> _priorityQueue;
 
-  public DictionaryBasedMultiColumnDistinctOrderByExecutor(List<ExpressionContext> expressions,
+  public DictionaryBasedMultiColumnDistinctOrderByExecutor(List<ExpressionContext> expressions, boolean hasMVExpression,
       List<Dictionary> dictionaries, List<DataType> dataTypes, List<OrderByExpressionContext> orderByExpressions,
       int limit) {
     super(expressions, dictionaries, dataTypes, limit);
+    _hasMVExpression = hasMVExpression;
 
     int numOrderByExpressions = orderByExpressions.size();
     int[] orderByExpressionIndices = new int[numOrderByExpressions];
@@ -67,31 +70,53 @@ public class DictionaryBasedMultiColumnDistinctOrderByExecutor extends BaseDicti
   public boolean process(TransformBlock transformBlock) {
     int numDocs = transformBlock.getNumDocs();
     int numExpressions = _expressions.size();
-    int[][] dictIdsArray = new int[numDocs][numExpressions];
-    for (int i = 0; i < numExpressions; i++) {
-      BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expressions.get(i));
-      int[] dictIdsForExpression = blockValueSet.getDictionaryIdsSV();
-      for (int j = 0; j < numDocs; j++) {
-        dictIdsArray[j][i] = dictIdsForExpression[j];
+    if (!_hasMVExpression) {
+      int[][] dictIdsArray = new int[numDocs][numExpressions];
+      for (int i = 0; i < numExpressions; i++) {
+        BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expressions.get(i));
+        int[] dictIdsForExpression = blockValueSet.getDictionaryIdsSV();
+        for (int j = 0; j < numDocs; j++) {
+          dictIdsArray[j][i] = dictIdsForExpression[j];
+        }
       }
-    }
-    for (int i = 0; i < numDocs; i++) {
-      DictIds dictIds = new DictIds(dictIdsArray[i]);
-      if (!_dictIdsSet.contains(dictIds)) {
-        if (_dictIdsSet.size() < _limit) {
-          _dictIdsSet.add(dictIds);
-          _priorityQueue.enqueue(dictIds);
+      for (int i = 0; i < numDocs; i++) {
+        add(new DictIds(dictIdsArray[i]));
+      }
+    } else {
+      int[][] svDictIds = new int[numExpressions][];
+      int[][][] mvDictIds = new int[numExpressions][][];
+      for (int i = 0; i < numExpressions; i++) {
+        BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expressions.get(i));
+        if (blockValueSet.isSingleValue()) {
+          svDictIds[i] = blockValueSet.getDictionaryIdsSV();
         } else {
-          DictIds firstDictIds = _priorityQueue.first();
-          if (_priorityQueue.comparator().compare(dictIds, firstDictIds) > 0) {
-            _dictIdsSet.remove(firstDictIds);
-            _dictIdsSet.add(dictIds);
-            _priorityQueue.dequeue();
-            _priorityQueue.enqueue(dictIds);
-          }
+          mvDictIds[i] = blockValueSet.getDictionaryIdsMV();
+        }
+      }
+      for (int i = 0; i < numDocs; i++) {
+        int[][] dictIdsArray = DistinctExecutorUtils.getDictIds(svDictIds, mvDictIds, i);
+        for (int[] dictIds : dictIdsArray) {
+          add(new DictIds(dictIds));
         }
       }
     }
     return false;
+  }
+
+  private void add(DictIds dictIds) {
+    if (!_dictIdsSet.contains(dictIds)) {
+      if (_dictIdsSet.size() < _limit) {
+        _dictIdsSet.add(dictIds);
+        _priorityQueue.enqueue(dictIds);
+      } else {
+        DictIds firstDictIds = _priorityQueue.first();
+        if (_priorityQueue.comparator().compare(dictIds, firstDictIds) > 0) {
+          _dictIdsSet.remove(firstDictIds);
+          _dictIdsSet.add(dictIds);
+          _priorityQueue.dequeue();
+          _priorityQueue.enqueue(dictIds);
+        }
+      }
+    }
   }
 }

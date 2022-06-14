@@ -160,6 +160,15 @@ public class ClusterInfoAccessor {
   }
 
   /**
+   * Get the data dir.
+   *
+   * @return the data dir.
+   */
+  public String getDataDir() {
+    return _controllerConf.getDataDir();
+  }
+
+  /**
    * Get the cluster config for a given config name, return null if not found.
    *
    * @return cluster config

@@ -115,6 +115,14 @@ public class SegmentFetcherFactoryTest {
     }
 
     @Override
+    public File fetchUntarSegmentToLocalStreamed(URI uri, File dest, long rateLimit)
+        throws Exception {
+      assertEquals(uri, new URI(TEST_URI));
+      _fetchFileToLocalCalled++;
+      return new File("fakeSegmentIndexFile");
+    }
+
+    @Override
     public void fetchSegmentToLocal(List<URI> uri, File dest)
         throws Exception {
       throw new UnsupportedOperationException();

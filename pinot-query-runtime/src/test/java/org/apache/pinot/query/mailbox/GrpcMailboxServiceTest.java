@@ -24,7 +24,7 @@ import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.common.proto.Mailbox;
-import org.apache.pinot.query.runtime.blocks.DataBlockUtils;
+import org.apache.pinot.core.common.datablock.DataBlockUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;

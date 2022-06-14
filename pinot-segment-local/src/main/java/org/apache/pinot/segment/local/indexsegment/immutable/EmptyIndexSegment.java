@@ -113,4 +113,10 @@ public class EmptyIndexSegment implements ImmutableSegment {
   public long getSegmentSizeBytes() {
     return 0;
   }
+
+  @Nullable
+  @Override
+  public String getTier() {
+    return null;
+  }
 }

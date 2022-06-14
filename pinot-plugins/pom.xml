@@ -126,10 +126,6 @@
                       <shadedPattern>${shade.prefix}.org.apache.parquet</shadedPattern>
                     </relocation>
                     <relocation>
-                      <pattern>org.apache.hadoop</pattern>
-                      <shadedPattern>${shade.prefix}.org.apache.hadoop</shadedPattern>
-                    </relocation>
-                    <relocation>
                       <pattern>org.apache.kafka</pattern>
                       <shadedPattern>${shade.prefix}.org.apache.kafka</shadedPattern>
                     </relocation>

@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -148,6 +149,19 @@ public abstract class SegmentDirectory implements Closeable {
   public void copyTo(File dest)
       throws Exception {
   }
+
+  /**
+   * Get the storage tier where the segment directory is placed by server.
+   *
+   * @return storage tier, null by default.
+   */
+  @Nullable
+  public abstract String getTier();
+
+  /**
+   * Set the storage tier where the segment directory is placed by server.
+   */
+  public abstract void setTier(@Nullable String tier);
 
   /**
    * Reader for columnar index buffers from segment directory

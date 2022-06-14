@@ -568,16 +568,23 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * Test DISTINCT query within a single segment.
    * <p>The following query types are tested:
    * <ul>
-   *   <li>Selecting all dictionary-encoded columns</li>
+   *   <li>Selecting all dictionary-encoded SV columns</li>
+   *   <li>Selecting all dictionary-encoded MV columns</li>
+   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
    *   <li>Selecting some columns with filter</li>
+   *   <li>Selecting some columns order by MV column</li>
    *   <li>Selecting some columns order by raw BYTES column</li>
    *   <li>Selecting some columns transform, filter, order-by and limit</li>
    *   <li>Selecting some columns with filter that does not match any record</li>
    * </ul>
    */
   private void testDistinctInnerSegmentHelper(String[] queries) {
+    assertEquals(queries.length, 8);
+
+    // Selecting all dictionary-encoded SV columns
+    // SELECT DISTINCT intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn
+    // FROM testTable LIMIT 10000
     {
-      // Test selecting all dictionary-encoded columns
       DistinctTable distinctTable = getDistinctTableInnerSegment(queries[0]);
 
       // Check data schema
@@ -610,35 +617,138 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }
       assertEquals(actualValues, expectedValues);
     }
+
+    // Selecting all dictionary-encoded MV columns
+    // SELECT DISTINCT intMVColumn, longMVColumn, floatMVColumn, doubleMVColumn, stringMVColumn
+    // FROM testTable LIMIT 10000
     {
-      // Test selecting some columns with filter
       DistinctTable distinctTable = getDistinctTableInnerSegment(queries[1]);
 
       // Check data schema
-      DataSchema expectedDataSchema = new DataSchema(new String[]{"stringColumn", "bytesColumn", "floatColumn"},
-          new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.FLOAT});
+      DataSchema expectedDataSchema = new DataSchema(new String[]{
+          "intMVColumn", "longMVColumn", "floatMVColumn", "doubleMVColumn", "stringMVColumn"
+      }, new ColumnDataType[]{
+          ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE, ColumnDataType.STRING
+      });
       assertEquals(distinctTable.getDataSchema(), expectedDataSchema);
 
-      // Check values, where 40 matched values should be returned
-      assertEquals(distinctTable.size(), NUM_UNIQUE_RECORDS_PER_SEGMENT - 60);
+      // Check values, where all 100 * 2^5 unique combinations should be returned
+      int numUniqueCombinations = NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 5);
+      assertEquals(distinctTable.size(), numUniqueCombinations);
+      assertFalse(distinctTable.isMainTable());
+      Set<List<Integer>> actualValues = new HashSet<>();
+      for (Record record : distinctTable.getRecords()) {
+        Object[] values = record.getValues();
+        int intValue = (Integer) values[0];
+        List<Integer> actualValueList =
+            Arrays.asList(intValue, ((Long) values[1]).intValue(), ((Float) values[2]).intValue(),
+                ((Double) values[3]).intValue(), Integer.parseInt((String) values[4]));
+        List<Integer> expectedValues = new ArrayList<>(2);
+        expectedValues.add(intValue % NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        expectedValues.add(intValue % NUM_UNIQUE_RECORDS_PER_SEGMENT + NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        for (Integer actualValue : actualValueList) {
+          assertTrue(expectedValues.contains(actualValue));
+        }
+        actualValues.add(actualValueList);
+      }
+      assertEquals(actualValues.size(), numUniqueCombinations);
+    }
+
+    // Selecting some SV columns (including raw) and some MV columns
+    // SELECT DISTINCT longColumn, rawBigDecimalColumn, floatMVColumn, stringMVColumn FROM testTable LIMIT 10000
+    {
+      DistinctTable distinctTable = getDistinctTableInnerSegment(queries[2]);
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{
+          "longColumn", "rawBigDecimalColumn", "floatMVColumn", "stringMVColumn"
+      }, new ColumnDataType[]{
+          ColumnDataType.LONG, ColumnDataType.BIG_DECIMAL, ColumnDataType.FLOAT, ColumnDataType.STRING
+      });
+      assertEquals(distinctTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where all 100 * 2^2 unique combinations should be returned
+      int numUniqueCombinations = NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 2);
+      assertEquals(distinctTable.size(), numUniqueCombinations);
+      assertTrue(distinctTable.isMainTable());
+      Set<List<Integer>> actualValues = new HashSet<>();
+      for (Record record : distinctTable.getRecords()) {
+        Object[] values = record.getValues();
+        int intValue = ((Long) values[0]).intValue();
+        List<Integer> actualValueList =
+            Arrays.asList(intValue, ((BigDecimal) values[1]).intValue(), ((Float) values[2]).intValue(),
+                Integer.parseInt((String) values[3]));
+        assertEquals((int) actualValueList.get(1), intValue);
+        List<Integer> expectedMVValues = new ArrayList<>(2);
+        expectedMVValues.add(intValue);
+        expectedMVValues.add(intValue + NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        assertTrue(expectedMVValues.contains(actualValueList.get(2)));
+        assertTrue(expectedMVValues.contains(actualValueList.get(3)));
+        actualValues.add(actualValueList);
+      }
+      assertEquals(actualValues.size(), numUniqueCombinations);
+    }
+
+    // Selecting some columns with filter
+    // SELECT DISTINCT stringColumn, bytesColumn, intMVColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000
+    {
+      DistinctTable distinctTable = getDistinctTableInnerSegment(queries[3]);
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{"stringColumn", "bytesColumn", "intMVColumn"},
+          new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.INT});
+      assertEquals(distinctTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where 40 * 2 matched combinations should be returned
+      int numMatchedCombinations = (NUM_UNIQUE_RECORDS_PER_SEGMENT - 60) * 2;
+      assertEquals(distinctTable.size(), numMatchedCombinations);
+      assertFalse(distinctTable.isMainTable());
+      Set<List<Integer>> actualValues = new HashSet<>();
+      for (Record record : distinctTable.getRecords()) {
+        Object[] values = record.getValues();
+        int intValue = Integer.parseInt((String) values[0]);
+        assertTrue(intValue >= 60);
+        List<Integer> actualValueList =
+            Arrays.asList(intValue, Integer.parseInt(new String(((ByteArray) values[1]).getBytes(), UTF_8).trim()),
+                (Integer) values[2]);
+        assertEquals((int) actualValueList.get(1), intValue);
+        assertTrue((Integer) values[2] == intValue || (Integer) values[2] == intValue + NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        actualValues.add(actualValueList);
+      }
+      assertEquals(actualValues.size(), numMatchedCombinations);
+    }
+
+    // Selecting some columns order by MV column
+    // SELECT DISTINCT floatColumn, doubleMVColumn FROM testTable ORDER BY doubleMVColumn DESC
+    {
+      DistinctTable distinctTable = getDistinctTableInnerSegment(queries[4]);
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "doubleMVColumn"},
+          new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.DOUBLE});
+      assertEquals(distinctTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where only 10 top values should be returned
+      assertEquals(distinctTable.size(), 10);
       assertFalse(distinctTable.isMainTable());
       Set<Integer> expectedValues = new HashSet<>();
-      for (int i = 60; i < NUM_UNIQUE_RECORDS_PER_SEGMENT; i++) {
-        expectedValues.add(i);
+      for (int i = 0; i < 10; i++) {
+        expectedValues.add(NUM_UNIQUE_RECORDS_PER_SEGMENT * 2 - i - 1);
       }
       Set<Integer> actualValues = new HashSet<>();
       for (Record record : distinctTable.getRecords()) {
         Object[] values = record.getValues();
-        int intValue = Integer.parseInt((String) values[0]);
-        assertEquals(new String(((ByteArray) values[1]).getBytes(), UTF_8).trim(), values[0]);
-        assertEquals(((Float) values[2]).intValue(), intValue);
-        actualValues.add(intValue);
+        int actualValue = ((Double) values[1]).intValue();
+        assertEquals(((Float) values[0]).intValue(), actualValue - NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        actualValues.add(actualValue);
       }
       assertEquals(actualValues, expectedValues);
     }
+
+    // Selecting some columns order by raw BYTES column
+    // SELECT DISTINCT intColumn, rawBytesColumn FROM testTable ORDER BY rawBytesColumn LIMIT 5
     {
-      // Test selecting some columns order by BYTES column
-      DistinctTable distinctTable = getDistinctTableInnerSegment(queries[2]);
+      DistinctTable distinctTable = getDistinctTableInnerSegment(queries[5]);
 
       // Check data schema
       DataSchema expectedDataSchema = new DataSchema(new String[]{"intColumn", "rawBytesColumn"},
@@ -659,10 +769,12 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals(Integer.parseInt(new String(((ByteArray) values[1]).getBytes(), UTF_8)), intValue);
       }
     }
+
+    // Selecting some columns transform, filter, order-by and limit
+    // SELECT DISTINCT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60
+    // ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10
     {
-      // Test selecting some columns with transform, filter, order-by and limit. Spaces in 'add' are intentional
-      // to ensure that AggregationFunction arguments are standardized (to remove spaces).
-      DistinctTable distinctTable = getDistinctTableInnerSegment(queries[3]);
+      DistinctTable distinctTable = getDistinctTableInnerSegment(queries[6]);
 
       // Check data schema
       DataSchema expectedDataSchema = new DataSchema(new String[]{"add(intColumn,floatColumn)", "stringColumn"},
@@ -681,12 +793,14 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals(Integer.parseInt((String) values[1]), intValue);
       }
     }
-    {
-      // Test selecting some columns with filter that does not match any record
-      DistinctTable distinctTable = getDistinctTableInnerSegment(queries[4]);
 
-      // Check data schema, where data type should be STRING for all columns
-      DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "longColumn"},
+    // Selecting some columns with filter that does not match any record
+    // SELECT DISTINCT floatColumn, longMVColumn FROM testTable WHERE stringColumn = 'a' ORDER BY longMVColumn
+    {
+      DistinctTable distinctTable = getDistinctTableInnerSegment(queries[7]);
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "longMVColumn"},
           new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.LONG});
       assertEquals(distinctTable.getDataSchema(), expectedDataSchema);
 
@@ -700,8 +814,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * Test DISTINCT query within a single segment.
    * <p>The following query types are tested:
    * <ul>
-   *   <li>Selecting all dictionary-encoded columns</li>
+   *   <li>Selecting all dictionary-encoded SV columns</li>
+   *   <li>Selecting all dictionary-encoded MV columns</li>
+   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
    *   <li>Selecting some columns with filter</li>
+   *   <li>Selecting some columns order by MV column</li>
    *   <li>Selecting some columns order by raw BYTES column</li>
    *   <li>Selecting some columns transform, filter, order-by and limit</li>
    *   <li>Selecting some columns with filter that does not match any record</li>
@@ -713,12 +830,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     testDistinctInnerSegmentHelper(new String[]{
         "SELECT DISTINCT intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn "
             + "FROM testTable LIMIT 10000",
-        "SELECT DISTINCT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000",
+        "SELECT DISTINCT intMVColumn, longMVColumn, floatMVColumn, doubleMVColumn, stringMVColumn FROM testTable "
+            + "LIMIT 10000",
+        "SELECT DISTINCT longColumn, rawBigDecimalColumn, floatMVColumn, stringMVColumn FROM testTable LIMIT 10000",
+        "SELECT DISTINCT stringColumn, bytesColumn, intMVColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000",
+        "SELECT DISTINCT floatColumn, doubleMVColumn FROM testTable ORDER BY doubleMVColumn DESC",
         "SELECT DISTINCT intColumn, rawBytesColumn FROM testTable ORDER BY rawBytesColumn LIMIT 5",
         "SELECT DISTINCT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 "
             + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
-        "SELECT DISTINCT floatColumn, longColumn FROM testTable WHERE stringColumn = 'a' "
-            + "ORDER BY longColumn LIMIT 10"
+        "SELECT DISTINCT floatColumn, longMVColumn FROM testTable WHERE stringColumn = 'a' ORDER BY longMVColumn"
     });
     //@formatter:on
   }
@@ -727,8 +847,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * Test Non-Aggregation GroupBy query rewrite to Distinct query within a single segment.
    * <p>The following query types are tested:
    * <ul>
-   *   <li>Selecting all dictionary-encoded columns</li>
+   *   <li>Selecting all dictionary-encoded SV columns</li>
+   *   <li>Selecting all dictionary-encoded MV columns</li>
+   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
    *   <li>Selecting some columns with filter</li>
+   *   <li>Selecting some columns order by MV column</li>
    *   <li>Selecting some columns order by raw BYTES column</li>
    *   <li>Selecting some columns transform, filter, order-by and limit</li>
    *   <li>Selecting some columns with filter that does not match any record</li>
@@ -742,15 +865,21 @@ public class DistinctQueriesTest extends BaseQueriesTest {
             + "FROM testTable "
             + "GROUP BY intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn "
             + "LIMIT 10000",
-        "SELECT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 "
-            + "GROUP BY stringColumn, bytesColumn, floatColumn LIMIT 10000",
+        "SELECT intMVColumn, longMVColumn, floatMVColumn, doubleMVColumn, stringMVColumn FROM testTable "
+            + "GROUP BY intMVColumn, longMVColumn, floatMVColumn, doubleMVColumn, stringMVColumn LIMIT 10000",
+        "SELECT longColumn, rawBigDecimalColumn, floatMVColumn, stringMVColumn FROM testTable "
+            + "GROUP BY longColumn, rawBigDecimalColumn, floatMVColumn, stringMVColumn LIMIT 10000",
+        "SELECT stringColumn, bytesColumn, intMVColumn FROM testTable WHERE intColumn >= 60 "
+            + "GROUP BY stringColumn, bytesColumn, intMVColumn LIMIT 10000",
+        "SELECT floatColumn, doubleMVColumn FROM testTable "
+            + "GROUP BY floatColumn, doubleMVColumn ORDER BY doubleMVColumn DESC",
         "SELECT intColumn, rawBytesColumn FROM testTable "
             + "GROUP BY intColumn, rawBytesColumn ORDER BY rawBytesColumn LIMIT 5",
         "SELECT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 "
             + "GROUP BY ADD(intColumn, floatColumn), stringColumn "
             + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
-        "SELECT floatColumn, longColumn FROM testTable WHERE stringColumn = 'a' "
-            + "GROUP BY floatColumn, longColumn ORDER BY longColumn LIMIT 10"
+        "SELECT floatColumn, longMVColumn FROM testTable WHERE stringColumn = 'a' "
+            + "GROUP BY floatColumn, longMVColumn ORDER BY longMVColumn"
     });
     //@formatter:on
   }
@@ -771,8 +900,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * Test DISTINCT query across multiple segments and servers (2 servers, each with 2 segments).
    * <p>The following query types are tested:
    * <ul>
-   *   <li>Selecting all dictionary-encoded columns</li>
+   *   <li>Selecting all dictionary-encoded SV columns</li>
+   *   <li>Selecting all dictionary-encoded MV columns</li>
+   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
    *   <li>Selecting some columns with filter</li>
+   *   <li>Selecting some columns order by MV column</li>
    *   <li>Selecting some columns order by raw BYTES column</li>
    *   <li>Selecting some columns transform, filter, order-by and limit</li>
    *   <li>Selecting some columns with filter that does not match any record</li>
@@ -780,15 +912,16 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    *     Selecting some columns with filter that does not match any record in one segment but matches some records in
    *     the other segment
    *   </li>
-   *   <li>
-   *     Selecting some columns with filter that does not match any record in one server but matches some records in the
-   *     other server
-   *   </li>
+   *   TODO: Support alias and add a test for that
    * </ul>
    */
   private void testDistinctInterSegmentHelper(String[] queries) {
+    assertEquals(queries.length, 9);
+
+    // Selecting all dictionary-encoded SV columns
+    // SELECT DISTINCT intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn
+    // FROM testTable LIMIT 10000
     {
-      // Test selecting all columns
       ResultTable resultTable = getBrokerResponse(queries[0]).getResultTable();
 
       // Check data schema
@@ -821,37 +954,133 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }
       assertEquals(actualValues, expectedValues);
     }
+
+    // Selecting all dictionary-encoded MV columns
+    // SELECT DISTINCT intMVColumn, longMVColumn, floatMVColumn, doubleMVColumn, stringMVColumn FROM testTable
+    // LIMIT 10000
     {
-      // Test selecting some columns with filter
       ResultTable resultTable = getBrokerResponse(queries[1]).getResultTable();
 
       // Check data schema
-      DataSchema expectedDataSchema = new DataSchema(new String[]{"stringColumn", "bytesColumn", "floatColumn"},
-          new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.FLOAT});
+      DataSchema expectedDataSchema = new DataSchema(new String[]{
+          "intMVColumn", "longMVColumn", "floatMVColumn", "doubleMVColumn", "stringMVColumn"
+      }, new ColumnDataType[]{
+          ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE, ColumnDataType.STRING
+      });
       assertEquals(resultTable.getDataSchema(), expectedDataSchema);
 
-      // Check values, where 140 matched values should be returned
+      // Check values, where all 200 * 2^5 unique values should be returned
+      int numUniqueCombinations = 2 * NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 5);
       List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 2 * NUM_UNIQUE_RECORDS_PER_SEGMENT - 60);
-      Set<Integer> expectedValues = new HashSet<>();
-      for (int i = 0; i < NUM_UNIQUE_RECORDS_PER_SEGMENT; i++) {
-        if (i >= 60) {
-          expectedValues.add(i);
+      assertEquals(rows.size(), numUniqueCombinations);
+      Set<List<Integer>> actualValues = new HashSet<>();
+      for (Object[] row : rows) {
+        int intValue = (Integer) row[0];
+        List<Integer> actualValueList = Arrays.asList(intValue, ((Long) row[1]).intValue(), ((Float) row[2]).intValue(),
+            ((Double) row[3]).intValue(), Integer.parseInt((String) row[4]));
+        List<Integer> expectedValues = new ArrayList<>(2);
+        if (intValue < 1000) {
+          expectedValues.add(intValue % NUM_UNIQUE_RECORDS_PER_SEGMENT);
+          expectedValues.add(intValue % NUM_UNIQUE_RECORDS_PER_SEGMENT + NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        } else {
+          expectedValues.add(intValue % NUM_UNIQUE_RECORDS_PER_SEGMENT + 1000);
+          expectedValues.add(intValue % NUM_UNIQUE_RECORDS_PER_SEGMENT + NUM_UNIQUE_RECORDS_PER_SEGMENT + 1000);
         }
-        expectedValues.add(1000 + i);
+        for (Integer actualValue : actualValueList) {
+          assertTrue(expectedValues.contains(actualValue));
+        }
+        actualValues.add(actualValueList);
       }
-      Set<Integer> values = new HashSet<>();
+      assertEquals(actualValues.size(), numUniqueCombinations);
+    }
+
+    // Selecting some SV columns (including raw) and some MV columns
+    // SELECT DISTINCT longColumn, rawBigDecimalColumn, floatMVColumn, stringMVColumn FROM testTable LIMIT 10000
+    {
+      ResultTable resultTable = getBrokerResponse(queries[2]).getResultTable();
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{
+          "longColumn", "rawBigDecimalColumn", "floatMVColumn", "stringMVColumn"
+      }, new ColumnDataType[]{
+          ColumnDataType.LONG, ColumnDataType.BIG_DECIMAL, ColumnDataType.FLOAT, ColumnDataType.STRING
+      });
+      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where all 200 * 2^2 unique values should be returned
+      int numUniqueCombinations = 2 * NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 2);
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), numUniqueCombinations);
+      Set<List<Integer>> actualValues = new HashSet<>();
+      for (Object[] row : rows) {
+        int intValue = ((Long) row[0]).intValue();
+        List<Integer> actualValueList =
+            Arrays.asList(intValue, ((BigDecimal) row[1]).intValue(), ((Float) row[2]).intValue(),
+                Integer.parseInt((String) row[3]));
+        assertEquals((int) actualValueList.get(1), intValue);
+        List<Integer> expectedMVValues = new ArrayList<>(2);
+        expectedMVValues.add(intValue);
+        expectedMVValues.add(intValue + NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        assertTrue(expectedMVValues.contains(actualValueList.get(2)));
+        assertTrue(expectedMVValues.contains(actualValueList.get(3)));
+        actualValues.add(actualValueList);
+      }
+      assertEquals(actualValues.size(), numUniqueCombinations);
+    }
+
+    // Selecting some columns with filter
+    // SELECT DISTINCT stringColumn, bytesColumn, intMVColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000
+    {
+      ResultTable resultTable = getBrokerResponse(queries[3]).getResultTable();
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{"stringColumn", "bytesColumn", "intMVColumn"},
+          new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.INT});
+      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where 140 * 2 matched values should be returned
+      int numMatchedCombinations = (2 * NUM_UNIQUE_RECORDS_PER_SEGMENT - 60) * 2;
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), numMatchedCombinations);
+      Set<List<Integer>> actualValues = new HashSet<>();
       for (Object[] row : rows) {
         int intValue = Integer.parseInt((String) row[0]);
-        assertEquals(new String(BytesUtils.toBytes((String) row[1]), UTF_8).trim(), row[0]);
-        assertEquals(((Float) row[2]).intValue(), intValue);
-        values.add(intValue);
+        assertTrue(intValue >= 60);
+        List<Integer> actualValueList =
+            Arrays.asList(intValue, Integer.parseInt(new String(BytesUtils.toBytes((String) row[1]), UTF_8).trim()),
+                (Integer) row[2]);
+        assertEquals((int) actualValueList.get(1), intValue);
+        assertTrue((Integer) row[2] == intValue || (Integer) row[2] == intValue + NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        actualValues.add(actualValueList);
       }
-      assertEquals(values, expectedValues);
+      assertEquals(actualValues.size(), numMatchedCombinations);
     }
+
+    // Selecting some columns order by MV column
+    // SELECT DISTINCT floatColumn, doubleMVColumn FROM testTable ORDER BY doubleMVColumn DESC
     {
-      // Test selecting some columns order by BYTES column
-      ResultTable resultTable = getBrokerResponse(queries[2]).getResultTable();
+      ResultTable resultTable = getBrokerResponse(queries[4]).getResultTable();
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "doubleMVColumn"},
+          new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.DOUBLE});
+      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where only 10 top values should be returned
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 10);
+      for (int i = 0; i < 10; i++) {
+        int expectedValue = NUM_UNIQUE_RECORDS_PER_SEGMENT * 2 + 1000 - i - 1;
+        Object[] row = rows.get(i);
+        assertEquals(((Float) row[0]).intValue(), expectedValue - NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        assertEquals(((Double) row[1]).intValue(), expectedValue);
+      }
+    }
+
+    // Selecting some columns order by raw BYTES column
+    // SELECT DISTINCT intColumn, rawBytesColumn FROM testTable ORDER BY rawBytesColumn LIMIT 5
+    {
+      ResultTable resultTable = getBrokerResponse(queries[5]).getResultTable();
 
       // Check data schema
       DataSchema expectedDataSchema = new DataSchema(new String[]{"intColumn", "rawBytesColumn"},
@@ -871,9 +1100,12 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals(Integer.parseInt(new String(BytesUtils.toBytes((String) row[1]), UTF_8)), intValue);
       }
     }
+
+    // Selecting some columns transform, filter, order-by and limit
+    // SELECT DISTINCT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60
+    // ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10
     {
-      // Test selecting some columns with transform, filter, order-by and limit
-      ResultTable resultTable = getBrokerResponse(queries[3]).getResultTable();
+      ResultTable resultTable = getBrokerResponse(queries[6]).getResultTable();
 
       // Check data schema
       DataSchema expectedDataSchema = new DataSchema(new String[]{"add(intColumn,floatColumn)", "stringColumn"},
@@ -891,22 +1123,26 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals(Integer.parseInt((String) row[1]), intValue);
       }
     }
+
+    // Selecting some columns with filter that does not match any record
+    // SELECT DISTINCT floatColumn, longMVColumn FROM testTable WHERE stringColumn = 'a' ORDER BY longMVColumn
     {
-      // Test selecting some columns with filter that does not match any record
-      ResultTable resultTable = getBrokerResponse(queries[4]).getResultTable();
+      ResultTable resultTable = getBrokerResponse(queries[7]).getResultTable();
 
       // Check data schema, where data type should be STRING for all columns
-      DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "longColumn"},
+      DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "longMVColumn"},
           new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING});
       assertEquals(resultTable.getDataSchema(), expectedDataSchema);
 
       // Check values, where no record should be returned
       assertTrue(resultTable.getRows().isEmpty());
     }
+
+    // Selecting some columns with filter that does not match any record in one segment but matches some records in the
+    // other segment
+    // SELECT DISTINCT intColumn FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5
     {
-      // Test selecting some columns with filter that does not match any record in one segment but matches some
-      // records in the other segment
-      ResultTable resultTable = getBrokerResponse(queries[5]).getResultTable();
+      ResultTable resultTable = getBrokerResponse(queries[8]).getResultTable();
 
       // Check data schema
       DataSchema expectedDataSchema =
@@ -921,32 +1157,17 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals((int) rows.get(i)[0], expectedValues[i]);
       }
     }
-    {
-      // Test electing some columns with filter that does not match any record in one server but matches some records
-      // in the other server
-      ResultTable resultTable = getBrokerResponse(queries[6]).getResultTable();
-
-      // Check data schema
-      DataSchema expectedDataSchema =
-          new DataSchema(new String[]{"longColumn"}, new ColumnDataType[]{ColumnDataType.LONG});
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
-
-      // Check values, where only 5 top values sorted in long format descending order should be returned
-      List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 5);
-      int[] expectedValues = new int[]{99, 98, 97, 96, 95};
-      for (int i = 0; i < 5; i++) {
-        assertEquals(((Long) rows.get(i)[0]).intValue(), expectedValues[i]);
-      }
-    }
   }
 
   /**
    * Test DISTINCT query across multiple segments and servers (2 servers, each with 2 segments).
    * <p>The following query types are tested:
    * <ul>
-   *   <li>Selecting all dictionary-encoded columns</li>
+   *   <li>Selecting all dictionary-encoded SV columns</li>
+   *   <li>Selecting all dictionary-encoded MV columns</li>
+   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
    *   <li>Selecting some columns with filter</li>
+   *   <li>Selecting some columns order by MV column</li>
    *   <li>Selecting some columns order by raw BYTES column</li>
    *   <li>Selecting some columns transform, filter, order-by and limit</li>
    *   <li>Selecting some columns with filter that does not match any record</li>
@@ -954,28 +1175,27 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    *     Selecting some columns with filter that does not match any record in one segment but matches some records in
    *     the other segment
    *   </li>
-   *   <li>
-   *     Selecting some columns with filter that does not match any record in one server but matches some records in the
-   *     other server
-   *   </li>
+   *   TODO: Support alias and add a test for that
    * </ul>
    */
   @Test
   public void testDistinctInterSegment() {
     //@formatter:off
-    String[] queries = new String[]{
+    testDistinctInterSegmentHelper(new String[]{
         "SELECT DISTINCT intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn "
             + "FROM testTable LIMIT 10000",
-        "SELECT DISTINCT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000",
+        "SELECT DISTINCT intMVColumn, longMVColumn, floatMVColumn, doubleMVColumn, stringMVColumn FROM testTable "
+            + "LIMIT 10000",
+        "SELECT DISTINCT longColumn, rawBigDecimalColumn, floatMVColumn, stringMVColumn FROM testTable LIMIT 10000",
+        "SELECT DISTINCT stringColumn, bytesColumn, intMVColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000",
+        "SELECT DISTINCT floatColumn, doubleMVColumn FROM testTable ORDER BY doubleMVColumn DESC",
         "SELECT DISTINCT intColumn, rawBytesColumn FROM testTable ORDER BY rawBytesColumn LIMIT 5",
         "SELECT DISTINCT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 "
             + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
-        "SELECT DISTINCT floatColumn, longColumn FROM testTable WHERE stringColumn = 'a' ORDER BY longColumn LIMIT 10",
-        "SELECT DISTINCT intColumn FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5",
-        "SELECT DISTINCT longColumn FROM testTable WHERE doubleColumn < 200 ORDER BY longColumn DESC LIMIT 5"
-    };
+        "SELECT DISTINCT floatColumn, longMVColumn FROM testTable WHERE stringColumn = 'a' ORDER BY longMVColumn",
+        "SELECT DISTINCT intColumn FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5"
+    });
     //@formatter:on
-    testDistinctInterSegmentHelper(queries);
   }
 
   /**
@@ -983,8 +1203,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * each with 2 segments).
    * <p>The following query types are tested:
    * <ul>
-   *   <li>Selecting all dictionary-encoded columns</li>
+   *   <li>Selecting all dictionary-encoded SV columns</li>
+   *   <li>Selecting all dictionary-encoded MV columns</li>
+   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
    *   <li>Selecting some columns with filter</li>
+   *   <li>Selecting some columns order by MV column</li>
    *   <li>Selecting some columns order by raw BYTES column</li>
    *   <li>Selecting some columns transform, filter, order-by and limit</li>
    *   <li>Selecting some columns with filter that does not match any record</li>
@@ -992,36 +1215,34 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    *     Selecting some columns with filter that does not match any record in one segment but matches some records in
    *     the other segment
    *   </li>
-   *   <li>
-   *     Selecting some columns with filter that does not match any record in one server but matches some records in the
-   *     other server
-   *   </li>
+   *   TODO: Support alias and add a test for that
    * </ul>
    */
   @Test
   public void testNonAggGroupByRewriteToDistinctInterSegment() {
     //@formatter:off
-    String[] queries = new String[]{
+    testDistinctInterSegmentHelper(new String[]{
         "SELECT intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn "
             + "FROM testTable "
             + "GROUP BY intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn "
             + "LIMIT 10000",
-        "SELECT stringColumn, bytesColumn, floatColumn FROM testTable WHERE intColumn >= 60 "
-            + "GROUP BY stringColumn, bytesColumn, floatColumn LIMIT 10000",
-        "SELECT intColumn, rawBytesColumn FROM testTable GROUP BY intColumn, rawBytesColumn "
-            + "ORDER BY rawBytesColumn LIMIT 5",
+        "SELECT intMVColumn, longMVColumn, floatMVColumn, doubleMVColumn, stringMVColumn FROM testTable "
+            + "GROUP BY intMVColumn, longMVColumn, floatMVColumn, doubleMVColumn, stringMVColumn LIMIT 10000",
+        "SELECT longColumn, rawBigDecimalColumn, floatMVColumn, stringMVColumn FROM testTable "
+            + "GROUP BY longColumn, rawBigDecimalColumn, floatMVColumn, stringMVColumn LIMIT 10000",
+        "SELECT stringColumn, bytesColumn, intMVColumn FROM testTable WHERE intColumn >= 60 "
+            + "GROUP BY stringColumn, bytesColumn, intMVColumn LIMIT 10000",
+        "SELECT floatColumn, doubleMVColumn FROM testTable "
+            + "GROUP BY floatColumn, doubleMVColumn ORDER BY doubleMVColumn DESC",
+        "SELECT intColumn, rawBytesColumn FROM testTable "
+            + "GROUP BY intColumn, rawBytesColumn ORDER BY rawBytesColumn LIMIT 5",
         "SELECT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 "
             + "GROUP BY ADD(intColumn, floatColumn), stringColumn "
             + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
-        "SELECT floatColumn, longColumn FROM testTable WHERE stringColumn = 'a' "
-            + "GROUP BY floatColumn, longColumn ORDER BY longColumn LIMIT 10",
-        "SELECT intColumn FROM testTable WHERE floatColumn > 200 GROUP BY intColumn ORDER BY intColumn ASC LIMIT 5",
-        "SELECT longColumn FROM testTable WHERE doubleColumn < 200 GROUP BY longColumn"
-            + " ORDER BY longColumn DESC LIMIT 5",
-        "SELECT longColumn as lc FROM testTable WHERE doubleColumn < 200 GROUP BY longColumn"
-            + " ORDER BY longColumn DESC LIMIT 5"
-    };
+        "SELECT floatColumn, longMVColumn FROM testTable WHERE stringColumn = 'a' "
+            + "GROUP BY floatColumn, longMVColumn ORDER BY longMVColumn",
+        "SELECT intColumn FROM testTable WHERE floatColumn > 200 GROUP BY intColumn ORDER BY intColumn ASC LIMIT 5"
+    });
     //@formatter:on
-    testDistinctInterSegmentHelper(queries);
   }
 }
