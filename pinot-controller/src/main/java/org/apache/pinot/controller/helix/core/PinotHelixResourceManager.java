@@ -100,6 +100,8 @@ import org.apache.pinot.common.messages.TableDeletionMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metadata.task.TaskType;
+import org.apache.pinot.common.metadata.task.TaskZKMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.common.utils.HashUtil;
@@ -1981,6 +1983,42 @@ public class PinotHelixResourceManager {
       instanceSet.addAll(tableIdealState.getInstanceSet(partition));
     }
     return instanceSet;
+  }
+
+  public TaskZKMetadata getTaskZKMetadata(String tableNameWithType, String taskId) {
+    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTask(tableNameWithType, taskId);
+    if (_propertyStore.exists(taskResourcePath, AccessOption.PERSISTENT)) {
+      return new TaskZKMetadata(_propertyStore.get(taskResourcePath, null, -1));
+    } else {
+      return null;
+    }
+  }
+
+  public List<TaskZKMetadata> getAllTasksForTable(String tableNameWithType) {
+    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTaskResource(tableNameWithType);
+    if (_propertyStore.exists(taskResourcePath, AccessOption.PERSISTENT)) {
+      List<ZNRecord> children = _propertyStore.getChildren(taskResourcePath, null, -1, CommonConstants.Helix.ZkClient.RETRY_COUNT,
+          CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
+      List<TaskZKMetadata> tasks = new ArrayList<>();
+      for (ZNRecord child : children) {
+        tasks.add(new TaskZKMetadata(child));
+      }
+      return tasks;
+    } else {
+      return Collections.emptyList();
+    }
+  }
+
+  public void addNewReloadAllSegmentsTask(String tableNameWithType, String taskId, int numberOfMessagesSent) {
+    TaskZKMetadata taskZKMetadata = new TaskZKMetadata(taskId, TaskType.RELOAD_ALL_SEGMENTS);
+    taskZKMetadata.setSimpleField(CommonConstants.Task.TASK_MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
+
+    ZNRecord znRecord = taskZKMetadata.toZNRecord();
+    String taskZKMetaPath = ZKMetadataProvider.constructPropertyStorePathForTask(tableNameWithType, taskId);
+
+    // Todo (saurabh) : Check how to achieve ZNode ttl
+    Preconditions.checkState(_propertyStore.set(taskZKMetaPath, znRecord, AccessOption.PERSISTENT),
+        "Failed to set task ZK metadata for table: " + tableNameWithType + ", taskId: " + taskId);
   }
 
   @VisibleForTesting

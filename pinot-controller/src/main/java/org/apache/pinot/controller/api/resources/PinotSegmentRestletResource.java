@@ -67,6 +67,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metadata.task.TaskZKMetadata;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -585,8 +586,8 @@ public class PinotSegmentRestletResource {
   @GET
   @Path("tables/{tableName}/segmentReloadStatus/{taskId}")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get status for a submitted reload operation", notes = "Get status for a submitted reload "
-      + "operation")
+  @ApiOperation(value = "Get status for a submitted reload operation",
+      notes = "Get status for a submitted reload operation")
   public ServerReloadTaskStatusResponse getReloadTaskStatus(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Reload task id", required = true) @PathParam("taskId") String reloadTaskId)
@@ -619,16 +620,41 @@ public class PinotSegmentRestletResource {
     serverReloadTaskStatusResponse.setSuccessCount(0);
     serverReloadTaskStatusResponse.setTotalSegmentCount(0);
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
-      ServerReloadTaskStatusResponse response =
-          JsonUtils.stringToObject(streamResponse.getValue(), ServerReloadTaskStatusResponse.class);
-      serverReloadTaskStatusResponse.setTotalSegmentCount(
-          serverReloadTaskStatusResponse.getTotalSegmentCount() + response.getTotalSegmentCount());
-      serverReloadTaskStatusResponse.setSuccessCount(
-          serverReloadTaskStatusResponse.getSuccessCount() + response.getSuccessCount());
+      String responseString = streamResponse.getValue();
+      if (responseString != null) {
+        ServerReloadTaskStatusResponse response =
+            JsonUtils.stringToObject(responseString, ServerReloadTaskStatusResponse.class);
+        serverReloadTaskStatusResponse.setTotalSegmentCount(
+            serverReloadTaskStatusResponse.getTotalSegmentCount() + response.getTotalSegmentCount());
+        serverReloadTaskStatusResponse.setSuccessCount(
+            serverReloadTaskStatusResponse.getSuccessCount() + response.getSuccessCount());
+      }
     }
 
     return serverReloadTaskStatusResponse;
   }
+
+  @GET
+  @Path("segments/{tableName}/tasks")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get list of tasks for this table", notes = "Get list of tasks for this table")
+  public List<TaskZKMetadata> getTasks(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr
+  ) {
+    TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
+    List<String> tableNamesWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
+            LOGGER);
+
+    List<TaskZKMetadata> result = new ArrayList<>();
+    for (String tableNameWithType : tableNamesWithType) {
+      result.addAll(_pinotHelixResourceManager.getAllTasksForTable(tableNameWithType));
+    }
+
+    return result;
+  }
+
 
   @POST
   @Path("segments/{tableName}/reload")
@@ -657,9 +683,13 @@ public class PinotSegmentRestletResource {
     for (String tableNameWithType : tableNamesWithType) {
       Pair<Integer, String> msgInfo = _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload);
       perTableMsgData.put(tableNameWithType, msgInfo);
+      // Store in ZK
+      _pinotHelixResourceManager.addNewReloadAllSegmentsTask(tableNameWithType, msgInfo.getRight(), msgInfo.getLeft());
     }
     return new SuccessResponse("Sent " + perTableMsgData + " reload messages");
   }
+
+
 
   @Deprecated
   @POST

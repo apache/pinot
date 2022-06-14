@@ -557,6 +557,17 @@ public class CommonConstants {
     public static final String CONFIG_OF_MINION_QUERY_REWRITER_CLASS_NAMES = "pinot.minion.query.rewriter.class.names";
   }
 
+  public static class Task {
+    /**
+     * Task ZK props
+     */
+
+    public static final String TASK_TYPE = "task.type";
+    public static final String TASK_ID = "task.id";
+    public static final String TASK_SUBMISSION_TIME = "task.submission.time";
+    public static final String TASK_MESSAGE_COUNT = "task.messages.count";
+  }
+
   public static class Segment {
     public static class Realtime {
       public enum Status {

@@ -258,7 +258,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
     List<String> failedSegments = new ArrayList<>();
     List<SegmentMetadata> segmentsMetadata = getAllSegmentsMetadata(tableNameWithType);
-    SegmentReloadTaskStatusCache.addTask(taskId, segmentsMetadata.size());
+
+    if (taskId != null) {
+      SegmentReloadTaskStatusCache.addTask(taskId, segmentsMetadata.size());
+    }
+
     ExecutorService workers = Executors.newCachedThreadPool();
     final AtomicReference<Exception> sampleException = new AtomicReference<>();
     //calling thread hasn't acquired any permit so we don't reload any segments using it.
@@ -268,7 +272,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         segmentRefreshSemaphore.acquireSema(segmentMetadata.getName(), LOGGER);
         try {
           reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
-          SegmentReloadTaskStatusCache.incrementSuccess(taskId);
+          if (taskId != null) {
+            SegmentReloadTaskStatusCache.incrementSuccess(taskId);
+          }
         } finally {
           segmentRefreshSemaphore.releaseSema();
         }

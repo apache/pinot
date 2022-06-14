@@ -55,6 +55,7 @@ public class ZKMetadataProvider {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ZKMetadataProvider.class);
   private static final String CLUSTER_TENANT_ISOLATION_ENABLED_KEY = "tenantIsolationEnabled";
+  private static final String PROPERTYSTORE_TASKS_PREFIX = "/TASKS";
   private static final String PROPERTYSTORE_SEGMENTS_PREFIX = "/SEGMENTS";
   private static final String PROPERTYSTORE_SCHEMAS_PREFIX = "/SCHEMAS";
   private static final String PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX = "/INSTANCE_PARTITIONS";
@@ -97,6 +98,10 @@ public class ZKMetadataProvider {
     return new InstanceZKMetadata(znRecord);
   }
 
+  public static String constructPropertyStorePathForTask(String resourceName, String taskId) {
+    return StringUtil.join("/", PROPERTYSTORE_TASKS_PREFIX, resourceName, taskId);
+  }
+
   public static String constructPropertyStorePathForSegment(String resourceName, String segmentName) {
     return StringUtil.join("/", PROPERTYSTORE_SEGMENTS_PREFIX, resourceName, segmentName);
   }
@@ -107,6 +112,10 @@ public class ZKMetadataProvider {
 
   public static String constructPropertyStorePathForInstancePartitions(String instancePartitionsName) {
     return StringUtil.join("/", PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX, instancePartitionsName);
+  }
+
+  public static String constructPropertyStorePathForTaskResource(String resourceName) {
+    return StringUtil.join("/", PROPERTYSTORE_TASKS_PREFIX, resourceName);
   }
 
   public static String constructPropertyStorePathForResource(String resourceName) {
