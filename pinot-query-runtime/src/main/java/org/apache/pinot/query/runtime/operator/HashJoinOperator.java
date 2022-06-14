@@ -25,14 +25,15 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.common.datablock.BaseDataBlock;
+import org.apache.pinot.core.common.datablock.DataBlockBuilder;
+import org.apache.pinot.core.common.datablock.DataBlockUtils;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
-import org.apache.pinot.query.runtime.blocks.BaseDataBlock;
-import org.apache.pinot.query.runtime.blocks.DataBlockBuilder;
-import org.apache.pinot.query.runtime.blocks.DataBlockUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 
 
 /**
@@ -86,14 +87,14 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     try {
       return new TransferableBlock(buildJoinedDataBlock(_leftTableOperator.nextBlock()));
     } catch (Exception e) {
-      return DataBlockUtils.getErrorTransferableBlock(e);
+      return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
   }
 
   private void buildBroadcastHashTable() {
     if (!_isHashTableBuilt) {
       TransferableBlock rightBlock = _rightTableOperator.nextBlock();
-      while (!DataBlockUtils.isEndOfStream(rightBlock)) {
+      while (!TransferableBlockUtils.isEndOfStream(rightBlock)) {
         BaseDataBlock dataBlock = rightBlock.getDataBlock();
         _rightTableSchema = dataBlock.getDataSchema();
         int numRows = dataBlock.getNumberOfRows();
@@ -112,7 +113,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
 
   private BaseDataBlock buildJoinedDataBlock(TransferableBlock block)
       throws Exception {
-    if (DataBlockUtils.isEndOfStream(block)) {
+    if (TransferableBlockUtils.isEndOfStream(block)) {
       return DataBlockUtils.getEndOfStreamDataBlock();
     }
     List<Object[]> rows = new ArrayList<>();

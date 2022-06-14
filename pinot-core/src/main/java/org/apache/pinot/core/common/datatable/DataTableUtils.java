@@ -56,7 +56,7 @@ public class DataTableUtils {
    * @param columnOffsets array of column offsets.
    * @return row size in bytes.
    */
-  public static int computeColumnOffsets(DataSchema dataSchema, int[] columnOffsets) {
+  public static int computeColumnOffsets(DataSchema dataSchema, int[] columnOffsets, int dataTableVersion) {
     int numColumns = columnOffsets.length;
     assert numColumns == dataSchema.size();
 
@@ -71,10 +71,12 @@ public class DataTableUtils {
         case LONG:
           rowSizeInBytes += 8;
           break;
-        // TODO: fix float size (should be 4).
-        // For backward compatible, DON'T CHANGE.
         case FLOAT:
-          rowSizeInBytes += 8;
+          if (dataTableVersion >= 4) {
+            rowSizeInBytes += 4;
+          } else {
+            rowSizeInBytes += 8;
+          }
           break;
         case DOUBLE:
           rowSizeInBytes += 8;

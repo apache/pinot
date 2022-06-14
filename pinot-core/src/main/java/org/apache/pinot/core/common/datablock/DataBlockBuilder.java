@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.blocks;
+package org.apache.pinot.core.common.datablock;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.common.datatable.DataTableUtils;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -73,7 +72,7 @@ public class DataBlockBuilder {
       }
     } else if (_blockType == BaseDataBlock.Type.ROW) {
       _columnOffsets = new int[_numColumns];
-      _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets);
+      _rowSizeInBytes = DataBlockUtils.computeColumnOffsets(dataSchema, _columnOffsets);
     }
   }
 

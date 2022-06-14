@@ -30,6 +30,9 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.common.datablock.BaseDataBlock;
+import org.apache.pinot.core.common.datablock.DataBlockBuilder;
+import org.apache.pinot.core.common.datablock.DataBlockUtils;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -37,10 +40,8 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
-import org.apache.pinot.query.runtime.blocks.BaseDataBlock;
-import org.apache.pinot.query.runtime.blocks.DataBlockBuilder;
-import org.apache.pinot.query.runtime.blocks.DataBlockUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -122,7 +123,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     if (_dataTableBlockBaseOperator != null) {
       transferableBlock = _dataTableBlockBaseOperator.nextBlock();
       dataTable = transferableBlock.getDataBlock();
-      isEndOfStream = DataBlockUtils.isEndOfStream(transferableBlock);
+      isEndOfStream = TransferableBlockUtils.isEndOfStream(transferableBlock);
     } else {
       dataTable = _dataTable;
       isEndOfStream = true;
