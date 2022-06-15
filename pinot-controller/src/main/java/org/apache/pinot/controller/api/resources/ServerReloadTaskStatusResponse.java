@@ -19,8 +19,17 @@
 package org.apache.pinot.controller.api.resources;
 
 public class ServerReloadTaskStatusResponse {
+  private long _taskSubmissionTimeInMillisEpoch;
   private int _totalSegmentCount;
   private int _successCount;
+
+  public long getTaskSubmissionTimeInMillisEpoch() {
+    return _taskSubmissionTimeInMillisEpoch;
+  }
+
+  public void setTaskSubmissionTimeInMillisEpoch(long taskSubmissionTimeInMillisEpoch) {
+    _taskSubmissionTimeInMillisEpoch = taskSubmissionTimeInMillisEpoch;
+  }
 
   public int getTotalSegmentCount() {
     return _totalSegmentCount;

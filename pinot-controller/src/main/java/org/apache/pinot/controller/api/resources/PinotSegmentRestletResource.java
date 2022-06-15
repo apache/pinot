@@ -67,6 +67,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metadata.task.TaskZKMetadata;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -86,6 +87,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
+import static org.apache.pinot.spi.utils.CommonConstants.Task.TASK_SUBMISSION_TIME;
 
 
 /**
@@ -599,6 +601,8 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Reload task id", required = true) @PathParam("taskId") String reloadTaskId)
       throws Exception {
+    TaskZKMetadata taskZKMetadata = null;
+
     // Call all servers to get status, collate and return
     List<String> tableNamesWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, null, LOGGER);
@@ -607,6 +611,10 @@ public class PinotSegmentRestletResource {
     for (String tableNameWithType : tableNamesWithType) {
       Map<String, List<String>> serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
       instances.addAll(serverToSegments.keySet());
+
+      if (taskZKMetadata == null) {
+        taskZKMetadata = _pinotHelixResourceManager.getTaskZKMetadata(tableNameWithType, reloadTaskId);
+      }
     }
 
     BiMap<String, String> serverEndPoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(instances);
@@ -636,6 +644,13 @@ public class PinotSegmentRestletResource {
         serverReloadTaskStatusResponse.setSuccessCount(
             serverReloadTaskStatusResponse.getSuccessCount() + response.getSuccessCount());
       }
+    }
+
+    // Add ZK data
+    if (taskZKMetadata != null) {
+      // TODO (saurabh) Add more derived fields (timeElapsed, estimatedTimeRemaining etc)
+      serverReloadTaskStatusResponse
+          .setTaskSubmissionTimeInMillisEpoch(Long.parseLong(taskZKMetadata.getSimpleField(TASK_SUBMISSION_TIME)));
     }
 
     return serverReloadTaskStatusResponse;
