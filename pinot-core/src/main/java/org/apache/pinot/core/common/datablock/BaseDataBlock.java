@@ -241,7 +241,7 @@ public abstract class BaseDataBlock implements DataTable {
 
   @Override
   public MutableRoaringBitmap getNullRowIds(int colId) {
-    throw new UnsupportedOperationException("Null bitmaps are not stored in DataTable version 3");
+    return null;
   }
 
   // --------------------------------------------------------------------------

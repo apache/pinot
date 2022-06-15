@@ -308,12 +308,11 @@ public class DataTableImplV4 extends RowDataBlock {
     if (_variableSizeDataBytes != null) {
       dataOutputStream.write(_variableSizeDataBytes);
     }
-    // Write fixed size null vector bytes.
     if (_fixedSizeNullVectorBytes != null) {
+      assert _variableSizeNullVectorBytes != null;
+      // Write fixed size null vector bytes.
       dataOutputStream.write(_fixedSizeNullVectorBytes);
-    }
-    // Write variable size null vector bytes.
-    if (_variableSizeNullVectorBytes != null) {
+      // Write variable size null vector bytes.
       dataOutputStream.write(_variableSizeNullVectorBytes);
     }
   }
