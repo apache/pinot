@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.common.metadata.task;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;

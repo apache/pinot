@@ -227,7 +227,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload)
+  public void reloadSegment(String taskId, String tableNameWithType, String segmentName, boolean forceDownload)
       throws Exception {
     LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);
     SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
@@ -242,8 +242,15 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
 
+    if (taskId != null) {
+      SegmentReloadTaskStatusCache.addTask(taskId, 1);
+    }
+
     reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
 
+    if (taskId != null) {
+      SegmentReloadTaskStatusCache.incrementSuccess(taskId);
+    }
     LOGGER.info("Reloaded single segment: {} in table: {}", segmentName, tableNameWithType);
   }
 

@@ -1997,8 +1997,8 @@ public class PinotHelixResourceManager {
   public List<TaskZKMetadata> getAllTasksForTable(String tableNameWithType) {
     String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTaskResource(tableNameWithType);
     if (_propertyStore.exists(taskResourcePath, AccessOption.PERSISTENT)) {
-      List<ZNRecord> children = _propertyStore.getChildren(taskResourcePath, null, -1, CommonConstants.Helix.ZkClient.RETRY_COUNT,
-          CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
+      List<ZNRecord> children = _propertyStore.getChildren(taskResourcePath, null, -1,
+          CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
       List<TaskZKMetadata> tasks = new ArrayList<>();
       for (ZNRecord child : children) {
         tasks.add(new TaskZKMetadata(child));
@@ -2007,6 +2007,20 @@ public class PinotHelixResourceManager {
     } else {
       return Collections.emptyList();
     }
+  }
+
+  public void addNewReloadSegmentTask(String tableNameWithType, String segmentName, String taskId,
+      int numberOfMessagesSent) {
+    TaskZKMetadata taskZKMetadata = new TaskZKMetadata(taskId, TaskType.RELOAD_SEGMENT);
+    taskZKMetadata.setSimpleField(CommonConstants.Task.TASK_MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
+    taskZKMetadata.setSimpleField(CommonConstants.Task.SEGMENT_RELOAD_TASK_SEGMENT_NAME, segmentName);
+
+    ZNRecord znRecord = taskZKMetadata.toZNRecord();
+    String taskZKMetaPath = ZKMetadataProvider.constructPropertyStorePathForTask(tableNameWithType, taskId);
+
+    // Todo (saurabh) : Check how to achieve ZNode ttl
+    Preconditions.checkState(_propertyStore.set(taskZKMetaPath, znRecord, AccessOption.PERSISTENT),
+        "Failed to set task ZK metadata for table: " + tableNameWithType + ", taskId: " + taskId);
   }
 
   public void addNewReloadAllSegmentsTask(String tableNameWithType, String taskId, int numberOfMessagesSent) {
@@ -2235,7 +2249,7 @@ public class PinotHelixResourceManager {
     return Pair.of(numMessagesSent, segmentReloadMessage.getReloadTaskId());
   }
 
-  public int reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload) {
+  public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload) {
     LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}", segmentName,
         tableNameWithType, forceDownload);
 
@@ -2265,7 +2279,7 @@ public class PinotHelixResourceManager {
     } else {
       LOGGER.warn("No reload message sent for segment: {} in table: {}", segmentName, tableNameWithType);
     }
-    return numMessagesSent;
+    return Pair.of(numMessagesSent, segmentReloadMessage.getReloadTaskId());
   }
 
   /**

@@ -67,7 +67,6 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metadata.task.TaskZKMetadata;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -465,9 +464,17 @@ public class PinotSegmentRestletResource {
     TableType tableType = SegmentName.isRealtimeSegmentName(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
-    int numMessagesSent = _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload);
-    if (numMessagesSent > 0) {
-      return new SuccessResponse("Sent " + numMessagesSent + " reload messages");
+    Pair<Integer, String> msgInfo =
+        _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload);
+    if (msgInfo.getLeft() > 0) {
+      // Store task in ZK
+      try {
+        _pinotHelixResourceManager.addNewReloadSegmentTask(tableNameWithType, segmentName, msgInfo.getRight(),
+            msgInfo.getLeft());
+      } catch (Exception e) {
+        LOGGER.error("Failed to add task meta into zookeeper ", e);
+      }
+      return new SuccessResponse("Sent " + msgInfo + " reload messages");
     } else {
       throw new ControllerApplicationException(LOGGER,
           "Failed to find segment: " + segmentName + " in table: " + tableName, Status.NOT_FOUND);
@@ -564,7 +571,7 @@ public class PinotSegmentRestletResource {
             LOGGER);
     int numMessagesSent = 0;
     for (String tableNameWithType : tableNamesWithType) {
-      numMessagesSent += _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, false);
+      numMessagesSent += _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, false).getLeft();
     }
     return new SuccessResponse("Sent " + numMessagesSent + " reload messages");
   }
@@ -662,7 +669,12 @@ public class PinotSegmentRestletResource {
       Pair<Integer, String> msgInfo = _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload);
       perTableMsgData.put(tableNameWithType, msgInfo);
       // Store in ZK
-      _pinotHelixResourceManager.addNewReloadAllSegmentsTask(tableNameWithType, msgInfo.getRight(), msgInfo.getLeft());
+      try {
+        _pinotHelixResourceManager.addNewReloadAllSegmentsTask(tableNameWithType, msgInfo.getRight(),
+            msgInfo.getLeft());
+      } catch (Exception e) {
+        LOGGER.error("Failed to store task meta in zookepper ", e);
+      }
     }
     return new SuccessResponse("Sent " + perTableMsgData + " reload messages");
   }

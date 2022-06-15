@@ -136,7 +136,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
           // Reload one segment
           _segmentRefreshSemaphore.acquireSema(_segmentName, _logger);
           try {
-            _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload);
+            _instanceDataManager.reloadSegment(_reloadTaskId, _tableNameWithType, _segmentName, _forceDownload);
           } finally {
             _segmentRefreshSemaphore.releaseSema();
           }

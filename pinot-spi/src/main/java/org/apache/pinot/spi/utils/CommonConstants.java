@@ -561,11 +561,15 @@ public class CommonConstants {
     /**
      * Task ZK props
      */
-
     public static final String TASK_TYPE = "task.type";
     public static final String TASK_ID = "task.id";
     public static final String TASK_SUBMISSION_TIME = "task.submission.time";
     public static final String TASK_MESSAGE_COUNT = "task.messages.count";
+
+    /**
+     * Segment reload task ZK props
+     */
+    public static final String SEGMENT_RELOAD_TASK_SEGMENT_NAME = "task.reload.segment.segmentName";
   }
 
   public static class Segment {
