@@ -82,15 +82,13 @@ import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
-import static org.apache.pinot.spi.utils.CommonConstants.Task.SEGMENT_RELOAD_TASK_SEGMENT_NAME;
-import static org.apache.pinot.spi.utils.CommonConstants.Task.TASK_SUBMISSION_TIME;
-import static org.apache.pinot.spi.utils.CommonConstants.Task.TASK_TYPE;
 
 
 /**
@@ -653,8 +651,10 @@ public class PinotSegmentRestletResource {
     if (taskZKMetadata != null) {
       // TODO (saurabh) Add more derived fields (timeElapsed, estimatedTimeRemaining etc)
       serverReloadTaskStatusResponse
-          .setTaskSubmissionTimeInMillisEpoch(Long.parseLong(taskZKMetadata.getSimpleField(TASK_SUBMISSION_TIME)));
-      serverReloadTaskStatusResponse.setTaskType(TaskType.valueOf(taskZKMetadata.getSimpleField(TASK_TYPE)));
+          .setTaskSubmissionTimeInMillisEpoch(
+              Long.parseLong(taskZKMetadata.getSimpleField(CommonConstants.Task.TASK_SUBMISSION_TIME)));
+      serverReloadTaskStatusResponse.setTaskType(
+          TaskType.valueOf(taskZKMetadata.getSimpleField(CommonConstants.Task.TASK_TYPE)));
     }
 
     return serverReloadTaskStatusResponse;
