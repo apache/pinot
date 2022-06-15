@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import com.google.common.cache.CacheBuilder;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.codehaus.jackson.annotate.JsonIgnore;
 
@@ -52,7 +52,10 @@ public class SegmentReloadTaskStatusCache {
   private SegmentReloadTaskStatusCache() {
   }
 
-  private static final Map<String, SegmentReloadStatusValue> SEGMENT_RELOAD_STATUS_MAP = new ConcurrentHashMap<>();
+  private static final ConcurrentMap<String, SegmentReloadStatusValue> SEGMENT_RELOAD_STATUS_MAP =
+      CacheBuilder.newBuilder()
+      .maximumSize(1000L)
+      .<String, SegmentReloadStatusValue>build().asMap();
 
   public static void addTask(String id, long totalSegmentCount) {
     SEGMENT_RELOAD_STATUS_MAP.putIfAbsent(id, new SegmentReloadStatusValue(totalSegmentCount));
