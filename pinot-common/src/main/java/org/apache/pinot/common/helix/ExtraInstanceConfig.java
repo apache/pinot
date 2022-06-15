@@ -47,21 +47,10 @@ public class ExtraInstanceConfig {
   }
 
   /**
-   * Returns an instance URL from the InstanceConfig. Will set the appropriate protocol and port.
+   * Returns an instance URL from the InstanceConfig. Will set the appropriate protocol and port. Returns null
+   * if the URL cannot be constructed.
    */
   public String getComponentUrl() {
-    String hostName = _proxy.getHostName();
-    // Backward-compatible with legacy hostname of format 'Controller_<hostname>'
-    if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE)) {
-      hostName = hostName.substring(CommonConstants.Helix.CONTROLLER_INSTANCE_PREFIX_LENGTH);
-    } else if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
-      hostName = hostName.substring(CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH);
-    } else if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
-      hostName = hostName.substring(CommonConstants.Helix.BROKER_INSTANCE_PREFIX_LENGTH);
-    } else if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE)) {
-      hostName = hostName.substring(CommonConstants.Helix.MINION_INSTANCE_PREFIX_LENGTH);
-    }
-
     String protocol = null;
     String port = null;
     try {
@@ -79,7 +68,7 @@ public class ExtraInstanceConfig {
       }
     }
     if (port != null) {
-      return String.format("%s://%s:%s", protocol, hostName, port);
+      return String.format("%s://%s:%s", protocol, _proxy.getHostName(), port);
     }
     return null;
   }
