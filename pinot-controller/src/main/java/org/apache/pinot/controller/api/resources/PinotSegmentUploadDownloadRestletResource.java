@@ -273,11 +273,7 @@ public class PinotSegmentUploadDownloadRestletResource {
           // else set to false for backward compatibility
           String copySegmentToDeepStore =
               extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE);
-          if (copySegmentToDeepStore != null) {
-            copySegmentToFinalLocation = Boolean.parseBoolean(copySegmentToDeepStore);
-          } else {
-            copySegmentToFinalLocation = false;
-          }
+          copySegmentToFinalLocation = Boolean.parseBoolean(copySegmentToDeepStore);
           createSegmentFileFromMultipart(multiPart, destFile);
           try {
             URI segmentURI = new URI(sourceDownloadURIStr);

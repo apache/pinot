@@ -266,7 +266,7 @@ public class SegmentPushUtils implements Serializable {
                   FileUploadDownloadClient.FileUploadType.METADATA.toString()));
               if (spec.getPushJobSpec() != null) {
                 headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE,
-                    String.valueOf(spec.getPushJobSpec().getMoveToDeepStoreForMetadataPush())));
+                    String.valueOf(spec.getPushJobSpec().getCopyToDeepStoreForMetadataPush())));
               }
               headers.addAll(AuthProviderUtils.toRequestHeaders(authProvider));
 

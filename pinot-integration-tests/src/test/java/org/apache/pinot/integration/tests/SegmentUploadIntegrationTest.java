@@ -113,7 +113,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
     PushJobSpec pushJobSpec = new PushJobSpec();
     // set moveToDeepStoreForMetadataPush to true
-    pushJobSpec.setMoveToDeepStoreForMetadataPush(true);
+    pushJobSpec.setCopyToDeepStoreForMetadataPush(true);
     jobSpec.setPushJobSpec(pushJobSpec);
     PinotFSSpec fsSpec = new PinotFSSpec();
     fsSpec.setScheme("file");
