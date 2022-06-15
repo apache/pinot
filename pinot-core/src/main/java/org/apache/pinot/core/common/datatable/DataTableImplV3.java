@@ -232,7 +232,7 @@ public class DataTableImplV3 extends BaseDataTable {
     // Write exceptions section offset(START|SIZE).
     dataOutputStream.writeInt(dataOffset);
     byte[] exceptionsBytes;
-    exceptionsBytes = serializeExceptions(_errCodeToExceptionMap);
+    exceptionsBytes = serializeExceptions();
     dataOutputStream.writeInt(exceptionsBytes.length);
     dataOffset += exceptionsBytes.length;
 
@@ -372,14 +372,14 @@ public class DataTableImplV3 extends BaseDataTable {
     return metadata;
   }
 
-  protected static byte[] serializeExceptions(Map<Integer, String> errCodeToExceptionMap)
+  protected byte[] serializeExceptions()
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 
-    dataOutputStream.writeInt(errCodeToExceptionMap.size());
+    dataOutputStream.writeInt(_errCodeToExceptionMap.size());
 
-    for (Map.Entry<Integer, String> entry : errCodeToExceptionMap.entrySet()) {
+    for (Map.Entry<Integer, String> entry : _errCodeToExceptionMap.entrySet()) {
       int key = entry.getKey();
       String value = entry.getValue();
       byte[] valueBytes = value.getBytes(UTF_8);

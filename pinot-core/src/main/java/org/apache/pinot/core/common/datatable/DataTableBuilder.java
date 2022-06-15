@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.NullBitmapUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -98,6 +99,8 @@ public class DataTableBuilder {
   private final ByteArrayOutputStream _variableSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
   private final DataOutputStream _variableSizeDataOutputStream =
       new DataOutputStream(_variableSizeDataByteArrayOutputStream);
+  // TODO: null bitmap handling can be safely removed once the rest of the codebase switches from using DataTableBuilder
+  //  and DataTableFactory to using DataBlockBuilder.
   private final ByteArrayOutputStream _fixedSizeNullVectorByteArrayOutputStream = new ByteArrayOutputStream();
   private final DataOutputStream _fixedSizeNullVectorOutputStream =
       new DataOutputStream(_fixedSizeNullVectorByteArrayOutputStream);
@@ -146,17 +149,7 @@ public class DataTableBuilder {
   public void setNullRowIds(ImmutableRoaringBitmap nullBitmap)
       throws IOException {
     assert _version >= VERSION_4;
-    _fixedSizeNullVectorOutputStream.writeInt(_variableSizeNullVectorOutputStream.size());
-    if (nullBitmap.isEmpty()) {
-      _fixedSizeNullVectorOutputStream.writeInt(0);
-    } else {
-      int[] nullBitmapArray = nullBitmap.toArray();
-      _fixedSizeNullVectorOutputStream.writeInt(nullBitmapArray.length);
-      // todo: optimize looping through bitmaps.
-      for (int nullBitmapInt : nullBitmapArray) {
-        _variableSizeNullVectorOutputStream.writeInt(nullBitmapInt);
-      }
-    }
+    NullBitmapUtils.setNullRowIds(nullBitmap, _fixedSizeNullVectorOutputStream, _variableSizeNullVectorOutputStream);
   }
 
   public void setColumn(int colId, boolean value) {
@@ -341,7 +334,9 @@ public class DataTableBuilder {
             _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
       case VERSION_4:
         return new DataTableImplV4(_numRows, _dataSchema, _reverseDictionaryMap,
-            _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
+            _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray(),
+            _fixedSizeNullVectorByteArrayOutputStream.toByteArray(),
+            _variableSizeNullVectorByteArrayOutputStream.toByteArray());
       default:
         throw new IllegalStateException("Unexpected value: " + _version);
     }

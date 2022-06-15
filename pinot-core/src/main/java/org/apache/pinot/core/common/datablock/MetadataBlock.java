@@ -40,7 +40,7 @@ public class MetadataBlock extends BaseDataBlock {
   }
 
   @Override
-  protected int getDataBlockVersionType() {
+  public int getDataBlockVersionType() {
     return VERSION + (Type.METADATA.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
   }
 

@@ -184,7 +184,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     List<BaseDataBlock> dataTableList = new ArrayList<>(partitionSize);
     for (int i = 0; i < partitionSize; i++) {
       List<Object[]> objects = temporaryRows.get(i);
-      dataTableList.add(DataBlockBuilder.buildFromRows(objects, dataTable.getDataSchema()));
+      dataTableList.add(DataBlockBuilder.buildFromRows(objects, null, dataTable.getDataSchema()));
     }
     return dataTableList;
   }

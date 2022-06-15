@@ -27,10 +27,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.NullBitmapUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.common.datatable.DataTableImplV4;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class DataBlockBuilder {
@@ -52,9 +55,13 @@ public class DataBlockBuilder {
   private final ByteArrayOutputStream _variableSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
   private final DataOutputStream _variableSizeDataOutputStream =
       new DataOutputStream(_variableSizeDataByteArrayOutputStream);
+  private final ByteArrayOutputStream _fixedSizeNullVectorByteArrayOutputStream = new ByteArrayOutputStream();
+  private final DataOutputStream _fixedSizeNullVectorOutputStream =
+      new DataOutputStream(_fixedSizeNullVectorByteArrayOutputStream);
+  private final ByteArrayOutputStream _variableSizeNullVectorByteArrayOutputStream = new ByteArrayOutputStream();
+  private final DataOutputStream _variableSizeNullVectorOutputStream =
+      new DataOutputStream(_variableSizeNullVectorByteArrayOutputStream);
 
-
-  private ByteBuffer _currentRowDataByteBuffer;
 
   private DataBlockBuilder(DataSchema dataSchema, BaseDataBlock.Type blockType) {
     _dataSchema = dataSchema;
@@ -76,7 +83,13 @@ public class DataBlockBuilder {
     }
   }
 
-  public static RowDataBlock buildFromRows(List<Object[]> rows, DataSchema dataSchema)
+  public void setNullRowIds(ImmutableRoaringBitmap nullBitmap)
+      throws IOException {
+    NullBitmapUtils.setNullRowIds(nullBitmap, _fixedSizeNullVectorOutputStream, _variableSizeNullVectorOutputStream);
+  }
+
+  public static RowDataBlock buildFromRows(List<Object[]> rows, ImmutableRoaringBitmap[] colNullBitmaps,
+      DataSchema dataSchema)
       throws IOException {
     DataBlockBuilder rowBuilder = new DataBlockBuilder(dataSchema, BaseDataBlock.Type.ROW);
     rowBuilder._numRows = rows.size();
@@ -166,6 +179,11 @@ public class DataBlockBuilder {
         }
       }
       rowBuilder._fixedSizeDataByteArrayOutputStream.write(byteBuffer.array(), 0, byteBuffer.position());
+    }
+    if (colNullBitmaps != null) {
+      for (ImmutableRoaringBitmap nullBitmap : colNullBitmaps) {
+        rowBuilder.setNullRowIds(nullBitmap);
+      }
     }
     return buildRowBlock(rowBuilder);
   }
@@ -289,9 +307,11 @@ public class DataBlockBuilder {
   }
 
   private static RowDataBlock buildRowBlock(DataBlockBuilder builder) {
-    return new RowDataBlock(builder._numRows, builder._dataSchema, builder._reverseDictionaryMap,
+    return new DataTableImplV4(builder._numRows, builder._dataSchema, builder._reverseDictionaryMap,
         builder._fixedSizeDataByteArrayOutputStream.toByteArray(),
-        builder._variableSizeDataByteArrayOutputStream.toByteArray());
+        builder._variableSizeDataByteArrayOutputStream.toByteArray(),
+        builder._fixedSizeNullVectorByteArrayOutputStream.toByteArray(),
+        builder._variableSizeNullVectorByteArrayOutputStream.toByteArray());
   }
 
   private static ColumnarDataBlock buildColumnarBlock(DataBlockBuilder builder) {
@@ -337,10 +357,15 @@ public class DataBlockBuilder {
       throws IOException {
     byteBuffer.putInt(builder._variableSizeDataByteArrayOutputStream.size());
     int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
-    byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);
-    byteBuffer.putInt(bytes.length);
-    builder._variableSizeDataOutputStream.writeInt(objectTypeValue);
-    builder._variableSizeDataByteArrayOutputStream.write(bytes);
+    if (objectTypeValue == ObjectSerDeUtils.ObjectType.Missing.getValue()) {
+      byteBuffer.putInt(0);
+      builder._variableSizeDataOutputStream.writeInt(objectTypeValue);
+    } else {
+      byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);
+      byteBuffer.putInt(bytes.length);
+      builder._variableSizeDataOutputStream.writeInt(objectTypeValue);
+      builder._variableSizeDataByteArrayOutputStream.write(bytes);
+    }
   }
 
   private static void setColumn(DataBlockBuilder builder, ByteBuffer byteBuffer, int[] values)

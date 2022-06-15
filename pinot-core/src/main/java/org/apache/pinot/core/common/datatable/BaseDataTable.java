@@ -267,7 +267,7 @@ public abstract class BaseDataTable implements DataTable {
 
   @Override
   public MutableRoaringBitmap getNullRowIds(int colId) {
-    throw new UnsupportedOperationException("Null bitmaps are not stored in DataTable versions: 2, 3");
+    return null;
   }
 
   private int positionCursorInVariableBuffer(int rowId, int colId) {

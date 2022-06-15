@@ -109,7 +109,7 @@ public class DataBlockTest {
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
     List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TEST_ROW_COUNT);
     List<Object[]> columnars = DataBlockTestUtils.convertColumnar(dataSchema, rows);
-    RowDataBlock rowBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
+    RowDataBlock rowBlock = DataBlockBuilder.buildFromRows(rows, null, dataSchema);
     ColumnarDataBlock columnarBlock = DataBlockBuilder.buildFromColumns(columnars, dataSchema);
 
     for (int colId = 0; colId < dataSchema.getColumnNames().length; colId++) {

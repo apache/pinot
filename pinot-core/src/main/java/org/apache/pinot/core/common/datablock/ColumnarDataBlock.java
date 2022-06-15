@@ -62,7 +62,7 @@ public class ColumnarDataBlock extends BaseDataBlock {
   }
 
   @Override
-  protected int getDataBlockVersionType() {
+  public int getDataBlockVersionType() {
     return VERSION + (Type.COLUMNAR.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
   }
 

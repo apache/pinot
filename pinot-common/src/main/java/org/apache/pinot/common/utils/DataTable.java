@@ -42,8 +42,6 @@ public interface DataTable {
 
   Map<Integer, String> getExceptions();
 
-  int getVersion();
-
   byte[] toBytes()
       throws IOException;
 
