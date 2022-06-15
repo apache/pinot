@@ -67,7 +67,8 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-common</artifactId>
+      <artifactId>pinot-core</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.testng</groupId>
