@@ -39,6 +39,16 @@ public class ConstantValueDoubleDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int indexOf(String stringValue) {
+    return Double.parseDouble(stringValue) == _value ? 0 : NULL_VALUE_INDEX;
+  }
+
+  @Override
+  public int indexOf(double doubleValue) {
+    return doubleValue == _value ? 0 : NULL_VALUE_INDEX;
+  }
+
+  @Override
   public int insertionIndexOf(String stringValue) {
     double doubleValue = Double.parseDouble(stringValue);
     if (doubleValue < _value) {

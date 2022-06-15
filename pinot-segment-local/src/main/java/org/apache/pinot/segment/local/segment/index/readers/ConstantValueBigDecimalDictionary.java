@@ -19,63 +19,95 @@
 package org.apache.pinot.segment.local.segment.index.readers;
 
 import java.math.BigDecimal;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public class DoubleDictionary extends BaseImmutableDictionary {
+/**
+ * Dictionary of a single BIG_DECIMAL value.
+ */
+public class ConstantValueBigDecimalDictionary extends BaseImmutableDictionary {
+  private final BigDecimal _value;
 
-  public DoubleDictionary(PinotDataBuffer dataBuffer, int length) {
-    super(dataBuffer, length, Double.BYTES, (byte) 0);
+  public ConstantValueBigDecimalDictionary(BigDecimal value) {
+    super(1);
+    _value = value;
   }
 
   @Override
   public DataType getValueType() {
-    return DataType.DOUBLE;
+    return DataType.BIG_DECIMAL;
   }
 
   @Override
-  public int indexOf(double doubleValue) {
-    return normalizeIndex(binarySearch(doubleValue));
+  public int indexOf(String stringValue) {
+    // Use compareTo instead of equals because
+    return new BigDecimal(stringValue).compareTo(_value) == 0 ? 0 : NULL_VALUE_INDEX;
+  }
+
+  @Override
+  public int indexOf(BigDecimal bigDecimalValue) {
+    return bigDecimalValue.compareTo(_value) == 0 ? 0 : NULL_VALUE_INDEX;
   }
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    return binarySearch(Double.parseDouble(stringValue));
+    int compareResult = new BigDecimal(stringValue).compareTo(_value);
+    if (compareResult < 0) {
+      return -1;
+    }
+    if (compareResult > 0) {
+      return -2;
+    }
+    return 0;
   }
 
   @Override
-  public Double get(int dictId) {
-    return getDouble(dictId);
+  public BigDecimal getMinVal() {
+    return _value;
+  }
+
+  @Override
+  public BigDecimal getMaxVal() {
+    return _value;
+  }
+
+  @Override
+  public BigDecimal[] getSortedValues() {
+    return new BigDecimal[]{_value};
+  }
+
+  @Override
+  public BigDecimal get(int dictId) {
+    return _value;
   }
 
   @Override
   public int getIntValue(int dictId) {
-    return (int) getDouble(dictId);
+    return _value.intValue();
   }
 
   @Override
   public long getLongValue(int dictId) {
-    return (long) getDouble(dictId);
+    return _value.longValue();
   }
 
   @Override
   public float getFloatValue(int dictId) {
-    return (float) getDouble(dictId);
+    return _value.floatValue();
   }
 
   @Override
   public double getDoubleValue(int dictId) {
-    return getDouble(dictId);
+    return _value.doubleValue();
   }
 
   @Override
   public BigDecimal getBigDecimalValue(int dictId) {
-    return BigDecimal.valueOf(getDouble(dictId));
+    return _value;
   }
 
   @Override
   public String getStringValue(int dictId) {
-    return Double.toString(getDouble(dictId));
+    return _value.toPlainString();
   }
 }

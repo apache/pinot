@@ -23,7 +23,6 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.Arrays;
-import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,12 +30,12 @@ import org.slf4j.LoggerFactory;
 /**
  * Wrapper around byte[] that provides additional features such as:
  * <ul>
- *   <li> Implements comparable interface, so comparison and sorting can be performed. </li>
- *   <li> Implements equals() and hashCode(), so it can be used as key for HashMap/Set. </li>
+ *   <li>Implements comparable interface, so comparison and sorting can be performed</li>
+ *   <li>Implements equals() and hashCode(), so it can be used as key for HashMap/Set</li>
+ *   <li>Caches the hash code of the byte[]</li>
  * </ul>
  */
 public class ByteArray implements Comparable<ByteArray>, Serializable {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(ByteArray.class);
 
   private static final MethodHandle COMPARE_UNSIGNED;
@@ -53,6 +52,9 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
   }
 
   private final byte[] _bytes;
+
+  // Hash for empty ByteArray is 1
+  private int _hash = 1;
 
   public ByteArray(byte[] bytes) {
     _bytes = bytes;
@@ -91,27 +93,30 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
 
   @Override
   public int hashCode() {
-    int hash = 1;
-    int i = 0;
-    for (; i + 7 < _bytes.length; i += 8) {
-      hash = -1807454463 * hash
-          + 1742810335 * _bytes[i]
-          + 887503681 * _bytes[i + 1]
-          + 28629151 * _bytes[i + 2]
-          + 923521 * _bytes[i + 3]
-          + 29791 * _bytes[i + 4]
-          + 961 * _bytes[i + 5]
-          + 31 * _bytes[i + 6]
-          + _bytes[i + 7];
-    }
-    for (; i < _bytes.length; i++) {
-      hash = 31 * hash + _bytes[i];
+    int hash = _hash;
+    if (hash == 1 && _bytes.length > 0) {
+      int i = 0;
+      for (; i + 7 < _bytes.length; i += 8) {
+        hash = -1807454463 * hash
+            + 1742810335 * _bytes[i]
+            + 887503681 * _bytes[i + 1]
+            + 28629151 * _bytes[i + 2]
+            + 923521 * _bytes[i + 3]
+            + 29791 * _bytes[i + 4]
+            + 961 * _bytes[i + 5]
+            + 31 * _bytes[i + 6]
+            + _bytes[i + 7];
+      }
+      for (; i < _bytes.length; i++) {
+        hash = 31 * hash + _bytes[i];
+      }
+      _hash = hash;
     }
     return hash;
   }
 
   @Override
-  public int compareTo(@Nonnull ByteArray that) {
+  public int compareTo(ByteArray that) {
     if (this == that) {
       return 0;
     }

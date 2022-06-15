@@ -19,89 +19,86 @@
 package org.apache.pinot.segment.local.segment.index.readers;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
-import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
- * Extension of {@link BaseImmutableDictionary} that implements immutable dictionary for byte[] type.
+ * Implementation of BIG_DECIMAL dictionary that cache all values on-heap.
+ * <p>This is useful for BIG_DECIMAL columns that:
+ * <ul>
+ *   <li>Has low cardinality BIG_DECIMAL dictionary where memory footprint on-heap is acceptably small</li>
+ *   <li>Is heavily queried</li>
+ * </ul>
  */
-public class BytesDictionary extends BaseImmutableDictionary {
+public class OnHeapBigDecimalDictionary extends BaseImmutableDictionary {
+  // NOTE: Always do binary search because BigDecimal's compareTo() is not consistent with equals()
+  //       E.g. compareTo(3.0, 3) returns 0 but equals(3.0, 3) returns false
+  private final BigDecimal[] _dictIdToVal;
 
-  public BytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
+  public OnHeapBigDecimalDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
     super(dataBuffer, length, numBytesPerValue, (byte) 0);
+
+    _dictIdToVal = new BigDecimal[length];
+    for (int dictId = 0; dictId < length; dictId++) {
+      _dictIdToVal[dictId] = getBigDecimal(dictId);
+    }
   }
 
   @Override
   public DataType getValueType() {
-    return DataType.BYTES;
+    return DataType.BIG_DECIMAL;
   }
 
   @Override
-  public int indexOf(ByteArray bytesValue) {
-    return normalizeIndex(binarySearch(bytesValue.getBytes()));
+  public int indexOf(BigDecimal bigDecimalValue) {
+    return normalizeIndex(Arrays.binarySearch(_dictIdToVal, bigDecimalValue));
   }
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    return binarySearch(BytesUtils.toBytes(stringValue));
+    return Arrays.binarySearch(_dictIdToVal, new BigDecimal(stringValue));
   }
 
   @Override
-  public ByteArray getMinVal() {
-    return new ByteArray(getBytes(0));
-  }
-
-  @Override
-  public ByteArray getMaxVal() {
-    return new ByteArray(getBytes(length() - 1));
-  }
-
-  @Override
-  public byte[] get(int dictId) {
-    return getBytes(dictId);
-  }
-
-  @Override
-  public Object getInternal(int dictId) {
-    return new ByteArray(getBytes(dictId));
+  public BigDecimal get(int dictId) {
+    return _dictIdToVal[dictId];
   }
 
   @Override
   public int getIntValue(int dictId) {
-    throw new UnsupportedOperationException();
+    return _dictIdToVal[dictId].intValue();
   }
 
   @Override
   public long getLongValue(int dictId) {
-    throw new UnsupportedOperationException();
+    return _dictIdToVal[dictId].longValue();
   }
 
   @Override
   public float getFloatValue(int dictId) {
-    throw new UnsupportedOperationException();
+    return _dictIdToVal[dictId].floatValue();
   }
 
   @Override
   public double getDoubleValue(int dictId) {
-    throw new UnsupportedOperationException();
+    return _dictIdToVal[dictId].doubleValue();
   }
 
   @Override
   public BigDecimal getBigDecimalValue(int dictId) {
-    return BigDecimalUtils.deserialize(getBytes(dictId));
+    return _dictIdToVal[dictId];
   }
 
   @Override
   public String getStringValue(int dictId) {
-    return BytesUtils.toHexString(getBytes(dictId));
+    return _dictIdToVal[dictId].toPlainString();
   }
 
   @Override
   public byte[] getBytesValue(int dictId) {
-    return getBytes(dictId);
+    return BigDecimalUtils.serialize(_dictIdToVal[dictId]);
   }
 }

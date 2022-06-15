@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers;
 
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.math.BigDecimal;
+import java.util.Arrays;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -27,12 +30,29 @@ import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
- * Extension of {@link BaseImmutableDictionary} that implements immutable dictionary for byte[] type.
+ * Implementation of BYTES dictionary that cache all values on-heap.
+ * <p>This is useful for BYTES columns that:
+ * <ul>
+ *   <li>Has low cardinality BYTES dictionary where memory footprint on-heap is acceptably small</li>
+ *   <li>Is heavily queried</li>
+ * </ul>
  */
-public class BytesDictionary extends BaseImmutableDictionary {
+public class OnHeapBytesDictionary extends BaseImmutableDictionary {
+  private final Object2IntOpenHashMap<ByteArray> _valToDictId;
+  private final ByteArray[] _dictIdToVal;
 
-  public BytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
+  public OnHeapBytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
     super(dataBuffer, length, numBytesPerValue, (byte) 0);
+
+    _valToDictId = new Object2IntOpenHashMap<>(length);
+    _valToDictId.defaultReturnValue(Dictionary.NULL_VALUE_INDEX);
+    _dictIdToVal = new ByteArray[length];
+
+    for (int dictId = 0; dictId < length; dictId++) {
+      ByteArray value = new ByteArray(getBytes(dictId));
+      _dictIdToVal[dictId] = value;
+      _valToDictId.put(value, dictId);
+    }
   }
 
   @Override
@@ -41,33 +61,30 @@ public class BytesDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int indexOf(String stringValue) {
+    return _valToDictId.getInt(BytesUtils.toByteArray(stringValue));
+  }
+
+  @Override
   public int indexOf(ByteArray bytesValue) {
-    return normalizeIndex(binarySearch(bytesValue.getBytes()));
+    return _valToDictId.getInt(bytesValue);
   }
 
   @Override
   public int insertionIndexOf(String stringValue) {
-    return binarySearch(BytesUtils.toBytes(stringValue));
-  }
-
-  @Override
-  public ByteArray getMinVal() {
-    return new ByteArray(getBytes(0));
-  }
-
-  @Override
-  public ByteArray getMaxVal() {
-    return new ByteArray(getBytes(length() - 1));
+    ByteArray byteArray = BytesUtils.toByteArray(stringValue);
+    int index = _valToDictId.getInt(byteArray);
+    return (index != Dictionary.NULL_VALUE_INDEX) ? index : Arrays.binarySearch(_dictIdToVal, byteArray);
   }
 
   @Override
   public byte[] get(int dictId) {
-    return getBytes(dictId);
+    return _dictIdToVal[dictId].getBytes();
   }
 
   @Override
   public Object getInternal(int dictId) {
-    return new ByteArray(getBytes(dictId));
+    return _dictIdToVal[dictId];
   }
 
   @Override
@@ -92,16 +109,16 @@ public class BytesDictionary extends BaseImmutableDictionary {
 
   @Override
   public BigDecimal getBigDecimalValue(int dictId) {
-    return BigDecimalUtils.deserialize(getBytes(dictId));
+    return BigDecimalUtils.deserialize(_dictIdToVal[dictId].getBytes());
   }
 
   @Override
   public String getStringValue(int dictId) {
-    return BytesUtils.toHexString(getBytes(dictId));
+    return BytesUtils.toHexString(_dictIdToVal[dictId].getBytes());
   }
 
   @Override
   public byte[] getBytesValue(int dictId) {
-    return getBytes(dictId);
+    return _dictIdToVal[dictId].getBytes();
   }
 }
