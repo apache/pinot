@@ -85,7 +85,7 @@ public abstract class BaseDataBlock implements DataTable {
   protected int _numRows;
   protected int _numColumns;
   protected DataSchema _dataSchema;
-  protected Map<String, Map<Integer, String>> _dictionaryMap;
+  protected String[] _stringDictionary;
   protected byte[] _fixedSizeDataBytes;
   protected ByteBuffer _fixedSizeData;
   protected byte[] _variableSizeDataBytes;
@@ -96,16 +96,16 @@ public abstract class BaseDataBlock implements DataTable {
    * construct a base data block.
    * @param numRows num of rows in the block
    * @param dataSchema schema of the data in the block
-   * @param dictionaryMap dictionary encoding map
+   * @param stringDictionary dictionary encoding map
    * @param fixedSizeDataBytes byte[] for fix-sized columns.
    * @param variableSizeDataBytes byte[] for variable length columns (arrays).
    */
-  public BaseDataBlock(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
+  public BaseDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
       byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
     _numRows = numRows;
     _numColumns = dataSchema.size();
     _dataSchema = dataSchema;
-    _dictionaryMap = dictionaryMap;
+    _stringDictionary = stringDictionary;
     _fixedSizeDataBytes = fixedSizeDataBytes;
     _fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
     _variableSizeDataBytes = variableSizeDataBytes;
@@ -121,7 +121,7 @@ public abstract class BaseDataBlock implements DataTable {
     _numRows = 0;
     _numColumns = 0;
     _dataSchema = null;
-    _dictionaryMap = null;
+    _stringDictionary = null;
     _fixedSizeDataBytes = null;
     _fixedSizeData = null;
     _variableSizeDataBytes = null;
@@ -158,9 +158,9 @@ public abstract class BaseDataBlock implements DataTable {
     // Read dictionary.
     if (dictionaryMapLength != 0) {
       byteBuffer.position(dictionaryMapStart);
-      _dictionaryMap = deserializeDictionaryMap(byteBuffer);
+      _stringDictionary = deserializeStringDictionary(byteBuffer);
     } else {
-      _dictionaryMap = null;
+      _stringDictionary = null;
     }
 
     // Read data schema.
@@ -282,8 +282,7 @@ public abstract class BaseDataBlock implements DataTable {
   @Override
   public String getString(int rowId, int colId) {
     positionCursorInFixSizedBuffer(rowId, colId);
-    int dictId = _fixedSizeData.getInt();
-    return _dictionaryMap.get(_dataSchema.getColumnName(colId)).get(dictId);
+    return _stringDictionary[_fixedSizeData.getInt()];
   }
 
   @Override
@@ -355,9 +354,8 @@ public abstract class BaseDataBlock implements DataTable {
   public String[] getStringArray(int rowId, int colId) {
     int length = positionCursorInVariableBuffer(rowId, colId);
     String[] strings = new String[length];
-    Map<Integer, String> dictionary = _dictionaryMap.get(_dataSchema.getColumnName(colId));
     for (int i = 0; i < length; i++) {
-      strings[i] = dictionary.get(_variableSizeData.getInt());
+      strings[i] = _stringDictionary[_variableSizeData.getInt()];
     }
     return strings;
   }
@@ -369,26 +367,16 @@ public abstract class BaseDataBlock implements DataTable {
   /**
    * Helper method to serialize dictionary map.
    */
-  protected byte[] serializeDictionaryMap()
+  protected byte[] serializeStringDictionary()
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 
-    dataOutputStream.writeInt(_dictionaryMap.size());
-    for (Map.Entry<String, Map<Integer, String>> dictionaryMapEntry : _dictionaryMap.entrySet()) {
-      String columnName = dictionaryMapEntry.getKey();
-      Map<Integer, String> dictionary = dictionaryMapEntry.getValue();
-      byte[] bytes = columnName.getBytes(UTF_8);
-      dataOutputStream.writeInt(bytes.length);
-      dataOutputStream.write(bytes);
-      dataOutputStream.writeInt(dictionary.size());
-
-      for (Map.Entry<Integer, String> dictionaryEntry : dictionary.entrySet()) {
-        dataOutputStream.writeInt(dictionaryEntry.getKey());
-        byte[] valueBytes = dictionaryEntry.getValue().getBytes(UTF_8);
-        dataOutputStream.writeInt(valueBytes.length);
-        dataOutputStream.write(valueBytes);
-      }
+    dataOutputStream.writeInt(_stringDictionary.length);
+    for (String entry : _stringDictionary) {
+      byte[] valueBytes = entry.getBytes(UTF_8);
+      dataOutputStream.writeInt(valueBytes.length);
+      dataOutputStream.write(valueBytes);
     }
 
     return byteArrayOutputStream.toByteArray();
@@ -397,24 +385,14 @@ public abstract class BaseDataBlock implements DataTable {
   /**
    * Helper method to deserialize dictionary map.
    */
-  protected Map<String, Map<Integer, String>> deserializeDictionaryMap(ByteBuffer buffer)
+  protected String[] deserializeStringDictionary(ByteBuffer buffer)
       throws IOException {
-    int numDictionaries = buffer.getInt();
-    Map<String, Map<Integer, String>> dictionaryMap = new HashMap<>(numDictionaries);
-
-    for (int i = 0; i < numDictionaries; i++) {
-      String column = DataTableUtils.decodeString(buffer);
-      int dictionarySize = buffer.getInt();
-      Map<Integer, String> dictionary = new HashMap<>(dictionarySize);
-      for (int j = 0; j < dictionarySize; j++) {
-        int key = buffer.getInt();
-        String value = DataTableUtils.decodeString(buffer);
-        dictionary.put(key, value);
-      }
-      dictionaryMap.put(column, dictionary);
+    int dictionarySize = buffer.getInt();
+    String[] stringDictionary = new String[dictionarySize];
+    for (int i = 0; i < dictionarySize; i++) {
+      stringDictionary[i] = (DataTableUtils.decodeString(buffer));
     }
-
-    return dictionaryMap;
+    return stringDictionary;
   }
 
   @Override
@@ -474,8 +452,8 @@ public abstract class BaseDataBlock implements DataTable {
     // Write dictionary map section offset(START|SIZE).
     dataOutputStream.writeInt(dataOffset);
     byte[] dictionaryMapBytes = null;
-    if (_dictionaryMap != null) {
-      dictionaryMapBytes = serializeDictionaryMap();
+    if (_stringDictionary != null) {
+      dictionaryMapBytes = serializeStringDictionary();
       dataOutputStream.writeInt(dictionaryMapBytes.length);
       dataOffset += dictionaryMapBytes.length;
     } else {

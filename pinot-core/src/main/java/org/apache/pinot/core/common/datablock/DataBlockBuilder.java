@@ -23,6 +23,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,8 +50,8 @@ public class DataBlockBuilder {
   private int _numRows;
   private int _numColumns;
 
-  private final Map<String, Map<String, Integer>> _dictionaryMap = new HashMap<>();
-  private final Map<String, Map<Integer, String>> _reverseDictionaryMap = new HashMap<>();
+  private final Map<String, Integer> _dictionaryMap = new HashMap<>();
+  private final List<String> _reverseDictionaryList = new ArrayList<>();
   private final ByteArrayOutputStream _fixedSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
   private final ByteArrayOutputStream _variableSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
   private final DataOutputStream _variableSizeDataOutputStream =
@@ -110,7 +111,7 @@ public class DataBlockBuilder {
             setColumn(rowBuilder, byteBuffer, (BigDecimal) value);
             break;
           case STRING:
-            setColumn(rowBuilder, byteBuffer, i, (String) value);
+            setColumn(rowBuilder, byteBuffer, (String) value);
             break;
           case BYTES:
             setColumn(rowBuilder, byteBuffer, (ByteArray) value);
@@ -220,7 +221,7 @@ public class DataBlockBuilder {
           break;
         case STRING:
           for (Object value : column) {
-            setColumn(columnarBuilder, byteBuffer, i, (String) value);
+            setColumn(columnarBuilder, byteBuffer, (String) value);
           }
           break;
         case BYTES:
@@ -303,13 +304,15 @@ public class DataBlockBuilder {
   }
 
   private static RowDataBlock buildRowBlock(DataBlockBuilder builder) {
-    return new RowDataBlock(builder._numRows, builder._dataSchema, builder._reverseDictionaryMap,
+    return new RowDataBlock(builder._numRows, builder._dataSchema,
+        builder._reverseDictionaryList.toArray(new String[0]),
         builder._fixedSizeDataByteArrayOutputStream.toByteArray(),
         builder._variableSizeDataByteArrayOutputStream.toByteArray());
   }
 
   private static ColumnarDataBlock buildColumnarBlock(DataBlockBuilder builder) {
-    return new ColumnarDataBlock(builder._numRows, builder._dataSchema, builder._reverseDictionaryMap,
+    return new ColumnarDataBlock(builder._numRows, builder._dataSchema,
+        builder._reverseDictionaryList.toArray(new String[0]),
         builder._fixedSizeDataByteArrayOutputStream.toByteArray(),
         builder._variableSizeDataByteArrayOutputStream.toByteArray());
   }
@@ -322,19 +325,12 @@ public class DataBlockBuilder {
     builder._variableSizeDataByteArrayOutputStream.write(bytes);
   }
 
-  private static void setColumn(DataBlockBuilder builder, ByteBuffer byteBuffer, int colId, String value) {
-    String columnName = builder._dataSchema.getColumnName(colId);
-    Map<String, Integer> dictionary = builder._dictionaryMap.get(columnName);
-    if (dictionary == null) {
-      dictionary = new HashMap<>();
-      builder._dictionaryMap.put(columnName, dictionary);
-      builder._reverseDictionaryMap.put(columnName, new HashMap<>());
-    }
-    Integer dictId = dictionary.get(value);
+  private static void setColumn(DataBlockBuilder builder, ByteBuffer byteBuffer, String value) {
+    Integer dictId = builder._dictionaryMap.get(value);
     if (dictId == null) {
-      dictId = dictionary.size();
-      dictionary.put(value, dictId);
-      builder._reverseDictionaryMap.get(columnName).put(dictId, value);
+      dictId = builder._dictionaryMap.size();
+      builder._dictionaryMap.put(value, dictId);
+      builder._reverseDictionaryList.add(value);
     }
     byteBuffer.putInt(dictId);
   }
@@ -404,19 +400,12 @@ public class DataBlockBuilder {
     byteBuffer.putInt(values.length);
 
     String columnName = builder._dataSchema.getColumnName(colId);
-    Map<String, Integer> dictionary = builder._dictionaryMap.get(columnName);
-    if (dictionary == null) {
-      dictionary = new HashMap<>();
-      builder._dictionaryMap.put(columnName, dictionary);
-      builder._reverseDictionaryMap.put(columnName, new HashMap<>());
-    }
-
     for (String value : values) {
-      Integer dictId = dictionary.get(value);
+      Integer dictId = builder._dictionaryMap.get(value);
       if (dictId == null) {
-        dictId = dictionary.size();
-        dictionary.put(value, dictId);
-        builder._reverseDictionaryMap.get(columnName).put(dictId, value);
+        dictId = builder._dictionaryMap.size();
+        builder._dictionaryMap.put(value, dictId);
+        builder._reverseDictionaryList.add(value);
       }
       builder._variableSizeDataOutputStream.writeInt(dictId);
     }

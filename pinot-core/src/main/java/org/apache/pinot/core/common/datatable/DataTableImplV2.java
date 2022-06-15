@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.DataTableFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -124,7 +125,7 @@ public class DataTableImplV2 extends BaseDataTable {
 
   @Override
   public int getVersion() {
-    return DataTableBuilder.VERSION_2;
+    return DataTableFactory.VERSION_2;
   }
 
   private Map<String, String> deserializeMetadata(ByteBuffer buffer)
@@ -170,7 +171,7 @@ public class DataTableImplV2 extends BaseDataTable {
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-    dataOutputStream.writeInt(DataTableBuilder.VERSION_2);
+    dataOutputStream.writeInt(DataTableFactory.VERSION_2);
     dataOutputStream.writeInt(_numRows);
     dataOutputStream.writeInt(_numColumns);
     int dataOffset = HEADER_SIZE;

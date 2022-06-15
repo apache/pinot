@@ -31,6 +31,8 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.DataTableBuilder;
+import org.apache.pinot.core.common.DataTableFactory;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
@@ -123,7 +125,7 @@ public class DataTableUtils {
     // NOTE: Use STRING column data type as default for selection query
     Arrays.fill(columnDataTypes, ColumnDataType.STRING);
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    return new DataTableBuilder(dataSchema).build();
+    return DataTableFactory.getDataTableBuilder(dataSchema).build();
   }
 
   /**
@@ -154,7 +156,7 @@ public class DataTableUtils {
         columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
         index++;
       }
-      return new DataTableBuilder(new DataSchema(columnNames, columnDataTypes)).build();
+      return DataTableFactory.getDataTableBuilder(new DataSchema(columnNames, columnDataTypes)).build();
     } else {
       // Aggregation only query
 
@@ -171,7 +173,8 @@ public class DataTableUtils {
       }
 
       // Build the data table
-      DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(aggregationColumnNames, columnDataTypes));
+      DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(
+          new DataSchema(aggregationColumnNames, columnDataTypes));
       dataTableBuilder.startRow();
       for (int i = 0; i < numAggregations; i++) {
         switch (columnDataTypes[i]) {
@@ -214,7 +217,7 @@ public class DataTableUtils {
         new DistinctTable(new DataSchema(columnNames, columnDataTypes), Collections.emptySet());
 
     // Build the data table
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(
+    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(
         new DataSchema(new String[]{distinctAggregationFunction.getColumnName()},
             new ColumnDataType[]{ColumnDataType.OBJECT}));
     dataTableBuilder.startRow();

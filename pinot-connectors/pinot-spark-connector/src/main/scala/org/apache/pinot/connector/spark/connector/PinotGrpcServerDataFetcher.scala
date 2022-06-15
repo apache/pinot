@@ -24,7 +24,7 @@ import org.apache.pinot.common.proto.Server.ServerRequest
 import org.apache.pinot.common.utils.DataTable
 import org.apache.pinot.connector.spark.exceptions.PinotException
 import org.apache.pinot.connector.spark.utils.Logging
-import org.apache.pinot.core.common.datatable.DataTableFactory
+import org.apache.pinot.core.common.DataTableFactory
 import org.apache.pinot.spi.config.table.TableType
 
 import scala.collection.JavaConverters._

@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.DataTableFactory;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -166,7 +167,7 @@ public class DataTableImplV3 extends BaseDataTable {
 
   @Override
   public int getVersion() {
-    return DataTableBuilder.VERSION_3;
+    return DataTableFactory.VERSION_3;
   }
 
   @Override
@@ -224,7 +225,7 @@ public class DataTableImplV3 extends BaseDataTable {
 
   private void writeLeadingSections(DataOutputStream dataOutputStream)
       throws IOException {
-    dataOutputStream.writeInt(DataTableBuilder.VERSION_3);
+    dataOutputStream.writeInt(DataTableFactory.VERSION_3);
     dataOutputStream.writeInt(_numRows);
     dataOutputStream.writeInt(_numColumns);
     int dataOffset = HEADER_SIZE;

@@ -28,6 +28,8 @@ import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.NullBitmapUtils;
+import org.apache.pinot.core.common.DataTableBuilder;
+import org.apache.pinot.core.common.DataTableFactory;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -84,53 +86,27 @@ import org.roaringbitmap.RoaringBitmap;
 // TODO:     note:  (Fixed in V4, remove this comment once V3 is deprecated)
 // TODO:   - use builder factory pattern to for different version so that no version check per build.
 // TODO:   - Use one dictionary for all columns (save space).
+// TODO:     note:  (Fixed in V4, remove this comment once V3 is deprecated)
 
-public class DataTableBuilder {
-  public static final int VERSION_2 = 2;
-  public static final int VERSION_3 = 3;
-  public static final int VERSION_4 = 4;
-  private static int _version = VERSION_3;
-  private final DataSchema _dataSchema;
-  private final int[] _columnOffsets;
-  private final int _rowSizeInBytes;
-  private final Map<String, Map<String, Integer>> _dictionaryMap = new HashMap<>();
-  private final Map<String, Map<Integer, String>> _reverseDictionaryMap = new HashMap<>();
-  private final ByteArrayOutputStream _fixedSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
-  private final ByteArrayOutputStream _variableSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
-  private final DataOutputStream _variableSizeDataOutputStream =
+public class DataTableBuilderV2V3 implements DataTableBuilder {
+  protected final DataSchema _dataSchema;
+  protected final int[] _columnOffsets;
+  protected final int _rowSizeInBytes;
+  protected final Map<String, Map<String, Integer>> _dictionaryMap = new HashMap<>();
+  protected final Map<String, Map<Integer, String>> _reverseDictionaryMap = new HashMap<>();
+  protected final ByteArrayOutputStream _fixedSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
+  protected final ByteArrayOutputStream _variableSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
+  protected final DataOutputStream _variableSizeDataOutputStream =
       new DataOutputStream(_variableSizeDataByteArrayOutputStream);
 
-  private int _numRows;
-  private ByteBuffer _currentRowDataByteBuffer;
+  protected int _numRows;
+  protected ByteBuffer _currentRowDataByteBuffer;
 
-  public DataTableBuilder(DataSchema dataSchema) {
+  public DataTableBuilderV2V3(DataSchema dataSchema) {
     _dataSchema = dataSchema;
     _columnOffsets = new int[dataSchema.size()];
-    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets, _version);
-  }
-
-  public static DataTable getEmptyDataTable() {
-    switch (_version) {
-      case VERSION_2:
-        return new DataTableImplV2();
-      case VERSION_3:
-        return new DataTableImplV3();
-      case VERSION_4:
-        return new DataTableImplV4();
-      default:
-        throw new IllegalStateException("Unexpected value: " + _version);
-    }
-  }
-
-  public static void setCurrentDataTableVersion(int version) {
-    if (version != VERSION_2 && version != VERSION_3 && version != VERSION_4) {
-      throw new IllegalArgumentException("Unsupported version: " + version);
-    }
-    _version = version;
-  }
-
-  public static int getCurrentDataTableVersion() {
-    return _version;
+    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets,
+        DataTableFactory.getCurrentDataTableVersion());
   }
 
   public void startRow() {
@@ -140,9 +116,7 @@ public class DataTableBuilder {
 
   public void setNullRowIds(RoaringBitmap nullBitmap)
       throws IOException {
-    assert _version >= VERSION_4;
-    NullBitmapUtils.setNullRowIds(nullBitmap, _fixedSizeDataByteArrayOutputStream,
-        _variableSizeDataByteArrayOutputStream);
+    throw new UnsupportedOperationException();
   }
 
   public void setColumn(int colId, boolean value) {
@@ -219,7 +193,7 @@ public class DataTableBuilder {
 
   public void setColumn(int colId, ByteArray value)
       throws IOException {
-    if (_version >= 4) {
+    if (DataTableFactory.getCurrentDataTableVersion() >= 4) {
       _currentRowDataByteBuffer.position(_columnOffsets[colId]);
       _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
       byte[] bytes = value.getBytes();
@@ -318,18 +292,16 @@ public class DataTableBuilder {
   }
 
   public DataTable build() {
-    switch (_version) {
-      case VERSION_2:
+    int version = DataTableFactory.getCurrentDataTableVersion();
+    switch (version) {
+      case DataTableFactory.VERSION_2:
         return new DataTableImplV2(_numRows, _dataSchema, _reverseDictionaryMap,
             _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
-      case VERSION_3:
+      case DataTableFactory.VERSION_3:
         return new DataTableImplV3(_numRows, _dataSchema, _reverseDictionaryMap,
             _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
-      case VERSION_4:
-        return new DataTableImplV4(_numRows, _dataSchema, _reverseDictionaryMap,
-            _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
       default:
-        throw new IllegalStateException("Unexpected value: " + _version);
+        throw new IllegalStateException("Unexpected value: " + version);
     }
   }
 }

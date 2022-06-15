@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.DataTableFactory;
 import org.apache.pinot.core.common.datablock.RowDataBlock;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
@@ -43,12 +44,25 @@ public class DataTableImplV4 extends RowDataBlock {
   }
 
   public DataTableImplV4(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
-      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
-    super(numRows, dataSchema, dictionaryMap, fixedSizeDataBytes, variableSizeDataBytes);
+      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes, int numDictionaryEntries) {
+    super(numRows, dataSchema, toStringDictionary(dictionaryMap, numDictionaryEntries),
+        fixedSizeDataBytes, variableSizeDataBytes);
   }
 
   @Override
   protected int getDataBlockVersionType() {
-    return DataTableBuilder.VERSION_4;
+    return DataTableFactory.VERSION_4;
+  }
+
+  private static String[] toStringDictionary(Map<String, Map<Integer, String>> dictionaryMap, int numOfEntries) {
+    String[] stringDictionary = new String[numOfEntries];
+    for (Map<Integer, String> entries : dictionaryMap.values()) {
+      for (Map.Entry<Integer, String> entry : entries.entrySet()) {
+        int key = entry.getKey();
+        String val = entry.getValue();
+        stringDictionary[key] = val;
+      }
+    }
+    return stringDictionary;
   }
 }

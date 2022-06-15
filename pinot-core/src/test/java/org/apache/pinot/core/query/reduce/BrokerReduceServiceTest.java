@@ -29,7 +29,8 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.common.DataTableBuilder;
+import org.apache.pinot.core.common.DataTableFactory;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -53,7 +54,7 @@ public class BrokerReduceServiceTest {
         CalciteSqlCompiler.compileToBrokerRequest("SELECT COUNT(*) FROM testTable GROUP BY col1");
     DataSchema dataSchema =
         new DataSchema(new String[]{"col1", "count(*)"}, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
+    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(dataSchema);
     int numGroups = 5000;
     for (int i = 0; i < numGroups; i++) {
       dataTableBuilder.startRow();

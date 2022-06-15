@@ -23,7 +23,8 @@ import org.apache.pinot.common.utils.DataSchema
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType
 import org.apache.pinot.connector.spark.BaseTest
 import org.apache.pinot.connector.spark.exceptions.PinotException
-import org.apache.pinot.core.common.datatable.DataTableBuilder
+import org.apache.pinot.core.common.DataTableFactory
+import org.apache.pinot.core.common.datatable.DataTableBuilderV2V3
 import org.apache.pinot.spi.data.Schema
 import org.apache.pinot.spi.utils.ByteArray
 import org.apache.spark.sql.catalyst.util.ArrayData
@@ -74,7 +75,7 @@ class PinotUtilsTest extends BaseTest {
     )
     val dataSchema = new DataSchema(columnNames, columnTypes)
 
-    val dataTableBuilder = new DataTableBuilder(dataSchema)
+    val dataTableBuilder = DataTableFactory.getDataTableBuilder(dataSchema)
     dataTableBuilder.startRow()
     dataTableBuilder.setColumn(0, "strValueDim")
     dataTableBuilder.setColumn(1, 5)
@@ -140,7 +141,7 @@ class PinotUtilsTest extends BaseTest {
     val columnTypes = Array(ColumnDataType.STRING, ColumnDataType.INT)
     val dataSchema = new DataSchema(columnNames, columnTypes)
 
-    val dataTableBuilder = new DataTableBuilder(dataSchema)
+    val dataTableBuilder = DataTableFactory.getDataTableBuilder(dataSchema)
     dataTableBuilder.startRow()
     dataTableBuilder.setColumn(0, "strValueDim")
     dataTableBuilder.setColumn(1, 5)
