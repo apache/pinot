@@ -818,7 +818,7 @@ public class DataTableSerDeTest {
             dataTableBuilder.setColumn(colId, JSONS[rowId]);
             break;
           case BYTES:
-            BYTES[rowId] =  isNull ? new byte[0] : RandomStringUtils.random(RANDOM.nextInt(20)).getBytes();
+            BYTES[rowId] = isNull ? new byte[0] : RandomStringUtils.random(RANDOM.nextInt(20)).getBytes();
             dataTableBuilder.setColumn(colId, new ByteArray(BYTES[rowId]));
             break;
           // Just test Double here, all object types will be covered in ObjectCustomSerDeTest.
