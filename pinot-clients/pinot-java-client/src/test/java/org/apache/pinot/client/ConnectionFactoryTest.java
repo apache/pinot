@@ -108,15 +108,14 @@ public class ConnectionFactoryTest {
    * @param args
    */
   public static void main(String[] args) {
-//    if (args.length != 3) {
-//      System.err.println("USAGE ConnectionFactoryTest <ZK_URL> <tableName> <query>");
-//      System.exit(1);
-//    }
-//    String zkUrl = args[0];
-    Connection connection = ConnectionFactory.fromController("http", "localhost", 9000);
-//    String tableName = args[1];
-
-    ResultSetGroup resultSetGroup = connection.execute("SELECT * FROM transcript");
+    if (args.length != 3) {
+      System.err.println("USAGE ConnectionFactoryTest <ZK_URL> <tableName> <query>");
+      System.exit(1);
+    }
+    String zkUrl = args[0];
+    Connection connection = ConnectionFactory.fromZookeeper(zkUrl);
+    String tableName = args[1];
+    ResultSetGroup resultSetGroup = connection.execute(tableName, args[2]);
     System.out.println(resultSetGroup);
   }
 }
