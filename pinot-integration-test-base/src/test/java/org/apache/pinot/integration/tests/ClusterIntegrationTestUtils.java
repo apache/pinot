@@ -283,12 +283,28 @@ public class ClusterIntegrationTestUtils {
   public static void buildSegmentFromAvro(File avroFile, TableConfig tableConfig,
       org.apache.pinot.spi.data.Schema schema, int segmentIndex, File segmentDir, File tarDir)
       throws Exception {
+    // Test segment with space and special character in the file name
+    buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex + " %", segmentDir, tarDir);
+  }
+
+  /**
+   * Builds one Pinot segment from the given Avro file.
+   *
+   * @param avroFile Avro file
+   * @param tableConfig Pinot table config
+   * @param schema Pinot schema
+   * @param segmentNamePostfix Segment name postfix
+   * @param segmentDir Output directory for the un-tarred segments
+   * @param tarDir Output directory for the tarred segments
+   */
+  public static void buildSegmentFromAvro(File avroFile, TableConfig tableConfig,
+      org.apache.pinot.spi.data.Schema schema, String segmentNamePostfix, File segmentDir, File tarDir)
+      throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setInputFilePath(avroFile.getPath());
     segmentGeneratorConfig.setOutDir(segmentDir.getPath());
     segmentGeneratorConfig.setTableName(tableConfig.getTableName());
-    // Test segment with space and special character in the file name
-    segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
+    segmentGeneratorConfig.setSegmentNamePostfix(segmentNamePostfix);
 
     // Build the segment
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();

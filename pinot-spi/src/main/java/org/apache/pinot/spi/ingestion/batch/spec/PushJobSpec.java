@@ -42,6 +42,11 @@ public class PushJobSpec implements Serializable {
   private long _pushRetryIntervalMillis = 1000;
 
   /**
+   * Applicable for URI and METADATA push types.
+   * If true, and if segment was not already in the deep store, move it to deep store.
+   */
+  private boolean _copyToDeepStoreForMetadataPush;
+  /**
    * Used in SegmentUriPushJobRunner, which is used to composite the segment uri to send to pinot controller.
    * The URI sends to controller is in the format ${segmentUriPrefix}${segmentPath}${segmentUriSuffix}
    */
@@ -120,5 +125,13 @@ public class PushJobSpec implements Serializable {
 
   public void setPushParallelism(int pushParallelism) {
     _pushParallelism = pushParallelism;
+  }
+
+  public boolean getCopyToDeepStoreForMetadataPush() {
+    return _copyToDeepStoreForMetadataPush;
+  }
+
+  public void setCopyToDeepStoreForMetadataPush(boolean copyToDeepStoreForMetadataPush) {
+    _copyToDeepStoreForMetadataPush = copyToDeepStoreForMetadataPush;
   }
 }
