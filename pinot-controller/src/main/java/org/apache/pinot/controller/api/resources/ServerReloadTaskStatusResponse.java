@@ -18,10 +18,22 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import org.apache.pinot.common.metadata.task.TaskType;
+
+
 public class ServerReloadTaskStatusResponse {
+  private TaskType _taskType;
   private long _taskSubmissionTimeInMillisEpoch;
   private int _totalSegmentCount;
   private int _successCount;
+
+  public TaskType getTaskType() {
+    return _taskType;
+  }
+
+  public void setTaskType(TaskType taskType) {
+    _taskType = taskType;
+  }
 
   public long getTaskSubmissionTimeInMillisEpoch() {
     return _taskSubmissionTimeInMillisEpoch;

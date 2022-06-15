@@ -67,6 +67,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metadata.task.TaskType;
 import org.apache.pinot.common.metadata.task.TaskZKMetadata;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
@@ -87,7 +88,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
+import static org.apache.pinot.spi.utils.CommonConstants.Task.SEGMENT_RELOAD_TASK_SEGMENT_NAME;
 import static org.apache.pinot.spi.utils.CommonConstants.Task.TASK_SUBMISSION_TIME;
+import static org.apache.pinot.spi.utils.CommonConstants.Task.TASK_TYPE;
 
 
 /**
@@ -651,6 +654,7 @@ public class PinotSegmentRestletResource {
       // TODO (saurabh) Add more derived fields (timeElapsed, estimatedTimeRemaining etc)
       serverReloadTaskStatusResponse
           .setTaskSubmissionTimeInMillisEpoch(Long.parseLong(taskZKMetadata.getSimpleField(TASK_SUBMISSION_TIME)));
+      serverReloadTaskStatusResponse.setTaskType(TaskType.valueOf(taskZKMetadata.getSimpleField(TASK_TYPE)));
     }
 
     return serverReloadTaskStatusResponse;
