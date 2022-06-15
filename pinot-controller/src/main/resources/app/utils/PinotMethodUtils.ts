@@ -28,6 +28,10 @@ import {
   setInstanceState,
   setTableState,
   dropInstance,
+  getPeriodicTaskNames,
+  getTaskTypes,
+  getTaskTypeTasks,
+  getTaskTypeState,
   updateInstanceTags,
   getClusterConfig,
   getQueryTables,
@@ -746,6 +750,35 @@ const deleteInstance = (instanceName) => {
   });
 };
 
+const getAllPeriodicTaskNames = () => {
+  return getPeriodicTaskNames().then((response)=>{
+    return { columns: ['Task Name'], records: response.data.map(d => [d]) };
+  });
+};
+
+const getAllTaskTypes = () => {
+  const finalResponse = {
+    columns: ['Task Type', 'Num Tasks in Queue', 'Queue Status'],
+    records: []
+  }
+  return new Promise((resolve, reject) => {
+    getTaskTypes().then(async (response)=>{
+      if (_.isArray(response.data)) {
+        const promiseArr = [];
+        const fetchData = async (taskType) => {
+          const tasksRes = await getTaskTypeTasks(taskType);
+          const stateRes = await getTaskTypeState(taskType);
+          const state = _.get(stateRes.data, _.first(_.keys(stateRes.data)));
+          finalResponse.records.push([taskType, tasksRes.data.length, state]);
+        };
+        response.data.forEach((taskType) => promiseArr.push(fetchData(taskType)));
+        await Promise.all(promiseArr);
+        resolve(finalResponse);
+      }
+    });
+  })
+};
+
 const reloadSegmentOp = (tableName, segmentName) => {
   return reloadSegment(tableName, segmentName).then((response)=>{
     return response.data;
@@ -972,6 +1005,8 @@ export default {
   toggleInstanceState,
   toggleTableState,
   deleteInstance,
+  getAllPeriodicTaskNames,
+  getAllTaskTypes,
   deleteSegmentOp,
   reloadSegmentOp,
   reloadStatusOp,

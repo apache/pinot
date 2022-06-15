@@ -26,6 +26,8 @@ import PinotMethodUtils from '../utils/PinotMethodUtils';
 import TenantsListing from '../components/Homepage/TenantsListing';
 import Instances from '../components/Homepage/InstancesTables';
 import ClusterConfig from '../components/Homepage/ClusterConfig';
+import PeriodicTaskTable from '../components/Homepage/PeriodicTaskTable';
+import TaskTypesTable from '../components/Homepage/TaskTypesTable';
 
 const useStyles = makeStyles((theme) => ({
   paper:{
@@ -67,12 +69,15 @@ const HomePage = () => {
   const [fetching, setFetching] = useState(true);
   const [tenantsData, setTenantsData] = useState<TableData>({ records: [], columns: [] });
   const [instances, setInstances] = useState<DataTable>();
+  const [periodicTaskNames, setPeriodicTaskNames] = useState<DataTable>({ records: [], columns: [] });
   const [clusterName, setClusterName] = useState('');
   const [tables, setTables] = useState([]);
 
   const fetchData = async () => {
     const tenantsDataResponse = await PinotMethodUtils.getTenantsData();
     const instanceResponse = await PinotMethodUtils.getAllInstances();
+    const periodicTaskNames = await PinotMethodUtils.getAllPeriodicTaskNames();
+    const taskTypes = await PinotMethodUtils.getAllTaskTypes();
     const tablesResponse = await PinotMethodUtils.getQueryTablesList({bothType: true});
     const tablesList = [];
     tablesResponse.records.map((record)=>{
@@ -80,6 +85,7 @@ const HomePage = () => {
     });
     setTenantsData(tenantsDataResponse);
     setInstances(instanceResponse);
+    setPeriodicTaskNames(periodicTaskNames);
     setTables(tablesList);
     let clusterNameRes = localStorage.getItem('pinot_ui:clusterName');
     if(!clusterNameRes){
@@ -130,6 +136,14 @@ const HomePage = () => {
           </Link>
         </Grid>
         <Grid item xs={2}>
+          <Link to="/minions" className={classes.paperLinks}>
+            <Paper className={classes.paper}>
+              <h4>Minions</h4>
+              <h2>{Array.isArray(instances.Minion) ? instances.Minion.length : 0}</h2>
+            </Paper>
+          </Link>
+        </Grid>
+        <Grid item xs={2}>
           <Link to="/tables" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Tables</h4>
@@ -140,6 +154,8 @@ const HomePage = () => {
       </Grid>
       <TenantsListing tenantsData={tenantsData} />
       <Instances instances={instances} clusterName={clusterName} />
+      <PeriodicTaskTable tableData={periodicTaskNames} />
+      <TaskTypesTable />
       <ClusterConfig />
     </Grid>
   );

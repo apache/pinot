@@ -87,6 +87,18 @@ export const setTableState = (name: string, stateName: string, tableType: string
 export const dropInstance = (name: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`instances/${name}`, { headers });
 
+export const getPeriodicTaskNames = (): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/periodictask/names`, { headers });
+
+export const getTaskTypes = (): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/tasktypes`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getTaskTypeTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/${taskType}/tasks`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getTaskTypeState = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/${taskType}/taskstates`, { headers: { ...headers, Accept: 'application/json' } });
+
 export const getClusterConfig = (): Promise<AxiosResponse<ClusterConfig>> =>
   baseApi.get('/cluster/configs');
 

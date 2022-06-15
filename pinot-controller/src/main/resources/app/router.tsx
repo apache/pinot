@@ -38,6 +38,7 @@ export default [
   { path: '/controllers', Component: InstanceListingPage },
   { path: '/brokers', Component: InstanceListingPage },
   { path: '/servers', Component: InstanceListingPage },
+  { path: '/minions', Component: InstanceListingPage },
   { path: '/tables', Component: TablesListingPage },
   { path: '/tenants/:tenantName', Component: TenantsPage },
   { path: '/tenants/:tenantName/table/:tableName', Component: TenantPageDetails },
