@@ -2064,7 +2064,7 @@ public class PinotHelixResourceManager {
         tasks = tasks.
                 entrySet()
             .stream()
-            .sorted(new Comparator<>() {
+            .sorted(new Comparator<Map.Entry<String, Map<String, String>>>() {
               @Override
               public int compare(Map.Entry<String, Map<String, String>> v1, Map.Entry<String, Map<String, String>> v2) {
                 return Long.compare(Long.parseLong(v2.getValue().get(CommonConstants.Task.TASK_SUBMISSION_TIME)),
