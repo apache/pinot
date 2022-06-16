@@ -27,7 +27,7 @@ import TenantsListing from '../components/Homepage/TenantsListing';
 import Instances from '../components/Homepage/InstancesTables';
 import ClusterConfig from '../components/Homepage/ClusterConfig';
 import PeriodicTaskTable from '../components/Homepage/PeriodicTaskTable';
-import TaskTypesTable from '../components/Homepage/TaskTypesTable';
+import useTaskTypesTable from '../components/Homepage/useTaskTypesTable';
 
 const useStyles = makeStyles((theme) => ({
   paper:{
@@ -72,6 +72,8 @@ const HomePage = () => {
   const [periodicTaskNames, setPeriodicTaskNames] = useState<DataTable>({ records: [], columns: [] });
   const [clusterName, setClusterName] = useState('');
   const [tables, setTables] = useState([]);
+
+  const { taskTypes, taskTypesTable } = useTaskTypesTable();
 
   const fetchData = async () => {
     const tenantsDataResponse = await PinotMethodUtils.getTenantsData();
@@ -151,11 +153,19 @@ const HomePage = () => {
             </Paper>
           </Link>
         </Grid>
+        <Grid item xs={2}>
+          <Link to="/minion-task-manager" className={classes.paperLinks}>
+            <Paper className={classes.paper}>
+              <h4>Minion Task Manager</h4>
+              <h2>{Array.isArray(taskTypes.records) ? taskTypes?.records?.length : 0}</h2>
+            </Paper>
+          </Link>
+        </Grid>
       </Grid>
       <TenantsListing tenantsData={tenantsData} />
       <Instances instances={instances} clusterName={clusterName} />
       <PeriodicTaskTable tableData={periodicTaskNames} />
-      <TaskTypesTable />
+      {taskTypesTable}
       <ClusterConfig />
     </Grid>
   );

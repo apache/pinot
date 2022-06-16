@@ -21,6 +21,7 @@ import HomePage from './pages/HomePage';
 import TenantsListingPage from './pages/TenantsListingPage';
 import InstanceListingPage from './pages/InstanceListingPage';
 import TablesListingPage from './pages/TablesListingPage';
+import MinionTaskManager from './pages/MinionTaskManager';
 import TenantsPage from './pages/Tenants';
 import TenantPageDetails from './pages/TenantDetails';
 import QueryPage from './pages/Query';
@@ -40,6 +41,7 @@ export default [
   { path: '/servers', Component: InstanceListingPage },
   { path: '/minions', Component: InstanceListingPage },
   { path: '/tables', Component: TablesListingPage },
+  { path: '/minion-task-manager', Component: MinionTaskManager },
   { path: '/tenants/:tenantName', Component: TenantsPage },
   { path: '/tenants/:tenantName/table/:tableName', Component: TenantPageDetails },
   { path: '/tenants/schema/:schemaName', Component: SchemaPageDetails },

@@ -22,7 +22,7 @@ import { DataTable } from 'Models';
 import CustomizedTables from '../Table';
 import PinotMethodUtils from '../../utils/PinotMethodUtils';
 
-const TaskTypesTable = ({ }) => {
+const useTaskTypesTable = () => {
   const [fetching, setFetching] = useState(true);
   const [taskTypes, setTaskTypes] = useState<DataTable>({ records: [], columns: [] });
 
@@ -36,15 +36,18 @@ const TaskTypesTable = ({ }) => {
     fetchData();
   }, []);
 
-  return !fetching && (
-    <CustomizedTables
-      title="Manages the minion tasks and task queues"
-      data={taskTypes}
-      showSearchBox={true}
-      inAccordionFormat={true}
-      isPagination={false}
-    />
-  );
+  return {
+    taskTypes,
+    taskTypesTable: !fetching && (
+      <CustomizedTables
+        title="Manages the minion tasks and task queues"
+        data={taskTypes}
+        showSearchBox={true}
+        inAccordionFormat={true}
+        isPagination={false}
+      />
+    )
+  };
 };
 
-export default TaskTypesTable;
+export default useTaskTypesTable;
