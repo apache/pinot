@@ -36,7 +36,7 @@
     <spark.version>2.4.7</spark.version>
     <scala.binary.version>2.12</scala.binary.version>
     <scala.version>2.12.15</scala.version>
-    <hadoop.version>2.10.1</hadoop.version>
+    <hadoop.version>3.3.3</hadoop.version>
     <phase.prop>package</phase.prop>
   </properties>
   <profiles>
