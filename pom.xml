@@ -1685,6 +1685,9 @@
             <exclude>**/.project</exclude>
             <exclude>**/.classpath</exclude>
             <exclude>.externalToolBuilders/**</exclude>
+            <!-- OpenAPI template files -->
+            <exclude>**/*.mustache</exclude>
+
           </excludes>
           <mapping>
             <java>JAVADOC_STYLE</java>
