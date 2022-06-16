@@ -32,6 +32,10 @@ import {
   getTaskTypes,
   getTaskTypeTasks,
   getTaskTypeState,
+  stopTasks,
+  resumeTasks,
+  cleanupTasks,
+  deleteTasks,
   updateInstanceTags,
   getClusterConfig,
   getQueryTables,
@@ -765,18 +769,47 @@ const getAllTaskTypes = () => {
     getTaskTypes().then(async (response)=>{
       if (_.isArray(response.data)) {
         const promiseArr = [];
-        const fetchData = async (taskType) => {
-          const tasksRes = await getTaskTypeTasks(taskType);
-          const stateRes = await getTaskTypeState(taskType);
-          const state = _.get(stateRes.data, _.first(_.keys(stateRes.data)));
-          finalResponse.records.push([taskType, tasksRes.data.length, state]);
+        const fetchInfo = async (taskType) => {
+          const [ count, state ] = await getTaskInfo(taskType);
+          finalResponse.records.push([taskType, count, state]);
         };
-        response.data.forEach((taskType) => promiseArr.push(fetchData(taskType)));
+        response.data.forEach((taskType) => promiseArr.push(fetchInfo(taskType)));
         await Promise.all(promiseArr);
         resolve(finalResponse);
       }
     });
   })
+};
+
+const getTaskInfo = async (taskType) => {
+  const tasksRes = await getTaskTypeTasks(taskType);
+  const stateRes = await getTaskTypeState(taskType);
+  const state = _.get(stateRes.data, _.first(_.keys(stateRes.data)));
+  return [tasksRes?.data?.length || 0, state];
+};
+
+const stopAllTasks = (taskType) => {
+  return stopTasks(taskType).then((response)=>{
+    return response.data;
+  });
+};
+
+const resumeAllTasks = (taskType) => {
+  return resumeTasks(taskType).then((response)=>{
+    return response.data;
+  });
+};
+
+const cleanupAllTasks = (taskType) => {
+  return cleanupTasks(taskType).then((response)=>{
+    return response.data;
+  });
+};
+
+const deleteAllTasks = (taskType) => {
+  return deleteTasks(taskType).then((response)=>{
+    return response.data;
+  });
 };
 
 const reloadSegmentOp = (tableName, segmentName) => {
@@ -1007,6 +1040,11 @@ export default {
   deleteInstance,
   getAllPeriodicTaskNames,
   getAllTaskTypes,
+  getTaskInfo,
+  stopAllTasks,
+  resumeAllTasks,
+  cleanupAllTasks,
+  deleteAllTasks,
   deleteSegmentOp,
   reloadSegmentOp,
   reloadStatusOp,

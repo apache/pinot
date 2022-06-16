@@ -18,13 +18,13 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { DataTable } from 'Models';
+import { TableData } from 'Models';
 import CustomizedTables from '../Table';
 import PinotMethodUtils from '../../utils/PinotMethodUtils';
 
 const useTaskTypesTable = () => {
   const [fetching, setFetching] = useState(true);
-  const [taskTypes, setTaskTypes] = useState<DataTable>({ records: [], columns: [] });
+  const [taskTypes, setTaskTypes] = useState<TableData>({ records: [], columns: [] });
 
   const fetchData = async () => {
     setFetching(true);
@@ -45,6 +45,8 @@ const useTaskTypesTable = () => {
         showSearchBox={true}
         inAccordionFormat={true}
         isPagination={false}
+        addLinks
+        baseURL='/task-queue/'
       />
     )
   };

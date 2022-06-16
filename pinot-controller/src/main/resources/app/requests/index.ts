@@ -99,6 +99,18 @@ export const getTaskTypeTasks = (taskType: string): Promise<AxiosResponse<Operat
 export const getTaskTypeState = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/taskstates`, { headers: { ...headers, Accept: 'application/json' } });
 
+export const stopTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/tasks/${taskType}/stop`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const resumeTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/tasks/${taskType}/resume`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const cleanupTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/tasks/${taskType}/cleanup`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const deleteTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.delete(`/tasks/${taskType}`, { headers: { ...headers, Accept: 'application/json' } });
+
 export const getClusterConfig = (): Promise<AxiosResponse<ClusterConfig>> =>
   baseApi.get('/cluster/configs');
 
