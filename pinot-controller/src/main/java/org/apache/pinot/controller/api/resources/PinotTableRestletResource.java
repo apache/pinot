@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -72,7 +73,6 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.task.TaskZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -802,7 +802,7 @@ public class PinotTableRestletResource {
   @Path("table/{tableName}/tasks")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get list of tasks for this table", notes = "Get list of tasks for this table")
-  public List<TaskZKMetadata> getTasks(
+  public Map<String, Map<String, String>> getTasks(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr
   ) {
@@ -811,9 +811,9 @@ public class PinotTableRestletResource {
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
             LOGGER);
 
-    List<TaskZKMetadata> result = new ArrayList<>();
+    Map<String, Map<String, String>> result = new HashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
-      result.addAll(_pinotHelixResourceManager.getAllTasksForTable(tableNameWithType));
+      result.putAll(_pinotHelixResourceManager.getAllTasksForTable(tableNameWithType));
     }
 
     return result;

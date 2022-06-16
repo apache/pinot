@@ -98,10 +98,6 @@ public class ZKMetadataProvider {
     return new InstanceZKMetadata(znRecord);
   }
 
-  public static String constructPropertyStorePathForTask(String resourceName, String taskId) {
-    return StringUtil.join("/", PROPERTYSTORE_TASKS_PREFIX, resourceName, taskId);
-  }
-
   public static String constructPropertyStorePathForSegment(String resourceName, String segmentName) {
     return StringUtil.join("/", PROPERTYSTORE_SEGMENTS_PREFIX, resourceName, segmentName);
   }

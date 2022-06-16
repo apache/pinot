@@ -569,6 +569,7 @@ public class CommonConstants {
     /**
      * Segment reload task ZK props
      */
+    public static final Integer MAXIMUM_RELOAD_TASKS_IN_ZK = 100;
     public static final String SEGMENT_RELOAD_TASK_SEGMENT_NAME = "task.reload.segment.segmentName";
   }
 

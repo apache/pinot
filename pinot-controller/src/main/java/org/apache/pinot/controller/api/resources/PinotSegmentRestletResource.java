@@ -68,7 +68,6 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.task.TaskType;
-import org.apache.pinot.common.metadata.task.TaskZKMetadata;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -602,7 +601,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Reload task id", required = true) @PathParam("taskId") String reloadTaskId)
       throws Exception {
-    TaskZKMetadata taskZKMetadata = null;
+    Map<String, String> taskZKMetadata = null;
 
     // Call all servers to get status, collate and return
     List<String> tableNamesWithType =
@@ -652,9 +651,9 @@ public class PinotSegmentRestletResource {
       // TODO (saurabh) Add more derived fields (timeElapsed, estimatedTimeRemaining etc)
       serverReloadTaskStatusResponse
           .setTaskSubmissionTimeInMillisEpoch(
-              Long.parseLong(taskZKMetadata.getSimpleField(CommonConstants.Task.TASK_SUBMISSION_TIME)));
+              Long.parseLong(taskZKMetadata.get(CommonConstants.Task.TASK_SUBMISSION_TIME)));
       serverReloadTaskStatusResponse.setTaskType(
-          TaskType.valueOf(taskZKMetadata.getSimpleField(CommonConstants.Task.TASK_TYPE)));
+          TaskType.valueOf(taskZKMetadata.get(CommonConstants.Task.TASK_TYPE)));
     }
 
     return serverReloadTaskStatusResponse;

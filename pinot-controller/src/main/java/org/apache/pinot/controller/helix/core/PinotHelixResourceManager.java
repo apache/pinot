@@ -31,6 +31,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -101,7 +102,6 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.task.TaskType;
-import org.apache.pinot.common.metadata.task.TaskZKMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.common.utils.HashUtil;
@@ -1985,54 +1985,103 @@ public class PinotHelixResourceManager {
     return instanceSet;
   }
 
-  public TaskZKMetadata getTaskZKMetadata(String tableNameWithType, String taskId) {
-    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTask(tableNameWithType, taskId);
+  public Map<String, String> getTaskZKMetadata(String tableNameWithType, String taskId) {
+    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTaskResource(tableNameWithType);
     if (_propertyStore.exists(taskResourcePath, AccessOption.PERSISTENT)) {
-      return new TaskZKMetadata(_propertyStore.get(taskResourcePath, null, -1));
+      ZNRecord taskResourceZnRecord = _propertyStore.get(taskResourcePath, null, -1);
+      return taskResourceZnRecord.getMapFields().get(taskId);
     } else {
       return null;
     }
   }
 
-  public List<TaskZKMetadata> getAllTasksForTable(String tableNameWithType) {
+  public Map<String, Map<String, String>> getAllTasksForTable(String tableNameWithType) {
     String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTaskResource(tableNameWithType);
     if (_propertyStore.exists(taskResourcePath, AccessOption.PERSISTENT)) {
-      List<ZNRecord> children = _propertyStore.getChildren(taskResourcePath, null, -1,
-          CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
-      List<TaskZKMetadata> tasks = new ArrayList<>();
-      for (ZNRecord child : children) {
-        tasks.add(new TaskZKMetadata(child));
-      }
-      return tasks;
+      ZNRecord tableTaskRecord = _propertyStore.get(taskResourcePath, null, -1);
+      return tableTaskRecord.getMapFields();
     } else {
-      return Collections.emptyList();
+      return Collections.emptyMap();
     }
   }
 
   public void addNewReloadSegmentTask(String tableNameWithType, String segmentName, String taskId,
       int numberOfMessagesSent) {
-    TaskZKMetadata taskZKMetadata = new TaskZKMetadata(taskId, TaskType.RELOAD_SEGMENT);
-    taskZKMetadata.setSimpleField(CommonConstants.Task.TASK_MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
-    taskZKMetadata.setSimpleField(CommonConstants.Task.SEGMENT_RELOAD_TASK_SEGMENT_NAME, segmentName);
+    Map<String, String> taskMetadata = new HashMap<>();
+    taskMetadata.put(CommonConstants.Task.TASK_ID, taskId);
+    taskMetadata.put(CommonConstants.Task.TASK_TYPE, TaskType.RELOAD_SEGMENT.toString());
+    taskMetadata.put(CommonConstants.Task.TASK_SUBMISSION_TIME, Long.toString(System.currentTimeMillis()));
+    taskMetadata.put(CommonConstants.Task.TASK_MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
+    taskMetadata.put(CommonConstants.Task.SEGMENT_RELOAD_TASK_SEGMENT_NAME, segmentName);
 
-    ZNRecord znRecord = taskZKMetadata.toZNRecord();
-    String taskZKMetaPath = ZKMetadataProvider.constructPropertyStorePathForTask(tableNameWithType, taskId);
+    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTaskResource(tableNameWithType);
+    ZNRecord tableTaskZnRecord;
 
-    // Todo (saurabh) : Check how to achieve ZNode ttl
-    Preconditions.checkState(_propertyStore.set(taskZKMetaPath, znRecord, AccessOption.PERSISTENT),
-        "Failed to set task ZK metadata for table: " + tableNameWithType + ", taskId: " + taskId);
+    if (_propertyStore.exists(taskResourcePath, AccessOption.PERSISTENT)) {
+      tableTaskZnRecord = _propertyStore.get(taskResourcePath, null, -1);
+      Map<String, Map<String, String>> tasks = tableTaskZnRecord.getMapFields();
+      tasks.put(taskId, taskMetadata);
+      if (tasks.size() > CommonConstants.Task.MAXIMUM_RELOAD_TASKS_IN_ZK) {
+        tasks = tasks.
+            entrySet()
+            .stream()
+            .sorted(new Comparator<Map.Entry<String, Map<String, String>>>() {
+          @Override
+          public int compare(Map.Entry<String, Map<String, String>> v1, Map.Entry<String, Map<String, String>> v2) {
+            return Long.compare(Long.parseLong(v2.getValue().get(CommonConstants.Task.TASK_SUBMISSION_TIME)),
+                Long.parseLong(v1.getValue().get(CommonConstants.Task.TASK_SUBMISSION_TIME)));
+          }
+        })
+            .collect(Collectors.toList())
+            .subList(0, CommonConstants.Task.MAXIMUM_RELOAD_TASKS_IN_ZK)
+            .stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+      }
+      tableTaskZnRecord.setMapFields(tasks);
+    } else {
+      tableTaskZnRecord = new ZNRecord(taskResourcePath);
+      tableTaskZnRecord.setMapField(taskId, taskMetadata);
+    }
+
+    _propertyStore.set(taskResourcePath, tableTaskZnRecord, AccessOption.PERSISTENT);
   }
 
   public void addNewReloadAllSegmentsTask(String tableNameWithType, String taskId, int numberOfMessagesSent) {
-    TaskZKMetadata taskZKMetadata = new TaskZKMetadata(taskId, TaskType.RELOAD_ALL_SEGMENTS);
-    taskZKMetadata.setSimpleField(CommonConstants.Task.TASK_MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
+    Map<String, String> taskMetadata = new HashMap<>();
+    taskMetadata.put(CommonConstants.Task.TASK_ID, taskId);
+    taskMetadata.put(CommonConstants.Task.TASK_TYPE, TaskType.RELOAD_ALL_SEGMENTS.toString());
+    taskMetadata.put(CommonConstants.Task.TASK_SUBMISSION_TIME, Long.toString(System.currentTimeMillis()));
+    taskMetadata.put(CommonConstants.Task.TASK_MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
 
-    ZNRecord znRecord = taskZKMetadata.toZNRecord();
-    String taskZKMetaPath = ZKMetadataProvider.constructPropertyStorePathForTask(tableNameWithType, taskId);
+    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTaskResource(tableNameWithType);
+    ZNRecord tableTaskZnRecord;
 
-    // Todo (saurabh) : Check how to achieve ZNode ttl
-    Preconditions.checkState(_propertyStore.set(taskZKMetaPath, znRecord, AccessOption.PERSISTENT),
-        "Failed to set task ZK metadata for table: " + tableNameWithType + ", taskId: " + taskId);
+    if (_propertyStore.exists(taskResourcePath, AccessOption.PERSISTENT)) {
+      tableTaskZnRecord = _propertyStore.get(taskResourcePath, null, -1);
+      Map<String, Map<String, String>> tasks = tableTaskZnRecord.getMapFields();
+      tasks.put(taskId, taskMetadata);
+      if (tasks.size() > CommonConstants.Task.MAXIMUM_RELOAD_TASKS_IN_ZK) {
+        tasks = tasks.
+                entrySet()
+            .stream()
+            .sorted(new Comparator<>() {
+              @Override
+              public int compare(Map.Entry<String, Map<String, String>> v1, Map.Entry<String, Map<String, String>> v2) {
+                return Long.compare(Long.parseLong(v2.getValue().get(CommonConstants.Task.TASK_SUBMISSION_TIME)),
+                    Long.parseLong(v1.getValue().get(CommonConstants.Task.TASK_SUBMISSION_TIME)));
+              }
+            })
+            .collect(Collectors.toList())
+            .subList(0, CommonConstants.Task.MAXIMUM_RELOAD_TASKS_IN_ZK)
+            .stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+      }
+      tableTaskZnRecord.setMapFields(tasks);
+    } else {
+      tableTaskZnRecord = new ZNRecord(taskResourcePath);
+      tableTaskZnRecord.setMapField(taskId, taskMetadata);
+    }
+    _propertyStore.set(taskResourcePath, tableTaskZnRecord, AccessOption.PERSISTENT);
   }
 
   @VisibleForTesting
