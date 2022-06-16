@@ -20,6 +20,7 @@
 import React, { useEffect, useState } from 'react';
 import { get } from 'lodash';
 import { TableData } from 'Models';
+import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { Grid, makeStyles } from '@material-ui/core';
 import SimpleAccordion from '../components/SimpleAccordion';
 import CustomButton from '../components/CustomButton';
@@ -27,6 +28,15 @@ import CustomButton from '../components/CustomButton';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import { useConfirm } from '../components/Confirm';
 import CustomizedTables from '../components/Table';
+
+const jsonoptions = {
+  lineNumbers: true,
+  mode: 'application/json',
+  styleActiveLine: true,
+  gutters: ['CodeMirror-lint-markers'],
+  theme: 'default',
+  readOnly: true
+};
 
 const useStyles = makeStyles(() => ({
   gridContainer: {
@@ -52,24 +62,34 @@ const useStyles = makeStyles(() => ({
     borderRadius: 4,
     marginBottom: '20px',
   },
+  sqlDiv: {
+    border: '1px #BDCCD9 solid',
+    borderRadius: 4,
+    marginBottom: '20px',
+  },
+  queryOutput: {
+    border: '1px solid #BDCCD9',
+    '& .CodeMirror': { height: 532 },
+  },
 }));
 
-const TaskQueue = (props) => {
+const TaskQueueTable = (props) => {
   const classes = useStyles();
-  const { taskType } = props.match.params;
+  const { taskType, tableName } = props.match.params;
 
   const [fetching, setFetching] = useState(true);
-  const [taskInfo, setTaskInfo] = useState([]);
-  const [tables, setTables] = useState<TableData>({ records: [], columns: ['Name'] });
+  // const [taskInfo, setTaskInfo] = useState([]);
+  const [jobDetail, setJobDetail] = useState({});
+  const [tableDetail, setTableDetail] = useState({});
+  // const [tables, setTables] = useState<TableData>({ records: [], columns: ['Name'] });
 
   const fetchData = async () => {
     setFetching(true);
-    const taskInfoRes = await PinotMethodUtils.getTaskInfo(taskType);
-    const tablesResponse:any = await PinotMethodUtils.getTable();
-    setTaskInfo(taskInfoRes);
-    setTables((prevState): TableData => {
-      return { ...prevState, records: get(tablesResponse, 'tables', []).map(table => [table]) };
-    });
+    const detail = await PinotMethodUtils.getScheduleJobDetail(tableName, taskType);
+    const tableDetailRes = await PinotMethodUtils.getTableDetails(tableName);
+    console.log('tableDetailRes', tableDetailRes);
+    setTableDetail(tableDetailRes);
+    setJobDetail(detail);
     setFetching(false);
   };
 
@@ -77,35 +97,13 @@ const TaskQueue = (props) => {
     fetchData();
   }, []);
 
-  const handleStopAll = async () => {
-    await PinotMethodUtils.stopAllTasks(taskType);
-    stopAllConfirm.setConfirmDialog(false);
+  const handleScheduleNow = async () => {
+    await PinotMethodUtils.scheduleTaskAction(tableName, taskType);
   };
 
-  const stopAllConfirm = useConfirm({
-    dialogTitle: 'Stop all tasks',
-    dialogContent: 'Are you sure want to stop all the tasks?',
-    successCallback: handleStopAll
-  });
-
-  const handleResumeAll = async () => {
-    await PinotMethodUtils.resumeAllTasks(taskType);
+  const handleExecute = async () => {
+    await PinotMethodUtils.executeTaskAction({ tableName, taskType });
   };
-
-  const handleCleanupAll = async () => {
-    await PinotMethodUtils.cleanupAllTasks(taskType);
-  };
-
-  const handleDeleteAll = async () => {
-    await PinotMethodUtils.deleteAllTasks(taskType);
-    deleteAllConfirm.setConfirmDialog(false);
-  };
-
-  const deleteAllConfirm = useConfirm({
-    dialogTitle: 'Delete all tasks',
-    dialogContent: 'Are you sure want to delete all the tasks?',
-    successCallback: handleDeleteAll
-  });
 
   return (
     <Grid item xs className={classes.gridContainer}>
@@ -116,32 +114,18 @@ const TaskQueue = (props) => {
         >
           <div>
             <CustomButton
-              onClick={() => stopAllConfirm.setConfirmDialog(true)}
-              tooltipTitle="Stop all tasks"
+              onClick={() => handleScheduleNow()}
+              tooltipTitle="Schedule now"
               enableTooltip={true}
             >
-              Stop All
+              Schedule Now
             </CustomButton>
             <CustomButton
-              onClick={handleResumeAll}
-              tooltipTitle="Resume all tasks"
+              onClick={() => handleExecute()}
+              tooltipTitle="Execute ADHOC"
               enableTooltip={true}
             >
-              Resume All
-            </CustomButton>
-            <CustomButton
-              onClick={handleCleanupAll}
-              tooltipTitle="Cleanup all tasks"
-              enableTooltip={true}
-            >
-              Cleanup All
-            </CustomButton>
-            <CustomButton
-              onClick={() => deleteAllConfirm.setConfirmDialog(true)}
-              tooltipTitle="Delete all tasks"
-              enableTooltip={true}
-            >
-              Delete All
+              Schedule ADHOC
             </CustomButton>
           </div>
         </SimpleAccordion>
@@ -149,19 +133,38 @@ const TaskQueue = (props) => {
       <div className={classes.highlightBackground}>
         {/* <TableToolbar name="Summary" showSearchBox={false} /> */}
         <Grid container className={classes.body}>
-          <Grid item xs={4}>
-            <strong>Task Type:</strong> {taskType}
+          <Grid item xs={12}>
+            <strong>Table Name:</strong> {tableName}
           </Grid>
-          <Grid item xs={4}>
-            <strong>Task Queue Status:</strong> {get(taskInfo, '1', null)}
+          <Grid item xs={12}>
+            <strong>Cron Schedule :</strong> {get(jobDetail, 'expression', '')}
           </Grid>
-          <Grid item xs={4}>
-            <strong>Num Tasks: </strong>
-            {get(taskInfo, '0', null)}
+          <Grid item xs={12}>
+            <strong>Previous Fire Time: </strong> {get(jobDetail, 'expression', '')}
+          </Grid>
+          <Grid item xs={12}>
+            <strong>Next Fire Time: </strong> {get(jobDetail, 'expression', '')}
           </Grid>
         </Grid>
       </div>
-      {!fetching && (
+      <Grid container spacing={2}>
+        <Grid item xs={6}>
+          <div className={classes.sqlDiv}>
+            <SimpleAccordion
+              headerTitle="Task Config"
+              showSearchBox={false}
+            >
+              <CodeMirror
+                options={jsonoptions}
+                value={get(tableDetail, `task.taskTypeConfigsMap.${taskType}`, `{}`)}
+                className={classes.queryOutput}
+                autoCursor={false}
+              />
+            </SimpleAccordion>
+          </div>
+        </Grid>
+      </Grid>
+      {/* {!fetching && (
         <CustomizedTables
           title="Tables"
           data={tables}
@@ -169,13 +172,11 @@ const TaskQueue = (props) => {
           inAccordionFormat={true}
           isPagination={false}
           addLinks
-          baseURL={`/task-queue/${taskType}/tables/`}
+          baseURL='/task-queue/tables/'
         />
-      )}
-      {stopAllConfirm.confirmComponent}
-      {deleteAllConfirm.confirmComponent}
+      )} */}
     </Grid>
   );
 };
 
-export default TaskQueue;
+export default TaskQueueTable;

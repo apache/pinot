@@ -36,6 +36,9 @@ import {
   resumeTasks,
   cleanupTasks,
   deleteTasks,
+  sheduleTask,
+  executeTask,
+  getJobDetail,
   updateInstanceTags,
   getClusterConfig,
   getQueryTables,
@@ -982,6 +985,24 @@ const getTable = ()=>{
   })
 };
 
+const scheduleTaskAction = (tableName, taskType)=>{
+  return sheduleTask(tableName, taskType).then(response=>{
+    return response.data;
+  })
+};
+
+const executeTaskAction = (data)=>{
+  return executeTask(data).then(response=>{
+    return response.data;
+  })
+};
+
+const getScheduleJobDetail = (tableName, taskType)=>{
+  return getJobDetail(tableName, taskType).then(response=>{
+    return response.data;
+  })
+};
+
 const getUserList = ()=>{
   return requestUserList().then(response=>{
     return response.data;
@@ -1045,6 +1066,9 @@ export default {
   resumeAllTasks,
   cleanupAllTasks,
   deleteAllTasks,
+  scheduleTaskAction,
+  executeTaskAction,
+  getScheduleJobDetail,
   deleteSegmentOp,
   reloadSegmentOp,
   reloadStatusOp,

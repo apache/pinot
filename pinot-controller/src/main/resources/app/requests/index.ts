@@ -111,6 +111,15 @@ export const cleanupTasks = (taskType: string): Promise<AxiosResponse<OperationR
 export const deleteTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/tasks/${taskType}`, { headers: { ...headers, Accept: 'application/json' } });
 
+export const sheduleTask = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.post(`/tasks/schedule?tableName=${tableName}&taskType=${taskType}`, null, { headers: { ...headers, Accept: 'application/json' } });
+
+export const executeTask = (data): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.post(`/tasks/execute`, data, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getJobDetail = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/scheduler/jobDetails?tableName=${tableName}&taskType=${taskType}`, { headers: { ...headers, Accept: 'application/json' } });
+
 export const getClusterConfig = (): Promise<AxiosResponse<ClusterConfig>> =>
   baseApi.get('/cluster/configs');
 
