@@ -82,9 +82,8 @@ public class CalciteSqlParser {
   //
   // Multiple OPTIONs is also supported by:
   // `OPTION (<k1> = <v1>, <k2> = <v2>, <k3> = <v3>)`
-  @Deprecated
   private static final Pattern OPTIONS_REGEX_PATTEN =
-      Pattern.compile("option\\s*\\(([^\\)]+)\\)\\Z", Pattern.CASE_INSENSITIVE);
+      Pattern.compile("\\s*option\\s*\\(([^\\)]+)\\)\\s*\\Z", Pattern.CASE_INSENSITIVE);
 
   /**
    * Checks for the presence of semicolon in the sql query and modifies the query accordingly
