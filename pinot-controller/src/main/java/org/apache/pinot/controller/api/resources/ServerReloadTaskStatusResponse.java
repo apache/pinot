@@ -23,6 +23,8 @@ import org.apache.pinot.common.metadata.task.TaskType;
 
 public class ServerReloadTaskStatusResponse {
   private TaskType _taskType;
+  private long _timeElapsedInMinutes;
+  private double _estimatedTimeRemainingInMinutes;
   private long _taskSubmissionTimeInMillisEpoch;
   private int _totalSegmentCount;
   private int _successCount;
@@ -57,5 +59,21 @@ public class ServerReloadTaskStatusResponse {
 
   public void setSuccessCount(int successCount) {
     _successCount = successCount;
+  }
+
+  public double getEstimatedTimeRemainingInMinutes() {
+    return _estimatedTimeRemainingInMinutes;
+  }
+
+  public void setEstimatedTimeRemainingInMinutes(double estimatedTimeRemainingInMillis) {
+    _estimatedTimeRemainingInMinutes = estimatedTimeRemainingInMillis;
+  }
+
+  public long getTimeElapsedInMinutes() {
+    return _timeElapsedInMinutes;
+  }
+
+  public void setTimeElapsedInMinutes(long timeElapsedInMinutes) {
+    _timeElapsedInMinutes = timeElapsedInMinutes;
   }
 }

@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -648,12 +649,17 @@ public class PinotSegmentRestletResource {
 
     // Add ZK data
     if (taskZKMetadata != null) {
-      // TODO (saurabh) Add more derived fields (timeElapsed, estimatedTimeRemaining etc)
+      long submissionTime = Long.parseLong(taskZKMetadata.get(CommonConstants.Task.TASK_SUBMISSION_TIME));
+      long timeElapsedInMinutes = TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis() - submissionTime);
+      int remainingSegments = serverReloadTaskStatusResponse.getTotalSegmentCount() -
+          serverReloadTaskStatusResponse.getSuccessCount();
+      double estimatedRemainingTimeInMinutes =
+          ((double)remainingSegments / (double) serverReloadTaskStatusResponse.getSuccessCount()) * timeElapsedInMinutes;
       serverReloadTaskStatusResponse
-          .setTaskSubmissionTimeInMillisEpoch(
-              Long.parseLong(taskZKMetadata.get(CommonConstants.Task.TASK_SUBMISSION_TIME)));
-      serverReloadTaskStatusResponse.setTaskType(
-          TaskType.valueOf(taskZKMetadata.get(CommonConstants.Task.TASK_TYPE)));
+          .setTaskSubmissionTimeInMillisEpoch(submissionTime);
+      serverReloadTaskStatusResponse.setTaskType(TaskType.valueOf(taskZKMetadata.get(CommonConstants.Task.TASK_TYPE)));
+      serverReloadTaskStatusResponse.setTimeElapsedInMinutes(timeElapsedInMinutes);
+      serverReloadTaskStatusResponse.setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes);
     }
 
     return serverReloadTaskStatusResponse;
