@@ -45,12 +45,12 @@
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
-      <scope>compile</scope>
+      <scope>${hadoop.dependencies.scope}</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>
-      <scope>compile</scope>
+      <scope>${hadoop.dependencies.scope}</scope>
       <exclusions>
         <exclusion>
           <groupId>xml-apis</groupId>
