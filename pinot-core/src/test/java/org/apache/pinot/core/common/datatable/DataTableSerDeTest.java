@@ -40,7 +40,6 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
-import org.apache.pinot.core.common.datablock.DataBlockFactory;
 import org.apache.pinot.core.common.datablock.RowDataBlock;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -446,7 +445,7 @@ public class DataTableSerDeTest {
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
     RowDataBlock rowDataBlock = getDataBlockFromRandomData(dataSchema, numColumns);
     Assert.assertEquals(rowDataBlock.getDataBlockVersionType(), DataTableBuilder.VERSION_4);
-    BaseDataBlock dataBlock = DataBlockFactory.getDataBlock(rowDataBlock.toBytes());
+    BaseDataBlock dataBlock = (BaseDataBlock) DataTableFactory.getDataTable(rowDataBlock.toBytes());
     Assert.assertEquals(dataBlock.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(dataBlock.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
     verifyDataIsSame(dataBlock, columnDataTypes, numColumns);
@@ -456,7 +455,7 @@ public class DataTableSerDeTest {
     dataSchema = new DataSchema(columnNames, columnDataTypes);
     rowDataBlock = getDataBlockFromRandomData(dataSchema, numColumns);
     Assert.assertEquals(rowDataBlock.getDataBlockVersionType(), DataTableBuilder.VERSION_4);
-    dataBlock = DataBlockFactory.getDataBlock(rowDataBlock.toBytes());
+    dataBlock = (BaseDataBlock) DataTableFactory.getDataTable(rowDataBlock.toBytes());
     Assert.assertEquals(dataBlock.getDataSchema(), dataSchema, ERROR_MESSAGE);
     Assert.assertEquals(dataBlock.getNumberOfRows(), NUM_ROWS, ERROR_MESSAGE);
     verifyDataIsSame(dataBlock, columnDataTypes, numColumns);
