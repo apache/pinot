@@ -48,7 +48,7 @@ public class DataTableImplV4 extends RowDataBlock {
   }
 
   @Override
-  public int getDataBlockVersionType() {
+  protected int getDataBlockVersionType() {
     return DataTableBuilder.VERSION_4;
   }
 }

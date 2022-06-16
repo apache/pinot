@@ -30,15 +30,13 @@ public final class NullBitmapUtils {
   public static void setNullRowIds(RoaringBitmap nullBitmap, ByteArrayOutputStream fixedSizeByteArrayOutputStream,
       ByteArrayOutputStream variableSizeDataByteArrayOutputStream)
       throws IOException {
-    if (nullBitmap != null) {
-      writeInt(fixedSizeByteArrayOutputStream, variableSizeDataByteArrayOutputStream.size());
-      if (nullBitmap.isEmpty()) {
-        writeInt(fixedSizeByteArrayOutputStream, 0);
-      } else {
-        byte[] nullBitmapBytes = ObjectSerDeUtils.ROARING_BITMAP_SER_DE.serialize(nullBitmap);
-        writeInt(fixedSizeByteArrayOutputStream, nullBitmapBytes.length);
-        variableSizeDataByteArrayOutputStream.write(nullBitmapBytes);
-      }
+    writeInt(fixedSizeByteArrayOutputStream, variableSizeDataByteArrayOutputStream.size());
+    if (nullBitmap == null || nullBitmap.isEmpty()) {
+      writeInt(fixedSizeByteArrayOutputStream, 0);
+    } else {
+      byte[] nullBitmapBytes = ObjectSerDeUtils.ROARING_BITMAP_SER_DE.serialize(nullBitmap);
+      writeInt(fixedSizeByteArrayOutputStream, nullBitmapBytes.length);
+      variableSizeDataByteArrayOutputStream.write(nullBitmapBytes);
     }
   }
 

@@ -204,7 +204,7 @@ public abstract class BaseDataBlock implements DataTable {
    * Return the int serialized form of the data block version and type.
    * @return
    */
-  public abstract int getDataBlockVersionType();
+  protected abstract int getDataBlockVersionType();
 
   /**
    * position the {@code _fixedSizeDataBytes} member variable to the corresponding row/column ID.

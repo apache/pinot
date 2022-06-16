@@ -81,7 +81,7 @@ public class RowDataBlock extends BaseDataBlock {
   }
 
   @Override
-  public int getDataBlockVersionType() {
+  protected int getDataBlockVersionType() {
     return VERSION + (Type.ROW.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
   }
 

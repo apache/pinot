@@ -30,7 +30,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.NullBitmapUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.common.datatable.DataTableImplV4;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -304,7 +303,7 @@ public class DataBlockBuilder {
   }
 
   private static RowDataBlock buildRowBlock(DataBlockBuilder builder) {
-    return new DataTableImplV4(builder._numRows, builder._dataSchema, builder._reverseDictionaryMap,
+    return new RowDataBlock(builder._numRows, builder._dataSchema, builder._reverseDictionaryMap,
         builder._fixedSizeDataByteArrayOutputStream.toByteArray(),
         builder._variableSizeDataByteArrayOutputStream.toByteArray());
   }
