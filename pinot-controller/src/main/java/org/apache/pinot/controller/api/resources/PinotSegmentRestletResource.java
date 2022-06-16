@@ -637,7 +637,7 @@ public class PinotSegmentRestletResource {
     serverReloadTaskStatusResponse.setTotalSegmentCount(0);
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       String responseString = streamResponse.getValue();
-      if (responseString != null) {
+      if (responseString != null && !responseString.equalsIgnoreCase("null")) {
         ServerReloadTaskStatusResponse response =
             JsonUtils.stringToObject(responseString, ServerReloadTaskStatusResponse.class);
         serverReloadTaskStatusResponse.setTotalSegmentCount(
@@ -651,12 +651,12 @@ public class PinotSegmentRestletResource {
     if (taskZKMetadata != null) {
       long submissionTime = Long.parseLong(taskZKMetadata.get(CommonConstants.Task.TASK_SUBMISSION_TIME));
       long timeElapsedInMinutes = TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis() - submissionTime);
-      int remainingSegments = serverReloadTaskStatusResponse.getTotalSegmentCount() -
-          serverReloadTaskStatusResponse.getSuccessCount();
+      int remainingSegments = serverReloadTaskStatusResponse.getTotalSegmentCount()
+          - serverReloadTaskStatusResponse.getSuccessCount();
       double estimatedRemainingTimeInMinutes =
-          ((double)remainingSegments / (double) serverReloadTaskStatusResponse.getSuccessCount()) * timeElapsedInMinutes;
-      serverReloadTaskStatusResponse
-          .setTaskSubmissionTimeInMillisEpoch(submissionTime);
+          ((double) remainingSegments / (double) serverReloadTaskStatusResponse.getSuccessCount())
+              * timeElapsedInMinutes;
+      serverReloadTaskStatusResponse.setTaskSubmissionTimeInMillisEpoch(submissionTime);
       serverReloadTaskStatusResponse.setTaskType(TaskType.valueOf(taskZKMetadata.get(CommonConstants.Task.TASK_TYPE)));
       serverReloadTaskStatusResponse.setTimeElapsedInMinutes(timeElapsedInMinutes);
       serverReloadTaskStatusResponse.setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes);
@@ -702,8 +702,6 @@ public class PinotSegmentRestletResource {
     }
     return new SuccessResponse("Sent " + perTableMsgData + " reload messages");
   }
-
-
 
   @Deprecated
   @POST

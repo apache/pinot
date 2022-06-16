@@ -1986,7 +1986,7 @@ public class PinotHelixResourceManager {
   }
 
   public Map<String, String> getTaskZKMetadata(String tableNameWithType, String taskId) {
-    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTaskResource(tableNameWithType);
+    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTask(tableNameWithType);
     if (_propertyStore.exists(taskResourcePath, AccessOption.PERSISTENT)) {
       ZNRecord taskResourceZnRecord = _propertyStore.get(taskResourcePath, null, -1);
       return taskResourceZnRecord.getMapFields().get(taskId);
@@ -1996,7 +1996,7 @@ public class PinotHelixResourceManager {
   }
 
   public Map<String, Map<String, String>> getAllTasksForTable(String tableNameWithType) {
-    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTaskResource(tableNameWithType);
+    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTask(tableNameWithType);
     if (_propertyStore.exists(taskResourcePath, AccessOption.PERSISTENT)) {
       ZNRecord tableTaskRecord = _propertyStore.get(taskResourcePath, null, -1);
       return tableTaskRecord.getMapFields();
@@ -2014,7 +2014,7 @@ public class PinotHelixResourceManager {
     taskMetadata.put(CommonConstants.Task.TASK_MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
     taskMetadata.put(CommonConstants.Task.SEGMENT_RELOAD_TASK_SEGMENT_NAME, segmentName);
 
-    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTaskResource(tableNameWithType);
+    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTask(tableNameWithType);
     ZNRecord tableTaskZnRecord;
 
     if (_propertyStore.exists(taskResourcePath, AccessOption.PERSISTENT)) {
@@ -2053,7 +2053,7 @@ public class PinotHelixResourceManager {
     taskMetadata.put(CommonConstants.Task.TASK_SUBMISSION_TIME, Long.toString(System.currentTimeMillis()));
     taskMetadata.put(CommonConstants.Task.TASK_MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
 
-    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTaskResource(tableNameWithType);
+    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTask(tableNameWithType);
     ZNRecord tableTaskZnRecord;
 
     if (_propertyStore.exists(taskResourcePath, AccessOption.PERSISTENT)) {
