@@ -31,7 +31,7 @@ import org.apache.pinot.core.common.NullBitmapUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -96,17 +96,11 @@ public class DataTableBuilder {
   private final Map<String, Map<String, Integer>> _dictionaryMap = new HashMap<>();
   private final Map<String, Map<Integer, String>> _reverseDictionaryMap = new HashMap<>();
   private final ByteArrayOutputStream _fixedSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
+//  private final DataOutputStream _fixedSizeDataOutputStream =
+//      new DataOutputStream(_fixedSizeDataByteArrayOutputStream);
   private final ByteArrayOutputStream _variableSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
   private final DataOutputStream _variableSizeDataOutputStream =
       new DataOutputStream(_variableSizeDataByteArrayOutputStream);
-  // TODO: null bitmap handling can be safely removed once the rest of the codebase switches from using DataTableBuilder
-  //  and DataTableFactory to using DataBlockBuilder.
-  private final ByteArrayOutputStream _fixedSizeNullVectorByteArrayOutputStream = new ByteArrayOutputStream();
-  private final DataOutputStream _fixedSizeNullVectorOutputStream =
-      new DataOutputStream(_fixedSizeNullVectorByteArrayOutputStream);
-  private final ByteArrayOutputStream _variableSizeNullVectorByteArrayOutputStream = new ByteArrayOutputStream();
-  private final DataOutputStream _variableSizeNullVectorOutputStream =
-      new DataOutputStream(_variableSizeNullVectorByteArrayOutputStream);
 
   private int _numRows;
   private ByteBuffer _currentRowDataByteBuffer;
@@ -146,10 +140,11 @@ public class DataTableBuilder {
     _currentRowDataByteBuffer = ByteBuffer.allocate(_rowSizeInBytes);
   }
 
-  public void setNullRowIds(ImmutableRoaringBitmap nullBitmap)
+  public void setNullRowIds(RoaringBitmap nullBitmap)
       throws IOException {
     assert _version >= VERSION_4;
-    NullBitmapUtils.setNullRowIds(nullBitmap, _fixedSizeNullVectorOutputStream, _variableSizeNullVectorOutputStream);
+    NullBitmapUtils.setNullRowIds(nullBitmap, _fixedSizeDataByteArrayOutputStream,
+        _variableSizeDataByteArrayOutputStream);
   }
 
   public void setColumn(int colId, boolean value) {
@@ -243,7 +238,7 @@ public class DataTableBuilder {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
-    if (objectTypeValue == ObjectSerDeUtils.ObjectType.Missing.getValue()) {
+    if (objectTypeValue == ObjectSerDeUtils.ObjectType.Null.getValue()) {
       _currentRowDataByteBuffer.putInt(0);
       _variableSizeDataOutputStream.writeInt(objectTypeValue);
     } else {
@@ -334,9 +329,7 @@ public class DataTableBuilder {
             _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
       case VERSION_4:
         return new DataTableImplV4(_numRows, _dataSchema, _reverseDictionaryMap,
-            _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray(),
-            _fixedSizeNullVectorByteArrayOutputStream.toByteArray(),
-            _variableSizeNullVectorByteArrayOutputStream.toByteArray());
+            _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
       default:
         throw new IllegalStateException("Unexpected value: " + _version);
     }

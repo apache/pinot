@@ -35,7 +35,7 @@ import org.apache.pinot.core.common.datatable.DataTableUtils;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.roaringbitmap.RoaringBitmap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -239,7 +239,7 @@ public abstract class BaseDataBlock implements DataTable {
   }
 
   @Override
-  public MutableRoaringBitmap getNullRowIds(int colId) {
+  public RoaringBitmap getNullRowIds(int colId) {
     return null;
   }
 
@@ -303,7 +303,7 @@ public abstract class BaseDataBlock implements DataTable {
     int size = positionCursorInVariableBuffer(rowId, colId);
     int objectTypeValue = _variableSizeData.getInt();
     if (size == 0) {
-      assert objectTypeValue == ObjectSerDeUtils.ObjectType.Missing.getValue();
+      assert objectTypeValue == ObjectSerDeUtils.ObjectType.Null.getValue();
       return null;
     }
     ByteBuffer byteBuffer = _variableSizeData.slice();
@@ -543,7 +543,7 @@ public abstract class BaseDataBlock implements DataTable {
    * Unlike V2, where numeric metadata values (int and long) in V3 are encoded in UTF-8 in the wire format,
    * in V3 big endian representation is used.
    */
-  protected byte[] serializeMetadata()
+  private byte[] serializeMetadata()
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
@@ -582,7 +582,7 @@ public abstract class BaseDataBlock implements DataTable {
    *
    * This method use relative operations on the ByteBuffer and expects the buffer's position to be set correctly.
    */
-  protected Map<String, String> deserializeMetadata(ByteBuffer buffer)
+  private Map<String, String> deserializeMetadata(ByteBuffer buffer)
       throws IOException {
     int numEntries = buffer.getInt();
     Map<String, String> metadata = new HashMap<>();
@@ -607,7 +607,7 @@ public abstract class BaseDataBlock implements DataTable {
     return metadata;
   }
 
-  protected byte[] serializeExceptions()
+  private byte[] serializeExceptions()
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
@@ -626,7 +626,7 @@ public abstract class BaseDataBlock implements DataTable {
     return byteArrayOutputStream.toByteArray();
   }
 
-  protected Map<Integer, String> deserializeExceptions(ByteBuffer buffer)
+  private Map<Integer, String> deserializeExceptions(ByteBuffer buffer)
       throws IOException {
     int numExceptions = buffer.getInt();
     Map<Integer, String> exceptions = new HashMap<>(numExceptions);

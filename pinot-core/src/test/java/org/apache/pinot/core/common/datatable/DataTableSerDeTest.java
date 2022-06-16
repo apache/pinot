@@ -44,7 +44,7 @@ import org.apache.pinot.core.common.datablock.DataBlockFactory;
 import org.apache.pinot.core.common.datablock.RowDataBlock;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -440,7 +440,6 @@ public class DataTableSerDeTest {
       columnNames[i] = columnDataTypes[i].name();
     }
 
-    // TODO: !!!!
     DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_4);
 
     ThreadTimer.setThreadCpuTimeMeasurementEnabled(false);
@@ -576,60 +575,13 @@ public class DataTableSerDeTest {
     }
   }
 
-  @Test
-  public void testDataTableMetadataStart()
-      throws IOException {
-    DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
-    int numColumns = columnDataTypes.length;
-    String[] columnNames = new String[numColumns];
-    for (int i = 0; i < numColumns; i++) {
-      columnNames[i] = columnDataTypes[i].name();
-    }
-
-    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_4);
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
-    fillDataTableWithRandomData(dataTableBuilder, columnDataTypes, numColumns);
-
-    DataTable dataTable = dataTableBuilder.build();
-
-    for (String key : EXPECTED_METADATA.keySet()) {
-      dataTable.getMetadata().put(key, EXPECTED_METADATA.get(key));
-    }
-
-    ByteBuffer byteBuffer = ByteBuffer.wrap(dataTable.toBytes());
-    int version = byteBuffer.getInt();
-    Assert.assertEquals(version, DataTableBuilder.VERSION_4);
-    byteBuffer.getInt(); // numOfRows
-    byteBuffer.getInt(); // numOfColumns
-    byteBuffer.getInt(); // exceptionsStart
-    byteBuffer.getInt(); // exceptionsLength
-    byteBuffer.getInt(); // dictionaryMapStart
-    byteBuffer.getInt(); // dictionaryMapLength
-    byteBuffer.getInt(); // dataSchemaStart
-    byteBuffer.getInt(); // dataSchemaLength
-    byteBuffer.getInt(); // fixedSizeDataStart
-    byteBuffer.getInt(); // fixedSizeDataLength
-    int variableSizeDataStart = byteBuffer.getInt();
-    int variableSizeDataLength = byteBuffer.getInt();
-    int fixedSizeNullVectorStart = byteBuffer.getInt();
-    int fixedSizeNullVectorLength = byteBuffer.getInt();
-    int variableSizeNullVectorStart = byteBuffer.getInt();
-    int variableSizeNullVectorLength = byteBuffer.getInt();
-
-    int metadataStart = variableSizeDataStart + variableSizeDataLength + fixedSizeNullVectorLength
-        + variableSizeNullVectorLength;
-    assert metadataStart == variableSizeNullVectorStart + variableSizeNullVectorLength;
-    Assert.assertEquals(metadataStart, variableSizeNullVectorStart + variableSizeNullVectorLength);
-  }
-
   private RowDataBlock getDataBlockFromRandomData(DataSchema schema, int numColumns)
       throws IOException {
-    MutableRoaringBitmap[] nullBitmaps = null;
+    RoaringBitmap[] nullBitmaps = null;
     if (DataTableBuilder.getCurrentDataTableVersion() >= DataTableBuilder.VERSION_4) {
-      nullBitmaps = new MutableRoaringBitmap[numColumns];
+      nullBitmaps = new RoaringBitmap[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
-        nullBitmaps[colId] = new MutableRoaringBitmap();
+        nullBitmaps[colId] = new RoaringBitmap();
       }
     }
     List<Object[]> rows = new ArrayList<Object[]>();
@@ -765,11 +717,11 @@ public class DataTableSerDeTest {
   private void fillDataTableWithRandomData(DataTableBuilder dataTableBuilder,
       DataSchema.ColumnDataType[] columnDataTypes, int numColumns)
       throws IOException {
-    MutableRoaringBitmap[] nullBitmaps = null;
+    RoaringBitmap[] nullBitmaps = null;
     if (DataTableBuilder.getCurrentDataTableVersion() >= DataTableBuilder.VERSION_4) {
-      nullBitmaps = new MutableRoaringBitmap[numColumns];
+      nullBitmaps = new RoaringBitmap[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
-        nullBitmaps[colId] = new MutableRoaringBitmap();
+        nullBitmaps[colId] = new RoaringBitmap();
       }
     }
     for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
@@ -896,17 +848,18 @@ public class DataTableSerDeTest {
             throw new UnsupportedOperationException("Unable to generate random data for: " + columnDataTypes[colId]);
         }
       }
-      if (nullBitmaps != null) {
-        for (int colId = 0; colId < numColumns; colId++) {
-          dataTableBuilder.setNullRowIds(nullBitmaps[colId]);
-        }
-      }
       dataTableBuilder.finishRow();
+    }
+    if (nullBitmaps != null) {
+      for (int colId = 0; colId < numColumns; colId++) {
+        System.out.println("col ID: " + colId);
+        dataTableBuilder.setNullRowIds(nullBitmaps[colId]);
+      }
     }
   }
 
   private void verifyDataIsSame(DataTable newDataTable, DataSchema.ColumnDataType[] columnDataTypes, int numColumns) {
-    MutableRoaringBitmap[] nullBitmaps = new MutableRoaringBitmap[numColumns];
+    RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
     for (int colId = 0; colId < numColumns; colId++) {
       nullBitmaps[colId] = newDataTable.getNullRowIds(colId);
     }

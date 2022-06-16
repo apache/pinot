@@ -18,28 +18,32 @@
  */
 package org.apache.pinot.core.common;
 
-import java.io.DataOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public final class NullBitmapUtils {
   private NullBitmapUtils() {
   }
 
-  public static void setNullRowIds(ImmutableRoaringBitmap nullBitmap, DataOutputStream fixedSizeNullVectorOutputStream,
-      DataOutputStream variableSizeNullVectorOutputStream)
+  public static void setNullRowIds(RoaringBitmap nullBitmap, ByteArrayOutputStream fixedSizeByteArrayOutputStream,
+      ByteArrayOutputStream variableSizeDataByteArrayOutputStream)
       throws IOException {
-    fixedSizeNullVectorOutputStream.writeInt(variableSizeNullVectorOutputStream.size());
+    writeInt(fixedSizeByteArrayOutputStream, variableSizeDataByteArrayOutputStream.size());
     if (nullBitmap.isEmpty()) {
-      fixedSizeNullVectorOutputStream.writeInt(0);
+      writeInt(fixedSizeByteArrayOutputStream, 0);
     } else {
-      int[] nullBitmapArray = nullBitmap.toArray();
-      fixedSizeNullVectorOutputStream.writeInt(nullBitmapArray.length);
-      // todo: optimize looping through bitmaps.
-      for (int nullBitmapInt : nullBitmapArray) {
-        variableSizeNullVectorOutputStream.writeInt(nullBitmapInt);
-      }
+      byte[] nullBitmapBytes = ObjectSerDeUtils.ROARING_BITMAP_SER_DE.serialize(nullBitmap);
+      writeInt(fixedSizeByteArrayOutputStream, nullBitmapBytes.length);
+      variableSizeDataByteArrayOutputStream.write(nullBitmapBytes);
     }
+  }
+
+  private static void writeInt(ByteArrayOutputStream out, int value) {
+    out.write((value >>> 24) & 0xFF);
+    out.write((value >>> 16) & 0xFF);
+    out.write((value >>> 8) & 0xFF);
+    out.write(value & 0xFF);
   }
 }

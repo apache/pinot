@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.NullBitmapUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -33,7 +34,7 @@ import org.apache.pinot.core.common.datatable.DataTableImplV4;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class DataBlockBuilder {
@@ -55,12 +56,6 @@ public class DataBlockBuilder {
   private final ByteArrayOutputStream _variableSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
   private final DataOutputStream _variableSizeDataOutputStream =
       new DataOutputStream(_variableSizeDataByteArrayOutputStream);
-  private final ByteArrayOutputStream _fixedSizeNullVectorByteArrayOutputStream = new ByteArrayOutputStream();
-  private final DataOutputStream _fixedSizeNullVectorOutputStream =
-      new DataOutputStream(_fixedSizeNullVectorByteArrayOutputStream);
-  private final ByteArrayOutputStream _variableSizeNullVectorByteArrayOutputStream = new ByteArrayOutputStream();
-  private final DataOutputStream _variableSizeNullVectorOutputStream =
-      new DataOutputStream(_variableSizeNullVectorByteArrayOutputStream);
 
 
   private DataBlockBuilder(DataSchema dataSchema, BaseDataBlock.Type blockType) {
@@ -83,12 +78,13 @@ public class DataBlockBuilder {
     }
   }
 
-  public void setNullRowIds(ImmutableRoaringBitmap nullBitmap)
+  public void setNullRowIds(RoaringBitmap nullBitmap)
       throws IOException {
-    NullBitmapUtils.setNullRowIds(nullBitmap, _fixedSizeNullVectorOutputStream, _variableSizeNullVectorOutputStream);
+    NullBitmapUtils.setNullRowIds(nullBitmap, _fixedSizeDataByteArrayOutputStream,
+        _variableSizeDataByteArrayOutputStream);
   }
 
-  public static RowDataBlock buildFromRows(List<Object[]> rows, ImmutableRoaringBitmap[] colNullBitmaps,
+  public static RowDataBlock buildFromRows(List<Object[]> rows, @Nullable RoaringBitmap[] colNullBitmaps,
       DataSchema dataSchema)
       throws IOException {
     DataBlockBuilder rowBuilder = new DataBlockBuilder(dataSchema, BaseDataBlock.Type.ROW);
@@ -180,8 +176,9 @@ public class DataBlockBuilder {
       }
       rowBuilder._fixedSizeDataByteArrayOutputStream.write(byteBuffer.array(), 0, byteBuffer.position());
     }
+    // Write null bitmaps after writing data.
     if (colNullBitmaps != null) {
-      for (ImmutableRoaringBitmap nullBitmap : colNullBitmaps) {
+      for (RoaringBitmap nullBitmap : colNullBitmaps) {
         rowBuilder.setNullRowIds(nullBitmap);
       }
     }
@@ -309,9 +306,7 @@ public class DataBlockBuilder {
   private static RowDataBlock buildRowBlock(DataBlockBuilder builder) {
     return new DataTableImplV4(builder._numRows, builder._dataSchema, builder._reverseDictionaryMap,
         builder._fixedSizeDataByteArrayOutputStream.toByteArray(),
-        builder._variableSizeDataByteArrayOutputStream.toByteArray(),
-        builder._fixedSizeNullVectorByteArrayOutputStream.toByteArray(),
-        builder._variableSizeNullVectorByteArrayOutputStream.toByteArray());
+        builder._variableSizeDataByteArrayOutputStream.toByteArray());
   }
 
   private static ColumnarDataBlock buildColumnarBlock(DataBlockBuilder builder) {
@@ -357,7 +352,7 @@ public class DataBlockBuilder {
       throws IOException {
     byteBuffer.putInt(builder._variableSizeDataByteArrayOutputStream.size());
     int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
-    if (objectTypeValue == ObjectSerDeUtils.ObjectType.Missing.getValue()) {
+    if (objectTypeValue == ObjectSerDeUtils.ObjectType.Null.getValue()) {
       byteBuffer.putInt(0);
       builder._variableSizeDataOutputStream.writeInt(objectTypeValue);
     } else {

@@ -32,7 +32,7 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.roaringbitmap.RoaringBitmap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -206,7 +206,7 @@ public abstract class BaseDataTable implements DataTable {
     int size = positionCursorInVariableBuffer(rowId, colId);
     int objectTypeValue = _variableSizeData.getInt();
     if (size == 0) {
-      assert objectTypeValue == ObjectSerDeUtils.ObjectType.Missing.getValue();
+      assert objectTypeValue == ObjectSerDeUtils.ObjectType.Null.getValue();
       return null;
     }
     ByteBuffer byteBuffer = _variableSizeData.slice();
@@ -266,7 +266,7 @@ public abstract class BaseDataTable implements DataTable {
   }
 
   @Override
-  public MutableRoaringBitmap getNullRowIds(int colId) {
+  public RoaringBitmap getNullRowIds(int colId) {
     return null;
   }
 
