@@ -308,7 +308,7 @@ public class DataTableImplV3 extends BaseDataTable {
    * Unlike V2, where numeric metadata values (int and long) in V3 are encoded in UTF-8 in the wire format,
    * in V3 big endian representation is used.
    */
-  protected byte[] serializeMetadata()
+  private byte[] serializeMetadata()
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
@@ -347,7 +347,7 @@ public class DataTableImplV3 extends BaseDataTable {
    *
    * This method use relative operations on the ByteBuffer and expects the buffer's position to be set correctly.
    */
-  protected Map<String, String> deserializeMetadata(ByteBuffer buffer)
+  private Map<String, String> deserializeMetadata(ByteBuffer buffer)
       throws IOException {
     int numEntries = buffer.getInt();
     Map<String, String> metadata = new HashMap<>();
@@ -372,7 +372,7 @@ public class DataTableImplV3 extends BaseDataTable {
     return metadata;
   }
 
-  protected byte[] serializeExceptions()
+  private byte[] serializeExceptions()
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
@@ -391,7 +391,7 @@ public class DataTableImplV3 extends BaseDataTable {
     return byteArrayOutputStream.toByteArray();
   }
 
-  protected Map<Integer, String> deserializeExceptions(ByteBuffer buffer)
+  private Map<Integer, String> deserializeExceptions(ByteBuffer buffer)
       throws IOException {
     int numExceptions = buffer.getInt();
     Map<Integer, String> exceptions = new HashMap<>(numExceptions);

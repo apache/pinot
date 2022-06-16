@@ -457,7 +457,7 @@ public abstract class BaseDataBlock implements DataTable {
     return byteArrayOutputStream.toByteArray();
   }
 
-  protected void writeLeadingSections(DataOutputStream dataOutputStream)
+  private void writeLeadingSections(DataOutputStream dataOutputStream)
       throws IOException {
     dataOutputStream.writeInt(getDataBlockVersionType());
     dataOutputStream.writeInt(_numRows);

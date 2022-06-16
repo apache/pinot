@@ -96,8 +96,6 @@ public class DataTableBuilder {
   private final Map<String, Map<String, Integer>> _dictionaryMap = new HashMap<>();
   private final Map<String, Map<Integer, String>> _reverseDictionaryMap = new HashMap<>();
   private final ByteArrayOutputStream _fixedSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
-//  private final DataOutputStream _fixedSizeDataOutputStream =
-//      new DataOutputStream(_fixedSizeDataByteArrayOutputStream);
   private final ByteArrayOutputStream _variableSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
   private final DataOutputStream _variableSizeDataOutputStream =
       new DataOutputStream(_variableSizeDataByteArrayOutputStream);

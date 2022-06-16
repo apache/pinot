@@ -30,14 +30,10 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 /**
- * Datatable V4 implementation is a wrapper around the Row-based data block.
+ * Datatable V4 Implementation is a wrapper around the Row-based data block.
  */
 @InterfaceStability.Evolving
 public class DataTableImplV4 extends RowDataBlock {
-  public DataTableImplV4(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
-      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
-    super(numRows, dataSchema, dictionaryMap, fixedSizeDataBytes, variableSizeDataBytes);
-  }
 
   public DataTableImplV4() {
     super();
@@ -46,6 +42,11 @@ public class DataTableImplV4 extends RowDataBlock {
   public DataTableImplV4(ByteBuffer byteBuffer)
       throws IOException {
     super(byteBuffer);
+  }
+
+  public DataTableImplV4(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
+      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
+    super(numRows, dataSchema, dictionaryMap, fixedSizeDataBytes, variableSizeDataBytes);
   }
 
   @Override
