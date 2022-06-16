@@ -1,0 +1,20 @@
+# Dependabot GitHub Configuration
+
+version: 2
+updates:
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "npm"
+    directory: "/pinot-controller/src/main/resources"
+    schedule:
+      interval: "daily"
+    # Disable version updates for npm dependencies
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
