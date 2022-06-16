@@ -32,11 +32,11 @@ public class InsertIntoFileTest {
       throws Exception {
     String insertIntoSql = "INSERT INTO \"baseballStats\"\n"
         + "FROM FILE 's3://my-bucket/path/to/data/'\n"
-        + "OPTION(taskName=myTask-1)\n"
-        + "OPTION(input.fs.className=org.apache.pinot.plugin.filesystem.S3PinotFS)\n"
-        + "OPTION(input.fs.prop.accessKey=my-access-key)\n"
-        + "OPTION(input.fs.prop.secretKey=my-secret-key)\n"
-        + "OPTION(input.fs.prop.region=us-west-2)";
+        + "OPTION(taskName=myTask-1,"
+        + "input.fs.className=org.apache.pinot.plugin.filesystem.S3PinotFS,"
+        + "input.fs.prop.accessKey=my-access-key,"
+        + "input.fs.prop.secretKey=my-secret-key,"
+        + "input.fs.prop.region=us-west-2)";
     InsertIntoFile insertIntoFile = InsertIntoFile.parse(CalciteSqlParser.compileToSqlNodeAndOptions(insertIntoSql));
     Assert.assertEquals(insertIntoFile.getTable(), "baseballStats");
     Assert.assertEquals(insertIntoFile.getExecutionType(), DataManipulationStatement.ExecutionType.MINION);

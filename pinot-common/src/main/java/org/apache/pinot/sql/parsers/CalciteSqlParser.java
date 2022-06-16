@@ -81,13 +81,10 @@ public class CalciteSqlParser {
   // PQL syntax is: `OPTION (<key> = <value>)`
   //
   // Multiple OPTIONs is also supported by:
-  // either
-  //   `OPTION (<k1> = <v1>, <k2> = <v2>, <k3> = <v3>)`
-  // or
-  //   `OPTION (<k1> = <v1>) OPTION (<k2> = <v2>) OPTION (<k3> = <v3>)`
-  // TODO: move to use parser syntax extension: `OPTION` `(` `<key>` = `<value>` [, `<key>` = `<value>`]* `)`
+  // `OPTION (<k1> = <v1>, <k2> = <v2>, <k3> = <v3>)`
+  @Deprecated
   private static final Pattern OPTIONS_REGEX_PATTEN =
-      Pattern.compile("option\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
+      Pattern.compile("option\\s*\\(([^\\)]+)\\)\\Z", Pattern.CASE_INSENSITIVE);
 
   /**
    * Checks for the presence of semicolon in the sql query and modifies the query accordingly
