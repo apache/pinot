@@ -69,6 +69,7 @@ import org.apache.pinot.core.util.trace.TraceContext;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -76,6 +77,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -197,8 +199,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     // Gather stats for realtime consuming segments
     int numConsumingSegmentsQueried = 0;
+    int numOnlineSegments = 0;
     long minIndexTimeMs = Long.MAX_VALUE;
     long minIngestionTimeMs = Long.MAX_VALUE;
+    long maxEndTimeMs = Long.MIN_VALUE;
     for (IndexSegment indexSegment : indexSegments) {
       if (indexSegment instanceof MutableSegment) {
         numConsumingSegmentsQueried += 1;
@@ -210,6 +214,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         long ingestionTimeMs = segmentMetadata.getLatestIngestionTimestamp();
         if (ingestionTimeMs != Long.MIN_VALUE && ingestionTimeMs < minIngestionTimeMs) {
           minIngestionTimeMs = ingestionTimeMs;
+        }
+      } else if (indexSegment instanceof ImmutableSegment) {
+        SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
+        Interval timeInterval = segmentMetadata.getTimeInterval();
+        numOnlineSegments++;
+        if (timeInterval != null) {
+          maxEndTimeMs = Math.max(maxEndTimeMs, timeInterval.getEndMillis());
         }
       }
     }
@@ -263,12 +274,22 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, numMissingSegments);
     }
 
+    long minConsumingFreshnessTimeMs = Long.MAX_VALUE;
     if (numConsumingSegmentsQueried > 0) {
-      long minConsumingFreshnessTimeMs = minIngestionTimeMs != Long.MAX_VALUE ? minIngestionTimeMs : minIndexTimeMs;
+      minConsumingFreshnessTimeMs = minIngestionTimeMs != Long.MAX_VALUE ? minIngestionTimeMs : minIndexTimeMs;
+      metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), Integer.toString(numConsumingSegmentsQueried));
+      metadata.put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), Long.toString(minConsumingFreshnessTimeMs));
       LOGGER.debug("Request {} queried {} consuming segments with minConsumingFreshnessTimeMs: {}", requestId,
           numConsumingSegmentsQueried, minConsumingFreshnessTimeMs);
-      metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(), Integer.toString(numConsumingSegmentsQueried));
-      metadata.put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), Long.toString(minConsumingFreshnessTimeMs));
+    } else if (numConsumingSegmentsQueried == 0 && maxEndTimeMs != Long.MIN_VALUE) {
+      minConsumingFreshnessTimeMs = maxEndTimeMs;
+      metadata.put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), Long.toString(maxEndTimeMs));
+      LOGGER.debug("Request {} queried {} consuming segments with minConsumingFreshnessTimeMs: {}", requestId,
+          numConsumingSegmentsQueried, minConsumingFreshnessTimeMs);
+    } else if (numOnlineSegments == 0) {
+      // case: no immutable segments, no metric emitted
+      LOGGER.warn("Request {} queried no consuming or online segments, with minConsumingFreshnessTimeMs: {}", requestId,
+          minConsumingFreshnessTimeMs);
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
