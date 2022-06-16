@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
-import java.io.IOException;
-import java.io.StreamCorruptedException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,7 +55,7 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
   @Override
   public byte[] getMessageAtIndex(int index) {
     Message<byte[]> msg = _messageList.get(index);
-    if(_enableKeyValueStitch) {
+    if (_enableKeyValueStitch) {
       return stitchKeyValue(msg.getKeyBytes(), msg.getData());
     }
     return _messageList.get(index).getData();

@@ -33,13 +33,13 @@ import org.testng.annotations.Test;
 
 
 public class PulsarMessageBatchTest {
-  private static final Random _random = new Random();
+  private Random _random = new Random();
   private DummyPulsarMessage _msgWithKeyAndValue;
   private byte[] _expectedValueBytes;
   private byte[] _expectedKeyBytes;
   private List<Message<byte[]>> _messageList;
 
-  class DummyPulsarMessage implements Message<byte[]>{
+  class DummyPulsarMessage implements Message<byte[]> {
     private final byte[] _keyData;
     private final byte[] _valueData;
 

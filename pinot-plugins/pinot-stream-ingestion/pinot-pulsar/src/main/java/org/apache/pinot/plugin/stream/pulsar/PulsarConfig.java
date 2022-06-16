@@ -101,5 +101,7 @@ public class PulsarConfig {
     return _tlsTrustCertsFilePath;
   }
 
-  public boolean getEnableKeyValueStitch() { return _enableKeyValueStitch; }
+  public boolean getEnableKeyValueStitch() {
+    return _enableKeyValueStitch;
+  }
 }
