@@ -39,6 +39,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -454,7 +455,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Send empty response since we don't need to evaluate either offline or realtime request.
       BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
       logBrokerResponse(requestId, query, requestContext, tableName, 0, new ServerStats(), brokerResponse,
-          System.nanoTime());
+          System.nanoTime(), requesterIdentity);
       return brokerResponse;
     }
 
@@ -587,7 +588,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     augmentStatistics(requestContext, brokerResponse);
 
     logBrokerResponse(requestId, query, requestContext, tableName, numUnavailableSegments, serverStats, brokerResponse,
-        totalTimeMs);
+        totalTimeMs, requesterIdentity);
     return brokerResponse;
   }
 
@@ -658,7 +659,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   private void logBrokerResponse(long requestId, String query, RequestContext requestContext, String tableName,
-      int numUnavailableSegments, ServerStats serverStats, BrokerResponseNative brokerResponse, long totalTimeMs) {
+      int numUnavailableSegments, ServerStats serverStats, BrokerResponseNative brokerResponse, long totalTimeMs,
+      RequesterIdentity requesterIdentity) {
     LOGGER.debug("Broker Response: {}", brokerResponse);
 
     // Please keep the format as name=value comma-separated with no spaces
@@ -670,7 +672,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
               + "segments(queried/processed/matched/consuming/unavailable):{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
               + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},"
               + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},"
-              + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},query={}", requestId, tableName,
+              + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},requestHeaders={}"
+              + ",query={}", requestId, tableName,
           totalTimeMs, brokerResponse.getNumDocsScanned(), brokerResponse.getTotalDocs(),
           brokerResponse.getNumEntriesScannedInFilter(), brokerResponse.getNumEntriesScannedPostFilter(),
           brokerResponse.getNumSegmentsQueried(), brokerResponse.getNumSegmentsProcessed(),
@@ -682,7 +685,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           brokerResponse.getOfflineThreadCpuTimeNs(), brokerResponse.getOfflineSystemActivitiesCpuTimeNs(),
           brokerResponse.getOfflineResponseSerializationCpuTimeNs(), brokerResponse.getRealtimeTotalCpuTimeNs(),
           brokerResponse.getRealtimeThreadCpuTimeNs(), brokerResponse.getRealtimeSystemActivitiesCpuTimeNs(),
-          brokerResponse.getRealtimeResponseSerializationCpuTimeNs(), StringUtils.substring(query, 0, _queryLogLength));
+          brokerResponse.getRealtimeResponseSerializationCpuTimeNs(),
+          ((HttpRequesterIdentity) requesterIdentity).getHttpHeaders().toString(),
+          StringUtils.substring(query, 0, _queryLogLength));
 
       // Limit the dropping log message at most once per second.
       if (_numDroppedLogRateLimiter.tryAcquire()) {
