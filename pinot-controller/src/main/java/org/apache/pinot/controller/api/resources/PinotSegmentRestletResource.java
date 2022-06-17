@@ -596,7 +596,7 @@ public class PinotSegmentRestletResource {
   @ApiOperation(value = "Get status for a submitted reload operation", notes = "Get status for a submitted reload "
       + "operation")
   public ServerReloadControllerJobStatusResponse getReloadJobStatus(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableNameWithType,
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Reload job id", required = true) @PathParam("jobId") String reloadJobId)
       throws Exception {
     Map<String, List<String>> serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);

@@ -562,7 +562,7 @@ public class CommonConstants {
      * Task ZK props
      */
     public static final String CONTROLLER_JOB_TYPE = "controller.job.type";
-    public static final String CONTROLLER_JOB_TABLE_NAME_WITH_TYPE = "controller.job.table.name"
+    public static final String CONTROLLER_JOB_TABLE_NAME_WITH_TYPE = "controller.job.table.name";
     public static final String CONTROLLER_JOB_ID = "controller.job.id";
     public static final String CONTROLLER_JOB_SUBMISSION_TIME = "controller.job.submission.time";
     public static final String CONTROLLER_JOB_MESSAGES_COUNT = "controller.job.messages.count";
