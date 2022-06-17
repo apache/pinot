@@ -54,7 +54,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 
 
 /**
- * API to get the storage tiers of immutable segments of the given table.
+ * A server-side API to get the storage tiers of immutable segments of the given table from the server being requested.
  */
 @Api(tags = "Table", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
