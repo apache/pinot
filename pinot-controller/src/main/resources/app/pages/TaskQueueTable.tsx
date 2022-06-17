@@ -19,6 +19,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { get } from 'lodash';
+import moment from 'moment';
 import { TableData } from 'Models';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { Grid, makeStyles } from '@material-ui/core';
@@ -105,6 +106,10 @@ const TaskQueueTable = (props) => {
     await PinotMethodUtils.executeTaskAction({ tableName, taskType });
   };
 
+  const cronExpression = get(jobDetail, 'Triggers.0.CronExpression', '');
+  const previousFireTime = get(jobDetail, 'Triggers.0.PreviousFireTime', 0);
+  const nextFireTime = get(jobDetail, 'Triggers.0.NextFireTime', 0);
+
   return (
     <Grid item xs className={classes.gridContainer}>
       <div className={classes.operationDiv}>
@@ -137,13 +142,13 @@ const TaskQueueTable = (props) => {
             <strong>Table Name:</strong> {tableName}
           </Grid>
           <Grid item xs={12}>
-            <strong>Cron Schedule :</strong> {get(jobDetail, 'expression', '')}
+            <strong>Cron Schedule :</strong> {cronExpression}
           </Grid>
           <Grid item xs={12}>
-            <strong>Previous Fire Time: </strong> {get(jobDetail, 'expression', '')}
+            <strong>Previous Fire Time: </strong> {previousFireTime ? moment(previousFireTime).toString() : '-'}
           </Grid>
           <Grid item xs={12}>
-            <strong>Next Fire Time: </strong> {get(jobDetail, 'expression', '')}
+            <strong>Next Fire Time: </strong> {nextFireTime ? moment(nextFireTime).toString() : '-'}
           </Grid>
         </Grid>
       </div>
@@ -156,7 +161,7 @@ const TaskQueueTable = (props) => {
             >
               <CodeMirror
                 options={jsonoptions}
-                value={get(tableDetail, `task.taskTypeConfigsMap.${taskType}`, `{}`)}
+                value={JSON.stringify(get(tableDetail, `OFFLINE.task.taskTypeConfigsMap.${taskType}`, {}), null, '  ')}
                 className={classes.queryOutput}
                 autoCursor={false}
               />
