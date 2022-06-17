@@ -130,9 +130,10 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
     int totalByteArrayLength = 8 + keyLen + valueLen;
     try {
       ByteArrayOutputStream bos = new ByteArrayOutputStream(totalByteArrayLength);
-      bos.write(_lengthBuf.putInt(keyLen).array());
       _lengthBuf.clear();
+      bos.write(_lengthBuf.putInt(keyLen).array());
       bos.write(keyBytes);
+      _lengthBuf.clear();
       bos.write(_lengthBuf.putInt(valueLen).array());
       bos.write(valueBytes);
       return bos.toByteArray();
