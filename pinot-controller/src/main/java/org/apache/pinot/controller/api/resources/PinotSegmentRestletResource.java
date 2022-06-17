@@ -36,11 +36,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -67,8 +65,8 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metadata.task.TaskType;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -470,12 +468,11 @@ public class PinotSegmentRestletResource {
     Pair<Integer, String> msgInfo =
         _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload);
     if (msgInfo.getLeft() > 0) {
-      // Store task in ZK
       try {
-        _pinotHelixResourceManager.addNewReloadSegmentTask(tableNameWithType, segmentName, msgInfo.getRight(),
+        _pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentName, msgInfo.getRight(),
             msgInfo.getLeft());
       } catch (Exception e) {
-        LOGGER.error("Failed to add task meta into zookeeper ", e);
+        LOGGER.error("Failed to add job meta into zookeeper ", e);
       }
       return new SuccessResponse("Sent " + msgInfo + " reload messages");
     } else {
@@ -594,75 +591,67 @@ public class PinotSegmentRestletResource {
   }
 
   @GET
-  @Path("tables/{tableName}/segmentReloadStatus/{taskId}")
+  @Path("tables/{tableNameWithType}/segmentReloadStatus/{jobId}")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get status for a submitted reload operation",
-      notes = "Get status for a submitted reload operation")
-  public ServerReloadTaskStatusResponse getReloadTaskStatus(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Reload task id", required = true) @PathParam("taskId") String reloadTaskId)
+  @ApiOperation(value = "Get status for a submitted reload operation", notes = "Get status for a submitted reload "
+      + "operation")
+  public ServerReloadControllerJobStatusResponse getReloadJobStatus(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableNameWithType,
+      @ApiParam(value = "Reload job id", required = true) @PathParam("jobId") String reloadJobId)
       throws Exception {
-    Map<String, String> taskZKMetadata = null;
+    Map<String, List<String>> serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+    Map<String, String> controllerJobZKMetadata =
+        _pinotHelixResourceManager.getControllerJobZKMetadata(tableNameWithType, reloadJobId);
 
-    // Call all servers to get status, collate and return
-    List<String> tableNamesWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, null, LOGGER);
-
-    Set<String> instances = new HashSet<>();
-    for (String tableNameWithType : tableNamesWithType) {
-      Map<String, List<String>> serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
-      instances.addAll(serverToSegments.keySet());
-
-      if (taskZKMetadata == null) {
-        taskZKMetadata = _pinotHelixResourceManager.getTaskZKMetadata(tableNameWithType, reloadTaskId);
-      }
-    }
-
-    BiMap<String, String> serverEndPoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(instances);
+    BiMap<String, String> serverEndPoints =
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
 
     List<String> serverUrls = new ArrayList<>();
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
-      String reloadTaskStatusEndpoint = endpoint + "/task/status/" + reloadTaskId;
+      String reloadTaskStatusEndpoint = endpoint + "/controllerJob/status/" + reloadJobId;
       serverUrls.add(reloadTaskStatusEndpoint);
     }
 
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 1000);
 
-    ServerReloadTaskStatusResponse serverReloadTaskStatusResponse = new ServerReloadTaskStatusResponse();
-    serverReloadTaskStatusResponse.setSuccessCount(0);
-    serverReloadTaskStatusResponse.setTotalSegmentCount(0);
+    ServerReloadControllerJobStatusResponse serverReloadControllerJobStatusResponse =
+        new ServerReloadControllerJobStatusResponse();
+    serverReloadControllerJobStatusResponse.setSuccessCount(0);
+    serverReloadControllerJobStatusResponse.setTotalSegmentCount(0);
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       String responseString = streamResponse.getValue();
       if (responseString != null && !responseString.equalsIgnoreCase("null")) {
-        ServerReloadTaskStatusResponse response =
-            JsonUtils.stringToObject(responseString, ServerReloadTaskStatusResponse.class);
-        serverReloadTaskStatusResponse.setTotalSegmentCount(
-            serverReloadTaskStatusResponse.getTotalSegmentCount() + response.getTotalSegmentCount());
-        serverReloadTaskStatusResponse.setSuccessCount(
-            serverReloadTaskStatusResponse.getSuccessCount() + response.getSuccessCount());
+        ServerReloadControllerJobStatusResponse response =
+            JsonUtils.stringToObject(responseString, ServerReloadControllerJobStatusResponse.class);
+        serverReloadControllerJobStatusResponse.setTotalSegmentCount(
+            serverReloadControllerJobStatusResponse.getTotalSegmentCount() + response.getTotalSegmentCount());
+        serverReloadControllerJobStatusResponse.setSuccessCount(
+            serverReloadControllerJobStatusResponse.getSuccessCount() + response.getSuccessCount());
       }
     }
 
     // Add ZK data
-    if (taskZKMetadata != null) {
-      long submissionTime = Long.parseLong(taskZKMetadata.get(CommonConstants.Task.TASK_SUBMISSION_TIME));
+    if (controllerJobZKMetadata != null) {
+      long submissionTime =
+          Long.parseLong(controllerJobZKMetadata.get(CommonConstants.Task.CONTROLLER_JOB_SUBMISSION_TIME));
       long timeElapsedInMinutes = TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis() - submissionTime);
-      int remainingSegments = serverReloadTaskStatusResponse.getTotalSegmentCount()
-          - serverReloadTaskStatusResponse.getSuccessCount();
+      int remainingSegments = serverReloadControllerJobStatusResponse.getTotalSegmentCount()
+          - serverReloadControllerJobStatusResponse.getSuccessCount();
       double estimatedRemainingTimeInMinutes =
-          ((double) remainingSegments / (double) serverReloadTaskStatusResponse.getSuccessCount())
+          ((double) remainingSegments / (double) serverReloadControllerJobStatusResponse.getSuccessCount())
               * timeElapsedInMinutes;
-      serverReloadTaskStatusResponse.setTaskSubmissionTimeInMillisEpoch(submissionTime);
-      serverReloadTaskStatusResponse.setTaskType(TaskType.valueOf(taskZKMetadata.get(CommonConstants.Task.TASK_TYPE)));
-      serverReloadTaskStatusResponse.setTimeElapsedInMinutes(timeElapsedInMinutes);
-      serverReloadTaskStatusResponse.setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes);
+      serverReloadControllerJobStatusResponse.setJobSubmissionTimeInMillisEpoch(submissionTime);
+      serverReloadControllerJobStatusResponse.setControllerJobType(
+          ControllerJobType.valueOf(controllerJobZKMetadata.get(CommonConstants.Task.CONTROLLER_JOB_TYPE)));
+      serverReloadControllerJobStatusResponse.setTimeElapsedInMinutes(timeElapsedInMinutes);
+      serverReloadControllerJobStatusResponse.setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes);
     }
 
-    return serverReloadTaskStatusResponse;
+    return serverReloadControllerJobStatusResponse;
   }
 
   @POST
@@ -694,8 +683,7 @@ public class PinotSegmentRestletResource {
       perTableMsgData.put(tableNameWithType, msgInfo);
       // Store in ZK
       try {
-        _pinotHelixResourceManager.addNewReloadAllSegmentsTask(tableNameWithType, msgInfo.getRight(),
-            msgInfo.getLeft());
+        _pinotHelixResourceManager.addNewReloadAllSegmentsJob(tableNameWithType, msgInfo.getRight(), msgInfo.getLeft());
       } catch (Exception e) {
         LOGGER.error("Failed to store task meta in zookepper ", e);
       }

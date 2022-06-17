@@ -99,9 +99,9 @@ import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metadata.task.TaskType;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.common.utils.HashUtil;
@@ -1985,18 +1985,18 @@ public class PinotHelixResourceManager {
     return instanceSet;
   }
 
-  public Map<String, String> getTaskZKMetadata(String tableNameWithType, String taskId) {
-    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTask(tableNameWithType);
-    if (_propertyStore.exists(taskResourcePath, AccessOption.PERSISTENT)) {
-      ZNRecord taskResourceZnRecord = _propertyStore.get(taskResourcePath, null, -1);
+  public Map<String, String> getControllerJobZKMetadata(String tableNameWithType, String taskId) {
+    String controllerJobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(tableNameWithType);
+    if (_propertyStore.exists(controllerJobResourcePath, AccessOption.PERSISTENT)) {
+      ZNRecord taskResourceZnRecord = _propertyStore.get(controllerJobResourcePath, null, -1);
       return taskResourceZnRecord.getMapFields().get(taskId);
     } else {
       return null;
     }
   }
 
-  public Map<String, Map<String, String>> getAllTasksForTable(String tableNameWithType) {
-    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTask(tableNameWithType);
+  public Map<String, Map<String, String>> getAllJobsForTable(String tableNameWithType) {
+    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(tableNameWithType);
     if (_propertyStore.exists(taskResourcePath, AccessOption.PERSISTENT)) {
       ZNRecord tableTaskRecord = _propertyStore.get(taskResourcePath, null, -1);
       return tableTaskRecord.getMapFields();
@@ -2005,75 +2005,43 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void addNewReloadSegmentTask(String tableNameWithType, String segmentName, String taskId,
+  public void addNewReloadSegmentJob(String tableNameWithType, String segmentName, String taskId,
       int numberOfMessagesSent) {
     Map<String, String> taskMetadata = new HashMap<>();
-    taskMetadata.put(CommonConstants.Task.TASK_ID, taskId);
-    taskMetadata.put(CommonConstants.Task.TASK_TYPE, TaskType.RELOAD_SEGMENT.toString());
-    taskMetadata.put(CommonConstants.Task.TASK_SUBMISSION_TIME, Long.toString(System.currentTimeMillis()));
-    taskMetadata.put(CommonConstants.Task.TASK_MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
-    taskMetadata.put(CommonConstants.Task.SEGMENT_RELOAD_TASK_SEGMENT_NAME, segmentName);
-
-    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTask(tableNameWithType);
-    ZNRecord tableTaskZnRecord;
-
-    if (_propertyStore.exists(taskResourcePath, AccessOption.PERSISTENT)) {
-      tableTaskZnRecord = _propertyStore.get(taskResourcePath, null, -1);
-      Map<String, Map<String, String>> tasks = tableTaskZnRecord.getMapFields();
-      tasks.put(taskId, taskMetadata);
-      if (tasks.size() > CommonConstants.Task.MAXIMUM_RELOAD_TASKS_IN_ZK) {
-        tasks = tasks.
-            entrySet()
-            .stream()
-            .sorted(new Comparator<Map.Entry<String, Map<String, String>>>() {
-          @Override
-          public int compare(Map.Entry<String, Map<String, String>> v1, Map.Entry<String, Map<String, String>> v2) {
-            return Long.compare(Long.parseLong(v2.getValue().get(CommonConstants.Task.TASK_SUBMISSION_TIME)),
-                Long.parseLong(v1.getValue().get(CommonConstants.Task.TASK_SUBMISSION_TIME)));
-          }
-        })
-            .collect(Collectors.toList())
-            .subList(0, CommonConstants.Task.MAXIMUM_RELOAD_TASKS_IN_ZK)
-            .stream()
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-      }
-      tableTaskZnRecord.setMapFields(tasks);
-    } else {
-      tableTaskZnRecord = new ZNRecord(taskResourcePath);
-      tableTaskZnRecord.setMapField(taskId, taskMetadata);
-    }
-
-    _propertyStore.set(taskResourcePath, tableTaskZnRecord, AccessOption.PERSISTENT);
+    taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_ID, taskId);
+    taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_TYPE, ControllerJobType.RELOAD_SEGMENT.toString());
+    taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_SUBMISSION_TIME, Long.toString(System.currentTimeMillis()));
+    taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_MESSAGES_COUNT, Integer.toString(numberOfMessagesSent));
+    taskMetadata.put(CommonConstants.Task.SEGMENT_RELOAD_JOB_SEGMENT_NAME, segmentName);
+    addReloadJobToZK(tableNameWithType, taskId, taskMetadata);
   }
 
-  public void addNewReloadAllSegmentsTask(String tableNameWithType, String taskId, int numberOfMessagesSent) {
+  public void addNewReloadAllSegmentsJob(String tableNameWithType, String taskId, int numberOfMessagesSent) {
     Map<String, String> taskMetadata = new HashMap<>();
-    taskMetadata.put(CommonConstants.Task.TASK_ID, taskId);
-    taskMetadata.put(CommonConstants.Task.TASK_TYPE, TaskType.RELOAD_ALL_SEGMENTS.toString());
-    taskMetadata.put(CommonConstants.Task.TASK_SUBMISSION_TIME, Long.toString(System.currentTimeMillis()));
-    taskMetadata.put(CommonConstants.Task.TASK_MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
+    taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_ID, taskId);
+    taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_TYPE, ControllerJobType.RELOAD_ALL_SEGMENTS.toString());
+    taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_SUBMISSION_TIME, Long.toString(System.currentTimeMillis()));
+    taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_MESSAGES_COUNT, Integer.toString(numberOfMessagesSent));
+    addReloadJobToZK(tableNameWithType, taskId, taskMetadata);
+  }
 
-    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForTask(tableNameWithType);
+  private void addReloadJobToZK(String tableNameWithType, String taskId, Map<String, String> taskMetadata) {
+    String taskResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(tableNameWithType);
     ZNRecord tableTaskZnRecord;
 
     if (_propertyStore.exists(taskResourcePath, AccessOption.PERSISTENT)) {
       tableTaskZnRecord = _propertyStore.get(taskResourcePath, null, -1);
       Map<String, Map<String, String>> tasks = tableTaskZnRecord.getMapFields();
       tasks.put(taskId, taskMetadata);
-      if (tasks.size() > CommonConstants.Task.MAXIMUM_RELOAD_TASKS_IN_ZK) {
-        tasks = tasks.
-                entrySet()
-            .stream()
-            .sorted(new Comparator<Map.Entry<String, Map<String, String>>>() {
+      if (tasks.size() > CommonConstants.Task.MAXIMUM_RELOAD_JOBS_IN_ZK) {
+        tasks = tasks.entrySet().stream().sorted(new Comparator<Map.Entry<String, Map<String, String>>>() {
               @Override
               public int compare(Map.Entry<String, Map<String, String>> v1, Map.Entry<String, Map<String, String>> v2) {
-                return Long.compare(Long.parseLong(v2.getValue().get(CommonConstants.Task.TASK_SUBMISSION_TIME)),
-                    Long.parseLong(v1.getValue().get(CommonConstants.Task.TASK_SUBMISSION_TIME)));
+                return Long.compare(
+                    Long.parseLong(v2.getValue().get(CommonConstants.Task.CONTROLLER_JOB_SUBMISSION_TIME)),
+                    Long.parseLong(v1.getValue().get(CommonConstants.Task.CONTROLLER_JOB_SUBMISSION_TIME)));
               }
-            })
-            .collect(Collectors.toList())
-            .subList(0, CommonConstants.Task.MAXIMUM_RELOAD_TASKS_IN_ZK)
-            .stream()
+            }).collect(Collectors.toList()).subList(0, CommonConstants.Task.MAXIMUM_RELOAD_JOBS_IN_ZK).stream()
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
       }
       tableTaskZnRecord.setMapFields(tasks);
@@ -2295,7 +2263,7 @@ public class PinotHelixResourceManager {
       LOGGER.warn("No reload message sent for table: {}", tableNameWithType);
     }
 
-    return Pair.of(numMessagesSent, segmentReloadMessage.getReloadTaskId());
+    return Pair.of(numMessagesSent, segmentReloadMessage.getReloadJobId());
   }
 
   public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload) {
@@ -2328,7 +2296,7 @@ public class PinotHelixResourceManager {
     } else {
       LOGGER.warn("No reload message sent for segment: {} in table: {}", segmentName, tableNameWithType);
     }
-    return Pair.of(numMessagesSent, segmentReloadMessage.getReloadTaskId());
+    return Pair.of(numMessagesSent, segmentReloadMessage.getReloadJobId());
   }
 
   /**

@@ -57,7 +57,7 @@ public class SegmentReloadTaskStatusCache {
       .maximumSize(1000L)
       .<String, SegmentReloadStatusValue>build().asMap();
 
-  public static void addTask(String id, long totalSegmentCount) {
+  public static void addReloadSegmentTask(String id, long totalSegmentCount) {
     SEGMENT_RELOAD_STATUS_MAP.putIfAbsent(id, new SegmentReloadStatusValue(totalSegmentCount));
   }
 

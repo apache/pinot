@@ -799,10 +799,11 @@ public class PinotTableRestletResource {
   }
 
   @GET
-  @Path("table/{tableName}/tasks")
+  @Path("table/{tableName}/jobs")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get list of tasks for this table", notes = "Get list of tasks for this table")
-  public Map<String, Map<String, String>> getTasks(
+  @ApiOperation(value = "Get list of controller jobs for this table",
+      notes = "Get list of controller jobs for this table")
+  public Map<String, Map<String, String>> getControllerJobs(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr
   ) {
@@ -813,7 +814,7 @@ public class PinotTableRestletResource {
 
     Map<String, Map<String, String>> result = new HashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
-      result.putAll(_pinotHelixResourceManager.getAllTasksForTable(tableNameWithType));
+      result.putAll(_pinotHelixResourceManager.getAllJobsForTable(tableNameWithType));
     }
 
     return result;

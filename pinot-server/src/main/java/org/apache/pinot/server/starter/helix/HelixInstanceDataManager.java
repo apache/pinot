@@ -243,7 +243,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
 
     if (taskId != null) {
-      SegmentReloadTaskStatusCache.addTask(taskId, 1);
+      SegmentReloadTaskStatusCache.addReloadSegmentTask(taskId, 1);
     }
 
     reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
@@ -267,7 +267,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     List<SegmentMetadata> segmentsMetadata = getAllSegmentsMetadata(tableNameWithType);
 
     if (taskId != null) {
-      SegmentReloadTaskStatusCache.addTask(taskId, segmentsMetadata.size());
+      SegmentReloadTaskStatusCache.addReloadSegmentTask(taskId, segmentsMetadata.size());
     }
 
     ExecutorService workers = Executors.newCachedThreadPool();

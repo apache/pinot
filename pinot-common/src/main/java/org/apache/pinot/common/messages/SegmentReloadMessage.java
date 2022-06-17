@@ -35,8 +35,7 @@ public class SegmentReloadMessage extends Message {
 
   private static final String FORCE_DOWNLOAD_KEY = "forceDownload";
 
-  // todo (saurabh) : getMsgId() returns different id on the server side than the one being set at controller. Check
-  private static final String RELOAD_TASK_ID = "reloadTaskId";
+  private static final String RELOAD_JOB_ID = "reloadJobId";
 
   public SegmentReloadMessage(@Nonnull String tableNameWithType, @Nullable String segmentName, boolean forceDownload) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
@@ -50,7 +49,7 @@ public class SegmentReloadMessage extends Message {
 
     ZNRecord znRecord = getRecord();
     znRecord.setBooleanField(FORCE_DOWNLOAD_KEY, forceDownload);
-    znRecord.setSimpleField(RELOAD_TASK_ID, super.getMsgId());
+    znRecord.setSimpleField(RELOAD_JOB_ID, super.getMsgId());
   }
 
   public SegmentReloadMessage(Message message) {
@@ -64,7 +63,7 @@ public class SegmentReloadMessage extends Message {
     return getRecord().getBooleanField(FORCE_DOWNLOAD_KEY, false);
   }
 
-  public String getReloadTaskId() {
-    return getRecord().getSimpleField(RELOAD_TASK_ID);
+  public String getReloadJobId() {
+    return getRecord().getSimpleField(RELOAD_JOB_ID);
   }
 }

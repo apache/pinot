@@ -18,31 +18,31 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import org.apache.pinot.common.metadata.task.TaskType;
+import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 
 
-public class ServerReloadTaskStatusResponse {
-  private TaskType _taskType;
+public class ServerReloadControllerJobStatusResponse {
+  private ControllerJobType _controllerJobType;
   private long _timeElapsedInMinutes;
   private double _estimatedTimeRemainingInMinutes;
-  private long _taskSubmissionTimeInMillisEpoch;
+  private long _jobSubmissionTimeInMillisEpoch;
   private int _totalSegmentCount;
   private int _successCount;
 
-  public TaskType getTaskType() {
-    return _taskType;
+  public ControllerJobType getControllerJobType() {
+    return _controllerJobType;
   }
 
-  public void setTaskType(TaskType taskType) {
-    _taskType = taskType;
+  public void setControllerJobType(ControllerJobType controllerJobType) {
+    _controllerJobType = controllerJobType;
   }
 
-  public long getTaskSubmissionTimeInMillisEpoch() {
-    return _taskSubmissionTimeInMillisEpoch;
+  public long getJobSubmissionTimeInMillisEpoch() {
+    return _jobSubmissionTimeInMillisEpoch;
   }
 
-  public void setTaskSubmissionTimeInMillisEpoch(long taskSubmissionTimeInMillisEpoch) {
-    _taskSubmissionTimeInMillisEpoch = taskSubmissionTimeInMillisEpoch;
+  public void setJobSubmissionTimeInMillisEpoch(long jobSubmissionTimeInMillisEpoch) {
+    _jobSubmissionTimeInMillisEpoch = jobSubmissionTimeInMillisEpoch;
   }
 
   public int getTotalSegmentCount() {

@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metadata.task;
+package org.apache.pinot.common.metadata.controllerjob;
 
-public enum TaskType {
+public enum ControllerJobType {
   RELOAD_SEGMENT,
   RELOAD_ALL_SEGMENTS
 }

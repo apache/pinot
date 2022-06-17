@@ -31,15 +31,15 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 @Api(tags = "Tasks")
 @Path("/")
-public class TaskStatusResource {
+public class ControllerJobStatusResource {
   @GET
-  @Path("/task/status/{taskId}")
+  @Path("/controllerJob/status/{jobId}")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Task status", notes = "Return status of the given task")
-  public String taskStatus(@PathParam("taskId") String taskId)
+  public String taskStatus(@PathParam("jobId") String jobId)
       throws Exception {
     SegmentReloadTaskStatusCache.SegmentReloadStatusValue segmentReloadStatusValue =
-        SegmentReloadTaskStatusCache.getStatus(taskId);
+        SegmentReloadTaskStatusCache.getStatus(jobId);
 
     return JsonUtils.objectToString(segmentReloadStatusValue);
   }
