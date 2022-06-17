@@ -228,7 +228,7 @@ public class IntermediateSegment implements MutableSegment {
   @Override
   public void getPrimaryKey(int docId, PrimaryKey reuse) {
     int numPrimaryKeyColumns = _schema.getPrimaryKeyColumns().size();
-    Object[] values = new Object[numPrimaryKeyColumns];;
+    Object[] values = reuse.getValues();
     for (int i = 0; i < numPrimaryKeyColumns; i++) {
       IntermediateIndexContainer indexContainer = _indexContainerMap.get(
           _schema.getPrimaryKeyColumns().get(i));
@@ -236,7 +236,6 @@ public class IntermediateSegment implements MutableSegment {
           indexContainer.getNumValuesInfo().getMaxNumValuesPerMVEntry());
       values[i] = value;
     }
-    reuse.setValues(values);
   }
 
   @Override

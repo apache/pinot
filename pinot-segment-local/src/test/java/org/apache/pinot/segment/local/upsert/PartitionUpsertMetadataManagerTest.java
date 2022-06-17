@@ -167,9 +167,12 @@ public class PartitionUpsertMetadataManagerTest {
     when(segment.getSegmentName()).thenReturn(segmentName);
     when(segment.getValidDocIds()).thenReturn(validDocIds);
     doAnswer((invocation) -> {
-        PrimaryKey pk = primaryKeys.get(invocation.getArgument(0));
-        PrimaryKey reuse = invocation.getArgument(1, PrimaryKey.class);
-        reuse.setValues(pk.getValues());
+      PrimaryKey pk = primaryKeys.get(invocation.getArgument(0));
+      PrimaryKey reuse = invocation.getArgument(1, PrimaryKey.class);
+      Object[] reuseValues = reuse.getValues();
+      for (int i = 0; i < reuseValues.length; i++) {
+        reuseValues[i] = pk.getValues()[i];
+      }
         return null;
       }).when(segment).getPrimaryKey(anyInt(), any(PrimaryKey.class));
 

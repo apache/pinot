@@ -264,11 +264,12 @@ public class PartitionUpsertMetadataManager {
       while (iterator.hasNext()) {
         int docId = iterator.next();
         segment.getPrimaryKey(docId, reuse);
-        _primaryKeyToRecordLocationMap.computeIfPresent(hashPrimaryKey(reuse, _hashFunction), (pk, recordLocation) -> {
-          if (recordLocation.getSegment() == segment) {
-            return null;
-          }
-          return recordLocation;
+        _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(reuse, _hashFunction),
+            (pk, recordLocation) -> {
+              if (recordLocation.getSegment() == segment) {
+                return null;
+              }
+              return recordLocation;
         });
       }
     }
