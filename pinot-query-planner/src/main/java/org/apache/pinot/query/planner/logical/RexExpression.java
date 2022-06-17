@@ -72,15 +72,15 @@ public interface RexExpression {
   static Object toRexValue(FieldSpec.DataType dataType, Comparable value) {
     switch (dataType) {
       case INT:
-        return ((BigDecimal) value).intValue();
+        return value == null ? 0 : ((BigDecimal) value).intValue();
       case LONG:
-        return ((BigDecimal) value).longValue();
+        return value == null ? 0L : ((BigDecimal) value).longValue();
       case FLOAT:
-        return ((BigDecimal) value).floatValue();
+        return value == null ? 0f : ((BigDecimal) value).floatValue();
       case DOUBLE:
-        return ((BigDecimal) value).doubleValue();
+        return value == null ? 0d : ((BigDecimal) value).doubleValue();
       case STRING:
-        return ((NlsString) value).getValue();
+        return value == null ? "" : ((NlsString) value).getValue();
       default:
         return value;
     }

@@ -28,6 +28,9 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.common.datablock.BaseDataBlock;
+import org.apache.pinot.core.common.datablock.DataBlockBuilder;
+import org.apache.pinot.core.common.datablock.DataBlockUtils;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -37,10 +40,8 @@ import org.apache.pinot.core.query.aggregation.function.MinAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.blocks.BaseDataBlock;
-import org.apache.pinot.query.runtime.blocks.DataBlockBuilder;
-import org.apache.pinot.query.runtime.blocks.DataBlockUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 
 
 /**
@@ -96,7 +97,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       cumulateAggregationBlocks();
       return new TransferableBlock(toResultBlock());
     } catch (Exception e) {
-      return DataBlockUtils.getErrorTransferableBlock(e);
+      return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
   }
 
@@ -119,7 +120,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       if (rows.size() == 0) {
         return DataBlockUtils.getEmptyDataBlock(_dataSchema);
       } else {
-        return DataBlockBuilder.buildFromRows(rows, _dataSchema);
+        return DataBlockBuilder.buildFromRows(rows, null, _dataSchema);
       }
     } else {
       return DataBlockUtils.getEndOfStreamDataBlock();
@@ -128,7 +129,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
 
   private void cumulateAggregationBlocks() {
     TransferableBlock block = _inputOperator.nextBlock();
-    while (!DataBlockUtils.isEndOfStream(block)) {
+    while (!TransferableBlockUtils.isEndOfStream(block)) {
       BaseDataBlock dataBlock = block.getDataBlock();
       if (_dataSchema == null) {
         _dataSchema = dataBlock.getDataSchema();
@@ -162,6 +163,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
             ExpressionContext.forIdentifier(
                 ((RexExpression.FunctionCall) aggCall).getFunctionOperands().get(0).toString()));
       case "$COUNT":
+      case "COUNT":
         return new CountAggregationFunction();
       case "$MIN":
       case "$MIN0":

@@ -104,7 +104,14 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
 
     // 2. attach exchange.
     List<Integer> groupSetIndices = ImmutableIntList.range(0, oldAggRel.getGroupCount());
-    LogicalExchange exchange = LogicalExchange.create(newLeafAgg, RelDistributions.hash(groupSetIndices));
+    LogicalExchange exchange = null;
+    if (groupSetIndices.size() == 0) {
+      exchange = LogicalExchange.create(newLeafAgg, RelDistributions.SINGLETON);
+    } else if (groupSetIndices.size() == 1) {
+      exchange = LogicalExchange.create(newLeafAgg, RelDistributions.hash(groupSetIndices));
+    } else {
+      throw new UnsupportedOperationException("Unable to plan GROUP-BY, only single column key is supported!");
+    }
 
     // 3. attach intermediate agg stage.
     RelNode newAggNode = makeNewIntermediateAgg(call, oldAggRel, exchange);
