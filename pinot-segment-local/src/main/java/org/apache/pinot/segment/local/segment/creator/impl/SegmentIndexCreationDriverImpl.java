@@ -203,6 +203,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     try {
       // Initialize the index creation using the per-column statistics information
+      // TODO: _indexCreationInfoMap holds the reference to all unique values on heap (ColumnIndexCreationInfo ->
+      //       ColumnStatistics) throughout the segment creation. Find a way to release the memory early.
       _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir);
 
       // Build the index

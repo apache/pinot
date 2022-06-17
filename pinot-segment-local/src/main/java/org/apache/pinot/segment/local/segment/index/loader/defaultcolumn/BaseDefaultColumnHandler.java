@@ -447,8 +447,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Create dictionary.
     // We will have only one value in the dictionary.
-    try (SegmentDictionaryCreator creator = new SegmentDictionaryCreator(sortedArray, fieldSpec, _indexDir, false)) {
-      creator.build();
+    try (SegmentDictionaryCreator creator = new SegmentDictionaryCreator(fieldSpec, _indexDir, false)) {
+      creator.build(sortedArray);
     }
 
     // Create forward index.
@@ -640,10 +640,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       }
 
       // Create dictionary
-      try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
-          indexCreationInfo.getSortedUniqueElementsArray(), fieldSpec, _indexDir,
+      try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(fieldSpec, _indexDir,
           indexCreationInfo.isUseVarLengthDictionary())) {
-        dictionaryCreator.build();
+        dictionaryCreator.build(indexCreationInfo.getSortedUniqueElementsArray());
 
         // Create forward index
         int cardinality = indexCreationInfo.getDistinctValueCount();

@@ -29,8 +29,7 @@ import org.apache.pinot.spi.utils.ByteArray;
  * Extension of {@link AbstractColumnStatisticsCollector} for byte[] column type.
  */
 public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatisticsCollector {
-  private final Set<ByteArray> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
-
+  private Set<ByteArray> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
   private int _maxRowLength = 0;
@@ -43,6 +42,8 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public void collect(Object entry) {
+    assert !_sealed;
+
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
       int rowLength = 0;
@@ -123,8 +124,11 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public void seal() {
-    _sortedValues = _values.toArray(new ByteArray[0]);
-    Arrays.sort(_sortedValues);
-    _sealed = true;
+    if (!_sealed) {
+      _sortedValues = _values.toArray(new ByteArray[0]);
+      _values = null;
+      Arrays.sort(_sortedValues);
+      _sealed = true;
+    }
   }
 }

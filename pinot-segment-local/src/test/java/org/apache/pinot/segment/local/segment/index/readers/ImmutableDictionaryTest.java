@@ -131,42 +131,44 @@ public class ImmutableDictionaryTest {
     _bytesValues = bytesSet.toArray(new ByteArray[NUM_VALUES]);
     Arrays.sort(_bytesValues);
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_intValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
         new DimensionFieldSpec(INT_COLUMN_NAME, DataType.INT, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+      dictionaryCreator.build(_intValues);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_longValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
         new DimensionFieldSpec(LONG_COLUMN_NAME, DataType.LONG, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+      dictionaryCreator.build(_longValues);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_floatValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
         new DimensionFieldSpec(FLOAT_COLUMN_NAME, DataType.FLOAT, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+      dictionaryCreator.build(_floatValues);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_doubleValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
         new DimensionFieldSpec(DOUBLE_COLUMN_NAME, DataType.DOUBLE, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+      dictionaryCreator.build(_doubleValues);
     }
 
     // Note: BigDecimalDictionary requires setting useVarLengthDictionary to true.
     boolean useVarLengthDictionary = true;
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_bigDecimalValues,
-        new MetricFieldSpec(BIG_DECIMAL_COLUMN_NAME, DataType.BIG_DECIMAL), TEMP_DIR, useVarLengthDictionary)) {
-      dictionaryCreator.build();
+    MetricFieldSpec bigDecimalMetricField = new MetricFieldSpec(BIG_DECIMAL_COLUMN_NAME, DataType.BIG_DECIMAL);
+    bigDecimalMetricField.setSingleValueField(true);
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(bigDecimalMetricField, TEMP_DIR,
+        useVarLengthDictionary)) {
+      dictionaryCreator.build(_bigDecimalValues);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_stringValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
         new DimensionFieldSpec(STRING_COLUMN_NAME, DataType.STRING, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+      dictionaryCreator.build(_stringValues);
       _numBytesPerStringValue = dictionaryCreator.getNumBytesPerEntry();
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_bytesValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
         new DimensionFieldSpec(BYTES_COLUMN_NAME, DataType.BYTES, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+      dictionaryCreator.build(_bytesValues);
       assertEquals(dictionaryCreator.getNumBytesPerEntry(), BYTES_LENGTH);
     }
   }
@@ -195,7 +197,7 @@ public class ImmutableDictionaryTest {
     for (int i = 0; i < NUM_VALUES; i++) {
       assertEquals(intDictionary.get(i), _intValues[i]);
       assertEquals(intDictionary.getIntValue(i), _intValues[i]);
-      assertEquals(intDictionary.getLongValue(i), (long) _intValues[i]);
+      assertEquals(intDictionary.getLongValue(i), _intValues[i]);
       assertEquals(intDictionary.getFloatValue(i), (float) _intValues[i]);
       assertEquals(intDictionary.getDoubleValue(i), (double) _intValues[i]);
       Assert.assertEquals(Integer.parseInt(intDictionary.getStringValue(i)), _intValues[i]);

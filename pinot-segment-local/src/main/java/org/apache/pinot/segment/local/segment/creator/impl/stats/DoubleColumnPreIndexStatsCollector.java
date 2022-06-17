@@ -25,8 +25,7 @@ import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 
 
 public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
-  private final DoubleSet _values = new DoubleOpenHashSet(INITIAL_HASH_SET_SIZE);
-
+  private DoubleSet _values = new DoubleOpenHashSet(INITIAL_HASH_SET_SIZE);
   private double[] _sortedValues;
   private boolean _sealed = false;
   private double _prevValue = Double.NEGATIVE_INFINITY;
@@ -37,6 +36,8 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public void collect(Object entry) {
+    assert !_sealed;
+
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
       for (Object obj : values) {
@@ -57,11 +58,9 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
     }
   }
 
-  void addressSorted(double entry) {
-    if (_isSorted) {
-      if (entry < _prevValue) {
-        _isSorted = false;
-      }
+  private void addressSorted(double entry) {
+    if (_sorted) {
+      _sorted = entry >= _prevValue;
       _prevValue = entry;
     }
   }
@@ -100,8 +99,11 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public void seal() {
-    _sortedValues = _values.toDoubleArray();
-    Arrays.sort(_sortedValues);
-    _sealed = true;
+    if (!_sealed) {
+      _sortedValues = _values.toDoubleArray();
+      _values = null;
+      Arrays.sort(_sortedValues);
+      _sealed = true;
+    }
   }
 }
