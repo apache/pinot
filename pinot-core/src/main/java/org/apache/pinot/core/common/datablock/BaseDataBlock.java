@@ -35,6 +35,7 @@ import org.apache.pinot.core.common.datatable.DataTableUtils;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.RoaringBitmap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -237,6 +238,11 @@ public abstract class BaseDataBlock implements DataTable {
     return _numRows;
   }
 
+  @Override
+  public RoaringBitmap getNullRowIds(int colId) {
+    return null;
+  }
+
   // --------------------------------------------------------------------------
   // Fixed sized element access.
   // --------------------------------------------------------------------------
@@ -296,6 +302,10 @@ public abstract class BaseDataBlock implements DataTable {
   public <T> T getObject(int rowId, int colId) {
     int size = positionCursorInVariableBuffer(rowId, colId);
     int objectTypeValue = _variableSizeData.getInt();
+    if (size == 0) {
+      assert objectTypeValue == ObjectSerDeUtils.ObjectType.Null.getValue();
+      return null;
+    }
     ByteBuffer byteBuffer = _variableSizeData.slice();
     byteBuffer.limit(size);
     return ObjectSerDeUtils.deserialize(byteBuffer, objectTypeValue);

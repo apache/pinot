@@ -27,9 +27,11 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.NullBitmapUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -127,9 +129,20 @@ public class DataTableBuilder {
     _version = version;
   }
 
+  public static int getCurrentDataTableVersion() {
+    return _version;
+  }
+
   public void startRow() {
     _numRows++;
     _currentRowDataByteBuffer = ByteBuffer.allocate(_rowSizeInBytes);
+  }
+
+  public void setNullRowIds(RoaringBitmap nullBitmap)
+      throws IOException {
+    assert _version >= VERSION_4;
+    NullBitmapUtils.setNullRowIds(nullBitmap, _fixedSizeDataByteArrayOutputStream,
+        _variableSizeDataByteArrayOutputStream);
   }
 
   public void setColumn(int colId, boolean value) {
@@ -223,10 +236,15 @@ public class DataTableBuilder {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
-    byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);
-    _currentRowDataByteBuffer.putInt(bytes.length);
-    _variableSizeDataOutputStream.writeInt(objectTypeValue);
-    _variableSizeDataByteArrayOutputStream.write(bytes);
+    if (objectTypeValue == ObjectSerDeUtils.ObjectType.Null.getValue()) {
+      _currentRowDataByteBuffer.putInt(0);
+      _variableSizeDataOutputStream.writeInt(objectTypeValue);
+    } else {
+      byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);
+      _currentRowDataByteBuffer.putInt(bytes.length);
+      _variableSizeDataOutputStream.writeInt(objectTypeValue);
+      _variableSizeDataByteArrayOutputStream.write(bytes);
+    }
   }
 
   public void setColumn(int colId, int[] values)

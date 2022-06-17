@@ -129,7 +129,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
         rows.add(joinRow(leftRow, rightRow));
       }
     }
-    return DataBlockBuilder.buildFromRows(rows, computeSchema());
+    return DataBlockBuilder.buildFromRows(rows, null, computeSchema());
   }
 
   private Object[] joinRow(Object[] leftRow, Object[] rightRow) {
