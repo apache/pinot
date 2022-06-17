@@ -197,7 +197,7 @@
                 </relocation>
                 <relocation>
                   <pattern>org.apache.commons</pattern>
-                  <shadedPattern>shaded.org.apache.commons</shadedPattern>
+                  <shadedPattern>${shade.prefix}.org.apache.commons</shadedPattern>
                 </relocation>
               </relocations>
             </configuration>
