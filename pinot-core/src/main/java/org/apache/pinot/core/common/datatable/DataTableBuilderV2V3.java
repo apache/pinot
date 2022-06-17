@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.NullBitmapUtils;
 import org.apache.pinot.core.common.DataTableBuilder;
 import org.apache.pinot.core.common.DataTableFactory;
 import org.apache.pinot.core.common.ObjectSerDeUtils;

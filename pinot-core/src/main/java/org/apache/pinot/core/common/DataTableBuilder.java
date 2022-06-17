@@ -66,7 +66,7 @@ import org.roaringbitmap.RoaringBitmap;
 public interface DataTableBuilder {
 
   void setNullRowIds(RoaringBitmap nullBitmap)
-      throws IOException ;
+      throws IOException;
 
   void startRow();
 
