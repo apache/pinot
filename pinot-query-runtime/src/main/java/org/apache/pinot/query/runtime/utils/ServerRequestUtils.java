@@ -105,11 +105,11 @@ public class ServerRequestUtils {
       pinotQuery.setFilterExpression(CalciteRexExpressionParser.toExpression(
           ((FilterNode) node).getCondition(), pinotQuery));
     } else if (node instanceof ProjectNode) {
-      pinotQuery.setSelectList(CalciteRexExpressionParser.convertSelectList(
+      pinotQuery.setSelectList(CalciteRexExpressionParser.overwriteSelectList(
           ((ProjectNode) node).getProjects(), pinotQuery));
     } else if (node instanceof AggregateNode) {
       // set agg list
-      pinotQuery.setSelectList(CalciteRexExpressionParser.convertSelectList(
+      pinotQuery.setSelectList(CalciteRexExpressionParser.addSelectList(pinotQuery.getSelectList(),
           ((AggregateNode) node).getAggCalls(), pinotQuery));
       // set group-by list
       pinotQuery.setGroupByList(CalciteRexExpressionParser.convertGroupByList(

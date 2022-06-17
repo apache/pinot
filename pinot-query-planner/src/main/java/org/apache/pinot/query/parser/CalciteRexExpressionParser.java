@@ -53,8 +53,13 @@ public class CalciteRexExpressionParser {
   // Relational conversion Utils
   // --------------------------------------------------------------------------
 
-  public static List<Expression> convertSelectList(List<RexExpression> rexNodeList, PinotQuery pinotQuery) {
-    List<Expression> selectExpr = pinotQuery.getSelectList() == null ? new ArrayList<>() : pinotQuery.getSelectList();
+  public static List<Expression> overwriteSelectList(List<RexExpression> rexNodeList, PinotQuery pinotQuery) {
+    return addSelectList(new ArrayList<>(), rexNodeList, pinotQuery);
+  }
+
+  public static List<Expression> addSelectList(List<Expression> existingList, List<RexExpression> rexNodeList,
+      PinotQuery pinotQuery) {
+    List<Expression> selectExpr = new ArrayList<>(existingList);
 
     final Iterator<RexExpression> iterator = rexNodeList.iterator();
     while (iterator.hasNext()) {
@@ -66,8 +71,7 @@ public class CalciteRexExpressionParser {
   }
 
   public static List<Expression> convertGroupByList(List<RexExpression> rexNodeList, PinotQuery pinotQuery) {
-    List<Expression> groupByExpr = pinotQuery.getGroupByList() == null
-        ? new ArrayList<>() : pinotQuery.getGroupByList();
+    List<Expression> groupByExpr = new ArrayList<>();
 
     final Iterator<RexExpression> iterator = rexNodeList.iterator();
     while (iterator.hasNext()) {

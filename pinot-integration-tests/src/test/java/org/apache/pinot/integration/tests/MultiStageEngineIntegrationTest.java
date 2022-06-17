@@ -113,10 +113,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
   @DataProvider
   public Object[][] multiStageQueryEngineSqlTestSet() {
     return new Object[][] {
-        new Object[]{"SELECT * FROM mytable_OFFLINE", 10, 73},
+        new Object[]{"SELECT COUNT(*) FROM mytable_OFFLINE WHERE Carrier='AA'", 1, 1},
+        new Object[]{"SELECT * FROM mytable_OFFLINE WHERE ArrDelay>1000", 2, 73},
         new Object[]{"SELECT CarrierDelay, ArrDelay FROM mytable_OFFLINE WHERE CarrierDelay=15 AND ArrDelay>20", 10, 2},
-        new Object[]{"SELECT * FROM mytable_OFFLINE AS a JOIN mytable_OFFLINE AS b ON a.AirlineID = b.AirlineID "
-            + " WHERE a.CarrierDelay=15 AND a.ArrDelay>20 AND b.ArrDelay<20", 10, 146}
+        new Object[]{"SELECT * FROM mytable_OFFLINE AS a JOIN mytable_OFFLINE AS b ON a.Origin = b.Origin "
+            + " WHERE a.Carrier='AA' AND a.ArrDelay>1000 AND b.ArrDelay>1000", 2, 146}
     };
   }
 
