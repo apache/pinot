@@ -2009,6 +2009,7 @@ public class PinotHelixResourceManager {
       int numberOfMessagesSent) {
     Map<String, String> taskMetadata = new HashMap<>();
     taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_ID, taskId);
+    taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_TABLE_NAME_WITH_TYPE, tableNameWithType);
     taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_TYPE, ControllerJobType.RELOAD_SEGMENT.toString());
     taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_SUBMISSION_TIME, Long.toString(System.currentTimeMillis()));
     taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_MESSAGES_COUNT, Integer.toString(numberOfMessagesSent));
@@ -2019,6 +2020,7 @@ public class PinotHelixResourceManager {
   public void addNewReloadAllSegmentsJob(String tableNameWithType, String taskId, int numberOfMessagesSent) {
     Map<String, String> taskMetadata = new HashMap<>();
     taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_ID, taskId);
+    taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_TABLE_NAME_WITH_TYPE, tableNameWithType);
     taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_TYPE, ControllerJobType.RELOAD_ALL_SEGMENTS.toString());
     taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_SUBMISSION_TIME, Long.toString(System.currentTimeMillis()));
     taskMetadata.put(CommonConstants.Task.CONTROLLER_JOB_MESSAGES_COUNT, Integer.toString(numberOfMessagesSent));
