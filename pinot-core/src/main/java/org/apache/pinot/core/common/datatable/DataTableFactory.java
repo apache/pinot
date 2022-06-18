@@ -16,17 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.common;
+package org.apache.pinot.core.common.datatable;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datatable.DataTableBuilderV2V3;
-import org.apache.pinot.core.common.datatable.DataTableBuilderV4;
-import org.apache.pinot.core.common.datatable.DataTableImplV2;
-import org.apache.pinot.core.common.datatable.DataTableImplV3;
-import org.apache.pinot.core.common.datatable.DataTableImplV4;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,12 +38,12 @@ public class DataTableFactory {
   private DataTableFactory() {
   }
 
-  public static int getCurrentDataTableVersion() {
+  public static int getDataTableVersion() {
     return _version;
   }
 
-  public static void setCurrentDataTableVersion(int version) {
-    LOGGER.warn("Setting current DataTable version to: " + version);
+  public static void setDataTableVersion(int version) {
+    LOGGER.info("Setting DataTable version to: " + version);
     if (version != DataTableFactory.VERSION_2 && version != DataTableFactory.VERSION_3
         && version != DataTableFactory.VERSION_4) {
       throw new IllegalArgumentException("Unsupported version: " + version);
@@ -73,7 +68,7 @@ public class DataTableFactory {
     switch (_version) {
       case VERSION_2:
       case VERSION_3:
-        return new DataTableBuilderV2V3(dataSchema);
+        return new DataTableBuilderV2V3(dataSchema, _version);
       case VERSION_4:
         return new DataTableBuilderV4(dataSchema);
       default:

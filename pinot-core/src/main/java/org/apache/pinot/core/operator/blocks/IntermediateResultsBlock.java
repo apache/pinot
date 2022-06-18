@@ -37,8 +37,8 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.DataTableBuilder;
-import org.apache.pinot.core.common.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
@@ -309,8 +309,7 @@ public class IntermediateResultsBlock implements Block {
 
   private DataTable getResultDataTable()
       throws IOException {
-    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(
-        _dataSchema);
+    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(_dataSchema);
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     Iterator<Record> iterator = _table.iterator();
     while (iterator.hasNext()) {
@@ -393,8 +392,8 @@ public class IntermediateResultsBlock implements Block {
     }
 
     // Build the data table.
-    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(
-        new DataSchema(columnNames, columnDataTypes));
+    DataTableBuilder dataTableBuilder =
+        DataTableFactory.getDataTableBuilder(new DataSchema(columnNames, columnDataTypes));
     dataTableBuilder.startRow();
     for (int i = 0; i < numAggregationFunctions; i++) {
       switch (columnDataTypes[i]) {

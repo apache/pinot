@@ -18,18 +18,16 @@
  */
 package org.apache.pinot.core.common.datablock;
 
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.NullBitmapUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -50,13 +48,12 @@ public class DataBlockBuilder {
   private int _numRows;
   private int _numColumns;
 
-  private final Map<String, Integer> _dictionaryMap = new HashMap<>();
-  private final List<String> _reverseDictionaryList = new ArrayList<>();
+  private final Object2IntOpenHashMap<String> _dictionary = new Object2IntOpenHashMap<>();
   private final ByteArrayOutputStream _fixedSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
+  private final DataOutputStream _fixedSizeDataOutputStream = new DataOutputStream(_fixedSizeDataByteArrayOutputStream);
   private final ByteArrayOutputStream _variableSizeDataByteArrayOutputStream = new ByteArrayOutputStream();
   private final DataOutputStream _variableSizeDataOutputStream =
       new DataOutputStream(_variableSizeDataByteArrayOutputStream);
-
 
   private DataBlockBuilder(DataSchema dataSchema, BaseDataBlock.Type blockType) {
     _dataSchema = dataSchema;
@@ -78,10 +75,16 @@ public class DataBlockBuilder {
     }
   }
 
-  public void setNullRowIds(RoaringBitmap nullBitmap)
+  public void setNullRowIds(@Nullable RoaringBitmap nullRowIds)
       throws IOException {
-    NullBitmapUtils.setNullRowIds(nullBitmap, _fixedSizeDataByteArrayOutputStream,
-        _variableSizeDataByteArrayOutputStream);
+    _fixedSizeDataOutputStream.writeInt(_variableSizeDataByteArrayOutputStream.size());
+    if (nullRowIds == null || nullRowIds.isEmpty()) {
+      _fixedSizeDataOutputStream.writeInt(0);
+    } else {
+      byte[] bitmapBytes = ObjectSerDeUtils.ROARING_BITMAP_SER_DE.serialize(nullRowIds);
+      _fixedSizeDataOutputStream.writeInt(bitmapBytes.length);
+      _variableSizeDataByteArrayOutputStream.write(bitmapBytes);
+    }
   }
 
   public static RowDataBlock buildFromRows(List<Object[]> rows, @Nullable RoaringBitmap[] colNullBitmaps,
@@ -166,12 +169,12 @@ public class DataBlockBuilder {
             break;
           case BYTES_ARRAY:
           case STRING_ARRAY:
-            setColumn(rowBuilder, byteBuffer, i, (String[]) value);
+            setColumn(rowBuilder, byteBuffer, (String[]) value);
             break;
           default:
-            throw new IllegalStateException(String.format(
-                "Unsupported data type: %s for column: %s", rowBuilder._columnDataType[i],
-                rowBuilder._dataSchema.getColumnName(i)));
+            throw new IllegalStateException(
+                String.format("Unsupported data type: %s for column: %s", rowBuilder._columnDataType[i],
+                    rowBuilder._dataSchema.getColumnName(i)));
         }
       }
       rowBuilder._fixedSizeDataByteArrayOutputStream.write(byteBuffer.array(), 0, byteBuffer.position());
@@ -290,13 +293,13 @@ public class DataBlockBuilder {
         case BYTES_ARRAY:
         case STRING_ARRAY:
           for (Object value : column) {
-            setColumn(columnarBuilder, byteBuffer, i, (String[]) value);
+            setColumn(columnarBuilder, byteBuffer, (String[]) value);
           }
           break;
         default:
-          throw new IllegalStateException(String.format(
-              "Unsupported data type: %s for column: %s", columnarBuilder._columnDataType[i],
-              columnarBuilder._dataSchema.getColumnName(i)));
+          throw new IllegalStateException(
+              String.format("Unsupported data type: %s for column: %s", columnarBuilder._columnDataType[i],
+                  columnarBuilder._dataSchema.getColumnName(i)));
       }
       columnarBuilder._fixedSizeDataByteArrayOutputStream.write(byteBuffer.array(), 0, byteBuffer.position());
     }
@@ -304,17 +307,23 @@ public class DataBlockBuilder {
   }
 
   private static RowDataBlock buildRowBlock(DataBlockBuilder builder) {
-    return new RowDataBlock(builder._numRows, builder._dataSchema,
-        builder._reverseDictionaryList.toArray(new String[0]),
+    return new RowDataBlock(builder._numRows, builder._dataSchema, getReverseDictionary(builder._dictionary),
         builder._fixedSizeDataByteArrayOutputStream.toByteArray(),
         builder._variableSizeDataByteArrayOutputStream.toByteArray());
   }
 
   private static ColumnarDataBlock buildColumnarBlock(DataBlockBuilder builder) {
-    return new ColumnarDataBlock(builder._numRows, builder._dataSchema,
-        builder._reverseDictionaryList.toArray(new String[0]),
+    return new ColumnarDataBlock(builder._numRows, builder._dataSchema, getReverseDictionary(builder._dictionary),
         builder._fixedSizeDataByteArrayOutputStream.toByteArray(),
         builder._variableSizeDataByteArrayOutputStream.toByteArray());
+  }
+
+  private static String[] getReverseDictionary(Object2IntOpenHashMap<String> dictionary) {
+    String[] reverseDictionary = new String[dictionary.size()];
+    for (Object2IntMap.Entry<String> entry : dictionary.object2IntEntrySet()) {
+      reverseDictionary[entry.getIntValue()] = entry.getKey();
+    }
+    return reverseDictionary;
   }
 
   private static void setColumn(DataBlockBuilder builder, ByteBuffer byteBuffer, BigDecimal value)
@@ -326,12 +335,8 @@ public class DataBlockBuilder {
   }
 
   private static void setColumn(DataBlockBuilder builder, ByteBuffer byteBuffer, String value) {
-    Integer dictId = builder._dictionaryMap.get(value);
-    if (dictId == null) {
-      dictId = builder._dictionaryMap.size();
-      builder._dictionaryMap.put(value, dictId);
-      builder._reverseDictionaryList.add(value);
-    }
+    Object2IntOpenHashMap<String> dictionary = builder._dictionary;
+    int dictId = dictionary.computeIntIfAbsent(value, k -> dictionary.size());
     byteBuffer.putInt(dictId);
   }
 
@@ -394,19 +399,13 @@ public class DataBlockBuilder {
     }
   }
 
-  private static void setColumn(DataBlockBuilder builder, ByteBuffer byteBuffer, int colId, String[] values)
+  private static void setColumn(DataBlockBuilder builder, ByteBuffer byteBuffer, String[] values)
       throws IOException {
     byteBuffer.putInt(builder._variableSizeDataByteArrayOutputStream.size());
     byteBuffer.putInt(values.length);
-
-    String columnName = builder._dataSchema.getColumnName(colId);
+    Object2IntOpenHashMap<String> dictionary = builder._dictionary;
     for (String value : values) {
-      Integer dictId = builder._dictionaryMap.get(value);
-      if (dictId == null) {
-        dictId = builder._dictionaryMap.size();
-        builder._dictionaryMap.put(value, dictId);
-        builder._reverseDictionaryList.add(value);
-      }
+      int dictId = dictionary.computeIntIfAbsent(value, k -> dictionary.size());
       builder._variableSizeDataOutputStream.writeInt(dictId);
     }
   }

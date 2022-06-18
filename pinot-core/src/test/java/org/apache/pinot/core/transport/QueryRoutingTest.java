@@ -27,7 +27,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
-import org.apache.pinot.core.common.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;

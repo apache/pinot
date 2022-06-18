@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.DataTableFactory;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;

@@ -24,7 +24,7 @@ import java.util.List;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingResponseUtils;

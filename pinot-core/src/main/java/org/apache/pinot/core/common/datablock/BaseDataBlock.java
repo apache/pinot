@@ -390,7 +390,7 @@ public abstract class BaseDataBlock implements DataTable {
     int dictionarySize = buffer.getInt();
     String[] stringDictionary = new String[dictionarySize];
     for (int i = 0; i < dictionarySize; i++) {
-      stringDictionary[i] = (DataTableUtils.decodeString(buffer));
+      stringDictionary[i] = DataTableUtils.decodeString(buffer);
     }
     return stringDictionary;
   }
@@ -451,11 +451,11 @@ public abstract class BaseDataBlock implements DataTable {
 
     // Write dictionary map section offset(START|SIZE).
     dataOutputStream.writeInt(dataOffset);
-    byte[] dictionaryMapBytes = null;
+    byte[] dictionaryBytes = null;
     if (_stringDictionary != null) {
-      dictionaryMapBytes = serializeStringDictionary();
-      dataOutputStream.writeInt(dictionaryMapBytes.length);
-      dataOffset += dictionaryMapBytes.length;
+      dictionaryBytes = serializeStringDictionary();
+      dataOutputStream.writeInt(dictionaryBytes.length);
+      dataOffset += dictionaryBytes.length;
     } else {
       dataOutputStream.writeInt(0);
     }
@@ -492,8 +492,8 @@ public abstract class BaseDataBlock implements DataTable {
     // Write exceptions bytes.
     dataOutputStream.write(exceptionsBytes);
     // Write dictionary map bytes.
-    if (dictionaryMapBytes != null) {
-      dataOutputStream.write(dictionaryMapBytes);
+    if (dictionaryBytes != null) {
+      dataOutputStream.write(dictionaryBytes);
     }
     // Write data schema bytes.
     if (dataSchemaBytes != null) {
