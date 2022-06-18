@@ -62,7 +62,7 @@ public class HelixHelperTest {
 
   @Test
   public void testAddDefaultTags() {
-    String instanceId = "myInstance";
+    String instanceId = "Server_myInstance";
     InstanceConfig instanceConfig = new InstanceConfig(instanceId);
     List<String> defaultTags = Arrays.asList("tag1", "tag2");
     assertTrue(HelixHelper.addDefaultTags(instanceConfig, () -> defaultTags));
@@ -74,5 +74,18 @@ public class HelixHelperTest {
     List<String> otherTags = Arrays.asList("tag3", "tag4");
     assertFalse(HelixHelper.addDefaultTags(instanceConfig, () -> otherTags));
     assertEquals(instanceConfig.getTags(), defaultTags);
+  }
+
+  @Test
+  public void testRemoveDisabledPartitions() {
+    String instanceId = "Server_myInstance";
+    InstanceConfig instanceConfig = new InstanceConfig(instanceId);
+    assertTrue(instanceConfig.getDisabledPartitionsMap().isEmpty());
+    assertFalse(HelixHelper.removeDisabledPartitions(instanceConfig));
+
+    instanceConfig.setInstanceEnabledForPartition("myResource", "myPartition", false);
+    assertFalse(instanceConfig.getDisabledPartitionsMap().isEmpty());
+    assertTrue(HelixHelper.removeDisabledPartitions(instanceConfig));
+    assertTrue(instanceConfig.getDisabledPartitionsMap().isEmpty());
   }
 }
