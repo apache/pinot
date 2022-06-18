@@ -26,21 +26,15 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 /**
  * Predicate for IN.
  */
-public class InPredicate extends BasePredicate {
-  private final List<String> _values;
+public class InPredicate extends BaseInPredicate {
 
   public InPredicate(ExpressionContext lhs, List<String> values) {
-    super(lhs);
-    _values = values;
+    super(lhs, values);
   }
 
   @Override
   public Type getType() {
     return Type.IN;
-  }
-
-  public List<String> getValues() {
-    return _values;
   }
 
   @Override

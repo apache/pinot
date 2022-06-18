@@ -168,6 +168,11 @@ public class FloatOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
+  public int indexOf(float floatValue) {
+    return getDictId(floatValue);
+  }
+
+  @Override
   public int getIntValue(int dictId) {
     return (int) getFloatValue(dictId);
   }

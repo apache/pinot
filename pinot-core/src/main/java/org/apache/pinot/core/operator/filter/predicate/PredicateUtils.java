@@ -18,14 +18,26 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import java.math.BigDecimal;
+import java.util.List;
+import org.apache.pinot.common.request.context.predicate.BaseInPredicate;
+import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 public class PredicateUtils {
   private PredicateUtils() {
   }
+
+  // Bound the initial dictionary id set size to prevent over-allocating when a lot of values do not exist in the
+  // dictionary
+  private static final int MAX_INITIAL_DICT_ID_SET_SIZE = 1000;
 
   /**
    * Converts the given predicate value to the stored value based on the data type.
@@ -53,5 +65,81 @@ public class PredicateUtils {
    */
   public static String getStoredTimestampValue(String timestampValue) {
     return Long.toString(TimestampUtils.toMillisSinceEpoch(timestampValue));
+  }
+
+  /**
+   * Returns a dictionary id set of the values in the given IN/NOT_IN predicate.
+   */
+  public static IntSet getDictIdSet(BaseInPredicate inPredicate, Dictionary dictionary, DataType dataType) {
+    List<String> values = inPredicate.getValues();
+    int hashSetSize = Integer.min(HashUtil.getMinHashSetSize(values.size()), MAX_INITIAL_DICT_ID_SET_SIZE);
+    IntSet dictIdSet = new IntOpenHashSet(hashSetSize);
+    switch (dataType.getStoredType()) {
+      case INT:
+        int[] intValues = inPredicate.getIntValues();
+        for (int value : intValues) {
+          int dictId = dictionary.indexOf(value);
+          if (dictId >= 0) {
+            dictIdSet.add(dictId);
+          }
+        }
+        break;
+      case LONG:
+        long[] longValues = inPredicate.getLongValues();
+        for (long value : longValues) {
+          int dictId = dictionary.indexOf(value);
+          if (dictId >= 0) {
+            dictIdSet.add(dictId);
+          }
+        }
+        break;
+      case FLOAT:
+        float[] floatValues = inPredicate.getFloatValues();
+        for (float value : floatValues) {
+          int dictId = dictionary.indexOf(value);
+          if (dictId >= 0) {
+            dictIdSet.add(dictId);
+          }
+        }
+        break;
+      case DOUBLE:
+        double[] doubleValues = inPredicate.getDoubleValues();
+        for (double value : doubleValues) {
+          int dictId = dictionary.indexOf(value);
+          if (dictId >= 0) {
+            dictIdSet.add(dictId);
+          }
+        }
+        break;
+      case BIG_DECIMAL:
+        BigDecimal[] bigDecimalValues = inPredicate.getBigDecimalValues();
+        for (BigDecimal value : bigDecimalValues) {
+          int dictId = dictionary.indexOf(value);
+          if (dictId >= 0) {
+            dictIdSet.add(dictId);
+          }
+        }
+        break;
+      case STRING:
+        for (String value : values) {
+          int dictId = dictionary.indexOf(value);
+          if (dictId >= 0) {
+            dictIdSet.add(dictId);
+          }
+        }
+        break;
+      case BYTES:
+        ByteArray[] bytesValues = inPredicate.getBytesValues();
+        for (ByteArray value : bytesValues) {
+          int dictId = dictionary.indexOf(value);
+          if (dictId >= 0) {
+            dictIdSet.add(dictId);
+          }
+        }
+        break;
+      default:
+        throw new IllegalStateException("Unsupported data type: " + dataType);
+    }
+    return dictIdSet;
   }
 }

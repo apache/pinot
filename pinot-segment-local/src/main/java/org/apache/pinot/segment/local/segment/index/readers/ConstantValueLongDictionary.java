@@ -39,6 +39,16 @@ public class ConstantValueLongDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int indexOf(String stringValue) {
+    return Long.parseLong(stringValue) == _value ? 0 : NULL_VALUE_INDEX;
+  }
+
+  @Override
+  public int indexOf(long longValue) {
+    return longValue == _value ? 0 : NULL_VALUE_INDEX;
+  }
+
+  @Override
   public int insertionIndexOf(String stringValue) {
     long longValue = Long.parseLong(stringValue);
     if (longValue < _value) {

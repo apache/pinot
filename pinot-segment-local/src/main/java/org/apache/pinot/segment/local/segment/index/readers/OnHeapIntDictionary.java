@@ -35,7 +35,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * </ul>
  * <p>This helps avoid creation of int from byte[].
  */
-public class OnHeapIntDictionary extends OnHeapDictionary {
+public class OnHeapIntDictionary extends BaseImmutableDictionary {
   private final Int2IntOpenHashMap _valToDictId;
   private final int[] _dictIdToVal;
 
@@ -61,13 +61,6 @@ public class OnHeapIntDictionary extends OnHeapDictionary {
   }
 
   @Override
-  public int insertionIndexOf(String stringValue) {
-    int intValue = Integer.parseInt(stringValue);
-    int index = _valToDictId.get(intValue);
-    return (index != Dictionary.NULL_VALUE_INDEX) ? index : Arrays.binarySearch(_dictIdToVal, intValue);
-  }
-
-  @Override
   public DataType getValueType() {
     return DataType.INT;
   }
@@ -75,6 +68,18 @@ public class OnHeapIntDictionary extends OnHeapDictionary {
   @Override
   public int indexOf(String stringValue) {
     return _valToDictId.get(Integer.parseInt(stringValue));
+  }
+
+  @Override
+  public int indexOf(int intValue) {
+    return _valToDictId.get(intValue);
+  }
+
+  @Override
+  public int insertionIndexOf(String stringValue) {
+    int intValue = Integer.parseInt(stringValue);
+    int index = _valToDictId.get(intValue);
+    return (index != Dictionary.NULL_VALUE_INDEX) ? index : Arrays.binarySearch(_dictIdToVal, intValue);
   }
 
   @Override
