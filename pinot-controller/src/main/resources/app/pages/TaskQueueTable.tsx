@@ -20,15 +20,16 @@
 import React, { useEffect, useState } from 'react';
 import { get } from 'lodash';
 import moment from 'moment';
-import { TableData } from 'Models';
+// import { TableData } from 'Models';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { Grid, makeStyles } from '@material-ui/core';
 import SimpleAccordion from '../components/SimpleAccordion';
 import CustomButton from '../components/CustomButton';
 // import TableToolbar from '../components/TableToolbar';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
-import { useConfirm } from '../components/Confirm';
-import CustomizedTables from '../components/Table';
+// import { useConfirm } from '../components/Confirm';
+// import CustomizedTables from '../components/Table';
+import useScheduleAdhocModal from '../components/useScheduleAdhocModal';
 
 const jsonoptions = {
   lineNumbers: true,
@@ -83,12 +84,13 @@ const TaskQueueTable = (props) => {
   const [jobDetail, setJobDetail] = useState({});
   const [tableDetail, setTableDetail] = useState({});
   // const [tables, setTables] = useState<TableData>({ records: [], columns: ['Name'] });
+  const scheduleAdhocModal = useScheduleAdhocModal();
 
   const fetchData = async () => {
     setFetching(true);
     const detail = await PinotMethodUtils.getScheduleJobDetail(tableName, taskType);
     const tableDetailRes = await PinotMethodUtils.getTableDetails(tableName);
-    console.log('tableDetailRes', tableDetailRes);
+    // console.log('tableDetailRes', tableDetailRes);
     setTableDetail(tableDetailRes);
     setJobDetail(detail);
     setFetching(false);
@@ -100,10 +102,6 @@ const TaskQueueTable = (props) => {
 
   const handleScheduleNow = async () => {
     await PinotMethodUtils.scheduleTaskAction(tableName, taskType);
-  };
-
-  const handleExecute = async () => {
-    await PinotMethodUtils.executeTaskAction({ tableName, taskType });
   };
 
   const cronExpression = get(jobDetail, 'Triggers.0.CronExpression', '');
@@ -126,7 +124,7 @@ const TaskQueueTable = (props) => {
               Schedule Now
             </CustomButton>
             <CustomButton
-              onClick={() => handleExecute()}
+              onClick={() => scheduleAdhocModal.handleOpen()}
               tooltipTitle="Execute ADHOC"
               enableTooltip={true}
             >
@@ -180,6 +178,7 @@ const TaskQueueTable = (props) => {
           baseURL='/task-queue/tables/'
         />
       )} */}
+      {scheduleAdhocModal.dialog}
     </Grid>
   );
 };
