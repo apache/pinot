@@ -310,6 +310,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     });
 
+    // Remove disabled partitions
+    updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
+
     // Update admin HTTP/HTTPS port
     int adminHttpPort = Integer.MIN_VALUE;
     int adminHttpsPort = Integer.MIN_VALUE;

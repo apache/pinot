@@ -2244,6 +2244,7 @@ public class PinotHelixResourceManager {
       if (externalViewStateMap == null || !SegmentStateModel.ERROR.equals(externalViewStateMap.get(instance))) {
         LOGGER.info("Disabling segment: {} of table: {}", segmentName, tableNameWithType);
         // enablePartition takes a segment which is NOT in ERROR state, to OFFLINE state
+        // TODO: If the controller fails to re-enable the partition, it will be left in disabled state
         _helixAdmin.enablePartition(false, _helixClusterName, instance, tableNameWithType,
             Lists.newArrayList(segmentName));
       } else {
@@ -2323,6 +2324,7 @@ public class PinotHelixResourceManager {
     }
     for (Map.Entry<String, Set<String>> entry : instanceToDisableSegmentsMap.entrySet()) {
       // enablePartition takes a segment which is NOT in ERROR state, to OFFLINE state
+      // TODO: If the controller fails to re-enable the partition, it will be left in disabled state
       _helixAdmin.enablePartition(false, _helixClusterName, entry.getKey(), tableNameWithType,
           Lists.newArrayList(entry.getValue()));
     }
