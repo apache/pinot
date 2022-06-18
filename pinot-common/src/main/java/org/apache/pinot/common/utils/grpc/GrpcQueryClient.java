@@ -27,6 +27,7 @@ import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslProvider;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
@@ -35,9 +36,14 @@ import org.apache.pinot.common.proto.PinotQueryServerGrpc;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class GrpcQueryClient {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcQueryClient.class);
+  private static final int DEFAULT_CHANNEL_SHUTDOWN_TIMEOUT_SECOND = 10;
+
   private final ManagedChannel _managedChannel;
   private final PinotQueryServerGrpc.PinotQueryServerBlockingStub _blockingStub;
 
@@ -83,7 +89,14 @@ public class GrpcQueryClient {
 
   public void close() {
     if (!_managedChannel.isShutdown()) {
-      _managedChannel.shutdownNow();
+      try {
+        _managedChannel.shutdownNow();
+        if (!_managedChannel.awaitTermination(DEFAULT_CHANNEL_SHUTDOWN_TIMEOUT_SECOND, TimeUnit.SECONDS)) {
+          LOGGER.warn("Timed out forcefully shutting down connection: {}. ", _managedChannel);
+        }
+      } catch (Exception e) {
+        LOGGER.error("Unexpected exception while waiting for channel termination", e);
+      }
     }
   }
 

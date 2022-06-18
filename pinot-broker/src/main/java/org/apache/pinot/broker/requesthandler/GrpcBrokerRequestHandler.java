@@ -78,6 +78,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   @Override
   public synchronized void shutDown() {
+    _streamingQueryClient.shutdown();
     _streamingReduceService.shutDown();
   }
 
@@ -145,6 +146,12 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
     private GrpcQueryClient getOrCreateGrpcQueryClient(String host, int port) {
       String key = String.format("%s_%d", host, port);
       return _grpcQueryClientMap.computeIfAbsent(key, k -> new GrpcQueryClient(host, port, _config));
+    }
+
+    public void shutdown() {
+      for (GrpcQueryClient client : _grpcQueryClientMap.values()) {
+        client.close();
+      }
     }
   }
 }
