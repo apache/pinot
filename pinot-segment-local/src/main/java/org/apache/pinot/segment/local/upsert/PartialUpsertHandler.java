@@ -20,29 +20,22 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.helix.HelixManager;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMergerFactory;
-import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+
 
 /**
  * Handler for partial-upsert.
  */
 public class PartialUpsertHandler {
   // _column2Mergers maintains the mapping of merge strategies per columns.
-  private final HelixManager _helixManager;
-  private final String _tableNameWithType;
   private final Map<String, PartialUpsertMerger> _column2Mergers = new HashMap<>();
-  private boolean _allSegmentsLoaded;
 
-  public PartialUpsertHandler(HelixManager helixManager, String tableNameWithType, Schema schema,
-      Map<String, UpsertConfig.Strategy> partialUpsertStrategies, UpsertConfig.Strategy defaultPartialUpsertStrategy,
-      String comparisonColumn) {
-    _helixManager = helixManager;
-    _tableNameWithType = tableNameWithType;
+  public PartialUpsertHandler(Schema schema, Map<String, UpsertConfig.Strategy> partialUpsertStrategies,
+      UpsertConfig.Strategy defaultPartialUpsertStrategy, String comparisonColumn) {
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
       _column2Mergers.put(entry.getKey(), PartialUpsertMergerFactory.getMerger(entry.getValue()));
     }
@@ -54,18 +47,6 @@ public class PartialUpsertHandler {
         _column2Mergers.put(columnName, PartialUpsertMergerFactory.getMerger(defaultPartialUpsertStrategy));
       }
     }
-  }
-
-  /**
-   * Returns {@code true} if all segments assigned to the current instance are loaded, {@code false} otherwise.
-   * Consuming segment should perform this check to ensure all previous records are loaded before inserting new records.
-   */
-  public synchronized boolean isAllSegmentsLoaded() {
-    if (_allSegmentsLoaded) {
-      return true;
-    }
-    _allSegmentsLoaded = TableStateUtils.isAllSegmentsLoaded(_helixManager, _tableNameWithType);
-    return _allSegmentsLoaded;
   }
 
   /**
@@ -91,8 +72,8 @@ public class PartialUpsertHandler {
           newRecord.putValue(column, previousRecord.getValue(column));
           newRecord.removeNullValueField(column);
         } else {
-          newRecord
-              .putValue(column, entry.getValue().merge(previousRecord.getValue(column), newRecord.getValue(column)));
+          newRecord.putValue(column,
+              entry.getValue().merge(previousRecord.getValue(column), newRecord.getValue(column)));
         }
       }
     }

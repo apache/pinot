@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.readers;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -39,6 +40,16 @@ public class ConstantValueBytesDictionary extends BaseImmutableDictionary {
   @Override
   public DataType getValueType() {
     return DataType.BYTES;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    return Arrays.equals(BytesUtils.toBytes(stringValue), _value) ? 0 : NULL_VALUE_INDEX;
+  }
+
+  @Override
+  public int indexOf(ByteArray bytesValue) {
+    return Arrays.equals(bytesValue.getBytes(), _value) ? 0 : NULL_VALUE_INDEX;
   }
 
   @Override

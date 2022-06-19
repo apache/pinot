@@ -181,6 +181,11 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   }
 
   @Override
+  public int indexOf(long longValue) {
+    return getDictId(longValue, null);
+  }
+
+  @Override
   public Long get(int dictId) {
     return getLongValue(dictId);
   }

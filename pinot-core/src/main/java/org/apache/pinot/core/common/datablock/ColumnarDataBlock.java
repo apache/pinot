@@ -20,7 +20,6 @@ package org.apache.pinot.core.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
 
 
@@ -36,9 +35,9 @@ public class ColumnarDataBlock extends BaseDataBlock {
     super();
   }
 
-  public ColumnarDataBlock(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
+  public ColumnarDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
       byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
-    super(numRows, dataSchema, dictionaryMap, fixedSizeDataBytes, variableSizeDataBytes);
+    super(numRows, dataSchema, stringDictionary, fixedSizeDataBytes, variableSizeDataBytes);
     computeBlockObjectConstants();
   }
 
@@ -89,7 +88,7 @@ public class ColumnarDataBlock extends BaseDataBlock {
 
   @Override
   public ColumnarDataBlock toDataOnlyDataTable() {
-    return new ColumnarDataBlock(_numRows, _dataSchema, _dictionaryMap, _fixedSizeDataBytes, _variableSizeDataBytes);
+    return new ColumnarDataBlock(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
   }
 
   // TODO: add whole-column access methods.

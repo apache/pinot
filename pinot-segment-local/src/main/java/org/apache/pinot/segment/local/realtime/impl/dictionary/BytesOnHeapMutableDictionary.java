@@ -126,6 +126,11 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
+  public int indexOf(ByteArray bytesValue) {
+    return getDictId(bytesValue);
+  }
+
+  @Override
   public byte[] get(int dictId) {
     return getBytesValue(dictId);
   }

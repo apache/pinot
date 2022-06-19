@@ -92,9 +92,9 @@ public class DictionariesTest {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    final SegmentGeneratorConfig config = SegmentTestUtils
-        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "time_day", TimeUnit.DAYS,
-            "test");
+    final SegmentGeneratorConfig config =
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "time_day",
+            TimeUnit.DAYS, "test");
     _tableConfig = config.getTableConfig();
 
     // The segment generation code in SegmentColumnarIndexCreator will throw
@@ -335,8 +335,7 @@ public class DictionariesTest {
 
   @Test
   public void testBigDecimalColumnPreIndexStatsCollector() {
-    AbstractColumnStatisticsCollector statsCollector =
-        buildStatsCollector("column1", DataType.BIG_DECIMAL, false);
+    AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.BIG_DECIMAL, false);
     statsCollector.collect(BigDecimal.valueOf(1d));
     Assert.assertTrue(statsCollector.isSorted());
     statsCollector.collect(BigDecimal.valueOf(2d));
@@ -458,11 +457,11 @@ public class DictionariesTest {
         new String(new byte[]{67, -61, -76, 116, 101, 32, 100, 39, 73, 118, 111, 105, 114, 101}); // "Côte d'Ivoire";
     Arrays.sort(inputStrings);
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(inputStrings, fieldSpec, indexDir)) {
-      dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(fieldSpec, indexDir)) {
+      dictionaryCreator.build(inputStrings);
       for (String inputString : inputStrings) {
-        Assert
-            .assertTrue(dictionaryCreator.indexOfSV(inputString) >= 0, "Value not found in dictionary " + inputString);
+        Assert.assertTrue(dictionaryCreator.indexOfSV(inputString) >= 0,
+            "Value not found in dictionary " + inputString);
       }
     }
 
@@ -479,9 +478,8 @@ public class DictionariesTest {
     indexDir.deleteOnExit();
     FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true);
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(new String[]{""}, fieldSpec,
-        indexDir)) {
-      dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(fieldSpec, indexDir)) {
+      dictionaryCreator.build(new String[]{""});
       Assert.assertEquals(dictionaryCreator.getNumBytesPerEntry(), 0);
       Assert.assertEquals(dictionaryCreator.indexOfSV(""), 0);
     }

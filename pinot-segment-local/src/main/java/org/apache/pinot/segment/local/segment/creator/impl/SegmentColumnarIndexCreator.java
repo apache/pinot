@@ -223,13 +223,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (dictEnabledColumn) {
         // Create dictionary-encoded index
         // Initialize dictionary creator
+        // TODO: Dictionary creator holds all unique values on heap. Consider keeping dictionary instead of creator
+        //       which uses off-heap memory.
         SegmentDictionaryCreator dictionaryCreator =
-            new SegmentDictionaryCreator(columnIndexCreationInfo.getSortedUniqueElementsArray(), fieldSpec, _indexDir,
-                columnIndexCreationInfo.isUseVarLengthDictionary());
+            new SegmentDictionaryCreator(fieldSpec, _indexDir, columnIndexCreationInfo.isUseVarLengthDictionary());
         _dictionaryCreatorMap.put(columnName, dictionaryCreator);
         // Create dictionary
         try {
-          dictionaryCreator.build();
+          dictionaryCreator.build(columnIndexCreationInfo.getSortedUniqueElementsArray());
         } catch (Exception e) {
           LOGGER.error("Error building dictionary for field: {}, cardinality: {}, number of bytes per entry: {}",
               fieldSpec.getName(), columnIndexCreationInfo.getDistinctValueCount(),
@@ -239,7 +240,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
 
       if (bloomFilterColumns.contains(columnName)) {
-        if (indexingConfig != null && indexingConfig.getBloomFilterConfigs() != null
+        if (indexingConfig.getBloomFilterConfigs() != null
             && indexingConfig.getBloomFilterConfigs().containsKey(columnName)) {
           _bloomFilterCreatorMap.put(columnName, _indexCreatorProvider.newBloomFilterCreator(
               context.forBloomFilter(indexingConfig.getBloomFilterConfigs().get(columnName))));
@@ -663,6 +664,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void seal()
       throws ConfigurationException, IOException {
+    for (SegmentDictionaryCreator dictionaryCreator : _dictionaryCreatorMap.values()) {
+      dictionaryCreator.postIndexingCleanup();
+    }
     for (DictionaryBasedInvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
       invertedIndexCreator.seal();
     }
@@ -779,7 +783,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(column);
       int dictionaryElementSize = (dictionaryCreator != null) ? dictionaryCreator.getNumBytesPerEntry() : 0;
       addColumnMetadataInfo(properties, column, columnIndexCreationInfo, _totalDocs, _schema.getFieldSpecFor(column),
-          _dictionaryCreatorMap.containsKey(column), dictionaryElementSize);
+          dictionaryCreator != null, dictionaryElementSize);
     }
 
     SegmentZKPropsConfig segmentZKPropsConfig = _config.getSegmentZKPropsConfig();

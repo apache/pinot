@@ -40,6 +40,11 @@ public class BigDecimalDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int indexOf(BigDecimal bigDecimalValue) {
+    return binarySearch(bigDecimalValue);
+  }
+
+  @Override
   public int insertionIndexOf(String stringValue) {
     return binarySearch(new BigDecimal(stringValue));
   }
@@ -61,22 +66,22 @@ public class BigDecimalDictionary extends BaseImmutableDictionary {
 
   @Override
   public int getIntValue(int dictId) {
-    return get(dictId).intValue();
+    return getBigDecimal(dictId).intValue();
   }
 
   @Override
   public long getLongValue(int dictId) {
-    return get(dictId).longValue();
+    return getBigDecimal(dictId).longValue();
   }
 
   @Override
   public float getFloatValue(int dictId) {
-    return get(dictId).floatValue();
+    return getBigDecimal(dictId).floatValue();
   }
 
   @Override
   public double getDoubleValue(int dictId) {
-    return get(dictId).doubleValue();
+    return getBigDecimal(dictId).doubleValue();
   }
 
   @Override
@@ -86,7 +91,7 @@ public class BigDecimalDictionary extends BaseImmutableDictionary {
 
   @Override
   public String getStringValue(int dictId) {
-    return get(dictId).toPlainString();
+    return getBigDecimal(dictId).toPlainString();
   }
 
   @Override

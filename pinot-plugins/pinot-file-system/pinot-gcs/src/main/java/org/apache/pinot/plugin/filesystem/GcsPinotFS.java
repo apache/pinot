@@ -21,8 +21,9 @@ package org.apache.pinot.plugin.filesystem;
 import com.google.api.gax.paging.Page;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
-import com.google.cloud.WriteChannel;
 import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.BlobId;
+import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.CopyWriter;
 import com.google.cloud.storage.Storage;
@@ -37,9 +38,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -58,7 +57,6 @@ public class GcsPinotFS extends BasePinotFS {
   public static final String GCP_KEY = "gcpKey";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GcsPinotFS.class);
-  private static final int BUFFER_SIZE = 128 * 1024;
   // See https://cloud.google.com/storage/docs/json_api/v1/how-tos/batch
   private static final int BATCH_LIMIT = 100;
   private Storage _storage;
@@ -181,17 +179,8 @@ public class GcsPinotFS extends BasePinotFS {
     LOGGER.info("Copying file {} to uri {}", srcFile.getAbsolutePath(), dstUri);
     GcsUri dstGcsUri = new GcsUri(dstUri);
     checkState(!isPathTerminatedByDelimiter(dstGcsUri), "Path '%s' must be a filename", dstGcsUri);
-    Blob blob = getBucket(dstGcsUri).create(dstGcsUri.getPath(), new byte[0]);
-    WriteChannel writeChannel = blob.writer();
-    writeChannel.setChunkSize(BUFFER_SIZE);
-    ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
-    SeekableByteChannel channel = Files.newByteChannel(srcFile.toPath());
-    for (int bytesRead = channel.read(buffer); bytesRead != -1; bytesRead = channel.read(buffer)) {
-      buffer.flip();
-      writeChannel.write(buffer);
-      buffer.clear();
-    }
-    writeChannel.close();
+    BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(dstGcsUri.getBucketName(), dstGcsUri.getPath())).build();
+    _storage.createFrom(blobInfo, Files.newInputStream(srcFile.toPath()));
   }
 
   @Override

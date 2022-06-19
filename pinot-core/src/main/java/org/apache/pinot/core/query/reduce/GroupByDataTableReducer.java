@@ -119,6 +119,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
       Collection<DataTable> dataTables, DataTableReducerContext reducerContext, String rawTableName,
       BrokerMetrics brokerMetrics)
       throws TimeoutException {
+    int numRecords;
     Iterator<Record> sortedIterator;
     if (!dataTables.isEmpty()) {
       IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
@@ -126,20 +127,32 @@ public class GroupByDataTableReducer implements DataTableReducer {
         brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NUM_RESIZES, indexedTable.getNumResizes());
         brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.RESIZE_TIME_MS, indexedTable.getResizeTimeMs());
       }
+      numRecords = indexedTable.size();
       sortedIterator = indexedTable.iterator();
     } else {
+      numRecords = 0;
       sortedIterator = Collections.emptyIterator();
     }
 
     DataSchema prePostAggregationDataSchema = getPrePostAggregationDataSchema(dataSchema);
-    ColumnDataType[] columnDataTypes = prePostAggregationDataSchema.getColumnDataTypes();
-    int numColumns = columnDataTypes.length;
-    int limit = _queryContext.getLimit();
-    List<Object[]> rows = new ArrayList<>(limit);
     PostAggregationHandler postAggregationHandler =
         new PostAggregationHandler(_queryContext, prePostAggregationDataSchema);
+    DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
+
+    // Directly return when there is no record returned, or limit is 0
+    int limit = _queryContext.getLimit();
+    if (numRecords == 0 || limit == 0) {
+      brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, Collections.emptyList()));
+      return;
+    }
+
+    // Calculate rows before post-aggregation
+    List<Object[]> rows;
+    ColumnDataType[] columnDataTypes = prePostAggregationDataSchema.getColumnDataTypes();
+    int numColumns = columnDataTypes.length;
     FilterContext havingFilter = _queryContext.getHavingFilter();
     if (havingFilter != null) {
+      rows = new ArrayList<>();
       HavingFilterHandler havingFilterHandler = new HavingFilterHandler(havingFilter, postAggregationHandler);
       while (rows.size() < limit && sortedIterator.hasNext()) {
         Object[] row = sortedIterator.next().getValues();
@@ -155,7 +168,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
         }
       }
     } else {
-      for (int i = 0; i < limit && sortedIterator.hasNext(); i++) {
+      int numRows = Math.min(numRecords, limit);
+      rows = new ArrayList<>(numRows);
+      for (int i = 0; i < numRows; i++) {
         Object[] row = sortedIterator.next().getValues();
         extractFinalAggregationResults(row);
         for (int j = 0; j < numColumns; j++) {
@@ -167,11 +182,11 @@ public class GroupByDataTableReducer implements DataTableReducer {
         rows.add(row);
       }
     }
-    DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
+
+    // Calculate final result rows after post aggregation
+    List<Object[]> resultRows = new ArrayList<>(rows.size());
     ColumnDataType[] resultColumnDataTypes = resultDataSchema.getColumnDataTypes();
     int numResultColumns = resultColumnDataTypes.length;
-    int numResultRows = rows.size();
-    List<Object[]> resultRows = new ArrayList<>(numResultRows);
     for (Object[] row : rows) {
       Object[] resultRow = postAggregationHandler.getResult(row);
       for (int i = 0; i < numResultColumns; i++) {
@@ -182,6 +197,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
       }
       resultRows.add(resultRow);
     }
+
     brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, resultRows));
   }
 

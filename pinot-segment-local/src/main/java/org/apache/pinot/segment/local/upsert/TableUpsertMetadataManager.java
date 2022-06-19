@@ -50,4 +50,8 @@ public class TableUpsertMetadataManager {
         k -> new PartitionUpsertMetadataManager(_tableNameWithType, k, _serverMetrics, _partialUpsertHandler,
             _hashFunction));
   }
+
+  public boolean isPartialUpsertEnabled() {
+    return _partialUpsertHandler != null;
+  }
 }

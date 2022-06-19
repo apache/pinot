@@ -166,7 +166,7 @@ public class DataTableImplV3 extends BaseDataTable {
 
   @Override
   public int getVersion() {
-    return DataTableBuilder.VERSION_3;
+    return DataTableFactory.VERSION_3;
   }
 
   @Override
@@ -224,7 +224,7 @@ public class DataTableImplV3 extends BaseDataTable {
 
   private void writeLeadingSections(DataOutputStream dataOutputStream)
       throws IOException {
-    dataOutputStream.writeInt(DataTableBuilder.VERSION_3);
+    dataOutputStream.writeInt(DataTableFactory.VERSION_3);
     dataOutputStream.writeInt(_numRows);
     dataOutputStream.writeInt(_numColumns);
     int dataOffset = HEADER_SIZE;

@@ -24,7 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -82,7 +82,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
     waitForAllDocsLoaded(600_000L);
 
     // Setting data table version to 4
-    DataTableBuilder.setCurrentDataTableVersion(4);
+    DataTableFactory.setDataTableVersion(4);
   }
 
   @Override
@@ -125,7 +125,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
   public void tearDown()
       throws Exception {
     // Setting data table version to 4
-    DataTableBuilder.setCurrentDataTableVersion(3);
+    DataTableFactory.setDataTableVersion(3);
 
     dropOfflineTable(DEFAULT_TABLE_NAME);
 

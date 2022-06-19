@@ -21,7 +21,6 @@ package org.apache.pinot.core.common.datatable;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.RowDataBlock;
 import org.apache.pinot.spi.annotations.InterfaceStability;
@@ -42,13 +41,13 @@ public class DataTableImplV4 extends RowDataBlock {
     super(byteBuffer);
   }
 
-  public DataTableImplV4(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
-      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
-    super(numRows, dataSchema, dictionaryMap, fixedSizeDataBytes, variableSizeDataBytes);
+  public DataTableImplV4(int numRows, DataSchema dataSchema, String[] dictionary, byte[] fixedSizeDataBytes,
+      byte[] variableSizeDataBytes) {
+    super(numRows, dataSchema, dictionary, fixedSizeDataBytes, variableSizeDataBytes);
   }
 
   @Override
   protected int getDataBlockVersionType() {
-    return DataTableBuilder.VERSION_4;
+    return DataTableFactory.VERSION_4;
   }
 }

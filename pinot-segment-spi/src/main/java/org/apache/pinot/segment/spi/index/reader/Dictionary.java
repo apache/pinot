@@ -56,35 +56,51 @@ public interface Dictionary extends Closeable {
   int indexOf(String stringValue);
 
   /**
-   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if
-   * the value does not exist.
+   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if the value does not exist.
+   * Must be implemented for INT dictionaries.
    */
   default int indexOf(int intValue) {
-    return indexOf(String.valueOf(intValue));
+    throw new UnsupportedOperationException();
   }
 
   /**
-   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if
-   * the value does not exist.
+   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if the value does not exist.
+   * Must be implemented for LONG dictionaries.
    */
   default int indexOf(long longValue) {
-    return indexOf(String.valueOf(longValue));
+    throw new UnsupportedOperationException();
   }
 
   /**
-   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if
-   * the value does not exist.
+   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if the value does not exist.
+   * Must be implemented for FLOAT dictionaries.
    */
   default int indexOf(float floatValue) {
-    return indexOf(String.valueOf(floatValue));
+    throw new UnsupportedOperationException();
   }
 
   /**
-   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if
-   * the value does not exist.
+   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if the value does not exist.
+   * Must be implemented for DOUBLE dictionaries.
    */
   default int indexOf(double doubleValue) {
-    return indexOf(String.valueOf(doubleValue));
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if the value does not exist.
+   * Must be implemented for BIG_DECIMAL dictionaries.
+   */
+  default int indexOf(BigDecimal bigDecimalValue) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if the value does not exist.
+   * Must be implemented for BYTE_ARRAY dictionaries.
+   */
+  default int indexOf(ByteArray bytesValue) {
+    throw new UnsupportedOperationException();
   }
 
   /**
@@ -119,9 +135,10 @@ public interface Dictionary extends Closeable {
   Comparable getMaxVal();
 
   /**
-   * Returns an sorted array of all values in the dictionary. For type INT/LONG/FLOAT/DOUBLE, primitive type array will
-   * be returned; for type STRING, {@code String[]} will be returned; for type BYTES, {@code ByteArray[]} will be
-   * returned. This method is for the stats collection phase when sealing the consuming segment.
+   * Returns a sorted array of all values in the dictionary. For type INT/LONG/FLOAT/DOUBLE, primitive type array will
+   * be returned; for type BIG_DECIMAL, {@code BigDecimal[]} will be returned; for type STRING, {@code String[]} will be
+   * returned; for type BYTES, {@code ByteArray[]} will be returned.
+   * This method is for the stats collection phase when sealing the consuming segment.
    */
   Object getSortedValues();
 
@@ -135,6 +152,7 @@ public interface Dictionary extends Closeable {
    *   <li>LONG -> Long</li>
    *   <li>FLOAT -> Float</li>
    *   <li>DOUBLE -> Double</li>
+   *   <li>BIG_DECIMAL -> BigDecimal</li>
    *   <li>STRING -> String</li>
    *   <li>BYTES -> byte[]</li>
    * </ul>
@@ -149,6 +167,7 @@ public interface Dictionary extends Closeable {
    *   <li>LONG -> Long</li>
    *   <li>FLOAT -> Float</li>
    *   <li>DOUBLE -> Double</li>
+   *   <li>BIG_DECIMAL -> BigDecimal</li>
    *   <li>STRING -> String</li>
    *   <li>BYTES -> ByteArray</li>
    * </ul>

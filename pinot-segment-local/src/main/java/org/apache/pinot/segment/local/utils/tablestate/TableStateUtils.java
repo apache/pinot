@@ -29,6 +29,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class TableStateUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableStateUtils.class);
 
@@ -72,8 +73,8 @@ public class TableStateUtils {
       String actualState = currentStateMap.get(segmentName);
       if (!CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(actualState)) {
         if (CommonConstants.Helix.StateModel.SegmentStateModel.ERROR.equals(actualState)) {
-          LOGGER
-              .error("Find ERROR segment: {}, table: {}, expected: {}", segmentName, tableNameWithType, expectedState);
+          LOGGER.error("Find ERROR segment: {}, table: {}, expected: {}", segmentName, tableNameWithType,
+              expectedState);
         } else {
           LOGGER.info("Find unloaded segment: {}, table: {}, expected: {}, actual: {}", segmentName, tableNameWithType,
               expectedState, actualState);
@@ -84,5 +85,18 @@ public class TableStateUtils {
 
     LOGGER.info("All segments loaded for table: {}", tableNameWithType);
     return true;
+  }
+
+  public static void waitForAllSegmentsLoaded(HelixManager helixManager, String tableNameWithType) {
+    try {
+      while (!TableStateUtils.isAllSegmentsLoaded(helixManager, tableNameWithType)) {
+        LOGGER.info("Sleeping 1 second waiting for all segments loaded for table: {}", tableNameWithType);
+        //noinspection BusyWait
+        Thread.sleep(1000L);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while waiting for all segments loaded for table: " + tableNameWithType, e);
+    }
   }
 }
