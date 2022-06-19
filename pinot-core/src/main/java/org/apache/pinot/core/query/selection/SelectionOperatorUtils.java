@@ -39,8 +39,10 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -91,27 +93,26 @@ public class SelectionOperatorUtils {
     }
 
     List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-    if (selectExpressions.size() == 1 && selectExpressions.get(0).equals(IDENTIFIER_STAR)) {
-      // For 'SELECT *', sort all columns (ignore columns that start with '$') so that the order is deterministic
-      Set<String> allColumns = indexSegment.getColumnNames();
-      List<String> selectColumns = new ArrayList<>(allColumns.size());
-      for (String column : allColumns) {
-        if (column.charAt(0) != '$') {
-          selectColumns.add(column);
+    for (ExpressionContext selectExpression : selectExpressions) {
+      // Handle a case like: SELECT *, 1 FROM table.
+      if (selectExpression.equals(IDENTIFIER_STAR)) {
+        // For 'SELECT *', sort all columns (ignore columns that start with '$') so that the order is deterministic
+        Set<String> allColumns = indexSegment.getColumnNames();
+        List<String> selectColumns = new ArrayList<>(allColumns.size());
+        for (String column : allColumns) {
+          if (column.charAt(0) != '$') {
+            selectColumns.add(column);
+          }
         }
-      }
-      selectColumns.sort(null);
-      for (String column : selectColumns) {
-        ExpressionContext expression = ExpressionContext.forIdentifier(column);
-        if (!expressionSet.contains(expression)) {
-          expressions.add(expression);
+        selectColumns.sort(null);
+        for (String column : selectColumns) {
+          ExpressionContext expression = ExpressionContext.forIdentifier(column);
+          if (!expressionSet.contains(expression)) {
+            expressions.add(expression);
+          }
         }
-      }
-    } else {
-      for (ExpressionContext selectExpression : selectExpressions) {
-        if (expressionSet.add(selectExpression)) {
-          expressions.add(selectExpression);
-        }
+      } else if (expressionSet.add(selectExpression)) {
+        expressions.add(selectExpression);
       }
     }
 
@@ -235,6 +236,33 @@ public class SelectionOperatorUtils {
     int numColumns = storedColumnDataTypes.length;
 
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
+    RoaringBitmap[] nullBitmaps = null;
+    // TODO: use indexing config isNullHandlingEnabled instead.
+    boolean isNullHandlingEnabled = DataTableBuilder.getCurrentDataTableVersion() >= DataTableBuilder.VERSION_4;
+    if (isNullHandlingEnabled) {
+      nullBitmaps = new RoaringBitmap[numColumns];
+      Object[] columnDefaultNullValues = new Object[numColumns];
+      for (int colId = 0; colId < numColumns; colId++) {
+        if (storedColumnDataTypes[colId] != ColumnDataType.OBJECT && !storedColumnDataTypes[colId].isArray()) {
+          columnDefaultNullValues[colId] = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC,
+              storedColumnDataTypes[colId].toDataType(), null);
+        }
+        nullBitmaps[colId] = new RoaringBitmap();
+      }
+
+      int rowId = 0;
+      for (Object[] row : rows) {
+        for (int i = 0; i < numColumns; i++) {
+          Object columnValue = row[i];
+          if (columnValue == null) {
+            row[i] = columnDefaultNullValues[i];
+            nullBitmaps[i].add(rowId);
+          }
+        }
+        rowId++;
+      }
+    }
+
     for (Object[] row : rows) {
       dataTableBuilder.startRow();
       for (int i = 0; i < numColumns; i++) {
@@ -319,6 +347,11 @@ public class SelectionOperatorUtils {
       dataTableBuilder.finishRow();
     }
 
+    if (isNullHandlingEnabled) {
+      for (int colId = 0; colId < numColumns; colId++) {
+        dataTableBuilder.setNullRowIds(nullBitmaps[colId]);
+      }
+    }
     return dataTableBuilder.build();
   }
 
@@ -394,12 +427,37 @@ public class SelectionOperatorUtils {
   public static List<Object[]> reduceWithoutOrdering(Collection<DataTable> dataTables, int limit) {
     List<Object[]> rows = new ArrayList<>(Math.min(limit, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
     for (DataTable dataTable : dataTables) {
+      int numColumns = dataTable.getDataSchema().size();
+      RoaringBitmap[] nullBitmaps = null;
+      boolean isNullHandlingEnabled = false;
+      for (int coldId = 0; coldId < numColumns; coldId++) {
+        RoaringBitmap nullBitmap = dataTable.getNullRowIds(coldId);
+        if (nullBitmap != null) {
+          if (nullBitmaps == null) {
+            nullBitmaps = new RoaringBitmap[numColumns];
+          }
+          nullBitmaps[coldId] = nullBitmap;
+          isNullHandlingEnabled = true;
+        }
+      }
+
       int numRows = dataTable.getNumberOfRows();
       for (int rowId = 0; rowId < numRows; rowId++) {
         if (rows.size() < limit) {
           rows.add(extractRowFromDataTable(dataTable, rowId));
         } else {
-          return rows;
+          break;
+        }
+      }
+
+      if (isNullHandlingEnabled) {
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = rows.get(rowId);
+          for (int colId = 0; colId < numColumns; colId++) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+              row[colId] = null;
+            }
+          }
         }
       }
     }
@@ -448,7 +506,10 @@ public class SelectionOperatorUtils {
       Object[] resultRow = new Object[numColumns];
       for (int i = 0; i < numColumns; i++) {
         int index = (columnNameToIndexMap != null) ? columnNameToIndexMap.get(selectionColumns.get(i)) : i;
-        resultRow[i] = resultColumnDataTypes[i].convertAndFormat(row[index]);
+        Object value = row[index];
+        if (value != null) {
+          resultRow[i] = resultColumnDataTypes[i].convertAndFormat(value);
+        }
       }
       resultRows.add(resultRow);
     }

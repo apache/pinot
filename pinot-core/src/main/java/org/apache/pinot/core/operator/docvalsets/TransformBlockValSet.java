@@ -19,7 +19,10 @@
 package org.apache.pinot.core.operator.docvalsets;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -30,6 +33,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -40,12 +44,38 @@ import org.apache.pinot.spi.trace.Tracing;
 public class TransformBlockValSet implements BlockValSet {
   private final ProjectionBlock _projectionBlock;
   private final TransformFunction _transformFunction;
+  private final RoaringBitmap _nullBitmap;
 
   private int[] _numMVEntries;
 
-  public TransformBlockValSet(ProjectionBlock projectionBlock, TransformFunction transformFunction) {
+  public TransformBlockValSet(ProjectionBlock projectionBlock, TransformFunction transformFunction,
+      ExpressionContext expression) {
     _projectionBlock = projectionBlock;
     _transformFunction = transformFunction;
+    // todo(nhejazi): handle null handling code behind a config (nullHanldingEnabledInSelect).
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    if (expression.getType() == ExpressionContext.Type.FUNCTION) {
+      Set<String> columns = new HashSet<>();
+      expression.getFunction().getColumns(columns);
+      for (String column : columns) {
+        BlockValSet blockValSet = _projectionBlock.getBlockValueSet(column);
+        RoaringBitmap columnNullBitmap = blockValSet.getNullBitmap();
+        if (columnNullBitmap != null) {
+          nullBitmap.or(columnNullBitmap);
+        }
+      }
+    }
+    _nullBitmap = nullBitmap;
+  }
+
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap() {
+    // The assumption is that any transformation applied to null values will result in null values.
+    // Examples:
+    //  CAST(null as STRING) -> null. This is similar to Presto behaviour.
+    //  YEAR(null) -> null. This is similar to Presto behaviour.
+    return _nullBitmap;
   }
 
   @Override

@@ -39,7 +39,9 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -92,6 +94,7 @@ public class DistinctTable {
         orderByExpressionIndices[i] = columnNames.indexOf(orderByExpression.getExpression().toString());
         comparisonFactors[i] = orderByExpression.isAsc() ? -1 : 1;
       }
+      // TODO(nhejazi): return a diff. priorityQueue when null handling is not needed.
       _priorityQueue = new ObjectHeapPriorityQueue<>(initialCapacity, (r1, r2) -> {
         Object[] values1 = r1.getValues();
         Object[] values2 = r2.getValues();
@@ -99,6 +102,14 @@ public class DistinctTable {
           int index = orderByExpressionIndices[i];
           Comparable value1 = (Comparable) values1[index];
           Comparable value2 = (Comparable) values2[index];
+          if (value1 == null) {
+            if (value2 == null) {
+              continue;
+            }
+            return comparisonFactors[i];
+          } else if (value2 == null) {
+            return -comparisonFactors[i];
+          }
           int result = value1.compareTo(value2) * comparisonFactors[i];
           if (result != 0) {
             return result;
@@ -242,6 +253,31 @@ public class DistinctTable {
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
+    // TODO(nhejazi): revisit to set based on isNullHandlingEnabled indexing config.
+    boolean isNullHandlingEnabled = DataTableBuilder.getCurrentDataTableVersion() >= DataTableBuilder.VERSION_4;
+    RoaringBitmap[] nullBitmaps = null;
+    if (isNullHandlingEnabled) {
+      nullBitmaps = new RoaringBitmap[numColumns];
+      Object[] colDefaultNullValues = new Object[numColumns];
+      for (int colId = 0; colId < numColumns; colId++) {
+        colDefaultNullValues[colId] = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC,
+            storedColumnDataTypes[colId].toDataType(), null);
+        nullBitmaps[colId] = new RoaringBitmap();
+      }
+
+      int rowId = 0;
+      for (Record record : _records) {
+        Object[] values = record.getValues();
+        for (int colId = 0; colId < numColumns; colId++) {
+          if (values[colId] == null) {
+            values[colId] = colDefaultNullValues[colId];
+            nullBitmaps[colId].add(rowId);
+          }
+        }
+        rowId++;
+      }
+    }
+
     for (Record record : _records) {
       dataTableBuilder.startRow();
       Object[] values = record.getValues();
@@ -275,6 +311,11 @@ public class DistinctTable {
       }
       dataTableBuilder.finishRow();
     }
+    if (isNullHandlingEnabled) {
+      for (int colId = 0; colId < numColumns; colId++) {
+        dataTableBuilder.setNullRowIds(nullBitmaps[colId]);
+      }
+    }
     return dataTableBuilder.build().toBytes();
   }
 
@@ -289,6 +330,15 @@ public class DistinctTable {
     int numRecords = dataTable.getNumberOfRows();
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
+    RoaringBitmap[] nullBitmaps = null;
+    boolean isNullHandlingEnabled = false;
+    if (dataTable.getVersion() >= DataTableBuilder.VERSION_4) {
+      nullBitmaps = new RoaringBitmap[numColumns];
+      for (int colId = 0; colId < numColumns; colId++) {
+        nullBitmaps[colId] = dataTable.getNullRowIds(colId);
+        isNullHandlingEnabled |= nullBitmaps[colId] != null;
+      }
+    }
     List<Record> records = new ArrayList<>(numRecords);
     for (int i = 0; i < numRecords; i++) {
       Object[] values = new Object[numColumns];
@@ -321,6 +371,17 @@ public class DistinctTable {
         }
       }
       records.add(new Record(values));
+    }
+
+    if (isNullHandlingEnabled) {
+      for (int i = 0; i < records.size(); i++) {
+        Object[] values = records.get(i).getValues();
+        for (int j = 0; j < numColumns; j++) {
+          if (nullBitmaps[j] != null && nullBitmaps[j].contains(i)) {
+            values[j] = null;
+          }
+        }
+      }
     }
     return new DistinctTable(dataSchema, records);
   }

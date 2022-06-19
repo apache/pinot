@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -42,16 +43,17 @@ public class RawBytesSingleColumnDistinctOrderByExecutor extends BaseRawBytesSin
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;
     _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
-        (b1, b2) -> b1.compareTo(b2) * comparisonFactor);
+        (b1, b2) -> b1 == null ? (b2 == null ? 0 : 1) : (b2 == null ? -1 : b1.compareTo(b2)) * comparisonFactor);
   }
 
   @Override
   public boolean process(TransformBlock transformBlock) {
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
     byte[][] values = blockValueSet.getBytesValuesSV();
+    RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
     int numDocs = transformBlock.getNumDocs();
     for (int i = 0; i < numDocs; i++) {
-      ByteArray value = new ByteArray(values[i]);
+      ByteArray value = nullBitmap != null && nullBitmap.contains(i) ? null : new ByteArray(values[i]);
       if (!_valueSet.contains(value)) {
         if (_valueSet.size() < _limit) {
           _valueSet.add(value);

@@ -19,11 +19,13 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -51,6 +53,9 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.roaringbitmap.RoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -58,6 +63,7 @@ import org.apache.pinot.core.util.trace.TraceRunnable;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class GroupByDataTableReducer implements DataTableReducer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GroupByDataTableReducer.class);
   private static final int MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE = 2; // TBD, find a better value.
 
   private final QueryContext _queryContext;
@@ -139,7 +145,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
         Object[] row = sortedIterator.next().getValues();
         extractFinalAggregationResults(row);
         for (int i = 0; i < numColumns; i++) {
-          row[i] = columnDataTypes[i].convert(row[i]);
+          Object value = row[i];
+          if (value != null) {
+            row[i] = columnDataTypes[i].convert(row[i]);
+          }
         }
         if (havingFilterHandler.isMatch(row)) {
           rows.add(row);
@@ -150,7 +159,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
         Object[] row = sortedIterator.next().getValues();
         extractFinalAggregationResults(row);
         for (int j = 0; j < numColumns; j++) {
-          row[j] = columnDataTypes[j].convert(row[j]);
+          Object value = row[j];
+          if (value != null) {
+            row[j] = columnDataTypes[j].convert(row[j]);
+          }
         }
         rows.add(row);
       }
@@ -163,7 +175,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
     for (Object[] row : rows) {
       Object[] resultRow = postAggregationHandler.getResult(row);
       for (int i = 0; i < numResultColumns; i++) {
-        resultRow[i] = resultColumnDataTypes[i].format(resultRow[i]);
+        Object value = resultRow[i];
+        if (value != null) {
+          resultRow[i] = resultColumnDataTypes[i].format(value);
+        }
       }
       resultRows.add(resultRow);
     }
@@ -250,6 +265,14 @@ public class GroupByDataTableReducer implements DataTableReducer {
               return;
             }
             try {
+              RoaringBitmap[] nullBitmaps = new RoaringBitmap[_numColumns];
+              boolean isNullHandlingEnabled = false;
+              for (int i = 0; i < _numColumns; i++) {
+                nullBitmaps[i] = dataTable.getNullRowIds(i);
+                isNullHandlingEnabled |= nullBitmaps[i] != null;
+              }
+              assert !isNullHandlingEnabled || Arrays.stream(nullBitmaps).allMatch(Objects::nonNull);
+
               int numRows = dataTable.getNumberOfRows();
               for (int rowId = 0; rowId < numRows; rowId++) {
                 Object[] values = new Object[_numColumns];
@@ -284,8 +307,17 @@ public class GroupByDataTableReducer implements DataTableReducer {
                       throw new IllegalStateException();
                   }
                 }
+                if (isNullHandlingEnabled) {
+                  for (int colId = 0; colId < _numColumns; colId++) {
+                    if (nullBitmaps[colId].contains(rowId)) {
+                      values[colId] = null;
+                    }
+                  }
+                }
                 indexedTable.upsert(new Record(values));
               }
+            } catch (Exception ex) {
+              LOGGER.warn("getIndexedTable exception: " + ex.getMessage());
             } finally {
               countDownLatch.countDown();
             }

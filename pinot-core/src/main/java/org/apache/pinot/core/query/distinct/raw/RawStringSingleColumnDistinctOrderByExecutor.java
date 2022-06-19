@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -41,7 +42,7 @@ public class RawStringSingleColumnDistinctOrderByExecutor extends BaseRawStringS
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;
     _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
-        (s1, s2) -> s1.compareTo(s2) * comparisonFactor);
+        (s1, s2) -> s1 == null ? (s2 == null ? 0 : 1) : (s2 == null ? -1 : s1.compareTo(s2)) * comparisonFactor);
   }
 
   @Override
@@ -50,8 +51,9 @@ public class RawStringSingleColumnDistinctOrderByExecutor extends BaseRawStringS
     int numDocs = transformBlock.getNumDocs();
     if (blockValueSet.isSingleValue()) {
       String[] values = blockValueSet.getStringValuesSV();
+      RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
       for (int i = 0; i < numDocs; i++) {
-        add(values[i]);
+        add(nullBitmap != null && nullBitmap.contains(i) ? null : values[i]);
       }
     } else {
       String[][] values = blockValueSet.getStringValuesMV();

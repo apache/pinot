@@ -31,6 +31,7 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 
 /**
@@ -71,17 +72,22 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
     boolean hasMVGroupByExpression = false;
     boolean hasNoDictionaryGroupByExpression = false;
+    boolean nullHandlingRequired = false;
     for (ExpressionContext groupByExpression : groupByExpressions) {
       TransformResultMetadata transformResultMetadata = transformOperator.getResultMetadata(groupByExpression);
       hasMVGroupByExpression |= !transformResultMetadata.isSingleValue();
       hasNoDictionaryGroupByExpression |= !transformResultMetadata.hasDictionary();
+      NullValueVectorReader nullValueReader = transformOperator.getNullValueVectorReader(groupByExpression);
+      if (nullValueReader != null && nullValueReader.getNullBitmap().getCardinality() > 0) {
+        nullHandlingRequired = true;
+      }
     }
     _hasMVGroupByExpression = hasMVGroupByExpression;
 
     // Initialize group key generator
     int numGroupsLimit = queryContext.getNumGroupsLimit();
     int maxInitialResultHolderCapacity = queryContext.getMaxInitialResultHolderCapacity();
-    if (hasNoDictionaryGroupByExpression) {
+    if (hasNoDictionaryGroupByExpression || nullHandlingRequired) {
       if (groupByExpressions.length == 1) {
         _groupKeyGenerator =
             new NoDictionarySingleColumnGroupKeyGenerator(transformOperator, groupByExpressions[0], numGroupsLimit);

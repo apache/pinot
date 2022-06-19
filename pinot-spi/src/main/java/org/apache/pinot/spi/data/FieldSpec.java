@@ -191,7 +191,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
   }
 
-  private static Object getDefaultNullValue(FieldType fieldType, DataType dataType,
+  public static Object getDefaultNullValue(FieldType fieldType, DataType dataType,
       @Nullable String stringDefaultNullValue) {
     if (stringDefaultNullValue != null) {
       return dataType.convert(stringDefaultNullValue);
@@ -208,7 +208,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             case DOUBLE:
               return DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
             case BIG_DECIMAL:
-              // todo(nhejazi): update documentation w/ default null values.
               return DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL;
             case STRING:
               return DEFAULT_METRIC_NULL_VALUE_OF_STRING;

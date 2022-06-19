@@ -41,6 +41,7 @@ abstract class BaseRawDoubleSingleColumnDistinctExecutor implements DistinctExec
   final int _limit;
 
   final DoubleSet _valueSet;
+  int _numNulls;
 
   BaseRawDoubleSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit) {
     _expression = expression;
@@ -58,6 +59,9 @@ abstract class BaseRawDoubleSingleColumnDistinctExecutor implements DistinctExec
     DoubleIterator valueIterator = _valueSet.iterator();
     while (valueIterator.hasNext()) {
       records.add(new Record(new Object[]{valueIterator.nextDouble()}));
+    }
+    if (_numNulls == 1) {
+      records.add(new Record(new Object[]{null}));
     }
     return new DistinctTable(dataSchema, records);
   }

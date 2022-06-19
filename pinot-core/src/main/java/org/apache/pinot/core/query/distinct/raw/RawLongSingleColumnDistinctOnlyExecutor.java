@@ -23,6 +23,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -40,10 +41,15 @@ public class RawLongSingleColumnDistinctOnlyExecutor extends BaseRawLongSingleCo
     int numDocs = transformBlock.getNumDocs();
     if (blockValueSet.isSingleValue()) {
       long[] values = blockValueSet.getLongValuesSV();
+      RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
       for (int i = 0; i < numDocs; i++) {
-        _valueSet.add(values[i]);
-        if (_valueSet.size() >= _limit) {
-          return true;
+        if (nullBitmap != null && nullBitmap.contains(i)) {
+          _numNulls = 1;
+        } else {
+          _valueSet.add(values[i]);
+          if (_valueSet.size() >= _limit - _numNulls) {
+            return true;
+          }
         }
       }
     } else {

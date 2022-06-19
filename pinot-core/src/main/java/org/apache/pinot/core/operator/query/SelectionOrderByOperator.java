@@ -141,13 +141,20 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       multipliers[i] = _orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
     }
 
-    return (o1, o2) -> {
+    // TODO: return separate comparator when nullHandlingEnabled is set to true.
+    return (Object[] o1, Object[] o2) -> {
       for (int i = 0; i < numValuesToCompare; i++) {
         int index = valueIndices[i];
 
         // TODO: Evaluate the performance of casting to Comparable and avoid the switch
         Object v1 = o1[index];
         Object v2 = o2[index];
+        if (v1 == null) {
+          // The default null ordering is: 'NULLS LAST', regardless of the ordering direction.
+          return v2 == null ? 0 : -multipliers[i];
+        } else if (v2 == null) {
+          return multipliers[i];
+        }
         int result;
         switch (storedTypes[i]) {
           case INT:
@@ -208,9 +215,28 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = transformBlock.getNumDocs();
-      for (int i = 0; i < numDocsFetched && (_numDocsScanned < _numRowsToKeep); i++) {
-        SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
-        _numDocsScanned++;
+      boolean isNullHandlingEnabled = false;
+      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
+      for (int i = 0; i < numExpressions; i++) {
+        nullBitmaps[i] = blockValueFetcher.getColumnNullBitmap(i);
+        isNullHandlingEnabled |= nullBitmaps[i] != null;
+      }
+      if (isNullHandlingEnabled) {
+        for (int rowId = 0; rowId < numDocsFetched && (_numDocsScanned < _numRowsToKeep); rowId++) {
+          Object[] row = blockValueFetcher.getRow(rowId);
+          for (int colId = 0; colId < numExpressions; colId++) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+              row[colId] = null;
+            }
+          }
+          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+          _numDocsScanned++;
+        }
+      } else {
+        for (int i = 0; i < numDocsFetched && (_numDocsScanned < _numRowsToKeep); i++) {
+          SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
+          _numDocsScanned++;
+        }
       }
     }
     _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;
@@ -248,8 +274,26 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = transformBlock.getNumDocs();
-      for (int i = 0; i < numDocsFetched; i++) {
-        SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
+      boolean isNullHandlingEnabled = false;
+      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
+      for (int i = 0; i < numExpressions; i++) {
+        nullBitmaps[i] = blockValueFetcher.getColumnNullBitmap(i);
+        isNullHandlingEnabled |= nullBitmaps[i] != null;
+      }
+      if (isNullHandlingEnabled) {
+        for (int rowId = 0; rowId < numDocsFetched; rowId++) {
+          Object[] row = blockValueFetcher.getRow(rowId);
+          for (int colId = 0; colId < numExpressions; colId++) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+              row[colId] = null;
+            }
+          }
+          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+        }
+      } else {
+        for (int i = 0; i < numDocsFetched; i++) {
+          SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
+        }
       }
       _numDocsScanned += numDocsFetched;
     }
@@ -287,15 +331,38 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = transformBlock.getNumDocs();
+
       int[] docIds = transformBlock.getDocIds();
-      for (int i = 0; i < numDocsFetched; i++) {
-        // NOTE: We pre-allocate the complete row so that we can fill up the non-order-by output expression values later
-        //       without creating extra rows or re-constructing the priority queue. We can change the values in-place
-        //       because the comparator only compare the values for the order-by expressions.
-        Object[] row = new Object[numExpressions];
-        blockValueFetcher.getRow(i, row, 0);
-        row[numOrderByExpressions] = docIds[i];
-        SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+      boolean isNullHandlingEnabled = false;
+      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numOrderByExpressions];
+      for (int i = 0; i < numOrderByExpressions; i++) {
+        nullBitmaps[i] = blockValueFetcher.getColumnNullBitmap(i);
+        isNullHandlingEnabled |= nullBitmaps[i] != null;
+      }
+      if (isNullHandlingEnabled) {
+        for (int rowId = 0; rowId < numDocsFetched; rowId++) {
+          Object[] row = new Object[numExpressions];
+          blockValueFetcher.getRow(rowId, row, 0);
+          row[numOrderByExpressions] = docIds[rowId];
+          // TODO: confirm nulls are handled when filling the non-order-by output expression values later in the row.
+          for (int colId = 0; colId < numOrderByExpressions; colId++) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+              row[colId] = null;
+            }
+          }
+          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+        }
+      } else {
+        for (int i = 0; i < numDocsFetched; i++) {
+          // NOTE: We pre-allocate the complete row so that we can fill up the non-order-by output expression values
+          // later
+          //       without creating extra rows or re-constructing the priority queue. We can change the values in-place
+          //       because the comparator only compare the values for the order-by expressions.
+          Object[] row = new Object[numExpressions];
+          blockValueFetcher.getRow(i, row, 0);
+          row[numOrderByExpressions] = docIds[i];
+          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+        }
       }
       _numDocsScanned += numDocsFetched;
     }

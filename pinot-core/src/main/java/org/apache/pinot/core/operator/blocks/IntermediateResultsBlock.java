@@ -44,7 +44,9 @@ import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -95,6 +97,18 @@ public class IntermediateResultsBlock implements Block {
   }
 
   /**
+   * Constructor for aggregation result.
+   * <p>For aggregation only, the result is a list of values.
+   * <p>For aggregation group-by, the result is a list of maps from group keys to aggregation values.
+   */
+  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> aggregationResult,
+      DataSchema dataSchema) {
+    _aggregationFunctions = aggregationFunctions;
+    _aggregationResult = aggregationResult;
+    _dataSchema = dataSchema;
+  }
+
+  /**
    * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult}.
    */
   public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
@@ -117,7 +131,9 @@ public class IntermediateResultsBlock implements Block {
 
   public IntermediateResultsBlock(Table table) {
     _table = table;
-    _dataSchema = table.getDataSchema();
+    if (_table != null) {
+      _dataSchema = table.getDataSchema();
+    }
   }
 
   /**
@@ -310,16 +326,54 @@ public class IntermediateResultsBlock implements Block {
       throws IOException {
     DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
-    Iterator<Record> iterator = _table.iterator();
-    while (iterator.hasNext()) {
-      Record record = iterator.next();
-      dataTableBuilder.startRow();
-      int columnIndex = 0;
-      for (Object value : record.getValues()) {
-        setDataTableColumn(storedColumnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
-        columnIndex++;
+    int numColumns = _dataSchema.size();
+    Object[] colDefaultNullValues = null;
+    RoaringBitmap[] nullBitmaps = null;
+    boolean isNullHandlingEnabled = DataTableBuilder.getCurrentDataTableVersion() >= DataTableBuilder.VERSION_4;
+    if (isNullHandlingEnabled) {
+      colDefaultNullValues = new Object[numColumns];
+      nullBitmaps = new RoaringBitmap[numColumns];
+      for (int colId = 0; colId < numColumns; colId++) {
+        if (storedColumnDataTypes[colId] != ColumnDataType.OBJECT) {
+          colDefaultNullValues[colId] = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC,
+              storedColumnDataTypes[colId].toDataType(), null);
+        }
+        nullBitmaps[colId] = new RoaringBitmap();
       }
-      dataTableBuilder.finishRow();
+    }
+    Iterator<Record> iterator = _table.iterator();
+    if (isNullHandlingEnabled) {
+      int rowId = 0;
+      while (iterator.hasNext()) {
+        Object[] values = iterator.next().getValues();
+        dataTableBuilder.startRow();
+        for (int columnIndex = 0; columnIndex < values.length; columnIndex++) {
+          Object value = values[columnIndex];
+          if (value == null) {
+            value = colDefaultNullValues[columnIndex];
+            nullBitmaps[columnIndex].add(rowId);
+          }
+          setDataTableColumn(storedColumnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
+        }
+        dataTableBuilder.finishRow();
+        rowId++;
+      }
+    } else {
+      while (iterator.hasNext()) {
+        Record record = iterator.next();
+        dataTableBuilder.startRow();
+        int columnIndex = 0;
+        for (Object value : record.getValues()) {
+          setDataTableColumn(storedColumnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
+          columnIndex++;
+        }
+        dataTableBuilder.finishRow();
+      }
+    }
+    if (isNullHandlingEnabled) {
+      for (int colId = 0; colId < numColumns; colId++) {
+        dataTableBuilder.setNullRowIds(nullBitmaps[colId]);
+      }
     }
     DataTable dataTable = dataTableBuilder.build();
     return attachMetadataToDataTable(dataTable);
@@ -375,7 +429,8 @@ public class IntermediateResultsBlock implements Block {
 
   private DataTable getSelectionResultDataTable()
       throws Exception {
-    return attachMetadataToDataTable(SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _dataSchema));
+    return attachMetadataToDataTable(
+        SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _dataSchema));
   }
 
   private DataTable getAggregationResultDataTable()
@@ -389,20 +444,46 @@ public class IntermediateResultsBlock implements Block {
       columnNames[i] = aggregationFunction.getColumnName();
       columnDataTypes[i] = aggregationFunction.getIntermediateResultColumnType();
     }
+    Object[] colDefaultNullValues = null;
+    RoaringBitmap[] nullBitmaps = null;
+    boolean isNullHandlingEnabled = DataTableBuilder.getCurrentDataTableVersion() >= DataTableBuilder.VERSION_4;
+    if (isNullHandlingEnabled) {
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        if (colDefaultNullValues == null) {
+          colDefaultNullValues = new Object[numAggregationFunctions];
+          nullBitmaps = new RoaringBitmap[numAggregationFunctions];
+        }
+        if (columnDataTypes[i] != ColumnDataType.OBJECT) {
+          colDefaultNullValues[i] = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC,
+              columnDataTypes[i].toDataType(), null);
+        }
+        nullBitmaps[i] = new RoaringBitmap();
+      }
+    }
 
     // Build the data table.
     DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
     dataTableBuilder.startRow();
     for (int i = 0; i < numAggregationFunctions; i++) {
+      Object value = _aggregationResult.get(i);
+      // OBJECT (e.g. DistinctTable) calls toBytes() (e.g. DistinctTable.toBytes()) which takes care of replacing nulls
+      // with default values, and building presence vector and serializing both.
+      if (isNullHandlingEnabled && columnDataTypes[i] != ColumnDataType.OBJECT) {
+        if (value == null) {
+          value = colDefaultNullValues[i];
+          nullBitmaps[i].add(0);
+        }
+      }
+
       switch (columnDataTypes[i]) {
         case LONG:
-          dataTableBuilder.setColumn(i, ((Number) _aggregationResult.get(i)).longValue());
+          dataTableBuilder.setColumn(i, ((Number) value).longValue());
           break;
         case DOUBLE:
-          dataTableBuilder.setColumn(i, ((Double) _aggregationResult.get(i)).doubleValue());
+          dataTableBuilder.setColumn(i, ((Double) value).doubleValue());
           break;
         case OBJECT:
-          dataTableBuilder.setColumn(i, _aggregationResult.get(i));
+          dataTableBuilder.setColumn(i, value);
           break;
         default:
           throw new UnsupportedOperationException(
@@ -410,6 +491,11 @@ public class IntermediateResultsBlock implements Block {
       }
     }
     dataTableBuilder.finishRow();
+    if (isNullHandlingEnabled) {
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        dataTableBuilder.setNullRowIds(nullBitmaps[i]);
+      }
+    }
     DataTable dataTable = dataTableBuilder.build();
 
     return attachMetadataToDataTable(dataTable);

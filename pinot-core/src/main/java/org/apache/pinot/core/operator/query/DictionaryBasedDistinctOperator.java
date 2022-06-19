@@ -72,8 +72,9 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
+    DistinctTable distinctTable = buildResult();
     return new IntermediateResultsBlock(new AggregationFunction[]{_distinctAggregationFunction},
-        Collections.singletonList(buildResult()));
+        Collections.singletonList(distinctTable), distinctTable.getDataSchema());
   }
 
   /**
@@ -119,6 +120,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
           }
         }
       } else {
+        // DictionaryBasedDistinctOperator cannot handle nulls.
         DistinctTable distinctTable =
             new DistinctTable(dataSchema, _distinctAggregationFunction.getOrderByExpressions(), limit);
 

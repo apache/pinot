@@ -32,6 +32,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 
 /**
@@ -63,8 +64,16 @@ public class DistinctPlanNode implements PlanNode {
         Dictionary dictionary = dataSource.getDictionary();
         if (dictionary != null) {
           DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
-          return new DictionaryBasedDistinctOperator(dataSourceMetadata.getDataType(), distinctAggregationFunction,
-              dictionary, dataSourceMetadata.getNumDocs());
+          // If nullHandlingEnabled is set to true, and the column contains null values, call DistinctOperator instead
+          // of DictionaryBasedDistinctOperator since nullValueVectorReader is a form of a filter.
+          // TODO: reserve special value in dictionary (e.g. -1) for null in the future so
+          //  DictionaryBasedDistinctOperator can be reused since it is more efficient than DistinctOperator for
+          //  dictionary-encoded columns.
+          NullValueVectorReader nullValueReader = dataSource.getNullValueVector();
+          if (nullValueReader == null || nullValueReader.getNullBitmap().getCardinality() == 0) {
+            return new DictionaryBasedDistinctOperator(dataSourceMetadata.getDataType(), distinctAggregationFunction,
+                dictionary, dataSourceMetadata.getNumDocs());
+          }
         }
       }
     }

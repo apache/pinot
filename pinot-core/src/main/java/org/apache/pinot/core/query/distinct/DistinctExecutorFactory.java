@@ -45,6 +45,7 @@ import org.apache.pinot.core.query.distinct.raw.RawMultiColumnDistinctExecutor;
 import org.apache.pinot.core.query.distinct.raw.RawStringSingleColumnDistinctOnlyExecutor;
 import org.apache.pinot.core.query.distinct.raw.RawStringSingleColumnDistinctOrderByExecutor;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -79,7 +80,8 @@ public class DistinctExecutorFactory {
       TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(expression);
       DataType dataType = expressionMetadata.getDataType();
       Dictionary dictionary = transformOperator.getDictionary(expression);
-      if (dictionary != null) {
+      NullValueVectorReader nullValueReader = transformOperator.getNullValueVectorReader(expression);
+      if (dictionary != null && (nullValueReader == null || nullValueReader.getNullBitmap().getCardinality() == 0)) {
         // Dictionary based
         return new DictionaryBasedSingleColumnDistinctOnlyExecutor(expression, dictionary, dataType, limit);
       } else {
@@ -147,8 +149,10 @@ public class DistinctExecutorFactory {
       assert orderByExpressions.size() == 1;
       OrderByExpressionContext orderByExpression = orderByExpressions.get(0);
       Dictionary dictionary = transformOperator.getDictionary(expression);
+      NullValueVectorReader nullValueReader = transformOperator.getNullValueVectorReader(expression);
       // Note: Use raw value based when dictionary is not sorted (consuming segments).
-      if (dictionary != null && dictionary.isSorted()) {
+      if (dictionary != null && dictionary.isSorted() && (nullValueReader == null
+          || nullValueReader.getNullBitmap().getCardinality() == 0)) {
         // Dictionary based
         return new DictionaryBasedSingleColumnDistinctOrderByExecutor(expression, dictionary, dataType,
             orderByExpressions.get(0), limit);

@@ -101,7 +101,10 @@ public class DistinctDataTableReducer implements DataTableReducer {
       Object[] values = iterator.next().getValues();
       Object[] row = new Object[numColumns];
       for (int i = 0; i < numColumns; i++) {
-        row[i] = columnDataTypes[i].convertAndFormat(values[i]);
+        Object value = values[i];
+        if (value != null) {
+          row[i] = columnDataTypes[i].convertAndFormat(value);
+        }
       }
       rows.add(row);
     }

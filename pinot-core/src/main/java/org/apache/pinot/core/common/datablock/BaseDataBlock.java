@@ -31,6 +31,7 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableUtils;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -198,6 +199,11 @@ public abstract class BaseDataBlock implements DataTable {
     if (metadataLength != 0) {
       _metadata = deserializeMetadata(byteBuffer);
     }
+  }
+
+  @Override
+  public int getVersion() {
+    return DataTableBuilder.VERSION_4;
   }
 
   /**

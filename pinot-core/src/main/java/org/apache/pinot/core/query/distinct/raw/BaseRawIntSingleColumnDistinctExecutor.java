@@ -41,11 +41,14 @@ abstract class BaseRawIntSingleColumnDistinctExecutor implements DistinctExecuto
   final int _limit;
 
   final IntSet _valueSet;
+  // Stored outside _valueSet to continue to use an IntSet instead of ObjectOpenHashSet (avoid boxing/unboxing).
+  int _numNulls;
 
   BaseRawIntSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit) {
     _expression = expression;
     _dataType = dataType;
     _limit = limit;
+    _numNulls = 0;
 
     _valueSet = new IntOpenHashSet(Math.min(limit, MAX_INITIAL_CAPACITY));
   }
@@ -59,6 +62,10 @@ abstract class BaseRawIntSingleColumnDistinctExecutor implements DistinctExecuto
     while (valueIterator.hasNext()) {
       records.add(new Record(new Object[]{valueIterator.nextInt()}));
     }
+    if (_numNulls == 1) {
+      records.add(new Record(new Object[]{null}));
+    }
+    assert records.size() <= _limit;
     return new DistinctTable(dataSchema, records);
   }
 }

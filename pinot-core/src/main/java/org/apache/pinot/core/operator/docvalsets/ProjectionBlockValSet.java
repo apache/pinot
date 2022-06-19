@@ -25,10 +25,12 @@ import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -40,6 +42,7 @@ public class ProjectionBlockValSet implements BlockValSet {
   private final DataBlockCache _dataBlockCache;
   private final String _column;
   private final DataSource _dataSource;
+  private final RoaringBitmap _nullBitmap;
 
   /**
    * Constructor for the class.
@@ -50,6 +53,26 @@ public class ProjectionBlockValSet implements BlockValSet {
     _dataBlockCache = dataBlockCache;
     _column = column;
     _dataSource = dataSource;
+    NullValueVectorReader nullValueReader = _dataSource.getNullValueVector();
+    if (nullValueReader != null && nullValueReader.getNullBitmap().getCardinality() > 0) {
+      // Project null bitmap.
+      RoaringBitmap projectedNullBitmap = new RoaringBitmap();
+      int[] docIds = _dataBlockCache.getDocIds();
+      for (int i = 0; i < _dataBlockCache.getNumDocs(); i++) {
+        if (nullValueReader.isNull(docIds[i])) {
+          projectedNullBitmap.add(i);
+        }
+      }
+      _nullBitmap = projectedNullBitmap;
+    } else {
+      _nullBitmap = null;
+    }
+  }
+
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap() {
+    return _nullBitmap;
   }
 
   @Override
