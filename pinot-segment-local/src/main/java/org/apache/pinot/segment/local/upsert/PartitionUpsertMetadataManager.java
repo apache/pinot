@@ -61,7 +61,7 @@ import org.slf4j.LoggerFactory;
  *   </li>
  * </ul>
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
+@SuppressWarnings("unchecked")
 @ThreadSafe
 public class PartitionUpsertMetadataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionUpsertMetadataManager.class);
@@ -202,17 +202,6 @@ public class PartitionUpsertMetadataManager {
     // Directly return the record when partial-upsert is not enabled
     if (_partialUpsertHandler == null) {
       return record;
-    }
-
-    // Ensure all previous records are loaded before inserting new records
-    while (!_partialUpsertHandler.isAllSegmentsLoaded()) {
-      LOGGER.info("Sleeping 1 second waiting for all segments loaded for partial-upsert table: {}", _tableNameWithType);
-      try {
-        //noinspection BusyWait
-        Thread.sleep(1000L);
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
     }
 
     RecordLocation currentRecordLocation =
