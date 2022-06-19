@@ -22,9 +22,11 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.utils.HashUtils;
@@ -66,6 +68,8 @@ import org.slf4j.LoggerFactory;
 public class PartitionUpsertMetadataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionUpsertMetadataManager.class);
 
+  private static final long OUT_OF_ORDER_EVENT_MIN_REPORT_INTERVAL_NS = TimeUnit.MINUTES.toNanos(1);
+
   private final String _tableNameWithType;
   private final int _partitionId;
   private final ServerMetrics _serverMetrics;
@@ -78,6 +82,9 @@ public class PartitionUpsertMetadataManager {
 
   // Reused for reading previous record during partial upsert
   private final GenericRow _reuse = new GenericRow();
+
+  private long _lastOutOfOrderEventReportTimeNs = Long.MIN_VALUE;
+  private int _numOutOfOrderEvents = 0;
 
   public PartitionUpsertMetadataManager(String tableNameWithType, int partitionId, ServerMetrics serverMetrics,
       @Nullable PartialUpsertHandler partialUpsertHandler, HashFunction hashFunction) {
@@ -214,10 +221,17 @@ public class PartitionUpsertMetadataManager {
             currentRecordLocation.getSegment().getRecord(currentRecordLocation.getDocId(), _reuse);
         return _partialUpsertHandler.merge(previousRecord, record);
       } else {
-        LOGGER.warn(
-            "Got late event for partial-upsert: {} (current comparison value: {}, record comparison value: {}), "
-                + "skipping updating the record", record, currentRecordLocation.getComparisonValue(),
-            recordInfo.getComparisonValue());
+        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_OUT_OF_ORDER, 1L);
+        _numOutOfOrderEvents++;
+        long currentTimeNs = System.nanoTime();
+        if (currentTimeNs - _lastOutOfOrderEventReportTimeNs > OUT_OF_ORDER_EVENT_MIN_REPORT_INTERVAL_NS) {
+          LOGGER.warn("Skipped {} out-of-order events for partial-upsert table: {} "
+                  + "(the last event has current comparison value: {}, record comparison value: {})",
+              _numOutOfOrderEvents,
+              _tableNameWithType, currentRecordLocation.getComparisonValue(), recordInfo.getComparisonValue());
+          _lastOutOfOrderEventReportTimeNs = currentTimeNs;
+          _numOutOfOrderEvents = 0;
+        }
         return record;
       }
     } else {
