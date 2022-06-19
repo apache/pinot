@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
+import com.google.common.base.Preconditions;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -39,32 +40,34 @@ import org.apache.pinot.spi.data.FieldSpec;
  * compute max
  * see if column isSorted
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class AbstractColumnStatisticsCollector implements ColumnStatistics {
   protected static final int INITIAL_HASH_SET_SIZE = 1000;
-  private Object _previousValue = null;
   protected final FieldSpec _fieldSpec;
-  protected boolean _isSorted = true;
-  private final String _column;
+
+  private final Map<String, String> _partitionFunctionConfig;
+  private final PartitionFunction _partitionFunction;
+  private final int _numPartitions;
+  private final Set<Integer> _partitions;
 
   protected int _totalNumberOfEntries = 0;
   protected int _maxNumberOfMultiValues = 0;
-  protected int _maxLengthOfMultiValues = 0;
-  private PartitionFunction _partitionFunction;
-  private final int _numPartitions;
-  private final Map<String, String> _functionConfig;
-  private final Set<Integer> _partitions;
+  protected boolean _sorted = true;
+  private Comparable _previousValue = null;
 
   public AbstractColumnStatisticsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
-    _column = column;
     _fieldSpec = statsCollectorConfig.getFieldSpecForColumn(column);
+    Preconditions.checkArgument(_fieldSpec != null, "Failed to find column: %s", column);
+    if (!_fieldSpec.isSingleValueField()) {
+      _sorted = false;
+    }
 
     String partitionFunctionName = statsCollectorConfig.getPartitionFunctionName(column);
-    int numPartitions = statsCollectorConfig.getNumPartitions(column);
-    _functionConfig = statsCollectorConfig.getPartitionFunctionConfig(column);
-    _partitionFunction = (partitionFunctionName != null) ? PartitionFunctionFactory
-        .getPartitionFunction(partitionFunctionName, numPartitions, _functionConfig) : null;
-
     _numPartitions = statsCollectorConfig.getNumPartitions(column);
+    _partitionFunctionConfig = statsCollectorConfig.getPartitionFunctionConfig(column);
+    _partitionFunction =
+        (partitionFunctionName != null) ? PartitionFunctionFactory.getPartitionFunction(partitionFunctionName,
+            _numPartitions, _partitionFunctionConfig) : null;
     if (_partitionFunction != null) {
       _partitions = new HashSet<>();
     } else {
@@ -76,42 +79,22 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     return _maxNumberOfMultiValues;
   }
 
-  public int getMaxLengthOfMultiValues() {
-    return _maxLengthOfMultiValues;
-  }
-
-  void addressSorted(Object entry) {
-    if (_isSorted) {
-      if (_previousValue != null) {
-        if (!entry.equals(_previousValue) && _previousValue != null) {
-          final Comparable prevValue = (Comparable) _previousValue;
-          final Comparable origin = (Comparable) entry;
-          if (origin.compareTo(prevValue) < 0) {
-            _isSorted = false;
-          }
-        }
-      }
+  protected void addressSorted(Comparable entry) {
+    if (_sorted) {
+      _sorted = _previousValue == null || entry.compareTo(_previousValue) >= 0;
       _previousValue = entry;
     }
   }
 
   @Override
   public boolean isSorted() {
-    return _fieldSpec.isSingleValueField() && _isSorted;
+    return _sorted;
   }
 
   /**
    * Collects statistics for the given entry (entry can be either single-valued or multi-valued).
    */
   public abstract void collect(Object entry);
-
-  public abstract Object getMinValue();
-
-  public abstract Object getMaxValue();
-
-  public abstract Object getUniqueValuesSet();
-
-  public abstract int getCardinality();
 
   public int getLengthOfShortestElement() {
     return -1;
@@ -147,7 +130,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
    */
   @Nullable
   public Map<String, String> getPartitionFunctionConfig() {
-    return _functionConfig;
+    return _partitionFunctionConfig;
   }
 
   /**

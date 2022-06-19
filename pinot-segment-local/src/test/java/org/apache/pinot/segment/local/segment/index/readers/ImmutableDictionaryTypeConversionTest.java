@@ -112,40 +112,41 @@ public class ImmutableDictionaryTypeConversionTest {
       _bytesValues[i] = BytesUtils.toByteArray(_stringValues[i]);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_intValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
         new DimensionFieldSpec(INT_COLUMN_NAME, DataType.INT, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+      dictionaryCreator.build(_intValues);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_longValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
         new DimensionFieldSpec(LONG_COLUMN_NAME, DataType.LONG, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+      dictionaryCreator.build(_longValues);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_floatValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
         new DimensionFieldSpec(FLOAT_COLUMN_NAME, DataType.FLOAT, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+      dictionaryCreator.build(_floatValues);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_doubleValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
         new DimensionFieldSpec(DOUBLE_COLUMN_NAME, DataType.DOUBLE, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+      dictionaryCreator.build(_doubleValues);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_bigDecimalValues,
-        new MetricFieldSpec(BIG_DECIMAL_COLUMN_NAME, DataType.BIG_DECIMAL), TEMP_DIR)) {
-      dictionaryCreator.build();
+    MetricFieldSpec bigDecimalMetricField = new MetricFieldSpec(BIG_DECIMAL_COLUMN_NAME, DataType.BIG_DECIMAL);
+    bigDecimalMetricField.setSingleValueField(true);
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(bigDecimalMetricField, TEMP_DIR)) {
+      dictionaryCreator.build(_bigDecimalValues);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_stringValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
         new DimensionFieldSpec(STRING_COLUMN_NAME, DataType.STRING, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+      dictionaryCreator.build(_stringValues);
       assertEquals(dictionaryCreator.getNumBytesPerEntry(), STRING_LENGTH);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_bytesValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
         new DimensionFieldSpec(BYTES_COLUMN_NAME, DataType.BYTES, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+      dictionaryCreator.build(_bytesValues);
       assertEquals(dictionaryCreator.getNumBytesPerEntry(), BYTES_LENGTH);
     }
 
