@@ -66,15 +66,13 @@ public class ColumnarDataBlock extends BaseDataBlock {
   }
 
   @Override
-  protected void positionCursorInFixSizedBuffer(int rowId, int colId) {
-    int position = _cumulativeColumnOffsetSizeInBytes[colId] + _columnSizeInBytes[colId] * rowId;
-    _fixedSizeData.position(position);
+  protected int computePositionCursorInFixSizedBuffer(int rowId, int colId) {
+    return _cumulativeColumnOffsetSizeInBytes[colId] + _columnSizeInBytes[colId] * rowId;
   }
 
   @Override
-  protected int positionCursorInVariableBuffer(int rowId, int colId) {
-    positionCursorInFixSizedBuffer(rowId, colId);
-    _variableSizeData.position(_fixedSizeData.getInt());
+  protected int computePositionCursorInVariableBuffer(int rowId, int colId) {
+    _variableSizeData.position(_fixedSizeData.getInt(computePositionCursorInFixSizedBuffer(rowId, colId)));
     return _fixedSizeData.getInt();
   }
 
