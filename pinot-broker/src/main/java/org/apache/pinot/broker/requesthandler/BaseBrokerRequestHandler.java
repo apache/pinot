@@ -455,8 +455,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
       // Send empty response since we don't need to evaluate either offline or realtime request.
       BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
+      // Extract source info from incoming request
+      Collection<String> remoteIps = null;
+      if (requesterIdentity != null) {
+        remoteIps = ((HttpRequesterIdentity) requesterIdentity).getHttpHeaders().get("X-Forwarded-For");
+      }
       logBrokerResponse(requestId, query, requestContext, tableName, 0, new ServerStats(), brokerResponse,
-          System.nanoTime(), null);
+          System.nanoTime(), remoteIps);
       return brokerResponse;
     }
 
