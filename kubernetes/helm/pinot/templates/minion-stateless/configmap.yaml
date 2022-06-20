@@ -17,19 +17,16 @@
 # under the License.
 #
 
-{{- if .Values.minion.enabled }}
+{{- if .Values.minionStateless.enabled }}
 apiVersion: v1
-kind: Service
+kind: ConfigMap
 metadata:
-  name: {{ template "pinot.minion.headless" . }}
-  labels:
-    {{- include "pinot.minionLabels" . | nindent 4 }}
-spec:
-  clusterIP: None
-  ports:
-    # [pod_name].[service_name].[namespace].svc.cluster.local
-    - name: {{ .Values.minion.service.name }}
-      port: {{ .Values.minion.service.port }}
-  selector:
-    {{- include "pinot.minionMatchLabels" . | nindent 4 }}
+  name: {{ include "pinot.minionStateless.config" . }}
+data:
+  pinot-minion-stateless.conf: |-
+    pinot.minion.port={{ .Values.minionStateless.service.port }}
+    {{- if .Values.minionStateless.dataDir }}
+    dataDir={{ .Values.minionStateless.dataDir }}
+    {{- end }}
+{{ .Values.minionStateless.extra.configs | indent 4 }}
 {{- end }}
