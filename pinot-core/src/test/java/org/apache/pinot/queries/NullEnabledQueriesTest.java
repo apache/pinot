@@ -29,7 +29,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -185,7 +185,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
   }
 
   public void testQueries(Number baseValue, ColumnDataType dataType) {
-    DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_4);
+    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     {
       String query = "SELECT *, 1 FROM testTable";
       BrokerResponseNative brokerResponse = getBrokerResponse(query);
@@ -406,7 +406,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         i++;
       }
     }
-    DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_3);
+    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_3);
   }
 
   @AfterClass

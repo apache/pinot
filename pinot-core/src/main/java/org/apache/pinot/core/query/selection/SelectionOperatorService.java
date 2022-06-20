@@ -29,7 +29,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -159,7 +159,7 @@ public class SelectionOperatorService {
   public void reduceWithOrdering(Collection<DataTable> dataTables) {
     RoaringBitmap[] nullBitmaps = null;
     for (DataTable dataTable : dataTables) {
-      if (dataTable.getVersion() >= DataTableBuilder.VERSION_4) {
+      if (dataTable.getVersion() >= DataTableFactory.VERSION_4) {
         if (nullBitmaps == null) {
           nullBitmaps = new RoaringBitmap[dataTable.getDataSchema().size()];
         }

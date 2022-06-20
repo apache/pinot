@@ -29,7 +29,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -167,7 +167,7 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
   }
 
   public void testQueries() {
-    DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_4);
+    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     HashSet<Integer> trueIndices = new HashSet<Integer>(Arrays.asList(1, 3, 5));
     {
       String query = "SELECT * FROM testTable";
@@ -271,7 +271,7 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       assertEquals(thirdRow.length, 1);
       assertEquals(thirdRow[0], false);
     }
-    DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_3);
+    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_3);
   }
 
   @AfterClass

@@ -239,7 +239,7 @@ public class SelectionOperatorUtils {
     DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(dataSchema);
     RoaringBitmap[] nullBitmaps = null;
     // TODO: use indexing config isNullHandlingEnabled instead.
-    boolean isNullHandlingEnabled = DataTableBuilder.getCurrentDataTableVersion() >= DataTableBuilder.VERSION_4;
+    boolean isNullHandlingEnabled = DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4;
     if (isNullHandlingEnabled) {
       nullBitmaps = new RoaringBitmap[numColumns];
       Object[] columnDefaultNullValues = new Object[numColumns];

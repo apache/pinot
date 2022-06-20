@@ -330,7 +330,7 @@ public class IntermediateResultsBlock implements Block {
     int numColumns = _dataSchema.size();
     Object[] colDefaultNullValues = null;
     RoaringBitmap[] nullBitmaps = null;
-    boolean isNullHandlingEnabled = DataTableBuilder.getCurrentDataTableVersion() >= DataTableBuilder.VERSION_4;
+    boolean isNullHandlingEnabled = DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4;
     if (isNullHandlingEnabled) {
       colDefaultNullValues = new Object[numColumns];
       nullBitmaps = new RoaringBitmap[numColumns];
@@ -447,7 +447,7 @@ public class IntermediateResultsBlock implements Block {
     }
     Object[] colDefaultNullValues = null;
     RoaringBitmap[] nullBitmaps = null;
-    boolean isNullHandlingEnabled = DataTableBuilder.getCurrentDataTableVersion() >= DataTableBuilder.VERSION_4;
+    boolean isNullHandlingEnabled = DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4;
     if (isNullHandlingEnabled) {
       for (int i = 0; i < numAggregationFunctions; i++) {
         if (colDefaultNullValues == null) {

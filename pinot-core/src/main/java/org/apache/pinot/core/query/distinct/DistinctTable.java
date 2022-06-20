@@ -255,7 +255,7 @@ public class DistinctTable {
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
     // TODO(nhejazi): revisit to set based on isNullHandlingEnabled indexing config.
-    boolean isNullHandlingEnabled = DataTableBuilder.getCurrentDataTableVersion() >= DataTableBuilder.VERSION_4;
+    boolean isNullHandlingEnabled = DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4;
     RoaringBitmap[] nullBitmaps = null;
     if (isNullHandlingEnabled) {
       nullBitmaps = new RoaringBitmap[numColumns];
@@ -333,7 +333,7 @@ public class DistinctTable {
     int numColumns = storedColumnDataTypes.length;
     RoaringBitmap[] nullBitmaps = null;
     boolean isNullHandlingEnabled = false;
-    if (dataTable.getVersion() >= DataTableBuilder.VERSION_4) {
+    if (dataTable.getVersion() >= DataTableFactory.VERSION_4) {
       nullBitmaps = new RoaringBitmap[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
         nullBitmaps[colId] = dataTable.getNullRowIds(colId);
