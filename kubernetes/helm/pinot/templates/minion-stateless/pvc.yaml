@@ -17,19 +17,24 @@
 # under the License.
 #
 
-{{- if .Values.minion.enabled }}
+{{- if .Values.minionStateless.enabled }}
+{{- if .Values.minionStateless.persistence.enabled }}
+kind: PersistentVolumeClaim
 apiVersion: v1
-kind: Service
 metadata:
-  name: {{ template "pinot.minion.headless" . }}
-  labels:
-    {{- include "pinot.minionLabels" . | nindent 4 }}
+  name: {{ .Values.minionStateless.persistence.pvcName }}
 spec:
-  clusterIP: None
-  ports:
-    # [pod_name].[service_name].[namespace].svc.cluster.local
-    - name: {{ .Values.minion.service.name }}
-      port: {{ .Values.minion.service.port }}
-  selector:
-    {{- include "pinot.minionMatchLabels" . | nindent 4 }}
+  accessModes:
+    - {{ .Values.minionStateless.persistence.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.minionStateless.persistence.size }}
+{{- if .Values.minionStateless.persistence.storageClass }}
+{{- if (eq "-" .Values.minionStateless.persistence.storageClass) }}
+  storageClassName: ""
+{{- else }}
+  storageClassName: {{ .Values.minionStateless.persistence.storageClass }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end }}

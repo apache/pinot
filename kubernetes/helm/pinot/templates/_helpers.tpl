@@ -100,6 +100,14 @@ component: {{ .Values.minion.name }}
 {{- end }}
 
 {{/*
+minionStateless labels
+*/}}
+{{- define "pinot.minionStatelessLabels" -}}
+{{- include "pinot.labels" . }}
+component: {{ .Values.minionStateless.name }}
+{{- end }}
+
+{{/*
 Server labels
 */}}
 {{- define "pinot.serverLabels" -}}
@@ -132,6 +140,15 @@ Minion Match Selector labels
 {{- define "pinot.minionMatchLabels" -}}
 {{- include "pinot.matchLabels" . }}
 component: {{ .Values.minion.name }}
+{{- end }}
+
+
+{{/*
+MinionStateless Match Selector labels
+*/}}
+{{- define "pinot.minionStatelessMatchLabels" -}}
+{{- include "pinot.matchLabels" . }}
+component: {{ .Values.minionStateless.name }}
 {{- end }}
 
 
@@ -217,6 +234,15 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 {{ template "pinot.fullname" . }}-{{ .Values.minion.name }}
 {{- end -}}
 
+
+{{/*
+Create a default fully qualified pinot minion stateless name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "pinot.minionStateless.fullname" -}}
+{{ template "pinot.fullname" . }}-{{ .Values.minionStateless.name }}
+{{- end -}}
+
 {{/*
 The name of the pinot controller headless service.
 */}}
@@ -285,4 +311,11 @@ The name of the pinot minion config.
 */}}
 {{- define "pinot.minion.config" -}}
 {{- printf "%s-config" (include "pinot.minion.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+The name of the pinot minion stateless config.
+*/}}
+{{- define "pinot.minionStateless.config" -}}
+{{- printf "%s-config" (include "pinot.minionStateless.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
