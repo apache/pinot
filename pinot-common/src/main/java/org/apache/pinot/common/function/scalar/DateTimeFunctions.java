@@ -720,7 +720,7 @@ public class DateTimeFunctions {
     } else {
       long granularityMs = granularitySpec.granularityToMillis();
       long roundedTimeValueMs = timeValueMs / granularityMs * granularityMs;
-      return new DateTimeFormatSpec(outputFormatStr).fromMillisToFormat(roundedTimeValueMs);
+      return outputFormat.fromMillisToFormat(roundedTimeValueMs);
     }
   }
 
