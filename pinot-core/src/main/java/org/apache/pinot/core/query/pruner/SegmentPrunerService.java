@@ -131,17 +131,24 @@ public class SegmentPrunerService {
   private static List<IndexSegment> removeInvalidSegments(List<IndexSegment> segments, QueryContext query,
       SegmentPrunerStatistics stats) {
     int selected = 0;
+    int invalid = 0;
     for (IndexSegment segment : segments) {
-      if (!isInvalidSegment(segment, query)) {
+      boolean isInvalid = isInvalidSegment(segment, query);
+      if (!isEmptySegment(segment) && !isInvalid) {
         segments.set(selected++, segment);
+      } else if (isInvalid) {
+        invalid++;
       }
     }
-    stats.setInvalidSegments(segments.size() - selected);
+    stats.setInvalidSegments(invalid);
     return segments.subList(0, selected);
   }
 
+  private static boolean isEmptySegment(IndexSegment segment) {
+    return segment.getSegmentMetadata().getTotalDocs() == 0;
+  }
+
   private static boolean isInvalidSegment(IndexSegment segment, QueryContext query) {
-    return segment.getSegmentMetadata().getTotalDocs() == 0
-        || !segment.getColumnNames().containsAll(query.getColumns());
+    return !segment.getColumnNames().containsAll(query.getColumns());
   }
 }
