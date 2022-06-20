@@ -308,7 +308,7 @@ const QueryPage = () => {
     if (numSegmentsPrunedInvalid) {
       warnings.push(`There are ${numSegmentsPrunedInvalid} invalid segment/s. This usually means that they were `
          + `created with an older schema. `
-         + `Data wasn't lost, but these segments will be ignored by some queries until the table is reloaded.`);
+         + `Please reload the table in order to refresh these segments to the new schema.`);
     }
     return warnings;
   }
