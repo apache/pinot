@@ -186,8 +186,7 @@ public abstract class BaseDataTable implements DataTable {
 
   @Override
   public String getString(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    int dictId = _fixedSizeData.getInt();
+    int dictId = _fixedSizeData.getInt(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     return _dictionaryMap.get(_dataSchema.getColumnName(colId)).get(dictId);
   }
 

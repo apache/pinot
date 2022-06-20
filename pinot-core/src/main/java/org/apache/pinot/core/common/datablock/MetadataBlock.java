@@ -44,12 +44,12 @@ public class MetadataBlock extends BaseDataBlock {
   }
 
   @Override
-  protected int computePositionCursorInFixSizedBuffer(int rowId, int colId) {
+  protected int getOffsetInFixedBuffer(int rowId, int colId) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  protected int computePositionCursorInVariableBuffer(int rowId, int colId) {
+  protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
     throw new UnsupportedOperationException();
   }
 
