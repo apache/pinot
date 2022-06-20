@@ -91,8 +91,9 @@ public class RowDataBlock extends BaseDataBlock {
 
   @Override
   protected int computePositionCursorInVariableBuffer(int rowId, int colId) {
-    _variableSizeData.position(_fixedSizeData.getInt(computePositionCursorInFixSizedBuffer(rowId, colId)));
-    return _fixedSizeData.getInt();
+    int offset = computePositionCursorInFixSizedBuffer(rowId, colId);
+    _variableSizeData.position(_fixedSizeData.getInt(offset));
+    return _fixedSizeData.getInt(offset + 4);
   }
 
   @Override

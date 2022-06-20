@@ -267,8 +267,9 @@ public abstract class BaseDataTable implements DataTable {
   }
 
   private int positionCursorInVariableBuffer(int rowId, int colId) {
-    _variableSizeData.position(_fixedSizeData.getInt(rowId * _rowSizeInBytes + _columnOffsets[colId]));
-    return _fixedSizeData.getInt();
+    int offset = rowId * _rowSizeInBytes + _columnOffsets[colId];
+    _variableSizeData.position(_fixedSizeData.getInt(offset));
+    return _fixedSizeData.getInt(offset + 4);
   }
 
   @Override
