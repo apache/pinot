@@ -82,8 +82,8 @@ public class KafkaPartitionLevelConsumerTest {
       for (int i = 0; i < NUM_MSG_PRODUCED_PER_PARTITION; i++) {
         producer.send(new ProducerRecord<>(TEST_TOPIC_1, 0, TIMESTAMP + i, null, "sample_msg_" + i));
         // TEST_TOPIC_2 has 2 partitions
-        producer.send(new ProducerRecord<>(TEST_TOPIC_2, 0, null, "sample_msg_" + i));
-        producer.send(new ProducerRecord<>(TEST_TOPIC_2, 1, null, "sample_msg_" + i));
+        producer.send(new ProducerRecord<>(TEST_TOPIC_2, 0, TIMESTAMP + i, null, "sample_msg_" + i));
+        producer.send(new ProducerRecord<>(TEST_TOPIC_2, 1, TIMESTAMP + i, null, "sample_msg_" + i));
         producer.send(new ProducerRecord<>(TEST_TOPIC_3, "sample_msg_" + i));
       }
       producer.flush();
