@@ -142,7 +142,7 @@ public class QueryServerEnclosure {
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = new GenericRow();
       row.putValue("col1", STRING_FIELD_LIST[i % STRING_FIELD_LIST.length]);
-      row.putValue("col2", STRING_FIELD_LIST[(i + 2) % STRING_FIELD_LIST.length]);
+      row.putValue("col2", STRING_FIELD_LIST[i % (STRING_FIELD_LIST.length - 2)]);
       row.putValue("col3", INT_FIELD_LIST[i % INT_FIELD_LIST.length]);
       row.putValue("ts", System.currentTimeMillis());
       rows.add(row);

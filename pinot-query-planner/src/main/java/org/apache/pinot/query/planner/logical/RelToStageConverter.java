@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
@@ -32,6 +33,7 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexCall;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
+import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
@@ -65,9 +67,15 @@ public final class RelToStageConverter {
       return convertLogicalProject((LogicalProject) node, currentStageId);
     } else if (node instanceof LogicalFilter) {
       return convertLogicalFilter((LogicalFilter) node, currentStageId);
+    } else if (node instanceof LogicalAggregate) {
+      return convertLogicalAggregate((LogicalAggregate) node, currentStageId);
     } else {
       throw new UnsupportedOperationException("Unsupported logical plan node: " + node);
     }
+  }
+
+  private static StageNode convertLogicalAggregate(LogicalAggregate node, int currentStageId) {
+    return new AggregateNode(currentStageId, node.getAggCallList(), node.getGroupSet());
   }
 
   private static StageNode convertLogicalProject(LogicalProject node, int currentStageId) {

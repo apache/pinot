@@ -38,13 +38,13 @@ import org.apache.pinot.query.planner.hints.PinotRelationalHints;
 
 
 /**
- * Special rule for Pinot, always insert exchange after JOIN
+ * Special rule for Pinot, this rule is fixed to always insert exchange after JOIN node.
  */
-public class PinotExchangeNodeInsertRule extends RelOptRule {
-  public static final PinotExchangeNodeInsertRule INSTANCE =
-      new PinotExchangeNodeInsertRule(RelFactories.LOGICAL_BUILDER);
+public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
+  public static final PinotJoinExchangeNodeInsertRule INSTANCE =
+      new PinotJoinExchangeNodeInsertRule(RelFactories.LOGICAL_BUILDER);
 
-  public PinotExchangeNodeInsertRule(RelBuilderFactory factory) {
+  public PinotJoinExchangeNodeInsertRule(RelBuilderFactory factory) {
     super(operand(LogicalJoin.class, any()), factory, null);
   }
 

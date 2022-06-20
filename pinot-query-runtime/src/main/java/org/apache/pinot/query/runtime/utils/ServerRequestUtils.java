@@ -29,6 +29,7 @@ import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
+import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
@@ -104,8 +105,15 @@ public class ServerRequestUtils {
       pinotQuery.setFilterExpression(CalciteRexExpressionParser.toExpression(
           ((FilterNode) node).getCondition(), pinotQuery));
     } else if (node instanceof ProjectNode) {
-      pinotQuery.setSelectList(CalciteRexExpressionParser.convertSelectList(
+      pinotQuery.setSelectList(CalciteRexExpressionParser.overwriteSelectList(
           ((ProjectNode) node).getProjects(), pinotQuery));
+    } else if (node instanceof AggregateNode) {
+      // set agg list
+      pinotQuery.setSelectList(CalciteRexExpressionParser.addSelectList(pinotQuery.getSelectList(),
+          ((AggregateNode) node).getAggCalls(), pinotQuery));
+      // set group-by list
+      pinotQuery.setGroupByList(CalciteRexExpressionParser.convertGroupByList(
+          ((AggregateNode) node).getGroupSet(), pinotQuery));
     } else if (node instanceof MailboxSendNode) {
       // TODO: MailboxSendNode should be the root of the leaf stage. but ignore for now since it is handle seperately
       // in QueryRunner as a single step sender.
