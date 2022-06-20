@@ -44,7 +44,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private static final String EXPLAIN_NAME = "BROADCAST_JOIN";
 
-  private final HashMap<Object, List<Object[]>> _broadcastHashTable;
+  private final HashMap<Integer, List<Object[]>> _broadcastHashTable;
   private final BaseOperator<TransferableBlock> _leftTableOperator;
   private final BaseOperator<TransferableBlock> _rightTableOperator;
 
@@ -52,12 +52,11 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private DataSchema _rightTableSchema;
   private int _resultRowSize;
   private boolean _isHashTableBuilt;
-  private KeySelector<Object[], Object> _leftKeySelector;
-  private KeySelector<Object[], Object> _rightKeySelector;
+  private KeySelector<Object[], Object[]> _leftKeySelector;
+  private KeySelector<Object[], Object[]> _rightKeySelector;
 
   public HashJoinOperator(BaseOperator<TransferableBlock> leftTableOperator,
       BaseOperator<TransferableBlock> rightTableOperator, List<JoinNode.JoinClause> criteria) {
-    // TODO: this assumes right table is broadcast.
     _leftKeySelector = criteria.get(0).getLeftJoinKeySelector();
     _rightKeySelector = criteria.get(0).getRightJoinKeySelector();
     _leftTableOperator = leftTableOperator;
@@ -97,7 +96,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
         // put all the rows into corresponding hash collections keyed by the key selector function.
         for (Object[] row : container) {
           List<Object[]> hashCollection =
-              _broadcastHashTable.computeIfAbsent(_rightKeySelector.getKey(row), k -> new ArrayList<>());
+              _broadcastHashTable.computeIfAbsent(_rightKeySelector.computeHash(row), k -> new ArrayList<>());
           hashCollection.add(row);
         }
         rightBlock = _rightTableOperator.nextBlock();
@@ -117,7 +116,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     List<Object[]> container = leftBlock.getContainer();
     for (Object[] leftRow : container) {
       List<Object[]> hashCollection =
-          _broadcastHashTable.getOrDefault(_leftKeySelector.getKey(leftRow), Collections.emptyList());
+          _broadcastHashTable.getOrDefault(_leftKeySelector.computeHash(leftRow), Collections.emptyList());
       for (Object[] rightRow : hashCollection) {
         rows.add(joinRow(leftRow, rightRow));
       }
