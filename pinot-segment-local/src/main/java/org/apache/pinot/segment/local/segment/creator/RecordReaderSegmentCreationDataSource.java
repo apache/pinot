@@ -18,10 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
-import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
@@ -47,19 +44,15 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
     _recordReader = recordReader;
   }
 
-  public RecordReaderSegmentCreationDataSource(RecordReader recordReader, RecordTransformer recordTransformer,
-      @Nullable ComplexTypeTransformer complexTypeTransformer) {
-    _recordReader = recordReader;
-    _transformPipeline = new TransformPipeline(recordTransformer, complexTypeTransformer);
+  public void setTransformPipeline(TransformPipeline transformPipeline) {
+    _transformPipeline = transformPipeline;
   }
 
   @Override
   public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
     try {
-      if (_transformPipeline == null) {
-        _transformPipeline =
-            new TransformPipeline(statsCollectorConfig.getTableConfig(), statsCollectorConfig.getSchema());
-      }
+      TransformPipeline transformPipeline = _transformPipeline != null ? _transformPipeline
+          : new TransformPipeline(statsCollectorConfig.getTableConfig(), statsCollectorConfig.getSchema());
 
       SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();
@@ -71,7 +64,7 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
         reuse.clear();
 
         reuse = _recordReader.next(reuse);
-        _transformPipeline.processRow(reuse, reusedResult);
+        transformPipeline.processRow(reuse, reusedResult);
         for (GenericRow row : reusedResult.getTransformedRows()) {
           collector.collectRow(row);
         }
