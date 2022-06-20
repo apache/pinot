@@ -119,6 +119,12 @@ export const executeTask = (data): Promise<AxiosResponse<OperationResponse>> =>
 
 export const getJobDetail = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/scheduler/jobDetails?tableName=${tableName}&taskType=${taskType}`, { headers: { ...headers, Accept: 'application/json' } });
+  
+export const getMinionMeta = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/${taskType}/${tableName}/metadata`, { headers: { ...headers, Accept: 'application/json' } });
+  
+export const getTasks = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/${taskType}/${tableName}/state`, { headers: { ...headers, Accept: 'application/json' } });
 
 export const getClusterConfig = (): Promise<AxiosResponse<ClusterConfig>> =>
   baseApi.get('/cluster/configs');

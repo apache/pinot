@@ -17,8 +17,10 @@
  * under the License.
  */
 
-import React from 'react';
-import CustomizedTables from '../Table';
+import React, { useEffect, useState } from 'react';
+import { DataTable } from 'Models';
+import PinotMethodUtils from '../utils/PinotMethodUtils';
+import CustomizedTables from './Table';
 
 const PeriodicTaskTable = ({ tableData }) => {
   return !!tableData?.records?.length && (
@@ -32,4 +34,25 @@ const PeriodicTaskTable = ({ tableData }) => {
   );
 };
 
-export default PeriodicTaskTable;
+export default function usePeriodicTasks(props) {
+  const { shouldFetchData } = props;
+  const [periodicTaskNames, setPeriodicTaskNames] = useState<DataTable>({ records: [], columns: [] });
+
+  const fetchData = async () => {
+    if (!shouldFetchData) return;
+    const periodicTaskNames = await PinotMethodUtils.getAllPeriodicTaskNames();
+    setPeriodicTaskNames(periodicTaskNames);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [shouldFetchData]);
+
+  return {
+    periodicTaskNames,
+    setPeriodicTaskNames,
+    content: (
+      <PeriodicTaskTable tableData={periodicTaskNames} />
+    )
+  };
+}

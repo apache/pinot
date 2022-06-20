@@ -20,16 +20,14 @@
 import React, { useEffect, useState } from 'react';
 import { get } from 'lodash';
 import moment from 'moment';
-// import { TableData } from 'Models';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { Grid, makeStyles } from '@material-ui/core';
 import SimpleAccordion from '../components/SimpleAccordion';
 import CustomButton from '../components/CustomButton';
-// import TableToolbar from '../components/TableToolbar';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
-// import { useConfirm } from '../components/Confirm';
-// import CustomizedTables from '../components/Table';
 import useScheduleAdhocModal from '../components/useScheduleAdhocModal';
+import useMinionMetadata from '../components/useMinionMetadata';
+import useTaskListing from '../components/useTaskListing';
 
 const jsonoptions = {
   lineNumbers: true,
@@ -80,11 +78,11 @@ const TaskQueueTable = (props) => {
   const { taskType, tableName } = props.match.params;
 
   const [fetching, setFetching] = useState(true);
-  // const [taskInfo, setTaskInfo] = useState([]);
   const [jobDetail, setJobDetail] = useState({});
   const [tableDetail, setTableDetail] = useState({});
-  // const [tables, setTables] = useState<TableData>({ records: [], columns: ['Name'] });
   const scheduleAdhocModal = useScheduleAdhocModal();
+  const minionMetadata = useMinionMetadata({ taskType, tableName });
+  const taskListing = useTaskListing({ taskType, tableName });
 
   const fetchData = async () => {
     setFetching(true);
@@ -165,19 +163,24 @@ const TaskQueueTable = (props) => {
               />
             </SimpleAccordion>
           </div>
+          <div className={classes.sqlDiv}>
+            {minionMetadata.content}
+          </div>
+        </Grid>
+        <Grid item xs={6}>
+          <div className={classes.sqlDiv}>
+            <SimpleAccordion
+              headerTitle="Scheduling Errors"
+              showSearchBox={false}
+            >
+              
+            </SimpleAccordion>
+          </div>
+        </Grid>
+        <Grid item xs={12}>
+          {taskListing.content}
         </Grid>
       </Grid>
-      {/* {!fetching && (
-        <CustomizedTables
-          title="Tables"
-          data={tables}
-          showSearchBox={true}
-          inAccordionFormat={true}
-          isPagination={false}
-          addLinks
-          baseURL='/task-queue/tables/'
-        />
-      )} */}
       {scheduleAdhocModal.dialog}
     </Grid>
   );

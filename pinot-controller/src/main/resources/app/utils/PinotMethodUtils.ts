@@ -39,6 +39,8 @@ import {
   sheduleTask,
   executeTask,
   getJobDetail,
+  getMinionMeta,
+  getTasks,
   updateInstanceTags,
   getClusterConfig,
   getQueryTables,
@@ -815,6 +817,18 @@ const deleteAllTasks = (taskType) => {
   });
 };
 
+const getMinionMetaData = (tableName, taskType) => {
+  return getMinionMeta(tableName, taskType).then((response)=>{
+    return response.data;
+  });
+};
+
+const getTasksList = (tableName, taskType) => {
+  return getTasks(tableName, taskType).then((response)=>{
+    return { columns: ['Task ID'], records: []};
+  });
+};
+
 const reloadSegmentOp = (tableName, segmentName) => {
   return reloadSegment(tableName, segmentName).then((response)=>{
     return response.data;
@@ -1069,6 +1083,8 @@ export default {
   scheduleTaskAction,
   executeTaskAction,
   getScheduleJobDetail,
+  getMinionMetaData,
+  getTasksList,
   deleteSegmentOp,
   reloadSegmentOp,
   reloadStatusOp,
