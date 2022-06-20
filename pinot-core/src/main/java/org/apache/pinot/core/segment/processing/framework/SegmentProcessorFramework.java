@@ -150,7 +150,8 @@ public class SegmentProcessorFramework {
         generatorConfig.setSequenceId(sequenceId);
         GenericRowFileRecordReader recordReaderForRange = recordReader.getRecordReaderForRange(startRowId, endRowId);
         SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-        driver.init(generatorConfig, new RecordReaderSegmentCreationDataSource(recordReaderForRange),
+        driver.init(generatorConfig,
+            new RecordReaderSegmentCreationDataSource(recordReaderForRange, passThroughTransformer, null),
             passThroughTransformer, null);
         driver.build();
         outputSegmentDirs.add(driver.getOutputDirectory());
