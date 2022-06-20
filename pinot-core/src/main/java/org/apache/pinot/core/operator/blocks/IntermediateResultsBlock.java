@@ -430,8 +430,7 @@ public class IntermediateResultsBlock implements Block {
 
   private DataTable getSelectionResultDataTable()
       throws Exception {
-    return attachMetadataToDataTable(
-        SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _dataSchema));
+    return attachMetadataToDataTable(SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _dataSchema));
   }
 
   private DataTable getAggregationResultDataTable()

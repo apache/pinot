@@ -229,14 +229,11 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
               row[colId] = null;
             }
           }
-          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
-          _numDocsScanned++;
         }
-      } else {
-        for (int i = 0; i < numDocsFetched && (_numDocsScanned < _numRowsToKeep); i++) {
-          SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
-          _numDocsScanned++;
-        }
+      }
+      for (int i = 0; i < numDocsFetched && (_numDocsScanned < _numRowsToKeep); i++) {
+        SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
+        _numDocsScanned++;
       }
     }
     _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;
@@ -282,6 +279,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       }
       if (isNullHandlingEnabled) {
         for (int rowId = 0; rowId < numDocsFetched; rowId++) {
+          // Note: Everytime blockValueFetcher.getRow is called, a new row instance is created.
           Object[] row = blockValueFetcher.getRow(rowId);
           for (int colId = 0; colId < numExpressions; colId++) {
             if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {

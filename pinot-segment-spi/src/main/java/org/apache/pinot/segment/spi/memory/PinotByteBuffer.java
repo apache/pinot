@@ -118,15 +118,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
   @Override
   public short getShort(long offset) {
     assert offset <= Integer.MAX_VALUE;
-    short s = 0;
-    try {
-      s = _buffer.getShort((int) offset);
-    } catch (IndexOutOfBoundsException ex) {
-      System.out.println(offset);
-      System.out.println(ex);
-      throw ex;
-    }
-    return s;
+    return _buffer.getShort((int) offset);
   }
 
   @Override

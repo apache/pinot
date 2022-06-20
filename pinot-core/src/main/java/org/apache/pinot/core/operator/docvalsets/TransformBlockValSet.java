@@ -52,7 +52,7 @@ public class TransformBlockValSet implements BlockValSet {
       ExpressionContext expression) {
     _projectionBlock = projectionBlock;
     _transformFunction = transformFunction;
-    // todo(nhejazi): handle null handling code behind a config (nullHanldingEnabledInSelect).
+    // TODO(nhejazi): handle null handling code behind a config (nullHanldingEnabledInSelect).
     RoaringBitmap nullBitmap = new RoaringBitmap();
     if (expression.getType() == ExpressionContext.Type.FUNCTION) {
       Set<String> columns = new HashSet<>();
