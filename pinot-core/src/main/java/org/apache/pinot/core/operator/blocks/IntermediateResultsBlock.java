@@ -56,6 +56,7 @@ import org.roaringbitmap.RoaringBitmap;
 @SuppressWarnings("rawtypes")
 public class IntermediateResultsBlock implements Block {
   private DataSchema _dataSchema;
+  private boolean _isNullHandlingEnabled;
   private Collection<Object[]> _selectionResult;
   private AggregationFunction[] _aggregationFunctions;
   private List<Object> _aggregationResult;
@@ -82,19 +83,11 @@ public class IntermediateResultsBlock implements Block {
   /**
    * Constructor for selection result.
    */
-  public IntermediateResultsBlock(DataSchema dataSchema, Collection<Object[]> selectionResult) {
+  public IntermediateResultsBlock(DataSchema dataSchema, Collection<Object[]> selectionResult,
+      boolean isNullHandlingEnabled) {
     _dataSchema = dataSchema;
     _selectionResult = selectionResult;
-  }
-
-  /**
-   * Constructor for aggregation result.
-   * <p>For aggregation only, the result is a list of values.
-   * <p>For aggregation group-by, the result is a list of maps from group keys to aggregation values.
-   */
-  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> aggregationResult) {
-    _aggregationFunctions = aggregationFunctions;
-    _aggregationResult = aggregationResult;
+    _isNullHandlingEnabled = isNullHandlingEnabled;
   }
 
   /**
@@ -103,20 +96,35 @@ public class IntermediateResultsBlock implements Block {
    * <p>For aggregation group-by, the result is a list of maps from group keys to aggregation values.
    */
   public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> aggregationResult,
-      DataSchema dataSchema) {
+      boolean isNullHandlingEnabled) {
+    _aggregationFunctions = aggregationFunctions;
+    _aggregationResult = aggregationResult;
+    _isNullHandlingEnabled = isNullHandlingEnabled;
+  }
+
+  /**
+   * Constructor for aggregation result.
+   * <p>For aggregation only, the result is a list of values.
+   * <p>For aggregation group-by, the result is a list of maps from group keys to aggregation values.
+   */
+  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> aggregationResult,
+      DataSchema dataSchema, boolean isNullHandlingEnabled) {
     _aggregationFunctions = aggregationFunctions;
     _aggregationResult = aggregationResult;
     _dataSchema = dataSchema;
+    _isNullHandlingEnabled = isNullHandlingEnabled;
   }
 
   /**
    * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult}.
    */
   public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
-      @Nullable AggregationGroupByResult aggregationGroupByResults, DataSchema dataSchema) {
+      @Nullable AggregationGroupByResult aggregationGroupByResults, DataSchema dataSchema,
+      boolean isNullHandlingEnabled) {
     _aggregationFunctions = aggregationFunctions;
     _aggregationGroupByResult = aggregationGroupByResults;
     _dataSchema = dataSchema;
+    _isNullHandlingEnabled = isNullHandlingEnabled;
   }
 
   /**
@@ -124,10 +132,11 @@ public class IntermediateResultsBlock implements Block {
    * with a collection of intermediate records.
    */
   public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
-      Collection<IntermediateRecord> intermediateRecords, DataSchema dataSchema) {
+      Collection<IntermediateRecord> intermediateRecords, DataSchema dataSchema, boolean isNullHandlingEnabled) {
     _aggregationFunctions = aggregationFunctions;
     _dataSchema = dataSchema;
     _intermediateRecords = intermediateRecords;
+    _isNullHandlingEnabled = isNullHandlingEnabled;
   }
 
   public IntermediateResultsBlock(Table table) {
@@ -135,6 +144,8 @@ public class IntermediateResultsBlock implements Block {
     if (_table != null) {
       _dataSchema = table.getDataSchema();
     }
+    // TODO: set based on whether null handling is enabled in GroupKeyGenerator.
+    _isNullHandlingEnabled = true;
   }
 
   /**
@@ -143,6 +154,7 @@ public class IntermediateResultsBlock implements Block {
   public IntermediateResultsBlock(ProcessingException processingException, Exception e) {
     _processingExceptions = new ArrayList<>();
     _processingExceptions.add(QueryException.getException(processingException, e));
+    _isNullHandlingEnabled = false;
   }
 
   /**
@@ -159,6 +171,10 @@ public class IntermediateResultsBlock implements Block {
 
   public void setDataSchema(DataSchema dataSchema) {
     _dataSchema = dataSchema;
+  }
+
+  public boolean isNullHandlingEnabled() {
+    return _isNullHandlingEnabled;
   }
 
   @Nullable
@@ -328,12 +344,11 @@ public class IntermediateResultsBlock implements Block {
     DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(_dataSchema);
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = _dataSchema.size();
-    Object[] colDefaultNullValues = null;
+    Iterator<Record> iterator = _table.iterator();
     RoaringBitmap[] nullBitmaps = null;
-    boolean isNullHandlingEnabled = DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4;
-    if (isNullHandlingEnabled) {
-      colDefaultNullValues = new Object[numColumns];
+    if (_isNullHandlingEnabled) {
       nullBitmaps = new RoaringBitmap[numColumns];
+      Object[] colDefaultNullValues = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
         if (storedColumnDataTypes[colId] != ColumnDataType.OBJECT) {
           colDefaultNullValues[colId] = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC,
@@ -341,9 +356,6 @@ public class IntermediateResultsBlock implements Block {
         }
         nullBitmaps[colId] = new RoaringBitmap();
       }
-    }
-    Iterator<Record> iterator = _table.iterator();
-    if (isNullHandlingEnabled) {
       int rowId = 0;
       while (iterator.hasNext()) {
         Object[] values = iterator.next().getValues();
@@ -371,7 +383,7 @@ public class IntermediateResultsBlock implements Block {
         dataTableBuilder.finishRow();
       }
     }
-    if (isNullHandlingEnabled) {
+    if (_isNullHandlingEnabled && DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4) {
       for (int colId = 0; colId < numColumns; colId++) {
         dataTableBuilder.setNullRowIds(nullBitmaps[colId]);
       }
@@ -430,7 +442,8 @@ public class IntermediateResultsBlock implements Block {
 
   private DataTable getSelectionResultDataTable()
       throws Exception {
-    return attachMetadataToDataTable(SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _dataSchema));
+    return attachMetadataToDataTable(SelectionOperatorUtils.getDataTableFromRows(
+        _selectionResult, _dataSchema, _isNullHandlingEnabled));
   }
 
   private DataTable getAggregationResultDataTable()
@@ -446,8 +459,7 @@ public class IntermediateResultsBlock implements Block {
     }
     Object[] colDefaultNullValues = null;
     RoaringBitmap[] nullBitmaps = null;
-    boolean isNullHandlingEnabled = DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4;
-    if (isNullHandlingEnabled) {
+    if (_isNullHandlingEnabled) {
       for (int i = 0; i < numAggregationFunctions; i++) {
         if (colDefaultNullValues == null) {
           colDefaultNullValues = new Object[numAggregationFunctions];
@@ -469,7 +481,7 @@ public class IntermediateResultsBlock implements Block {
       Object value = _aggregationResult.get(i);
       // OBJECT (e.g. DistinctTable) calls toBytes() (e.g. DistinctTable.toBytes()) which takes care of replacing nulls
       // with default values, and building presence vector and serializing both.
-      if (isNullHandlingEnabled && columnDataTypes[i] != ColumnDataType.OBJECT) {
+      if (_isNullHandlingEnabled && columnDataTypes[i] != ColumnDataType.OBJECT) {
         if (value == null) {
           value = colDefaultNullValues[i];
           nullBitmaps[i].add(0);
@@ -492,7 +504,7 @@ public class IntermediateResultsBlock implements Block {
       }
     }
     dataTableBuilder.finishRow();
-    if (isNullHandlingEnabled) {
+    if (_isNullHandlingEnabled && DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4) {
       for (int i = 0; i < numAggregationFunctions; i++) {
         dataTableBuilder.setNullRowIds(nullBitmaps[i]);
       }

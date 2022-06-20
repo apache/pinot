@@ -52,8 +52,9 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private final ExpressionContext _groupByExpression;
   private final DataType _storedType;
   private final Map _groupKeyMap;
-  private Integer _groupIdForNullValue = null;
   private final int _globalGroupIdUpperBound;
+
+  private Integer _groupIdForNullValue = null;
 
   private int _numGroups = 0;
 
@@ -74,99 +75,124 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   public void generateKeysForBlock(TransformBlock transformBlock, int[] groupKeys) {
     BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByExpression);
     RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    boolean isNullHandlingEnabled = nullBitmap != null && nullBitmap.getCardinality() > 0;
     int numDocs = transformBlock.getNumDocs();
 
     switch (_storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
-        if (nullBitmap == null || nullBitmap.getCardinality() < numDocs) {
-          for (int i = 0; i < numDocs; i++) {
-            if (nullBitmap != null && nullBitmap.contains(i)) {
-              // Preserve null value:
-              groupKeys[i] = getKeyForNullValue();
-            } else {
-              groupKeys[i] = getKeyForValue(intValues[i]);
+        if (isNullHandlingEnabled) {
+          if (nullBitmap.getCardinality() < numDocs) {
+            for (int i = 0; i < numDocs; i++) {
+              groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(intValues[i]);
             }
+          } else if (numDocs > 0) {
+            _groupIdForNullValue = _numGroups++;
+            Arrays.fill(groupKeys, _groupIdForNullValue);
           }
-        } else {
-          _groupIdForNullValue = _numGroups++;
-          Arrays.fill(groupKeys, _groupIdForNullValue);
+          break;
+        }
+        for (int i = 0; i < numDocs; i++) {
+          groupKeys[i] = getKeyForValue(intValues[i]);
         }
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
-        if (nullBitmap == null || nullBitmap.getCardinality() < numDocs) {
-          for (int i = 0; i < numDocs; i++) {
-            if (nullBitmap != null && nullBitmap.contains(i)) {
-              groupKeys[i] = getKeyForNullValue();
-            } else {
-              groupKeys[i] = getKeyForValue(longValues[i]);
+        if (isNullHandlingEnabled) {
+          if (nullBitmap.getCardinality() < numDocs) {
+            for (int i = 0; i < numDocs; i++) {
+              groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(longValues[i]);
             }
+          } else if (numDocs > 0) {
+            _groupIdForNullValue = _numGroups++;
+            Arrays.fill(groupKeys, _groupIdForNullValue);
           }
-        } else {
-          _groupIdForNullValue = _numGroups++;
-          Arrays.fill(groupKeys, _groupIdForNullValue);
+          break;
+        }
+        for (int i = 0; i < numDocs; i++) {
+          groupKeys[i] = getKeyForValue(longValues[i]);
         }
         break;
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
-        if (nullBitmap == null || nullBitmap.getCardinality() < numDocs) {
-          for (int i = 0; i < numDocs; i++) {
-            if (nullBitmap != null && nullBitmap.contains(i)) {
-              groupKeys[i] = getKeyForNullValue();
-            } else {
-              groupKeys[i] = getKeyForValue(floatValues[i]);
+        if (isNullHandlingEnabled) {
+          if (nullBitmap.getCardinality() < numDocs) {
+            for (int i = 0; i < numDocs; i++) {
+              groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(floatValues[i]);
             }
+          } else if (numDocs > 0) {
+            _groupIdForNullValue = _numGroups++;
+            Arrays.fill(groupKeys, _groupIdForNullValue);
           }
-        } else {
-          _groupIdForNullValue = _numGroups++;
-          Arrays.fill(groupKeys, _groupIdForNullValue);
+          break;
+        }
+        for (int i = 0; i < numDocs; i++) {
+          groupKeys[i] = getKeyForValue(floatValues[i]);
         }
         break;
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
-        if (nullBitmap == null || nullBitmap.getCardinality() < numDocs) {
-          for (int i = 0; i < numDocs; i++) {
-            if (nullBitmap != null && nullBitmap.contains(i)) {
-              groupKeys[i] = getKeyForNullValue();
-            } else {
-              groupKeys[i] = getKeyForValue(doubleValues[i]);
+        if (isNullHandlingEnabled) {
+          if (nullBitmap.getCardinality() < numDocs) {
+            for (int i = 0; i < numDocs; i++) {
+              groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(doubleValues[i]);
             }
+          } else if (numDocs > 0) {
+            _groupIdForNullValue = _numGroups++;
+            Arrays.fill(groupKeys, _groupIdForNullValue);
           }
-        } else {
-          _groupIdForNullValue = _numGroups++;
-          Arrays.fill(groupKeys, _groupIdForNullValue);
+          break;
+        }
+        for (int i = 0; i < numDocs; i++) {
+          groupKeys[i] = getKeyForValue(doubleValues[i]);
         }
         break;
       case BIG_DECIMAL:
         BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
-        if (nullBitmap == null || nullBitmap.getCardinality() < numDocs) {
-          for (int i = 0; i < numDocs; i++) {
-            groupKeys[i] = getKeyForValue(nullBitmap != null && nullBitmap.contains(i) ? null : bigDecimalValues[i]);
+        if (isNullHandlingEnabled) {
+          if (nullBitmap.getCardinality() < numDocs) {
+            for (int i = 0; i < numDocs; i++) {
+              groupKeys[i] = getKeyForValue(nullBitmap.contains(i) ? null : bigDecimalValues[i]);
+            }
+          } else if (numDocs > 0) {
+            Arrays.fill(groupKeys, getKeyForValue((BigDecimal) null));
           }
-        } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, getKeyForValue((BigDecimal) null));
+          break;
+        }
+        for (int i = 0; i < numDocs; i++) {
+          groupKeys[i] = getKeyForValue(bigDecimalValues[i]);
         }
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
-        if (nullBitmap == null || nullBitmap.getCardinality() < numDocs) {
-          for (int i = 0; i < numDocs; i++) {
-            groupKeys[i] = getKeyForValue(nullBitmap != null && nullBitmap.contains(i) ? null : stringValues[i]);
+        if (isNullHandlingEnabled) {
+          if (nullBitmap.getCardinality() < numDocs) {
+            for (int i = 0; i < numDocs; i++) {
+              groupKeys[i] = getKeyForValue(nullBitmap.contains(i) ? null : stringValues[i]);
+            }
+          } else if (numDocs > 0) {
+            Arrays.fill(groupKeys, getKeyForValue((String) null));
           }
-        } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, getKeyForValue((String) null));
+          break;
+        }
+        for (int i = 0; i < numDocs; i++) {
+          groupKeys[i] = getKeyForValue(stringValues[i]);
         }
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (nullBitmap == null || nullBitmap.getCardinality() < numDocs) {
-          for (int i = 0; i < numDocs; i++) {
-            groupKeys[i] = getKeyForValue(nullBitmap != null && nullBitmap.contains(i) ? null
-                : new ByteArray(bytesValues[i]));
+        if (isNullHandlingEnabled) {
+          if (nullBitmap.getCardinality() < numDocs) {
+            for (int i = 0; i < numDocs; i++) {
+              groupKeys[i] = getKeyForValue(nullBitmap.contains(i) ? null : new ByteArray(bytesValues[i]));
+            }
+          } else if (numDocs > 0) {
+            Arrays.fill(groupKeys, getKeyForValue((ByteArray) null));
           }
-        } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, getKeyForValue((ByteArray) null));
+          break;
+        }
+        for (int i = 0; i < numDocs; i++) {
+          groupKeys[i] = getKeyForValue(new ByteArray(bytesValues[i]));
         }
         break;
       default:

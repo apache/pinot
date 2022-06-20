@@ -23,6 +23,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -70,6 +71,7 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
       resultIndexMap.put(_aggregationFunctions[i], i);
     }
 
+    boolean isNullHandlingEnabled = false;
     for (Pair<AggregationFunction[], TransformOperator> filteredAggregation : _aggFunctionsWithTransformOperator) {
       AggregationFunction[] aggregationFunctions = filteredAggregation.getLeft();
       AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggregationFunctions);
@@ -79,6 +81,11 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
       while ((transformBlock = transformOperator.nextBlock()) != null) {
         aggregationExecutor.aggregate(transformBlock);
         numDocsScanned += transformBlock.getNumDocs();
+        for (AggregationFunction func : _aggregationFunctions) {
+          for (ExpressionContext expressionContext : (List<ExpressionContext>) func.getInputExpressions()) {
+            isNullHandlingEnabled |= transformBlock.getBlockValueSet(expressionContext).getNullBitmap() != null;
+          }
+        }
       }
       List<Object> filteredResult = aggregationExecutor.getResult();
 
@@ -89,7 +96,7 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
       _numEntriesScannedInFilter += transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * transformOperator.getNumColumnsProjected();
     }
-    return new IntermediateResultsBlock(_aggregationFunctions, Arrays.asList(result));
+    return new IntermediateResultsBlock(_aggregationFunctions, Arrays.asList(result), isNullHandlingEnabled);
   }
 
   @Override

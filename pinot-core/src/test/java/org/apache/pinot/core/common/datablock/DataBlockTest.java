@@ -82,7 +82,7 @@ public class DataBlockTest {
         columnDataTypes.toArray(new DataSchema.ColumnDataType[0]));
     List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TEST_ROW_COUNT);
     DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
-    DataTable dataTableImpl = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema);
+    DataTable dataTableImpl = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema, false);
     DataTable dataBlockFromDataTable = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTableImpl.toBytes()));
 
     for (int rowId = 0; rowId < TEST_ROW_COUNT; rowId++) {

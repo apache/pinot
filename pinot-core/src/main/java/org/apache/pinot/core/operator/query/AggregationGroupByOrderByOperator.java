@@ -104,9 +104,15 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       groupByExecutor = new DefaultGroupByExecutor(_queryContext, _groupByExpressions, _transformOperator);
     }
     TransformBlock transformBlock;
+    boolean isNullHandlingEnabled = false;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       _numDocsScanned += transformBlock.getNumDocs();
       groupByExecutor.process(transformBlock);
+      for (AggregationFunction func : _aggregationFunctions) {
+        for (ExpressionContext expressionContext : (List<ExpressionContext>) func.getInputExpressions()) {
+          isNullHandlingEnabled |= transformBlock.getBlockValueSet(expressionContext).getNullBitmap() != null;
+        }
+      }
     }
 
     // Check if the groups limit is reached
@@ -125,15 +131,15 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       if (groupByExecutor.getNumGroups() > trimSize) {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
-        IntermediateResultsBlock resultsBlock =
-            new IntermediateResultsBlock(_aggregationFunctions, intermediateRecords, _dataSchema);
+        IntermediateResultsBlock resultsBlock = new IntermediateResultsBlock(
+            _aggregationFunctions, intermediateRecords, _dataSchema, isNullHandlingEnabled);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
         return resultsBlock;
       }
     }
 
-    IntermediateResultsBlock resultsBlock =
-        new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
+    IntermediateResultsBlock resultsBlock = new IntermediateResultsBlock(
+        _aggregationFunctions, groupByExecutor.getResult(), _dataSchema, isNullHandlingEnabled);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
     return resultsBlock;
   }

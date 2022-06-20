@@ -208,6 +208,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     BlockValSet[] blockValSets = new BlockValSet[numExpressions];
     int numColumnsProjected = _transformOperator.getNumColumnsProjected();
     TransformBlock transformBlock;
+    boolean anyNullHandlingEnabled = false;
     while (_numDocsScanned < _numRowsToKeep && (transformBlock = _transformOperator.nextBlock()) != null) {
       for (int i = 0; i < numExpressions; i++) {
         ExpressionContext expression = _expressions.get(i);
@@ -221,6 +222,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
         nullBitmaps[i] = blockValueFetcher.getColumnNullBitmap(i);
         isNullHandlingEnabled |= nullBitmaps[i] != null;
       }
+      anyNullHandlingEnabled |= isNullHandlingEnabled;
       if (isNullHandlingEnabled) {
         for (int rowId = 0; rowId < numDocsFetched && (_numDocsScanned < _numRowsToKeep); rowId++) {
           Object[] row = blockValueFetcher.getRow(rowId);
@@ -251,7 +253,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new IntermediateResultsBlock(dataSchema, _rows);
+    return new IntermediateResultsBlock(dataSchema, _rows, anyNullHandlingEnabled);
   }
 
   /**
@@ -264,6 +266,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     BlockValSet[] blockValSets = new BlockValSet[numExpressions];
     int numColumnsProjected = _transformOperator.getNumColumnsProjected();
     TransformBlock transformBlock;
+    boolean anyNullHandlingEnabled = false;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       for (int i = 0; i < numExpressions; i++) {
         ExpressionContext expression = _expressions.get(i);
@@ -277,6 +280,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
         nullBitmaps[i] = blockValueFetcher.getColumnNullBitmap(i);
         isNullHandlingEnabled |= nullBitmaps[i] != null;
       }
+      anyNullHandlingEnabled |= isNullHandlingEnabled;
       if (isNullHandlingEnabled) {
         for (int rowId = 0; rowId < numDocsFetched; rowId++) {
           // Note: Everytime blockValueFetcher.getRow is called, a new row instance is created.
@@ -308,7 +312,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new IntermediateResultsBlock(dataSchema, _rows);
+    return new IntermediateResultsBlock(dataSchema, _rows, anyNullHandlingEnabled);
   }
 
   /**
@@ -322,6 +326,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     BlockValSet[] blockValSets = new BlockValSet[numOrderByExpressions];
     int numColumnsProjected = _transformOperator.getNumColumnsProjected();
     TransformBlock transformBlock;
+    boolean anyNullHandlingEnabled = false;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       for (int i = 0; i < numOrderByExpressions; i++) {
         ExpressionContext expression = _orderByExpressions.get(i).getExpression();
@@ -337,12 +342,12 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
         nullBitmaps[i] = blockValueFetcher.getColumnNullBitmap(i);
         isNullHandlingEnabled |= nullBitmaps[i] != null;
       }
+      anyNullHandlingEnabled |= isNullHandlingEnabled;
       if (isNullHandlingEnabled) {
         for (int rowId = 0; rowId < numDocsFetched; rowId++) {
           Object[] row = new Object[numExpressions];
           blockValueFetcher.getRow(rowId, row, 0);
           row[numOrderByExpressions] = docIds[rowId];
-          // TODO: confirm nulls are handled when filling the non-order-by output expression values later in the row.
           for (int colId = 0; colId < numOrderByExpressions; colId++) {
             if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
               row[colId] = null;
@@ -431,7 +436,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new IntermediateResultsBlock(dataSchema, _rows);
+    return new IntermediateResultsBlock(dataSchema, _rows, anyNullHandlingEnabled);
   }
 
 

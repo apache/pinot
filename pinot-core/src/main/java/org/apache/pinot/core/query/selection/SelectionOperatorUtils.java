@@ -228,18 +228,18 @@ public class SelectionOperatorUtils {
    *
    * @param rows {@link Collection} of selection rows.
    * @param dataSchema data schema.
+   * @param isNullHandlingEnabled whether null handling is enabled.
    * @return data table.
    * @throws Exception
    */
-  public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema)
+  public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema,
+      boolean isNullHandlingEnabled)
       throws Exception {
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
 
     DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(dataSchema);
     RoaringBitmap[] nullBitmaps = null;
-    // TODO: use indexing config isNullHandlingEnabled instead.
-    boolean isNullHandlingEnabled = DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4;
     if (isNullHandlingEnabled) {
       nullBitmaps = new RoaringBitmap[numColumns];
       Object[] columnDefaultNullValues = new Object[numColumns];
@@ -348,7 +348,7 @@ public class SelectionOperatorUtils {
       dataTableBuilder.finishRow();
     }
 
-    if (isNullHandlingEnabled) {
+    if (isNullHandlingEnabled && DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4) {
       for (int colId = 0; colId < numColumns; colId++) {
         dataTableBuilder.setNullRowIds(nullBitmaps[colId]);
       }

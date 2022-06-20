@@ -84,8 +84,10 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<IntermediateRes
       return null;
     }
     int numExpressions = _expressions.size();
+    boolean isNullHandlingEnabled = false;
     for (int i = 0; i < numExpressions; i++) {
       _blockValSets[i] = transformBlock.getBlockValueSet(_expressions.get(i));
+      isNullHandlingEnabled |= _blockValSets[i].getNullBitmap() != null;
     }
     RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(_blockValSets);
     int numDocs = transformBlock.getNumDocs();
@@ -95,7 +97,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<IntermediateRes
       rows.add(blockValueFetcher.getRow(i));
     }
     _numDocsScanned += numDocs;
-    return new IntermediateResultsBlock(_dataSchema, rows);
+    return new IntermediateResultsBlock(_dataSchema, rows, isNullHandlingEnabled);
   }
 
 

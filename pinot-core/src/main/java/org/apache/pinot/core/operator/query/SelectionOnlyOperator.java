@@ -124,7 +124,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
       }
     }
 
-    return new IntermediateResultsBlock(_dataSchema, _rows);
+    return new IntermediateResultsBlock(_dataSchema, _rows, isNullHandlingEnabled);
   }
 
 

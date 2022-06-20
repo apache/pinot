@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.query;
 
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -58,8 +59,12 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
   @Override
   protected IntermediateResultsBlock getNextBlock() {
     TransformBlock transformBlock;
+    boolean isNullHandlingEnabled = false;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       _numDocsScanned += transformBlock.getNumDocs();
+      for (ExpressionContext expressionContext : _distinctAggregationFunction.getInputExpressions()) {
+        isNullHandlingEnabled |= transformBlock.getBlockValueSet(expressionContext).getNullBitmap() != null;
+      }
       if (_distinctExecutor.process(transformBlock)) {
         break;
       }
@@ -67,7 +72,7 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
     DistinctTable distinctTable = _distinctExecutor.getResult();
     // TODO: Use a separate way to represent DISTINCT instead of aggregation.
     return new IntermediateResultsBlock(new AggregationFunction[]{_distinctAggregationFunction},
-        Collections.singletonList(distinctTable), distinctTable.getDataSchema());
+        Collections.singletonList(distinctTable), distinctTable.getDataSchema(), isNullHandlingEnabled);
   }
 
   @Override
