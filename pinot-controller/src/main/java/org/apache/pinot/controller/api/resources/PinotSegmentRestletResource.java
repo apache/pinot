@@ -472,7 +472,8 @@ public class PinotSegmentRestletResource {
         _pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentName, msgInfo.getRight(),
             msgInfo.getLeft());
       } catch (Exception e) {
-        LOGGER.error("Failed to add job meta into zookeeper ", e);
+        LOGGER.error("Failed to add reload segment job meta into zookeeper for table {}, segment {}",
+            tableNameWithType, segmentName, e);
       }
       return new SuccessResponse("Sent " + msgInfo + " reload messages");
     } else {
@@ -591,14 +592,17 @@ public class PinotSegmentRestletResource {
   }
 
   @GET
-  @Path("tables/{tableNameWithType}/segmentReloadStatus/{jobId}")
+  @Path("tables/{tableName}/segmentReloadStatus/{jobId}")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get status for a submitted reload operation", notes = "Get status for a submitted reload "
-      + "operation")
+  @ApiOperation(value = "Get status for a submitted reload operation",
+      notes = "Get status for a submitted reload operation")
   public ServerReloadControllerJobStatusResponse getReloadJobStatus(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Reload job id", required = true) @PathParam("jobId") String reloadJobId)
       throws Exception {
+    TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
+    String tableNameWithType = TableNameBuilder.forType(tableTypeFromRequest).tableNameWithType(tableName);
     Map<String, List<String>> serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
     Map<String, String> controllerJobZKMetadata =
         _pinotHelixResourceManager.getControllerJobZKMetadata(tableNameWithType, reloadJobId);
@@ -685,7 +689,7 @@ public class PinotSegmentRestletResource {
       try {
         _pinotHelixResourceManager.addNewReloadAllSegmentsJob(tableNameWithType, msgInfo.getRight(), msgInfo.getLeft());
       } catch (Exception e) {
-        LOGGER.error("Failed to store task meta in zookepper ", e);
+        LOGGER.error("Failed to add reload all segments job meta into zookeeper for table {}", tableNameWithType, e);
       }
     }
     return new SuccessResponse("Sent " + perTableMsgData + " reload messages");
