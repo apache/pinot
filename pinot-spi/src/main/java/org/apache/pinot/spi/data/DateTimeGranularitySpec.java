@@ -23,15 +23,13 @@ import com.google.common.base.Preconditions;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 
 
 /**
  * Class to represent granularity from {@link DateTimeFieldSpec}
  */
 public class DateTimeGranularitySpec {
-
-  public static final String NUMBER_REGEX = "[1-9][0-9]*";
-
   public static final String COLON_SEPARATOR = ":";
 
   /* DateTimeFieldSpec granularity is of format size:timeUnit */
@@ -101,7 +99,7 @@ public class DateTimeGranularitySpec {
     String[] granularityTokens = granularity.split(COLON_SEPARATOR);
     Preconditions.checkState(granularityTokens.length == MAX_GRANULARITY_TOKENS,
         "Incorrect granularity: %s. Must be of format 'size:timeunit'", granularity);
-    Preconditions.checkState(granularityTokens[GRANULARITY_SIZE_POSITION].matches(NUMBER_REGEX),
+    Preconditions.checkState(TimeUtils.isTimeSize(granularityTokens[GRANULARITY_SIZE_POSITION]),
         "Incorrect granularity size: %s. Must be of format '[0-9]+:<TimeUnit>'",
         granularityTokens[GRANULARITY_SIZE_POSITION]);
     Preconditions.checkState(EnumUtils.isValidEnum(TimeUnit.class, granularityTokens[GRANULARITY_UNIT_POSITION]),

@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
@@ -34,8 +35,6 @@ import org.joda.time.format.DateTimeFormatter;
  * Class to represent format from {@link DateTimeFieldSpec}
  */
 public class DateTimeFormatSpec {
-
-  public static final String NUMBER_REGEX = "[1-9][0-9]*";
   public static final String COLON_SEPARATOR = ":";
   public static final String PIPE_SEPARATOR = "|";
 
@@ -225,7 +224,7 @@ public class DateTimeFormatSpec {
     String[] formatTokens = StringUtils.split(format, COLON_SEPARATOR, MAX_FORMAT_TOKENS);
     Preconditions.checkState(formatTokens.length >= MIN_FORMAT_TOKENS && formatTokens.length <= MAX_FORMAT_TOKENS,
         "Incorrect format: %s. Must be of format 'size:timeunit:timeformat(:pattern)'", format);
-    Preconditions.checkState(formatTokens[FORMAT_SIZE_POSITION].matches(NUMBER_REGEX),
+    Preconditions.checkState(TimeUtils.isTimeSize(formatTokens[FORMAT_SIZE_POSITION]),
         "Incorrect format size: %s in format: %s. Must be of format '[0-9]+:<TimeUnit>:<TimeFormat>(:pattern)'",
         formatTokens[FORMAT_SIZE_POSITION], format);
 
@@ -264,11 +263,11 @@ public class DateTimeFormatSpec {
               || formatTokens[FORMAT_SIZE_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
           "Incorrect format %s. Must be of 'EPOCH|<timeUnit>(|<size>)' or" + "'SDF|<timeFormat>(|<timezone>)'");
 
-      if (formatTokens.length == MAX_FORMAT_TOKENS_PIPE
-          && formatTokens[FORMAT_SIZE_POSITION].equals(TimeFormat.EPOCH.toString())) {
-          Preconditions.checkState(formatTokens[EPOCH_SIZE_POSITION].matches(NUMBER_REGEX),
-              "Incorrect format size: %s in format: %s. Must be of format 'EPOCH|<timeUnit>|[0-9]+'",
-              formatTokens[EPOCH_SIZE_POSITION], format);
+      if (formatTokens.length == MAX_FORMAT_TOKENS_PIPE && formatTokens[FORMAT_SIZE_POSITION]
+          .equals(TimeFormat.EPOCH.toString())) {
+        Preconditions.checkState(TimeUtils.isTimeSize(formatTokens[EPOCH_SIZE_POSITION]),
+            "Incorrect format size: %s in format: %s. Must be of format 'EPOCH|<timeUnit>|[0-9]+'",
+            formatTokens[EPOCH_SIZE_POSITION], format);
       }
     }
     return formatTokens;

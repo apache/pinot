@@ -194,4 +194,29 @@ public class TimeUtils {
       return false;
     }
   }
+
+  /**
+   * Check if a string value matches regex `[1-9][0-9]*`. This check is used when converting date times and date time
+   * conversion is a common transforms applied when generating segments, thus this check is on its critical path.
+   * Based on benchmarks, this util method is about 3x faster than compiled regex and about 10x faster than calling
+   * String.matches(regex) directly.
+   *
+   * @param value the String value to check
+   * @return true if the value matches `[1-9][0-9]*`
+   */
+  public static boolean isTimeSize(String value) {
+    if (value == null || value.length() == 0) {
+      return false;
+    }
+    char[] digits = value.toCharArray();
+    if (digits[0] < '1' || digits[0] > '9') {
+      return false;
+    }
+    for (int i = 1; i < digits.length; i++) {
+      if (digits[i] < '0' || digits[i] > '9') {
+        return false;
+      }
+    }
+    return true;
+  }
 }
