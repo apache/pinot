@@ -21,12 +21,16 @@ package org.apache.pinot.common.restlet.resources;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.Map;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableTierInfo {
+  @JsonPropertyDescription("Name of table to look for segment storage tiers")
   private final String _tableName;
+
+  @JsonPropertyDescription("Storage tiers of segments hosted on the server")
   private final Map<String, String> _segmentTiers;
 
   @JsonCreator

@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.controller.util;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.collect.BiMap;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import org.apache.commons.httpclient.HttpConnectionManager;
@@ -37,6 +38,9 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
  * Reads segment storage tiers from servers for the given table.
  */
 public class TableTierReader {
+  private static final String ERROR_RESP_NO_RESPONSE = "NO_RESPONSE_FROM_SERVER";
+  private static final String ERROR_RESP_MISSING_SEGMENT = "SEGMENT_MISSED_ON_SERVER";
+
   private final Executor _executor;
   private final HttpConnectionManager _connectionManager;
   private final PinotHelixResourceManager _helixResourceManager;
@@ -75,49 +79,37 @@ public class TableTierReader {
     TableTierDetails tableTierDetails = new TableTierDetails(tableNameWithType);
     for (Map.Entry<String, List<String>> entry : serverToSegmentsMap.entrySet()) {
       String server = entry.getKey();
+      List<String> expectedSegmentsOnServer = entry.getValue();
       TableTierInfo tableTierInfo = serverToTableTierInfoMap.get(server);
-      if (tableTierInfo == null) {
-        tableTierDetails._missingServers.add(server);
-        continue;
-      }
-      Map<String, String> segmentTiers = tableTierInfo.getSegmentTiers();
-      for (String expectedSegment : entry.getValue()) {
-        if (!segmentTiers.containsKey(expectedSegment)) {
-          tableTierDetails._missingSegments.computeIfAbsent(server, (k) -> new HashSet<>()).add(expectedSegment);
-        } else {
-          tableTierDetails._segmentTiers.computeIfAbsent(expectedSegment, (k) -> new HashMap<>())
-              .put(server, segmentTiers.get(expectedSegment));
-        }
+      for (String expectedSegment : expectedSegmentsOnServer) {
+        tableTierDetails._segmentTiers.computeIfAbsent(expectedSegment, (k) -> new HashMap<>()).put(server,
+            (tableTierInfo != null) ? tableTierInfo.getSegmentTiers()
+                .getOrDefault(expectedSegment, ERROR_RESP_MISSING_SEGMENT) : ERROR_RESP_NO_RESPONSE);
       }
     }
     return tableTierDetails;
   }
 
   // This class aggregates the TableTierInfo returned from multi servers.
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public static class TableTierDetails {
     private final String _tableName;
-    private final Set<String> _missingServers = new HashSet<>();
-    private final Map<String/*server*/, Set<String>/*segments*/> _missingSegments = new HashMap<>();
-    private final Map<String/*segment*/, Map<String/*server*/, String/*tier*/>> _segmentTiers = new HashMap<>();
+    private final Map<String/*segment*/, Map<String/*server*/, String/*tier or err*/>> _segmentTiers = new HashMap<>();
 
     TableTierDetails(String tableName) {
       _tableName = tableName;
     }
 
+    @JsonPropertyDescription("Name of table to look for segment storage tiers")
+    @JsonProperty("tableName")
     public String getTableName() {
       return _tableName;
     }
 
+    @JsonPropertyDescription("Storage tiers of segments for the given table")
+    @JsonProperty("segmentTiers")
     public Map<String, Map<String, String>> getSegmentTiers() {
       return _segmentTiers;
-    }
-
-    public Map<String, Set<String>> getMissingSegments() {
-      return _missingSegments;
-    }
-
-    public Set<String> getMissingServers() {
-      return _missingServers;
     }
   }
 }

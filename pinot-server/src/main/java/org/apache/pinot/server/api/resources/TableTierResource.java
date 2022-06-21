@@ -67,14 +67,14 @@ public class TableTierResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/tables/{tableName}/tier")
+  @Path("/tables/{tableName}/tiers")
   @ApiOperation(value = "Get storage tiers of immutable segments of the given table", notes = "Get storage tiers of "
       + "immutable segments of the given table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
       @ApiResponse(code = 404, message = "Table not found")
   })
-  public String getTableTier(
+  public String getTableTiers(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed)
       throws WebApplicationException {

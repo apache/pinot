@@ -55,7 +55,7 @@ public class ServerTableTierReader {
     List<String> serverUrls = new ArrayList<>(numServers);
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
-      String tableTierUri = endpoint + "/tables/" + tableNameWithType + "/tier";
+      String tableTierUri = endpoint + "/tables/" + tableNameWithType + "/tiers";
       serverUrls.add(tableTierUri);
     }
     CompletionServiceHelper completionServiceHelper =

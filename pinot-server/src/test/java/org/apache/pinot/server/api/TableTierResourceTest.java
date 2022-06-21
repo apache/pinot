@@ -31,7 +31,7 @@ import static org.testng.Assert.assertEquals;
 public class TableTierResourceTest extends BaseResourceTest {
   @Test
   public void testTableNotFound() {
-    Response response = _webTarget.path("tables/unknownTable/tier").request().get(Response.class);
+    Response response = _webTarget.path("tables/unknownTable/tiers").request().get(Response.class);
     assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
@@ -42,7 +42,7 @@ public class TableTierResourceTest extends BaseResourceTest {
   }
 
   private void verifyTableTierInfo(String expectedTableName, ImmutableSegment segment) {
-    String path = "/tables/" + expectedTableName + "/tier";
+    String path = "/tables/" + expectedTableName + "/tiers";
     TableTierInfo tableTierInfo = _webTarget.path(path).request().get(TableTierInfo.class);
     assertEquals(tableTierInfo.getTableName(), expectedTableName);
     assertEquals(tableTierInfo.getSegmentTiers().size(), 1);

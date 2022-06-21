@@ -51,7 +51,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
 
 
 public class TableTierReaderTest {
@@ -110,7 +109,7 @@ public class TableTierReaderTest {
     counter++;
 
     // server5 ... timing out server
-    s = new FakeSizeServer(Collections.singletonMap("seg05", "someTier"));
+    s = new FakeSizeServer(Collections.singletonMap("seg04", "someTier"));
     s.start(URI_PATH, createHandler(200, s._segTierMap, TIMEOUT_MSEC * EXTENDED_TIMEOUT_FACTOR));
     _serverMap.put(serverName(counter), s);
   }
@@ -187,9 +186,6 @@ public class TableTierReaderTest {
       throws InvalidConfigException {
     final String[] servers = {"server0", "server1"};
     TableTierReader.TableTierDetails tableTierDetails = testRunner(servers, "myTable_OFFLINE", null);
-    assertTrue(tableTierDetails.getMissingServers().isEmpty());
-    assertTrue(tableTierDetails.getMissingSegments().isEmpty());
-
     assertEquals(tableTierDetails.getSegmentTiers().size(), 2);
     Map<String, String> tiersByServer = tableTierDetails.getSegmentTiers().get("seg01");
     assertEquals(tiersByServer.size(), 2);
@@ -205,11 +201,13 @@ public class TableTierReaderTest {
       throws InvalidConfigException {
     String[] servers = {"server2", "server5"};
     TableTierReader.TableTierDetails tableTierDetails = testRunner(servers, "myTable_OFFLINE", null);
-    assertEquals(tableTierDetails.getMissingServers().size(), 2);
-    assertTrue(tableTierDetails.getMissingServers().contains("server2"));
-    assertTrue(tableTierDetails.getMissingServers().contains("server5"));
-    assertTrue(tableTierDetails.getSegmentTiers().isEmpty());
-    assertTrue(tableTierDetails.getMissingSegments().isEmpty());
+    assertEquals(tableTierDetails.getSegmentTiers().size(), 2);
+    Map<String, String> tiersByServer = tableTierDetails.getSegmentTiers().get("seg02");
+    assertEquals(tiersByServer.size(), 1);
+    assertEquals(tiersByServer.get("server2"), "NO_RESPONSE_FROM_SERVER");
+    tiersByServer = tableTierDetails.getSegmentTiers().get("seg04");
+    assertEquals(tiersByServer.size(), 1);
+    assertEquals(tiersByServer.get("server5"), "NO_RESPONSE_FROM_SERVER");
   }
 
   @Test
@@ -218,22 +216,25 @@ public class TableTierReaderTest {
     final String[] servers = {"server0", "server1", "server2", "server3", "server4", "server5"};
     TableTierReader.TableTierDetails tableTierDetails = testRunner(servers, "myTable_OFFLINE", null);
 
-    assertEquals(tableTierDetails.getMissingServers().size(), 2);
-    assertTrue(tableTierDetails.getMissingServers().contains("server2"));
-    assertTrue(tableTierDetails.getMissingServers().contains("server5"));
-
-    assertEquals(tableTierDetails.getMissingSegments().size(), 1);
-    assertTrue(tableTierDetails.getMissingSegments().get("server4").contains("seg03"));
-
-    assertEquals(tableTierDetails.getSegmentTiers().size(), 2);
+    assertEquals(tableTierDetails.getSegmentTiers().size(), 4);
     Map<String, String> tiersByServer = tableTierDetails.getSegmentTiers().get("seg01");
     assertEquals(tiersByServer.size(), 2);
     assertNull(tiersByServer.get("server0"));
     assertNull(tiersByServer.get("server1"));
+
     tiersByServer = tableTierDetails.getSegmentTiers().get("seg02");
-    assertEquals(tiersByServer.size(), 2);
+    assertEquals(tiersByServer.size(), 3);
     assertEquals(tiersByServer.get("server0"), "someTier");
+    assertEquals(tiersByServer.get("server2"), "NO_RESPONSE_FROM_SERVER");
     assertEquals(tiersByServer.get("server4"), "someTier");
+
+    tiersByServer = tableTierDetails.getSegmentTiers().get("seg03");
+    assertEquals(tiersByServer.size(), 1);
+    assertEquals(tiersByServer.get("server4"), "SEGMENT_MISSED_ON_SERVER");
+
+    tiersByServer = tableTierDetails.getSegmentTiers().get("seg04");
+    assertEquals(tiersByServer.size(), 1);
+    assertEquals(tiersByServer.get("server5"), "NO_RESPONSE_FROM_SERVER");
   }
 
   @Test
@@ -242,18 +243,14 @@ public class TableTierReaderTest {
     final String[] servers = {"server0", "server1", "server2", "server3", "server4", "server5"};
     TableTierReader.TableTierDetails tableTierDetails = testRunner(servers, "myTable_OFFLINE", "seg01");
 
-    assertEquals(tableTierDetails.getMissingServers().size(), 2);
-    assertTrue(tableTierDetails.getMissingServers().contains("server2"));
-    assertTrue(tableTierDetails.getMissingServers().contains("server5"));
-
-    assertEquals(tableTierDetails.getMissingSegments().size(), 2);
-    assertTrue(tableTierDetails.getMissingSegments().get("server3").contains("seg01"));
-    assertTrue(tableTierDetails.getMissingSegments().get("server4").contains("seg01"));
-
     assertEquals(tableTierDetails.getSegmentTiers().size(), 1);
     Map<String, String> tiersByServer = tableTierDetails.getSegmentTiers().get("seg01");
-    assertEquals(tiersByServer.size(), 2);
+    assertEquals(tiersByServer.size(), 6);
     assertNull(tiersByServer.get("server0"));
     assertNull(tiersByServer.get("server1"));
+    assertEquals(tiersByServer.get("server2"), "NO_RESPONSE_FROM_SERVER");
+    assertEquals(tiersByServer.get("server3"), "SEGMENT_MISSED_ON_SERVER");
+    assertEquals(tiersByServer.get("server4"), "SEGMENT_MISSED_ON_SERVER");
+    assertEquals(tiersByServer.get("server5"), "NO_RESPONSE_FROM_SERVER");
   }
 }
