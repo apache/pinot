@@ -158,26 +158,22 @@ public abstract class BaseDataTable implements DataTable {
 
   @Override
   public int getInt(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getInt();
+    return _fixedSizeData.getInt(rowId * _rowSizeInBytes + _columnOffsets[colId]);
   }
 
   @Override
   public long getLong(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getLong();
+    return _fixedSizeData.getLong(rowId * _rowSizeInBytes + _columnOffsets[colId]);
   }
 
   @Override
   public float getFloat(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getFloat();
+    return _fixedSizeData.getFloat(rowId * _rowSizeInBytes + _columnOffsets[colId]);
   }
 
   @Override
   public double getDouble(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getDouble();
+    return _fixedSizeData.getDouble(rowId * _rowSizeInBytes + _columnOffsets[colId]);
   }
 
   @Override
@@ -190,8 +186,7 @@ public abstract class BaseDataTable implements DataTable {
 
   @Override
   public String getString(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    int dictId = _fixedSizeData.getInt();
+    int dictId = _fixedSizeData.getInt(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     return _dictionaryMap.get(_dataSchema.getColumnName(colId)).get(dictId);
   }
 
@@ -271,9 +266,9 @@ public abstract class BaseDataTable implements DataTable {
   }
 
   private int positionCursorInVariableBuffer(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    _variableSizeData.position(_fixedSizeData.getInt());
-    return _fixedSizeData.getInt();
+    int offset = rowId * _rowSizeInBytes + _columnOffsets[colId];
+    _variableSizeData.position(_fixedSizeData.getInt(offset));
+    return _fixedSizeData.getInt(offset + 4);
   }
 
   @Override

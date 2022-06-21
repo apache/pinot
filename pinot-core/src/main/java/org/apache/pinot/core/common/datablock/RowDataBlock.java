@@ -85,16 +85,15 @@ public class RowDataBlock extends BaseDataBlock {
   }
 
   @Override
-  protected void positionCursorInFixSizedBuffer(int rowId, int colId) {
-    int position = rowId * _rowSizeInBytes + _columnOffsets[colId];
-    _fixedSizeData.position(position);
+  protected int getOffsetInFixedBuffer(int rowId, int colId) {
+    return rowId * _rowSizeInBytes + _columnOffsets[colId];
   }
 
   @Override
-  protected int positionCursorInVariableBuffer(int rowId, int colId) {
-    positionCursorInFixSizedBuffer(rowId, colId);
-    _variableSizeData.position(_fixedSizeData.getInt());
-    return _fixedSizeData.getInt();
+  protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
+    int offset = getOffsetInFixedBuffer(rowId, colId);
+    _variableSizeData.position(_fixedSizeData.getInt(offset));
+    return _fixedSizeData.getInt(offset + 4);
   }
 
   @Override

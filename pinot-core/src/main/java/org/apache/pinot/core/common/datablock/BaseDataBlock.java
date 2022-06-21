@@ -207,21 +207,22 @@ public abstract class BaseDataBlock implements DataTable {
   protected abstract int getDataBlockVersionType();
 
   /**
-   * position the {@code _fixedSizeDataBytes} member variable to the corresponding row/column ID.
+   * return the offset in {@code _fixedSizeDataBytes} of the row/column ID.
    * @param rowId row ID
    * @param colId column ID
+   * @return the offset in the fixed size buffer for the row/columnID.
    */
-  protected abstract void positionCursorInFixSizedBuffer(int rowId, int colId);
+  protected abstract int getOffsetInFixedBuffer(int rowId, int colId);
 
   /**
-   * position the {@code _variableSizeDataBytes} member variable to the corresponding row/column ID. and return the
+   * position the {@code _variableSizeDataBytes} to the corresponding row/column ID. and return the
    * length of bytes to extract from the variable size buffer.
    *
    * @param rowId row ID
    * @param colId column ID
    * @return the length to extract from variable size buffer.
    */
-  protected abstract int positionCursorInVariableBuffer(int rowId, int colId);
+  protected abstract int positionOffsetInVariableBufferAndGetLength(int rowId, int colId);
 
   @Override
   public Map<String, String> getMetadata() {
@@ -249,31 +250,27 @@ public abstract class BaseDataBlock implements DataTable {
 
   @Override
   public int getInt(int rowId, int colId) {
-    positionCursorInFixSizedBuffer(rowId, colId);
-    return _fixedSizeData.getInt();
+    return _fixedSizeData.getInt(getOffsetInFixedBuffer(rowId, colId));
   }
 
   @Override
   public long getLong(int rowId, int colId) {
-    positionCursorInFixSizedBuffer(rowId, colId);
-    return _fixedSizeData.getLong();
+    return _fixedSizeData.getLong(getOffsetInFixedBuffer(rowId, colId));
   }
 
   @Override
   public float getFloat(int rowId, int colId) {
-    positionCursorInFixSizedBuffer(rowId, colId);
-    return _fixedSizeData.getFloat();
+    return _fixedSizeData.getFloat(getOffsetInFixedBuffer(rowId, colId));
   }
 
   @Override
   public double getDouble(int rowId, int colId) {
-    positionCursorInFixSizedBuffer(rowId, colId);
-    return _fixedSizeData.getDouble();
+    return _fixedSizeData.getDouble(getOffsetInFixedBuffer(rowId, colId));
   }
 
   @Override
   public BigDecimal getBigDecimal(int rowId, int colId) {
-    int size = positionCursorInVariableBuffer(rowId, colId);
+    int size = positionOffsetInVariableBufferAndGetLength(rowId, colId);
     ByteBuffer byteBuffer = _variableSizeData.slice();
     byteBuffer.limit(size);
     return BigDecimalUtils.deserialize(byteBuffer);
@@ -281,13 +278,12 @@ public abstract class BaseDataBlock implements DataTable {
 
   @Override
   public String getString(int rowId, int colId) {
-    positionCursorInFixSizedBuffer(rowId, colId);
-    return _stringDictionary[_fixedSizeData.getInt()];
+    return _stringDictionary[_fixedSizeData.getInt(getOffsetInFixedBuffer(rowId, colId))];
   }
 
   @Override
   public ByteArray getBytes(int rowId, int colId) {
-    int size = positionCursorInVariableBuffer(rowId, colId);
+    int size = positionOffsetInVariableBufferAndGetLength(rowId, colId);
     byte[] buffer = new byte[size];
     _variableSizeData.get(buffer);
     return new ByteArray(buffer);
@@ -299,7 +295,7 @@ public abstract class BaseDataBlock implements DataTable {
 
   @Override
   public <T> T getObject(int rowId, int colId) {
-    int size = positionCursorInVariableBuffer(rowId, colId);
+    int size = positionOffsetInVariableBufferAndGetLength(rowId, colId);
     int objectTypeValue = _variableSizeData.getInt();
     if (size == 0) {
       assert objectTypeValue == ObjectSerDeUtils.ObjectType.Null.getValue();
@@ -312,7 +308,7 @@ public abstract class BaseDataBlock implements DataTable {
 
   @Override
   public int[] getIntArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
+    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
     int[] ints = new int[length];
     for (int i = 0; i < length; i++) {
       ints[i] = _variableSizeData.getInt();
@@ -322,7 +318,7 @@ public abstract class BaseDataBlock implements DataTable {
 
   @Override
   public long[] getLongArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
+    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
     long[] longs = new long[length];
     for (int i = 0; i < length; i++) {
       longs[i] = _variableSizeData.getLong();
@@ -332,7 +328,7 @@ public abstract class BaseDataBlock implements DataTable {
 
   @Override
   public float[] getFloatArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
+    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
     float[] floats = new float[length];
     for (int i = 0; i < length; i++) {
       floats[i] = _variableSizeData.getFloat();
@@ -342,7 +338,7 @@ public abstract class BaseDataBlock implements DataTable {
 
   @Override
   public double[] getDoubleArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
+    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
     double[] doubles = new double[length];
     for (int i = 0; i < length; i++) {
       doubles[i] = _variableSizeData.getDouble();
@@ -352,7 +348,7 @@ public abstract class BaseDataBlock implements DataTable {
 
   @Override
   public String[] getStringArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
+    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
     String[] strings = new String[length];
     for (int i = 0; i < length; i++) {
       strings[i] = _stringDictionary[_variableSizeData.getInt()];
