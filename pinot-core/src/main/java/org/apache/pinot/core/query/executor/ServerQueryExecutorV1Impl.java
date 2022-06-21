@@ -224,10 +224,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           }
         } else if (indexSegment instanceof ImmutableSegment) {
           SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
-          Interval timeInterval = segmentMetadata.getTimeInterval();
+          long indexCreationTime = segmentMetadata.getIndexCreationTime();
           numOnlineSegments++;
-          if (timeInterval != null) {
-            maxEndTimeMs = Math.max(maxEndTimeMs, timeInterval.getEndMillis());
+          if (indexCreationTime != Long.MIN_VALUE) {
+            maxEndTimeMs = Math.max(maxEndTimeMs, indexCreationTime);
+          } else {
+            // NOTE: the endTime may be totally inaccurate based on the value added in the timeColumn
+            Interval timeInterval = segmentMetadata.getTimeInterval();
+            if (timeInterval != null) {
+              maxEndTimeMs = Math.max(maxEndTimeMs, timeInterval.getEndMillis());
+            }
           }
         }
       }
@@ -286,7 +292,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       long minConsumingFreshnessTimeMs = Long.MAX_VALUE;
       if (numConsumingSegmentsQueried > 0) {
         minConsumingFreshnessTimeMs = minIngestionTimeMs != Long.MAX_VALUE ? minIngestionTimeMs : minIndexTimeMs;
-        metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), Integer.toString(numConsumingSegmentsQueried));
+        metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(),
+            Integer.toString(numConsumingSegmentsQueried));
         metadata.put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), Long.toString(minConsumingFreshnessTimeMs));
         LOGGER.debug("Request {} queried {} consuming segments with minConsumingFreshnessTimeMs: {}", requestId,
             numConsumingSegmentsQueried, minConsumingFreshnessTimeMs);
