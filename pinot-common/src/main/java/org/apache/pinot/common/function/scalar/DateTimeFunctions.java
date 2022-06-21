@@ -25,13 +25,9 @@ import org.apache.pinot.common.function.DateTimePatternHandler;
 import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
 import org.apache.pinot.spi.annotations.ScalarFunction;
-import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.DateTimeFormatSpec;
-import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.chrono.ISOChronology;
-import org.joda.time.format.DateTimeFormatter;
 
 /**
  * Inbuilt date time related transform functions
@@ -678,50 +674,6 @@ public class DateTimeFunctions {
       TimeUnit outputTimeUnit) {
     return outputTimeUnit.convert(DateTimeUtils.getTimestampField(chronology, unit)
         .roundFloor(TimeUnit.MILLISECONDS.convert(timeValue, inputTimeUnit)), TimeUnit.MILLISECONDS);
-  }
-
-  /**
-   * Equivalent to {@code DateTimeConversionTransformFunction}. Both input and output are string type to support simple
-   * date format.
-   */
-  @ScalarFunction
-  public static String dateTimeConvert(String timeValueStr, String inputFormatStr, String outputFormatStr,
-      String outputGranularityStr) {
-    long timeValueMs = new DateTimeFormatSpec(inputFormatStr).fromFormatToMillis(timeValueStr);
-    DateTimeFormatSpec outputFormat = new DateTimeFormatSpec(outputFormatStr);
-    DateTimeGranularitySpec granularitySpec = new DateTimeGranularitySpec(outputGranularityStr);
-    if (outputFormat.getTimeFormat() == DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT) {
-      DateTimeFormatter outputFormatter = outputFormat.getDateTimeFormatter();
-      DateTime dateTime = new DateTime(timeValueMs, outputFormatter.getZone());
-      int size = granularitySpec.getSize();
-      switch (granularitySpec.getTimeUnit()) {
-        case MILLISECONDS:
-          dateTime = dateTime.withMillisOfSecond((dateTime.getMillisOfSecond() / size) * size);
-          break;
-        case SECONDS:
-          dateTime = dateTime.withSecondOfMinute((dateTime.getSecondOfMinute() / size) * size).secondOfMinute()
-              .roundFloorCopy();
-          break;
-        case MINUTES:
-          dateTime =
-              dateTime.withMinuteOfHour((dateTime.getMinuteOfHour() / size) * size).minuteOfHour().roundFloorCopy();
-          break;
-        case HOURS:
-          dateTime = dateTime.withHourOfDay((dateTime.getHourOfDay() / size) * size).hourOfDay().roundFloorCopy();
-          break;
-        case DAYS:
-          dateTime = dateTime.withDayOfMonth(((dateTime.getDayOfMonth() - 1) / size) * size + 1).dayOfMonth()
-              .roundFloorCopy();
-          break;
-        default:
-          break;
-      }
-      return outputFormatter.print(dateTime);
-    } else {
-      long granularityMs = granularitySpec.granularityToMillis();
-      long roundedTimeValueMs = timeValueMs / granularityMs * granularityMs;
-      return outputFormat.fromMillisToFormat(roundedTimeValueMs);
-    }
   }
 
   /**
