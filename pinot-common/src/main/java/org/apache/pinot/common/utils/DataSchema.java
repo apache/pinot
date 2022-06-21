@@ -257,8 +257,8 @@ public class DataSchema {
     DOUBLE_ARRAY,
     BOOLEAN_ARRAY /* Stored as INT_ARRAY */,
     TIMESTAMP_ARRAY /* Stored as LONG_ARRAY */,
-    BYTES_ARRAY,
-    STRING_ARRAY;
+    STRING_ARRAY,
+    BYTES_ARRAY;
 
     private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL);
     private static final EnumSet<ColumnDataType> INTEGRAL_TYPES = EnumSet.of(INT, LONG);
@@ -558,12 +558,12 @@ public class DataSchema {
           return FLOAT_ARRAY;
         case DOUBLE:
           return DOUBLE_ARRAY;
-        case STRING:
-          return STRING_ARRAY;
         case BOOLEAN:
           return BOOLEAN_ARRAY;
         case TIMESTAMP:
           return TIMESTAMP_ARRAY;
+        case STRING:
+          return STRING_ARRAY;
         case BYTES:
           return BYTES_ARRAY;
         default:

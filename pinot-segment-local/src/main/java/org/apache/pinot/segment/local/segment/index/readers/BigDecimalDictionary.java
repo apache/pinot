@@ -30,7 +30,6 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 public class BigDecimalDictionary extends BaseImmutableDictionary {
 
   public BigDecimalDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
-    // Works with VarLengthValueBuffer only.
     super(dataBuffer, length, numBytesPerValue, (byte) 0);
   }
 
