@@ -19,16 +19,12 @@
 package org.apache.pinot.segment.local.segment.creator.impl;
 
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
-import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
-import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.VarLengthValueWriter;
@@ -52,11 +48,11 @@ public class SegmentDictionaryCreator implements Closeable {
   private final File _dictionaryFile;
   private final boolean _useVarLengthDictionary;
 
-  private Int2IntOpenHashMap _intValueToIndexMap;
-  private Long2IntOpenHashMap _longValueToIndexMap;
-  private Float2IntOpenHashMap _floatValueToIndexMap;
-  private Double2IntOpenHashMap _doubleValueToIndexMap;
-  private Object2IntOpenHashMap<Object> _objectValueToIndexMap;
+  private int[] _sortedInts;
+  private long[] _sortedLongs;
+  private float[] _sortedFloats;
+  private double[] _sortedDoubles;
+  private Object[] _sortedObjects;
   private int _numBytesPerEntry = 0;
 
   public SegmentDictionaryCreator(FieldSpec fieldSpec, File indexDir, boolean useVarLengthDictionary) {
@@ -76,96 +72,83 @@ public class SegmentDictionaryCreator implements Closeable {
 
     switch (_storedType) {
       case INT:
-        int[] sortedInts = (int[]) sortedValues;
-        int numValues = sortedInts.length;
+        _sortedInts = (int[]) sortedValues;
+        int numValues = _sortedInts.length;
         Preconditions.checkState(numValues > 0);
-        _intValueToIndexMap = new Int2IntOpenHashMap(numValues);
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapFile(_dictionaryFile, false, 0,
             (long) numValues * Integer.BYTES, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
             FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
           for (int i = 0; i < numValues; i++) {
-            int value = sortedInts[i];
-            _intValueToIndexMap.put(value, i);
-            writer.writeInt(i, value);
+            writer.writeInt(i, _sortedInts[i]);
           }
         }
         LOGGER.info("Created dictionary for INT column: {} with cardinality: {}, range: {} to {}", _columnName,
-            numValues, sortedInts[0], sortedInts[numValues - 1]);
+            numValues, _sortedInts[0], _sortedInts[numValues - 1]);
         return;
 
       case LONG:
-        long[] sortedLongs = (long[]) sortedValues;
-        numValues = sortedLongs.length;
+        _sortedLongs = (long[]) sortedValues;
+        numValues = _sortedLongs.length;
         Preconditions.checkState(numValues > 0);
-        _longValueToIndexMap = new Long2IntOpenHashMap(numValues);
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapFile(_dictionaryFile, false, 0,
             (long) numValues * Long.BYTES, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
             FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
           for (int i = 0; i < numValues; i++) {
-            long value = sortedLongs[i];
-            _longValueToIndexMap.put(value, i);
-            writer.writeLong(i, value);
+            writer.writeLong(i, _sortedLongs[i]);
           }
         }
         LOGGER.info("Created dictionary for LONG column: {} with cardinality: {}, range: {} to {}", _columnName,
-            numValues, sortedLongs[0], sortedLongs[numValues - 1]);
+            numValues, _sortedLongs[0], _sortedLongs[numValues - 1]);
         return;
 
       case FLOAT:
-        float[] sortedFloats = (float[]) sortedValues;
-        numValues = sortedFloats.length;
+        _sortedFloats = (float[]) sortedValues;
+        numValues = _sortedFloats.length;
         Preconditions.checkState(numValues > 0);
-        _floatValueToIndexMap = new Float2IntOpenHashMap(numValues);
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapFile(_dictionaryFile, false, 0,
             (long) numValues * Float.BYTES, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
             FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
           for (int i = 0; i < numValues; i++) {
-            float value = sortedFloats[i];
-            _floatValueToIndexMap.put(value, i);
-            writer.writeFloat(i, value);
+            writer.writeFloat(i, _sortedFloats[i]);
           }
         }
         LOGGER.info("Created dictionary for FLOAT column: {} with cardinality: {}, range: {} to {}", _columnName,
-            numValues, sortedFloats[0], sortedFloats[numValues - 1]);
+            numValues, _sortedFloats[0], _sortedFloats[numValues - 1]);
         return;
 
       case DOUBLE:
-        double[] sortedDoubles = (double[]) sortedValues;
-        numValues = sortedDoubles.length;
+        _sortedDoubles = (double[]) sortedValues;
+        numValues = _sortedDoubles.length;
         Preconditions.checkState(numValues > 0);
-        _doubleValueToIndexMap = new Double2IntOpenHashMap(numValues);
 
         // Backward-compatible: index file is always big-endian
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapFile(_dictionaryFile, false, 0,
             (long) numValues * Double.BYTES, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
             FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
           for (int i = 0; i < numValues; i++) {
-            double value = sortedDoubles[i];
-            _doubleValueToIndexMap.put(value, i);
-            writer.writeDouble(i, value);
+            writer.writeDouble(i, _sortedDoubles[i]);
           }
         }
         LOGGER.info("Created dictionary for DOUBLE column: {} with cardinality: {}, range: {} to {}", _columnName,
-            numValues, sortedDoubles[0], sortedDoubles[numValues - 1]);
+            numValues, _sortedDoubles[0], _sortedDoubles[numValues - 1]);
         return;
 
       case BIG_DECIMAL:
         BigDecimal[] sortedBigDecimals = (BigDecimal[]) sortedValues;
+        _sortedObjects = sortedBigDecimals;
         numValues = sortedBigDecimals.length;
         Preconditions.checkState(numValues > 0);
-        _objectValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
 
         // Get the maximum length of all entries
         byte[][] sortedBigDecimalBytes = new byte[numValues][];
         for (int i = 0; i < numValues; i++) {
           BigDecimal value = sortedBigDecimals[i];
-          _objectValueToIndexMap.put(value, i);
           byte[] valueBytes = BigDecimalUtils.serialize(value);
           sortedBigDecimalBytes[i] = valueBytes;
           _numBytesPerEntry = Math.max(_numBytesPerEntry, valueBytes.length);
@@ -179,15 +162,14 @@ public class SegmentDictionaryCreator implements Closeable {
 
       case STRING:
         String[] sortedStrings = (String[]) sortedValues;
+        _sortedObjects = sortedStrings;
         numValues = sortedStrings.length;
         Preconditions.checkState(numValues > 0);
-        _objectValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
 
         // Get the maximum length of all entries
         byte[][] sortedStringBytes = new byte[numValues][];
         for (int i = 0; i < numValues; i++) {
           String value = sortedStrings[i];
-          _objectValueToIndexMap.put(value, i);
           byte[] valueBytes = value.getBytes(UTF_8);
           sortedStringBytes[i] = valueBytes;
           _numBytesPerEntry = Math.max(_numBytesPerEntry, valueBytes.length);
@@ -201,16 +183,15 @@ public class SegmentDictionaryCreator implements Closeable {
 
       case BYTES:
         ByteArray[] sortedBytes = (ByteArray[]) sortedValues;
+        _sortedObjects = sortedBytes;
         numValues = sortedBytes.length;
         Preconditions.checkState(numValues > 0);
-        _objectValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
 
         // Get the maximum length of all entries
         byte[][] sortedByteArrays = new byte[numValues][];
         for (int i = 0; i < numValues; i++) {
           ByteArray value = sortedBytes[i];
           sortedByteArrays[i] = value.getBytes();
-          _objectValueToIndexMap.put(value, i);
           _numBytesPerEntry = Math.max(_numBytesPerEntry, value.getBytes().length);
         }
 
@@ -262,20 +243,20 @@ public class SegmentDictionaryCreator implements Closeable {
   public int indexOfSV(Object value) {
     switch (_storedType) {
       case INT:
-        return _intValueToIndexMap.get((int) value);
+        return indexOf((int) value);
       case LONG:
-        return _longValueToIndexMap.get((long) value);
+        return indexOf((long) value);
       case FLOAT:
-        return _floatValueToIndexMap.get((float) value);
+        return indexOf((float) value);
       case DOUBLE:
-        return _doubleValueToIndexMap.get((double) value);
-      case STRING:
+        return indexOf((double) value);
       case BIG_DECIMAL:
-        return _objectValueToIndexMap.getInt(value);
+      case STRING:
+        return indexOf(value);
       case BYTES:
-        return _objectValueToIndexMap.getInt(new ByteArray((byte[]) value));
+        return indexOf(new ByteArray((byte[]) value));
       default:
-        throw new UnsupportedOperationException("Unsupported data type : " + _storedType);
+        throw new UnsupportedOperationException("Unsupported SV data type: " + _storedType);
     }
   }
 
@@ -286,49 +267,69 @@ public class SegmentDictionaryCreator implements Closeable {
     switch (_storedType) {
       case INT:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _intValueToIndexMap.get((int) multiValues[i]);
+          indexes[i] = indexOf((int) multiValues[i]);
         }
         break;
       case LONG:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _longValueToIndexMap.get((long) multiValues[i]);
+          indexes[i] = indexOf((long) multiValues[i]);
         }
         break;
       case FLOAT:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _floatValueToIndexMap.get((float) multiValues[i]);
+          indexes[i] = indexOf((float) multiValues[i]);
         }
         break;
       case DOUBLE:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _doubleValueToIndexMap.get((double) multiValues[i]);
+          indexes[i] = indexOf((double) multiValues[i]);
         }
         break;
       case STRING:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _objectValueToIndexMap.getInt(multiValues[i]);
+          indexes[i] = indexOf(multiValues[i]);
         }
         break;
       case BYTES:
         for (int i = 0; i < multiValues.length; i++) {
-          indexes[i] = _objectValueToIndexMap.getInt(new ByteArray((byte[]) multiValues[i]));
+          indexes[i] = indexOf(new ByteArray((byte[]) multiValues[i]));
         }
         break;
       default:
-        throw new UnsupportedOperationException("Unsupported data type : " + _storedType);
+        throw new UnsupportedOperationException("Unsupported MV data type: " + _storedType);
     }
     return indexes;
+  }
+
+  private int indexOf(int value) {
+    return Arrays.binarySearch(_sortedInts, value);
+  }
+
+  private int indexOf(long value) {
+    return Arrays.binarySearch(_sortedLongs, value);
+  }
+
+  private int indexOf(float value) {
+    return Arrays.binarySearch(_sortedFloats, value);
+  }
+
+  private int indexOf(double value) {
+    return Arrays.binarySearch(_sortedDoubles, value);
+  }
+
+  private int indexOf(Object value) {
+    return Arrays.binarySearch(_sortedObjects, value);
   }
 
   /**
    * Cleans up the no longer needed objects after all the indexing is done to free up some memory.
    */
   public void postIndexingCleanup() {
-    _intValueToIndexMap = null;
-    _longValueToIndexMap = null;
-    _floatValueToIndexMap = null;
-    _doubleValueToIndexMap = null;
-    _objectValueToIndexMap = null;
+    _sortedInts = null;
+    _sortedLongs = null;
+    _sortedFloats = null;
+    _sortedDoubles = null;
+    _sortedObjects = null;
   }
 
   @Override
