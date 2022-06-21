@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -60,6 +61,10 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
@@ -119,11 +124,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String TEST_STAR_TREE_QUERY_2 = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
 
   // For default columns test
-  private static final String SCHEMA_FILE_NAME_WITH_EXTRA_COLUMNS =
-      "On_Time_On_Time_Performance_2014_100k_subset_nonulls_default_column_test_extra_columns.schema";
-  private static final String SCHEMA_FILE_NAME_WITH_MISSING_COLUMNS =
-      "On_Time_On_Time_Performance_2014_100k_subset_nonulls_default_column_test_missing_columns.schema";
-  private static final String TEST_EXTRA_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntDimension < 0";
+  private static final String TEST_EXTRA_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntMetric = 1";
   private static final String TEST_REGULAR_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE AirlineID > 0";
   private static final String SELECT_STAR_QUERY = "SELECT * FROM mytable";
 
@@ -509,8 +510,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // The table size gets larger for sure, but it does not necessarily equal to tableSizeWithNewIndex, because the
     // order of entries in the index_map file can change when the raw segment adds/deletes indices back and forth.
     long tableSizeAfterAddIndex = getTableSize(getTableName());
-    assertTrue(tableSizeAfterAddIndex > tableSizeAfterReloadSegment, String
-        .format("Table size: %d should increase after adding inverted index on segment: %s, as compared with %d",
+    assertTrue(tableSizeAfterAddIndex > tableSizeAfterReloadSegment,
+        String.format("Table size: %d should increase after adding inverted index on segment: %s, as compared with %d",
             tableSizeAfterAddIndex, segmentName, tableSizeAfterReloadSegment));
 
     // Force to download the whole table and use the original table config, so the disk usage should get back to
@@ -584,12 +585,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
     String encodedString = response.get("resultTable").get("rows").get(0).get(0).asText();
     String expectedUrlStr = encodeUrl("key1=value 1&key2=value@!$2&key3=value%3");
-    ;
     assertEquals(encodedString, expectedUrlStr);
 
     String decodedString = response.get("resultTable").get("rows").get(0).get(1).asText();
     expectedUrlStr = decodeUrl("key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
-    ;
     assertEquals(decodedString, expectedUrlStr);
   }
 
@@ -893,15 +892,21 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
    *   <li>"NewAddedLongMetric", METRIC, LONG, single-value, 1</li>
    *   <li>"NewAddedFloatMetric", METRIC, FLOAT, single-value, default (0.0)</li>
    *   <li>"NewAddedDoubleMetric", METRIC, DOUBLE, single-value, default (0.0)</li>
-   *   <li>"NewAddedIntDimension", DIMENSION, INT, single-value, default (Integer.MIN_VALUE)</li>
-   *   <li>"NewAddedLongDimension", DIMENSION, LONG, single-value, default (Long.MIN_VALUE)</li>
-   *   <li>"NewAddedFloatDimension", DIMENSION, FLOAT, single-value, default (Float.NEGATIVE_INFINITY)</li>
-   *   <li>"NewAddedDoubleDimension", DIMENSION, DOUBLE, single-value, default (Double.NEGATIVE_INFINITY)</li>
-   *   <li>"NewAddedSVStringDimension", DIMENSION, STRING, single-value, default ("null")</li>
-   *   <li>"NewAddedMVStringDimension", DIMENSION, STRING, multi-value, ""</li>
-   *   <li>"NewAddedDerivedHoursSinceEpoch", DIMENSION, INT, single-value, default (Integer.MIN_VALUE)</li>
-   *   <li>"NewAddedDerivedSecondsSinceEpoch", DIMENSION, LONG, single-value, default (LONG.MIN_VALUE)</li>
-   *   <li>"NewAddedDerivedMVStringDimension", DIMENSION, STRING, multi-value</li>
+   *   <li>"NewAddedBigDecimalMetric", METRIC, BIG_DECIMAL, single-value, default (0)</li>
+   *   <li>"NewAddedBytesMetric", METRIC, BYTES, single-value, default (byte[0])</li>
+   *   <li>"NewAddedMVIntDimension", DIMENSION, INT, multi-value, default (Integer.MIN_VALUE)</li>
+   *   <li>"NewAddedMVLongDimension", DIMENSION, LONG, multi-value, default (Long.MIN_VALUE)</li>
+   *   <li>"NewAddedMVFloatDimension", DIMENSION, FLOAT, multi-value, default (Float.NEGATIVE_INFINITY)</li>
+   *   <li>"NewAddedMVDoubleDimension", DIMENSION, DOUBLE, multi-value, default (Double.NEGATIVE_INFINITY)</li>
+   *   <li>"NewAddedMVBooleanDimension", DIMENSION, BOOLEAN, multi-value, default (false)</li>
+   *   <li>"NewAddedMVTimestampDimension", DIMENSION, TIMESTAMP, multi-value, default (EPOCH)</li>
+   *   <li>"NewAddedMVStringDimension", DIMENSION, STRING, multi-value, default ("null")</li>
+   *   <li>"NewAddedSVJSONDimension", DIMENSION, JSON, single-value, default ("null")</li>
+   *   <li>"NewAddedSVBytesDimension", DIMENSION, BYTES, single-value, default (byte[0])</li>
+   *   <li>"NewAddedDerivedHoursSinceEpoch", DATE_TIME, INT, single-value, default (Integer.MIN_VALUE)</li>
+   *   <li>"NewAddedDerivedTimestamp", DATE_TIME, TIMESTAMP, single-value, default (EPOCH)</li>
+   *   <li>"NewAddedDerivedSVBooleanDimension", DIMENSION, BOOLEAN, single-value, default (false)</li>
+   *   <li>"NewAddedDerivedMVStringDimension", DATE_TIME, STRING, multi-value</li>
    * </ul>
    */
   @Test(dependsOnMethods = "testAggregateMetadataAPI")
@@ -912,7 +917,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadWithExtraColumns();
     JsonNode queryResponse = postQuery(SELECT_STAR_QUERY);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), 92);
+    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), 98);
 
     testNewAddedColumns();
     testExpressionOverride();
@@ -969,13 +974,35 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     long numTotalDocs = getCountStarResult();
 
     // Add columns to the schema first to pass the validation of the table config
-    _schemaFileName = SCHEMA_FILE_NAME_WITH_EXTRA_COLUMNS;
-    addSchema(createSchema());
+    Schema schema = createSchema();
+    schema.addField(new MetricFieldSpec("NewAddedIntMetric", DataType.INT, 1));
+    schema.addField(new MetricFieldSpec("NewAddedLongMetric", DataType.LONG, 1));
+    schema.addField(new MetricFieldSpec("NewAddedFloatMetric", DataType.FLOAT));
+    schema.addField(new MetricFieldSpec("NewAddedDoubleMetric", DataType.DOUBLE));
+    schema.addField(new MetricFieldSpec("NewAddedBigDecimalMetric", DataType.BIG_DECIMAL));
+    schema.addField(new MetricFieldSpec("NewAddedBytesMetric", DataType.BYTES));
+    schema.addField(new DimensionFieldSpec("NewAddedMVIntDimension", DataType.INT, false));
+    schema.addField(new DimensionFieldSpec("NewAddedMVLongDimension", DataType.LONG, false));
+    schema.addField(new DimensionFieldSpec("NewAddedMVFloatDimension", DataType.FLOAT, false));
+    schema.addField(new DimensionFieldSpec("NewAddedMVDoubleDimension", DataType.DOUBLE, false));
+    schema.addField(new DimensionFieldSpec("NewAddedMVBooleanDimension", DataType.BOOLEAN, false));
+    schema.addField(new DimensionFieldSpec("NewAddedMVTimestampDimension", DataType.TIMESTAMP, false));
+    schema.addField(new DimensionFieldSpec("NewAddedMVStringDimension", DataType.STRING, false));
+    // NOTE: MV JSON and BYTES are not supported
+    schema.addField(new DimensionFieldSpec("NewAddedSVJSONDimension", DataType.JSON, true));
+    schema.addField(new DimensionFieldSpec("NewAddedSVBytesDimension", DataType.BYTES, true));
+    schema.addField(new DateTimeFieldSpec("NewAddedDerivedHoursSinceEpoch", DataType.INT, "EPOCH|HOURS", "1:DAYS"));
+    schema.addField(new DateTimeFieldSpec("NewAddedDerivedTimestamp", DataType.TIMESTAMP, "TIMESTAMP", "1:DAYS"));
+    schema.addField(new DimensionFieldSpec("NewAddedDerivedSVBooleanDimension", DataType.BOOLEAN, true));
+    schema.addField(new DimensionFieldSpec("NewAddedDerivedMVStringDimension", DataType.STRING, false));
+    addSchema(schema);
+
     TableConfig tableConfig = getOfflineTableConfig();
-    List<TransformConfig> transformConfigs = Arrays.asList(
-        new TransformConfig("NewAddedDerivedHoursSinceEpoch", "times(DaysSinceEpoch, 24)"),
-        new TransformConfig("NewAddedDerivedSecondsSinceEpoch", "times(times(DaysSinceEpoch, 24), 3600)"),
-        new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')"));
+    List<TransformConfig> transformConfigs =
+        Arrays.asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "DaysSinceEpoch * 24"),
+            new TransformConfig("NewAddedDerivedTimestamp", "DaysSinceEpoch * 24 * 3600 * 1000"),
+            new TransformConfig("NewAddedDerivedSVBooleanDimension", "ActualElapsedTime > 0"),
+            new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')"));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
     tableConfig.setIngestionConfig(ingestionConfig);
@@ -1012,8 +1039,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Need to first delete then add the schema because removing columns is backward-incompatible change
     deleteSchema(getSchemaName());
-    _schemaFileName = SCHEMA_FILE_NAME_WITH_MISSING_COLUMNS;
-    addSchema(createSchema());
+    Schema schema = createSchema();
+    schema.removeField("AirlineID");
+    schema.removeField("ArrTime");
+    schema.removeField("AirTime");
+    schema.removeField("ArrDel15");
+    addSchema(schema);
 
     // Trigger reload
     reloadOfflineTable(getTableName());
@@ -1071,41 +1102,46 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     double numTotalDocsInDouble = (double) numTotalDocs;
 
     // Test queries with each new added columns
-    String pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntMetric = 1";
     String h2Query = "SELECT COUNT(*) FROM mytable";
+    String pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntMetric = 1";
     testQuery(pinotQuery, h2Query);
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedLongMetric = 1";
-    h2Query = "SELECT COUNT(*) FROM mytable";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedFloatMetric = 0.0";
-    h2Query = "SELECT COUNT(*) FROM mytable";
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedFloatMetric = 0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDoubleMetric = 0.0";
-    h2Query = "SELECT COUNT(*) FROM mytable";
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDoubleMetric = 0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntDimension < 0";
-    h2Query = "SELECT COUNT(*) FROM mytable";
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedBigDecimalMetric = 0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedLongDimension < 0";
-    h2Query = "SELECT COUNT(*) FROM mytable";
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedBytesMetric = ''";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedFloatDimension < 0.0";
-    h2Query = "SELECT COUNT(*) FROM mytable";
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVIntDimension < 0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDoubleDimension < 0.0";
-    h2Query = "SELECT COUNT(*) FROM mytable";
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVLongDimension < 0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedSVStringDimension = 'null'";
-    h2Query = "SELECT COUNT(*) FROM mytable";
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVFloatDimension < 0.0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVStringDimension = ''";
-    h2Query = "SELECT COUNT(*) FROM mytable";
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVDoubleDimension < 0.0";
     testQuery(pinotQuery, h2Query);
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVBooleanDimension = false";
+    testQuery(pinotQuery, h2Query);
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVTimestampDimension = 0";
+    testQuery(pinotQuery, h2Query);
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVStringDimension = 'null'";
+    testQuery(pinotQuery, h2Query);
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedSVJSONDimension = 'null'";
+    testQuery(pinotQuery, h2Query);
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedSVBytesDimension = ''";
+    testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedHoursSinceEpoch = 392232";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16343";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedSecondsSinceEpoch = 1411862400";
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedTimestamp = 1411862400000";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16341";
+    testQuery(pinotQuery, h2Query);
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedSVBooleanDimension = true";
+    h2Query = "SELECT COUNT(*) FROM mytable WHERE ActualElapsedTime > 0";
     testQuery(pinotQuery, h2Query);
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedMVStringDimension = 'CA'";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
@@ -1127,7 +1163,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Test other query forms with new added columns
     pinotQuery =
-        "SELECT NewAddedSVStringDimension, SUM(NewAddedFloatMetric) FROM mytable GROUP BY NewAddedSVStringDimension";
+        "SELECT NewAddedMVStringDimension, SUM(NewAddedFloatMetric) FROM mytable GROUP BY NewAddedMVStringDimension";
     JsonNode response = postQuery(pinotQuery);
     JsonNode rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
@@ -1135,15 +1171,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.size(), 2);
     assertEquals(row.get(0).asText(), "null");
     assertEquals(row.get(1).asDouble(), 0.0);
-    pinotQuery = "SELECT NewAddedIntDimension, SUM(NewAddedDoubleMetric) FROM mytable GROUP BY NewAddedIntDimension";
+    pinotQuery =
+        "SELECT NewAddedSVBytesDimension, SUM(NewAddedBigDecimalMetric) FROM mytable GROUP BY NewAddedSVBytesDimension";
     response = postQuery(pinotQuery);
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
     row = rows.get(0);
     assertEquals(row.size(), 2);
-    assertEquals(row.get(0).asInt(), Integer.MIN_VALUE);
+    assertEquals(row.get(0).asText(), "");
     assertEquals(row.get(1).asDouble(), 0.0);
-    pinotQuery = "SELECT NewAddedLongDimension, SUM(NewAddedIntMetric) FROM mytable GROUP BY NewAddedLongDimension";
+    pinotQuery = "SELECT NewAddedMVLongDimension, SUM(NewAddedIntMetric) FROM mytable GROUP BY NewAddedMVLongDimension";
     response = postQuery(pinotQuery);
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
@@ -1151,31 +1188,35 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.size(), 2);
     assertEquals(row.get(0).asLong(), Long.MIN_VALUE);
     assertEquals(row.get(1).asDouble(), numTotalDocsInDouble);
-    pinotQuery = "SELECT NewAddedIntDimension, NewAddedLongDimension, NewAddedFloatDimension, NewAddedDoubleDimension, "
-        + "NewAddedSVStringDimension, NewAddedMVStringDimension, SUM(NewAddedIntMetric), SUM(NewAddedLongMetric),"
-        + " SUM(NewAddedFloatMetric), SUM(NewAddedDoubleMetric) FROM mytable GROUP BY NewAddedIntDimension, "
-        + "NewAddedLongDimension, NewAddedFloatDimension, NewAddedDoubleDimension, NewAddedSVStringDimension, "
-        + "NewAddedMVStringDimension";
+    String newAddedDimensions =
+        "NewAddedMVIntDimension, NewAddedMVLongDimension, NewAddedMVFloatDimension, NewAddedMVDoubleDimension, "
+            + "NewAddedMVBooleanDimension, NewAddedMVTimestampDimension, NewAddedMVStringDimension, "
+            + "NewAddedSVJSONDimension, NewAddedSVBytesDimension";
+    pinotQuery = "SELECT " + newAddedDimensions + ", SUM(NewAddedIntMetric), SUM(NewAddedLongMetric), "
+        + "SUM(NewAddedFloatMetric), SUM(NewAddedDoubleMetric) FROM mytable GROUP BY " + newAddedDimensions;
     response = postQuery(pinotQuery);
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
     row = rows.get(0);
-    assertEquals(row.size(), 10);
+    assertEquals(row.size(), 13);
     assertEquals(row.get(0).asInt(), Integer.MIN_VALUE);
     assertEquals(row.get(1).asLong(), Long.MIN_VALUE);
-    assertEquals((float) row.get(2).asDouble(), Float.NEGATIVE_INFINITY);
+    assertEquals(row.get(2).asDouble(), (double) Float.NEGATIVE_INFINITY);
     assertEquals(row.get(3).asDouble(), Double.NEGATIVE_INFINITY);
-    assertEquals(row.get(4).asText(), "null");
-    assertEquals(row.get(5).asText(), "");
-    assertEquals(row.get(6).asDouble(), numTotalDocsInDouble);
-    assertEquals(row.get(7).asDouble(), numTotalDocsInDouble);
-    assertEquals(row.get(8).asDouble(), 0.0);
-    assertEquals(row.get(9).asDouble(), 0.0);
+    assertFalse(row.get(4).asBoolean());
+    assertEquals(row.get(5).asText(), new Timestamp(0).toString());
+    assertEquals(row.get(6).asText(), "null");
+    assertEquals(row.get(7).asText(), "null");
+    assertEquals(row.get(8).asText(), "");
+    assertEquals(row.get(9).asDouble(), numTotalDocsInDouble);
+    assertEquals(row.get(10).asDouble(), numTotalDocsInDouble);
+    assertEquals(row.get(11).asDouble(), 0.0);
+    assertEquals(row.get(12).asDouble(), 0.0);
   }
 
   private void testExpressionOverride()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch * 24 * 3600 = 1411862400";
+    String query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch * 24 = 392184";
 
     // Initially there is no expression override
     {
@@ -1187,7 +1228,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Add expression override
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setQueryConfig(new QueryConfig(null, null, null,
-        Collections.singletonMap("times(times(DaysSinceEpoch, 24), 3600)", "NewAddedDerivedSecondsSinceEpoch")));
+        Collections.singletonMap("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch")));
     updateTableConfig(tableConfig);
 
     TestUtils.waitForCondition(aVoid -> {
@@ -1955,8 +1996,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     baseQueries.forEach(
         q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
     // something like "SELECT MYDB.MYTABLE.DAYSSinceEpOch from MYDB.MYTABLE where MYDB.MYTABLE.DAYSSinceEpOch = 16138"
-    baseQueries.forEach(q -> queries.add(
-        q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
+    baseQueries.forEach(
+        q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
 
     for (String query : queries) {
       JsonNode response = postQuery(query);
