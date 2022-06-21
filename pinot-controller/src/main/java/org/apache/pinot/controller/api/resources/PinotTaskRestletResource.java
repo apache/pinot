@@ -216,6 +216,18 @@ public class PinotTaskRestletResource {
   }
 
   @GET
+  @Path("/tasks/{taskType}/{tableNameWithType}/debug")
+  @ApiOperation("Fetch information for the given task type and table")
+  public Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> getTasksDebugInfo(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
+          String tableNameWithType,
+      @ApiParam(value = "verbosity (By default, prints for running and error tasks. Value of >0 prints for all tasks)")
+      @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
+    return _pinotHelixTaskResourceManager.getTasksDebugInfoByTable(taskType, tableNameWithType, verbosity);
+  }
+
+  @GET
   @Path("/tasks/task/{taskName}/debug")
   @ApiOperation("Fetch information for the given task name")
   public PinotHelixTaskResourceManager.TaskDebugInfo getTaskDebugInfo(

@@ -460,7 +460,7 @@ public class PinotHelixTaskResourceManager {
    * Helper method to return a map of task names to corresponding task state
    * where the task corresponds to the given Pinot table name. This is used to
    * check status of all tasks for a given table.
-   * @param taskType Task Name
+   * @param taskType Pinot taskType / Helix JobQueue
    * @param tableNameWithType table name with type to filter on
    * @return Map of filtered task name to corresponding state
    */
@@ -527,6 +527,48 @@ public class PinotHelixTaskResourceManager {
     Map<String, TaskState> helixJobStates = workflowContext.getJobStates();
     for (String helixJobName : helixJobStates.keySet()) {
       taskDebugInfos.put(getPinotTaskName(helixJobName), getTaskDebugInfo(workflowContext, helixJobName, verbosity));
+    }
+    return taskDebugInfos;
+  }
+
+  /**
+   * Given a taskType and a tableNameWithType, helper method to debug all the HelixJobs for
+   * the taskType and tableNameWithType. For each of the HelixJobs, collects status of
+   * the (sub)tasks in the taskbatch.
+   *
+   * @param taskType Pinot taskType / Helix JobQueue
+   * @param tableNameWithType Table name with type to filter on
+   * @param verbosity By default, does not show details for completed tasks.
+   *                  If verbosity > 0, shows details for all tasks.
+   * @return Map of Pinot Task Name to TaskDebugInfo. TaskDebugInfo contains details for subtasks.
+   */
+  public synchronized Map<String, TaskDebugInfo> getTasksDebugInfoByTable(
+      String taskType, String tableNameWithType, int verbosity) {
+    Map<String, TaskDebugInfo> taskDebugInfos = new TreeMap<>();
+    WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
+    if (workflowContext == null) {
+      return taskDebugInfos;
+    }
+
+    Map<String, TaskState> helixJobStates = workflowContext.getJobStates();
+    for (String helixJobName : helixJobStates.keySet()) {
+      String pinotTaskName = getPinotTaskName(helixJobName);
+
+      // Iterate through all task configs associated with this task name
+      for (PinotTaskConfig taskConfig : getTaskConfigs(pinotTaskName)) {
+        Map<String, String> pinotConfigs = taskConfig.getConfigs();
+
+        // Filter task configs that matches this table name
+        if (pinotConfigs != null) {
+          String tableNameConfig = pinotConfigs.get(TABLE_NAME);
+          if (tableNameConfig != null && tableNameConfig.equals(tableNameWithType)) {
+            // Found a match. Add task debug info to the result
+            // TODO: we may want to filter out debug info that does not belong to the given table.
+            taskDebugInfos.put(pinotTaskName, getTaskDebugInfo(workflowContext, helixJobName, verbosity));
+            break;
+          }
+        }
+      }
     }
     return taskDebugInfos;
   }
