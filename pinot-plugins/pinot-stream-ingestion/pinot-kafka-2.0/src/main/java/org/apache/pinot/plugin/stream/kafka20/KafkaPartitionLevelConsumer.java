@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
+import com.google.common.collect.Lists;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,7 +58,7 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       LOGGER.debug("poll consumer: {}, startOffset: {}, endOffset:{} timeout: {}ms", _topicPartition, startOffset,
           endOffset, timeoutMillis);
     }
-    Map<TopicPartition, Long> beginningOffsets = _consumer.beginningOffsets(List.of(_topicPartition));
+    Map<TopicPartition, Long> beginningOffsets = _consumer.beginningOffsets(Lists.newArrayList(_topicPartition));
     Long beginningOffset = beginningOffsets.values().iterator().next();
     // explicitly check for OutOfRange, where startOffset < beginningOffset
     // without this, _consumer.poll will auto offset reset to latest, resulting in data loss
