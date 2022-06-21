@@ -64,6 +64,13 @@ public class TransformPipeline {
   }
 
   /**
+   * Returns a pass through pipeline that does not transform the record.
+   */
+  public static TransformPipeline getPassThroughPipeline() {
+    return new TransformPipeline(CompositeTransformer.getPassThroughTransformer(), null);
+  }
+
+  /**
    * Process and validate the decoded row against schema.
    * @param decodedRow the row data to pass in
    * @param reusedResult the reused result so we can reduce objects created for each row

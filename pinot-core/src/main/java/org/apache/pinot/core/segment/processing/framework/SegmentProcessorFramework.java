@@ -32,8 +32,8 @@ import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileRecordR
 import org.apache.pinot.core.segment.processing.mapper.SegmentMapper;
 import org.apache.pinot.core.segment.processing.reducer.Reducer;
 import org.apache.pinot.core.segment.processing.reducer.ReducerFactory;
-import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
+import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGeneratorFactory;
@@ -132,7 +132,6 @@ public class SegmentProcessorFramework {
     }
 
     int maxNumRecordsPerSegment = _segmentProcessorConfig.getSegmentConfig().getMaxNumRecordsPerSegment();
-    CompositeTransformer passThroughTransformer = CompositeTransformer.getPassThroughTransformer();
     int sequenceId = 0;
     for (Map.Entry<String, GenericRowFileManager> entry : partitionToFileManagerMap.entrySet()) {
       String partitionId = entry.getKey();
@@ -151,7 +150,7 @@ public class SegmentProcessorFramework {
         GenericRowFileRecordReader recordReaderForRange = recordReader.getRecordReaderForRange(startRowId, endRowId);
         SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
         driver.init(generatorConfig, new RecordReaderSegmentCreationDataSource(recordReaderForRange),
-            passThroughTransformer, null);
+            TransformPipeline.getPassThroughPipeline());
         driver.build();
         outputSegmentDirs.add(driver.getOutputDirectory());
       }
