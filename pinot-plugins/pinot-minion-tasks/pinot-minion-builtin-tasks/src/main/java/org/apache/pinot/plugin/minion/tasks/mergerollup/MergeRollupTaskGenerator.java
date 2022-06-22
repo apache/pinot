@@ -77,7 +77,7 @@ import org.slf4j.LoggerFactory;
  *    - Repeat until k time buckets get created or we loop through all the candidate segments:
  *      - Calculate merge/roll-up bucket:
  *        - Read watermarkMs from the {@link MergeRollupTaskMetadata} ZNode found at
- *          {@code MINION_TASK_METADATA/MergeRollupTask/<tableNameWithType>}
+ *          {@code MINION_TASK_METADATA/<tableNameWithType>/MergeRollupTask}
  *          In case of cold-start, no ZNode will exist.
  *          A new ZNode will be created, with watermarkMs as the smallest time found in all segments truncated to the
  *          closest bucket start time.

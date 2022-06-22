@@ -41,7 +41,7 @@ public class MinionTaskMetadataUtilsTest {
   public void testPersistTaskMetadata() {
     DummyTaskMetadata taskMetadata = new DummyTaskMetadata("TestTable_OFFLINE", 1000);
     HelixPropertyStore<ZNRecord> mockPropertyStore = Mockito.mock(HelixPropertyStore.class);
-    String expectedPath = "/MINION_TASK_METADATA/TestTaskType/TestTable_OFFLINE";
+    String expectedPath = "/MINION_TASK_METADATA/TestTable_OFFLINE/TestTaskType";
     int expectedVersion = -1;
 
     // Test happy path. No exceptions thrown.
