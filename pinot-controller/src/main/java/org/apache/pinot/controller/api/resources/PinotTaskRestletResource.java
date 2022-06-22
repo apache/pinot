@@ -210,21 +210,23 @@ public class PinotTaskRestletResource {
   @ApiOperation("Fetch information for all the tasks for the given task type")
   public Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> getTasksDebugInfo(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
-      @ApiParam(value = "verbosity (By default, prints details for running and error tasks. "
-          + "Value of > 0 prints details for all tasks)")
+      @ApiParam(value = "verbosity (Prints information for all the tasks for the given task type."
+          + "By default, only prints subtask details for running and error tasks. "
+          + "Value of > 0 prints subtask details for all tasks)")
       @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
     return _pinotHelixTaskResourceManager.getTasksDebugInfo(taskType, verbosity);
   }
 
   @GET
   @Path("/tasks/{taskType}/{tableNameWithType}/debug")
-  @ApiOperation("Fetch information for the given task type and table")
+  @ApiOperation("Fetch information for all the tasks for the given task type and table")
   public Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> getTasksDebugInfo(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,
-      @ApiParam(value = "verbosity (By default, prints details for running and error tasks. "
-          + "Value of > 0 prints details for all tasks)")
+      @ApiParam(value = "verbosity (Prints information for all the tasks for the given task type and table."
+          + "By default, only prints subtask details for running and error tasks. "
+          + "Value of > 0 prints subtask details for all tasks)")
       @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
     return _pinotHelixTaskResourceManager.getTasksDebugInfoByTable(taskType, tableNameWithType, verbosity);
   }
@@ -234,8 +236,9 @@ public class PinotTaskRestletResource {
   @ApiOperation("Fetch information for the given task name")
   public PinotHelixTaskResourceManager.TaskDebugInfo getTaskDebugInfo(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
-      @ApiParam(value = "verbosity (By default, prints details for running and error tasks. "
-          + "Value of > 0 prints details for all tasks)")
+      @ApiParam(value = "verbosity (Prints information for the given task name."
+          + "By default, only prints subtask details for running and error tasks. "
+          + "Value of > 0 prints subtask details for all tasks)")
       @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
     return _pinotHelixTaskResourceManager.getTaskDebugInfo(taskName, verbosity);
   }
