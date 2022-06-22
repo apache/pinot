@@ -223,7 +223,7 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,
-      @ApiParam(value = "verbosity (By default, prints for running and error tasks. "
+      @ApiParam(value = "verbosity (By default, prints details for running and error tasks. "
           + "Value of > 0 prints details for all tasks)")
       @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
     return _pinotHelixTaskResourceManager.getTasksDebugInfoByTable(taskType, tableNameWithType, verbosity);
