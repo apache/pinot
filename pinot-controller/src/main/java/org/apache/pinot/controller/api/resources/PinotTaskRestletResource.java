@@ -210,7 +210,8 @@ public class PinotTaskRestletResource {
   @ApiOperation("Fetch information for all the tasks for the given task type")
   public Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> getTasksDebugInfo(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
-      @ApiParam(value = "verbosity (By default, prints for running and error tasks. Value of >0 prints for all tasks)")
+      @ApiParam(value = "verbosity (By default, prints details for running and error tasks. "
+          + "Value of > 0 prints details for all tasks)")
       @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
     return _pinotHelixTaskResourceManager.getTasksDebugInfo(taskType, verbosity);
   }
@@ -222,7 +223,8 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,
-      @ApiParam(value = "verbosity (By default, prints for running and error tasks. Value of >0 prints for all tasks)")
+      @ApiParam(value = "verbosity (By default, prints for running and error tasks. "
+          + "Value of > 0 prints details for all tasks)")
       @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
     return _pinotHelixTaskResourceManager.getTasksDebugInfoByTable(taskType, tableNameWithType, verbosity);
   }
@@ -232,7 +234,8 @@ public class PinotTaskRestletResource {
   @ApiOperation("Fetch information for the given task name")
   public PinotHelixTaskResourceManager.TaskDebugInfo getTaskDebugInfo(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
-      @ApiParam(value = "verbosity (By default, prints for running and error tasks. Value of >0 prints for all tasks)")
+      @ApiParam(value = "verbosity (By default, prints details for running and error tasks. "
+          + "Value of > 0 prints details for all tasks)")
       @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
     return _pinotHelixTaskResourceManager.getTaskDebugInfo(taskName, verbosity);
   }

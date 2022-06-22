@@ -563,7 +563,9 @@ public class PinotHelixTaskResourceManager {
           String tableNameConfig = pinotConfigs.get(TABLE_NAME);
           if (tableNameConfig != null && tableNameConfig.equals(tableNameWithType)) {
             // Found a match. Add task debug info to the result
-            // TODO: we may want to filter out debug info that does not belong to the given table.
+            // TODO: If a task consists of subtasks belonging to the current table and other tables at the same time,
+            //  we will collect debug info of them all. We may want to filter out debug info that does not belong
+            //  to the given table.
             taskDebugInfos.put(pinotTaskName, getTaskDebugInfo(workflowContext, helixJobName, verbosity));
             break;
           }
