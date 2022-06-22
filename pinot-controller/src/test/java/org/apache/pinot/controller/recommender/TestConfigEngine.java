@@ -133,6 +133,20 @@ public class TestConfigEngine {
   }
 
   @Test
+  void testInvalidColumnInFilterRule()
+      throws InvalidInputException, IOException {
+    loadInput("recommenderInput/InvalidColumnInFilterInput.json");
+    ConfigManager output = new ConfigManager();
+    AbstractRule abstractRule =
+        RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.InvertedSortedIndexJointRule, _input, output);
+    abstractRule.run();
+    assertEquals(output.getIndexConfig().getInvertedIndexColumns().toString(), "[]");
+    assertEquals(_input.getOverWrittenConfigs().getFlaggedQueries().getFlaggedQueries().toString(),
+        "{select i from tableName where a = xyz and t > 500=ERROR: "
+            + "Query is filtering on columns not appearing in schema: [xyz]}");
+  }
+
+  @Test
   void testSortedInvertedIndexJointRuleWithMetricAndDateTimeColumn()
       throws InvalidInputException, IOException {
     loadInput("recommenderInput/SortedInvertedIndexInputWithMetricAndDateTimeColumn.json");

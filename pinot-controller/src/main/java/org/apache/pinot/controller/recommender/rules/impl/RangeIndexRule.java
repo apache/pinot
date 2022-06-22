@@ -71,6 +71,7 @@ public class RangeIndexRule extends AbstractRule {
       // As currently, only numeric columns are selected in range index creation, we will skip non numeric columns
       if (((weights[i] / totalWeight.get()) > _params._thresholdMinPercentRangeIndex) && !_output.getIndexConfig()
           .getSortedColumn().equals(colName) && !_output.getIndexConfig().getInvertedIndexColumns().contains(colName)
+          && _input.getCardinality(colName) > _params._thresholdMinCardinalityRangeIndex
           && _input.getFieldType(colName).isNumeric()) {
         _output.getIndexConfig().getRangeIndexColumns().add(colName);
       }

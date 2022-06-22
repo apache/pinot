@@ -66,6 +66,7 @@ import org.slf4j.LoggerFactory;
 
 import static java.lang.Math.max;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.*;
+import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.FlagQueryRuleParams.ERROR_INVALID_COLUMN;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.FlagQueryRuleParams.ERROR_INVALID_QUERY;
 
 
@@ -170,6 +171,18 @@ public class InputManager {
         PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(queryString);
         _queryOptimizer.optimize(pinotQuery, _schema);
         QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+
+        //Flag the queries having in filter columns not appear in schema
+        Set<String> filterColumns = new HashSet<>();
+        if (queryContext.getFilter() != null) {
+          queryContext.getFilter().getColumns(filterColumns);
+          filterColumns.removeAll(_colNameToIntMap.keySet());
+          if (!filterColumns.isEmpty()) {
+            invalidQueries.add(queryString);
+            _overWrittenConfigs.getFlaggedQueries().add(queryString, ERROR_INVALID_COLUMN + filterColumns);
+          }
+        }
+
         _parsedQueries.put(queryString,
             Triple.of(_queryWeightMap.get(queryString), CalciteSqlCompiler.convertToBrokerRequest(pinotQuery),
                 queryContext));
