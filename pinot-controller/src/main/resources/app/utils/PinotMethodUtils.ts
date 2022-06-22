@@ -41,6 +41,7 @@ import {
   getJobDetail,
   getMinionMeta,
   getTasks,
+  getTaskDebug,
   updateInstanceTags,
   getClusterConfig,
   getQueryTables,
@@ -824,9 +825,29 @@ const getMinionMetaData = (tableName, taskType) => {
 };
 
 const getTasksList = (tableName, taskType) => {
-  return getTasks(tableName, taskType).then((response)=>{
-    return { columns: ['Task ID'], records: []};
-  });
+  const finalResponse = {
+    columns: ['Task ID', 'Status'],
+    records: []
+  }
+  return new Promise((resolve, reject) => {
+    getTasks(tableName, taskType).then(async (response)=>{
+      const promiseArr = [];
+      const fetchInfo = async (taskID, status) => {
+        const debugData = await getTaskDebugData(taskID);
+        finalResponse.records.push([taskID, status, debugData]);
+      };
+      _.each(response.data, async (val, key) => {
+        promiseArr.push(fetchInfo(key, val));
+      });
+      await Promise.all(promiseArr);
+      resolve(finalResponse);
+    });
+  })
+};
+
+const getTaskDebugData = async (taskName) => {
+  const debugRes = await getTaskDebug(taskName);
+  return debugRes;
 };
 
 const reloadSegmentOp = (tableName, segmentName) => {
@@ -1085,6 +1106,7 @@ export default {
   getScheduleJobDetail,
   getMinionMetaData,
   getTasksList,
+  getTaskDebugData,
   deleteSegmentOp,
   reloadSegmentOp,
   reloadStatusOp,

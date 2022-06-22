@@ -25,11 +25,14 @@ import PinotMethodUtils from '../utils/PinotMethodUtils';
 
 export default function useTaskListing(props) {
   const { taskType, tableName } = props;
+  const [fetching, setFetching] = useState(true);
   const [tasks, setTasks] = useState({ columns: [], records: [] });
 
   const fetchData = async () => {
+    setFetching(true);
     const tasksRes = await PinotMethodUtils.getTasksList(tableName, taskType);
     setTasks(tasksRes);
+    setFetching(false);
   };
 
   useEffect(() => {
@@ -39,7 +42,7 @@ export default function useTaskListing(props) {
   return {
     tasks,
     setTasks,
-    content: (
+    content: !fetching && (
       <CustomizedTables
         title="Tasks"
         data={tasks}
@@ -47,7 +50,7 @@ export default function useTaskListing(props) {
         inAccordionFormat={true}
         isPagination={false}
         addLinks
-        baseURL='/task-queue/tables/'
+        baseURL={`/task-queue/${taskType}/tables/${tableName}/task/`}
       />
     )
   };

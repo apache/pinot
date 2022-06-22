@@ -19,15 +19,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { get } from 'lodash';
-import moment from 'moment';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { Grid, makeStyles } from '@material-ui/core';
 import SimpleAccordion from '../components/SimpleAccordion';
-import CustomButton from '../components/CustomButton';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
-import useScheduleAdhocModal from '../components/useScheduleAdhocModal';
-import useMinionMetadata from '../components/useMinionMetadata';
-import useTaskListing from '../components/useTaskListing';
 
 const jsonoptions = {
   lineNumbers: true,
@@ -73,23 +68,17 @@ const useStyles = makeStyles(() => ({
   },
 }));
 
-const TaskQueueTable = (props) => {
+const TaskDetail = (props) => {
   const classes = useStyles();
-  const { taskType, tableName } = props.match.params;
+  const { taskID, taskType, tableName } = props.match.params;
 
   const [fetching, setFetching] = useState(true);
-  const [jobDetail, setJobDetail] = useState({});
-  const [tableDetail, setTableDetail] = useState({});
-  const scheduleAdhocModal = useScheduleAdhocModal();
-  const minionMetadata = useMinionMetadata({ taskType, tableName });
-  const taskListing = useTaskListing({ taskType, tableName });
+  const [taskDebugData, setTaskDebugData] = useState({});
 
   const fetchData = async () => {
     setFetching(true);
-    const detail = await PinotMethodUtils.getScheduleJobDetail(tableName, taskType);
-    const tableDetailRes = await PinotMethodUtils.getTableDetails(tableName);
-    setTableDetail(tableDetailRes);
-    setJobDetail(detail);
+    const debugRes = await PinotMethodUtils.getTaskDebugData(taskID);
+    setTaskDebugData(debugRes);
     setFetching(false);
   };
 
@@ -97,53 +86,15 @@ const TaskQueueTable = (props) => {
     fetchData();
   }, []);
 
-  const handleScheduleNow = async () => {
-    await PinotMethodUtils.scheduleTaskAction(tableName, taskType);
-  };
-
-  const cronExpression = get(jobDetail, 'Triggers.0.CronExpression', '');
-  const previousFireTime = get(jobDetail, 'Triggers.0.PreviousFireTime', 0);
-  const nextFireTime = get(jobDetail, 'Triggers.0.NextFireTime', 0);
-
   return (
     <Grid item xs className={classes.gridContainer}>
-      <div className={classes.operationDiv}>
-        <SimpleAccordion
-          headerTitle="Operations"
-          showSearchBox={false}
-        >
-          <div>
-            <CustomButton
-              onClick={() => handleScheduleNow()}
-              tooltipTitle="Schedule now"
-              enableTooltip={true}
-            >
-              Schedule Now
-            </CustomButton>
-            <CustomButton
-              onClick={() => scheduleAdhocModal.handleOpen()}
-              tooltipTitle="Execute ADHOC"
-              enableTooltip={true}
-            >
-              Schedule ADHOC
-            </CustomButton>
-          </div>
-        </SimpleAccordion>
-      </div>
       <div className={classes.highlightBackground}>
-        {/* <TableToolbar name="Summary" showSearchBox={false} /> */}
         <Grid container className={classes.body}>
           <Grid item xs={12}>
-            <strong>Table Name:</strong> {tableName}
+            <strong>Name:</strong> {taskID}
           </Grid>
           <Grid item xs={12}>
-            <strong>Cron Schedule :</strong> {cronExpression}
-          </Grid>
-          <Grid item xs={12}>
-            <strong>Previous Fire Time: </strong> {previousFireTime ? moment(previousFireTime).toString() : '-'}
-          </Grid>
-          <Grid item xs={12}>
-            <strong>Next Fire Time: </strong> {nextFireTime ? moment(nextFireTime).toString() : '-'}
+            <strong>Status:</strong> {get(taskDebugData, 'taskState', '')}
           </Grid>
         </Grid>
       </div>
@@ -156,33 +107,26 @@ const TaskQueueTable = (props) => {
             >
               <CodeMirror
                 options={jsonoptions}
-                value={JSON.stringify(get(tableDetail, `OFFLINE.task.taskTypeConfigsMap.${taskType}`, {}), null, '  ')}
+                value={JSON.stringify(get({}, `OFFLINE.task.taskTypeConfigsMap.${taskType}`, {}), null, '  ')}
                 className={classes.queryOutput}
                 autoCursor={false}
               />
             </SimpleAccordion>
           </div>
-          <div className={classes.sqlDiv}>
-            {minionMetadata.content}
-          </div>
         </Grid>
         <Grid item xs={6}>
           <div className={classes.sqlDiv}>
             <SimpleAccordion
-              headerTitle="Scheduling Errors"
+              headerTitle="Execution Errors"
               showSearchBox={false}
             >
               
             </SimpleAccordion>
           </div>
         </Grid>
-        <Grid item xs={12}>
-          {taskListing.content}
-        </Grid>
       </Grid>
-      {scheduleAdhocModal.dialog}
     </Grid>
   );
 };
 
-export default TaskQueueTable;
+export default TaskDetail;
