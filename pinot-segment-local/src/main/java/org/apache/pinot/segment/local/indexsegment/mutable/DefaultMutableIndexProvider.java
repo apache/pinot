@@ -51,24 +51,35 @@ public class DefaultMutableIndexProvider implements MutableIndexProvider {
     FieldSpec.DataType storedType = context.getFieldSpec().getDataType().getStoredType();
     boolean isSingleValue = context.getFieldSpec().isSingleValueField();
     if (!context.hasDictionary()) {
-      // No dictionary column must be single-valued
-      assert isSingleValue;
-      String allocationContext =
-          buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
-              V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-      if (storedType.isFixedWidth()) {
-        return new FixedByteSVMutableForwardIndex(false, storedType, context.getCapacity(), context.getMemoryManager(),
-            allocationContext);
+      if (isSingleValue) {
+        String allocationContext =
+            buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
+                V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+        if (storedType.isFixedWidth()) {
+          return new FixedByteSVMutableForwardIndex(false, storedType, context.getCapacity(),
+              context.getMemoryManager(), allocationContext);
+        } else {
+          // RealtimeSegmentStatsHistory does not have the stats for no-dictionary columns from previous consuming
+          // segments
+          // TODO: Add support for updating RealtimeSegmentStatsHistory with average column value size for no dictionary
+          //       columns as well
+          // TODO: Use the stats to get estimated average length
+          // Use a smaller capacity as opposed to segment flush size
+          int initialCapacity = Math.min(context.getCapacity(),
+              NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT);
+          return new VarByteSVMutableForwardIndex(storedType, context.getMemoryManager(), allocationContext,
+              initialCapacity, NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT);
+        }
       } else {
-        // RealtimeSegmentStatsHistory does not have the stats for no-dictionary columns from previous consuming
-        // segments
-        // TODO: Add support for updating RealtimeSegmentStatsHistory with average column value size for no dictionary
-        //       columns as well
-        // TODO: Use the stats to get estimated average length
-        // Use a smaller capacity as opposed to segment flush size
-        int initialCapacity = Math.min(context.getCapacity(), NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT);
-        return new VarByteSVMutableForwardIndex(storedType, context.getMemoryManager(), allocationContext,
-            initialCapacity, NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT);
+        // TODO: Add support for variable width (bytes, string, big decimal) MV RAW column types
+        assert storedType.isFixedWidth();
+        String allocationContext =
+            buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
+                V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
+        // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
+        return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
+            context.getCapacity(), storedType.size(), context.getMemoryManager(), allocationContext, false,
+            storedType);
       }
     } else {
       if (isSingleValue) {
@@ -82,7 +93,7 @@ public class DefaultMutableIndexProvider implements MutableIndexProvider {
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
         return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
             context.getCapacity(), Integer.BYTES,
-            context.getMemoryManager(), allocationContext);
+            context.getMemoryManager(), allocationContext, true, INT);
       }
     }
   }

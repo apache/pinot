@@ -628,12 +628,15 @@ public class DataFetcher {
 
     void readIntValuesMV(int[] docIds, int length, int[][] valuesBuffer) {
       Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
-      assert _dictionary != null;
-      for (int i = 0; i < length; i++) {
-        int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
-        int[] values = new int[numValues];
-        _dictionary.readIntValues(_reusableMVDictIds, numValues, values);
-        valuesBuffer[i] = values;
+      if (_dictionary != null) {
+        for (int i = 0; i < length; i++) {
+          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
+          int[] values = new int[numValues];
+          _dictionary.readIntValues(_reusableMVDictIds, numValues, values);
+          valuesBuffer[i] = values;
+        }
+      } else {
+        _reader.readValuesMV(docIds, length, valuesBuffer, getReaderContext());
       }
     }
 
@@ -645,12 +648,15 @@ public class DataFetcher {
 
     void readLongValuesMV(int[] docIds, int length, long[][] valuesBuffer) {
       Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
-      assert _dictionary != null;
-      for (int i = 0; i < length; i++) {
-        int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
-        long[] values = new long[numValues];
-        _dictionary.readLongValues(_reusableMVDictIds, numValues, values);
-        valuesBuffer[i] = values;
+      if (_dictionary != null) {
+        for (int i = 0; i < length; i++) {
+          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
+          long[] values = new long[numValues];
+          _dictionary.readLongValues(_reusableMVDictIds, numValues, values);
+          valuesBuffer[i] = values;
+        }
+      } else {
+        _reader.readValuesMV(docIds, length, valuesBuffer, getReaderContext());
       }
     }
 
@@ -662,12 +668,15 @@ public class DataFetcher {
 
     void readFloatValuesMV(int[] docIds, int length, float[][] valuesBuffer) {
       Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
-      assert _dictionary != null;
-      for (int i = 0; i < length; i++) {
-        int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
-        float[] values = new float[numValues];
-        _dictionary.readFloatValues(_reusableMVDictIds, numValues, values);
-        valuesBuffer[i] = values;
+      if (_dictionary != null) {
+        for (int i = 0; i < length; i++) {
+          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
+          float[] values = new float[numValues];
+          _dictionary.readFloatValues(_reusableMVDictIds, numValues, values);
+          valuesBuffer[i] = values;
+        }
+      } else {
+        _reader.readValuesMV(docIds, length, valuesBuffer, getReaderContext());
       }
     }
 
@@ -679,12 +688,15 @@ public class DataFetcher {
 
     void readDoubleValuesMV(int[] docIds, int length, double[][] valuesBuffer) {
       Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
-      assert _dictionary != null;
-      for (int i = 0; i < length; i++) {
-        int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
-        double[] values = new double[numValues];
-        _dictionary.readDoubleValues(_reusableMVDictIds, numValues, values);
-        valuesBuffer[i] = values;
+      if (_dictionary != null) {
+        for (int i = 0; i < length; i++) {
+          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
+          double[] values = new double[numValues];
+          _dictionary.readDoubleValues(_reusableMVDictIds, numValues, values);
+          valuesBuffer[i] = values;
+        }
+      } else {
+        _reader.readValuesMV(docIds, length, valuesBuffer, getReaderContext());
       }
     }
 
@@ -696,12 +708,15 @@ public class DataFetcher {
 
     void readStringValuesMV(int[] docIds, int length, String[][] valuesBuffer) {
       Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
-      assert _dictionary != null;
-      for (int i = 0; i < length; i++) {
-        int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
-        String[] values = new String[numValues];
-        _dictionary.readStringValues(_reusableMVDictIds, numValues, values);
-        valuesBuffer[i] = values;
+      if (_dictionary != null) {
+        for (int i = 0; i < length; i++) {
+          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
+          String[] values = new String[numValues];
+          _dictionary.readStringValues(_reusableMVDictIds, numValues, values);
+          valuesBuffer[i] = values;
+        }
+      } else {
+        _reader.readValuesMV(docIds, length, valuesBuffer, getReaderContext());
       }
     }
 
@@ -714,7 +729,7 @@ public class DataFetcher {
     public void readNumValuesMV(int[] docIds, int length, int[] numValuesBuffer) {
       Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
       for (int i = 0; i < length; i++) {
-        numValuesBuffer[i] = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
+        numValuesBuffer[i] = _reader.getNumValuesMV(docIds[i], getReaderContext());
       }
     }
 

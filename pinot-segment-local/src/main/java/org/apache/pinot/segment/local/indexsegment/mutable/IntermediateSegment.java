@@ -153,7 +153,7 @@ public class IntermediateSegment implements MutableSegment {
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
         forwardIndex =
             new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, DEFAULT_AVG_MULTI_VALUE_COUNT, _capacity,
-                Integer.BYTES, _memoryManager, allocationContext);
+                Integer.BYTES, _memoryManager, allocationContext, true, DataType.INT);
       }
 
       _indexContainerMap.put(column,

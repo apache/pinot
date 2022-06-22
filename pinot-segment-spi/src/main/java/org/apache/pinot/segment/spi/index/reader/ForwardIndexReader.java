@@ -101,6 +101,17 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   }
 
   /**
+   * Reads the dictionary ids for a multi-value column at the given document id into a buffer and returns the buffer.
+   *
+   * @param docId Document id
+   * @param context Reader context
+   * @return A buffer containing the multi-value entries
+   */
+  default int[] getDictIdMV(int docId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
    * SINGLE-VALUE COLUMN RAW INDEX APIs
    */
 
@@ -410,8 +421,302 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
 
   /**
    * MULTI-VALUE COLUMN RAW INDEX APIs
-   * TODO: Not supported yet
    */
+
+  /**
+   * Fills the values
+   * @param docIds Array containing the document ids to read
+   * @param length Number of values to read
+   * @param values Values to fill
+   * @param context Reader context
+   */
+  default void readValuesMV(int[] docIds, int length, int[][] values, T context) {
+    switch (getValueType()) {
+      case INT:
+        for (int i = 0; i < length; i++) {
+          values[i] = getIntMV(docIds[i], context);
+        }
+        break;
+      case LONG:
+        for (int i = 0; i < length; i++) {
+          long[] longValueBuffer = getLongMV(docIds[i], context);
+          int numValues = longValueBuffer.length;
+          values[i] = new int[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = (int) longValueBuffer[j];
+          }
+        }
+        break;
+      case FLOAT:
+        for (int i = 0; i < length; i++) {
+          float[] floatValueBuffer = getFloatMV(docIds[i], context);
+          int numValues = floatValueBuffer.length;
+          values[i] = new int[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = (int) floatValueBuffer[j];
+          }
+        }
+        break;
+      case DOUBLE:
+        for (int i = 0; i < length; i++) {
+          double[] doubleValueBuffer = getDoubleMV(docIds[i], context);
+          int numValues = doubleValueBuffer.length;
+          values[i] = new int[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = (int) doubleValueBuffer[j];
+          }
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          String[] stringValueBuffer = getStringMV(docIds[i], context);
+          int numValues = stringValueBuffer.length;
+          values[i] = new int[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = Integer.parseInt(stringValueBuffer[j]);
+          }
+        }
+        break;
+      default:
+        throw new IllegalArgumentException("readValuesMV not supported for type " + getValueType());
+    }
+  }
+
+  /**
+   * Fills the values
+   * @param docIds Array containing the document ids to read
+   * @param length Number of values to read
+   * @param values Values to fill
+   * @param context Reader context
+   */
+  default void readValuesMV(int[] docIds, int length, long[][] values, T context) {
+    switch (getValueType()) {
+      case INT:
+        for (int i = 0; i < length; i++) {
+          int[] intValueBuffer = getIntMV(docIds[i], context);
+          int numValues = intValueBuffer.length;
+          values[i] = new long[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = intValueBuffer[j];
+          }
+        }
+        break;
+      case LONG:
+        for (int i = 0; i < length; i++) {
+          values[i] = getLongMV(docIds[i], context);
+        }
+        break;
+      case FLOAT:
+        for (int i = 0; i < length; i++) {
+          float[] floatValueBuffer = getFloatMV(docIds[i], context);
+          int numValues = floatValueBuffer.length;
+          values[i] = new long[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = (long) floatValueBuffer[j];
+          }
+        }
+        break;
+      case DOUBLE:
+        for (int i = 0; i < length; i++) {
+          double[] doubleValueBuffer = getDoubleMV(docIds[i], context);
+          int numValues = doubleValueBuffer.length;
+          values[i] = new long[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = (long) doubleValueBuffer[j];
+          }
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          String[] stringValueBuffer = getStringMV(docIds[i], context);
+          int numValues = stringValueBuffer.length;
+          values[i] = new long[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = Long.parseLong(stringValueBuffer[j]);
+          }
+        }
+        break;
+      default:
+        throw new IllegalArgumentException("readValuesMV not supported for type " + getValueType());
+    }
+  }
+
+  /**
+   * Fills the values
+   * @param docIds Array containing the document ids to read
+   * @param length Number of values to read
+   * @param values Values to fill
+   * @param context Reader context
+   */
+  default void readValuesMV(int[] docIds, int length, float[][] values, T context) {
+    switch (getValueType()) {
+      case INT:
+        for (int i = 0; i < length; i++) {
+          int[] intValueBuffer = getIntMV(docIds[i], context);
+          int numValues = intValueBuffer.length;
+          values[i] = new float[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = intValueBuffer[j];
+          }
+        }
+        break;
+      case LONG:
+        for (int i = 0; i < length; i++) {
+          long[] longValueBuffer = getLongMV(docIds[i], context);
+          int numValues = longValueBuffer.length;
+          values[i] = new float[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = longValueBuffer[j];
+          }
+        }
+        break;
+      case FLOAT:
+        for (int i = 0; i < length; i++) {
+          values[i] = getFloatMV(docIds[i], context);
+        }
+        break;
+      case DOUBLE:
+        for (int i = 0; i < length; i++) {
+          double[] doubleValueBuffer = getDoubleMV(docIds[i], context);
+          int numValues = doubleValueBuffer.length;
+          values[i] = new float[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = (float) doubleValueBuffer[j];
+          }
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          String[] stringValueBuffer = getStringMV(docIds[i], context);
+          int numValues = stringValueBuffer.length;
+          values[i] = new float[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = Float.parseFloat(stringValueBuffer[j]);
+          }
+        }
+        break;
+      default:
+        throw new IllegalArgumentException("readValuesMV not supported for type " + getValueType());
+    }
+  }
+
+  /**
+   * Fills the values
+   * @param docIds Array containing the document ids to read
+   * @param length Number of values to read
+   * @param values Values to fill
+   * @param context Reader context
+   */
+  default void readValuesMV(int[] docIds, int length, double[][] values, T context) {
+    switch (getValueType()) {
+      case INT:
+        for (int i = 0; i < length; i++) {
+          int[] intValueBuffer = getIntMV(docIds[i], context);
+          int numValues = intValueBuffer.length;
+          values[i] = new double[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = intValueBuffer[j];
+          }
+        }
+        break;
+      case LONG:
+        for (int i = 0; i < length; i++) {
+          long[] longValueBuffer = getLongMV(docIds[i], context);
+          int numValues = longValueBuffer.length;
+          values[i] = new double[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = longValueBuffer[j];
+          }
+        }
+        break;
+      case FLOAT:
+        for (int i = 0; i < length; i++) {
+          float[] floatValueBuffer = getFloatMV(docIds[i], context);
+          int numValues = floatValueBuffer.length;
+          values[i] = new double[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = floatValueBuffer[j];
+          }
+        }
+        break;
+      case DOUBLE:
+        for (int i = 0; i < length; i++) {
+          values[i] = getDoubleMV(docIds[i], context);
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          String[] stringValueBuffer = getStringMV(docIds[i], context);
+          int numValues = stringValueBuffer.length;
+          values[i] = new double[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = Double.parseDouble(stringValueBuffer[j]);
+          }
+        }
+        break;
+      default:
+        throw new IllegalArgumentException("readValuesMV not supported for type " + getValueType());
+    }
+  }
+
+  /**
+   * Fills the values
+   * @param docIds Array containing the document ids to read
+   * @param length Number of values to read
+   * @param values Values to fill
+   * @param context Reader context
+   */
+  default void readValuesMV(int[] docIds, int length, String[][] values, T context) {
+    switch (getValueType()) {
+      case INT:
+        for (int i = 0; i < length; i++) {
+          int[] intValueBuffer = getIntMV(docIds[i], context);
+          int numValues = intValueBuffer.length;
+          values[i] = new String[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = String.valueOf(intValueBuffer[j]);
+          }
+        }
+        break;
+      case LONG:
+        for (int i = 0; i < length; i++) {
+          long[] longValueBuffer = getLongMV(docIds[i], context);
+          int numValues = longValueBuffer.length;
+          values[i] = new String[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = String.valueOf(longValueBuffer[j]);
+          }
+        }
+        break;
+      case FLOAT:
+        for (int i = 0; i < length; i++) {
+          float[] floatValueBuffer = getFloatMV(docIds[i], context);
+          int numValues = floatValueBuffer.length;
+          values[i] = new String[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = String.valueOf(floatValueBuffer[j]);
+          }
+        }
+        break;
+      case DOUBLE:
+        for (int i = 0; i < length; i++) {
+          double[] doubleValueBuffer = getDoubleMV(docIds[i], context);
+          int numValues = doubleValueBuffer.length;
+          values[i] = new String[numValues];
+          for (int j = 0; j < numValues; j++) {
+            values[i][j] = String.valueOf(doubleValueBuffer[j]);
+          }
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          values[i] = getStringMV(docIds[i], context);
+        }
+        break;
+      default:
+        throw new IllegalArgumentException("readValuesMV not supported for type " + getValueType());
+    }
+  }
 
   /**
    * Reads the INT type multi-value at the given document id into the passed in value buffer (the buffer size must be
@@ -424,6 +729,17 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @return Number of values within the multi-value entry
    */
   default int getIntMV(int docId, int[] valueBuffer, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Reads the INT type multi-value at the given document id into a buffer and returns the buffer.
+   *
+   * @param docId Document id
+   * @param context Reader context
+   * @return A buffer containing the multi-value entries
+   */
+  default int[] getIntMV(int docId, T context) {
     throw new UnsupportedOperationException();
   }
 
@@ -442,6 +758,17 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   }
 
   /**
+   * Reads the LONG type multi-value at the given document id into a buffer and returns the buffer.
+   *
+   * @param docId Document id
+   * @param context Reader context
+   * @return A buffer containing the multi-value entries
+   */
+  default long[] getLongMV(int docId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
    * Reads the FLOAT type multi-value at the given document id into the passed in value buffer (the buffer size must be
    * enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
    * entry.
@@ -452,6 +779,17 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @return Number of values within the multi-value entry
    */
   default int getFloatMV(int docId, float[] valueBuffer, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Reads the FLOAT type multi-value at the given document id into a buffer and returns the buffer.
+   *
+   * @param docId Document id
+   * @param context Reader context
+   * @return A buffer containing the multi-value entries
+   */
+  default float[] getFloatMV(int docId, T context) {
     throw new UnsupportedOperationException();
   }
 
@@ -470,6 +808,17 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   }
 
   /**
+   * Reads the DOUBLE type multi-value at the given document id into a buffer and returns the buffer.
+   *
+   * @param docId Document id
+   * @param context Reader context
+   * @return A buffer containing the multi-value entries
+   */
+  default double[] getDoubleMV(int docId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
    * Reads the STRING type multi-value at the given document id into the passed in value buffer (the buffer size must
    * be enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
    * entry.
@@ -484,6 +833,17 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   }
 
   /**
+   * Reads the STRING type multi-value at the given document id into a buffer and returns the buffer.
+   *
+   * @param docId Document id
+   * @param context Reader context
+   * @return A buffer containing the multi-value entries
+   */
+  default String[] getStringMV(int docId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
    * Reads the bytes type multi-value at the given document id into the passed in value buffer (the buffer size must
    * be enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
    * entry.
@@ -494,6 +854,28 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @return Number of values within the multi-value entry
    */
   default int getBytesMV(int docId, byte[][] valueBuffer, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Reads the bytes type multi-value at the given document id into a buffer and returns the buffer.
+   *
+   * @param docId Document id
+   * @param context Reader context
+   * @return A buffer containing the multi-value entries
+   */
+  default byte[][] getBytesMV(int docId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Gets the number of multi-values at a given document id and returns it.
+   *
+   * @param docId Document id
+   * @param context Reader context
+   * @return Number of values within the multi-value entry
+   */
+  default int getNumValuesMV(int docId, T context) {
     throw new UnsupportedOperationException();
   }
 }

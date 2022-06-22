@@ -92,9 +92,24 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Reads the dictionary ids for a multi-value column at the given document id into a buffer and returns the buffer.
+   *
+   * @param docId Document id
+   * @return A buffer containing the multi-value entries
+   */
+  default int[] getDictIdMV(int docId) {
+    throw new UnsupportedOperationException();
+  }
+
   @Override
   default int getDictIdMV(int docId, int[] dictIdBuffer, ForwardIndexReaderContext context) {
     return getDictIdMV(docId, dictIdBuffer);
+  }
+
+  @Override
+  default int[] getDictIdMV(int docId, ForwardIndexReaderContext context) {
+    return getDictIdMV(docId);
   }
 
   /**
@@ -321,9 +336,24 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Reads the INT type multi-value at the given document id into a buffer and returns the buffer.
+   *
+   * @param docId Document id
+   * @return A buffer containing the multi-value entries
+   */
+  default int[] getIntMV(int docId) {
+    throw new UnsupportedOperationException();
+  }
+
   @Override
   default int getIntMV(int docId, int[] valueBuffer, ForwardIndexReaderContext context) {
     return getIntMV(docId, valueBuffer);
+  }
+
+  @Override
+  default int[] getIntMV(int docId, ForwardIndexReaderContext context) {
+    return getIntMV(docId);
   }
 
   /**
@@ -339,9 +369,24 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Reads the LONG type multi-value at the given document id into a buffer and returns the buffer.
+   *
+   * @param docId Document id
+   * @return A buffer containing the multi-value entries
+   */
+  default long[] getLongMV(int docId) {
+    throw new UnsupportedOperationException();
+  }
+
   @Override
   default int getLongMV(int docId, long[] valueBuffer, ForwardIndexReaderContext context) {
     return getLongMV(docId, valueBuffer);
+  }
+
+  @Override
+  default long[] getLongMV(int docId, ForwardIndexReaderContext context) {
+    return getLongMV(docId);
   }
 
   /**
@@ -357,9 +402,24 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Reads the FLOAT type multi-value at the given document id into a buffer and returns the buffer.
+   *
+   * @param docId Document id
+   * @return A buffer containing the multi-value entries
+   */
+  default float[] getFloatMV(int docId) {
+    throw new UnsupportedOperationException();
+  }
+
   @Override
   default int getFloatMV(int docId, float[] valueBuffer, ForwardIndexReaderContext context) {
     return getFloatMV(docId, valueBuffer);
+  }
+
+  @Override
+  default float[] getFloatMV(int docId, ForwardIndexReaderContext context) {
+    return getFloatMV(docId);
   }
 
   /**
@@ -375,9 +435,24 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Reads the DOUBLE type multi-value at the given document id into a buffer and returns the buffer.
+   *
+   * @param docId Document id
+   * @return A buffer containing the multi-value entries
+   */
+  default double[] getDoubleMV(int docId) {
+    throw new UnsupportedOperationException();
+  }
+
   @Override
   default int getDoubleMV(int docId, double[] valueBuffer, ForwardIndexReaderContext context) {
     return getDoubleMV(docId, valueBuffer);
+  }
+
+  @Override
+  default double[] getDoubleMV(int docId, ForwardIndexReaderContext context) {
+    return getDoubleMV(docId);
   }
 
   /**
@@ -393,9 +468,39 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Reads the STRING type multi-value at the given document id into a buffer and returns the buffer.
+   *
+   * @param docId Document id
+   * @return A buffer containing the multi-value entries
+   */
+  default String[] getStringMV(int docId) {
+    throw new UnsupportedOperationException();
+  }
+
   @Override
   default int getStringMV(int docId, String[] valueBuffer, ForwardIndexReaderContext context) {
     return getStringMV(docId, valueBuffer);
+  }
+
+  @Override
+  default String[] getStringMV(int docId, ForwardIndexReaderContext context) {
+    return getStringMV(docId);
+  }
+
+  /**
+   * Gets the number of multi-values at a given document id and returns it.
+   *
+   * @param docId Document id
+   * @return Number of values within the multi-value entry
+   */
+  default int getNumValuesMV(int docId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  default int getNumValuesMV(int docId, ForwardIndexReaderContext context) {
+    return getNumValuesMV(docId);
   }
 
   /**

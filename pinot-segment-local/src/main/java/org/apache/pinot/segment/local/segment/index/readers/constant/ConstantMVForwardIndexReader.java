@@ -50,6 +50,16 @@ public final class ConstantMVForwardIndexReader implements ForwardIndexReader<Fo
   }
 
   @Override
+  public int[] getDictIdMV(int docId, ForwardIndexReaderContext context) {
+    return new int[]{0};
+  }
+
+  @Override
+  public int getNumValuesMV(int docId, ForwardIndexReaderContext context) {
+    return 1;
+  }
+
+  @Override
   public void close() {
   }
 }

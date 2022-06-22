@@ -133,6 +133,77 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
   }
 
   @Override
+  public int[] getDictIdMV(int docId, Context context) {
+    int contextDocId = context._docId;
+    int contextEndOffset = context._endOffset;
+    int startIndex;
+    if (docId == contextDocId + 1) {
+      startIndex = contextEndOffset;
+    } else {
+      int chunkId = docId / _numDocsPerChunk;
+      if (docId > contextDocId && chunkId == contextDocId / _numDocsPerChunk) {
+        // Same chunk
+        startIndex = _bitmapReader.getNextNthSetBitOffset(contextEndOffset + 1, docId - contextDocId - 1);
+      } else {
+        // Different chunk
+        int chunkOffset = _chunkOffsetReader.getInt(chunkId);
+        int indexInChunk = docId % _numDocsPerChunk;
+        if (indexInChunk == 0) {
+          startIndex = chunkOffset;
+        } else {
+          startIndex = _bitmapReader.getNextNthSetBitOffset(chunkOffset + 1, indexInChunk);
+        }
+      }
+    }
+    int endIndex;
+    if (docId == _numDocs - 1) {
+      endIndex = _numValues;
+    } else {
+      endIndex = _bitmapReader.getNextSetBitOffset(startIndex + 1);
+    }
+    int numValues = endIndex - startIndex;
+    int[] dictIdBuffer = new int[numValues];
+    _rawDataReader.readInt(startIndex, numValues, dictIdBuffer);
+
+    // Update context
+    context._docId = docId;
+    context._endOffset = endIndex;
+
+    return dictIdBuffer;
+  }
+
+  public int getNumValuesMV(int docId, Context context) {
+    int contextDocId = context._docId;
+    int contextEndOffset = context._endOffset;
+    int startIndex;
+    if (docId == contextDocId + 1) {
+      startIndex = contextEndOffset;
+    } else {
+      int chunkId = docId / _numDocsPerChunk;
+      if (docId > contextDocId && chunkId == contextDocId / _numDocsPerChunk) {
+        // Same chunk
+        startIndex = _bitmapReader.getNextNthSetBitOffset(contextEndOffset + 1, docId - contextDocId - 1);
+      } else {
+        // Different chunk
+        int chunkOffset = _chunkOffsetReader.getInt(chunkId);
+        int indexInChunk = docId % _numDocsPerChunk;
+        if (indexInChunk == 0) {
+          startIndex = chunkOffset;
+        } else {
+          startIndex = _bitmapReader.getNextNthSetBitOffset(chunkOffset + 1, indexInChunk);
+        }
+      }
+    }
+    int endIndex;
+    if (docId == _numDocs - 1) {
+      endIndex = _numValues;
+    } else {
+      endIndex = _bitmapReader.getNextSetBitOffset(startIndex + 1);
+    }
+    return endIndex - startIndex;
+  }
+
+  @Override
   public void close() {
     // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
     // caller is responsible of closing the PinotDataBuffer.
