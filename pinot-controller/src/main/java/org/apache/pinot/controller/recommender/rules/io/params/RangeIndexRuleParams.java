@@ -28,6 +28,17 @@ import com.fasterxml.jackson.annotation.Nulls;
 public class RangeIndexRuleParams {
   public Double _thresholdMinPercentRangeIndex =
       RecommenderConstants.RangeIndexRule.DEFAULT_THRESHOLD_MIN_PERCENT_RANGE_INDEX;
+  public Double _thresholdMinCardinalityRangeIndex =
+      RecommenderConstants.RangeIndexRule.DEFAULT_THRESHOLD_MIN_CARDINALITY_RANGE_INDEX;
+
+  public Double getThresholdMinCardinalityRangeIndex() {
+    return _thresholdMinCardinalityRangeIndex;
+  }
+
+  @JsonSetter(value = "THRESHOLD_MIN_CARDINALITY_RANGE_INDEX", nulls = Nulls.SKIP)
+  public void setThresholdMinCardinalityRangeIndex(Double thresholdMinCardinalityRangeIndex) {
+    _thresholdMinCardinalityRangeIndex = thresholdMinCardinalityRangeIndex;
+  }
 
   public Double getThresholdMinPercentRangeIndex() {
     return _thresholdMinPercentRangeIndex;

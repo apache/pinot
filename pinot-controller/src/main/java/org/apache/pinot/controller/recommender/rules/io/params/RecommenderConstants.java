@@ -71,6 +71,7 @@ public class RecommenderConstants {
 
   public static class RangeIndexRule {
     public static final double DEFAULT_THRESHOLD_MIN_PERCENT_RANGE_INDEX = 0.4;
+    public static final double DEFAULT_THRESHOLD_MIN_CARDINALITY_RANGE_INDEX = 2;
   }
 
   public static class NoDictionaryOnHeapDictionaryJointRule {
@@ -94,6 +95,9 @@ public class RecommenderConstants {
     public static final String WARNING_TOO_LONG_LIMIT =
         "Warning: Please verify if you need to pull out huge number of records for this query. Consider using smaller"
             + " limit than " + DEFAULT_THRESHOLD_MAX_LIMIT_SIZE;
+
+    public static final String ERROR_INVALID_COLUMN =
+        "ERROR: Query is filtering on columns not appearing in schema: ";
     public static final String ERROR_INVALID_QUERY = "Error: Invalid query syntax. Please fix the query";
   }
 
