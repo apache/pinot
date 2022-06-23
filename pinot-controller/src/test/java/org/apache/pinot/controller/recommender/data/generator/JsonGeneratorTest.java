@@ -39,7 +39,7 @@ public class JsonGeneratorTest {
     checkJson((String) jsonGenerator3.next(), 8);
 
     JsonGenerator jsonGenerator4 = new JsonGenerator(20);
-    checkJson((String)jsonGenerator4.next(), 20);
+    checkJson((String) jsonGenerator4.next(), 20);
   }
 
   public static void checkJson(String jsonString, int desiredLength)
@@ -51,7 +51,7 @@ public class JsonGeneratorTest {
     // Make sure we are generating JSON string that is close to the desired length. Length of JSON string should be 2
     // (length of opening and closing parentheses) + number of commas + size of all the elements.
     Assert.assertEquals(jsonString.length(),
-        "{}".length() + (elementCount-1) + elementCount * JsonGenerator.DEFAULT_JSON_ELEMENT_LENGTH);
+        "{}".length() + (elementCount - 1) + elementCount * JsonGenerator.DEFAULT_JSON_ELEMENT_LENGTH);
 
     // Check if json string is valid json.
     JsonUtils.stringToJsonNode(jsonString);

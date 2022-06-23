@@ -27,6 +27,7 @@ public class JsonGenerator implements Generator {
 
   private int _jsonStringLength = 0;
   private Random _random;
+
   public JsonGenerator(Integer jsonSize) {
     _jsonStringLength = jsonSize == null ? 0 : jsonSize;
     _random = new Random(System.currentTimeMillis());
@@ -51,7 +52,7 @@ public class JsonGenerator implements Generator {
       if (jsonBuffer.length() > 1) {
         jsonBuffer.append(",");
       }
-      String item = "\"" + (char)('a' + _random.nextInt(26)) + "\":" + _random.nextInt(10);
+      String item = "\"" + (char) ('a' + _random.nextInt(26)) + "\":" + _random.nextInt(10);
       jsonBuffer.append(item);
     }
 
