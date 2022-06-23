@@ -68,12 +68,12 @@ public class MinionTaskMetadataUtilsTest {
     assertEquals(MinionTaskMetadataUtils.fetchTaskMetadata(propertyStore, TASK_TYPE, TABLE_NAME_WITH_TYPE),
         NEW_TASK_METADATA.toZNRecord());
 
-    // if two metadata paths exist at the same time, the old one will be used.
+    // if two metadata paths exist at the same time, the new one will be used.
     propertyStore = new FakePropertyStore();
     propertyStore.set(OLD_MINION_METADATA_PATH, OLD_TASK_METADATA.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
     propertyStore.set(NEW_MINION_METADATA_PATH, NEW_TASK_METADATA.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
     assertEquals(MinionTaskMetadataUtils.fetchTaskMetadata(propertyStore, TASK_TYPE, TABLE_NAME_WITH_TYPE),
-        OLD_TASK_METADATA.toZNRecord());
+        NEW_TASK_METADATA.toZNRecord());
   }
 
   @Test
@@ -140,14 +140,14 @@ public class MinionTaskMetadataUtilsTest {
     assertEquals(MinionTaskMetadataUtils.fetchTaskMetadata(propertyStore, TASK_TYPE, TABLE_NAME_WITH_TYPE),
         taskMetadata.toZNRecord());
 
-    // the metadata will be written to old new path if both paths exist
+    // the metadata will be written to the new path if both paths exist
     propertyStore = new FakePropertyStore();
     propertyStore.set(OLD_MINION_METADATA_PATH, OLD_TASK_METADATA.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
     propertyStore.set(NEW_MINION_METADATA_PATH, NEW_TASK_METADATA.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
     MinionTaskMetadataUtils.persistTaskMetadata(propertyStore, TASK_TYPE, taskMetadata, EXPECTED_VERSION);
     assertTrue(propertyStore.exists(NEW_MINION_METADATA_PATH, ACCESS_OPTION));
     assertTrue(propertyStore.exists(OLD_MINION_METADATA_PATH, ACCESS_OPTION));
-    assertEquals(propertyStore.get(OLD_MINION_METADATA_PATH, new Stat(), ACCESS_OPTION), taskMetadata.toZNRecord());
+    assertEquals(propertyStore.get(NEW_MINION_METADATA_PATH, new Stat(), ACCESS_OPTION), taskMetadata.toZNRecord());
     assertEquals(MinionTaskMetadataUtils.fetchTaskMetadata(propertyStore, TASK_TYPE, TABLE_NAME_WITH_TYPE),
         taskMetadata.toZNRecord());
   }
