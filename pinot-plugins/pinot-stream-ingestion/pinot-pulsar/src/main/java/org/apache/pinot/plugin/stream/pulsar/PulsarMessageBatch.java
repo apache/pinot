@@ -35,6 +35,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A {@link MessageBatch} for collecting messages from pulsar topic
+ *
+ * When 'enableKeyValueStitch' flag is enabled, existing {@link org.apache.pinot.spi.stream.StreamMessageDecoder}
+ * plugins will not work. A custom decoder will be needed to unpack key and value byte arrays and decode
+ * them independently.
  */
 public class PulsarMessageBatch implements MessageBatch<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarMessageBatch.class);
@@ -58,7 +62,7 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
     if (_enableKeyValueStitch) {
       return stitchKeyValue(msg.getKeyBytes(), msg.getData());
     }
-    return _messageList.get(index).getData();
+    return msg.getData();
   }
 
   @Override
