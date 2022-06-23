@@ -121,7 +121,6 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
   const [value, setValue] = useState('');
   const fetchData = async () => {
     const result = await PinotMethodUtils.getSegmentDetails(tableName, segmentName);
-    console.log("result", result)
     setSegmentSummary(result.summary);
     setIndexes(result.indexes);
     setReplica(result.replicaSet);
