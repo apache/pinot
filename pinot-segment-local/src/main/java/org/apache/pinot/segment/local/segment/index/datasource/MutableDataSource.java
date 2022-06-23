@@ -42,13 +42,13 @@ public class MutableDataSource extends BaseDataSource {
 
   public MutableDataSource(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
       @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions, @Nullable Comparable minValue,
-      @Nullable Comparable maxValue, ForwardIndexReader forwardIndex, @Nullable Dictionary dictionary,
+      @Nullable Comparable maxValue, @Nullable Set<Comparable> uniqueValueSet, ForwardIndexReader forwardIndex, @Nullable Dictionary dictionary,
       @Nullable InvertedIndexReader invertedIndex, @Nullable RangeIndexReader rangeIndex,
       @Nullable TextIndexReader textIndex, @Nullable TextIndexReader fstIndex, @Nullable JsonIndexReader jsonIndex,
       @Nullable H3IndexReader h3Index, @Nullable BloomFilterReader bloomFilter,
       @Nullable NullValueVectorReader nullValueVector) {
     super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, partitionFunction,
-            partitions, minValue, maxValue), forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, fstIndex,
+            partitions, minValue, maxValue, uniqueValueSet), forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, fstIndex,
         jsonIndex, h3Index, bloomFilter, nullValueVector);
   }
 
@@ -61,10 +61,11 @@ public class MutableDataSource extends BaseDataSource {
     final Set<Integer> _partitions;
     final Comparable _minValue;
     final Comparable _maxValue;
+    final Set<Comparable> _uniqueValuesSet;
 
     MutableDataSourceMetadata(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
         @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions, @Nullable Comparable minValue,
-        @Nullable Comparable maxValue) {
+        @Nullable Comparable maxValue, @Nullable Set<Comparable> uniqueValueSet) {
       _fieldSpec = fieldSpec;
       _numDocs = numDocs;
       _numValues = numValues;
@@ -78,6 +79,7 @@ public class MutableDataSource extends BaseDataSource {
       }
       _minValue = minValue;
       _maxValue = maxValue;
+      _uniqueValuesSet = uniqueValueSet;
     }
 
     @Override
@@ -116,6 +118,12 @@ public class MutableDataSource extends BaseDataSource {
     @Override
     public Comparable getMaxValue() {
       return _maxValue;
+    }
+
+    @Nullable
+    @Override
+    public Set<Comparable> getUniqueValueSet() {
+      return _uniqueValuesSet;
     }
 
     @Nullable

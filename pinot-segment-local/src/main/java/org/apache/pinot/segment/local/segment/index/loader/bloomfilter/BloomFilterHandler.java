@@ -43,6 +43,8 @@ import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -109,8 +111,7 @@ public class BloomFilterHandler implements IndexHandler {
   }
 
   private boolean shouldCreateBloomFilter(ColumnMetadata columnMetadata) {
-    // TODO: Support raw index
-    return columnMetadata != null && columnMetadata.hasDictionary();
+    return columnMetadata != null;
   }
 
   private void createBloomFilterForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
@@ -136,16 +137,45 @@ public class BloomFilterHandler implements IndexHandler {
     BloomFilterConfig bloomFilterConfig = _bloomFilterConfigs.get(columnName);
     LOGGER.info("Creating new bloom filter for segment: {}, column: {} with config: {}", segmentName, columnName,
         bloomFilterConfig);
-    try (BloomFilterCreator bloomFilterCreator = indexCreatorProvider.newBloomFilterCreator(
-        IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata)
-            .build().forBloomFilter(bloomFilterConfig));
-        Dictionary dictionary = getDictionaryReader(columnMetadata, segmentWriter)) {
-      int length = dictionary.length();
-      for (int i = 0; i < length; i++) {
-        bloomFilterCreator.add(dictionary.getStringValue(i));
+
+    if (columnMetadata.hasDictionary()) {
+      try (BloomFilterCreator bloomFilterCreator = indexCreatorProvider.newBloomFilterCreator(
+          IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata)
+              .build().forBloomFilter(bloomFilterConfig));
+          Dictionary dictionary = getDictionaryReader(columnMetadata, segmentWriter)) {
+        int length = dictionary.length();
+        for (int i = 0; i < length; i++) {
+          bloomFilterCreator.add(dictionary.getStringValue(i));
+        }
+        bloomFilterCreator.seal();
       }
-      bloomFilterCreator.seal();
+    } else {
+      int numDocs = columnMetadata.getTotalDocs();
+      try (BloomFilterCreator bloomFilterCreator = indexCreatorProvider.newBloomFilterCreator(
+          IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata)
+              .build().forBloomFilter(bloomFilterConfig));
+          ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
+          ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
+        if (columnMetadata.isSingleValue()) {
+          // SV
+          for (int i = 0; i < numDocs; i++) {
+            bloomFilterCreator.add(forwardIndexReader.getString(i, readerContext));
+          }
+          bloomFilterCreator.seal();
+        } else {
+          // MV
+          for (int i = 0; i < numDocs; i++) {
+            String[] buffer = new String[columnMetadata.getMaxNumberOfMultiValues()];
+            int length = forwardIndexReader.getStringMV(i, buffer, readerContext);
+            for (int j = 0; j < length; j++) {
+              bloomFilterCreator.add(buffer[j]);
+            }
+          }
+          bloomFilterCreator.seal();
+        }
+      }
     }
+
 
     // For v3, write the generated bloom filter file into the single file and remove it.
     if (_segmentMetadata.getVersion() == SegmentVersion.v3) {

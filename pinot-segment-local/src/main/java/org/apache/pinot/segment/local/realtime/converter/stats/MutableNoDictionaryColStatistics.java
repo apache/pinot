@@ -50,12 +50,16 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics {
 
   @Override
   public Object getUniqueValuesSet() {
-    return null;
+    Set<Comparable> values = _dataSourceMetadata.getUniqueValueSet();
+    if (values == null) {
+      return null;
+    }
+    return values.toArray();
   }
 
   @Override
   public int getCardinality() {
-    return UNKNOWN_CARDINALITY;
+    return _dataSourceMetadata.getUniqueValueSet().size();
   }
 
   @Override

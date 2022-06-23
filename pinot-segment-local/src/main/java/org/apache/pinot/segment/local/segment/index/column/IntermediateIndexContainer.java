@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.column;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
@@ -44,6 +45,8 @@ public class IntermediateIndexContainer implements Closeable {
 
   volatile Comparable _minValue;
   volatile Comparable _maxValue;
+  volatile Set<Comparable> _valueSet = new HashSet<>();
+
 
   // Hold the dictionary id for the latest record
   int _dictId = Integer.MIN_VALUE;
@@ -62,7 +65,7 @@ public class IntermediateIndexContainer implements Closeable {
 
   public DataSource toDataSource(int numDocsIndexed) {
     return new MutableDataSource(_fieldSpec, numDocsIndexed, _numValuesInfo._numValues,
-        _numValuesInfo._maxNumValuesPerMVEntry, _partitionFunction, _partitions, _minValue, _maxValue, _forwardIndex,
+        _numValuesInfo._maxNumValuesPerMVEntry, _partitionFunction, _partitions, _minValue, _maxValue, _valueSet, _forwardIndex,
         _dictionary, null, null, null, null, null, null, null, null);
   }
 
@@ -130,5 +133,9 @@ public class IntermediateIndexContainer implements Closeable {
 
   public void setMaxValue(Comparable maxValue) {
     _maxValue = maxValue;
+  }
+
+  public void addValueToSet(Comparable value) {
+    _valueSet.add(value);
   }
 }

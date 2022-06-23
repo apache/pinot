@@ -254,6 +254,7 @@ public class IntermediateSegment implements MutableSegment {
         // Update min/max value from dictionary
         indexContainer.setMinValue(dictionary.getMinVal());
         indexContainer.setMaxValue(dictionary.getMaxVal());
+        indexContainer.addValueToSet((Comparable) value);
       }
     }
   }
@@ -327,6 +328,7 @@ public class IntermediateSegment implements MutableSegment {
                 indexContainer.setMaxValue(comparable);
               }
             }
+            indexContainer.addValueToSet(comparable);
           }
         }
       } else {

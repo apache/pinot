@@ -711,7 +711,7 @@ public class MutableSegmentImpl implements MutableSegment {
                   "Unsupported data type: " + dataType + " for no-dictionary column: " + column);
           }
 
-          // Update min/max value from raw value
+          // Update min/max and cardinality value from raw value
           // NOTE: Skip updating min/max value for aggregated metrics because the value will change over time.
           if (!isAggregateMetricsEnabled() || fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC) {
             Comparable comparable;
@@ -731,6 +731,11 @@ public class MutableSegmentImpl implements MutableSegment {
                 indexContainer._maxValue = comparable;
               }
             }
+
+            if (indexContainer._valueSet == null) {
+              indexContainer._valueSet = new HashSet<>();
+            }
+            indexContainer._valueSet.add(comparable);
           }
         }
 
@@ -1315,6 +1320,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
     volatile Comparable _minValue;
     volatile Comparable _maxValue;
+    volatile Set<Comparable> _valueSet = new HashSet<>();
 
     // Hold the dictionary id for the latest record
     int _dictId = Integer.MIN_VALUE;
@@ -1348,7 +1354,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
     DataSource toDataSource() {
       return new MutableDataSource(_fieldSpec, _numDocsIndexed, _numValuesInfo._numValues,
-          _numValuesInfo._maxNumValuesPerMVEntry, _partitionFunction, _partitions, _minValue, _maxValue, _forwardIndex,
+          _numValuesInfo._maxNumValuesPerMVEntry, _partitionFunction, _partitions, _minValue, _maxValue, _valueSet, _forwardIndex,
           _dictionary, _invertedIndex, _rangeIndex, _textIndex, _fstIndex, _jsonIndex, _h3Index, _bloomFilter,
           _nullValueVector);
     }

@@ -81,6 +81,12 @@ public class EmptyDataSource extends BaseDataSource {
 
     @Nullable
     @Override
+    public Set<Comparable> getUniqueValueSet() {
+      return null;
+    }
+
+    @Nullable
+    @Override
     public PartitionFunction getPartitionFunction() {
       return null;
     }

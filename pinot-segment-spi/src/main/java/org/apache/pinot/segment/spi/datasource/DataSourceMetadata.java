@@ -82,6 +82,9 @@ public interface DataSourceMetadata {
   @Nullable
   Comparable getMaxValue();
 
+  @Nullable
+  Set<Comparable> getUniqueValueSet();
+
   /**
    * Returns the partition function of the column, or {@code null} if the column is not partitioned.
    */
