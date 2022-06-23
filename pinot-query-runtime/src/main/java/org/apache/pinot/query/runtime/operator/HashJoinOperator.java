@@ -26,8 +26,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
-import org.apache.pinot.core.common.datablock.DataBlockBuilder;
-import org.apache.pinot.core.common.datablock.DataBlockUtils;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
@@ -85,7 +83,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   protected TransferableBlock getNextBlock() {
     buildBroadcastHashTable();
     try {
-      return new TransferableBlock(buildJoinedDataBlock(_leftTableOperator.nextBlock()));
+      return buildJoinedDataBlock(_leftTableOperator.nextBlock());
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
@@ -98,9 +96,10 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
         BaseDataBlock dataBlock = rightBlock.getDataBlock();
         _rightTableSchema = dataBlock.getDataSchema();
         int numRows = dataBlock.getNumberOfRows();
+        List<Object[]> container = rightBlock.getContainer();
         // put all the rows into corresponding hash collections keyed by the key selector function.
         for (int rowId = 0; rowId < numRows; rowId++) {
-          Object[] objects = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
+          Object[] objects = container.get(rowId);
           List<Object[]> hashCollection =
               _broadcastHashTable.computeIfAbsent(_rightKeySelector.getKey(objects), k -> new ArrayList<>());
           hashCollection.add(objects);
@@ -111,10 +110,10 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
-  private BaseDataBlock buildJoinedDataBlock(TransferableBlock block)
+  private TransferableBlock buildJoinedDataBlock(TransferableBlock block)
       throws Exception {
     if (TransferableBlockUtils.isEndOfStream(block)) {
-      return DataBlockUtils.getEndOfStreamDataBlock();
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
     List<Object[]> rows = new ArrayList<>();
     BaseDataBlock dataBlock = block.getDataBlock();
@@ -129,7 +128,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
         rows.add(joinRow(leftRow, rightRow));
       }
     }
-    return DataBlockBuilder.buildFromRows(rows, null, computeSchema());
+    return new TransferableBlock(rows, computeSchema(), BaseDataBlock.Type.ROW);
   }
 
   private Object[] joinRow(Object[] leftRow, Object[] rightRow) {
