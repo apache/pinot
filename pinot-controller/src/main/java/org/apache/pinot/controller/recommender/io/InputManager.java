@@ -172,11 +172,15 @@ public class InputManager {
         _queryOptimizer.optimize(pinotQuery, _schema);
         QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
 
-        //Flag the queries having in filter columns not appear in schema
+        // Flag the queries having in filter columns not appear in schema
+        // to exclude user input like select i from tableName where a = xyz and t > 500
         Set<String> filterColumns = new HashSet<>();
         if (queryContext.getFilter() != null) {
+          // get in filter column names, excluding literals, etc
           queryContext.getFilter().getColumns(filterColumns);
+          // remove those appear in schema
           filterColumns.removeAll(_colNameToIntMap.keySet());
+          // flag if there are columns left
           if (!filterColumns.isEmpty()) {
             invalidQueries.add(queryString);
             _overWrittenConfigs.getFlaggedQueries().add(queryString, ERROR_INVALID_COLUMN + filterColumns);

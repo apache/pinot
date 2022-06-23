@@ -136,7 +136,9 @@
   },
   "queriesWithWeights":{
     "select i from tableName where a = xyz and t > 500": 1,
-    "select i from tableName where a = 43 and t > 500": 1
+    "select i from tableName where a = 43 and t > 500": 1,
+    "select i from tableName where a = 'xyz' and t > 500": 1,
+    "select i from tableName where a = b and t > 500": 1
   },
   "qps": 15000,
   "numMessagesPerSecInKafkaTopic":1000,
