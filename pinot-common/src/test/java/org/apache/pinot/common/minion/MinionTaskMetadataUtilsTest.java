@@ -152,7 +152,6 @@ public class MinionTaskMetadataUtilsTest {
         taskMetadata.toZNRecord());
   }
 
-
   @Test
   public void testPersistTaskMetadataWithException() {
     DummyTaskMetadata taskMetadata = new DummyTaskMetadata(TABLE_NAME_WITH_TYPE, 1000);
@@ -160,21 +159,19 @@ public class MinionTaskMetadataUtilsTest {
     String expectedPath = NEW_MINION_METADATA_PATH;
 
     // Test happy path. No exceptions thrown.
-    when(mockPropertyStore.set(expectedPath, taskMetadata.toZNRecord(), EXPECTED_VERSION,
-        ACCESS_OPTION)).thenReturn(true);
+    when(mockPropertyStore.set(expectedPath, taskMetadata.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION)).thenReturn(
+        true);
     MinionTaskMetadataUtils.persistTaskMetadata(mockPropertyStore, TASK_TYPE, taskMetadata, EXPECTED_VERSION);
-    verify(mockPropertyStore, times(1)).set(expectedPath, taskMetadata.toZNRecord(), EXPECTED_VERSION,
-        ACCESS_OPTION);
+    verify(mockPropertyStore, times(1)).set(expectedPath, taskMetadata.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
 
     // Test exception thrown
-    when(mockPropertyStore.set(expectedPath, taskMetadata.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION))
-        .thenReturn(false);
+    when(mockPropertyStore.set(expectedPath, taskMetadata.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION)).thenReturn(
+        false);
     try {
       MinionTaskMetadataUtils.persistTaskMetadata(mockPropertyStore, TASK_TYPE, taskMetadata, EXPECTED_VERSION);
       fail("ZkException should have been thrown");
     } catch (ZkException e) {
-      verify(mockPropertyStore, times(2)).set(expectedPath, taskMetadata.toZNRecord(), EXPECTED_VERSION,
-          ACCESS_OPTION);
+      verify(mockPropertyStore, times(2)).set(expectedPath, taskMetadata.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
       assertEquals(e.getMessage(), "Failed to persist minion metadata for task: TestTaskType and metadata:"
           + " {\"tableNameWithType\":\"TestTable_OFFLINE\"}");
     }
