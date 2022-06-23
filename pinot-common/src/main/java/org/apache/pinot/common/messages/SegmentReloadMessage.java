@@ -35,8 +35,6 @@ public class SegmentReloadMessage extends Message {
 
   private static final String FORCE_DOWNLOAD_KEY = "forceDownload";
 
-  private static final String RELOAD_JOB_ID = "reloadJobId";
-
   public SegmentReloadMessage(@Nonnull String tableNameWithType, @Nullable String segmentName, boolean forceDownload) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setResourceName(tableNameWithType);
@@ -49,7 +47,6 @@ public class SegmentReloadMessage extends Message {
 
     ZNRecord znRecord = getRecord();
     znRecord.setBooleanField(FORCE_DOWNLOAD_KEY, forceDownload);
-    znRecord.setSimpleField(RELOAD_JOB_ID, super.getMsgId());
   }
 
   public SegmentReloadMessage(Message message) {
@@ -61,9 +58,5 @@ public class SegmentReloadMessage extends Message {
 
   public boolean shouldForceDownload() {
     return getRecord().getBooleanField(FORCE_DOWNLOAD_KEY, false);
-  }
-
-  public String getReloadJobId() {
-    return getRecord().getSimpleField(RELOAD_JOB_ID);
   }
 }

@@ -2265,7 +2265,7 @@ public class PinotHelixResourceManager {
       LOGGER.warn("No reload message sent for table: {}", tableNameWithType);
     }
 
-    return Pair.of(numMessagesSent, segmentReloadMessage.getReloadJobId());
+    return Pair.of(numMessagesSent, segmentReloadMessage.getMsgId());
   }
 
   public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload) {
@@ -2298,7 +2298,7 @@ public class PinotHelixResourceManager {
     } else {
       LOGGER.warn("No reload message sent for segment: {} in table: {}", segmentName, tableNameWithType);
     }
-    return Pair.of(numMessagesSent, segmentReloadMessage.getReloadJobId());
+    return Pair.of(numMessagesSent, segmentReloadMessage.getMsgId());
   }
 
   /**
