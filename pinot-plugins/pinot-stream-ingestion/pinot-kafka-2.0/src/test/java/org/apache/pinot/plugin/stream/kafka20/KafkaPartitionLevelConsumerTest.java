@@ -93,10 +93,13 @@ public class KafkaPartitionLevelConsumerTest {
   @AfterClass
   public void tearDown()
       throws Exception {
-    _kafkaCluster.deleteTopic(TEST_TOPIC_1);
-    _kafkaCluster.deleteTopic(TEST_TOPIC_2);
-    _kafkaCluster.deleteTopic(TEST_TOPIC_3);
-    _kafkaCluster.close();
+    try {
+      _kafkaCluster.deleteTopic(TEST_TOPIC_1);
+      _kafkaCluster.deleteTopic(TEST_TOPIC_2);
+      _kafkaCluster.deleteTopic(TEST_TOPIC_3);
+    } finally {
+      _kafkaCluster.close();
+    }
   }
 
   @Test
@@ -370,6 +373,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.consumer.type", "lowlevel");
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    streamConfigMap.put("auto.offset.reset", "earliest");
     StreamConfig streamConfig = new StreamConfig("tableName_REALTIME", streamConfigMap);
 
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
@@ -378,9 +382,9 @@ public class KafkaPartitionLevelConsumerTest {
     // Start offset has expired. Automatically reset to earliest available and fetch whatever available
     MessageBatch batch1 = consumer.fetchMessages(new LongMsgOffset(0), new LongMsgOffset(400), 10000);
     Assert.assertEquals(batch1.getMessageCount(), 200);
-    for (int i = 200; i < batch1.getMessageCount(); i++) {
+    for (int i = 0; i < batch1.getMessageCount(); i++) {
       byte[] msg = (byte[]) batch1.getMessageAtIndex(i);
-      Assert.assertEquals(new String(msg), "sample_msg_" + i);
+      Assert.assertEquals(new String(msg), "sample_msg_" + (i + 200));
     }
     Assert.assertEquals(batch1.getOffsetOfNextBatch().toString(), "400");
 
@@ -390,17 +394,17 @@ public class KafkaPartitionLevelConsumerTest {
 
     MessageBatch batch3 = consumer.fetchMessages(new LongMsgOffset(201), new LongMsgOffset(401), 10000);
     Assert.assertEquals(batch3.getMessageCount(), 200);
-    for (int i = 201; i < batch3.getMessageCount(); i++) {
+    for (int i = 0; i < batch3.getMessageCount(); i++) {
       byte[] msg = (byte[]) batch3.getMessageAtIndex(i);
-      Assert.assertEquals(new String(msg), "sample_msg_" + i);
+      Assert.assertEquals(new String(msg), "sample_msg_" + (i + 201));
     }
     Assert.assertEquals(batch3.getOffsetOfNextBatch().toString(), "401");
 
     MessageBatch batch4 = consumer.fetchMessages(new LongMsgOffset(0), null, 10000);
     Assert.assertEquals(batch4.getMessageCount(), 500);
-    for (int i = 200; i < batch4.getMessageCount(); i++) {
+    for (int i = 0; i < batch4.getMessageCount(); i++) {
       byte[] msg = (byte[]) batch4.getMessageAtIndex(i);
-      Assert.assertEquals(new String(msg), "sample_msg_" + i);
+      Assert.assertEquals(new String(msg), "sample_msg_" + (i + 200));
     }
     Assert.assertEquals(batch4.getOffsetOfNextBatch().toString(), "700");
   }

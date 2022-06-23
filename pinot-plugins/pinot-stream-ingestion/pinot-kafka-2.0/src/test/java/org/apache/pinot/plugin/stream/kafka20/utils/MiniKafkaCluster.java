@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -117,7 +118,8 @@ public final class MiniKafkaCluster implements Closeable {
   }
 
   public void deleteRecordsBeforeOffset(String topicName, int partitionId, long offset) {
-    _adminClient.deleteRecords(
-        Map.of(new TopicPartition(topicName, partitionId), RecordsToDelete.beforeOffset(offset)));
+    Map<TopicPartition, RecordsToDelete> recordsToDelete = new HashMap<>();
+    recordsToDelete.put(new TopicPartition(topicName, partitionId), RecordsToDelete.beforeOffset(offset));
+    _adminClient.deleteRecords(recordsToDelete);
   }
 }
