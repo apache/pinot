@@ -19,6 +19,8 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import java.io.IOException;
+import java.util.List;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
@@ -26,6 +28,8 @@ import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.common.datablock.ColumnarDataBlock;
+import org.apache.pinot.core.common.datablock.DataBlockBuilder;
+import org.apache.pinot.core.common.datablock.DataBlockUtils;
 import org.apache.pinot.core.common.datablock.RowDataBlock;
 
 
@@ -35,8 +39,18 @@ import org.apache.pinot.core.common.datablock.RowDataBlock;
  */
 public class TransferableBlock implements Block {
 
+  private final BaseDataBlock.Type _type;
+
   private BaseDataBlock _dataBlock;
-  private BaseDataBlock.Type _type;
+
+  private List<Object[]> _container;
+  private DataSchema _dataSchema;
+
+  public TransferableBlock(List<Object[]> container, DataSchema dataSchema, BaseDataBlock.Type containerType) {
+    _container = container;
+    _dataSchema = dataSchema;
+    _type = containerType;
+  }
 
   public TransferableBlock(BaseDataBlock dataBlock) {
     _dataBlock = dataBlock;
@@ -44,7 +58,37 @@ public class TransferableBlock implements Block {
         : dataBlock instanceof RowDataBlock ? BaseDataBlock.Type.ROW : BaseDataBlock.Type.METADATA;
   }
 
+  public List<Object[]> getContainer() {
+    if (_container == null) {
+      switch (_type) {
+        case ROW:
+          _container = DataBlockUtils.extraRows(_dataBlock);
+          break;
+        case COLUMNAR:
+        default:
+          throw new UnsupportedOperationException("Unable to extract from container with type: " + _type);
+      }
+    }
+    return _container;
+  }
+
   public BaseDataBlock getDataBlock() {
+    if (_dataBlock == null) {
+      try {
+        switch (_type) {
+          case ROW:
+            _dataBlock = DataBlockBuilder.buildFromRows(_container, null, _dataSchema);
+            break;
+          case COLUMNAR:
+            _dataBlock = DataBlockBuilder.buildFromColumns(_container, null, _dataSchema);
+            break;
+          default:
+            throw new UnsupportedOperationException("Unable to build from container with type: " + _type);
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Unable to create DataBlock");
+      }
+    }
     return _dataBlock;
   }
 
