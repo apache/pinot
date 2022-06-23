@@ -725,6 +725,10 @@ public class PinotSegmentRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get storage tier for all segments in the given table", notes = "Get storage tier for all "
       + "segments in the given table")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Table not found")
+  })
   public TableTierReader.TableTierDetails getTableTiers(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr) {
@@ -736,6 +740,10 @@ public class PinotSegmentRestletResource {
   @Path("segments/{tableName}/{segmentName}/tiers")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get storage tiers for the given segment", notes = "Get storage tiers for the given segment")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Table or segment not found")
+  })
   public TableTierReader.TableTierDetails getSegmentTiers(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,

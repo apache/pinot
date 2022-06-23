@@ -69,23 +69,23 @@ public class TableTierResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/tables/{tableName}/tiers")
+  @Path("/tables/{tableNameWithType}/tiers")
   @ApiOperation(value = "Get storage tiers of immutable segments of the given table", notes = "Get storage tiers of "
       + "immutable segments of the given table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
       @ApiResponse(code = 404, message = "Table not found")
   })
-  public String getTableTiers(
-      @ApiParam(value = "Table name with type", required = true) @PathParam("tableName") String tableName)
+  public String getTableTiers(@ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
+      String tableNameWithType)
       throws WebApplicationException {
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     if (instanceDataManager == null) {
       throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
     }
-    TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableName);
+    TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableNameWithType);
     if (tableDataManager == null) {
-      throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
+      throw new WebApplicationException("Table: " + tableNameWithType + " is not found", Response.Status.NOT_FOUND);
     }
     Set<String> mutableSegments = new HashSet<>();
     Map<String, String> segmentTiers = new HashMap<>();
@@ -110,7 +110,7 @@ public class TableTierResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/segments/{tableName}/{segmentName}/tiers")
+  @Path("/segments/{tableNameWithType}/{segmentName}/tiers")
   @ApiOperation(value = "Get storage tiers of the immutable segment of the given table", notes = "Get storage tiers "
       + "of the immutable segment of the given table")
   @ApiResponses(value = {
@@ -118,7 +118,8 @@ public class TableTierResource {
       @ApiResponse(code = 404, message = "Table or segment not found")
   })
   public String getTableSegmentTiers(
-      @ApiParam(value = "Table name with type", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
+          String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName)
       throws WebApplicationException {
     segmentName = URIUtils.decode(segmentName);
@@ -126,13 +127,15 @@ public class TableTierResource {
     if (instanceDataManager == null) {
       throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
     }
-    TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableName);
+    TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableNameWithType);
     if (tableDataManager == null) {
-      throw new WebApplicationException(String.format("Table: %s is not found", tableName), Response.Status.NOT_FOUND);
+      throw new WebApplicationException(String.format("Table: %s is not found", tableNameWithType),
+          Response.Status.NOT_FOUND);
     }
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     if (segmentDataManager == null) {
-      throw new WebApplicationException(String.format("Segment: %s is not found in table: %s", segmentName, tableName),
+      throw new WebApplicationException(
+          String.format("Segment: %s is not found in table: %s", segmentName, tableNameWithType),
           Response.Status.NOT_FOUND);
     }
     Set<String> mutableSegments = new HashSet<>();
