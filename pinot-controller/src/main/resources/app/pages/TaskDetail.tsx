@@ -18,11 +18,12 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { get } from 'lodash';
+import { get, each } from 'lodash';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { Grid, makeStyles } from '@material-ui/core';
 import SimpleAccordion from '../components/SimpleAccordion';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
+import CustomizedTables from '../components/Table';
 
 const jsonoptions = {
   lineNumbers: true,
@@ -74,10 +75,23 @@ const TaskDetail = (props) => {
 
   const [fetching, setFetching] = useState(true);
   const [taskDebugData, setTaskDebugData] = useState({});
+  const [subtaskTableData, setSubtaskTableData] = useState({ columns: [], records: [] });
 
   const fetchData = async () => {
     setFetching(true);
     const debugRes = await PinotMethodUtils.getTaskDebugData(taskID);
+    const subtaskTableRecords = [];
+    each(get(debugRes, 'data.subtaskInfos', {}), (subTask) => {
+      subtaskTableRecords.push([
+        get(subTask, 'taskId'),
+        get(subTask, 'state'),
+        get(subTask, 'startTime'),
+        get(subTask, 'finishTime'),
+      ])
+    });
+    setSubtaskTableData(prevState => {
+      return { ...prevState, records: subtaskTableRecords };
+    });
     setTaskDebugData(debugRes);
     setFetching(false);
   };
@@ -123,6 +137,19 @@ const TaskDetail = (props) => {
               
             </SimpleAccordion>
           </div>
+        </Grid>
+        <Grid item xs={12}>
+          {!fetching && (
+            <CustomizedTables
+              title="Sub Tasks"
+              data={subtaskTableData}
+              showSearchBox={true}
+              inAccordionFormat={true}
+              isPagination={false}
+              addLinks
+              baseURL={`/task-queue/${taskType}/tables/`}
+            />
+          )}
         </Grid>
       </Grid>
     </Grid>
