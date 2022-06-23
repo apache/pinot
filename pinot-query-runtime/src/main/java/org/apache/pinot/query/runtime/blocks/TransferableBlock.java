@@ -40,11 +40,11 @@ import org.apache.pinot.core.common.datablock.RowDataBlock;
 public class TransferableBlock implements Block {
 
   private final BaseDataBlock.Type _type;
+  private final DataSchema _dataSchema;
 
   private BaseDataBlock _dataBlock;
 
   private List<Object[]> _container;
-  private DataSchema _dataSchema;
 
   public TransferableBlock(List<Object[]> container, DataSchema dataSchema, BaseDataBlock.Type containerType) {
     _container = container;
@@ -54,8 +54,13 @@ public class TransferableBlock implements Block {
 
   public TransferableBlock(BaseDataBlock dataBlock) {
     _dataBlock = dataBlock;
+    _dataSchema = dataBlock.getDataSchema();
     _type = dataBlock instanceof ColumnarDataBlock ? BaseDataBlock.Type.COLUMNAR
         : dataBlock instanceof RowDataBlock ? BaseDataBlock.Type.ROW : BaseDataBlock.Type.METADATA;
+  }
+
+  public DataSchema getDataSchema() {
+    return _dataSchema;
   }
 
   public List<Object[]> getContainer() {
