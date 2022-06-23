@@ -63,7 +63,7 @@
     "@fortawesome/react-fontawesome": "0.1.18",
     "@material-ui/core": "4.11.0",
     "@material-ui/icons": "4.11.3",
-    "@material-ui/lab": "4.0.0-alpha.61",
+    "@material-ui/lab": "4.0.0-alpha.51",
     "@types/codemirror": "0.0.104",
     "@types/react": "16.14.26",
     "@types/react-dom": "16.9.16",
