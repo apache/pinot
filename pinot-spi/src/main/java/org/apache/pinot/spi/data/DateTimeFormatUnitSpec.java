@@ -19,9 +19,9 @@
 package org.apache.pinot.spi.data;
 
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.EnumUtils;
-import org.apache.pinot.spi.utils.EqualityUtils;
 import org.joda.time.DurationFieldType;
 import org.joda.time.chrono.ISOChronology;
 
@@ -98,17 +98,24 @@ public class DateTimeFormatUnitSpec {
     public abstract long fromMillis(long millisSinceEpoch);
   }
 
-  private TimeUnit _timeUnit = null;
-  private DateTimeTransformUnit _dateTimeTransformUnit = null;
+  public static final DateTimeFormatUnitSpec MILLISECONDS = new DateTimeFormatUnitSpec(TimeUnit.MILLISECONDS.name());
+
+  private final TimeUnit _timeUnit;
+  private final DateTimeTransformUnit _dateTimeTransformUnit;
 
   public DateTimeFormatUnitSpec(String unit) {
-    validateUnitSpec(unit);
     if (EnumUtils.isValidEnum(TimeUnit.class, unit)) {
       _timeUnit = TimeUnit.valueOf(unit);
+    } else {
+      _timeUnit = null;
     }
     if (EnumUtils.isValidEnum(DateTimeTransformUnit.class, unit)) {
       _dateTimeTransformUnit = DateTimeTransformUnit.valueOf(unit);
+    } else {
+      _dateTimeTransformUnit = null;
     }
+    Preconditions.checkArgument(_timeUnit != null || _dateTimeTransformUnit != null,
+        "Unit must belong to enum TimeUnit or DateTimeTransformUnit, got: %s", unit);
   }
 
   public TimeUnit getTimeUnit() {
@@ -119,32 +126,20 @@ public class DateTimeFormatUnitSpec {
     return _dateTimeTransformUnit;
   }
 
-  public static void validateUnitSpec(String unit) {
-    Preconditions.checkState(
-        EnumUtils.isValidEnum(TimeUnit.class, unit) || EnumUtils.isValidEnum(DateTimeTransformUnit.class, unit),
-        "Unit: %s must belong to enum TimeUnit or DateTimeTransformUnit", unit);
-  }
-
   @Override
   public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
+    if (this == o) {
       return true;
     }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
-
     DateTimeFormatUnitSpec that = (DateTimeFormatUnitSpec) o;
-
-    return EqualityUtils.isEqual(_timeUnit, that._timeUnit) && EqualityUtils
-        .isEqual(_dateTimeTransformUnit, that._dateTimeTransformUnit);
+    return _timeUnit == that._timeUnit && _dateTimeTransformUnit == that._dateTimeTransformUnit;
   }
 
   @Override
   public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_timeUnit);
-    result = EqualityUtils.hashCodeOf(result, _dateTimeTransformUnit);
-    return result;
+    return Objects.hash(_timeUnit, _dateTimeTransformUnit);
   }
 }
