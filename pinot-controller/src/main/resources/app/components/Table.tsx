@@ -329,7 +329,7 @@ export default function CustomizedTables({
   }, [data]);
 
   const styleCell = (str: string) => {
-    if (str === 'Good' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive') {
+    if (str === 'Good' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive' || str.toLowerCase() === 'true') {
       return (
         <StyledChip
           label={str}
@@ -338,7 +338,7 @@ export default function CustomizedTables({
         />
       );
     }
-    if (str === 'Bad' || str.toLowerCase() === 'offline' || str.toLowerCase() === 'dead') {
+    if (str === 'Bad' || str.toLowerCase() === 'offline' || str.toLowerCase() === 'dead' || str.toLowerCase() === 'false') {
       return (
         <StyledChip
           label={str}
