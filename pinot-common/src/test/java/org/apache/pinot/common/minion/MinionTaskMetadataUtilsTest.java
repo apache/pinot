@@ -42,9 +42,9 @@ public class MinionTaskMetadataUtilsTest {
   private static final String TABLE_NAME_WITH_TYPE = "TestTable_OFFLINE";
   private static final String TASK_TYPE = "TestTaskType";
   private static final String NEW_MINION_METADATA_PATH =
-      ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadataNewFormat(TASK_TYPE, TABLE_NAME_WITH_TYPE);
-  private static final String OLD_MINION_METADATA_PATH =
       ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(TASK_TYPE, TABLE_NAME_WITH_TYPE);
+  private static final String OLD_MINION_METADATA_PATH =
+      ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadataDeprecated(TASK_TYPE, TABLE_NAME_WITH_TYPE);
   private static final DummyTaskMetadata NEW_TASK_METADATA = new DummyTaskMetadata(TABLE_NAME_WITH_TYPE, 1000);
   private static final DummyTaskMetadata OLD_TASK_METADATA = new DummyTaskMetadata(TABLE_NAME_WITH_TYPE, 100);
   private static final int EXPECTED_VERSION = -1;
