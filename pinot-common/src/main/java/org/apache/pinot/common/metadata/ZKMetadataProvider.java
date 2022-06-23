@@ -130,11 +130,12 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_SEGMENT_LINEAGE, tableNameWithType);
   }
 
-  public static String constructPropertyStorePathForMinionTaskMetadata(String taskType, String tableNameWithType) {
+  public static String constructPropertyStorePathForMinionTaskMetadataNewFormat(
+      String taskType, String tableNameWithType) {
     return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, tableNameWithType, taskType);
   }
 
-  public static String constructPropertyStorePathForMinionTaskMetadataOldFormat(
+  public static String constructPropertyStorePathForMinionTaskMetadata(
       String taskType, String tableNameWithType) {
     return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, taskType, tableNameWithType);
   }

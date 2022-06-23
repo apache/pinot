@@ -43,13 +43,13 @@ public final class MinionTaskMetadataUtils {
   @Nullable
   public static ZNRecord fetchTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
       String tableNameWithType) {
-    String oldPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadataOldFormat(
+    String oldPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(
         taskType, tableNameWithType);
     if (propertyStore.exists(oldPath, AccessOption.PERSISTENT)) {
       return fetchTaskMetadata(propertyStore, oldPath);
     } else {
       return fetchTaskMetadata(propertyStore,
-          ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType, tableNameWithType));
+          ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadataNewFormat(taskType, tableNameWithType));
     }
   }
 
@@ -70,9 +70,9 @@ public final class MinionTaskMetadataUtils {
    */
   public static void deleteTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
       String tableNameWithType) {
-    String newPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(
+    String newPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadataNewFormat(
         taskType, tableNameWithType);
-    String oldPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadataOldFormat(
+    String oldPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(
         taskType, tableNameWithType);
     if (!propertyStore.remove(newPath, AccessOption.PERSISTENT)
         || !propertyStore.remove(oldPath, AccessOption.PERSISTENT)) {
@@ -91,12 +91,12 @@ public final class MinionTaskMetadataUtils {
    */
   public static void persistTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
       BaseTaskMetadata taskMetadata, int expectedVersion) {
-    String oldPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadataOldFormat(
+    String oldPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(
         taskType, taskMetadata.getTableNameWithType());
     if (propertyStore.exists(oldPath, AccessOption.PERSISTENT)) {
       persistTaskMetadata(oldPath, propertyStore, taskType, taskMetadata, expectedVersion);
     } else {
-      String newPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(
+      String newPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadataNewFormat(
           taskType, taskMetadata.getTableNameWithType());
       persistTaskMetadata(newPath, propertyStore, taskType, taskMetadata, expectedVersion);
     }
