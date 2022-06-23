@@ -21,7 +21,7 @@ package org.apache.pinot.controller.api.resources;
 import java.util.Map;
 
 public class ServerReloadControllerJobStatusResponse {
-  private long _timeElapsedInMinutes;
+  private double _timeElapsedInMinutes;
   private double _estimatedTimeRemainingInMinutes;
   private int _totalSegmentCount;
   private int _successCount;
@@ -53,11 +53,11 @@ public class ServerReloadControllerJobStatusResponse {
     _estimatedTimeRemainingInMinutes = estimatedTimeRemainingInMillis;
   }
 
-  public long getTimeElapsedInMinutes() {
+  public double getTimeElapsedInMinutes() {
     return _timeElapsedInMinutes;
   }
 
-  public void setTimeElapsedInMinutes(long timeElapsedInMinutes) {
+  public void setTimeElapsedInMinutes(double timeElapsedInMinutes) {
     _timeElapsedInMinutes = timeElapsedInMinutes;
   }
 

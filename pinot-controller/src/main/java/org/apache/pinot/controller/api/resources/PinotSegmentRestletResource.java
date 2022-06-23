@@ -657,12 +657,17 @@ public class PinotSegmentRestletResource {
     // Add derived fields
     long submissionTime =
         Long.parseLong(controllerJobZKMetadata.get(CommonConstants.Task.CONTROLLER_JOB_SUBMISSION_TIME));
-    long timeElapsedInMinutes = TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis() - submissionTime);
+    double timeElapsedInMinutes = ((double) System.currentTimeMillis() - (double) submissionTime) / (1000.0 * 60.0);
     int remainingSegments = serverReloadControllerJobStatusResponse.getTotalSegmentCount()
         - serverReloadControllerJobStatusResponse.getSuccessCount();
-    double estimatedRemainingTimeInMinutes =
-        ((double) remainingSegments / (double) serverReloadControllerJobStatusResponse.getSuccessCount())
-            * timeElapsedInMinutes;
+
+    double estimatedRemainingTimeInMinutes = -1;
+    if (serverReloadControllerJobStatusResponse.getSuccessCount() > 0) {
+      estimatedRemainingTimeInMinutes =
+          ((double) remainingSegments / (double) serverReloadControllerJobStatusResponse.getSuccessCount())
+              * timeElapsedInMinutes;
+    }
+
     serverReloadControllerJobStatusResponse.setTimeElapsedInMinutes(timeElapsedInMinutes);
     serverReloadControllerJobStatusResponse.setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes);
 
