@@ -184,6 +184,10 @@ public class QueryRunnerTest {
 
         // Aggregation without group by
         new Object[]{"SELECT COUNT(*) FROM a WHERE a.col3 >= 0 AND a.col2 = 'alice'", 1},
+
+        // project in intermeidate stage
+        new Object[]{"SELECT a.col1, a.ts, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
+            + " WHERE a.col3 >= 0 AND a.col2 = 'foo' AND b.col3 >= 0", 3},
     };
   }
 }
