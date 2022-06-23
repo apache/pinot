@@ -65,7 +65,6 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
@@ -607,6 +606,11 @@ public class PinotSegmentRestletResource {
     Map<String, String> controllerJobZKMetadata =
         _pinotHelixResourceManager.getControllerJobZKMetadata(tableNameWithType, reloadJobId);
 
+    if (controllerJobZKMetadata == null) {
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to find controller job: " + reloadJobId + " for table: " + tableNameWithType, Status.NOT_FOUND);
+    }
+
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
     CompletionServiceHelper completionServiceHelper =
@@ -615,45 +619,52 @@ public class PinotSegmentRestletResource {
     List<String> serverUrls = new ArrayList<>();
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
-      String reloadTaskStatusEndpoint = endpoint + "/controllerJob/status/" + reloadJobId;
+      String reloadTaskStatusEndpoint =
+          endpoint + "/controllerJob/reloadStatus/" + tableNameWithType + "/?reloadJobTimestamp="
+              + controllerJobZKMetadata.get(CommonConstants.Task.CONTROLLER_JOB_SUBMISSION_TIME);
       serverUrls.add(reloadTaskStatusEndpoint);
     }
 
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 1000);
+        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
 
     ServerReloadControllerJobStatusResponse serverReloadControllerJobStatusResponse =
         new ServerReloadControllerJobStatusResponse();
     serverReloadControllerJobStatusResponse.setSuccessCount(0);
     serverReloadControllerJobStatusResponse.setTotalSegmentCount(0);
+    serverReloadControllerJobStatusResponse.setTotalServersQueried(serverUrls.size());
+    serverReloadControllerJobStatusResponse.setTotalServerCallsFailed(serviceResponse._failedResponseCount);
+
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       String responseString = streamResponse.getValue();
-      if (responseString != null && !responseString.equalsIgnoreCase("null")) {
+      try {
         ServerReloadControllerJobStatusResponse response =
             JsonUtils.stringToObject(responseString, ServerReloadControllerJobStatusResponse.class);
         serverReloadControllerJobStatusResponse.setTotalSegmentCount(
             serverReloadControllerJobStatusResponse.getTotalSegmentCount() + response.getTotalSegmentCount());
         serverReloadControllerJobStatusResponse.setSuccessCount(
             serverReloadControllerJobStatusResponse.getSuccessCount() + response.getSuccessCount());
+      } catch (Exception e) {
+        serverReloadControllerJobStatusResponse.setTotalServerCallsFailed(
+            serverReloadControllerJobStatusResponse.getTotalServerCallsFailed() + 1
+        );
       }
     }
 
-    // Add ZK data
-    if (controllerJobZKMetadata != null) {
-      long submissionTime =
-          Long.parseLong(controllerJobZKMetadata.get(CommonConstants.Task.CONTROLLER_JOB_SUBMISSION_TIME));
-      long timeElapsedInMinutes = TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis() - submissionTime);
-      int remainingSegments = serverReloadControllerJobStatusResponse.getTotalSegmentCount()
-          - serverReloadControllerJobStatusResponse.getSuccessCount();
-      double estimatedRemainingTimeInMinutes =
-          ((double) remainingSegments / (double) serverReloadControllerJobStatusResponse.getSuccessCount())
-              * timeElapsedInMinutes;
-      serverReloadControllerJobStatusResponse.setJobSubmissionTimeInMillisEpoch(submissionTime);
-      serverReloadControllerJobStatusResponse.setControllerJobType(
-          ControllerJobType.valueOf(controllerJobZKMetadata.get(CommonConstants.Task.CONTROLLER_JOB_TYPE)));
-      serverReloadControllerJobStatusResponse.setTimeElapsedInMinutes(timeElapsedInMinutes);
-      serverReloadControllerJobStatusResponse.setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes);
-    }
+    // Add ZK fields
+    serverReloadControllerJobStatusResponse.setTaskMetadata(controllerJobZKMetadata);
+
+    // Add derived fields
+    long submissionTime =
+        Long.parseLong(controllerJobZKMetadata.get(CommonConstants.Task.CONTROLLER_JOB_SUBMISSION_TIME));
+    long timeElapsedInMinutes = TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis() - submissionTime);
+    int remainingSegments = serverReloadControllerJobStatusResponse.getTotalSegmentCount()
+        - serverReloadControllerJobStatusResponse.getSuccessCount();
+    double estimatedRemainingTimeInMinutes =
+        ((double) remainingSegments / (double) serverReloadControllerJobStatusResponse.getSuccessCount())
+            * timeElapsedInMinutes;
+    serverReloadControllerJobStatusResponse.setTimeElapsedInMinutes(timeElapsedInMinutes);
+    serverReloadControllerJobStatusResponse.setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes);
 
     return serverReloadControllerJobStatusResponse;
   }

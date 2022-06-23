@@ -20,27 +20,52 @@ package org.apache.pinot.server.api.resources;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import java.util.List;
+import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
-import org.apache.pinot.server.starter.helix.SegmentReloadTaskStatusCache;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.server.starter.helix.SegmentReloadStatusValue;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 @Api(tags = "Tasks")
 @Path("/")
 public class ControllerJobStatusResource {
+
+  @Inject
+  private ServerInstance _serverInstance;
+
   @GET
-  @Path("/controllerJob/status/{jobId}")
+  @Path("/controllerJob/reloadStatus/{tableNameWithType}")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Task status", notes = "Return status of the given task")
-  public String taskStatus(@PathParam("jobId") String jobId)
+  public String taskStatus(@PathParam("tableNameWithType") String tableNameWithType,
+      @QueryParam("reloadJobTimestamp") long reloadJobSubmissionTimestamp)
       throws Exception {
-    SegmentReloadTaskStatusCache.SegmentReloadStatusValue segmentReloadStatusValue =
-        SegmentReloadTaskStatusCache.getStatus(jobId);
-
-    return JsonUtils.objectToString(segmentReloadStatusValue);
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    List<SegmentDataManager> allSegments = tableDataManager.acquireAllSegments();
+    try {
+      long successCount = 0;
+      for (SegmentDataManager segmentDataManager : allSegments) {
+        if (segmentDataManager.getSegmentLoadTimeInMillisEpoch() >= reloadJobSubmissionTimestamp) {
+          successCount++;
+        }
+      }
+      SegmentReloadStatusValue segmentReloadStatusValue =
+          new SegmentReloadStatusValue(allSegments.size(), successCount);
+      return JsonUtils.objectToString(segmentReloadStatusValue);
+    } finally {
+      for (SegmentDataManager segmentDataManager : allSegments) {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
+    }
   }
 }

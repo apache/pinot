@@ -27,6 +27,19 @@ import org.apache.pinot.segment.spi.IndexSegment;
  */
 public abstract class SegmentDataManager {
   private int _referenceCount = 1;
+  private long _segmentLoadTimeInMillisEpoch = System.currentTimeMillis();
+
+  public void setReferenceCount(int referenceCount) {
+    _referenceCount = referenceCount;
+  }
+
+  public long getSegmentLoadTimeInMillisEpoch() {
+    return _segmentLoadTimeInMillisEpoch;
+  }
+
+  public void setSegmentLoadTimeInMillisEpoch(long segmentLoadTimeInMillisEpoch) {
+    _segmentLoadTimeInMillisEpoch = segmentLoadTimeInMillisEpoch;
+  }
 
   @VisibleForTesting
   public synchronized int getReferenceCount() {

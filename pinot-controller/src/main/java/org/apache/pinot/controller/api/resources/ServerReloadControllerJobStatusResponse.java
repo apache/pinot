@@ -18,32 +18,16 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
-
+import java.util.Map;
 
 public class ServerReloadControllerJobStatusResponse {
-  private ControllerJobType _controllerJobType;
   private long _timeElapsedInMinutes;
   private double _estimatedTimeRemainingInMinutes;
-  private long _jobSubmissionTimeInMillisEpoch;
   private int _totalSegmentCount;
   private int _successCount;
-
-  public ControllerJobType getControllerJobType() {
-    return _controllerJobType;
-  }
-
-  public void setControllerJobType(ControllerJobType controllerJobType) {
-    _controllerJobType = controllerJobType;
-  }
-
-  public long getJobSubmissionTimeInMillisEpoch() {
-    return _jobSubmissionTimeInMillisEpoch;
-  }
-
-  public void setJobSubmissionTimeInMillisEpoch(long jobSubmissionTimeInMillisEpoch) {
-    _jobSubmissionTimeInMillisEpoch = jobSubmissionTimeInMillisEpoch;
-  }
+  private int _totalServersQueried;
+  private int _totalServerCallsFailed;
+  private Map<String, String> _taskMetadata;
 
   public int getTotalSegmentCount() {
     return _totalSegmentCount;
@@ -75,5 +59,29 @@ public class ServerReloadControllerJobStatusResponse {
 
   public void setTimeElapsedInMinutes(long timeElapsedInMinutes) {
     _timeElapsedInMinutes = timeElapsedInMinutes;
+  }
+
+  public int getTotalServersQueried() {
+    return _totalServersQueried;
+  }
+
+  public void setTotalServersQueried(int totalServersQueried) {
+    _totalServersQueried = totalServersQueried;
+  }
+
+  public int getTotalServerCallsFailed() {
+    return _totalServerCallsFailed;
+  }
+
+  public void setTotalServerCallsFailed(int totalServerCallsFailed) {
+    _totalServerCallsFailed = totalServerCallsFailed;
+  }
+
+  public Map<String, String> getTaskMetadata() {
+    return _taskMetadata;
+  }
+
+  public void setTaskMetadata(Map<String, String> taskMetadata) {
+    _taskMetadata = taskMetadata;
   }
 }

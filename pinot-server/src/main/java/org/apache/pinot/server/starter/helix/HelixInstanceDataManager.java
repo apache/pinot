@@ -241,16 +241,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     Preconditions.checkNotNull(tableConfig);
 
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
-
-    if (taskId != null) {
-      SegmentReloadTaskStatusCache.addReloadSegmentTask(taskId, 1);
-    }
-
     reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
-
-    if (taskId != null) {
-      SegmentReloadTaskStatusCache.incrementSuccess(taskId);
-    }
     LOGGER.info("Reloaded single segment: {} in table: {}", segmentName, tableNameWithType);
   }
 
@@ -266,10 +257,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     List<String> failedSegments = new ArrayList<>();
     List<SegmentMetadata> segmentsMetadata = getAllSegmentsMetadata(tableNameWithType);
 
-    if (taskId != null) {
-      SegmentReloadTaskStatusCache.addReloadSegmentTask(taskId, segmentsMetadata.size());
-    }
-
     ExecutorService workers = Executors.newCachedThreadPool();
     final AtomicReference<Exception> sampleException = new AtomicReference<>();
     //calling thread hasn't acquired any permit so we don't reload any segments using it.
@@ -279,9 +266,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         segmentRefreshSemaphore.acquireSema(segmentMetadata.getName(), LOGGER);
         try {
           reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema, forceDownload);
-          if (taskId != null) {
-            SegmentReloadTaskStatusCache.incrementSuccess(taskId);
-          }
         } finally {
           segmentRefreshSemaphore.releaseSema();
         }
@@ -325,6 +309,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       try {
         if (reloadMutableSegment(tableNameWithType, segmentName, segmentDataManager, schema)) {
           // A mutable segment has been found and reloaded.
+          segmentDataManager.setSegmentLoadTimeInMillisEpoch(System.currentTimeMillis());
           return;
         }
       } finally {
