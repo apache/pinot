@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
@@ -55,7 +56,8 @@ import static org.testng.Assert.assertNull;
 
 public class TableTierReaderTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableTierReaderTest.class);
-  private static final String URI_PATH = "/tables/";
+  private static final String URI_PATH_TABLE_TIERS = "/tables/";
+  private static final String URI_PATH_SEGMENT_TIERS = "/segments/";
   private static final int TIMEOUT_MSEC = 3000;
   private static final int EXTENDED_TIMEOUT_FACTOR = 100;
 
@@ -70,30 +72,33 @@ public class TableTierReaderTest {
     _helix = mock(PinotHelixResourceManager.class);
 
     int counter = 0;
+
+    // following servers are configured to get table tiers
     // server0 - all good
     Map<String, String> segTierMap = new HashMap<>();
     segTierMap.put("seg01", null);
     segTierMap.put("seg02", "someTier");
-    FakeSizeServer s = new FakeSizeServer(segTierMap);
-    s.start(URI_PATH, createHandler(200, s._segTierMap, 0));
+    Set<String> muSegs = Collections.singleton("muSeg01");
+    FakeSizeServer s = new FakeSizeServer(segTierMap, muSegs);
+    s.start(URI_PATH_TABLE_TIERS, createHandler(200, s._segTierMap, muSegs, 0));
     _serverMap.put(serverName(counter), s);
     counter++;
 
     // server1 - all good
     s = new FakeSizeServer(Collections.singletonMap("seg01", null));
-    s.start(URI_PATH, createHandler(200, s._segTierMap, 0));
+    s.start(URI_PATH_TABLE_TIERS, createHandler(200, s._segTierMap, Collections.emptySet(), 0));
     _serverMap.put(serverName(counter), s);
     counter++;
 
     // server2 - always 404
     s = new FakeSizeServer(Collections.singletonMap("seg02", "someTier"));
-    s.start(URI_PATH, createHandler(404, s._segTierMap, 0));
+    s.start(URI_PATH_TABLE_TIERS, createHandler(404, s._segTierMap, Collections.emptySet(), 0));
     _serverMap.put(serverName(counter), s);
     counter++;
 
     // server3 - empty server
     s = new FakeSizeServer(Collections.emptyMap());
-    s.start(URI_PATH, createHandler(200, s._segTierMap, 0));
+    s.start(URI_PATH_TABLE_TIERS, createHandler(200, s._segTierMap, Collections.emptySet(), 0));
     _serverMap.put(serverName(counter), s);
     counter++;
 
@@ -104,14 +109,47 @@ public class TableTierReaderTest {
     s = new FakeSizeServer(segTierMap);
     segTierMap = new HashMap<>(segTierMap);
     segTierMap.remove("seg03");
-    s.start(URI_PATH, createHandler(200, segTierMap, 0));
+    s.start(URI_PATH_TABLE_TIERS, createHandler(200, segTierMap, Collections.emptySet(), 0));
     _serverMap.put(serverName(counter), s);
     counter++;
 
-    // server5 ... timing out server
+    // server5 - timing out server
     s = new FakeSizeServer(Collections.singletonMap("seg04", "someTier"));
-    s.start(URI_PATH, createHandler(200, s._segTierMap, TIMEOUT_MSEC * EXTENDED_TIMEOUT_FACTOR));
+    s.start(URI_PATH_TABLE_TIERS,
+        createHandler(200, s._segTierMap, Collections.emptySet(), TIMEOUT_MSEC * EXTENDED_TIMEOUT_FACTOR));
     _serverMap.put(serverName(counter), s);
+    counter++;
+
+    // following servers are configured to get segment tiers
+    // server6 - all good for segX
+    segTierMap = new HashMap<>();
+    segTierMap.put("segX", "someTier");
+    muSegs = Collections.singleton("segY");
+    s = new FakeSizeServer(segTierMap, muSegs);
+    s.start(URI_PATH_SEGMENT_TIERS, createHandler(200, s._segTierMap, muSegs, 0));
+    _serverMap.put(serverName(counter), s);
+    counter++;
+
+    // server7 - missing segX
+    s = new FakeSizeServer(segTierMap);
+    segTierMap = new HashMap<>(segTierMap);
+    segTierMap.remove("segX");
+    s.start(URI_PATH_SEGMENT_TIERS, createHandler(200, segTierMap, Collections.emptySet(), 0));
+    _serverMap.put(serverName(counter), s);
+    counter++;
+
+    // server8 - 404
+    s = new FakeSizeServer(Collections.singletonMap("segX", null));
+    s.start(URI_PATH_TABLE_TIERS, createHandler(404, s._segTierMap, Collections.emptySet(), 0));
+    _serverMap.put(serverName(counter), s);
+    counter++;
+
+    // server9 - timing out
+    s = new FakeSizeServer(Collections.singletonMap("segX", null));
+    s.start(URI_PATH_TABLE_TIERS,
+        createHandler(200, s._segTierMap, Collections.emptySet(), TIMEOUT_MSEC * EXTENDED_TIMEOUT_FACTOR));
+    _serverMap.put(serverName(counter), s);
+    counter++;
   }
 
   @AfterClass
@@ -121,7 +159,8 @@ public class TableTierReaderTest {
     }
   }
 
-  private HttpHandler createHandler(int status, Map<String, String> segTierMap, int sleepTimeMs) {
+  private HttpHandler createHandler(int status, Map<String, String> segTierMap, Set<String> mutableSegments,
+      int sleepTimeMs) {
     return httpExchange -> {
       if (sleepTimeMs > 0) {
         try {
@@ -130,7 +169,7 @@ public class TableTierReaderTest {
           LOGGER.info("Handler interrupted during sleep");
         }
       }
-      TableTierInfo tableInfo = new TableTierInfo("myTable", segTierMap);
+      TableTierInfo tableInfo = new TableTierInfo("myTable", segTierMap, mutableSegments);
       String json = JsonUtils.objectToString(tableInfo);
       httpExchange.sendResponseHeaders(status, json.length());
       OutputStream responseBody = httpExchange.getResponseBody();
@@ -144,17 +183,26 @@ public class TableTierReaderTest {
   }
 
   private static class FakeSizeServer extends FakeHttpServer {
+    Set<String> _mutableSegments;
     Map<String, String> _segTierMap;
 
     FakeSizeServer(Map<String, String> segTierMap) {
+      this(segTierMap, Collections.emptySet());
+    }
+
+    FakeSizeServer(Map<String, String> segTierMap, Set<String> mutableSegments) {
       _segTierMap = segTierMap;
+      _mutableSegments = mutableSegments;
     }
   }
 
   private Map<String, List<String>> subsetOfServerSegments(String... servers) {
     Map<String, List<String>> subset = new HashMap<>();
     for (String server : servers) {
-      subset.put(server, new ArrayList<>(_serverMap.get(server)._segTierMap.keySet()));
+      FakeSizeServer fakeSvr = _serverMap.get(server);
+      ArrayList<String> segmentsOnServer = new ArrayList<>(fakeSvr._segTierMap.keySet());
+      segmentsOnServer.addAll(fakeSvr._mutableSegments);
+      subset.put(server, segmentsOnServer);
     }
     return subset;
   }
@@ -186,7 +234,7 @@ public class TableTierReaderTest {
       throws InvalidConfigException {
     final String[] servers = {"server0", "server1"};
     TableTierReader.TableTierDetails tableTierDetails = testRunner(servers, "myTable_OFFLINE", null);
-    assertEquals(tableTierDetails.getSegmentTiers().size(), 2);
+    assertEquals(tableTierDetails.getSegmentTiers().size(), 3);
     Map<String, String> tiersByServer = tableTierDetails.getSegmentTiers().get("seg01");
     assertEquals(tiersByServer.size(), 2);
     assertNull(tiersByServer.get("server0"));
@@ -194,6 +242,9 @@ public class TableTierReaderTest {
     tiersByServer = tableTierDetails.getSegmentTiers().get("seg02");
     assertEquals(tiersByServer.size(), 1);
     assertEquals(tiersByServer.get("server0"), "someTier");
+    tiersByServer = tableTierDetails.getSegmentTiers().get("muSeg01");
+    assertEquals(tiersByServer.size(), 1);
+    assertEquals(tiersByServer.get("server0"), "NOT_IMMUTABLE_SEGMENT");
   }
 
   @Test
@@ -216,7 +267,7 @@ public class TableTierReaderTest {
     final String[] servers = {"server0", "server1", "server2", "server3", "server4", "server5"};
     TableTierReader.TableTierDetails tableTierDetails = testRunner(servers, "myTable_OFFLINE", null);
 
-    assertEquals(tableTierDetails.getSegmentTiers().size(), 4);
+    assertEquals(tableTierDetails.getSegmentTiers().size(), 5);
     Map<String, String> tiersByServer = tableTierDetails.getSegmentTiers().get("seg01");
     assertEquals(tiersByServer.size(), 2);
     assertNull(tiersByServer.get("server0"));
@@ -235,22 +286,26 @@ public class TableTierReaderTest {
     tiersByServer = tableTierDetails.getSegmentTiers().get("seg04");
     assertEquals(tiersByServer.size(), 1);
     assertEquals(tiersByServer.get("server5"), "NO_RESPONSE_FROM_SERVER");
+
+    tiersByServer = tableTierDetails.getSegmentTiers().get("muSeg01");
+    assertEquals(tiersByServer.size(), 1);
+    assertEquals(tiersByServer.get("server0"), "NOT_IMMUTABLE_SEGMENT");
   }
 
   @Test
   public void testGetSegmentTierInfoFromAllServers()
       throws InvalidConfigException {
-    final String[] servers = {"server0", "server1", "server2", "server3", "server4", "server5"};
-    TableTierReader.TableTierDetails tableTierDetails = testRunner(servers, "myTable_OFFLINE", "seg01");
-
+    final String[] servers = {"server6", "server7", "server8", "server9"};
+    TableTierReader.TableTierDetails tableTierDetails = testRunner(servers, "myTable_OFFLINE", "segX");
     assertEquals(tableTierDetails.getSegmentTiers().size(), 1);
-    Map<String, String> tiersByServer = tableTierDetails.getSegmentTiers().get("seg01");
-    assertEquals(tiersByServer.size(), 6);
-    assertNull(tiersByServer.get("server0"));
-    assertNull(tiersByServer.get("server1"));
-    assertEquals(tiersByServer.get("server2"), "NO_RESPONSE_FROM_SERVER");
-    assertEquals(tiersByServer.get("server3"), "SEGMENT_MISSED_ON_SERVER");
-    assertEquals(tiersByServer.get("server4"), "SEGMENT_MISSED_ON_SERVER");
-    assertEquals(tiersByServer.get("server5"), "NO_RESPONSE_FROM_SERVER");
+    Map<String, String> tiersByServer = tableTierDetails.getSegmentTiers().get("segX");
+    assertEquals(tiersByServer.size(), 4);
+    assertEquals(tiersByServer.get("server6"), "someTier");
+    assertEquals(tiersByServer.get("server7"), "SEGMENT_MISSED_ON_SERVER");
+    assertEquals(tiersByServer.get("server8"), "NO_RESPONSE_FROM_SERVER");
+    assertEquals(tiersByServer.get("server9"), "NO_RESPONSE_FROM_SERVER");
+    // Check a mutable segment segY.
+    tableTierDetails = testRunner(new String[]{"server6"}, "myTable_OFFLINE", "segY");
+    assertEquals(tableTierDetails.getSegmentTiers().get("segY").get("server6"), "NOT_IMMUTABLE_SEGMENT");
   }
 }

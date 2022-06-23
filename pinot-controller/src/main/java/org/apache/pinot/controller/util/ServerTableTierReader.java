@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import javax.annotation.Nullable;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.restlet.resources.TableTierInfo;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -48,15 +49,20 @@ public class ServerTableTierReader {
   }
 
   public Map<String, TableTierInfo> getTableTierInfoFromServers(BiMap<String, String> serverEndPoints,
-      String tableNameWithType, int timeoutMs) {
+      String tableNameWithType, @Nullable String segmentName, int timeoutMs) {
     int numServers = serverEndPoints.size();
     LOGGER.info("Getting segment storage tiers from {} servers for table: {} with timeout: {}ms", numServers,
         tableNameWithType, timeoutMs);
     List<String> serverUrls = new ArrayList<>(numServers);
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
-      String tableTierUri = endpoint + "/tables/" + tableNameWithType + "/tiers";
-      serverUrls.add(tableTierUri);
+      String tierUri = endpoint;
+      if (segmentName == null) {
+        tierUri += "/tables/" + tableNameWithType + "/tiers";
+      } else {
+        tierUri += "/segments/" + tableNameWithType + "/" + segmentName + "/tiers";
+      }
+      serverUrls.add(tierUri);
     }
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);

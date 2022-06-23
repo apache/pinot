@@ -36,14 +36,39 @@ public class TableTierResourceTest extends BaseResourceTest {
   }
 
   @Test
-  public void testTableTierInfo() {
-    verifyTableTierInfo(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), _realtimeIndexSegments.get(0));
-    verifyTableTierInfo(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), _offlineIndexSegments.get(0));
+  public void testSegmentNotFound() {
+    String tableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
+    Response response =
+        _webTarget.path(String.format("segments/%s/unknownSegment/tiers", tableName)).request().get(Response.class);
+    assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
-  private void verifyTableTierInfo(String expectedTableName, ImmutableSegment segment) {
-    String path = "/tables/" + expectedTableName + "/tiers";
-    TableTierInfo tableTierInfo = _webTarget.path(path).request().get(TableTierInfo.class);
+  @Test
+  public void testTableTierInfo() {
+    String tableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
+    String requestPath = "/tables/" + tableName + "/tiers";
+    verifyTableTierInfo(requestPath, tableName, _realtimeIndexSegments.get(0));
+
+    tableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
+    requestPath = "/tables/" + tableName + "/tiers";
+    verifyTableTierInfo(requestPath, tableName, _offlineIndexSegments.get(0));
+  }
+
+  @Test
+  public void testTableSegmentTierInfo() {
+    String tableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
+    ImmutableSegment segment = _realtimeIndexSegments.get(0);
+    String requestPath = "/segments/" + tableName + "/" + segment.getSegmentName() + "/tiers";
+    verifyTableTierInfo(requestPath, tableName, segment);
+
+    tableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
+    segment = _offlineIndexSegments.get(0);
+    requestPath = "/segments/" + tableName + "/" + segment.getSegmentName() + "/tiers";
+    verifyTableTierInfo(requestPath, tableName, segment);
+  }
+
+  private void verifyTableTierInfo(String requestPath, String expectedTableName, ImmutableSegment segment) {
+    TableTierInfo tableTierInfo = _webTarget.path(requestPath).request().get(TableTierInfo.class);
     assertEquals(tableTierInfo.getTableName(), expectedTableName);
     assertEquals(tableTierInfo.getSegmentTiers().size(), 1);
     assertEquals(tableTierInfo.getSegmentTiers(),

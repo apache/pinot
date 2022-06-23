@@ -38,8 +38,12 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
  * Reads segment storage tiers from servers for the given table.
  */
 public class TableTierReader {
+  // Server didn't respond although segment should be hosted there per ideal state.
   private static final String ERROR_RESP_NO_RESPONSE = "NO_RESPONSE_FROM_SERVER";
+  // The segment is not listed in the server response, although segment should be hosted by the server per ideal state.
   private static final String ERROR_RESP_MISSING_SEGMENT = "SEGMENT_MISSED_ON_SERVER";
+  // The segment is listed in the server response but it's not immutable segment over there, thus no tier info.
+  private static final String ERROR_RESP_NOT_IMMUTABLE = "NOT_IMMUTABLE_SEGMENT";
 
   private final Executor _executor;
   private final HttpConnectionManager _connectionManager;
@@ -74,7 +78,7 @@ public class TableTierReader {
     BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
     ServerTableTierReader serverTableTierReader = new ServerTableTierReader(_executor, _connectionManager);
     Map<String, TableTierInfo> serverToTableTierInfoMap =
-        serverTableTierReader.getTableTierInfoFromServers(endpoints, tableNameWithType, timeoutMs);
+        serverTableTierReader.getTableTierInfoFromServers(endpoints, tableNameWithType, segmentName, timeoutMs);
 
     TableTierDetails tableTierDetails = new TableTierDetails(tableNameWithType);
     for (Map.Entry<String, List<String>> entry : serverToSegmentsMap.entrySet()) {
@@ -83,11 +87,21 @@ public class TableTierReader {
       TableTierInfo tableTierInfo = serverToTableTierInfoMap.get(server);
       for (String expectedSegment : expectedSegmentsOnServer) {
         tableTierDetails._segmentTiers.computeIfAbsent(expectedSegment, (k) -> new HashMap<>()).put(server,
-            (tableTierInfo != null) ? tableTierInfo.getSegmentTiers()
-                .getOrDefault(expectedSegment, ERROR_RESP_MISSING_SEGMENT) : ERROR_RESP_NO_RESPONSE);
+            (tableTierInfo == null) ? ERROR_RESP_NO_RESPONSE : getSegmentTier(expectedSegment, tableTierInfo));
       }
     }
     return tableTierDetails;
+  }
+
+  private static String getSegmentTier(String expectedSegment, TableTierInfo tableTierInfo) {
+    if (tableTierInfo.getMutableSegments().contains(expectedSegment)) {
+      return ERROR_RESP_NOT_IMMUTABLE;
+    }
+    if (!tableTierInfo.getSegmentTiers().containsKey(expectedSegment)) {
+      return ERROR_RESP_MISSING_SEGMENT;
+    }
+    // The value, i.e. tier, can be null.
+    return tableTierInfo.getSegmentTiers().get(expectedSegment);
   }
 
   // This class aggregates the TableTierInfo returned from multi servers.

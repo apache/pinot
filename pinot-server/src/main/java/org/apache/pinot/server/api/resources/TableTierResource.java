@@ -28,21 +28,23 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.inject.Inject;
-import javax.ws.rs.DefaultValue;
+import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.TableTierInfo;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -75,8 +77,7 @@ public class TableTierResource {
       @ApiResponse(code = 404, message = "Table not found")
   })
   public String getTableTiers(
-      @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed)
+      @ApiParam(value = "Table name with type", required = true) @PathParam("tableName") String tableName)
       throws WebApplicationException {
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     if (instanceDataManager == null) {
@@ -86,6 +87,7 @@ public class TableTierResource {
     if (tableDataManager == null) {
       throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
     }
+    Set<String> mutableSegments = new HashSet<>();
     Map<String, String> segmentTiers = new HashMap<>();
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
@@ -93,6 +95,8 @@ public class TableTierResource {
         if (segmentDataManager instanceof ImmutableSegmentDataManager) {
           ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
           segmentTiers.put(immutableSegment.getSegmentName(), immutableSegment.getTier());
+        } else {
+          mutableSegments.add(segmentDataManager.getSegmentName());
         }
       }
     } finally {
@@ -100,7 +104,50 @@ public class TableTierResource {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
-    TableTierInfo tableTierInfo = new TableTierInfo(tableDataManager.getTableName(), segmentTiers);
+    TableTierInfo tableTierInfo = new TableTierInfo(tableDataManager.getTableName(), segmentTiers, mutableSegments);
+    return ResourceUtils.convertToJsonString(tableTierInfo);
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/segments/{tableName}/{segmentName}/tiers")
+  @ApiOperation(value = "Get storage tiers of the immutable segment of the given table", notes = "Get storage tiers "
+      + "of the immutable segment of the given table")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Table or segment not found")
+  })
+  public String getTableSegmentTiers(
+      @ApiParam(value = "Table name with type", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName)
+      throws WebApplicationException {
+    segmentName = URIUtils.decode(segmentName);
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+    if (instanceDataManager == null) {
+      throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableName);
+    if (tableDataManager == null) {
+      throw new WebApplicationException(String.format("Table: %s is not found", tableName), Response.Status.NOT_FOUND);
+    }
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    if (segmentDataManager == null) {
+      throw new WebApplicationException(String.format("Segment: %s is not found in table: %s", segmentName, tableName),
+          Response.Status.NOT_FOUND);
+    }
+    Set<String> mutableSegments = new HashSet<>();
+    Map<String, String> segmentTiers = new HashMap<>();
+    try {
+      if (segmentDataManager instanceof ImmutableSegmentDataManager) {
+        ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
+        segmentTiers.put(immutableSegment.getSegmentName(), immutableSegment.getTier());
+      } else {
+        mutableSegments.add(segmentDataManager.getSegmentName());
+      }
+    } finally {
+      tableDataManager.releaseSegment(segmentDataManager);
+    }
+    TableTierInfo tableTierInfo = new TableTierInfo(tableDataManager.getTableName(), segmentTiers, mutableSegments);
     return ResourceUtils.convertToJsonString(tableTierInfo);
   }
 }

@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.Map;
+import java.util.Set;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -33,11 +34,16 @@ public class TableTierInfo {
   @JsonPropertyDescription("Storage tiers of segments hosted on the server")
   private final Map<String, String> _segmentTiers;
 
+  @JsonPropertyDescription("Segments that's not immutable and has no storage tier")
+  private final Set<String> _mutableSegments;
+
   @JsonCreator
   public TableTierInfo(@JsonProperty("tableName") String tableName,
-      @JsonProperty("segmentTiers") Map<String, String> segmentTiers) {
+      @JsonProperty("segmentTiers") Map<String, String> segmentTiers,
+      @JsonProperty("mutableSegments") Set<String> mutableSegments) {
     _tableName = tableName;
     _segmentTiers = segmentTiers;
+    _mutableSegments = mutableSegments;
   }
 
   public String getTableName() {
@@ -46,5 +52,9 @@ public class TableTierInfo {
 
   public Map<String, String> getSegmentTiers() {
     return _segmentTiers;
+  }
+
+  public Set<String> getMutableSegments() {
+    return _mutableSegments;
   }
 }

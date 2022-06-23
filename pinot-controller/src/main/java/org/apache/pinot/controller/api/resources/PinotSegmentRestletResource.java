@@ -757,12 +757,13 @@ public class PinotSegmentRestletResource {
       tableTierDetails = tableTierReader.getTableTierDetails(tableNameWithType, segmentName,
           _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (Throwable t) {
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Failed to get tier info for segment: %s in table: %s", segmentName, tableName),
-          Response.Status.INTERNAL_SERVER_ERROR, t);
+      throw new ControllerApplicationException(LOGGER, String
+          .format("Failed to get tier info for segment: %s in table: %s of type: %s", segmentName, tableName,
+              tableTypeStr), Response.Status.INTERNAL_SERVER_ERROR, t);
     }
     if (segmentName != null && !tableTierDetails.getSegmentTiers().containsKey(segmentName)) {
-      throw new ControllerApplicationException(LOGGER, "Segment " + segmentName + " not found in table " + tableName,
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Segment: %s is not found in table: %s of type: %s", segmentName, tableName, tableTypeStr),
           Response.Status.NOT_FOUND);
     }
     return tableTierDetails;
