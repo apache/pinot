@@ -70,14 +70,14 @@ const useStyles = makeStyles(() => ({
 
 const TaskDetail = (props) => {
   const classes = useStyles();
-  const { taskID } = props.match.params;
+  const { subTaskID } = props.match.params;
 
   const [fetching, setFetching] = useState(true);
   const [taskDebugData, setTaskDebugData] = useState({});
 
   const fetchData = async () => {
     setFetching(true);
-    const debugRes = await PinotMethodUtils.getTaskDebugData(taskID);
+    const debugRes = await PinotMethodUtils.getTaskDebugData(subTaskID);
     // const subtaskTableRecords = [];
     // each(get(debugRes, 'data.subtaskInfos', {}), (subTask) => {
     //   subtaskTableRecords.push([
@@ -100,7 +100,7 @@ const TaskDetail = (props) => {
       <div className={classes.highlightBackground}>
         <Grid container className={classes.body}>
           <Grid item xs={12}>
-            <strong>Name:</strong> {taskID}
+            <strong>Name:</strong> {subTaskID}
           </Grid>
           <Grid item xs={12}>
             <strong>Status:</strong> {get(taskDebugData, 'state', '')}

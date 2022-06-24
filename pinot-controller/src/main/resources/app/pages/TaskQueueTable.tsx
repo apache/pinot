@@ -75,7 +75,7 @@ const useStyles = makeStyles(() => ({
 
 const TaskQueueTable = (props) => {
   const classes = useStyles();
-  const { taskType, tableName } = props.match.params;
+  const { taskType, queueTableName: tableName } = props.match.params;
 
   const [fetching, setFetching] = useState(true);
   const [jobDetail, setJobDetail] = useState({});

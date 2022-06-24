@@ -96,7 +96,7 @@ const BreadcrumbsComponent = ({ ...props }) => {
     const breadcrumbs = [getClickableLabel(breadcrumbNameMap['/'], '/')];
     const paramsKeys = _.keys(props.match.params);
     if(paramsKeys.length){
-      const {tenantName, tableName, segmentName, instanceName, schemaName, query} = props.match.params;
+      const {tenantName, tableName, segmentName, instanceName, schemaName, query, taskType, queueTableName, taskID, subTaskID} = props.match.params;
       if((tenantName || instanceName) && tableName){
         breadcrumbs.push(
           getClickableLabel(
@@ -129,7 +129,16 @@ const BreadcrumbsComponent = ({ ...props }) => {
           getClickableLabel('Schemas', '/tables')
         );
       }
-      breadcrumbs.push(getLabel(segmentName || tableName || tenantName || instanceName || schemaName || 'Query Console'));
+      if (queueTableName && taskType) {
+        breadcrumbs.push(getClickableLabel(taskType, `/task-queue/${taskType}`));
+      }
+      if (taskID) {
+        breadcrumbs.push(getLabel('Tasks'));
+      }
+      if (subTaskID) {
+        breadcrumbs.push(getLabel('Sub Tasks'));
+      }
+      breadcrumbs.push(getLabel(segmentName || tableName || tenantName || instanceName || schemaName || queueTableName || taskType || taskID || subTaskID || 'Query Console'));
     } else {
       breadcrumbs.push(getLabel(breadcrumbNameMap[location.pathname]));
     }
