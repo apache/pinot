@@ -53,6 +53,7 @@ public class DataFetcher {
   //       ChunkReaderContext should be closed explicitly to release the off-heap buffer
   private final Map<String, ColumnValueReader> _columnValueReaderMap;
   private final int[] _reusableMVDictIds;
+  private final int _maxNumValuesPerMVEntry;
 
   /**
    * Constructor for DataFetcher.
@@ -74,6 +75,7 @@ public class DataFetcher {
       }
     }
     _reusableMVDictIds = new int[maxNumValuesPerMVEntry];
+    _maxNumValuesPerMVEntry = maxNumValuesPerMVEntry;
   }
 
   /**
@@ -636,7 +638,7 @@ public class DataFetcher {
           valuesBuffer[i] = values;
         }
       } else {
-        _reader.readValuesMV(docIds, length, valuesBuffer, getReaderContext());
+        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, getReaderContext());
       }
     }
 
@@ -656,7 +658,7 @@ public class DataFetcher {
           valuesBuffer[i] = values;
         }
       } else {
-        _reader.readValuesMV(docIds, length, valuesBuffer, getReaderContext());
+        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, getReaderContext());
       }
     }
 
@@ -676,7 +678,7 @@ public class DataFetcher {
           valuesBuffer[i] = values;
         }
       } else {
-        _reader.readValuesMV(docIds, length, valuesBuffer, getReaderContext());
+        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, getReaderContext());
       }
     }
 
@@ -696,7 +698,7 @@ public class DataFetcher {
           valuesBuffer[i] = values;
         }
       } else {
-        _reader.readValuesMV(docIds, length, valuesBuffer, getReaderContext());
+        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, getReaderContext());
       }
     }
 
@@ -716,7 +718,7 @@ public class DataFetcher {
           valuesBuffer[i] = values;
         }
       } else {
-        _reader.readValuesMV(docIds, length, valuesBuffer, getReaderContext());
+        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, getReaderContext());
       }
     }
 
