@@ -40,7 +40,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -621,7 +620,7 @@ public class PinotSegmentRestletResource {
     for (String endpoint : endpointsToServers.keySet()) {
       String reloadTaskStatusEndpoint =
           endpoint + "/controllerJob/reloadStatus/" + tableNameWithType + "/?reloadJobTimestamp="
-              + controllerJobZKMetadata.get(CommonConstants.Task.CONTROLLER_JOB_SUBMISSION_TIME);
+              + controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONTROLLER_JOB_SUBMISSION_TIME);
       serverUrls.add(reloadTaskStatusEndpoint);
     }
 
@@ -652,11 +651,11 @@ public class PinotSegmentRestletResource {
     }
 
     // Add ZK fields
-    serverReloadControllerJobStatusResponse.setTaskMetadata(controllerJobZKMetadata);
+    serverReloadControllerJobStatusResponse.setMetadata(controllerJobZKMetadata);
 
     // Add derived fields
     long submissionTime =
-        Long.parseLong(controllerJobZKMetadata.get(CommonConstants.Task.CONTROLLER_JOB_SUBMISSION_TIME));
+        Long.parseLong(controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONTROLLER_JOB_SUBMISSION_TIME));
     double timeElapsedInMinutes = ((double) System.currentTimeMillis() - (double) submissionTime) / (1000.0 * 60.0);
     int remainingSegments = serverReloadControllerJobStatusResponse.getTotalSegmentCount()
         - serverReloadControllerJobStatusResponse.getSuccessCount();

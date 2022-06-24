@@ -557,7 +557,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_MINION_QUERY_REWRITER_CLASS_NAMES = "pinot.minion.query.rewriter.class.names";
   }
 
-  public static class Task {
+  public static class ControllerJob {
     /**
      * Task ZK props
      */

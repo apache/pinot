@@ -27,7 +27,7 @@ public class ServerReloadControllerJobStatusResponse {
   private int _successCount;
   private int _totalServersQueried;
   private int _totalServerCallsFailed;
-  private Map<String, String> _taskMetadata;
+  private Map<String, String> _metadata;
 
   public int getTotalSegmentCount() {
     return _totalSegmentCount;
@@ -77,11 +77,11 @@ public class ServerReloadControllerJobStatusResponse {
     _totalServerCallsFailed = totalServerCallsFailed;
   }
 
-  public Map<String, String> getTaskMetadata() {
-    return _taskMetadata;
+  public Map<String, String> getMetadata() {
+    return _metadata;
   }
 
-  public void setTaskMetadata(Map<String, String> taskMetadata) {
-    _taskMetadata = taskMetadata;
+  public void setMetadata(Map<String, String> metadata) {
+    _metadata = metadata;
   }
 }
