@@ -186,6 +186,11 @@ rules:
   cache: true
   labels:
     table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.queryTotalTimeMs\"><>(\\w+)"
+  name: "pinot_broker_queryTotalTimeMs_$2"
+  cache: true
+  labels:
+    table: "$1"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.reduce\"><>(\\w+)"
   name: "pinot_broker_reduce_$2"
   cache: true
