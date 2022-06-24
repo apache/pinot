@@ -1,0 +1,97 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.plugin.inputformat.protobuf;
+
+import com.google.common.base.Preconditions;
+import com.google.protobuf.DescriptorProtos;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.DynamicMessage;
+import com.google.protobuf.Message;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.util.Map;
+import java.util.Set;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.utils.ResourceFinder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+//TODO: Add support for Schema Registry
+//TODO: Making descriptor file accessible on all servers
+public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ProtoBufMessageDecoder.class);
+
+  public static final String DESCRIPTOR_FILE_PATH = "descriptorFile";
+  private DynamicMessage _dynamicMessage;
+  private ProtoBufRecordExtractor _recordExtractor;
+
+  @Override
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+      throws Exception {
+    Preconditions.checkState(props.containsKey(DESCRIPTOR_FILE_PATH),
+        "Protocol Buffer schema descriptor file must be provided");
+
+    InputStream descriptorFileInputStream = getDescriptorFileInputStream(props.get(DESCRIPTOR_FILE_PATH));
+    Descriptors.Descriptor descriptor = buildProtoBufDescriptor(descriptorFileInputStream);
+    _recordExtractor = new ProtoBufRecordExtractor();
+    _recordExtractor.init(fieldsToRead, null);
+    _dynamicMessage = DynamicMessage.getDefaultInstance(descriptor);
+  }
+
+  private Descriptors.Descriptor buildProtoBufDescriptor(InputStream fin)
+      throws IOException {
+    try {
+      DescriptorProtos.FileDescriptorSet set = DescriptorProtos.FileDescriptorSet.parseFrom(fin);
+      Descriptors.FileDescriptor fileDescriptor =
+          Descriptors.FileDescriptor.buildFrom(set.getFile(0), new Descriptors.FileDescriptor[]{});
+      return fileDescriptor.getMessageTypes().get(0);
+    } catch (Descriptors.DescriptorValidationException e) {
+      throw new IOException("Descriptor file validation failed", e);
+    }
+  }
+
+  @Override
+  public GenericRow decode(byte[] payload, GenericRow destination) {
+    return decode(payload, 0, payload.length, destination);
+  }
+
+  @Override
+  public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+    Message message;
+    try {
+      Message.Builder builder = _dynamicMessage.newBuilderForType();
+      builder.mergeFrom(payload);
+      message = builder.build();
+    } catch (Exception e) {
+      LOGGER.error("Not able to decode protobuf message", e);
+      return destination;
+    }
+    _recordExtractor.extract(message, destination);
+    return destination;
+  }
+
+  private InputStream getDescriptorFileInputStream(String descriptorFilePath)
+      throws IOException {
+    URI descriptorFileURI = URI.create(descriptorFilePath);
+    return ResourceFinder.openResource(descriptorFileURI);
+  }
+}
