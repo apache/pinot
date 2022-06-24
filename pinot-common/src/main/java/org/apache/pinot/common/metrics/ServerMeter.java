@@ -60,9 +60,6 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_SEGMENTS_QUERIED("numSegmentsQueried", false),
   NUM_SEGMENTS_PROCESSED("numSegmentsProcessed", false),
   NUM_SEGMENTS_MATCHED("numSegmentsMatched", false),
-  NUM_SEGMENTS_PRUNED_INVALID("numSegmentsPrunedInvalid", false),
-  NUM_SEGMENTS_PRUNED_BY_LIMIT("numSegmentsPrunedByLimit", false),
-  NUM_SEGMENTS_PRUNED_BY_VALUE("numSegmentsPrunedByValue", false),
   NUM_MISSING_SEGMENTS("segments", false),
   RELOAD_FAILURES("segments", false),
   REFRESH_FAILURES("segments", false),
@@ -77,7 +74,11 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   // Netty connection metrics
   NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
   NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),
-  NETTY_CONNECTION_BYTES_SENT("nettyConnection", true);
+  NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
+  
+  NUM_SEGMENTS_PRUNED_INVALID("numSegmentsPrunedInvalid", false),
+  NUM_SEGMENTS_PRUNED_BY_LIMIT("numSegmentsPrunedByLimit", false),
+  NUM_SEGMENTS_PRUNED_BY_VALUE("numSegmentsPrunedByValue", false),;
 
   private final String _meterName;
   private final String _unit;
