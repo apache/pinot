@@ -25,10 +25,11 @@ import org.testng.annotations.Test;
 
 
 public class JsonGeneratorTest {
+
   @Test
   public void testNext()
       throws IOException {
-    // JsonGenerator generates empty json when size is  less than JsonGenerator.DEFAULT_JSON_ELEMENT_LENGTH)
+    // JsonGenerator generates empty json when size is less than JsonGenerator.DEFAULT_JSON_ELEMENT_LENGTH
     JsonGenerator jsonGenerator1 = new JsonGenerator(0);
     Assert.assertEquals(jsonGenerator1.next(), "{}");
 

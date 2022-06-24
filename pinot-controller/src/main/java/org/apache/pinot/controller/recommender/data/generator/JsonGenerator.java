@@ -25,8 +25,8 @@ public class JsonGenerator implements Generator {
   // Length of each key-value pair int the JSON string.
   static final int DEFAULT_JSON_ELEMENT_LENGTH = 5;
 
-  private int _jsonStringLength = 0;
-  private Random _random;
+  private final int _jsonStringLength;
+  private final Random _random;
 
   public JsonGenerator(Integer jsonSize) {
     _jsonStringLength = jsonSize == null ? 0 : jsonSize;
