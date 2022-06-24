@@ -42,14 +42,14 @@ public class MutableDataSource extends BaseDataSource {
 
   public MutableDataSource(FieldSpec fieldSpec, int numDocs, int numValues, int maxNumValuesPerMVEntry,
       @Nullable PartitionFunction partitionFunction, @Nullable Set<Integer> partitions, @Nullable Comparable minValue,
-      @Nullable Comparable maxValue, @Nullable Set<Comparable> uniqueValueSet, ForwardIndexReader forwardIndex, @Nullable Dictionary dictionary,
-      @Nullable InvertedIndexReader invertedIndex, @Nullable RangeIndexReader rangeIndex,
-      @Nullable TextIndexReader textIndex, @Nullable TextIndexReader fstIndex, @Nullable JsonIndexReader jsonIndex,
-      @Nullable H3IndexReader h3Index, @Nullable BloomFilterReader bloomFilter,
+      @Nullable Comparable maxValue, @Nullable Set<Comparable> uniqueValueSet, ForwardIndexReader forwardIndex,
+      @Nullable Dictionary dictionary, @Nullable InvertedIndexReader invertedIndex,
+      @Nullable RangeIndexReader rangeIndex, @Nullable TextIndexReader textIndex, @Nullable TextIndexReader fstIndex,
+      @Nullable JsonIndexReader jsonIndex, @Nullable H3IndexReader h3Index, @Nullable BloomFilterReader bloomFilter,
       @Nullable NullValueVectorReader nullValueVector) {
     super(new MutableDataSourceMetadata(fieldSpec, numDocs, numValues, maxNumValuesPerMVEntry, partitionFunction,
-            partitions, minValue, maxValue, uniqueValueSet), forwardIndex, dictionary, invertedIndex, rangeIndex, textIndex, fstIndex,
-        jsonIndex, h3Index, bloomFilter, nullValueVector);
+            partitions, minValue, maxValue, uniqueValueSet), forwardIndex, dictionary, invertedIndex, rangeIndex,
+            textIndex, fstIndex, jsonIndex, h3Index, bloomFilter, nullValueVector);
   }
 
   private static class MutableDataSourceMetadata implements DataSourceMetadata {

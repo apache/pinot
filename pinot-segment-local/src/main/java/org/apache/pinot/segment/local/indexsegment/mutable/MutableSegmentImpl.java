@@ -1354,9 +1354,9 @@ public class MutableSegmentImpl implements MutableSegment {
 
     DataSource toDataSource() {
       return new MutableDataSource(_fieldSpec, _numDocsIndexed, _numValuesInfo._numValues,
-          _numValuesInfo._maxNumValuesPerMVEntry, _partitionFunction, _partitions, _minValue, _maxValue, _valueSet, _forwardIndex,
-          _dictionary, _invertedIndex, _rangeIndex, _textIndex, _fstIndex, _jsonIndex, _h3Index, _bloomFilter,
-          _nullValueVector);
+          _numValuesInfo._maxNumValuesPerMVEntry, _partitionFunction, _partitions, _minValue, _maxValue, _valueSet,
+          _forwardIndex, _dictionary, _invertedIndex, _rangeIndex, _textIndex, _fstIndex, _jsonIndex, _h3Index,
+          _bloomFilter, _nullValueVector);
     }
 
     @Override

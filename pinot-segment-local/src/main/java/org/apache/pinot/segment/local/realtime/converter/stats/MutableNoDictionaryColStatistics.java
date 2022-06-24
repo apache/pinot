@@ -26,9 +26,6 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
-import static org.apache.pinot.segment.spi.Constants.UNKNOWN_CARDINALITY;
-
-
 public class MutableNoDictionaryColStatistics implements ColumnStatistics {
   private final DataSourceMetadata _dataSourceMetadata;
   private final MutableForwardIndex _forwardIndex;
