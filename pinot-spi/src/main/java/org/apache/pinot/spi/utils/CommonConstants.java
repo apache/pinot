@@ -254,6 +254,10 @@ public class CommonConstants {
 
     public static final String CONTROLLER_URL = "pinot.broker.controller.url";
 
+    public static final String CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING =
+        "pinot.broker.request.client.ip.logging";
+    public static final boolean DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING = true;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String TRACE = "trace";

@@ -594,13 +594,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     augmentStatistics(requestContext, brokerResponse);
 
     // Extract source info from incoming request
-    Collection<String> remoteIps = null;
+    Collection<String> clientIp = null;
     if (requesterIdentity != null) {
-      remoteIps = ((HttpRequesterIdentity) requesterIdentity).getHttpHeaders().get("X-Forwarded-For");
+      clientIp = ((HttpRequesterIdentity) requesterIdentity).getHttpHeaders().get("X-Forwarded-For");
     }
 
     logBrokerResponse(requestId, query, requestContext, tableName, numUnavailableSegments, serverStats, brokerResponse,
-        totalTimeMs, remoteIps);
+        totalTimeMs, clientIp);
     return brokerResponse;
   }
 
@@ -672,8 +672,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   private void logBrokerResponse(long requestId, String query, RequestContext requestContext, String tableName,
       int numUnavailableSegments, ServerStats serverStats, BrokerResponseNative brokerResponse, long totalTimeMs,
-      @Nullable Collection<String> remoteIps) {
+      @Nullable Collection<String> clientIp) {
     LOGGER.debug("Broker Response: {}", brokerResponse);
+    boolean enableClientIpLogging = _config.getProperty(Broker.CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING,
+        Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING);
+
 
     // Please keep the format as name=value comma-separated with no spaces
     // Please keep all the name value pairs together, then followed by the query. To add a new entry, please add it to
@@ -684,7 +687,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
               + "segments(queried/processed/matched/consuming/unavailable):{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
               + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},"
               + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},"
-              + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},remoteIps={}"
+              + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},clientIp={}"
               + ",query={}", requestId, tableName,
           totalTimeMs, brokerResponse.getNumDocsScanned(), brokerResponse.getTotalDocs(),
           brokerResponse.getNumEntriesScannedInFilter(), brokerResponse.getNumEntriesScannedPostFilter(),
@@ -698,7 +701,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           brokerResponse.getOfflineResponseSerializationCpuTimeNs(), brokerResponse.getRealtimeTotalCpuTimeNs(),
           brokerResponse.getRealtimeThreadCpuTimeNs(), brokerResponse.getRealtimeSystemActivitiesCpuTimeNs(),
           brokerResponse.getRealtimeResponseSerializationCpuTimeNs(),
-          remoteIps == null ? "" : StringUtils.join(remoteIps, ";"), StringUtils.substring(query, 0, _queryLogLength));
+          enableClientIpLogging ? (clientIp == null ? "" : StringUtils.join(clientIp, ";")) : "",
+          StringUtils.substring(query, 0, _queryLogLength));
 
       // Limit the dropping log message at most once per second.
       if (_numDroppedLogRateLimiter.tryAcquire()) {
