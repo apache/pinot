@@ -140,11 +140,6 @@ public class SegmentPrunerService {
           segments.set(selected++, segment);
         }
       }
-      if (!isEmptySegment(segment) && !isInvalid) {
-        segments.set(selected++, segment);
-      } else if (isInvalid) {
-        invalid++;
-      }
     }
     stats.setInvalidSegments(invalid);
     return segments.subList(0, selected);
