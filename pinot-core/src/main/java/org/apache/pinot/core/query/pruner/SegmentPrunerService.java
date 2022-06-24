@@ -133,7 +133,13 @@ public class SegmentPrunerService {
     int selected = 0;
     int invalid = 0;
     for (IndexSegment segment : segments) {
-      boolean isInvalid = isInvalidSegment(segment, query);
+      if (!isEmptySegment(segment)) {
+        if (isInvalidSegment(segment, query)) {
+          invalid++
+        } else {
+          segments.set(selected++, segment);
+        }
+      }
       if (!isEmptySegment(segment) && !isInvalid) {
         segments.set(selected++, segment);
       } else if (isInvalid) {
