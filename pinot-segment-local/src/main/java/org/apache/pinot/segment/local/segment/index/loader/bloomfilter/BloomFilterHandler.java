@@ -185,11 +185,6 @@ public class BloomFilterHandler implements IndexHandler {
                 bloomFilterCreator.add(forwardIndexReader.getString(i, readerContext));
               }
               break;
-            case BIG_DECIMAL:
-              for (int i = 0; i < numDocs; i++) {
-                bloomFilterCreator.add(forwardIndexReader.getBigDecimal(i, readerContext).toPlainString());
-              }
-              break;
             case BYTES:
               for (int i = 0; i < numDocs; i++) {
                 bloomFilterCreator.add(
@@ -198,7 +193,8 @@ public class BloomFilterHandler implements IndexHandler {
               }
               break;
             default:
-              throw new UnsupportedOperationException("Data type not supported");
+              throw new IllegalStateException("Unsupported data type: " + columnMetadata.getDataType() + " for column: "
+                  + columnMetadata.getColumnName());
           }
           bloomFilterCreator.seal();
         } else {
@@ -259,7 +255,8 @@ public class BloomFilterHandler implements IndexHandler {
               }
               break;
             default:
-              throw new UnsupportedOperationException("Data type not supported");
+              throw new IllegalStateException("Unsupported data type: " + columnMetadata.getDataType() + " for column: "
+                  + columnMetadata.getColumnName());
           }
           bloomFilterCreator.seal();
         }
