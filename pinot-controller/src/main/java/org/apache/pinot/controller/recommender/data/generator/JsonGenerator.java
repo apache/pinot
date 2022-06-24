@@ -44,15 +44,16 @@ public class JsonGenerator implements Generator {
       return "{}";
     }
 
-    // Create JSON string { "<character>":<integer>, "<character>":<integer>, ...} as per length specified.
+    // Create JSON string { "<character>":<integer>, "<character>":<integer>, ...} as per length specified. Escape
+    // comma's in JSON since comma is used as delimiter in CSV data file that will be used to generate segment.
     StringBuffer jsonBuffer = new StringBuffer();
     int elementCount = _jsonStringLength / DEFAULT_JSON_ELEMENT_LENGTH;
     jsonBuffer.append("{");
     for (int i = 0; i < elementCount; i++) {
       if (jsonBuffer.length() > 1) {
-        jsonBuffer.append(",");
+        jsonBuffer.append("\\,");
       }
-      String item = "\"" + (char) ('a' + _random.nextInt(26)) + "\":" + _random.nextInt(10);
+      String item = "\\\"" + (char) ('a' + _random.nextInt(26)) + "\\\":" + _random.nextInt(10);
       jsonBuffer.append(item);
     }
 

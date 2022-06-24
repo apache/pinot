@@ -450,8 +450,8 @@ public class TestConfigEngine {
       throws Exception {
     ConfigManager output = runRecommenderDriver("recommenderInput/SegmentSizeRuleInput.json");
     SegmentSizeRecommendations segmentSizeRecommendations = output.getSegmentSizeRecommendations();
-    assertEquals(segmentSizeRecommendations.getNumSegments(), 2);
-    assertEquals(segmentSizeRecommendations.getNumRowsPerSegment(), 50_000);
+    assertEquals(segmentSizeRecommendations.getNumSegments(), 3);
+    assertEquals(segmentSizeRecommendations.getNumRowsPerSegment(), 33_333);
   }
 
   @Test
