@@ -28,7 +28,8 @@ import java.util.Properties;
  * Creates connections to Pinot, given various initialization methods.
  */
 public class ConnectionFactory {
-  private static PinotClientTransport _defaultTransport;
+  private static volatile PinotClientTransport _defaultTransport;
+  private static final Object TRANSPORT_LOCK = new Object();
 
   private ConnectionFactory() {
   }
@@ -173,7 +174,11 @@ public class ConnectionFactory {
 
   private static PinotClientTransport getDefault() {
     if (_defaultTransport == null) {
-      _defaultTransport = new JsonAsyncHttpPinotClientTransportFactory().buildTransport();
+      synchronized (TRANSPORT_LOCK) {
+        if (_defaultTransport == null) {
+          _defaultTransport = new JsonAsyncHttpPinotClientTransportFactory().buildTransport();
+        }
+      }
     }
     return _defaultTransport;
   }
