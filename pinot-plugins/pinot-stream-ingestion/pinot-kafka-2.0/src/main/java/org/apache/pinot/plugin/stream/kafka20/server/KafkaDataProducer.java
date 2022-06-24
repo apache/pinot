@@ -58,15 +58,13 @@ public class KafkaDataProducer implements StreamDataProducer {
 
   @Override
   public void produce(String topic, byte[] payload) {
-    ProducerRecord<byte[], byte[]> record = new ProducerRecord(topic, payload);
-    _producer.send(record);
+    _producer.send(new ProducerRecord<>(topic, payload));
     _producer.flush();
   }
 
   @Override
   public void produce(String topic, byte[] key, byte[] payload) {
-    ProducerRecord<byte[], byte[]> record = new ProducerRecord(topic, key, payload);
-    _producer.send(record);
+    _producer.send(new ProducerRecord<>(topic, key, payload));
     _producer.flush();
   }
 
