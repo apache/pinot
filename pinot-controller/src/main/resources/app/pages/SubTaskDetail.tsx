@@ -23,7 +23,6 @@ import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { Grid, makeStyles } from '@material-ui/core';
 import SimpleAccordion from '../components/SimpleAccordion';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
-import CustomizedTables from '../components/Table';
 
 const jsonoptions = {
   lineNumbers: true,
@@ -75,23 +74,19 @@ const TaskDetail = (props) => {
 
   const [fetching, setFetching] = useState(true);
   const [taskDebugData, setTaskDebugData] = useState({});
-  const [subtaskTableData, setSubtaskTableData] = useState({ columns: ['Task ID', 'Status', 'Start Time', 'Finish Time'], records: [] });
 
   const fetchData = async () => {
     setFetching(true);
     const debugRes = await PinotMethodUtils.getTaskDebugData(taskID);
-    const subtaskTableRecords = [];
-    each(get(debugRes, 'data.subtaskInfos', {}), (subTask) => {
-      subtaskTableRecords.push([
-        get(subTask, 'taskId'),
-        get(subTask, 'state'),
-        get(subTask, 'startTime'),
-        get(subTask, 'finishTime'),
-      ])
-    });
-    setSubtaskTableData(prevState => {
-      return { ...prevState, records: subtaskTableRecords };
-    });
+    // const subtaskTableRecords = [];
+    // each(get(debugRes, 'data.subtaskInfos', {}), (subTask) => {
+    //   subtaskTableRecords.push([
+    //     get(subTask, 'taskId'),
+    //     get(subTask, 'state'),
+    //     get(subTask, 'startTime'),
+    //     get(subTask, 'finishTime'),
+    //   ])
+    // });
     setTaskDebugData(debugRes);
     setFetching(false);
   };
@@ -108,7 +103,13 @@ const TaskDetail = (props) => {
             <strong>Name:</strong> {taskID}
           </Grid>
           <Grid item xs={12}>
-            <strong>Status:</strong> {get(taskDebugData, 'taskState', '')}
+            <strong>Status:</strong> {get(taskDebugData, 'state', '')}
+          </Grid>
+          <Grid item xs={12}>
+            <strong>Start Time:</strong> {get(taskDebugData, 'startTime', '')}
+          </Grid>
+          <Grid item xs={12}>
+            <strong>Finish Time:</strong> {get(taskDebugData, 'finishTime', '')}
           </Grid>
         </Grid>
       </div>
@@ -121,35 +122,12 @@ const TaskDetail = (props) => {
             >
               <CodeMirror
                 options={jsonoptions}
-                value={JSON.stringify(get({}, `0`, {}), null, '  ')}
+                value={JSON.stringify(get(taskDebugData, `taskConfig.`, {}), null, '  ')}
                 className={classes.queryOutput}
                 autoCursor={false}
               />
             </SimpleAccordion>
           </div>
-        </Grid>
-        <Grid item xs={6}>
-          <div className={classes.sqlDiv}>
-            <SimpleAccordion
-              headerTitle="Execution Errors"
-              showSearchBox={false}
-            >
-              
-            </SimpleAccordion>
-          </div>
-        </Grid>
-        <Grid item xs={12}>
-          {!fetching && (
-            <CustomizedTables
-              title="Sub Tasks"
-              data={subtaskTableData}
-              showSearchBox={true}
-              inAccordionFormat={true}
-              isPagination={false}
-              addLinks
-              baseURL={`/sub-task/`}
-            />
-          )}
         </Grid>
       </Grid>
     </Grid>

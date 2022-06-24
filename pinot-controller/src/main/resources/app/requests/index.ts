@@ -127,7 +127,7 @@ export const getTasks = (tableName: string, taskType: string): Promise<AxiosResp
   baseApi.get(`/tasks/${taskType}/${tableName}/state`, { headers: { ...headers, Accept: 'application/json' } });
 
 export const getTaskDebug = (taskName: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.get(`/tasks/task/${taskName}/debug?verbosity=0`, { headers: { ...headers, Accept: 'application/json' } });
+  baseApi.get(`/tasks/task/${taskName}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
 
 export const getClusterConfig = (): Promise<AxiosResponse<ClusterConfig>> =>
   baseApi.get('/cluster/configs');

@@ -834,7 +834,7 @@ const getTasksList = (tableName, taskType) => {
       const promiseArr = [];
       const fetchInfo = async (taskID, status) => {
         const debugData = await getTaskDebugData(taskID);
-        finalResponse.records.push([taskID, status, debugData]);
+        finalResponse.records.push([taskID, status]);
       };
       _.each(response.data, async (val, key) => {
         promiseArr.push(fetchInfo(key, val));
