@@ -130,7 +130,7 @@ public class WorkerQueryExecutor {
     } else if (stageNode instanceof ProjectNode) {
       ProjectNode projectNode = (ProjectNode) stageNode;
       return new TransformOperator(getOperator(requestId, projectNode.getInputs().get(0), metadataMap),
-          projectNode.getProjects());
+          projectNode.getProjects(), projectNode.getInputs().get(0).getDataSchema());
     } else {
       throw new UnsupportedOperationException(
           String.format("Stage node type %s is not supported!", stageNode.getClass().getSimpleName()));
