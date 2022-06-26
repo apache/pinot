@@ -47,6 +47,8 @@ import org.apache.pinot.controller.helix.core.realtime.MissingConsumingSegmentFi
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,8 +115,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   @Override
   protected void processTable(String tableNameWithType, Context context) {
     try {
-      updateTableConfigMetrics(tableNameWithType);
-      updateSegmentMetrics(tableNameWithType, context);
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      updateTableConfigMetrics(tableNameWithType, tableConfig);
+      updateSegmentMetrics(tableNameWithType, tableConfig, context);
       updateTableSizeMetrics(tableNameWithType);
     } catch (Exception e) {
       LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
@@ -134,8 +137,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
    * Updates metrics related to the table config.
    * If table config not found, resets the metrics
    */
-  private void updateTableConfigMetrics(String tableNameWithType) {
-    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+  private void updateTableConfigMetrics(String tableNameWithType, TableConfig tableConfig) {
     if (tableConfig == null) {
       LOGGER.warn("Found null table config for table: {}. Resetting table config metrics.", tableNameWithType);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, 0);
@@ -159,7 +161,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
    * Runs a segment status pass over the given table.
    * TODO: revisit the logic and reduce the ZK access
    */
-  private void updateSegmentMetrics(String tableNameWithType, Context context) {
+  private void updateSegmentMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     if (tableType == TableType.OFFLINE) {
       context._offlineTableCount++;
@@ -305,7 +307,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
 
     if (tableType == TableType.REALTIME) {
-      new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics)
+      PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
+          IngestionConfigUtils.getStreamConfigMap(tableConfig));
+      new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics, streamConfig)
           .findAndEmitMetrics(idealState);
     }
   }
