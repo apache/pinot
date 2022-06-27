@@ -341,14 +341,11 @@ public class DistinctTable {
     int numRecords = dataTable.getNumberOfRows();
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
-    RoaringBitmap[] nullBitmaps = null;
+    RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
     boolean isNullHandlingEnabled = false;
-    if (dataTable.getVersion() >= DataTableFactory.VERSION_4) {
-      nullBitmaps = new RoaringBitmap[numColumns];
-      for (int colId = 0; colId < numColumns; colId++) {
-        nullBitmaps[colId] = dataTable.getNullRowIds(colId);
-        isNullHandlingEnabled |= nullBitmaps[colId] != null;
-      }
+    for (int colId = 0; colId < numColumns; colId++) {
+      nullBitmaps[colId] = dataTable.getNullRowIds(colId);
+      isNullHandlingEnabled |= nullBitmaps[colId] != null;
     }
     List<Record> records = new ArrayList<>(numRecords);
     for (int i = 0; i < numRecords; i++) {

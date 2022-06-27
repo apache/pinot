@@ -457,20 +457,16 @@ public class IntermediateResultsBlock implements Block {
       columnNames[i] = aggregationFunction.getColumnName();
       columnDataTypes[i] = aggregationFunction.getIntermediateResultColumnType();
     }
-    Object[] colDefaultNullValues = null;
     RoaringBitmap[] nullBitmaps = null;
+    Object[] colDefaultNullValues = null;
     if (_isNullHandlingEnabled) {
+      colDefaultNullValues = new Object[numAggregationFunctions];
+      nullBitmaps = new RoaringBitmap[numAggregationFunctions];
       for (int i = 0; i < numAggregationFunctions; i++) {
-        if (colDefaultNullValues == null) {
-          colDefaultNullValues = new Object[numAggregationFunctions];
-          nullBitmaps = new RoaringBitmap[numAggregationFunctions];
-        }
         if (columnDataTypes[i] != ColumnDataType.OBJECT) {
           // Store a dummy value that is both a valid numeric, and a valid hex encoded value.
           String specialVal = "30";
           colDefaultNullValues[i] = columnDataTypes[i].toDataType().convert(specialVal);
-          colDefaultNullValues[i] = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC,
-              columnDataTypes[i].toDataType(), null);
         }
         nullBitmaps[i] = new RoaringBitmap();
       }
