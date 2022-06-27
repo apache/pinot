@@ -148,7 +148,7 @@ const TaskDetail = (props) => {
               inAccordionFormat={true}
               isPagination={false}
               addLinks
-              baseURL={`/sub-task/`}
+              baseURL={`/task/${taskID}/sub-task/`}
             />
           )}
         </Grid>

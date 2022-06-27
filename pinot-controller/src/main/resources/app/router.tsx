@@ -49,7 +49,7 @@ export default [
   { path: '/task-queue/:taskType', Component: TaskQueue },
   { path: '/task-queue/:taskType/tables/:queueTableName', Component: TaskQueueTable },
   { path: '/task/:taskID', Component: TaskDetail },
-  { path: '/sub-task/:subTaskID', Component: SubTaskDetail },
+  { path: '/task/:taskID/sub-task/:subTaskID', Component: SubTaskDetail },
   { path: '/tenants/:tenantName', Component: TenantsPage },
   { path: '/tenants/:tenantName/table/:tableName', Component: TenantPageDetails },
   { path: '/tenants/schema/:schemaName', Component: SchemaPageDetails },

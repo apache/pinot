@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { get, each } from 'lodash';
+import { get, find } from 'lodash';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { Grid, makeStyles } from '@material-ui/core';
 import SimpleAccordion from '../components/SimpleAccordion';
@@ -70,24 +70,16 @@ const useStyles = makeStyles(() => ({
 
 const TaskDetail = (props) => {
   const classes = useStyles();
-  const { subTaskID } = props.match.params;
+  const { subTaskID, taskID } = props.match.params;
 
   const [fetching, setFetching] = useState(true);
   const [taskDebugData, setTaskDebugData] = useState({});
 
   const fetchData = async () => {
     setFetching(true);
-    const debugRes = await PinotMethodUtils.getTaskDebugData(subTaskID);
-    // const subtaskTableRecords = [];
-    // each(get(debugRes, 'data.subtaskInfos', {}), (subTask) => {
-    //   subtaskTableRecords.push([
-    //     get(subTask, 'taskId'),
-    //     get(subTask, 'state'),
-    //     get(subTask, 'startTime'),
-    //     get(subTask, 'finishTime'),
-    //   ])
-    // });
-    setTaskDebugData(debugRes);
+    const debugRes = await PinotMethodUtils.getTaskDebugData(taskID);
+    const subTaskData = find(debugRes.data.subtaskInfos, (subTask) => get(subTask, 'taskId', '') === subTaskID);
+    setTaskDebugData(subTaskData);
     setFetching(false);
   };
 
@@ -125,7 +117,7 @@ const TaskDetail = (props) => {
             >
               <CodeMirror
                 options={jsonoptions}
-                value={JSON.stringify(get(taskDebugData, `taskConfig.`, {}), null, '  ')}
+                value={JSON.stringify(get(taskDebugData, `taskConfig`, {}), null, '  ')}
                 className={classes.queryOutput}
                 autoCursor={false}
               />
