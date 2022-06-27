@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.controller.recommender.data.generator;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -49,12 +51,18 @@ public class JsonGeneratorTest {
     // Number of expected elements in the generated JSON string
     int elementCount = desiredLength / JsonGenerator.DEFAULT_JSON_ELEMENT_LENGTH;
 
+    // Remove escape characters from jsonString for verification purposes. Escape character were added before comma
+    // since json string is written to a CSV file where comma is used as delimiter.
+    jsonString = StringUtils.remove(jsonString, "\\");
+
     // Make sure we are generating JSON string that is close to the desired length. Length of JSON string should be 2
     // (length of opening and closing parentheses) + number of commas + size of all the elements.
     Assert.assertEquals(jsonString.length(),
         "{}".length() + (elementCount - 1) + elementCount * JsonGenerator.DEFAULT_JSON_ELEMENT_LENGTH);
 
-    // Check if json string is valid json.
-    JsonUtils.stringToJsonNode(jsonString);
+    // Check if json string is valid json (i.e does not throw parse exceptions) and doesn't result in a
+    // JsonNode "missing node".
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonString);
+    Assert.assertFalse(jsonNode.isMissingNode());
   }
 }
