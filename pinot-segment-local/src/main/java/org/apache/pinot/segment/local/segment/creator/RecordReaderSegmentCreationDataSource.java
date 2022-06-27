@@ -38,16 +38,21 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
   private static final Logger LOGGER = LoggerFactory.getLogger(RecordReaderSegmentCreationDataSource.class);
 
   private final RecordReader _recordReader;
+  private TransformPipeline _transformPipeline;
 
   public RecordReaderSegmentCreationDataSource(RecordReader recordReader) {
     _recordReader = recordReader;
   }
 
+  public void setTransformPipeline(TransformPipeline transformPipeline) {
+    _transformPipeline = transformPipeline;
+  }
+
   @Override
   public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
     try {
-      TransformPipeline transformPipeline =
-          new TransformPipeline(statsCollectorConfig.getTableConfig(), statsCollectorConfig.getSchema());
+      TransformPipeline transformPipeline = _transformPipeline != null ? _transformPipeline
+          : new TransformPipeline(statsCollectorConfig.getTableConfig(), statsCollectorConfig.getSchema());
 
       SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();

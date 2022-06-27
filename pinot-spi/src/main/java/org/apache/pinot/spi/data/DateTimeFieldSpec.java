@@ -72,7 +72,11 @@ public final class DateTimeFieldSpec extends FieldSpec {
     super(name, dataType, true);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(dataType);
-    DateTimeFormatSpec.validateFormat(format);
+    if (Character.isDigit(format.charAt(0))) {
+      DateTimeFormatSpec.validateFormat(format);
+    } else {
+      DateTimeFormatSpec.validatePipeFormat(format);
+    }
     DateTimeGranularitySpec.validateGranularity(granularity);
 
     _format = format;

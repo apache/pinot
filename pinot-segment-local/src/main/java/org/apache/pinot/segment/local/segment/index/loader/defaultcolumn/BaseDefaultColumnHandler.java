@@ -24,6 +24,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -32,6 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.common.function.FunctionUtils;
+import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
@@ -67,7 +70,6 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.spi.data.FieldSpec.FieldType.DATE_TIME;
 import static org.apache.pinot.spi.data.FieldSpec.FieldType.DIMENSION;
 import static org.apache.pinot.spi.data.FieldSpec.FieldType.METRIC;
@@ -399,7 +401,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     Object defaultValue = fieldSpec.getDefaultNullValue();
     boolean isSingleValue = fieldSpec.isSingleValueField();
     int maxNumberOfMultiValueElements = isSingleValue ? 0 : 1;
-    int dictionaryElementSize = 0;
 
     Object sortedArray;
     switch (dataType.getStoredType()) {
@@ -419,16 +420,16 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         Preconditions.checkState(defaultValue instanceof Double);
         sortedArray = new double[]{(Double) defaultValue};
         break;
+      case BIG_DECIMAL:
+        Preconditions.checkState(defaultValue instanceof BigDecimal);
+        sortedArray = new BigDecimal[]{(BigDecimal) defaultValue};
+        break;
       case STRING:
         Preconditions.checkState(defaultValue instanceof String);
-        String stringDefaultValue = (String) defaultValue;
-        // Length of the UTF-8 encoded byte array.
-        dictionaryElementSize = stringDefaultValue.getBytes(UTF_8).length;
-        sortedArray = new String[]{stringDefaultValue};
+        sortedArray = new String[]{(String) defaultValue};
         break;
       case BYTES:
         Preconditions.checkState(defaultValue instanceof byte[]);
-        dictionaryElementSize = ((byte[]) defaultValue).length;
         // Convert byte[] to ByteArray for internal usage
         ByteArray bytesDefaultValue = new ByteArray((byte[]) defaultValue);
         defaultValue = bytesDefaultValue;
@@ -447,8 +448,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Create dictionary.
     // We will have only one value in the dictionary.
+    int dictionaryElementSize;
     try (SegmentDictionaryCreator creator = new SegmentDictionaryCreator(fieldSpec, _indexDir, false)) {
       creator.build(sortedArray);
+      dictionaryElementSize = creator.getNumBytesPerEntry();
     }
 
     // Create forward index.
@@ -499,11 +502,18 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       Object[] inputValues = new Object[numArguments];
       int numDocs = _segmentMetadata.getTotalDocs();
       Object[] outputValues = new Object[numDocs];
+      PinotDataType outputValueType = null;
       for (int i = 0; i < numDocs; i++) {
         for (int j = 0; j < numArguments; j++) {
           inputValues[j] = valueReaders.get(j).getValue(i);
         }
-        outputValues[i] = functionEvaluator.evaluate(inputValues);
+        Object outputValue = functionEvaluator.evaluate(inputValues);
+        outputValues[i] = outputValue;
+        if (outputValueType == null) {
+          Class<?> outputValueClass = outputValue.getClass();
+          outputValueType = FunctionUtils.getParameterType(outputValueClass);
+          Preconditions.checkState(outputValueType != null, "Unsupported output value class: %s", outputValueClass);
+        }
       }
 
       FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
@@ -514,13 +524,15 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       switch (fieldSpec.getDataType().getStoredType()) {
         case INT: {
           for (int i = 0; i < numDocs; i++) {
+            Object outputValue = outputValues[i];
             if (isSingleValue) {
-              outputValues[i] = ((Number) outputValues[i]).intValue();
+              outputValues[i] = outputValueType.toInt(outputValue);
             } else {
-              Object[] array = (Object[]) outputValues[i];
-              for (int j = 0; j < array.length; j++) {
-                array[j] = ((Number) array[j]).intValue();
+              Integer[] values = outputValueType.toIntegerArray(outputValue);
+              if (values.length == 0) {
+                values = new Integer[]{(Integer) fieldSpec.getDefaultNullValue()};
               }
+              outputValues[i] = values;
             }
           }
           IntColumnPreIndexStatsCollector statsCollector =
@@ -535,13 +547,15 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case LONG: {
           for (int i = 0; i < numDocs; i++) {
+            Object outputValue = outputValues[i];
             if (isSingleValue) {
-              outputValues[i] = ((Number) outputValues[i]).longValue();
+              outputValues[i] = outputValueType.toLong(outputValue);
             } else {
-              Object[] array = (Object[]) outputValues[i];
-              for (int j = 0; j < array.length; j++) {
-                array[j] = ((Number) array[j]).longValue();
+              Long[] values = outputValueType.toLongArray(outputValue);
+              if (values.length == 0) {
+                values = new Long[]{(Long) fieldSpec.getDefaultNullValue()};
               }
+              outputValues[i] = values;
             }
           }
           LongColumnPreIndexStatsCollector statsCollector =
@@ -556,13 +570,15 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case FLOAT: {
           for (int i = 0; i < numDocs; i++) {
+            Object outputValue = outputValues[i];
             if (isSingleValue) {
-              outputValues[i] = ((Number) outputValues[i]).floatValue();
+              outputValues[i] = outputValueType.toFloat(outputValue);
             } else {
-              Object[] array = (Object[]) outputValues[i];
-              for (int j = 0; j < array.length; j++) {
-                array[j] = ((Number) array[j]).floatValue();
+              Float[] values = outputValueType.toFloatArray(outputValue);
+              if (values.length == 0) {
+                values = new Float[]{(Float) fieldSpec.getDefaultNullValue()};
               }
+              outputValues[i] = values;
             }
           }
           FloatColumnPreIndexStatsCollector statsCollector =
@@ -577,14 +593,31 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case DOUBLE: {
           for (int i = 0; i < numDocs; i++) {
+            Object outputValue = outputValues[i];
             if (isSingleValue) {
-              outputValues[i] = ((Number) outputValues[i]).doubleValue();
+              outputValues[i] = outputValueType.toDouble(outputValue);
             } else {
-              Object[] array = (Object[]) outputValues[i];
-              for (int j = 0; j < array.length; j++) {
-                array[j] = ((Number) array[j]).doubleValue();
+              Double[] values = outputValueType.toDoubleArray(outputValue);
+              if (values.length == 0) {
+                values = new Double[]{(Double) fieldSpec.getDefaultNullValue()};
               }
+              outputValues[i] = values;
             }
+          }
+          DoubleColumnPreIndexStatsCollector statsCollector =
+              new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig);
+          for (Object value : outputValues) {
+            statsCollector.collect(value);
+          }
+          statsCollector.seal();
+          indexCreationInfo =
+              new ColumnIndexCreationInfo(statsCollector, true, false, true, fieldSpec.getDefaultNullValue());
+          break;
+        }
+        case BIG_DECIMAL: {
+          for (int i = 0; i < numDocs; i++) {
+            Preconditions.checkState(isSingleValue, "MV BIG_DECIMAL is not supported");
+            outputValues[i] = outputValueType.toBigDecimal(outputValues[i]);
           }
           DoubleColumnPreIndexStatsCollector statsCollector =
               new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig);
@@ -598,13 +631,15 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case STRING: {
           for (int i = 0; i < numDocs; i++) {
+            Object outputValue = outputValues[i];
             if (isSingleValue) {
-              outputValues[i] = outputValues[i].toString();
+              outputValues[i] = outputValueType.toString(outputValue);
             } else {
-              Object[] array = (Object[]) outputValues[i];
-              for (int j = 0; j < array.length; j++) {
-                array[j] = array[j].toString();
+              String[] values = outputValueType.toStringArray(outputValue);
+              if (values.length == 0) {
+                values = new String[]{(String) fieldSpec.getDefaultNullValue()};
               }
+              outputValues[i] = values;
             }
           }
           StringColumnPreIndexStatsCollector statsCollector =
@@ -619,6 +654,18 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           break;
         }
         case BYTES: {
+          for (int i = 0; i < numDocs; i++) {
+            Object outputValue = outputValues[i];
+            if (isSingleValue) {
+              outputValues[i] = outputValueType.toBytes(outputValue);
+            } else {
+              byte[][] values = outputValueType.toBytesArray(outputValue);
+              if (values.length == 0) {
+                values = new byte[][]{(byte[]) fieldSpec.getDefaultNullValue()};
+              }
+              outputValues[i] = values;
+            }
+          }
           BytesColumnPredIndexStatsCollector statsCollector =
               new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {

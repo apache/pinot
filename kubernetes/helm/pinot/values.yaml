@@ -344,8 +344,9 @@ server:
 # Pinot Minion:
 # ------------------------------------------------------------------------------
 minion:
+  enabled: false
   name: minion
-  replicaCount: 1
+  replicaCount: 0
   podManagementPolicy: Parallel
   podSecurityContext: {}
     # fsGroup: 2000
@@ -396,6 +397,75 @@ minion:
 
   updateStrategy:
     type: RollingUpdate
+
+  # Use envFrom to define all of the ConfigMap or Secret data as container environment variables.
+  # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#configure-all-key-value-pairs-in-a-configmap-as-container-environment-variables
+  # ref: https://kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/#configure-all-key-value-pairs-in-a-secret-as-container-environment-variables
+  envFrom: []
+  #  - configMapRef:
+  #      name: special-config
+  #  - secretRef:
+  #      name: test-secret
+
+  # Use extraEnv to add individual key value pairs as container environment variables.
+  # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
+  extraEnv: []
+  #  - name: PINOT_CUSTOM_ENV
+  #    value: custom-value
+
+  # Extra configs will be appended to pinot-minion.conf file
+  extra:
+    configs: |-
+      pinot.set.instance.id.to.hostname=true
+
+
+# ------------------------------------------------------------------------------
+# Pinot Minion Stateless:
+# ------------------------------------------------------------------------------
+minionStateless:
+  enabled: true
+  name: minion-stateless
+  replicaCount: 1
+  podSecurityContext: {}
+    # fsGroup: 2000
+  securityContext: {}
+
+  probes:
+    endpoint: "/health"
+    livenessEnabled: true
+    readinessEnabled: true
+
+  dataDir: /var/pinot/minion/data
+  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
+
+  log4j2ConfFile: /opt/pinot/conf/log4j2.xml
+  pluginsDir: /opt/pinot/plugins
+
+  persistence:
+    enabled: false
+    pvcName: minion-data-vol
+    accessMode: ReadWriteOnce
+    size: 4G
+    mountPath: /var/pinot/minion/data
+    storageClass: ""
+    #storageClass: "ssd"
+    extraVolumes: []
+    extraVolumeMounts: []
+
+  service:
+    port: 9514
+    protocol: TCP
+    name: minion
+
+  resources: {}
+
+  nodeSelector: {}
+
+  affinity: {}
+
+  tolerations: []
+
+  podAnnotations: {}
 
   # Use envFrom to define all of the ConfigMap or Secret data as container environment variables.
   # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#configure-all-key-value-pairs-in-a-configmap-as-container-environment-variables

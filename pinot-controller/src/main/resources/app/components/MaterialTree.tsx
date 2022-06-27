@@ -88,7 +88,7 @@ const CustomTreeItem = ({ itemObj, showChildEvent }: CustomTreeProps) => {
       nodeId={itemObj.nodeId}
       label={itemObj.label}
       endIcon={itemObj.isLeafNode ? <DescriptionOutlinedIcon /> : <AddCircleOutlineOutlinedIcon />}
-      onIconClick={(e)=> {
+      onClick={(e)=> {
         showChildEvent(itemObj);
       }}
     >

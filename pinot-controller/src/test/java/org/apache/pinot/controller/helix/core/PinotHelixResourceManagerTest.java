@@ -915,7 +915,9 @@ public class PinotHelixResourceManagerTest {
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId3).getState(), LineageEntryState.IN_PROGRESS);
 
     // Check that the segments from the older lineage gets deleted
-    waitForSegmentsToDelete(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, 3, TIMEOUT_IN_MS);
+    Collections.disjoint(
+        TEST_INSTANCE.getHelixResourceManager().getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false),
+        Arrays.asList("s6", "s7", "s8"));
     Assert.assertEquals(TEST_INSTANCE.getHelixResourceManager()
         .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false).size(), 3);
     Assert.assertEquals(new HashSet<>(TEST_INSTANCE.getHelixResourceManager()
@@ -973,7 +975,9 @@ public class PinotHelixResourceManagerTest {
     segmentsTo = Arrays.asList("s12", "s13", "s14");
     String lineageEntryId4 = TEST_INSTANCE.getHelixResourceManager()
         .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, segmentsFrom, segmentsTo, true);
-    waitForSegmentsToDelete(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, 3, TIMEOUT_IN_MS);
+    Collections.disjoint(
+        TEST_INSTANCE.getHelixResourceManager().getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false),
+        Arrays.asList("s9", "s10", "s11"));
     Assert.assertEquals(new HashSet<>(TEST_INSTANCE.getHelixResourceManager()
             .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false)),
         new HashSet<>(Arrays.asList("s3", "s4", "s5")));

@@ -42,18 +42,12 @@ import org.slf4j.LoggerFactory;
  * The instance replica-group/partition selector is responsible for selecting the instances for each replica-group and
  * partition.
  */
-public class InstanceReplicaGroupPartitionSelector {
+public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceReplicaGroupPartitionSelector.class);
-
-  private final InstanceReplicaGroupPartitionConfig _replicaGroupPartitionConfig;
-  private final String _tableNameWithType;
-  private final InstancePartitions _existingInstancePartitions;
 
   public InstanceReplicaGroupPartitionSelector(InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig,
       String tableNameWithType, @Nullable InstancePartitions existingInstancePartitions) {
-    _replicaGroupPartitionConfig = replicaGroupPartitionConfig;
-    _tableNameWithType = tableNameWithType;
-    _existingInstancePartitions = existingInstancePartitions;
+    super(replicaGroupPartitionConfig, tableNameWithType, existingInstancePartitions);
   }
 
   /**

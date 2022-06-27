@@ -1,0 +1,170 @@
+{
+  "schema":{
+    "schemaName": "tableSchema",
+    "dimensionFieldSpecs": [
+      {
+        "name": "a",
+        "dataType": "INT",
+        "cardinality":20,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "b",
+        "dataType": "DOUBLE",
+        "cardinality":6,
+        "singleValueField": false,
+        "numValuesPerEntry":1.5
+      },
+      {
+        "name": "c",
+        "dataType": "FLOAT",
+        "cardinality":7,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "d",
+        "dataType": "STRING",
+        "cardinality":41,
+        "singleValueField": false,
+        "numValuesPerEntry":2,
+        "averageLength" : 27
+      },
+      {
+        "name": "e",
+        "dataType": "LONG",
+        "cardinality":18,
+        "singleValueField": false,
+        "numValuesPerEntry":4
+      },
+      {
+        "name": "f",
+        "dataType": "DOUBLE",
+        "cardinality":13,
+        "singleValueField": false,
+        "numValuesPerEntry":3
+      },
+      {
+        "name": "g",
+        "dataType": "STRING",
+        "cardinality":6,
+        "singleValueField": false,
+        "numValuesPerEntry":2,
+        "averageLength" : 100
+      },
+      {
+        "name": "h",
+        "dataType": "BYTES",
+        "cardinality":12,
+        "numValuesPerEntry":1,
+        "averageLength" : 10
+      },
+      {
+        "name": "i",
+        "dataType": "STRING",
+        "singleValueField": false,
+        "cardinality":7,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      },
+      {
+        "name": "j",
+        "dataType": "DOUBLE",
+        "cardinality":4,
+        "numValuesPerEntry":1.00000001
+      },
+      {
+        "name": "ja",
+        "dataType": "BOOLEAN"
+      },
+      {
+        "name": "jb",
+        "dataType": "BOOLEAN",
+        "numValuesPerEntry": 3
+      }
+    ],
+    "metricFieldSpecs": [
+      {
+        "name": "k",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 100
+      },
+      {
+        "name": "l",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 10
+      },
+      {
+        "name": "m",
+        "dataType": "BYTES",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      },
+      {
+        "name": "n",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      },
+      {
+        "name": "o",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1,
+        "averageLength" : 25
+      },
+      {
+        "name": "p",
+        "dataType": "DOUBLE",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    ],
+    "timeFieldSpec": {
+      "incomingGranularitySpec": {
+        "dataType": "INT",
+        "name": "t",
+        "timeType": "DAYS",
+        "cardinality":10000,
+        "numValuesPerEntry":1
+      }
+    }
+  },
+  "queriesWithWeights":{
+    "select i from tableName where a = xyz and t > 500": 1,
+    "select i from tableName where a = 43 and t > 500": 1,
+    "select i from tableName where a = 'xyz' and t > 500": 1,
+    "select i from tableName where a = b and t > 500": 1
+  },
+  "qps": 15000,
+  "numMessagesPerSecInKafkaTopic":1000,
+  "numRecordsPerPush":1000000000,
+  "tableType": "HYBRID",
+  "latencySLA": 500,
+
+  "rulesToExecute": {
+    "recommendInvertedSortedIndexJoint": true
+  },
+  "partitionRuleParams": {
+    "THRESHOLD_MAX_LATENCY_SLA_PARTITION": 1001
+  },
+  "bloomFilterRuleParams": {
+    "THRESHOLD_MIN_PERCENT_EQ_BLOOMFILTER" : 0.51
+  },
+  "invertedSortedIndexJointRuleParams": {
+    "THRESHOLD_RATIO_MIN_GAIN_DIFF_BETWEEN_ITERATION" : 0.06
+  },
+  "noDictionaryOnHeapDictionaryJointRuleParams": {
+    "THRESHOLD_MIN_PERCENT_DICTIONARY_STORAGE_SAVE" : 0.96
+  },
+  "overWrittenConfigs": {
+    "indexConfig": {
+      "invertedIndexColumns": ["a","b"],
+      "rangeIndexColumns": ["f"]
+    }
+  }
+}

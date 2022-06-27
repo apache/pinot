@@ -113,8 +113,8 @@ public class TestQuickStartCommand {
         TimestampIndexQuickstart.class);
   }
 
-  private Class<? extends QuickStartBase> quickStartClassFor(String offline)
+  private Class<? extends QuickStartBase> quickStartClassFor(String type)
       throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
-    return QuickStartCommand.selectQuickStart(offline).getClass();
+    return new QuickStartCommand().selectQuickStart(type).getClass();
   }
 }

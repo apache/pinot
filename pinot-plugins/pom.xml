@@ -146,10 +146,6 @@
                       <pattern>org.apache.commons</pattern>
                       <shadedPattern>${shade.prefix}.org.apache.commons</shadedPattern>
                     </relocation>
-                    <relocation>
-                      <pattern>org.apache.avro</pattern>
-                      <shadedPattern>${shade.prefix}.org.apache.avro</shadedPattern>
-                    </relocation>
                   </relocations>
                 </configuration>
               </execution>
