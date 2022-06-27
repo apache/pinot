@@ -159,7 +159,7 @@ public class MissingConsumingSegmentFinderTest {
   public void noMissingConsumingSegmentsScenario4() {
     // scenario 4: no missing segments, but connecting to stream throws exception
     // two partitions have reached end of life
-    // since there's no way to detect if the partitions have reached end of life,  those partitions are reported as
+    // since there's no way to detect if the partitions have reached end of life, those partitions are reported as
     // missing consuming segments
 
     Map<String, Map<String, String>> idealStateMap = new HashMap<>();
@@ -188,9 +188,9 @@ public class MissingConsumingSegmentFinderTest {
     // setup segment metadata fetcher
     MissingConsumingSegmentFinder.SegmentMetadataFetcher metadataFetcher =
         mock(MissingConsumingSegmentFinder.SegmentMetadataFetcher.class);
-    when(metadataFetcher.fetchSegmentCreationTime("tableA", "tableA__1__1__20220601T1200Z"))
+    when(metadataFetcher.fetchSegmentCompletionTime("tableA", "tableA__1__1__20220601T1200Z"))
         .thenReturn(Instant.parse("2022-06-01T15:00:00.00Z").toEpochMilli());
-    when(metadataFetcher.fetchSegmentCreationTime("tableA", "tableA__4__0__20220601T0900Z"))
+    when(metadataFetcher.fetchSegmentCompletionTime("tableA", "tableA__4__0__20220601T0900Z"))
         .thenReturn(Instant.parse("2022-06-01T12:00:00.00Z").toEpochMilli());
 
     Instant now = Instant.parse("2022-06-01T18:00:00.00Z");
@@ -290,9 +290,9 @@ public class MissingConsumingSegmentFinderTest {
     // setup segment metadata fetcher
     MissingConsumingSegmentFinder.SegmentMetadataFetcher metadataFetcher =
         mock(MissingConsumingSegmentFinder.SegmentMetadataFetcher.class);
-    when(metadataFetcher.fetchSegmentCreationTime("tableA", "tableA__1__1__20220601T1200Z"))
+    when(metadataFetcher.fetchSegmentCompletionTime("tableA", "tableA__1__1__20220601T1200Z"))
         .thenReturn(Instant.parse("2022-06-01T15:00:00.00Z").toEpochMilli());
-    when(metadataFetcher.fetchSegmentCreationTime("tableA", "tableA__4__0__20220601T0900Z"))
+    when(metadataFetcher.fetchSegmentCompletionTime("tableA", "tableA__4__0__20220601T0900Z"))
         .thenReturn(Instant.parse("2022-06-01T12:00:00.00Z").toEpochMilli());
 
     Instant now = Instant.parse("2022-06-01T18:00:00.00Z");

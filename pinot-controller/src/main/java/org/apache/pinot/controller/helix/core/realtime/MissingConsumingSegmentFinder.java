@@ -42,6 +42,7 @@ import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,7 +137,8 @@ public class MissingConsumingSegmentFinder {
             missingSegmentInfo._newPartitionGroupCount++;
             missingSegmentInfo._totalCount++;
           } else {
-            // completed segment is available, but there's no consuming segment
+            // Completed segment is available, but there's no consuming segment.
+            // Note that there is no problem in case the partition group has reached its end of life.
             SegmentZKMetadata segmentZKMetadata = _segmentMetadataFetcher
                 .fetchSegmentZkMetadata(_realtimeTableName, latestCompletedSegment.getSegmentName());
             StreamPartitionMsgOffset completedSegmentEndOffset =
@@ -154,7 +156,7 @@ public class MissingConsumingSegmentFinder {
         if (!partitionGroupIdToLatestConsumingSegmentMap.containsKey(partitionGroupId)) {
           missingSegmentInfo._totalCount++;
           long segmentCompletionTimeMillis = _segmentMetadataFetcher
-              .fetchSegmentCreationTime(_realtimeTableName, latestCompletedSegment.getSegmentName());
+              .fetchSegmentCompletionTime(_realtimeTableName, latestCompletedSegment.getSegmentName());
           updateMaxDurationInfo(missingSegmentInfo, partitionGroupId, segmentCompletionTimeMillis, now);
         }
       });
@@ -201,9 +203,19 @@ public class MissingConsumingSegmentFinder {
     }
 
     public SegmentZKMetadata fetchSegmentZkMetadata(String tableName, String segmentName) {
+      return fetchSegmentZkMetadata(tableName, segmentName, null);
+    }
+
+    public long fetchSegmentCompletionTime(String tableName, String segmentName) {
+      Stat stat = new Stat();
+      fetchSegmentZkMetadata(tableName, segmentName, stat);
+      return stat.getMtime();
+    }
+
+    private SegmentZKMetadata fetchSegmentZkMetadata(String tableName, String segmentName, Stat stat) {
       try {
         ZNRecord znRecord = _propertyStore
-            .get(ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segmentName), null,
+            .get(ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segmentName), stat,
                 AccessOption.PERSISTENT);
         Preconditions.checkState(znRecord != null, "Failed to find segment ZK metadata for segment: %s of table: %s",
             segmentName, tableName);
@@ -212,10 +224,6 @@ public class MissingConsumingSegmentFinder {
         _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.LLC_ZOOKEEPER_FETCH_FAILURES, 1L);
         throw e;
       }
-    }
-
-    public long fetchSegmentCreationTime(String tableName, String segmentName) {
-      return fetchSegmentZkMetadata(tableName, segmentName).getCreationTime();
     }
   }
 }

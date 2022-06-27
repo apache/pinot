@@ -306,7 +306,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           nReplicasIdealMax);
     }
 
-    if (tableType == TableType.REALTIME) {
+    if (tableType == TableType.REALTIME && tableConfig != null) {
       PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
           IngestionConfigUtils.getStreamConfigMap(tableConfig));
       new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics, streamConfig)
