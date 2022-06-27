@@ -192,14 +192,12 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
 
       // Process the segment
       Operator operator = minMaxValueContext._operator;
-      IntermediateResultsBlock resultsBlock = null;
+      IntermediateResultsBlock resultsBlock;
       try {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         resultsBlock = (IntermediateResultsBlock) operator.nextBlock();
-      } catch (Exception ex) {
-        System.out.println(ex.getMessage());
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();

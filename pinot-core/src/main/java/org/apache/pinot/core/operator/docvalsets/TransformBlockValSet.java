@@ -52,8 +52,7 @@ public class TransformBlockValSet implements BlockValSet {
       ExpressionContext expression) {
     _projectionBlock = projectionBlock;
     _transformFunction = transformFunction;
-    // TODO(nhejazi): handle null handling code behind a config (nullHanldingEnabledInSelect).
-    RoaringBitmap nullBitmap = new RoaringBitmap();
+    RoaringBitmap nullBitmap = null;
     if (expression.getType() == ExpressionContext.Type.FUNCTION) {
       Set<String> columns = new HashSet<>();
       expression.getFunction().getColumns(columns);
@@ -61,6 +60,9 @@ public class TransformBlockValSet implements BlockValSet {
         BlockValSet blockValSet = _projectionBlock.getBlockValueSet(column);
         RoaringBitmap columnNullBitmap = blockValSet.getNullBitmap();
         if (columnNullBitmap != null) {
+          if (nullBitmap == null) {
+            nullBitmap = columnNullBitmap.clone();
+          }
           nullBitmap.or(columnNullBitmap);
         }
       }

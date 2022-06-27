@@ -109,10 +109,8 @@ public class IntermediateResultsBlock implements Block {
    */
   public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> aggregationResult,
       DataSchema dataSchema, boolean isNullHandlingEnabled) {
-    _aggregationFunctions = aggregationFunctions;
-    _aggregationResult = aggregationResult;
+    this(aggregationFunctions, aggregationResult, isNullHandlingEnabled);
     _dataSchema = dataSchema;
-    _isNullHandlingEnabled = isNullHandlingEnabled;
   }
 
   /**
@@ -141,9 +139,7 @@ public class IntermediateResultsBlock implements Block {
 
   public IntermediateResultsBlock(Table table, boolean isNullHandlingEnabled) {
     _table = table;
-    if (_table != null) {
-      _dataSchema = table.getDataSchema();
-    }
+    _dataSchema = table.getDataSchema();
     _isNullHandlingEnabled = isNullHandlingEnabled;
   }
 
