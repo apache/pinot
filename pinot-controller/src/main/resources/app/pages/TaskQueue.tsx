@@ -68,7 +68,7 @@ const TaskQueue = (props) => {
     const tablesResponse:any = await PinotMethodUtils.getTable();
     setTaskInfo(taskInfoRes);
     setTables((prevState): TableData => {
-      return { ...prevState, records: get(tablesResponse, 'tables', []).map(table => [table]) };
+      return { ...prevState, records: get(tablesResponse, 'tables', []).map(table => [`${table}_OFFLINE`]) };
     });
     setFetching(false);
   };

@@ -111,6 +111,9 @@ const TaskDetail = (props) => {
           <Grid item xs={12}>
             <strong>Finish Time:</strong> {get(taskDebugData, 'finishTime', '')}
           </Grid>
+          <Grid item xs={12}>
+            <strong>Minion Host Name:</strong> {get(taskDebugData, 'participant', '')}
+          </Grid>
         </Grid>
       </div>
       <Grid container spacing={2}>

@@ -75,7 +75,7 @@ const TaskDetail = (props) => {
 
   const [fetching, setFetching] = useState(true);
   const [taskDebugData, setTaskDebugData] = useState({});
-  const [subtaskTableData, setSubtaskTableData] = useState({ columns: ['Task ID', 'Status', 'Start Time', 'Finish Time'], records: [] });
+  const [subtaskTableData, setSubtaskTableData] = useState({ columns: ['Task ID', 'Status', 'Start Time', 'Finish Time', 'Minion Host Name'], records: [] });
 
   const fetchData = async () => {
     setFetching(true);
@@ -87,6 +87,7 @@ const TaskDetail = (props) => {
         get(subTask, 'state'),
         get(subTask, 'startTime'),
         get(subTask, 'finishTime'),
+        get(subTask, 'participant'),
       ])
     });
     setSubtaskTableData(prevState => {
