@@ -31,8 +31,9 @@ import org.roaringbitmap.RoaringBitmap;
  */
 public class RawFloatSingleColumnDistinctOnlyExecutor extends BaseRawFloatSingleColumnDistinctExecutor {
 
-  public RawFloatSingleColumnDistinctOnlyExecutor(ExpressionContext expression, DataType dataType, int limit) {
-    super(expression, dataType, limit);
+  public RawFloatSingleColumnDistinctOnlyExecutor(ExpressionContext expression, DataType dataType, int limit,
+      boolean isNullHandlingEnabled) {
+    super(expression, dataType, limit, isNullHandlingEnabled);
   }
 
   @Override

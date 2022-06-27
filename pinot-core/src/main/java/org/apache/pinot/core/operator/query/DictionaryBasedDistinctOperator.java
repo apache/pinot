@@ -46,6 +46,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
   private final DistinctAggregationFunction _distinctAggregationFunction;
   private final Dictionary _dictionary;
   private final int _numTotalDocs;
+  private final boolean _isNullHandlingEnabled;
   private final FieldSpec.DataType _dataType;
 
   private boolean _hasOrderBy;
@@ -53,12 +54,14 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
   private int _numDocsScanned;
 
   public DictionaryBasedDistinctOperator(FieldSpec.DataType dataType,
-      DistinctAggregationFunction distinctAggregationFunction, Dictionary dictionary, int numTotalDocs) {
+      DistinctAggregationFunction distinctAggregationFunction, Dictionary dictionary, int numTotalDocs,
+      boolean isNullHandlingEnabled) {
 
     _dataType = dataType;
     _distinctAggregationFunction = distinctAggregationFunction;
     _dictionary = dictionary;
     _numTotalDocs = numTotalDocs;
+    _isNullHandlingEnabled = isNullHandlingEnabled;
 
     List<OrderByExpressionContext> orderByExpressionContexts = _distinctAggregationFunction.getOrderByExpressions();
 
@@ -121,8 +124,8 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
         }
       } else {
         // DictionaryBasedDistinctOperator cannot handle nulls.
-        DistinctTable distinctTable =
-            new DistinctTable(dataSchema, _distinctAggregationFunction.getOrderByExpressions(), limit);
+        DistinctTable distinctTable = new DistinctTable(
+            dataSchema, _distinctAggregationFunction.getOrderByExpressions(), limit, _isNullHandlingEnabled);
 
         _numDocsScanned = dictLength;
         for (int i = 0; i < dictLength; i++) {
@@ -133,7 +136,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
       }
     }
 
-    return new DistinctTable(dataSchema, records);
+    return new DistinctTable(dataSchema, records, _isNullHandlingEnabled);
   }
 
   @Override

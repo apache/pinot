@@ -21,7 +21,6 @@ package org.apache.pinot.core.common;
 import java.math.BigDecimal;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.roaringbitmap.RoaringBitmap;
 
 
 public class RowBasedBlockValueFetcher {
@@ -44,15 +43,6 @@ public class RowBasedBlockValueFetcher {
     return row;
   }
 
-  public RoaringBitmap getColumnNullBitmap(int colId) {
-    // TODO: If null handling is enabled, we can directly set null in getRow() instead of relying on the caller to fill
-    //  the null values
-    if (SingleValueFetcher.class.isAssignableFrom(_valueFetchers[colId].getClass())) {
-      return ((SingleValueFetcher) _valueFetchers[colId]).getNullBitmap();
-    }
-    return null;
-  }
-
   public void getRow(int docId, Object[] buffer, int startIndex) {
     for (ValueFetcher valueFetcher : _valueFetchers) {
       buffer[startIndex++] = valueFetcher.getValue(docId);
@@ -64,19 +54,19 @@ public class RowBasedBlockValueFetcher {
     if (blockValSet.isSingleValue()) {
       switch (storedType) {
         case INT:
-          return new IntSingleValueFetcher(blockValSet.getIntValuesSV(), blockValSet.getNullBitmap());
+          return new IntSingleValueFetcher(blockValSet.getIntValuesSV());
         case LONG:
-          return new LongSingleValueFetcher(blockValSet.getLongValuesSV(), blockValSet.getNullBitmap());
+          return new LongSingleValueFetcher(blockValSet.getLongValuesSV());
         case FLOAT:
-          return new FloatSingleValueFetcher(blockValSet.getFloatValuesSV(), blockValSet.getNullBitmap());
+          return new FloatSingleValueFetcher(blockValSet.getFloatValuesSV());
         case DOUBLE:
-          return new DoubleSingleValueFetcher(blockValSet.getDoubleValuesSV(), blockValSet.getNullBitmap());
+          return new DoubleSingleValueFetcher(blockValSet.getDoubleValuesSV());
         case BIG_DECIMAL:
-          return new BigDecimalValueFetcher(blockValSet.getBigDecimalValuesSV(), blockValSet.getNullBitmap());
+          return new BigDecimalValueFetcher(blockValSet.getBigDecimalValuesSV());
         case STRING:
-          return new StringSingleValueFetcher(blockValSet.getStringValuesSV(), blockValSet.getNullBitmap());
+          return new StringSingleValueFetcher(blockValSet.getStringValuesSV());
         case BYTES:
-          return new BytesValueFetcher(blockValSet.getBytesValuesSV(), blockValSet.getNullBitmap());
+          return new BytesValueFetcher(blockValSet.getBytesValuesSV());
         default:
           throw new IllegalStateException("Unsupported value type: " + storedType + " for single-value column");
       }
@@ -102,147 +92,87 @@ public class RowBasedBlockValueFetcher {
     Object getValue(int docId);
   }
 
-  private static abstract class SingleValueFetcher implements ValueFetcher {
-    private final RoaringBitmap _nullBitmap;
-
-    public SingleValueFetcher(RoaringBitmap nullBitmap) {
-      _nullBitmap = nullBitmap;
-    }
-
-    public boolean isNull(int docId) {
-      return _nullBitmap.contains(docId);
-    }
-
-    public RoaringBitmap getNullBitmap() {
-      return _nullBitmap;
-    }
-
-    abstract public int getRowCount();
-  }
-
-  private static class IntSingleValueFetcher extends SingleValueFetcher {
+  private static class IntSingleValueFetcher implements ValueFetcher {
     private final int[] _values;
 
-    IntSingleValueFetcher(int[] values, RoaringBitmap nullBitmap) {
-      super(nullBitmap);
+    IntSingleValueFetcher(int[] values) {
       _values = values;
     }
 
     public Integer getValue(int docId) {
       return _values[docId];
     }
-
-    @Override
-    public int getRowCount() {
-      return _values.length;
-    }
   }
 
-  private static class LongSingleValueFetcher extends SingleValueFetcher {
+  private static class LongSingleValueFetcher implements ValueFetcher {
     private final long[] _values;
 
-    LongSingleValueFetcher(long[] values, RoaringBitmap nullBitmap) {
-      super(nullBitmap);
+    LongSingleValueFetcher(long[] values) {
       _values = values;
     }
 
     public Long getValue(int docId) {
       return _values[docId];
     }
-
-    @Override
-    public int getRowCount() {
-      return _values.length;
-    }
   }
 
-  private static class FloatSingleValueFetcher extends SingleValueFetcher {
+  private static class FloatSingleValueFetcher implements ValueFetcher {
     private final float[] _values;
 
-    FloatSingleValueFetcher(float[] values, RoaringBitmap nullBitmap) {
-      super(nullBitmap);
+    FloatSingleValueFetcher(float[] values) {
       _values = values;
     }
 
     public Float getValue(int docId) {
       return _values[docId];
     }
-
-    @Override
-    public int getRowCount() {
-      return _values.length;
-    }
   }
 
-  private static class DoubleSingleValueFetcher extends SingleValueFetcher {
+  private static class DoubleSingleValueFetcher implements ValueFetcher {
     private final double[] _values;
 
-    DoubleSingleValueFetcher(double[] values, RoaringBitmap nullBitmap) {
-      super(nullBitmap);
+    DoubleSingleValueFetcher(double[] values) {
       _values = values;
     }
 
     public Double getValue(int docId) {
       return _values[docId];
     }
-
-    @Override
-    public int getRowCount() {
-      return _values.length;
-    }
   }
 
-  private static class BigDecimalValueFetcher extends SingleValueFetcher {
+  private static class BigDecimalValueFetcher implements ValueFetcher {
     private final BigDecimal[] _values;
 
-    BigDecimalValueFetcher(BigDecimal[] values, RoaringBitmap nullBitmap) {
-      super(nullBitmap);
+    BigDecimalValueFetcher(BigDecimal[] values) {
       _values = values;
     }
 
     public BigDecimal getValue(int docId) {
       return _values[docId];
     }
-
-    @Override
-    public int getRowCount() {
-      return _values.length;
-    }
   }
 
-  private static class StringSingleValueFetcher extends SingleValueFetcher {
+  private static class StringSingleValueFetcher implements ValueFetcher {
     private final String[] _values;
 
-    StringSingleValueFetcher(String[] values, RoaringBitmap nullBitmap) {
-      super(nullBitmap);
+    StringSingleValueFetcher(String[] values) {
       _values = values;
     }
 
     public String getValue(int docId) {
       return _values[docId];
     }
-
-    @Override
-    public int getRowCount() {
-      return _values.length;
-    }
   }
 
-  private static class BytesValueFetcher extends SingleValueFetcher {
+  private static class BytesValueFetcher implements ValueFetcher {
     private final byte[][] _values;
 
-    BytesValueFetcher(byte[][] values, RoaringBitmap nullBitmap) {
-      super(nullBitmap);
+    BytesValueFetcher(byte[][] values) {
       _values = values;
     }
 
     public ByteArray getValue(int docId) {
       return new ByteArray(_values[docId]);
-    }
-
-    @Override
-    public int getRowCount() {
-      return _values.length;
     }
   }
 

@@ -41,15 +41,17 @@ abstract class BaseDictionaryBasedSingleColumnDistinctExecutor implements Distin
   final Dictionary _dictionary;
   final DataType _dataType;
   final int _limit;
+  final boolean _isNullHandlingEnabled;
 
   final IntSet _dictIdSet;
 
   BaseDictionaryBasedSingleColumnDistinctExecutor(ExpressionContext expression, Dictionary dictionary,
-      DataType dataType, int limit) {
+      DataType dataType, int limit, boolean isNullHandlingEnabled) {
     _expression = expression;
     _dictionary = dictionary;
     _dataType = dataType;
     _limit = limit;
+    _isNullHandlingEnabled = isNullHandlingEnabled;
 
     _dictIdSet = new IntOpenHashSet(Math.min(limit, MAX_INITIAL_CAPACITY));
   }
@@ -63,6 +65,6 @@ abstract class BaseDictionaryBasedSingleColumnDistinctExecutor implements Distin
     while (dictIdIterator.hasNext()) {
       records.add(new Record(new Object[]{_dictionary.getInternal(dictIdIterator.nextInt())}));
     }
-    return new DistinctTable(dataSchema, records);
+    return new DistinctTable(dataSchema, records, _isNullHandlingEnabled);
   }
 }

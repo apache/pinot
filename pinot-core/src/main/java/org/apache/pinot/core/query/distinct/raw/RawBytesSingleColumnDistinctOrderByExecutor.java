@@ -37,8 +37,8 @@ public class RawBytesSingleColumnDistinctOrderByExecutor extends BaseRawBytesSin
   private final PriorityQueue<ByteArray> _priorityQueue;
 
   public RawBytesSingleColumnDistinctOrderByExecutor(ExpressionContext expression, DataType dataType,
-      OrderByExpressionContext orderByExpression, int limit) {
-    super(expression, dataType, limit);
+      OrderByExpressionContext orderByExpression, int limit, boolean isNullHandlingEnabled) {
+    super(expression, dataType, limit, isNullHandlingEnabled);
 
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;

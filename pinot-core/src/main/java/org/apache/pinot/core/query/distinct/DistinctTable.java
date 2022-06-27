@@ -39,7 +39,6 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -68,16 +67,19 @@ public class DistinctTable {
 
   // Available in main DistinctTable only
   private final int _limit;
+  private final boolean _isNullHandlingEnabled;
   private final ObjectSet<Record> _recordSet;
   private final PriorityQueue<Record> _priorityQueue;
 
   /**
    * Constructor of the main DistinctTable which can be used to add records and merge other DistinctTables.
    */
-  public DistinctTable(DataSchema dataSchema, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit) {
+  public DistinctTable(DataSchema dataSchema, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
+      boolean isNullHandlingEnabled) {
     _dataSchema = dataSchema;
     _isMainTable = true;
     _limit = limit;
+    _isNullHandlingEnabled = isNullHandlingEnabled;
 
     // NOTE: When LIMIT is smaller than or equal to the MAX_INITIAL_CAPACITY, no resize is required.
     int initialCapacity = Math.min(limit, DistinctExecutor.MAX_INITIAL_CAPACITY);
@@ -94,7 +96,7 @@ public class DistinctTable {
         orderByExpressionIndices[i] = columnNames.indexOf(orderByExpression.getExpression().toString());
         comparisonFactors[i] = orderByExpression.isAsc() ? -1 : 1;
       }
-      // TODO(nhejazi): return a diff. priorityQueue when null handling is not needed.
+
       _priorityQueue = new ObjectHeapPriorityQueue<>(initialCapacity, (r1, r2) -> {
         Object[] values1 = r1.getValues();
         Object[] values2 = r2.getValues();
@@ -102,13 +104,15 @@ public class DistinctTable {
           int index = orderByExpressionIndices[i];
           Comparable value1 = (Comparable) values1[index];
           Comparable value2 = (Comparable) values2[index];
-          if (value1 == null) {
-            if (value2 == null) {
-              continue;
+          if (_isNullHandlingEnabled) {
+            if (value1 == null) {
+              if (value2 == null) {
+                continue;
+              }
+              return comparisonFactors[i];
+            } else if (value2 == null) {
+              return -comparisonFactors[i];
             }
-            return comparisonFactors[i];
-          } else if (value2 == null) {
-            return -comparisonFactors[i];
           }
           int result = value1.compareTo(value2) * comparisonFactors[i];
           if (result != 0) {
@@ -125,13 +129,21 @@ public class DistinctTable {
   /**
    * Constructor of the wrapper DistinctTable which can only be merged into the main DistinctTable.
    */
-  public DistinctTable(DataSchema dataSchema, Collection<Record> records) {
+  public DistinctTable(DataSchema dataSchema, Collection<Record> records, boolean isNullHandlingEnabled) {
     _dataSchema = dataSchema;
     _records = records;
+    _isNullHandlingEnabled = isNullHandlingEnabled;
     _isMainTable = false;
     _limit = Integer.MIN_VALUE;
     _recordSet = null;
     _priorityQueue = null;
+  }
+
+  /**
+   * Constructor of the wrapper DistinctTable which can only be merged into the main DistinctTable.
+   */
+  public DistinctTable(DataSchema dataSchema, Collection<Record> records) {
+    this(dataSchema, records, false);
   }
 
   /**
@@ -254,15 +266,13 @@ public class DistinctTable {
         _dataSchema);
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
-    // TODO(nhejazi): revisit to set based on isNullHandlingEnabled indexing config.
-    boolean isNullHandlingEnabled = DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4;
     RoaringBitmap[] nullBitmaps = null;
-    if (isNullHandlingEnabled) {
+    if (_isNullHandlingEnabled) {
       nullBitmaps = new RoaringBitmap[numColumns];
       Object[] colDefaultNullValues = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
-        colDefaultNullValues[colId] = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC,
-            storedColumnDataTypes[colId].toDataType(), null);
+        String specialVal = "30";
+        colDefaultNullValues[colId] = storedColumnDataTypes[colId].toDataType().convert(specialVal);
         nullBitmaps[colId] = new RoaringBitmap();
       }
 
@@ -312,7 +322,7 @@ public class DistinctTable {
       }
       dataTableBuilder.finishRow();
     }
-    if (isNullHandlingEnabled) {
+    if (_isNullHandlingEnabled) {
       for (int colId = 0; colId < numColumns; colId++) {
         dataTableBuilder.setNullRowIds(nullBitmaps[colId]);
       }

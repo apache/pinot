@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.query;
 
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -30,6 +29,7 @@ import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 
 
@@ -44,15 +44,17 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   private final TransformOperator _transformOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
+  private final QueryContext _queryContext;
 
   private int _numDocsScanned = 0;
 
   public AggregationOperator(AggregationFunction[] aggregationFunctions, TransformOperator transformOperator,
-      long numTotalDocs, boolean useStarTree) {
+      long numTotalDocs, boolean useStarTree, QueryContext queryContext) {
     _aggregationFunctions = aggregationFunctions;
     _transformOperator = transformOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
+    _queryContext = queryContext;
   }
 
   @Override
@@ -65,19 +67,14 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
       aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctions);
     }
     TransformBlock transformBlock;
-    boolean isNullHandlingEnabled = false;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       _numDocsScanned += transformBlock.getNumDocs();
       aggregationExecutor.aggregate(transformBlock);
-      for (AggregationFunction func : _aggregationFunctions) {
-        for (ExpressionContext expressionContext : (List<ExpressionContext>) func.getInputExpressions()) {
-          isNullHandlingEnabled |= transformBlock.getBlockValueSet(expressionContext).getNullBitmap() != null;
-        }
-      }
     }
 
     // Build intermediate result block based on aggregation result from the executor
-    return new IntermediateResultsBlock(_aggregationFunctions, aggregationExecutor.getResult(), isNullHandlingEnabled);
+    return new IntermediateResultsBlock(_aggregationFunctions, aggregationExecutor.getResult(),
+        _queryContext.isNullHandlingEnabled());
   }
 
   @Override

@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.query;
 
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -32,6 +31,7 @@ import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunct
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctExecutorFactory;
 import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
@@ -45,26 +45,25 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
   private final DistinctAggregationFunction _distinctAggregationFunction;
   private final TransformOperator _transformOperator;
   private final DistinctExecutor _distinctExecutor;
+  private final QueryContext _queryContext;
 
   private int _numDocsScanned = 0;
 
   public DistinctOperator(IndexSegment indexSegment, DistinctAggregationFunction distinctAggregationFunction,
-      TransformOperator transformOperator) {
+      TransformOperator transformOperator, QueryContext queryContext) {
     _indexSegment = indexSegment;
     _distinctAggregationFunction = distinctAggregationFunction;
     _transformOperator = transformOperator;
-    _distinctExecutor = DistinctExecutorFactory.getDistinctExecutor(distinctAggregationFunction, transformOperator);
+    _queryContext = queryContext;
+    _distinctExecutor = DistinctExecutorFactory.getDistinctExecutor(
+        distinctAggregationFunction, transformOperator, _queryContext.isNullHandlingEnabled());
   }
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
     TransformBlock transformBlock;
-    boolean isNullHandlingEnabled = false;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       _numDocsScanned += transformBlock.getNumDocs();
-      for (ExpressionContext expressionContext : _distinctAggregationFunction.getInputExpressions()) {
-        isNullHandlingEnabled |= transformBlock.getBlockValueSet(expressionContext).getNullBitmap() != null;
-      }
       if (_distinctExecutor.process(transformBlock)) {
         break;
       }
@@ -72,7 +71,7 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
     DistinctTable distinctTable = _distinctExecutor.getResult();
     // TODO: Use a separate way to represent DISTINCT instead of aggregation.
     return new IntermediateResultsBlock(new AggregationFunction[]{_distinctAggregationFunction},
-        Collections.singletonList(distinctTable), distinctTable.getDataSchema(), isNullHandlingEnabled);
+        Collections.singletonList(distinctTable), distinctTable.getDataSchema(), _queryContext.isNullHandlingEnabled());
   }
 
   @Override

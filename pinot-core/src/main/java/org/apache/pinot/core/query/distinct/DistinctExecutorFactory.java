@@ -60,19 +60,20 @@ public class DistinctExecutorFactory {
    * Returns the {@link DistinctExecutor} for the given distinct query.
    */
   public static DistinctExecutor getDistinctExecutor(DistinctAggregationFunction distinctAggregationFunction,
-      TransformOperator transformOperator) {
+      TransformOperator transformOperator, boolean isNullHandlingEnabled) {
     List<ExpressionContext> expressions = distinctAggregationFunction.getInputExpressions();
     List<OrderByExpressionContext> orderByExpressions = distinctAggregationFunction.getOrderByExpressions();
     int limit = distinctAggregationFunction.getLimit();
     if (orderByExpressions == null) {
-      return getDistinctOnlyExecutor(expressions, limit, transformOperator);
+      return getDistinctOnlyExecutor(expressions, limit, transformOperator, isNullHandlingEnabled);
     } else {
-      return getDistinctOrderByExecutor(expressions, orderByExpressions, limit, transformOperator);
+      return getDistinctOrderByExecutor(
+          expressions, orderByExpressions, limit, transformOperator, isNullHandlingEnabled);
     }
   }
 
   private static DistinctExecutor getDistinctOnlyExecutor(List<ExpressionContext> expressions, int limit,
-      TransformOperator transformOperator) {
+      TransformOperator transformOperator, boolean isNullHandlingEnabled) {
     int numExpressions = expressions.size();
     if (numExpressions == 1) {
       // Single column
@@ -80,27 +81,27 @@ public class DistinctExecutorFactory {
       TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(expression);
       DataType dataType = expressionMetadata.getDataType();
       Dictionary dictionary = transformOperator.getDictionary(expression);
-      NullValueVectorReader nullValueReader = transformOperator.getNullValueVectorReader(expression);
-      if (dictionary != null && (nullValueReader == null || nullValueReader.getNullBitmap().getCardinality() == 0)) {
+      if (dictionary != null && !isNullHandlingEnabled) {
         // Dictionary based
         return new DictionaryBasedSingleColumnDistinctOnlyExecutor(expression, dictionary, dataType, limit);
       } else {
         // Raw value based
         switch (dataType.getStoredType()) {
           case INT:
-            return new RawIntSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
+            return new RawIntSingleColumnDistinctOnlyExecutor(expression, dataType, limit, isNullHandlingEnabled);
           case LONG:
-            return new RawLongSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
+            return new RawLongSingleColumnDistinctOnlyExecutor(expression, dataType, limit, isNullHandlingEnabled);
           case FLOAT:
-            return new RawFloatSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
+            return new RawFloatSingleColumnDistinctOnlyExecutor(expression, dataType, limit, isNullHandlingEnabled);
           case DOUBLE:
-            return new RawDoubleSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
+            return new RawDoubleSingleColumnDistinctOnlyExecutor(expression, dataType, limit, isNullHandlingEnabled);
           case BIG_DECIMAL:
-            return new RawBigDecimalSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
+            return new RawBigDecimalSingleColumnDistinctOnlyExecutor(
+                expression, dataType, limit, isNullHandlingEnabled);
           case STRING:
-            return new RawStringSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
+            return new RawStringSingleColumnDistinctOnlyExecutor(expression, dataType, limit, isNullHandlingEnabled);
           case BYTES:
-            return new RawBytesSingleColumnDistinctOnlyExecutor(expression, dataType, limit);
+            return new RawBytesSingleColumnDistinctOnlyExecutor(expression, dataType, limit, isNullHandlingEnabled);
           default:
             throw new IllegalStateException();
         }
@@ -139,7 +140,8 @@ public class DistinctExecutorFactory {
   }
 
   private static DistinctExecutor getDistinctOrderByExecutor(List<ExpressionContext> expressions,
-      List<OrderByExpressionContext> orderByExpressions, int limit, TransformOperator transformOperator) {
+      List<OrderByExpressionContext> orderByExpressions, int limit, TransformOperator transformOperator,
+      boolean isNullHandlingEnabled) {
     int numExpressions = expressions.size();
     if (numExpressions == 1) {
       // Single column
@@ -151,8 +153,7 @@ public class DistinctExecutorFactory {
       Dictionary dictionary = transformOperator.getDictionary(expression);
       NullValueVectorReader nullValueReader = transformOperator.getNullValueVectorReader(expression);
       // Note: Use raw value based when dictionary is not sorted (consuming segments).
-      if (dictionary != null && dictionary.isSorted() && (nullValueReader == null
-          || nullValueReader.getNullBitmap().getCardinality() == 0)) {
+      if (dictionary != null && dictionary.isSorted() && !isNullHandlingEnabled) {
         // Dictionary based
         return new DictionaryBasedSingleColumnDistinctOrderByExecutor(expression, dictionary, dataType,
             orderByExpressions.get(0), limit);
@@ -160,19 +161,26 @@ public class DistinctExecutorFactory {
         // Raw value based
         switch (dataType.getStoredType()) {
           case INT:
-            return new RawIntSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
+            return new RawIntSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit,
+                isNullHandlingEnabled);
           case LONG:
-            return new RawLongSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
+            return new RawLongSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit,
+                isNullHandlingEnabled);
           case FLOAT:
-            return new RawFloatSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
+            return new RawFloatSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit,
+                isNullHandlingEnabled);
           case DOUBLE:
-            return new RawDoubleSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
+            return new RawDoubleSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit,
+                isNullHandlingEnabled);
           case BIG_DECIMAL:
-            return new RawBigDecimalSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
+            return new RawBigDecimalSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit,
+                isNullHandlingEnabled);
           case STRING:
-            return new RawStringSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
+            return new RawStringSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit,
+                isNullHandlingEnabled);
           case BYTES:
-            return new RawBytesSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit);
+            return new RawBytesSingleColumnDistinctOrderByExecutor(expression, dataType, orderByExpression, limit,
+                isNullHandlingEnabled);
           default:
             throw new IllegalStateException();
         }

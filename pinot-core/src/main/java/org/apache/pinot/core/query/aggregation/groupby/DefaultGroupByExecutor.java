@@ -31,7 +31,6 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 
 /**
@@ -52,6 +51,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][]);
 
   protected final AggregationFunction[] _aggregationFunctions;
+  protected final boolean _isNullHandlingEnabled;
   protected final GroupKeyGenerator _groupKeyGenerator;
   protected final GroupByResultHolder[] _groupByResultHolders;
   protected final boolean _hasMVGroupByExpression;
@@ -69,28 +69,25 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       TransformOperator transformOperator) {
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
+    _isNullHandlingEnabled = queryContext.isNullHandlingEnabled();
 
     boolean hasMVGroupByExpression = false;
     boolean hasNoDictionaryGroupByExpression = false;
-    boolean nullHandlingRequired = false;
     for (ExpressionContext groupByExpression : groupByExpressions) {
       TransformResultMetadata transformResultMetadata = transformOperator.getResultMetadata(groupByExpression);
       hasMVGroupByExpression |= !transformResultMetadata.isSingleValue();
       hasNoDictionaryGroupByExpression |= !transformResultMetadata.hasDictionary();
-      NullValueVectorReader nullValueReader = transformOperator.getNullValueVectorReader(groupByExpression);
-      if (nullValueReader != null && nullValueReader.getNullBitmap().getCardinality() > 0) {
-        nullHandlingRequired = true;
-      }
     }
     _hasMVGroupByExpression = hasMVGroupByExpression;
 
     // Initialize group key generator
     int numGroupsLimit = queryContext.getNumGroupsLimit();
     int maxInitialResultHolderCapacity = queryContext.getMaxInitialResultHolderCapacity();
-    if (hasNoDictionaryGroupByExpression || nullHandlingRequired) {
+    if (hasNoDictionaryGroupByExpression || _isNullHandlingEnabled) {
       if (groupByExpressions.length == 1) {
         _groupKeyGenerator =
-            new NoDictionarySingleColumnGroupKeyGenerator(transformOperator, groupByExpressions[0], numGroupsLimit);
+            new NoDictionarySingleColumnGroupKeyGenerator(transformOperator, groupByExpressions[0], numGroupsLimit,
+                _isNullHandlingEnabled);
       } else {
         _groupKeyGenerator =
             new NoDictionaryMultiColumnGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit);

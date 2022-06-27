@@ -72,7 +72,7 @@ public class DistinctPlanNode implements PlanNode {
           NullValueVectorReader nullValueReader = dataSource.getNullValueVector();
           if (nullValueReader == null || nullValueReader.getNullBitmap().getCardinality() == 0) {
             return new DictionaryBasedDistinctOperator(dataSourceMetadata.getDataType(), distinctAggregationFunction,
-                dictionary, dataSourceMetadata.getNumDocs());
+                dictionary, dataSourceMetadata.getNumDocs(), _queryContext.isNullHandlingEnabled());
           }
         }
       }
@@ -80,6 +80,6 @@ public class DistinctPlanNode implements PlanNode {
 
     TransformOperator transformOperator =
         new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
-    return new DistinctOperator(_indexSegment, distinctAggregationFunction, transformOperator);
+    return new DistinctOperator(_indexSegment, distinctAggregationFunction, transformOperator, _queryContext);
   }
 }

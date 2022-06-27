@@ -86,11 +86,6 @@ public abstract class BaseDataTable implements DataTable {
   }
 
   /**
-   * get the current data table version.
-   */
-  public abstract int getVersion();
-
-  /**
    * Helper method to serialize dictionary map.
    */
   protected byte[] serializeDictionaryMap()

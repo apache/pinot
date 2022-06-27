@@ -79,6 +79,7 @@ public interface DataTable {
 
   String[] getStringArray(int rowId, int colId);
 
+  @Nullable
   RoaringBitmap getNullRowIds(int colId);
 
   DataTable toMetadataOnlyDataTable();

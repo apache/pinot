@@ -74,6 +74,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   private static final String EXPLAIN_NAME = "SELECT_ORDERBY";
 
   private final IndexSegment _indexSegment;
+  private final boolean _isNullHandlingEnabled;
   // Deduped order-by expressions followed by output expressions from SelectionOperatorUtils.extractExpressions()
   private final List<ExpressionContext> _expressions;
   private final TransformOperator _transformOperator;
@@ -89,6 +90,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   public SelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, TransformOperator transformOperator, boolean allOrderByColsPreSorted) {
     _indexSegment = indexSegment;
+    _isNullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _expressions = expressions;
     _transformOperator = transformOperator;
     _allOrderByColsPreSorted = allOrderByColsPreSorted;
@@ -141,7 +143,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       multipliers[i] = _orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
     }
 
-    // TODO: return separate comparator when nullHandlingEnabled is set to true.
     return (Object[] o1, Object[] o2) -> {
       for (int i = 0; i < numValuesToCompare; i++) {
         int index = valueIndices[i];
@@ -149,11 +150,13 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
         // TODO: Evaluate the performance of casting to Comparable and avoid the switch
         Object v1 = o1[index];
         Object v2 = o2[index];
-        if (v1 == null) {
-          // The default null ordering is: 'NULLS LAST', regardless of the ordering direction.
-          return v2 == null ? 0 : -multipliers[i];
-        } else if (v2 == null) {
-          return multipliers[i];
+        if (_isNullHandlingEnabled) {
+          if (v1 == null) {
+            // The default null ordering is: 'NULLS LAST', regardless of the ordering direction.
+            return v2 == null ? 0 : -multipliers[i];
+          } else if (v2 == null) {
+            return multipliers[i];
+          }
         }
         int result;
         switch (storedTypes[i]) {
@@ -208,7 +211,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     BlockValSet[] blockValSets = new BlockValSet[numExpressions];
     int numColumnsProjected = _transformOperator.getNumColumnsProjected();
     TransformBlock transformBlock;
-    boolean anyNullHandlingEnabled = false;
     while (_numDocsScanned < _numRowsToKeep && (transformBlock = _transformOperator.nextBlock()) != null) {
       for (int i = 0; i < numExpressions; i++) {
         ExpressionContext expression = _expressions.get(i);
@@ -216,14 +218,11 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = transformBlock.getNumDocs();
-      boolean isNullHandlingEnabled = false;
-      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
-      for (int i = 0; i < numExpressions; i++) {
-        nullBitmaps[i] = blockValueFetcher.getColumnNullBitmap(i);
-        isNullHandlingEnabled |= nullBitmaps[i] != null;
-      }
-      anyNullHandlingEnabled |= isNullHandlingEnabled;
-      if (isNullHandlingEnabled) {
+      if (_isNullHandlingEnabled) {
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
+        for (int i = 0; i < numExpressions; i++) {
+          nullBitmaps[i] = blockValSets[i].getNullBitmap();
+        }
         for (int rowId = 0; rowId < numDocsFetched && (_numDocsScanned < _numRowsToKeep); rowId++) {
           Object[] row = blockValueFetcher.getRow(rowId);
           for (int colId = 0; colId < numExpressions; colId++) {
@@ -253,7 +252,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new IntermediateResultsBlock(dataSchema, _rows, anyNullHandlingEnabled);
+    return new IntermediateResultsBlock(dataSchema, _rows, _isNullHandlingEnabled);
   }
 
   /**
@@ -266,7 +265,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     BlockValSet[] blockValSets = new BlockValSet[numExpressions];
     int numColumnsProjected = _transformOperator.getNumColumnsProjected();
     TransformBlock transformBlock;
-    boolean anyNullHandlingEnabled = false;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       for (int i = 0; i < numExpressions; i++) {
         ExpressionContext expression = _expressions.get(i);
@@ -274,14 +272,11 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = transformBlock.getNumDocs();
-      boolean isNullHandlingEnabled = false;
-      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
-      for (int i = 0; i < numExpressions; i++) {
-        nullBitmaps[i] = blockValueFetcher.getColumnNullBitmap(i);
-        isNullHandlingEnabled |= nullBitmaps[i] != null;
-      }
-      anyNullHandlingEnabled |= isNullHandlingEnabled;
-      if (isNullHandlingEnabled) {
+      if (_isNullHandlingEnabled) {
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
+        for (int i = 0; i < numExpressions; i++) {
+          nullBitmaps[i] = blockValSets[i].getNullBitmap();
+        }
         for (int rowId = 0; rowId < numDocsFetched; rowId++) {
           // Note: Everytime blockValueFetcher.getRow is called, a new row instance is created.
           Object[] row = blockValueFetcher.getRow(rowId);
@@ -312,7 +307,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new IntermediateResultsBlock(dataSchema, _rows, anyNullHandlingEnabled);
+    return new IntermediateResultsBlock(dataSchema, _rows, _isNullHandlingEnabled);
   }
 
   /**
@@ -326,7 +321,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     BlockValSet[] blockValSets = new BlockValSet[numOrderByExpressions];
     int numColumnsProjected = _transformOperator.getNumColumnsProjected();
     TransformBlock transformBlock;
-    boolean anyNullHandlingEnabled = false;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       for (int i = 0; i < numOrderByExpressions; i++) {
         ExpressionContext expression = _orderByExpressions.get(i).getExpression();
@@ -334,16 +328,12 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = transformBlock.getNumDocs();
-
       int[] docIds = transformBlock.getDocIds();
-      boolean isNullHandlingEnabled = false;
-      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numOrderByExpressions];
-      for (int i = 0; i < numOrderByExpressions; i++) {
-        nullBitmaps[i] = blockValueFetcher.getColumnNullBitmap(i);
-        isNullHandlingEnabled |= nullBitmaps[i] != null;
-      }
-      anyNullHandlingEnabled |= isNullHandlingEnabled;
-      if (isNullHandlingEnabled) {
+      if (_isNullHandlingEnabled) {
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numOrderByExpressions];
+        for (int i = 0; i < numOrderByExpressions; i++) {
+          nullBitmaps[i] = blockValSets[i].getNullBitmap();
+        }
         for (int rowId = 0; rowId < numDocsFetched; rowId++) {
           Object[] row = new Object[numExpressions];
           blockValueFetcher.getRow(rowId, row, 0);
@@ -436,7 +426,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new IntermediateResultsBlock(dataSchema, _rows, anyNullHandlingEnabled);
+    return new IntermediateResultsBlock(dataSchema, _rows, _isNullHandlingEnabled);
   }
 
 

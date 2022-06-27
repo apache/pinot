@@ -90,7 +90,8 @@ public class SelectionDataTableReducer implements DataTableReducer {
       } else {
         // Selection only
         List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
-        List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), limit);
+        List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), limit,
+            _queryContext.isNullHandlingEnabled());
         brokerResponseNative.setResultTable(
             SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, dataSchema, selectionColumns));
       }

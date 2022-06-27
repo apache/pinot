@@ -186,9 +186,10 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
 
   public void testQueries(Number baseValue, ColumnDataType dataType) {
     DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+    boolean isNullHandlingEnabled = true;
     {
       String query = "SELECT *, 1 FROM testTable";
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, isNullHandlingEnabled);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME, "'1'"},
@@ -209,7 +210,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT * FROM testTable ORDER BY %s DESC LIMIT 4000", COLUMN_NAME);
       // getBrokerResponseForSqlQuery(query) runs SQL query on multiple index segments. The result should be equivalent
       // to querying 4 identical index segments.
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, isNullHandlingEnabled);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -241,7 +242,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
     }
     {
       String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s", COLUMN_NAME, COLUMN_NAME);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, isNullHandlingEnabled);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -269,7 +270,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       int limit = 40;
       String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s LIMIT %d", COLUMN_NAME, COLUMN_NAME,
           limit);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, isNullHandlingEnabled);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -296,7 +297,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       // This test case was added to validate path-code for distinct w/o order by.
       int limit = 40;
       String query = String.format("SELECT DISTINCT %s FROM testTable LIMIT %d", COLUMN_NAME, limit);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, isNullHandlingEnabled);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -307,7 +308,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
     {
       String query = String.format("SELECT %s FROM testTable GROUP BY %s ORDER BY %s DESC", COLUMN_NAME, COLUMN_NAME,
           COLUMN_NAME);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, isNullHandlingEnabled);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{dataType}));
@@ -333,7 +334,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format(
           "SELECT COUNT(*) AS count, %s FROM testTable GROUP BY %s ORDER BY %s DESC LIMIT 1000", COLUMN_NAME,
           COLUMN_NAME, COLUMN_NAME);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, isNullHandlingEnabled);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"count", COLUMN_NAME},
@@ -361,7 +362,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
     {
       String query = String.format("SELECT %s FROM testTable WHERE %s = '%s'", COLUMN_NAME, COLUMN_NAME,
           baseValue.doubleValue() + 68);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, isNullHandlingEnabled);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{dataType}));
@@ -376,7 +377,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
     {
       String query = String.format("SELECT %s FROM testTable WHERE %s = '%s'", COLUMN_NAME, COLUMN_NAME,
           baseValue.doubleValue() + 69);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, isNullHandlingEnabled);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{dataType}));
@@ -389,7 +390,7 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format(
           "SELECT MAX(%s) AS max FROM testTable GROUP BY %s HAVING max > %s ORDER BY max", COLUMN_NAME, COLUMN_NAME,
           baseValue.doubleValue() + lowerLimit);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, isNullHandlingEnabled);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,

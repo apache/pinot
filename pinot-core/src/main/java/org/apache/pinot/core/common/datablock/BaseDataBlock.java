@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
@@ -244,6 +245,7 @@ public abstract class BaseDataBlock implements DataTable {
     return _numRows;
   }
 
+  @Nullable
   @Override
   public RoaringBitmap getNullRowIds(int colId) {
     return null;

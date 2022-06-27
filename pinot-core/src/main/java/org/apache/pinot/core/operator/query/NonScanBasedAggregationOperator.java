@@ -78,12 +78,10 @@ public class NonScanBasedAggregationOperator extends BaseOperator<IntermediateRe
   @Override
   protected IntermediateResultsBlock getNextBlock() {
     List<Object> aggregationResults = new ArrayList<>(_aggregationFunctions.length);
-    boolean isNullHandlingEnabled = false;
     for (int i = 0; i < _aggregationFunctions.length; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
       // note that dataSource will be null for COUNT, sp do not interact with it until it's known this isn't a COUNT
       DataSource dataSource = _dataSources[i];
-      isNullHandlingEnabled |= dataSource != null && dataSource.getNullValueVector() != null;
       Object result;
       switch (aggregationFunction.getType()) {
         case COUNT:
@@ -130,7 +128,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<IntermediateRe
     }
 
     // Build intermediate result block based on aggregation result from the executor.
-    return new IntermediateResultsBlock(_aggregationFunctions, aggregationResults, isNullHandlingEnabled);
+    return new IntermediateResultsBlock(_aggregationFunctions, aggregationResults, false);
   }
 
   private static Double getMinValue(DataSource dataSource) {

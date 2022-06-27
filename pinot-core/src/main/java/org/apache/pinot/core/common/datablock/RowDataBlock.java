@@ -20,6 +20,7 @@ package org.apache.pinot.core.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.roaringbitmap.RoaringBitmap;
@@ -49,6 +50,7 @@ public class RowDataBlock extends BaseDataBlock {
     computeBlockObjectConstants();
   }
 
+  @Nullable
   @Override
   public RoaringBitmap getNullRowIds(int colId) {
     // _fixedSizeData stores two ints per col's null bitmap: offset, and length.
@@ -66,7 +68,7 @@ public class RowDataBlock extends BaseDataBlock {
       _variableSizeData.get(nullBitmapBytes);
       return ObjectSerDeUtils.ROARING_BITMAP_SER_DE.deserialize(nullBitmapBytes);
     }
-    return new RoaringBitmap();
+    return null;
   }
 
   protected void computeBlockObjectConstants() {

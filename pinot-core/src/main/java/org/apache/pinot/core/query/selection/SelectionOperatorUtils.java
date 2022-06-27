@@ -40,7 +40,6 @@ import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -242,11 +241,12 @@ public class SelectionOperatorUtils {
     RoaringBitmap[] nullBitmaps = null;
     if (isNullHandlingEnabled) {
       nullBitmaps = new RoaringBitmap[numColumns];
-      Object[] columnDefaultNullValues = new Object[numColumns];
+      Object[] colDefaultNullValues = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
         if (storedColumnDataTypes[colId] != ColumnDataType.OBJECT && !storedColumnDataTypes[colId].isArray()) {
-          columnDefaultNullValues[colId] = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC,
-              storedColumnDataTypes[colId].toDataType(), null);
+          // Store a dummy value that is both a valid numeric, and a valid hex encoded value.
+          String specialVal = "30";
+          colDefaultNullValues[colId] = storedColumnDataTypes[colId].toDataType().convert(specialVal);
         }
         nullBitmaps[colId] = new RoaringBitmap();
       }
@@ -256,7 +256,7 @@ public class SelectionOperatorUtils {
         for (int i = 0; i < numColumns; i++) {
           Object columnValue = row[i];
           if (columnValue == null) {
-            row[i] = columnDefaultNullValues[i];
+            row[i] = colDefaultNullValues[i];
             nullBitmaps[i].add(rowId);
           }
         }
@@ -425,20 +425,16 @@ public class SelectionOperatorUtils {
    * Reduces a collection of {@link DataTable}s to selection rows for selection queries without <code>ORDER BY</code>.
    * (Broker side)
    */
-  public static List<Object[]> reduceWithoutOrdering(Collection<DataTable> dataTables, int limit) {
+  public static List<Object[]> reduceWithoutOrdering(Collection<DataTable> dataTables, int limit,
+      boolean isNullHandlingEnabled) {
     List<Object[]> rows = new ArrayList<>(Math.min(limit, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
     for (DataTable dataTable : dataTables) {
       int numColumns = dataTable.getDataSchema().size();
       RoaringBitmap[] nullBitmaps = null;
-      boolean isNullHandlingEnabled = false;
-      for (int coldId = 0; coldId < numColumns; coldId++) {
-        RoaringBitmap nullBitmap = dataTable.getNullRowIds(coldId);
-        if (nullBitmap != null) {
-          if (nullBitmaps == null) {
-            nullBitmaps = new RoaringBitmap[numColumns];
-          }
-          nullBitmaps[coldId] = nullBitmap;
-          isNullHandlingEnabled = true;
+      if (isNullHandlingEnabled) {
+        nullBitmaps = new RoaringBitmap[numColumns];;
+        for (int coldId = 0; coldId < numColumns; coldId++) {
+          nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
         }
       }
 

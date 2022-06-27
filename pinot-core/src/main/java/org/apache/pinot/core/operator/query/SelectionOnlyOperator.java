@@ -43,6 +43,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   private static final String EXPLAIN_NAME = "SELECT";
 
   private final IndexSegment _indexSegment;
+  private final boolean _isNullHandlingEnabled;
   private final TransformOperator _transformOperator;
   private final List<ExpressionContext> _expressions;
   private final BlockValSet[] _blockValSets;
@@ -56,6 +57,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   public SelectionOnlyOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
+    _isNullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _transformOperator = transformOperator;
     _expressions = expressions;
 
@@ -74,7 +76,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
 
     _numRowsToKeep = queryContext.getLimit();
     _rows = new ArrayList<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
-    _nullBitmaps = new RoaringBitmap[numExpressions];
+    _nullBitmaps = _isNullHandlingEnabled ? new RoaringBitmap[numExpressions] : null;
   }
 
   @Override
@@ -92,19 +94,19 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   @Override
   protected IntermediateResultsBlock getNextBlock() {
     TransformBlock transformBlock;
-    boolean isNullHandlingEnabled = false;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       int numExpressions = _expressions.size();
       for (int i = 0; i < numExpressions; i++) {
         _blockValSets[i] = transformBlock.getBlockValueSet(_expressions.get(i));
-        _nullBitmaps[i] = _blockValSets[i].getNullBitmap();
-        isNullHandlingEnabled |= _nullBitmaps[i] != null;
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(_blockValSets);
 
       int numDocsToAdd = Math.min(_numRowsToKeep - _rows.size(), transformBlock.getNumDocs());
       _numDocsScanned += numDocsToAdd;
-      if (isNullHandlingEnabled) {
+      if (_isNullHandlingEnabled) {
+        for (int i = 0; i < numExpressions; i++) {
+          _nullBitmaps[i] = _blockValSets[i].getNullBitmap();
+        }
         for (int docId = 0; docId < numDocsToAdd; docId++) {
           Object[] values = blockValueFetcher.getRow(docId);
           for (int colId = 0; colId < numExpressions; colId++) {
@@ -124,7 +126,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
       }
     }
 
-    return new IntermediateResultsBlock(_dataSchema, _rows, isNullHandlingEnabled);
+    return new IntermediateResultsBlock(_dataSchema, _rows, _isNullHandlingEnabled);
   }
 
 

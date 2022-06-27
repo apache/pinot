@@ -82,6 +82,7 @@ public class QueryContext {
   private final Map<String, String> _queryOptions;
   private final Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
   private final boolean _explain;
+  private final boolean _isNullHandlingEnabled;
 
   private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
 
@@ -123,7 +124,7 @@ public class QueryContext {
       @Nullable List<ExpressionContext> groupByExpressions, @Nullable FilterContext havingFilter,
       @Nullable List<OrderByExpressionContext> orderByExpressions, int limit, int offset,
       Map<String, String> queryOptions, @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints,
-      boolean explain) {
+      boolean explain, boolean isNullHandlingEnabled) {
     _tableName = tableName;
     _subquery = subquery;
     _selectExpressions = selectExpressions;
@@ -137,6 +138,7 @@ public class QueryContext {
     _queryOptions = queryOptions;
     _expressionOverrideHints = expressionOverrideHints;
     _explain = explain;
+    _isNullHandlingEnabled = isNullHandlingEnabled;
   }
 
   /**
@@ -234,6 +236,13 @@ public class QueryContext {
    */
   public boolean isExplain() {
     return _explain;
+  }
+
+  /**
+   * Returns {@code true} if the query has null handling enabled, {@code false} otherwise.
+   */
+  public boolean isNullHandlingEnabled() {
+    return _isNullHandlingEnabled;
   }
 
   /**
@@ -413,6 +422,7 @@ public class QueryContext {
     private Map<String, String> _debugOptions;
     private Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
     private boolean _explain;
+    private boolean _isNullHandlingEnabled;
 
     public Builder setTableName(String tableName) {
       _tableName = tableName;
@@ -479,6 +489,11 @@ public class QueryContext {
       return this;
     }
 
+    public Builder setIsNullHandlingEnabled(boolean isNullHandlingEnabled) {
+      _isNullHandlingEnabled = isNullHandlingEnabled;
+      return this;
+    }
+
     public QueryContext build() {
       // TODO: Add validation logic here
 
@@ -487,7 +502,8 @@ public class QueryContext {
       }
       QueryContext queryContext =
           new QueryContext(_tableName, _subquery, _selectExpressions, _aliasList, _filter, _groupByExpressions,
-              _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions, _expressionOverrideHints, _explain);
+              _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions, _expressionOverrideHints, _explain,
+              _isNullHandlingEnabled);
 
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);

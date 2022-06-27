@@ -19,13 +19,11 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -281,13 +279,14 @@ public class GroupByDataTableReducer implements DataTableReducer {
               return;
             }
             try {
-              RoaringBitmap[] nullBitmaps = new RoaringBitmap[_numColumns];
-              boolean isNullHandlingEnabled = false;
-              for (int i = 0; i < _numColumns; i++) {
-                nullBitmaps[i] = dataTable.getNullRowIds(i);
-                isNullHandlingEnabled |= nullBitmaps[i] != null;
+              boolean isNullHandlingEnabled = _queryContext.isNullHandlingEnabled();
+              RoaringBitmap[] nullBitmaps = null;
+              if (isNullHandlingEnabled) {
+                nullBitmaps = new RoaringBitmap[_numColumns];
+                for (int i = 0; i < _numColumns; i++) {
+                  nullBitmaps[i] = dataTable.getNullRowIds(i);
+                }
               }
-              assert !isNullHandlingEnabled || Arrays.stream(nullBitmaps).allMatch(Objects::nonNull);
 
               int numRows = dataTable.getNumberOfRows();
               for (int rowId = 0; rowId < numRows; rowId++) {
@@ -325,15 +324,13 @@ public class GroupByDataTableReducer implements DataTableReducer {
                 }
                 if (isNullHandlingEnabled) {
                   for (int colId = 0; colId < _numColumns; colId++) {
-                    if (nullBitmaps[colId].contains(rowId)) {
+                    if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
                       values[colId] = null;
                     }
                   }
                 }
                 indexedTable.upsert(new Record(values));
               }
-            } catch (Exception ex) {
-              LOGGER.warn("getIndexedTable exception: " + ex.getMessage());
             } finally {
               countDownLatch.countDown();
             }

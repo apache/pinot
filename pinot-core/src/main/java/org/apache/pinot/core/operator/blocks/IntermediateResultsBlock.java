@@ -139,13 +139,12 @@ public class IntermediateResultsBlock implements Block {
     _isNullHandlingEnabled = isNullHandlingEnabled;
   }
 
-  public IntermediateResultsBlock(Table table) {
+  public IntermediateResultsBlock(Table table, boolean isNullHandlingEnabled) {
     _table = table;
     if (_table != null) {
       _dataSchema = table.getDataSchema();
     }
-    // TODO: set based on whether null handling is enabled in GroupKeyGenerator.
-    _isNullHandlingEnabled = true;
+    _isNullHandlingEnabled = isNullHandlingEnabled;
   }
 
   /**
@@ -351,8 +350,9 @@ public class IntermediateResultsBlock implements Block {
       Object[] colDefaultNullValues = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
         if (storedColumnDataTypes[colId] != ColumnDataType.OBJECT) {
-          colDefaultNullValues[colId] = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC,
-              storedColumnDataTypes[colId].toDataType(), null);
+          // Store a dummy value that is both a valid numeric, and a valid hex encoded value.
+          String specialVal = "30";
+          colDefaultNullValues[colId] = storedColumnDataTypes[colId].toDataType().convert(specialVal);
         }
         nullBitmaps[colId] = new RoaringBitmap();
       }
@@ -466,6 +466,9 @@ public class IntermediateResultsBlock implements Block {
           nullBitmaps = new RoaringBitmap[numAggregationFunctions];
         }
         if (columnDataTypes[i] != ColumnDataType.OBJECT) {
+          // Store a dummy value that is both a valid numeric, and a valid hex encoded value.
+          String specialVal = "30";
+          colDefaultNullValues[i] = columnDataTypes[i].toDataType().convert(specialVal);
           colDefaultNullValues[i] = FieldSpec.getDefaultNullValue(FieldSpec.FieldType.METRIC,
               columnDataTypes[i].toDataType(), null);
         }

@@ -50,9 +50,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   private static final String EXPLAIN_NAME = "SELECT_STREAMING_COMBINE";
 
   // Special IntermediateResultsBlock to indicate that this is the last results block for an operator
-  private static final IntermediateResultsBlock LAST_RESULTS_BLOCK =
-      new IntermediateResultsBlock(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]),
-          Collections.emptyList(), false);
+  private final IntermediateResultsBlock _lastResultsBlock;
 
   private final StreamObserver<Server.ServerResponse> _streamObserver;
   private final int _limit;
@@ -63,6 +61,8 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
     super(operators, queryContext, executorService);
     _streamObserver = streamObserver;
     _limit = queryContext.getLimit();
+    _lastResultsBlock = new IntermediateResultsBlock(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]),
+            Collections.emptyList(), queryContext.isNullHandlingEnabled());
   }
 
 
@@ -94,7 +94,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
-      _blockingQueue.offer(LAST_RESULTS_BLOCK);
+      _blockingQueue.offer(_lastResultsBlock);
     }
   }
 
@@ -118,7 +118,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
         // the exception
         return resultsBlock;
       }
-      if (resultsBlock == LAST_RESULTS_BLOCK) {
+      if (resultsBlock == _lastResultsBlock) {
         numOperatorsFinished++;
         continue;
       }

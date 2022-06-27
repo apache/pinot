@@ -60,9 +60,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
 
   // For min/max value based combine, when a thread detects that no more segments need to be processed, it inserts this
   // special IntermediateResultsBlock into the BlockingQueue to awake the main thread
-  private static final IntermediateResultsBlock LAST_RESULTS_BLOCK =
-      new IntermediateResultsBlock(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]),
-          Collections.emptyList(), false);
+  private final IntermediateResultsBlock _lastResultsBlock;
 
   // Use an AtomicInteger to track the number of operators skipped (no result inserted into the BlockingQueue)
   private final AtomicInteger _numOperatorsSkipped = new AtomicInteger();
@@ -74,6 +72,8 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       ExecutorService executorService) {
     super(operators, queryContext, executorService);
     _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
+    _lastResultsBlock = new IntermediateResultsBlock(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]),
+        Collections.emptyList(), queryContext.isNullHandlingEnabled());
 
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     assert orderByExpressions != null;
@@ -172,7 +172,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
             int result = minMaxValueContext._minValue.compareTo(boundaryValue);
             if (result > 0 || (result == 0 && numOrderByExpressions == 1)) {
               _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numTasks);
-              _blockingQueue.offer(LAST_RESULTS_BLOCK);
+              _blockingQueue.offer(_lastResultsBlock);
               return;
             }
           }
@@ -183,7 +183,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
             int result = minMaxValueContext._maxValue.compareTo(boundaryValue);
             if (result < 0 || (result == 0 && numOrderByExpressions == 1)) {
               _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numTasks);
-              _blockingQueue.offer(LAST_RESULTS_BLOCK);
+              _blockingQueue.offer(_lastResultsBlock);
               return;
             }
           }
@@ -192,12 +192,14 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
 
       // Process the segment
       Operator operator = minMaxValueContext._operator;
-      IntermediateResultsBlock resultsBlock;
+      IntermediateResultsBlock resultsBlock = null;
       try {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         resultsBlock = (IntermediateResultsBlock) operator.nextBlock();
+      } catch (Exception ex) {
+        System.out.println(ex.getMessage());
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
@@ -264,7 +266,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       if (mergedBlock == null) {
         mergedBlock = blockToMerge;
       } else {
-        if (blockToMerge != LAST_RESULTS_BLOCK) {
+        if (blockToMerge != _lastResultsBlock) {
           mergeResultsBlocks(mergedBlock, blockToMerge);
         }
       }

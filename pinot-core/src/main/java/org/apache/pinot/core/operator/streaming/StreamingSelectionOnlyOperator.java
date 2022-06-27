@@ -42,6 +42,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<IntermediateRes
   private static final String EXPLAIN_NAME = "SELECT_STREAMING";
 
   private final IndexSegment _indexSegment;
+  private final boolean _isNullHandlingEnabled;
   private final TransformOperator _transformOperator;
   private final List<ExpressionContext> _expressions;
   private final BlockValSet[] _blockValSets;
@@ -53,6 +54,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<IntermediateRes
   public StreamingSelectionOnlyOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
+    _isNullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _transformOperator = transformOperator;
     _expressions = expressions;
 
@@ -84,10 +86,8 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<IntermediateRes
       return null;
     }
     int numExpressions = _expressions.size();
-    boolean isNullHandlingEnabled = false;
     for (int i = 0; i < numExpressions; i++) {
       _blockValSets[i] = transformBlock.getBlockValueSet(_expressions.get(i));
-      isNullHandlingEnabled |= _blockValSets[i].getNullBitmap() != null;
     }
     RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(_blockValSets);
     int numDocs = transformBlock.getNumDocs();
@@ -97,7 +97,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<IntermediateRes
       rows.add(blockValueFetcher.getRow(i));
     }
     _numDocsScanned += numDocs;
-    return new IntermediateResultsBlock(_dataSchema, rows, isNullHandlingEnabled);
+    return new IntermediateResultsBlock(_dataSchema, rows, _isNullHandlingEnabled);
   }
 
 

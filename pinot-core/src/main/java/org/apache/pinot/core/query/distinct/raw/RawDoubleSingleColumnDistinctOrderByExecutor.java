@@ -36,8 +36,8 @@ public class RawDoubleSingleColumnDistinctOrderByExecutor extends BaseRawDoubleS
   private final DoublePriorityQueue _priorityQueue;
 
   public RawDoubleSingleColumnDistinctOrderByExecutor(ExpressionContext expression, DataType dataType,
-      OrderByExpressionContext orderByExpression, int limit) {
-    super(expression, dataType, limit);
+      OrderByExpressionContext orderByExpression, int limit, boolean isNullHandlingEnabled) {
+    super(expression, dataType, limit, isNullHandlingEnabled);
 
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;

@@ -23,7 +23,6 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -33,6 +32,7 @@ import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
@@ -48,6 +48,7 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
   private final AggregationFunction[] _aggregationFunctions;
   private final List<Pair<AggregationFunction[], TransformOperator>> _aggFunctionsWithTransformOperator;
   private final long _numTotalDocs;
+  private final QueryContext _queryContext;
 
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
@@ -56,10 +57,12 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
   // We can potentially do away with aggregationFunctions parameter, but its cleaner to pass it in than to construct
   // it from aggFunctionsWithTransformOperator
   public FilteredAggregationOperator(AggregationFunction[] aggregationFunctions,
-      List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator, long numTotalDocs) {
+      List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator, long numTotalDocs,
+      QueryContext queryContext) {
     _aggregationFunctions = aggregationFunctions;
     _aggFunctionsWithTransformOperator = aggFunctionsWithTransformOperator;
     _numTotalDocs = numTotalDocs;
+    _queryContext = queryContext;
   }
 
   @Override
@@ -71,7 +74,6 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
       resultIndexMap.put(_aggregationFunctions[i], i);
     }
 
-    boolean isNullHandlingEnabled = false;
     for (Pair<AggregationFunction[], TransformOperator> filteredAggregation : _aggFunctionsWithTransformOperator) {
       AggregationFunction[] aggregationFunctions = filteredAggregation.getLeft();
       AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggregationFunctions);
@@ -81,11 +83,6 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
       while ((transformBlock = transformOperator.nextBlock()) != null) {
         aggregationExecutor.aggregate(transformBlock);
         numDocsScanned += transformBlock.getNumDocs();
-        for (AggregationFunction func : _aggregationFunctions) {
-          for (ExpressionContext expressionContext : (List<ExpressionContext>) func.getInputExpressions()) {
-            isNullHandlingEnabled |= transformBlock.getBlockValueSet(expressionContext).getNullBitmap() != null;
-          }
-        }
       }
       List<Object> filteredResult = aggregationExecutor.getResult();
 
@@ -96,7 +93,8 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
       _numEntriesScannedInFilter += transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * transformOperator.getNumColumnsProjected();
     }
-    return new IntermediateResultsBlock(_aggregationFunctions, Arrays.asList(result), isNullHandlingEnabled);
+    return new IntermediateResultsBlock(_aggregationFunctions, Arrays.asList(result),
+        _queryContext.isNullHandlingEnabled());
   }
 
   @Override
