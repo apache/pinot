@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
  *
  * Steps:
  *  - The watermarkMs is read from the {@link RealtimeToOfflineSegmentsTaskMetadata} ZNode
- *  found at MINION_TASK_METADATA/tableNameWithType/RealtimeToOfflineSegmentsTask
+ *  found at MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
  *  In case of cold-start, no ZNode will exist.
  *  A new ZNode will be created, with watermarkMs as the smallest time found in the COMPLETED segments
  *

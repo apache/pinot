@@ -26,7 +26,7 @@ import org.apache.helix.ZNRecord;
  * The <code>watermarkMs</code> denotes the time (exclusive) upto which tasks have been executed.
  *
  * This gets serialized and stored in zookeeper under the path
- * MINION_TASK_METADATA/tableNameWithType/RealtimeToOfflineSegmentsTask
+ * MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
  *
  * PinotTaskGenerator:
  * The <code>watermarkMs</code>> is used by the <code>RealtimeToOfflineSegmentsTaskGenerator</code>,
