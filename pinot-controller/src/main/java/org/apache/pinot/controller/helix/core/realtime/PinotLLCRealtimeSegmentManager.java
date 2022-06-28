@@ -1418,7 +1418,7 @@ public class PinotLLCRealtimeSegmentManager {
 
   /**
    * Pause consumption on a table by
-   *   1) setting "isPausedFlag" in ideal states to true and
+   *   1) setting "isTablePaused" in ideal states to true and
    *   2) sending force commit messages to servers
    */
   public void pauseConsumption(String tableNameWithType) {
@@ -1428,13 +1428,13 @@ public class PinotLLCRealtimeSegmentManager {
 
   /**
    * Resume consumption on a table by
-   *   1) setting "isPausedFlag" in ideal states to false and
+   *   1) setting "isTablePaused" in ideal states to false and
    *   2) triggering segment validation job to create new consuming segments in ideal states
    */
   public void resumeConsumption(String tableNameWithType) {
     updatePauseStatusInIdealState(tableNameWithType, false);
 
-    // trigger realtime segment validation task to resume consumption
+    // trigger realtime segment validation job to resume consumption
     Map<String, String> taskProperties = new HashMap<>();
     taskProperties.put(RealtimeSegmentValidationManager.RECREATE_DELETED_CONSUMING_SEGMENT_KEY, "true");
     _helixResourceManager
