@@ -188,7 +188,8 @@ public class DataBlockBuilder {
     return buildRowBlock(rowBuilder);
   }
 
-  public static ColumnarDataBlock buildFromColumns(List<Object[]> columns, DataSchema dataSchema)
+  public static ColumnarDataBlock buildFromColumns(List<Object[]> columns, @Nullable RoaringBitmap[] colNullBitmaps,
+      DataSchema dataSchema)
       throws IOException {
     DataBlockBuilder columnarBuilder = new DataBlockBuilder(dataSchema, BaseDataBlock.Type.COLUMNAR);
     for (int i = 0; i < columns.size(); i++) {
@@ -302,6 +303,12 @@ public class DataBlockBuilder {
                   columnarBuilder._dataSchema.getColumnName(i)));
       }
       columnarBuilder._fixedSizeDataByteArrayOutputStream.write(byteBuffer.array(), 0, byteBuffer.position());
+    }
+    // Write null bitmaps after writing data.
+    if (colNullBitmaps != null) {
+      for (RoaringBitmap nullBitmap : colNullBitmaps) {
+        columnarBuilder.setNullRowIds(nullBitmap);
+      }
     }
     return buildColumnarBlock(columnarBuilder);
   }

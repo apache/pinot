@@ -26,10 +26,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
-import org.apache.pinot.core.common.datablock.DataBlockBuilder;
-import org.apache.pinot.core.common.datablock.DataBlockUtils;
 import org.apache.pinot.core.operator.BaseOperator;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -85,7 +82,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   protected TransferableBlock getNextBlock() {
     buildBroadcastHashTable();
     try {
-      return new TransferableBlock(buildJoinedDataBlock(_leftTableOperator.nextBlock()));
+      return buildJoinedDataBlock(_leftTableOperator.nextBlock());
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
@@ -95,15 +92,13 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     if (!_isHashTableBuilt) {
       TransferableBlock rightBlock = _rightTableOperator.nextBlock();
       while (!TransferableBlockUtils.isEndOfStream(rightBlock)) {
-        BaseDataBlock dataBlock = rightBlock.getDataBlock();
-        _rightTableSchema = dataBlock.getDataSchema();
-        int numRows = dataBlock.getNumberOfRows();
+        _rightTableSchema = rightBlock.getDataSchema();
+        List<Object[]> container = rightBlock.getContainer();
         // put all the rows into corresponding hash collections keyed by the key selector function.
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object[] objects = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
+        for (Object[] row : container) {
           List<Object[]> hashCollection =
-              _broadcastHashTable.computeIfAbsent(_rightKeySelector.getKey(objects), k -> new ArrayList<>());
-          hashCollection.add(objects);
+              _broadcastHashTable.computeIfAbsent(_rightKeySelector.getKey(row), k -> new ArrayList<>());
+          hashCollection.add(row);
         }
         rightBlock = _rightTableOperator.nextBlock();
       }
@@ -111,25 +106,23 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
-  private BaseDataBlock buildJoinedDataBlock(TransferableBlock block)
+  private TransferableBlock buildJoinedDataBlock(TransferableBlock leftBlock)
       throws Exception {
-    if (TransferableBlockUtils.isEndOfStream(block)) {
-      return DataBlockUtils.getEndOfStreamDataBlock();
+    if (TransferableBlockUtils.isEndOfStream(leftBlock)) {
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
     List<Object[]> rows = new ArrayList<>();
-    BaseDataBlock dataBlock = block.getDataBlock();
-    _leftTableSchema = dataBlock.getDataSchema();
+    _leftTableSchema = leftBlock.getDataSchema();
     _resultRowSize = _leftTableSchema.size() + _rightTableSchema.size();
-    int numRows = dataBlock.getNumberOfRows();
-    for (int rowId = 0; rowId < numRows; rowId++) {
-      Object[] leftRow = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
+    List<Object[]> container = leftBlock.getContainer();
+    for (Object[] leftRow : container) {
       List<Object[]> hashCollection =
           _broadcastHashTable.getOrDefault(_leftKeySelector.getKey(leftRow), Collections.emptyList());
       for (Object[] rightRow : hashCollection) {
         rows.add(joinRow(leftRow, rightRow));
       }
     }
-    return DataBlockBuilder.buildFromRows(rows, null, computeSchema());
+    return new TransferableBlock(rows, computeSchema(), BaseDataBlock.Type.ROW);
   }
 
   private Object[] joinRow(Object[] leftRow, Object[] rightRow) {
