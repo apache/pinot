@@ -23,12 +23,15 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -86,6 +89,8 @@ import static org.testng.Assert.assertNotNull;
 
 
 public class ControllerTest {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
   public static final String DEFAULT_TENANT = "DefaultTenant";
   public static final String LOCAL_HOST = "localhost";
   public static final int DEFAULT_CONTROLLER_PORT = 18998;
@@ -267,6 +272,35 @@ public class ControllerTest {
     configAccessor.set(scope, Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
     // Set hyperloglog log2m value to 12.
     configAccessor.set(scope, Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
+
+    waitForController();
+  }
+
+  private void waitForController()
+      throws InterruptedException, TimeoutException {
+    boolean ready = false;
+    Duration timeoutDuration = Duration.ofSeconds(60);
+    Instant timeoutInstant = Instant.now().plus(timeoutDuration);
+
+    LOGGER.info("Verifying that controller can be reached");
+
+    while (!ready && Instant.now().isBefore(timeoutInstant)) {
+      try {
+        getControllerRequestClient().getSchema("whatever");
+        ready = true;
+      } catch (IOException ex) {
+        Throwable cause = ex.getCause();
+        if (cause instanceof HttpErrorStatusException && ((HttpErrorStatusException) cause).getStatusCode() == 404) {
+          ready = true;
+        } else {
+          LOGGER.warn("Controller cannot be reached yet", ex);
+          Thread.sleep(1000);
+        }
+      }
+    }
+    if (!ready) {
+      throw new TimeoutException("Controller wasn't ready to answer in " + timeoutDuration);
+    }
   }
 
   public void stopController() {
