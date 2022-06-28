@@ -28,7 +28,7 @@ import org.apache.helix.ZNRecord;
  * The <code>watermarkMap</code> denotes the time (exclusive) upto which tasks have been executed for the bucket
  * granularity.
  *
- * This gets serialized and stored in zookeeper under the path MINION_TASK_METADATA/MergeRollupTask/tableNameWithType
+ * This gets serialized and stored in zookeeper under the path MINION_TASK_METADATA/${tableNameWithType}/MergeRollupTask
  */
 public class MergeRollupTaskMetadata extends BaseTaskMetadata {
 
