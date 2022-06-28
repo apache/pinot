@@ -43,7 +43,7 @@ public final class MinionTaskMetadataUtils {
   @Nullable
   public static ZNRecord fetchTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
       String tableNameWithType) {
-    String newPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType, tableNameWithType);
+    String newPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(tableNameWithType, taskType);
     if (propertyStore.exists(newPath, AccessOption.PERSISTENT)) {
       return fetchTaskMetadata(propertyStore, newPath);
     } else {
@@ -69,7 +69,7 @@ public final class MinionTaskMetadataUtils {
    */
   public static void deleteTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
       String tableNameWithType) {
-    String newPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType, tableNameWithType);
+    String newPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(tableNameWithType, taskType);
     String oldPath =
         ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadataDeprecated(taskType, tableNameWithType);
     boolean newPathDeleted = propertyStore.remove(newPath, AccessOption.PERSISTENT);
@@ -90,8 +90,9 @@ public final class MinionTaskMetadataUtils {
    */
   public static void persistTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
       BaseTaskMetadata taskMetadata, int expectedVersion) {
-    String newPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskType,
-        taskMetadata.getTableNameWithType());
+    String newPath =
+        ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(taskMetadata.getTableNameWithType(),
+            taskType);
     String oldPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadataDeprecated(taskType,
         taskMetadata.getTableNameWithType());
     if (propertyStore.exists(newPath, AccessOption.PERSISTENT) || !propertyStore.exists(oldPath,
