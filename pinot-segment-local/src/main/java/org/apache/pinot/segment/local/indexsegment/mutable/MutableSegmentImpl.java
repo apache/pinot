@@ -436,8 +436,8 @@ public class MutableSegmentImpl implements MutableSegment {
             column, dataType.toString());
         return false;
       }
-      // So don't create dictionary if the column (1) is member of noDictionary, and (2) is single-value or multi-value with a
-      // fixed-width field, and (3) doesn't have an inverted index
+      // So don't create dictionary if the column (1) is member of noDictionary, and (2) is single-value or multi-value
+      // with a fixed-width field, and (3) doesn't have an inverted index
       return (fieldSpec.isSingleValueField() || fieldSpec.getDataType().isFixedWidth())
           && !invertedIndexColumns.contains(column);
     }
