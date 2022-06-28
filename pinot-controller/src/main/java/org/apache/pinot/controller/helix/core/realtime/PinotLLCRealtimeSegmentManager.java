@@ -1477,7 +1477,7 @@ public class PinotLLCRealtimeSegmentManager {
   private Set<String> findConsumingSegments(IdealState idealState) {
     Set<String> consumingSegments = new TreeSet<>();
     idealState.getRecord().getMapFields().forEach((segmentName, instanceToStateMap) -> {
-      for(String state : instanceToStateMap.values()) {
+      for (String state : instanceToStateMap.values()) {
         if (state.equals(SegmentStateModel.CONSUMING)) {
           consumingSegments.add(segmentName);
           break;

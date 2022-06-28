@@ -178,7 +178,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     private String _tableName;
     private Set<String> _segmentNames;
 
-    public ForceCommitMessageHandler(ForceCommitMessage forceCommitMessage, ServerMetrics metrics, NotificationContext ctx) {
+    public ForceCommitMessageHandler(ForceCommitMessage forceCommitMessage, ServerMetrics metrics,
+        NotificationContext ctx) {
       super(forceCommitMessage, metrics, ctx);
       _tableName = forceCommitMessage.getTableName();
       _segmentNames = forceCommitMessage.getSegmentNames();
