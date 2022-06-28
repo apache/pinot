@@ -93,7 +93,8 @@ jobs:
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
             -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
-            -XX:+IgnoreUnrecognizedVMOptions
+            -XX:+IgnoreUnrecognizedVMOptions -XX:NativeMemoryTracking=summary -XX:MaxDirectMemorySize=2G
+            -Dio.grpc.netty.shaded.io.netty.leakDetection.level=PARANOID -Dio.netty.leakDetection.level=PARANOID
             --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
@@ -131,7 +132,8 @@ jobs:
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
             -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
-            -XX:+IgnoreUnrecognizedVMOptions
+            -XX:+IgnoreUnrecognizedVMOptions -XX:NativeMemoryTracking=summary -XX:MaxDirectMemorySize=2G
+            -Dio.grpc.netty.shaded.io.netty.leakDetection.level=PARANOID -Dio.netty.leakDetection.level=PARANOID
             --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED

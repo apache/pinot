@@ -108,8 +108,9 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     LOGGER.info("Shutting down GrpcQueryServer");
     try {
       _server.shutdown().awaitTermination();
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
+    } catch (Throwable t) {
+      LOGGER.error("Error occurred when shutting down GrpcQueryServer", t);
+      throw new RuntimeException(t);
     }
   }
 

@@ -94,8 +94,9 @@ public class GrpcQueryClient {
         if (!_managedChannel.awaitTermination(DEFAULT_CHANNEL_SHUTDOWN_TIMEOUT_SECOND, TimeUnit.SECONDS)) {
           LOGGER.warn("Timed out forcefully shutting down connection: {}. ", _managedChannel);
         }
-      } catch (Exception e) {
-        LOGGER.error("Unexpected exception while waiting for channel termination", e);
+      } catch (Throwable t) {
+        LOGGER.error("Unexpected exception occurred when shutting down GrpcQueryClient", t);
+        throw new RuntimeException(t);
       }
     }
   }
