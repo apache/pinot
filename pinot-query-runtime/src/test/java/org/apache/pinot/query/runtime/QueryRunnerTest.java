@@ -160,6 +160,10 @@ public class QueryRunnerTest {
         new Object[]{"SELECT * FROM a JOIN b on a.col1 = b.col2", 15},
 
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
+        // thus the final JOIN result will be 15 x 1 = 15.
+        new Object[]{"SELECT * FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2", 15},
+
+        // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
         // but only 1 out of 5 rows from table A will be selected out; and all in table B will be selected.
         // thus the final JOIN result will be 1 x 3 x 1 = 3.
         new Object[]{"SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "

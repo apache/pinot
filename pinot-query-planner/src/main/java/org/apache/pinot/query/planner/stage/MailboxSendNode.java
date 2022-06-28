@@ -30,7 +30,7 @@ public class MailboxSendNode extends AbstractStageNode {
   @ProtoProperties
   private RelDistribution.Type _exchangeType;
   @ProtoProperties
-  private KeySelector<Object[], Object> _partitionKeySelector;
+  private KeySelector<Object[], Object[]> _partitionKeySelector;
 
   public MailboxSendNode(int stageId) {
     super(stageId);
@@ -43,7 +43,7 @@ public class MailboxSendNode extends AbstractStageNode {
   }
 
   public MailboxSendNode(int stageId, int receiverStageId,
-      RelDistribution.Type exchangeType, @Nullable KeySelector<Object[], Object> partitionKeySelector) {
+      RelDistribution.Type exchangeType, @Nullable KeySelector<Object[], Object[]> partitionKeySelector) {
     super(stageId);
     _receiverStageId = receiverStageId;
     _exchangeType = exchangeType;
@@ -58,7 +58,7 @@ public class MailboxSendNode extends AbstractStageNode {
     return _exchangeType;
   }
 
-  public KeySelector<Object[], Object> getPartitionKeySelector() {
+  public KeySelector<Object[], Object[]> getPartitionKeySelector() {
     return _partitionKeySelector;
   }
 }

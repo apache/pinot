@@ -58,7 +58,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
 
   private final List<ServerInstance> _receivingStageInstances;
   private final RelDistribution.Type _exchangeType;
-  private final KeySelector<Object[], Object> _keySelector;
+  private final KeySelector<Object[], Object[]> _keySelector;
   private final String _serverHostName;
   private final int _serverPort;
   private final long _jobId;
@@ -69,7 +69,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
 
   public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
       BaseOperator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
-      RelDistribution.Type exchangeType, KeySelector<Object[], Object> keySelector, String hostName, int port,
+      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, String hostName, int port,
       long jobId, int stageId) {
     _mailboxService = mailboxService;
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
@@ -91,7 +91,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
    */
   public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService, BaseDataBlock dataTable,
       List<ServerInstance> receivingStageInstances, RelDistribution.Type exchangeType,
-      KeySelector<Object[], Object> keySelector, String hostName, int port, long jobId, int stageId) {
+      KeySelector<Object[], Object[]> keySelector, String hostName, int port, long jobId, int stageId) {
     _mailboxService = mailboxService;
     _dataTable = dataTable;
     _receivingStageInstances = receivingStageInstances;
@@ -169,7 +169,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   }
 
   private static List<BaseDataBlock> constructPartitionedDataBlock(DataTable dataTable,
-      KeySelector<Object[], Object> keySelector, int partitionSize)
+      KeySelector<Object[], Object[]> keySelector, int partitionSize)
       throws Exception {
     List<List<Object[]>> temporaryRows = new ArrayList<>(partitionSize);
     for (int i = 0; i < partitionSize; i++) {
@@ -177,9 +177,8 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     }
     for (int rowId = 0; rowId < dataTable.getNumberOfRows(); rowId++) {
       Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-      Object key = keySelector.getKey(row);
-      // TODO: support other partitioning algorithm
-      temporaryRows.get(hashToIndex(key, partitionSize)).add(row);
+      int partitionId = keySelector.computeHash(row) % partitionSize;
+      temporaryRows.get(partitionId).add(row);
     }
     List<BaseDataBlock> dataTableList = new ArrayList<>(partitionSize);
     for (int i = 0; i < partitionSize; i++) {
@@ -187,10 +186,6 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
       dataTableList.add(DataBlockBuilder.buildFromRows(objects, null, dataTable.getDataSchema()));
     }
     return dataTableList;
-  }
-
-  private static int hashToIndex(Object key, int partitionSize) {
-    return (key.hashCode()) % partitionSize;
   }
 
   private void sendDataTableBlock(ServerInstance serverInstance, BaseDataBlock dataTable, boolean isEndOfStream)

@@ -51,9 +51,9 @@ public class JoinNode extends AbstractStageNode {
 
   public static class JoinClause {
     @ProtoProperties
-    private KeySelector<Object[], Object> _leftJoinKeySelector;
+    private KeySelector<Object[], Object[]> _leftJoinKeySelector;
     @ProtoProperties
-    private KeySelector<Object[], Object> _rightJoinKeySelector;
+    private KeySelector<Object[], Object[]> _rightJoinKeySelector;
 
     public JoinClause() {
     }
@@ -63,11 +63,11 @@ public class JoinNode extends AbstractStageNode {
       _rightJoinKeySelector = rightKeySelector;
     }
 
-    public KeySelector<Object[], Object> getLeftJoinKeySelector() {
+    public KeySelector<Object[], Object[]> getLeftJoinKeySelector() {
       return _leftJoinKeySelector;
     }
 
-    public KeySelector<Object[], Object> getRightJoinKeySelector() {
+    public KeySelector<Object[], Object[]> getRightJoinKeySelector() {
       return _rightJoinKeySelector;
     }
   }

@@ -19,7 +19,6 @@
 package org.apache.pinot.query.rules;
 
 import com.google.common.collect.ImmutableList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -33,8 +32,8 @@ import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rex.RexCall;
-import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.hints.PinotRelationalHints;
 
 
@@ -72,13 +71,13 @@ public class PinotExchangeNodeInsertRule extends RelOptRule {
     RelNode rightExchange;
     List<RelHint> hints = join.getHints();
     if (hints.contains(PinotRelationalHints.USE_HASH_DISTRIBUTE)) {
-      int leftOperandIndex = ((RexInputRef) ((RexCall) join.getCondition()).getOperands().get(0)).getIndex();
-      int rightOperandIndex = ((RexInputRef) ((RexCall) join.getCondition()).getOperands().get(1)).getIndex()
-          - join.getLeft().getRowType().getFieldNames().size();
+      RexCall joinCondition = (RexCall) join.getCondition();
+      int leftNodeOffset = join.getLeft().getRowType().getFieldNames().size();
+      List<List<Integer>> conditions = PlannerUtils.parseJoinConditions(joinCondition, leftNodeOffset);
       leftExchange = LogicalExchange.create(leftInput,
-          RelDistributions.hash(Collections.singletonList(leftOperandIndex)));
+          RelDistributions.hash(conditions.get(0)));
       rightExchange = LogicalExchange.create(rightInput,
-          RelDistributions.hash(Collections.singletonList(rightOperandIndex)));
+          RelDistributions.hash(conditions.get(1)));
     } else { // if (hints.contains(PinotRelationalHints.USE_BROADCAST_JOIN))
       leftExchange = LogicalExchange.create(leftInput, RelDistributions.SINGLETON);
       rightExchange = LogicalExchange.create(rightInput, RelDistributions.BROADCAST_DISTRIBUTED);

@@ -28,11 +28,9 @@ import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalTableScan;
-import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexCall;
-import org.apache.calcite.rex.RexInputRef;
-import org.apache.calcite.sql.SqlKind;
+import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.JoinNode;
@@ -89,19 +87,15 @@ public final class RelToStageConverter {
 
   private static StageNode convertLogicalJoin(LogicalJoin node, int currentStageId) {
     JoinRelType joinType = node.getJoinType();
+    Preconditions.checkState(node.getCondition() instanceof RexCall);
     RexCall joinCondition = (RexCall) node.getCondition();
-    Preconditions.checkState(
-        joinCondition.getOperator().getKind().equals(SqlKind.EQUALS) && joinCondition.getOperands().size() == 2,
-        "only equality JOIN is supported");
-    Preconditions.checkState(joinCondition.getOperands().get(0) instanceof RexInputRef, "only reference supported");
-    Preconditions.checkState(joinCondition.getOperands().get(1) instanceof RexInputRef, "only reference supported");
-    RelDataType leftRowType = node.getLeft().getRowType();
-    RelDataType rightRowType = node.getRight().getRowType();
-    int leftOperandIndex = ((RexInputRef) joinCondition.getOperands().get(0)).getIndex();
-    int rightOperandIndex = ((RexInputRef) joinCondition.getOperands().get(1)).getIndex();
-    FieldSelectionKeySelector leftFieldSelectionKeySelector = new FieldSelectionKeySelector(leftOperandIndex);
-    FieldSelectionKeySelector rightFieldSelectionKeySelector =
-          new FieldSelectionKeySelector(rightOperandIndex - leftRowType.getFieldNames().size());
+
+    // Parse out all equality JOIN conditions
+    int leftNodeOffset = node.getLeft().getRowType().getFieldList().size();
+    List<List<Integer>> predicateColumns = PlannerUtils.parseJoinConditions(joinCondition, leftNodeOffset);
+
+    FieldSelectionKeySelector leftFieldSelectionKeySelector = new FieldSelectionKeySelector(predicateColumns.get(0));
+    FieldSelectionKeySelector rightFieldSelectionKeySelector = new FieldSelectionKeySelector(predicateColumns.get(1));
     return new JoinNode(currentStageId, joinType, Collections.singletonList(new JoinNode.JoinClause(
         leftFieldSelectionKeySelector, rightFieldSelectionKeySelector)));
   }
