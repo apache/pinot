@@ -27,19 +27,25 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
-import org.apache.commons.lang3.tuple.Pair;
+import javax.ws.rs.core.Response;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
+import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -49,27 +55,58 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
 @Path("/")
 public class PinotRealtimeTableResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeTableResource.class);
+
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
+
+  @Inject
+  PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
+
+  @POST
+  @Path("/tables/{tableName}/pauseConsumption")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Pause consumption of a realtime table",
+      notes = "Pause the consumption of a realtime table")
+  public Response pauseConsumption(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+    try {
+      String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      _pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType);
+      return Response.ok().build();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
 
   @POST
   @Path("/tables/{tableName}/resumeConsumption")
   @Produces(MediaType.APPLICATION_JSON)
-  @Consumes(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Resume the consumption of a realtime table",
-      notes = "Resume the consumption of a realtime table")
-  public String resumeConsumption(
-      @ApiParam(value = "Name of the table", required = true)
-      @PathParam("tableName") String tableName) throws JsonProcessingException {
-    // TODO: Add util method for invoking periodic tasks
-    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    Map<String, String> taskProperties = new HashMap<>();
-    taskProperties.put(RealtimeSegmentValidationManager.RECREATE_DELETED_CONSUMING_SEGMENT_KEY, "true");
+  @ApiOperation(value = "Resume consumption of a realtime table",
+      notes = "Resume the consumption for a realtime table")
+  public Response resumeConsumption(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+    try {
+      String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      _pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType);
+      return Response.ok().build();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
 
-    Pair<String, Integer> taskExecutionDetails = _pinotHelixResourceManager
-        .invokeControllerPeriodicTask(tableNameWithType, Constants.REALTIME_SEGMENT_VALIDATION_MANAGER, taskProperties);
-
-    return "{\"Log Request Id\": \"" + taskExecutionDetails.getLeft()
-        + "\",\"Controllers notified\":" + (taskExecutionDetails.getRight() > 0) + "}";
+  @GET
+  @Path("/tables/{tableName}/consumptionStatus")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Return consumption status of a realtime table",
+      notes = "Return consumption status of a realtime table. It can be CONSUMING, PAUSED, CONSUMING(RESUMED)")
+  public Response getConsumptionStatus(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+    try {
+      String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      return Response.ok().entity(_pinotLLCRealtimeSegmentManager.getConsumptionStatus(tableNameWithType)).build();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
   }
 }

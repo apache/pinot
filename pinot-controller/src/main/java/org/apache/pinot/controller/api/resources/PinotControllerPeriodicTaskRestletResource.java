@@ -62,7 +62,7 @@ public class PinotControllerPeriodicTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/run")
   @ApiOperation(value = "Run periodic task against table. If table name is missing, task will run against all tables.")
-  public String runPeriodicTask(
+  public Response runPeriodicTask(
       @ApiParam(value = "Periodic task name", required = true) @QueryParam("taskname") String periodicTaskName,
       @ApiParam(value = "Name of the table") @QueryParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE | REALTIME") @QueryParam("type") String tableType) {
@@ -87,11 +87,9 @@ public class PinotControllerPeriodicTaskRestletResource {
       tableName = matchingTableNamesWithType.get(0);
     }
 
-    Pair<String, Integer> taskExecutionDetails = _pinotHelixResourceManager
-        .invokeControllerPeriodicTask(tableName, periodicTaskName, null);
-
-    return "{\"Log Request Id\": \"" + taskExecutionDetails.getLeft()
-        + "\",\"Controllers notified\":" + (taskExecutionDetails.getRight() > 0) + "}";
+    return Response.ok()
+        .entity(_pinotHelixResourceManager.invokeControllerPeriodicTask(tableName, periodicTaskName, null))
+        .build();
   }
 
   @GET

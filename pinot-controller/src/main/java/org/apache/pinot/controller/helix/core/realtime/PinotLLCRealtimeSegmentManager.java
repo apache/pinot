@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -36,13 +38,16 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
+import org.apache.helix.Criteria;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
+import org.apache.helix.InstanceType;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.messages.ForceCommitMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -56,6 +61,7 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
+import org.apache.pinot.controller.api.resources.Constants;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -67,6 +73,7 @@ import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpd
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
+import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -121,6 +128,9 @@ public class PinotLLCRealtimeSegmentManager {
 
   private static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
+
+  // simple field in Ideal State representing pause status for the table
+  private static final String IS_TABLE_PAUSED = "isTablePaused";
 
   // Max time to wait for all LLC segments to complete committing their metadata while stopping the controller.
   private static final long MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS = 30_000L;
@@ -552,12 +562,12 @@ public class PinotLLCRealtimeSegmentManager {
             .collect(Collectors.toSet());
     int numPartitionGroups = newPartitionGroupMetadataList.size();
 
-    // Only if committingSegment's partitionGroup is present in the newPartitionGroupMetadataList, we create new
-    // segment metadata
     String newConsumingSegmentName = null;
-    String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
-    long newSegmentCreationTimeMs = getCurrentTimeMs();
-    if (newPartitionGroupSet.contains(committingSegmentPartitionGroupId)) {
+    if (!isTablePaused(idealState) && newPartitionGroupSet.contains(committingSegmentPartitionGroupId)) {
+      // Only if committingSegment's partitionGroup is present in the newPartitionGroupMetadataList, we create new
+      // segment metadata
+      String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
+      long newSegmentCreationTimeMs = getCurrentTimeMs();
       LLCSegmentName newLLCSegment = new LLCSegmentName(rawTableName, committingSegmentPartitionGroupId,
           committingLLCSegment.getSequenceNumber() + 1, newSegmentCreationTimeMs);
       createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegment, newSegmentCreationTimeMs,
@@ -854,7 +864,6 @@ public class PinotLLCRealtimeSegmentManager {
    *
    * If the controller fails after step-3, we are fine because the idealState has the new segments.
    * If the controller fails before step-1, the server will see this as an upload failure, and will re-try.
-   * @param tableConfig
    *
    * If the consuming segment is deleted by user intentionally or by mistake:
    * Check whether there are segments in the PROPERTYSTORE with status DONE, but no new segment in status
@@ -873,7 +882,9 @@ public class PinotLLCRealtimeSegmentManager {
     String realtimeTableName = tableConfig.getTableName();
     HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
       assert idealState != null;
-      if (idealState.isEnabled()) {
+      boolean isTableEnabled = idealState.isEnabled();
+      boolean isTablePaused = isTablePaused(idealState);
+      if (isTableEnabled && !isTablePaused) {
         List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
             getPartitionGroupConsumptionStatusList(idealState, streamConfig);
         // Read the smallest offset when a new partition is detected
@@ -885,7 +896,8 @@ public class PinotLLCRealtimeSegmentManager {
         return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupMetadataList,
             recreateDeletedConsumingSegment);
       } else {
-        LOGGER.info("Skipping LLC segments validation for disabled table: {}", realtimeTableName);
+        LOGGER.info("Skipping LLC segments validation for table: {}, isTableEnabled: {}, isTablePaused: {}",
+            realtimeTableName, isTableEnabled, isTablePaused);
         return idealState;
       }
     }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f), true);
@@ -916,9 +928,13 @@ public class PinotLLCRealtimeSegmentManager {
             "Exceeded max segment completion time for segment " + committingSegmentName);
       }
       updateInstanceStatesForNewConsumingSegment(idealState.getRecord().getMapFields(), committingSegmentName,
-          newSegmentName, segmentAssignment, instancePartitionsMap);
+          isTablePaused(idealState) ? null : newSegmentName, segmentAssignment, instancePartitionsMap);
       return idealState;
     }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f));
+  }
+
+  private boolean isTablePaused(IdealState idealState) {
+    return Boolean.parseBoolean(idealState.getRecord().getSimpleField(IS_TABLE_PAUSED));
   }
 
   @VisibleForTesting
@@ -1397,6 +1413,110 @@ public class PinotLLCRealtimeSegmentManager {
             ControllerMeter.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR, 1L);
         LOGGER.error("Failed to upload segment {} to deep store", segmentName, e);
       }
+    }
+  }
+
+  /**
+   * Pause consumption on a table by
+   *   1) setting "isPausedFlag" in ideal states to true and
+   *   2) sending force commit messages to servers
+   */
+  public void pauseConsumption(String tableNameWithType) {
+    IdealState updatedIdealState = updatePauseStatusInIdealState(tableNameWithType, true);
+    sendForceCommitMessageToServers(tableNameWithType, updatedIdealState);
+  }
+
+  /**
+   * Resume consumption on a table by
+   *   1) setting "isPausedFlag" in ideal states to false and
+   *   2) triggering segment validation job to create new consuming segments in ideal states
+   */
+  public void resumeConsumption(String tableNameWithType) {
+    updatePauseStatusInIdealState(tableNameWithType, false);
+
+    // trigger realtime segment validation task to resume consumption
+    Map<String, String> taskProperties = new HashMap<>();
+    taskProperties.put(RealtimeSegmentValidationManager.RECREATE_DELETED_CONSUMING_SEGMENT_KEY, "true");
+    _helixResourceManager
+        .invokeControllerPeriodicTask(tableNameWithType, Constants.REALTIME_SEGMENT_VALIDATION_MANAGER, taskProperties);
+  }
+
+  private IdealState updatePauseStatusInIdealState(String tableNameWithType, boolean pause) {
+    IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
+      Preconditions.checkNotNull(idealState, "Ideal State is null for table " + tableNameWithType);
+      Preconditions.checkState(idealState.isEnabled(), "Ideal State is disabled for table " + tableNameWithType);
+      ZNRecord znRecord = idealState.getRecord();
+      znRecord.setSimpleField(IS_TABLE_PAUSED, Boolean.valueOf(pause).toString());
+      return new IdealState(znRecord);
+    }, RetryPolicies.noDelayRetryPolicy(1));
+    LOGGER.info("Set 'isTablePaused' to {} in the Ideal State for table {}.", pause, tableNameWithType);
+    return updatedIdealState;
+  }
+
+  private void sendForceCommitMessageToServers(String tableNameWithType, IdealState idealState) {
+    Set<String> consumingSegments = findConsumingSegments(idealState);
+    if (!consumingSegments.isEmpty()) {
+      Criteria recipientCriteria = new Criteria();
+      recipientCriteria.setInstanceName("%");
+      recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+      recipientCriteria.setResource(tableNameWithType);
+      recipientCriteria.setSessionSpecific(true);
+      ForceCommitMessage message = new ForceCommitMessage(tableNameWithType, consumingSegments);
+      int numMessagesSent = _helixManager.getMessagingService().send(recipientCriteria, message, null, -1);
+      if (numMessagesSent > 0) {
+        LOGGER.info("Sent {} force commit messages for table: {} segments: {}", numMessagesSent, tableNameWithType,
+            consumingSegments);
+      } else {
+        throw new RuntimeException(String
+            .format("No force commit message was sent for table: %s segments: %s", tableNameWithType,
+                consumingSegments));
+      }
+    }
+  }
+
+  private Set<String> findConsumingSegments(IdealState idealState) {
+    Set<String> consumingSegments = new TreeSet<>();
+    idealState.getRecord().getMapFields().forEach((segmentName, instanceToStateMap) -> {
+      for(String state : instanceToStateMap.values()) {
+        if (state.equals(SegmentStateModel.CONSUMING)) {
+          consumingSegments.add(segmentName);
+          break;
+        }
+      }
+    });
+    return consumingSegments;
+  }
+
+  /**
+   * Return consumption status:
+   *   - the value of `isTablePaused` flag in ideal state
+   *   - list of consuming segments
+   */
+  public ConsumptionStatus getConsumptionStatus(String tableNameWithType) {
+    IdealState idealState = getIdealState(tableNameWithType);
+    String isTablePausedStr = idealState.getRecord().getSimpleField(IS_TABLE_PAUSED);
+    Set<String> consumingSegments = findConsumingSegments(idealState);
+    return new ConsumptionStatus(Boolean.parseBoolean(isTablePausedStr), consumingSegments);
+  }
+
+  public static class ConsumptionStatus {
+
+    private boolean _isPauseFlagSet;
+    private Set<String> _consumingSegments;
+
+    ConsumptionStatus(Boolean isPauseFlagSet, Set<String> consumingSegments) {
+      _isPauseFlagSet = isPauseFlagSet;
+      _consumingSegments = consumingSegments;
+    }
+
+    @JsonProperty("isPauseFlagSet")
+    public boolean isPauseFlagSet() {
+      return _isPauseFlagSet;
+    }
+
+    @JsonProperty("consumingSegments")
+    public Set<String> getConsumingSegments() {
+      return _consumingSegments;
     }
   }
 }

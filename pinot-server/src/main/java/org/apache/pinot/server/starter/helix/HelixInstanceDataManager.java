@@ -49,6 +49,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
@@ -64,6 +65,7 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -461,5 +463,28 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public SegmentUploader getSegmentUploader() {
     return _segmentUploader;
+  }
+
+  @Override
+  public void forceCommit(String tableNameWithType, Set<String> segmentNames) {
+    Preconditions.checkArgument(TableNameBuilder.isRealtimeTableResource(tableNameWithType), String
+        .format("Force commit is only supported for segments of realtime tables - table name: %s segment names: %s",
+            tableNameWithType, segmentNames));
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager != null) {
+      segmentNames.forEach(segName -> {
+        SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segName);
+        if (segmentDataManager != null) {
+          try {
+            if (segmentDataManager instanceof LLRealtimeSegmentDataManager) {
+              LLRealtimeSegmentDataManager llSegmentDataManager = (LLRealtimeSegmentDataManager) segmentDataManager;
+              llSegmentDataManager.forceCommit();
+            }
+          } finally {
+            tableDataManager.releaseSegment(segmentDataManager);
+          }
+        }
+      });
+    }
   }
 }

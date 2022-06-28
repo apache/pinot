@@ -89,12 +89,12 @@ public class HelixHelper {
    * @param helixManager The HelixManager used to interact with the Helix cluster
    * @param resourceName The resource for which to update the ideal state
    * @param updater A function that returns an updated ideal state given an input ideal state
+   * @return updated ideal state if successful, null if not
    */
-  // TODO: since updater always update ideal state in place, it should return boolean indicating whether the ideal
-  //  state get changed.
-  public static void updateIdealState(final HelixManager helixManager, final String resourceName,
+  public static IdealState updateIdealState(final HelixManager helixManager, final String resourceName,
       final Function<IdealState, IdealState> updater, RetryPolicy policy, final boolean noChangeOk) {
     try {
+      IdealStateWrapper idealStateWrapper = new IdealStateWrapper();
       policy.attempt(new Callable<Boolean>() {
         @Override
         public Boolean call() {
@@ -139,6 +139,7 @@ public class HelixHelper {
               if (dataAccessor.getBaseDataAccessor()
                   .set(idealStateKey.getPath(), updatedZNRecord, idealState.getRecord().getVersion(),
                       AccessOption.PERSISTENT)) {
+                idealStateWrapper._idealState = updatedIdealState;
                 return true;
               } else {
                 LOGGER.warn("Failed to update ideal state for resource: {}", resourceName);
@@ -158,13 +159,19 @@ public class HelixHelper {
             } else {
               LOGGER.warn("Idempotent or null ideal state update for resource {}, skipping update.", resourceName);
             }
+            idealStateWrapper._idealState = idealState;
             return true;
           }
         }
       });
+      return idealStateWrapper._idealState;
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while updating ideal state for resource: " + resourceName, e);
     }
+  }
+
+  private static class IdealStateWrapper {
+    IdealState _idealState;
   }
 
   /**
@@ -181,14 +188,14 @@ public class HelixHelper {
     }
   }
 
-  public static void updateIdealState(HelixManager helixManager, String resourceName,
+  public static IdealState updateIdealState(HelixManager helixManager, String resourceName,
       Function<IdealState, IdealState> updater) {
-    updateIdealState(helixManager, resourceName, updater, DEFAULT_TABLE_IDEALSTATES_UPDATE_RETRY_POLICY, false);
+    return updateIdealState(helixManager, resourceName, updater, DEFAULT_TABLE_IDEALSTATES_UPDATE_RETRY_POLICY, false);
   }
 
-  public static void updateIdealState(final HelixManager helixManager, final String resourceName,
+  public static IdealState updateIdealState(final HelixManager helixManager, final String resourceName,
       final Function<IdealState, IdealState> updater, RetryPolicy policy) {
-    updateIdealState(helixManager, resourceName, updater, policy, false);
+    return updateIdealState(helixManager, resourceName, updater, policy, false);
   }
 
   /**

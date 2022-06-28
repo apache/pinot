@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
@@ -3587,9 +3588,9 @@ public class PinotHelixResourceManager {
    * @param tableName Name of table against which task is to be run
    * @param periodicTaskName Task name
    * @param taskProperties Extra properties to be passed along
-   * @return Task id for filtering logs, along with the number of successfully sent messages
+   * @return Task id for filtering logs, along with success status (whether helix messeages were sent)
    */
-  public Pair<String, Integer> invokeControllerPeriodicTask(String tableName, String periodicTaskName,
+  public PeriodicTaskInvocationResponse invokeControllerPeriodicTask(String tableName, String periodicTaskName,
       Map<String, String> taskProperties) {
     String periodicTaskRequestId = API_REQUEST_ID_PREFIX + UUID.randomUUID().toString().substring(0, 8);
 
@@ -3613,7 +3614,27 @@ public class PinotHelixResourceManager {
 
     LOGGER.info("[TaskRequestId: {}] Periodic task execution message sent to {} controllers.", periodicTaskRequestId,
         messageCount);
-    return Pair.of(periodicTaskRequestId, messageCount);
+    return new PeriodicTaskInvocationResponse(periodicTaskRequestId, messageCount > 0);
+  }
+
+  public static class PeriodicTaskInvocationResponse {
+    String _taskId;
+    boolean _isSuccessful;
+
+    public PeriodicTaskInvocationResponse(String taskId, boolean isSuccessful) {
+      _taskId = taskId;
+      _isSuccessful = isSuccessful;
+    }
+
+    @JsonProperty("isSuccessful")
+    public boolean isSuccessful() {
+      return _isSuccessful;
+    }
+
+    @JsonProperty("taskId")
+    public String getTaskId() {
+      return _taskId;
+    }
   }
 
   /*
