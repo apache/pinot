@@ -26,7 +26,6 @@ import com.google.common.util.concurrent.RateLimiter;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -456,12 +455,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Send empty response since we don't need to evaluate either offline or realtime request.
       BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
       // Extract source info from incoming request
-      Collection<String> remoteIps = null;
-      if (requesterIdentity != null) {
-        remoteIps = ((HttpRequesterIdentity) requesterIdentity).getHttpHeaders().get("X-Forwarded-For");
-      }
       logBrokerResponse(requestId, query, requestContext, tableName, 0, new ServerStats(), brokerResponse,
-          System.nanoTime(), remoteIps);
+          System.nanoTime(), requesterIdentity);
       return brokerResponse;
     }
 
@@ -594,13 +589,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     augmentStatistics(requestContext, brokerResponse);
 
     // Extract source info from incoming request
-    Collection<String> clientIp = null;
-    if (requesterIdentity != null) {
-      clientIp = ((HttpRequesterIdentity) requesterIdentity).getHttpHeaders().get("X-Forwarded-For");
-    }
-
     logBrokerResponse(requestId, query, requestContext, tableName, numUnavailableSegments, serverStats, brokerResponse,
-        totalTimeMs, clientIp);
+        totalTimeMs, requesterIdentity);
     return brokerResponse;
   }
 
@@ -672,10 +662,29 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   private void logBrokerResponse(long requestId, String query, RequestContext requestContext, String tableName,
       int numUnavailableSegments, ServerStats serverStats, BrokerResponseNative brokerResponse, long totalTimeMs,
-      @Nullable Collection<String> clientIp) {
+      @Nullable RequesterIdentity requesterIdentity) {
     LOGGER.debug("Broker Response: {}", brokerResponse);
+
     boolean enableClientIpLogging = _config.getProperty(Broker.CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING,
         Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING);
+    String clientIp = "";
+    // If reverse proxy is used X-Forwarded-For will be populated
+    // If X-Forwarded-For is not present, check if x-real-ip is present
+    // Since X-Forwarded-For can contain comma separated list of values, we convert it to ";" delimiter to avoid
+    // downstream parsing errors for other fields where "," is being used
+    if (enableClientIpLogging && requesterIdentity != null) {
+      for (Map.Entry<String, String> entries : ((HttpRequesterIdentity) requesterIdentity).getHttpHeaders().entries()) {
+        if (entries.getKey().equalsIgnoreCase("x-forwarded-for")) {
+          if (entries.getValue().contains(",")) {
+            clientIp = String.join(";", entries.getValue().split(","));
+          } else {
+            clientIp = entries.getValue();
+          }
+        } else if (entries.getKey().equalsIgnoreCase("x-real-ip")) {
+          clientIp = entries.getValue();
+        }
+      }
+    }
 
 
     // Please keep the format as name=value comma-separated with no spaces
@@ -700,8 +709,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           brokerResponse.getOfflineThreadCpuTimeNs(), brokerResponse.getOfflineSystemActivitiesCpuTimeNs(),
           brokerResponse.getOfflineResponseSerializationCpuTimeNs(), brokerResponse.getRealtimeTotalCpuTimeNs(),
           brokerResponse.getRealtimeThreadCpuTimeNs(), brokerResponse.getRealtimeSystemActivitiesCpuTimeNs(),
-          brokerResponse.getRealtimeResponseSerializationCpuTimeNs(),
-          enableClientIpLogging ? (clientIp == null ? "" : StringUtils.join(clientIp, ";")) : "",
+          brokerResponse.getRealtimeResponseSerializationCpuTimeNs(), clientIp,
           StringUtils.substring(query, 0, _queryLogLength));
 
       // Limit the dropping log message at most once per second.
