@@ -142,7 +142,7 @@ public class PulsarConsumerTest {
 
   private long getNumberOfEntries(PulsarAdmin admin, String topicName) {
     try {
-      return admin.topics().getPartitionedStats(topicName, false).msgInCounter;
+      return admin.topics().getPartitionedStats(topicName, false).getMsgInCounter();
     } catch (Exception e) {
       e.printStackTrace();
       LOGGER.warn("Could not fetch number of rows in pulsar topic " + topicName, e);
@@ -377,7 +377,8 @@ public class PulsarConsumerTest {
   private MessageId getMessageIdForPartitionAndIndex(int partitionNum, int index) {
     MessageId startMessageIdRaw = _partitionToFirstMessageIdMap.get(partitionNum);
     MessageIdImpl startMessageId = MessageIdImpl.convertToMessageIdImpl(startMessageIdRaw);
-    return DefaultImplementation.newMessageId(startMessageId.getLedgerId(), index, partitionNum);
+    return DefaultImplementation.getDefaultImplementation()
+        .newMessageId(startMessageId.getLedgerId(), index, partitionNum);
   }
 
   private MessageId getBatchMessageIdForPartitionAndIndex(int partitionNum, int index) {

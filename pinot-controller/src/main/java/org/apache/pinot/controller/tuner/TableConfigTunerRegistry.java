@@ -69,7 +69,7 @@ public class TableConfigTunerRegistry {
     }
 
     Reflections reflections = new Reflections(
-        new ConfigurationBuilder().setUrls(urls).filterInputsBy(new FilterBuilder.Include(".*\\.tuner\\..*"))
+        new ConfigurationBuilder().setUrls(urls).filterInputsBy(new FilterBuilder().includePattern(".*\\.tuner\\..*"))
             .setScanners(new ResourcesScanner(), new TypeAnnotationsScanner(), new SubTypesScanner()));
     Set<Class<?>> classes = reflections.getTypesAnnotatedWith(Tuner.class);
     classes.forEach(tunerClass -> {

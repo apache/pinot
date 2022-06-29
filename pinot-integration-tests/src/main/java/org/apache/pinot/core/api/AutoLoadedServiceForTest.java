@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.api;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import org.jvnet.hk2.annotations.Service;
 
 @Service

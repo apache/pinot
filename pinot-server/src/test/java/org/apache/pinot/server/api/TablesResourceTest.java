@@ -19,10 +19,10 @@
 package org.apache.pinot.server.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.ws.rs.core.Response;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;

@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.common.auth;
 
+import jakarta.ws.rs.core.HttpHeaders;
 import java.util.Collections;
 import java.util.Map;
-import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.spi.auth.AuthProvider;
 
 

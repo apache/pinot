@@ -29,13 +29,24 @@
     <relativePath>..</relativePath>
   </parent>
 
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>${maven.surefire.plugin.version}</version>
+        <configuration combine.children="override">
+          <skip>false</skip>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 
   <artifactId>pinot-protobuf</artifactId>
   <name>Pinot Protocol Buffers</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <proto.version>3.11.4</proto.version>
     <phase.prop>package</phase.prop>
   </properties>
   <dependencies>
@@ -46,7 +57,7 @@
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
-      <version>${proto.version}</version>
+      <version>${protobuf.version}</version>
     </dependency>
   </dependencies>
 </project>

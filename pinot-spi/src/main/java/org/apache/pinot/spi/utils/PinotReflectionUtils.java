@@ -39,7 +39,8 @@ public class PinotReflectionUtils {
     synchronized (getReflectionLock()) {
       Reflections reflections = new Reflections(
           new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage(PINOT_PACKAGE_PREFIX))
-              .filterInputsBy(new FilterBuilder.Include(regexPattern)).setScanners(new TypeAnnotationsScanner()));
+              .filterInputsBy(
+                  new FilterBuilder().includePattern(regexPattern)).setScanners(new TypeAnnotationsScanner()));
       return reflections.getTypesAnnotatedWith(annotation, true);
     }
   }

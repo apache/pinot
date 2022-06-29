@@ -46,7 +46,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-storage</artifactId>
-      <version>1.113.1</version>
+      <version>2.8.1</version>
       <exclusions>
         <exclusion>
           <groupId>com.google.guava</groupId>
@@ -55,6 +55,22 @@
         <exclusion>
           <groupId>com.google.protobuf</groupId>
           <artifactId>protobuf-java</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.google.errorprone</groupId>
+          <artifactId>error_prone_annotations</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.google.apis</groupId>
+          <artifactId>google-api-services-storage</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.checkerframework</groupId>
+          <artifactId>checker-qual</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.google.oauth-client</groupId>
+          <artifactId>google-oauth-client</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -65,18 +81,34 @@
     <dependency>
       <groupId>com.google.api-client</groupId>
       <artifactId>google-api-client</artifactId>
-      <version>1.30.10</version>
+      <version>1.34.1</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.oauth-client</groupId>
+          <artifactId>google-oauth-client</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.google.http-client</groupId>
       <artifactId>google-http-client</artifactId>
-      <version>1.36.0</version>
+      <version>1.41.8</version>
+      <exclusions>
+        <exclusion>
+          <groupId>io.opencensus</groupId>
+          <artifactId>opencensus-contrib-http-util</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.opencensus</groupId>
+          <artifactId>opencensus-api</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <!-- Due to dependency convergence issues with google cloud storage: https://github.com/googleapis/google-cloud-java/issues/4175 -->
     <dependency>
       <groupId>com.google.api.grpc</groupId>
       <artifactId>proto-google-common-protos</artifactId>
-      <version>1.18.1</version>
+      <version>2.8.3</version>
       <exclusions>
         <exclusion>
           <groupId>com.google.protobuf</groupId>
@@ -87,7 +119,7 @@
     <dependency>
       <groupId>com.google.api.grpc</groupId>
       <artifactId>proto-google-iam-v1</artifactId>
-      <version>1.0.0</version>
+      <version>1.3.4</version>
       <exclusions>
         <exclusion>
           <groupId>com.google.protobuf</groupId>
@@ -102,7 +134,7 @@
     <dependency>
       <groupId>com.google.apis</groupId>
       <artifactId>google-api-services-storage</artifactId>
-      <version>v1-rev20200814-1.30.10</version>
+      <version>v1-rev20220608-1.32.1</version>
       <exclusions>
         <exclusion>
           <groupId>com.google.api-client</groupId>
@@ -113,7 +145,7 @@
     <dependency>
       <groupId>com.google.api</groupId>
       <artifactId>gax-httpjson</artifactId>
-      <version>0.75.2</version>
+      <version>0.103.1</version>
       <exclusions>
         <exclusion>
           <groupId>com.google.http-client</groupId>
@@ -134,6 +166,14 @@
         <exclusion>
           <groupId>com.google.auth</groupId>
           <artifactId>google-auth-library-oauth2-http</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.google.http-client</groupId>
+          <artifactId>google-http-client-gson</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.google.protobuf</groupId>
+          <artifactId>protobuf-java-util</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

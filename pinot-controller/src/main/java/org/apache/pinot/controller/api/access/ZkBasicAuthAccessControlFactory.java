@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.controller.api.access;
 
+import jakarta.ws.rs.core.HttpHeaders;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.common.config.provider.AccessControlUserCache;
 import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.controller.ControllerConf;

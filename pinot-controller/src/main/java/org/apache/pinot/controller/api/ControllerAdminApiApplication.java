@@ -19,14 +19,14 @@
 package org.apache.pinot.controller.api;
 
 import io.swagger.jaxrs.config.BeanConfig;
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerResponseContext;
+import jakarta.ws.rs.container.ContainerResponseFilter;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.List;
 import javax.servlet.http.HttpServletResponse;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.container.ContainerResponseContext;
-import javax.ws.rs.container.ContainerResponseFilter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AuthenticationFilter;
 import org.apache.pinot.core.api.ServiceAutoDiscoveryFeature;

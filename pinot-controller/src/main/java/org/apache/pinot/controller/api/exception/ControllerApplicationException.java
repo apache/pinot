@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.controller.api.exception;
 
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response;
 import javax.annotation.Nullable;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 
 

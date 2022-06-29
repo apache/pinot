@@ -114,7 +114,8 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
                 ((BatchMessageIdImpl) currentMessageId).getAcker());
       }
     } else {
-      nextMessageId = DefaultImplementation.newMessageId(currentLedgerId, currentEntryId + 1, currentPartitionIndex);
+      nextMessageId = DefaultImplementation.getDefaultImplementation()
+          .newMessageId(currentLedgerId, currentEntryId + 1, currentPartitionIndex);
     }
     return new MessageIdStreamOffset(nextMessageId);
   }

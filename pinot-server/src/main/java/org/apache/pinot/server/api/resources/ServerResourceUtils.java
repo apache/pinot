@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.server.api.resources;
 
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Response;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.server.starter.ServerInstance;

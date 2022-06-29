@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import jakarta.ws.rs.core.Response;
 import java.util.List;
 import javax.annotation.Nullable;
-import javax.ws.rs.core.Response;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;

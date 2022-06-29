@@ -118,8 +118,23 @@
       <artifactId>jersey-media-json-jackson</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.glassfish.jersey.containers</groupId>
+      <artifactId>jersey-container-servlet-core</artifactId>
+      <version>${jersey.version}</version>
+    </dependency>
+    <dependency>
       <groupId>io.swagger</groupId>
       <artifactId>swagger-jersey2-jaxrs</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>org.glassfish.jersey.containers</groupId>
+          <artifactId>jersey-container-servlet-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.glassfish.jersey.media</groupId>
+          <artifactId>jersey-media-multipart</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
@@ -153,6 +168,10 @@
           <groupId>com.fasterxml.jackson.core</groupId>
           <artifactId>jackson-databind</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.reflections</groupId>
+          <artifactId>reflections</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -168,20 +187,27 @@
     <dependency>
       <groupId>org.apache.helix</groupId>
       <artifactId>helix-core</artifactId>
+      <version>${helix.version}</version>
       <exclusions>
         <exclusion>
           <groupId>io.netty</groupId>
           <artifactId>netty</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.codehaus.jackson</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>com.101tec</groupId>
-      <artifactId>zkclient</artifactId>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-all</artifactId>
+      <version>${netty.version}</version>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
+      <version>${mockito.version}</version>
       <scope>test</scope>
     </dependency>
     <!-- End Helix Related Depedency -->
@@ -196,6 +222,17 @@
     <dependency>
       <groupId>org.quartz-scheduler</groupId>
       <artifactId>quartz</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.hk2.external</groupId>
+      <artifactId>jakarta.inject</artifactId>
+      <version>2.6.1</version>
+    </dependency>
+    <!-- the old swagger does not allow to replace it with jakarta.ws.rs -->
+    <dependency>
+       <groupId>javax.ws.rs</groupId>
+       <artifactId>javax.ws.rs-api</artifactId>
+       <version>2.1.1</version>
     </dependency>
   </dependencies>
   <build>
@@ -278,8 +315,9 @@
           version upgraded to 3.0.0-M5 since the earlier version (2.19) was causing test cases defined in suites to run
           twice. See https://github.com/apache/pinot/pull/6326#issue-533412053 for more details.
         -->
-        <version>3.0.0-M5</version>
+        <version>${maven.surefire.plugin.version}</version>
         <configuration combine.children="override">
+          <skip>false</skip>
           <suiteXmlFiles>
             <suiteXmlFile>testng-statefull.xml</suiteXmlFile>
             <suiteXmlFile>testng-stateless.xml</suiteXmlFile>

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.controller.api.access;
 
-import javax.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.HttpHeaders;
 
 
 public class AllowAllAccessFactory implements AccessControlFactory {

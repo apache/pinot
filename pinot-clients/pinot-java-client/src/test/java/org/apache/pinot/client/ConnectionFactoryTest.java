@@ -23,7 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import org.I0Itec.zkclient.ZkClient;
+import org.apache.helix.manager.zk.ZkClient;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;

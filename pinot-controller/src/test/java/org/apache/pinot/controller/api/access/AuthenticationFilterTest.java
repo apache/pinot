@@ -19,9 +19,9 @@
 
 package org.apache.pinot.controller.api.access;
 
+import jakarta.ws.rs.core.MultivaluedHashMap;
+import jakarta.ws.rs.core.MultivaluedMap;
 import java.util.Optional;
-import javax.ws.rs.core.MultivaluedHashMap;
-import javax.ws.rs.core.MultivaluedMap;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

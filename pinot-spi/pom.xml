@@ -40,6 +40,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
+        <version>${maven.surefire.plugin.version}</version>
         <configuration>
           <forkCount>1</forkCount>
           <reuseForks>true</reuseForks>
@@ -160,6 +161,7 @@
         <plugins>
           <plugin>
             <artifactId>maven-shade-plugin</artifactId>
+            <version>${maven.shade.plugin.version}</version>
             <executions>
               <execution>
                 <phase>package</phase>

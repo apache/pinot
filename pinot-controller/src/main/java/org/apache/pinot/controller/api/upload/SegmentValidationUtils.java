@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.controller.api.upload;
 
+import jakarta.ws.rs.core.Response;
 import java.io.File;
 import java.util.concurrent.Executor;
-import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ControllerMetrics;

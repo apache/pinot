@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.controller.util;
 
+import jakarta.ws.rs.core.Response;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;

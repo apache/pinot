@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import jakarta.inject.Inject;
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerResponseContext;
+import jakarta.ws.rs.container.ContainerResponseFilter;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.ext.Provider;
 import java.io.IOException;
-import javax.inject.Inject;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.container.ContainerResponseContext;
-import javax.ws.rs.container.ContainerResponseFilter;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.ext.Provider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +36,7 @@ public class ControllerResponseFilter implements ContainerResponseFilter {
   public static final Logger LOGGER = LoggerFactory.getLogger(ControllerResponseFilter.class);
 
   @Inject
-  private javax.inject.Provider<org.glassfish.grizzly.http.server.Request> _request;
+  private jakarta.inject.Provider<org.glassfish.grizzly.http.server.Request> _request;
 
   @Override
   public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext)

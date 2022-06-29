@@ -121,24 +121,24 @@
       See also: the surefire plugin section and the profiles section.-->
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
-    <avro.version>1.9.2</avro.version>
-    <parquet.version>1.11.1</parquet.version>
-    <helix.version>0.9.8</helix.version>
-    <zkclient.version>0.7</zkclient.version>
-    <jackson.version>2.12.7</jackson.version>
-    <zookeeper.version>3.5.8</zookeeper.version>
+    <avro.version>1.11.0</avro.version>
+    <parquet.version>1.12.3</parquet.version>
+    <helix.version>1.0.4</helix.version>
+    <zkclient.version>0.11</zkclient.version>
+    <jackson.version>2.13.3</jackson.version>
+    <zookeeper.version>3.5.9</zookeeper.version> <!-- 3.7.1 -->
     <async-http-client.version>2.12.3</async-http-client.version>
-    <jersey.version>2.35</jersey.version>
-    <grizzly.version>2.4.4</grizzly.version>
-    <hk2.version>2.6.1</hk2.version>
+    <jersey.version>3.1.0-M3</jersey.version> <!-- TODO: try 3.0.5 probably -->
+    <grizzly.version>4.0.0</grizzly.version>
+    <hk2.version>3.0.3</hk2.version>
     <swagger.version>1.6.6</swagger.version>
-    <hadoop.version>2.10.1</hadoop.version>
+    <hadoop.version>3.3.3</hadoop.version>
     <antlr.version>4.6</antlr.version>
     <jsonpath.version>2.7.0</jsonpath.version>
     <quartz.version>2.3.2</quartz.version>
-    <calcite.version>1.29.0</calcite.version>
+    <calcite.version>1.30.0</calcite.version>
     <lucene.version>8.2.0</lucene.version>
-    <reflections.version>0.9.11</reflections.version>
+    <reflections.version>0.10.2</reflections.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
     <commons-lang.version>2.6</commons-lang.version>
     <!-- pinot-common, commons-configuration, hadoop-common, hadoop-client use commons-logging -->
@@ -151,7 +151,8 @@
     <zstd-jni.version>1.4.9-5</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <log4j.version>2.17.1</log4j.version>
-    <netty.version>4.1.74.Final</netty.version>
+    <netty.version>4.1.77.Final</netty.version>
+    <jetty.version>9.4.48.v20220622</jetty.version>
     <reactivestreams.version>1.0.3</reactivestreams.version>
     <jts.version>1.16.1</jts.version>
     <h3.version>3.7.2</h3.version>
@@ -167,7 +168,7 @@
     TODO: figure out a way to inject kafka dependency instead of explicitly setting the kafka module dependency -->
     <kafka.version>2.0</kafka.version>
     <protobuf.version>3.19.2</protobuf.version>
-    <grpc.version>1.41.0</grpc.version>
+    <grpc.version>1.47.0</grpc.version>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
@@ -175,6 +176,11 @@
 
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
+    <maven.shade.plugin.version>3.2.4</maven.shade.plugin.version>
+
+    <!-- Other version specifications-->
+    <maven.surefire.plugin.version>3.0.0-M7</maven.surefire.plugin.version>
+    <mockito.version>3.9.0</mockito.version>
   </properties>
 
   <profiles>
@@ -198,6 +204,7 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
+            <version>${maven.surefire.plugin.version}</version>
             <configuration>
               <skipTests>true</skipTests>
             </configuration>
@@ -352,6 +359,12 @@
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-hadoop</artifactId>
         <version>${project.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.mortbay.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
@@ -420,8 +433,14 @@
       <dependency>
         <groupId>nl.jqno.equalsverifier</groupId>
         <artifactId>equalsverifier</artifactId>
-        <version>3.6</version>
+        <version>3.10</version>
         <scope>test</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>net.bytebuddy</groupId>
+            <artifactId>byte-buddy</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
@@ -444,24 +463,9 @@
         <version>0.9.28</version>
       </dependency>
       <dependency>
-        <groupId>com.101tec</groupId>
-        <artifactId>zkclient</artifactId>
-        <version>${zkclient.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
-        <version>20.0</version>
+        <version>31.1-jre</version>
       </dependency>
       <dependency>
         <groupId>commons-cli</groupId>
@@ -501,6 +505,13 @@
         <version>${netty.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+
+      <!-- zkclient & helix-core use netty -->
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-all</artifactId>
+        <version>${netty.version}</version>
       </dependency>
 
       <dependency>
@@ -565,9 +576,9 @@
         <scope>compile</scope>
       </dependency>
       <dependency>
-        <groupId>javax.ws.rs</groupId>
-        <artifactId>javax.ws.rs-api</artifactId>
-        <version>2.0.1</version>
+        <groupId>jakarta.ws.rs</groupId>
+        <artifactId>jakarta.ws.rs-api</artifactId>
+        <version>3.1.0</version>
       </dependency>
       <dependency>
         <groupId>org.quartz-scheduler</groupId>
@@ -583,6 +594,21 @@
         <groupId>javax.activation</groupId>
         <artifactId>activation</artifactId>
         <version>1.1.1</version>
+      </dependency>
+      <dependency>
+        <groupId>javax.xml.bind</groupId>
+        <artifactId>jaxb-api</artifactId>
+        <version>2.3.0</version> <!-- 2.3.3 -->
+      </dependency>
+      <dependency>
+        <groupId>com.sun.xml.bind</groupId>
+        <artifactId>jaxb-core</artifactId>
+        <version>2.3.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.sun.xml.bind</groupId>
+        <artifactId>jaxb-impl</artifactId>
+        <version>2.3.0</version>
       </dependency>
       <dependency>
         <groupId>org.apache.helix</groupId>
@@ -604,6 +630,14 @@
           <exclusion>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>netty</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>*</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -643,6 +677,12 @@
         <groupId>org.asynchttpclient</groupId>
         <artifactId>async-http-client</artifactId>
         <version>${async-http-client.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.yaml</groupId>
@@ -652,6 +692,11 @@
       <dependency>
         <groupId>org.xerial.larray</groupId>
         <artifactId>larray-mmap</artifactId>
+        <version>0.4.1</version>
+      </dependency>
+      <dependency>
+        <groupId>org.xerial.larray</groupId>
+        <artifactId>larray-buffer</artifactId>
         <version>0.4.1</version>
       </dependency>
       <!-- Transitive dependencies with inconsistent version numbers -->
@@ -735,6 +780,12 @@
         <groupId>com.fasterxml.jackson.module</groupId>
         <artifactId>jackson-module-jaxb-annotations</artifactId>
         <version>${jackson.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>jakarta.activation</groupId>
+            <artifactId>jakarta.activation-api</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
 
       <!-- Hadoop -->
@@ -772,6 +823,22 @@
             <groupId>org.apache.yetus</groupId>
             <artifactId>audience-annotations</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.mortbay.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>netty</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -795,6 +862,22 @@
           <exclusion>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.mortbay.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>netty</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -832,6 +915,22 @@
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.mortbay.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>netty</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -839,6 +938,24 @@
         <artifactId>hadoop-mapreduce-client-core</artifactId>
         <version>${hadoop.version}</version>
         <scope>provided</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>org.mortbay.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>netty</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
 
       <!-- Metrics -->
@@ -871,7 +988,7 @@
       <dependency>
         <groupId>org.apache.orc</groupId>
         <artifactId>orc-core</artifactId>
-        <version>1.5.9</version>
+        <version>1.7.5</version>
         <exclusions>
           <exclusion>
             <groupId>com.google.protobuf</groupId>
@@ -887,27 +1004,7 @@
       <dependency>
         <groupId>org.apache.orc</groupId>
         <artifactId>orc-mapreduce</artifactId>
-        <version>1.5.9</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-core-asl</artifactId>
-        <version>1.9.13</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-mapper-asl</artifactId>
-        <version>1.9.13</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-jaxrs</artifactId>
-        <version>1.9.13</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-xc</artifactId>
-        <version>1.9.13</version>
+        <version>1.7.5</version>
       </dependency>
       <dependency>
         <groupId>org.webjars</groupId>
@@ -1016,6 +1113,10 @@
             <groupId>com.google.errorprone</groupId>
             <artifactId>error_prone_annotations</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.checkerframework</groupId>
+            <artifactId>checker-qual</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1087,6 +1188,10 @@
             <groupId>jakarta.ws.rs</groupId>
             <artifactId>jakarta.ws.rs-api</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>jakarta.inject</groupId>
+            <artifactId>jakarta.inject-api</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1123,6 +1228,10 @@
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.reflections</groupId>
+            <artifactId>reflections</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1152,18 +1261,18 @@
       <dependency>
         <groupId>org.apache.maven.surefire</groupId>
         <artifactId>surefire-testng</artifactId>
-        <version>3.0.0-M5</version>
+        <version>${maven.surefire.plugin.version}</version>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
-        <version>3.9.0</version>
+        <version>${mockito.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-inline</artifactId>
-        <version>3.9.0</version>
+        <version>${mockito.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -1234,21 +1343,45 @@
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-java</artifactId>
         <version>${protobuf.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.google.errorprone</groupId>
+            <artifactId>error_prone_annotations</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>io.grpc</groupId>
         <artifactId>grpc-netty-shaded</artifactId>
         <version>${grpc.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.google.errorprone</groupId>
+            <artifactId>error_prone_annotations</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>io.grpc</groupId>
         <artifactId>grpc-protobuf</artifactId>
         <version>${grpc.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.google.errorprone</groupId>
+            <artifactId>error_prone_annotations</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>io.grpc</groupId>
         <artifactId>grpc-stub</artifactId>
         <version>${grpc.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.google.errorprone</groupId>
+            <artifactId>error_prone_annotations</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <!-- geo dependencies -->
       <dependency>
@@ -1380,7 +1513,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>3.0.0-M5</version>
+          <version>${maven.surefire.plugin.version}</version>
           <configuration>
             <!-- Do not set argLine here, it will break the code coverage plugin. Set it in the properties section. -->
             <forkCount>1</forkCount>
@@ -1419,6 +1552,9 @@
           <groupId>com.mycila</groupId>
           <artifactId>license-maven-plugin</artifactId>
           <version>4.0</version>
+          <configuration>
+            <skip>true</skip>
+          </configuration>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -1492,6 +1628,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
+        <version>${maven.surefire.plugin.version}</version>
         <!--
           Configuration for unit/integration tests section 2 of 3 (plugins) STARTS HERE.
           This is the core piece for being able to manage unit tests and
@@ -1581,7 +1718,7 @@
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
         <artifactId>spotless-maven-plugin</artifactId>
-        <version>2.9.0</version>
+        <version>2.22.8</version>
         <executions>
           <execution>
             <phase>verify</phase>
@@ -1717,6 +1854,7 @@
           </execution>
         </executions>
         <configuration>
+          <skip>true</skip>
           <excludes>
             <!-- Exclude license copies -->
             <exclude>licenses/**</exclude>
@@ -1806,7 +1944,7 @@
       </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>3.2.1</version>
+        <version>${maven.shade.plugin.version}</version>
         <configuration>
           <shadedArtifactAttached>true</shadedArtifactAttached>
           <transformers>

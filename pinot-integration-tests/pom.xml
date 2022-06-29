@@ -36,7 +36,7 @@
     <pinot.root>${basedir}/..</pinot.root>
     <localstack-utils.version>0.2.19</localstack-utils.version>
     <awaitility.version>3.0.0</awaitility.version>
-    <aws.sdk.version>2.14.28</aws.sdk.version>
+    <aws.sdk.version>2.17.207</aws.sdk.version>
   </properties>
 
   <build>
@@ -73,6 +73,14 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>${maven.surefire.plugin.version}</version>
+        <configuration combine.children="override">
+          <skip>false</skip>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 
@@ -87,6 +95,7 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
+            <version>${maven.surefire.plugin.version}</version>
             <configuration>
               <skipTests>false</skipTests>
               <excludes>
@@ -112,6 +121,7 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
+            <version>${maven.surefire.plugin.version}</version>
             <configuration>
               <skipTests>true</skipTests>
             </configuration>
@@ -220,22 +230,24 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>com.101tec</groupId>
-      <artifactId>zkclient</artifactId>
+      <groupId>org.glassfish.hk2</groupId>
+      <artifactId>hk2-locator</artifactId>
       <exclusions>
         <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>netty</artifactId>
+          <groupId>jakarta.inject</groupId>
+          <artifactId>jakarta.inject-api</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
     <dependency>
       <groupId>org.glassfish.hk2</groupId>
-      <artifactId>hk2-locator</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.glassfish.hk2</groupId>
       <artifactId>hk2-metadata-generator</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>jakarta.inject</groupId>
+          <artifactId>jakarta.inject-api</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -380,6 +392,7 @@
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
+      <version>${mockito.version}</version>
     </dependency>
   </dependencies>
 </project>

@@ -19,9 +19,9 @@
 package org.apache.pinot.server.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import jakarta.ws.rs.core.Response;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import javax.ws.rs.core.Response;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;

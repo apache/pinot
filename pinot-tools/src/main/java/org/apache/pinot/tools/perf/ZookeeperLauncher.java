@@ -20,8 +20,9 @@ package org.apache.pinot.tools.perf;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import org.I0Itec.zkclient.IDefaultNameSpace;
-import org.I0Itec.zkclient.ZkServer;
+import org.apache.helix.zookeeper.zkclient.IDefaultNameSpace;
+import org.apache.helix.zookeeper.zkclient.ZkClient;
+import org.apache.helix.zookeeper.zkclient.ZkServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +54,7 @@ public class ZookeeperLauncher {
   public boolean start(int zkPort) {
     IDefaultNameSpace defaultNameSpace = new IDefaultNameSpace() {
       @Override
-      public void createDefaultNameSpace(org.I0Itec.zkclient.ZkClient zkClient) {
+      public void createDefaultNameSpace(ZkClient zkClient) {
         // init any zk paths if needed
       }
     };

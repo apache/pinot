@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.common.auth;
 
+import jakarta.ws.rs.core.HttpHeaders;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Map;
-import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 
