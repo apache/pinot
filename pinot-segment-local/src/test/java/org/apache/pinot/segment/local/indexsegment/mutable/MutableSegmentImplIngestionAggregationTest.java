@@ -131,6 +131,52 @@ public class MutableSegmentImplIngestionAggregationTest {
     mutableSegmentImpl.destroy();
   }
 
+
+  @Test
+  public void testValuesAreNull()
+      throws Exception {
+    String m1 = "sum1";
+
+    Schema schema =
+        getSchemaBuilder().addMetric(m1, FieldSpec.DataType.INT).build();
+    MutableSegmentImpl mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(m1)),
+            VAR_LENGTH_SET, INVERTED_INDEX_SET,
+            Arrays.asList(new AggregationConfig(m1, "SUM(metric)")));
+
+
+    Set<String> keys = new HashSet<>();
+
+    long seed = 2;
+    Random random = new Random(seed);
+    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
+
+    for (int i = 0; i < NUM_ROWS; i++) {
+      // Generate random int to prevent overflow
+      GenericRow row = getRow(random, 1);
+      row.putValue(METRIC, null);
+      mutableSegmentImpl.index(row, defaultMetadata);
+
+      String key = buildKey(row);
+      keys.add(key);
+    }
+
+    int numDocsIndexed = mutableSegmentImpl.getNumDocsIndexed();
+    Assert.assertEquals(numDocsIndexed, keys.size());
+
+    // Assert that aggregation happened.
+    Assert.assertTrue(numDocsIndexed < NUM_ROWS);
+
+    GenericRow reuse = new GenericRow();
+    for (int docId = 0; docId < keys.size(); docId++) {
+      GenericRow row = mutableSegmentImpl.getRecord(docId, reuse);
+      String key = buildKey(row);
+      Assert.assertEquals(row.getValue(m1), 0, key);
+    }
+
+    mutableSegmentImpl.destroy();
+  }
+
   @Test
   public void testCOUNT()
       throws Exception {
