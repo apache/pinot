@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -90,7 +91,6 @@ import static org.testng.Assert.assertNotNull;
 
 public class ControllerTest {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
   public static final String DEFAULT_TENANT = "DefaultTenant";
   public static final String LOCAL_HOST = "localhost";
   public static final int DEFAULT_CONTROLLER_PORT = 18998;
@@ -133,6 +133,11 @@ public class ControllerTest {
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
+  private final Logger _logger;
+
+  public ControllerTest() {
+    _logger = LoggerFactory.getLogger(this.getClass());
+  }
 
   /**
    * Acquire the {@link ControllerTest} default instance that can be shared across different test cases.
@@ -195,6 +200,7 @@ public class ControllerTest {
       }
     } catch (Exception e) {
       // Swallow exceptions
+      _logger.warn("Error while stopping ZooKeeper", e);
     }
   }
 
@@ -276,13 +282,15 @@ public class ControllerTest {
     waitForController();
   }
 
-  private void waitForController()
+  protected void waitForController()
       throws InterruptedException, TimeoutException {
     boolean ready = false;
+    Instant start = Instant.now();
     Duration timeoutDuration = Duration.ofSeconds(60);
     Instant timeoutInstant = Instant.now().plus(timeoutDuration);
 
-    LOGGER.info("Verifying that controller can be reached");
+    _logger.info("Verifying that controller can be reached");
+    boolean failedAtLeastOnce = false;
 
     while (!ready && Instant.now().isBefore(timeoutInstant)) {
       try {
@@ -293,7 +301,8 @@ public class ControllerTest {
         if (cause instanceof HttpErrorStatusException && ((HttpErrorStatusException) cause).getStatusCode() == 404) {
           ready = true;
         } else {
-          LOGGER.warn("Controller cannot be reached yet", ex);
+          failedAtLeastOnce = true;
+          _logger.warn("Controller cannot be reached yet", ex);
           Thread.sleep(1000);
         }
       }
@@ -301,6 +310,8 @@ public class ControllerTest {
     if (!ready) {
       throw new TimeoutException("Controller wasn't ready to answer in " + timeoutDuration);
     }
+    Consumer<String> logger = failedAtLeastOnce ? _logger::warn : _logger::info;
+    logger.accept("Controller ready to answer after " + (Duration.between(start, Instant.now())));
   }
 
   public void stopController() {
