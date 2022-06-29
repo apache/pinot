@@ -28,18 +28,13 @@ netstat -i
 if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   # Integration Tests
   mvn clean install -DskipTests -am -B -pl 'pinot-integration-tests' -T 16 || exit 1
-  if [ "$RUN_TEST_SET" == "1" ]; then
-    mvn test -am -B \
-        -pl 'pinot-integration-tests' \
-        -Dtest='C*Test,L*Test,M*Test,R*Test,S*Test' \
-        -P github-actions,integration-tests-only && exit 0 || exit 1
-  fi
-  if [ "$RUN_TEST_SET" == "2" ]; then
-    mvn test -am -B \
-        -pl 'pinot-integration-tests' \
-        -Dtest='!C*Test,!L*Test,!M*Test,!R*Test,!S*Test' \
-        -P github-actions,integration-tests-only && exit 0 || exit 1
-  fi
+  for i in {1..100}
+  do
+    echo "Running test the $i-th times!"
+    mvn test -pl 'pinot-integration-tests' \
+        -Dtest='Grpc*Test,*GRPC*Test' \
+        -P github-actions,integration-tests-only || exit 1
+  done
 else
   # Unit Tests
   if [ "$RUN_TEST_SET" == "1" ]; then
