@@ -23,13 +23,13 @@ package org.apache.pinot.query.service;
  */
 public class QueryConfig {
   public static final String KEY_OF_QUERY_SERVER_PORT = "pinot.query.server.port";
-  public static final int DEFAULT_QUERY_SERVER_PORT = -1;
+  public static final int DEFAULT_QUERY_SERVER_PORT = 0;
 
   public static final String KEY_OF_QUERY_RUNNER_HOSTNAME = "pinot.query.runner.hostname";
   public static final String DEFAULT_QUERY_RUNNER_HOSTNAME = "localhost";
   // query runner port is the mailbox port.
   public static final String KEY_OF_QUERY_RUNNER_PORT = "pinot.query.runner.port";
-  public static final int DEFAULT_QUERY_RUNNER_PORT = -1;
+  public static final int DEFAULT_QUERY_RUNNER_PORT = 0;
 
   private QueryConfig() {
     // do not instantiate.

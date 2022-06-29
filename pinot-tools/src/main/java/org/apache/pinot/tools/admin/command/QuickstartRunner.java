@@ -54,7 +54,7 @@ public class QuickstartRunner {
   private static final int DEFAULT_MINION_PORT = 6000;
 
   private static final int DEFAULT_BROKER_MULTISTAGE_RUNNER_PORT = 8421;
-  private static final int DEFAULT_SERVER_MULTISTAGE_RUNNER_PORT = 8422;
+  private static final int DEFAULT_SERVER_MULTISTAGE_RUNNER_PORT = 8442;
   private static final int DEFAULT_SERVER_MULTISTAGE_SERVER_PORT = 8842;
 
   private static final String DEFAULT_ZK_DIR = "PinotZkDir";
@@ -136,7 +136,7 @@ public class QuickstartRunner {
     for (int i = 0; i < _numBrokers; i++) {
       StartBrokerCommand brokerStarter = new StartBrokerCommand();
       brokerStarter.setPort(DEFAULT_BROKER_PORT + i)
-          .setBrokerMultiStageRunnerPort(DEFAULT_BROKER_MULTISTAGE_RUNNER_PORT - i)
+          .setBrokerMultiStageRunnerPort(DEFAULT_BROKER_MULTISTAGE_RUNNER_PORT + i)
           .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setConfigOverrides(_configOverrides);
       if (!brokerStarter.execute()) {

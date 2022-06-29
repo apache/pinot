@@ -158,7 +158,7 @@ public class PinotConfigUtils {
     properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_HOSTNAME,
         !StringUtils.isEmpty(brokerHost) ? brokerHost : NetUtils.getHostAddress());
     properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, brokerPort != 0 ? brokerPort : getAvailablePort());
-    properties.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, brokerMultiStageRunnerPort <= 0
+    properties.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, brokerMultiStageRunnerPort != 0
         ? brokerMultiStageRunnerPort : getAvailablePort());
     return properties;
   }
@@ -187,9 +187,9 @@ public class PinotConfigUtils {
     properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkAddress);
     properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, serverHost);
     properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, serverPort);
-    properties.put(QueryConfig.KEY_OF_QUERY_SERVER_PORT, serverMultiStageServerPort <= 0
+    properties.put(QueryConfig.KEY_OF_QUERY_SERVER_PORT, serverMultiStageServerPort != 0
         ? serverMultiStageServerPort : getAvailablePort());
-    properties.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, serverMultiStageRunnerPort <= 0
+    properties.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, serverMultiStageRunnerPort != 0
         ? serverMultiStageRunnerPort : getAvailablePort());
     properties.put(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, serverAdminPort);
     properties.put(CommonConstants.Server.CONFIG_OF_GRPC_PORT, serverGrpcPort);
