@@ -412,6 +412,8 @@ public class PinotTaskRestletResource {
           triggerMap.put("RepeatInterval", simpleTrigger.getRepeatInterval());
           triggerMap.put("RepeatCount", simpleTrigger.getRepeatCount());
           triggerMap.put("TimesTriggered", simpleTrigger.getTimesTriggered());
+          triggerMap.put("NextFireTime", simpleTrigger.getNextFireTime());
+          triggerMap.put("PreviousFireTime", simpleTrigger.getPreviousFireTime());
         } else if (trigger instanceof CronTrigger) {
           CronTrigger cronTrigger = (CronTrigger) trigger;
           triggerMap.put("TriggerType", CronTrigger.class.getSimpleName());
