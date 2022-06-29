@@ -184,7 +184,7 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <argLine>-Xms8g -Xmx8g -Dlog4j2.configurationFile=log4j2.xml</argLine>
+        <argLine>-Xms2g -Xmx2g -Dlog4j2.configurationFile=log4j2.xml</argLine>
       </properties>
     </profile>
     <!-- jfim: this profile is overridden in pinot-integration-tests -->
