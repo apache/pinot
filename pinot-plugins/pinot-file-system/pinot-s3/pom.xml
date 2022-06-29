@@ -41,6 +41,7 @@
     <http.core.version>4.4.13</http.core.version>
     <s3mock.version>2.1.19</s3mock.version>
     <javax.version>3.1.0</javax.version>
+    <localstack-utils.version>0.2.19</localstack-utils.version>
     <phase.prop>package</phase.prop>
   </properties>
 
@@ -219,6 +220,30 @@
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk18on</artifactId>
       <version>1.71</version>
+    </dependency>
+    <dependency>
+      <groupId>cloud.localstack</groupId>
+      <artifactId>localstack-utils</artifactId>
+      <version>${localstack-utils.version}</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.amazonaws</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <!-- We have to explicitly exclude kinesis, due to a bug in the current
+             version of the maven-enforcer-plugin, where it doesn't handle
+             wildcard exclusions in transitive dependencies. So projects that
+             depend on this project wind up not excluding kinesis. -->
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>kinesis</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
   <profiles>
