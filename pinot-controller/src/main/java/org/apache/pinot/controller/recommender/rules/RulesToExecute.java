@@ -26,6 +26,7 @@ import org.apache.pinot.controller.recommender.rules.impl.AggregateMetricsRule;
 import org.apache.pinot.controller.recommender.rules.impl.BloomFilterRule;
 import org.apache.pinot.controller.recommender.rules.impl.FlagQueryRule;
 import org.apache.pinot.controller.recommender.rules.impl.InvertedSortedIndexJointRule;
+import org.apache.pinot.controller.recommender.rules.impl.JsonIndexRule;
 import org.apache.pinot.controller.recommender.rules.impl.KafkaPartitionRule;
 import org.apache.pinot.controller.recommender.rules.impl.NoDictionaryOnHeapDictionaryJointRule;
 import org.apache.pinot.controller.recommender.rules.impl.PinotTablePartitionRule;
@@ -61,6 +62,8 @@ public class RulesToExecute {
           return new BloomFilterRule(inputManager, outputManager);
         case RangeIndexRule:
           return new RangeIndexRule(inputManager, outputManager);
+        case JsonIndexRule:
+          return new JsonIndexRule(inputManager, outputManager);
         case NoDictionaryOnHeapDictionaryJointRule:
           return new NoDictionaryOnHeapDictionaryJointRule(inputManager, outputManager);
         case VariedLengthDictionaryRule:
@@ -82,6 +85,7 @@ public class RulesToExecute {
   boolean _recommendInvertedSortedIndexJoint = DEFAULT_RECOMMEND_INVERTED_SORTED_INDEX_JOINT;
   boolean _recommendBloomFilter = DEFAULT_RECOMMEND_BLOOM_FILTER;
   boolean _recommendRangeIndex = DEFAULT_RECOMMEND_RANGE_INDEX;
+  boolean _recommendJsonIndex = DEFAULT_RECOMMEND_JSON_INDEX;
   boolean _recommendNoDictionaryOnHeapDictionaryJoint = DEFAULT_RECOMMEND_NO_DICTIONARY_ONHEAP_DICTIONARY_JOINT;
   boolean _recommendVariedLengthDictionary = DEFAULT_RECOMMEND_VARIED_LENGTH_DICTIONARY;
   boolean _recommendFlagQuery = DEFAULT_RECOMMEND_FLAG_QUERY;
@@ -126,6 +130,11 @@ public class RulesToExecute {
   @JsonSetter(nulls = Nulls.SKIP)
   public void setRecommendRangeIndex(boolean recommendRangeIndex) {
     _recommendRangeIndex = recommendRangeIndex;
+  }
+
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setRecommendJsonIndex(boolean recommendJsonIndex) {
+    _recommendJsonIndex = recommendJsonIndex;
   }
 
   @JsonSetter(nulls = Nulls.SKIP)
@@ -175,6 +184,10 @@ public class RulesToExecute {
     return _recommendRangeIndex;
   }
 
+  public boolean isRecommendJsonIndex() {
+    return _recommendJsonIndex;
+  }
+
   public boolean isRecommendAggregateMetrics() {
     return _recommendAggregateMetrics;
   }
@@ -203,6 +216,7 @@ public class RulesToExecute {
     // partitions, after NoDictionaryOnHeapDictionaryJointRule to correctly calculate record size
     BloomFilterRule,
     RangeIndexRule,
+    JsonIndexRule,
     AggregateMetricsRule,
     RealtimeProvisioningRule // this rule must be the last one because it needs the output of other rules as its input
   }

@@ -267,6 +267,18 @@ public class TestConfigEngine {
     assertEquals(output.getIndexConfig().getRangeIndexColumns().toString(), "[t, j]");
   }
 
+  /** Verifiy rule that recommends JsonIndex and NoDictionary on JSON columns. */
+  @Test
+  void testJsonIndexRule()
+      throws InvalidInputException, IOException {
+    loadInput("recommenderInput/SegmentSizeRuleInput.json");
+    ConfigManager output = new ConfigManager();
+    AbstractRule abstractRule = RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.JsonIndexRule, _input, output);
+    abstractRule.run();
+    assertEquals(output.getIndexConfig().getJsonIndexColumns().toString(), "[q]");
+    assertEquals(output.getIndexConfig().getNoDictionaryColumns().toString(), "[q]");
+  }
+
   @Test
   void testNoDictionaryOnHeapDictionaryJointRule()
       throws InvalidInputException, IOException {
