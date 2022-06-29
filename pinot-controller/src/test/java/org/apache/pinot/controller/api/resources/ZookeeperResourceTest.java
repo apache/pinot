@@ -115,5 +115,23 @@ public class ZookeeperResourceTest {
     recordList = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
         new TypeReference<List<ZNRecord>>() { });
     Assert.assertEquals(recordList.size(), 2);
+
+    // CASE 4: put all children back into a different path
+    String path4 = path + "/testCase4";
+    params = "path=" + path4 + "&expectedVersion=" + expectedVersion + "&accessOption=" + accessOption;
+
+    // validate that zk/putChildren will insert all correctly to another path
+    urlPut = TEST_INSTANCE.getControllerRequestURLBuilder().forZkPutChildren(path);
+    String encodedChildrenData = ZookeeperResource.MAPPER.writeValueAsString(recordList);
+    result = ControllerTest.sendPutRequest(urlPut + "?" + params, encodedChildrenData);
+
+    // validate that zk/getChildren from new path should result in the same recordList
+    urlGet = TEST_INSTANCE.getControllerRequestURLBuilder().forZkGetChildren(path);
+    result = ControllerTest.sendGetRequest(urlGet);
+
+    List<ZNRecord> newRecordList = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
+        new TypeReference<List<ZNRecord>>() { });
+    Assert.assertEquals(newRecordList.get(0), recordList.get(0));
+    Assert.assertEquals(newRecordList.get(1), recordList.get(1));
   }
 }

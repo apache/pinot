@@ -438,6 +438,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "zk/put");
   }
 
+  public String forZkPutChildren(String path) {
+    return StringUtil.join("/", _baseUrl, "zk/putChildren", "?path=" + path);
+  }
+
   public String forZkGet(String path) {
     return StringUtil.join("/", _baseUrl, "zk/get", "?path=" + path);
   }
