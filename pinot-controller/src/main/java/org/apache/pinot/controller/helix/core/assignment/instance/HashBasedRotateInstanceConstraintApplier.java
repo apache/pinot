@@ -34,17 +34,18 @@ import org.slf4j.LoggerFactory;
 public class HashBasedRotateInstanceConstraintApplier implements InstanceConstraintApplier {
   private static final Logger LOGGER = LoggerFactory.getLogger(HashBasedRotateInstanceConstraintApplier.class);
 
-  private final String _tableNameWithType;
+  // Entity could be either a table or table-group
+  private final String _entityName;
 
-  public HashBasedRotateInstanceConstraintApplier(String tableNameWithType) {
-    _tableNameWithType = tableNameWithType;
+  public HashBasedRotateInstanceConstraintApplier(String entityName) {
+    _entityName = entityName;
   }
 
   @Override
   public Map<Integer, List<InstanceConfig>> applyConstraint(
       Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap) {
-    int tableNameHash = Math.abs(_tableNameWithType.hashCode());
-    LOGGER.info("Rotating instances for table: {} with hash: {}", _tableNameWithType, tableNameHash);
+    int tableNameHash = Math.abs(_entityName.hashCode());
+    LOGGER.info("Rotating instances for entity: {} with hash: {}", _entityName, tableNameHash);
 
     for (Map.Entry<Integer, List<InstanceConfig>> entry : poolToInstanceConfigsMap.entrySet()) {
       List<InstanceConfig> instanceConfigs = entry.getValue();

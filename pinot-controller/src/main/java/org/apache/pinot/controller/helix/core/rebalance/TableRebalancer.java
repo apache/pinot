@@ -49,6 +49,7 @@ import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -416,8 +417,19 @@ public class TableRebalancer {
   private InstancePartitions getInstancePartitions(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType, boolean reassignInstances, boolean dryRun) {
     String tableNameWithType = tableConfig.getTableName();
+    boolean isTableInGroup = TableConfigUtils.isTableInGroup(tableConfig);
     if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
-      if (reassignInstances) {
+      if (isTableInGroup) {
+        InstancePartitions groupInstancePartitions = InstancePartitionsUtils.fetchGroupInstancePartitions(
+            _helixManager.getHelixPropertyStore(), tableConfig.getTableGroupName());
+        InstancePartitions instancePartitions = groupInstancePartitions.withName(InstancePartitionsUtils
+            .getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
+        if (!dryRun) {
+          LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
+          InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);
+        }
+        return instancePartitions;
+      } else if (reassignInstances) {
         InstancePartitions existingInstancePartitions =
             InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
                 InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,

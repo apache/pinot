@@ -39,19 +39,20 @@ public class InstanceTagPoolSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceTagPoolSelector.class);
 
   private final InstanceTagPoolConfig _tagPoolConfig;
-  private final String _tableNameWithType;
+  // The entity could be either a table or table-group.
+  private final String _entityName;
 
-  public InstanceTagPoolSelector(InstanceTagPoolConfig tagPoolConfig, String tableNameWithType) {
+  public InstanceTagPoolSelector(InstanceTagPoolConfig tagPoolConfig, String entityName) {
     _tagPoolConfig = tagPoolConfig;
-    _tableNameWithType = tableNameWithType;
+    _entityName = entityName;
   }
 
   /**
    * Returns a map from pool to instance configs based on the tag and pool config for the given instance configs.
    */
   public Map<Integer, List<InstanceConfig>> selectInstances(List<InstanceConfig> instanceConfigs) {
-    int tableNameHash = Math.abs(_tableNameWithType.hashCode());
-    LOGGER.info("Starting instance tag/pool selection for table: {} with hash: {}", _tableNameWithType, tableNameHash);
+    int tableNameHash = Math.abs(_entityName.hashCode());
+    LOGGER.info("Starting instance tag/pool selection for entity: {} with hash: {}", _entityName, tableNameHash);
 
     // Filter out the instances with the correct tag
     String tag = _tagPoolConfig.getTag();
@@ -64,7 +65,7 @@ public class InstanceTagPoolSelector {
     candidateInstanceConfigs.sort(Comparator.comparing(InstanceConfig::getInstanceName));
     int numCandidateInstances = candidateInstanceConfigs.size();
     Preconditions.checkState(numCandidateInstances > 0, "No enabled instance has the tag: %s", tag);
-    LOGGER.info("{} enabled instances have the tag: {} for table: {}", numCandidateInstances, tag, _tableNameWithType);
+    LOGGER.info("{} enabled instances have the tag: {} for entity table: {}", numCandidateInstances, tag, _entityName);
 
     Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = new TreeMap<>();
     if (_tagPoolConfig.isPoolBased()) {
@@ -84,7 +85,7 @@ public class InstanceTagPoolSelector {
       for (Map.Entry<Integer, List<InstanceConfig>> entry : poolToInstanceConfigsMap.entrySet()) {
         poolToNumInstancesMap.put(entry.getKey(), entry.getValue().size());
       }
-      LOGGER.info("Number instances for each pool: {} for table: {}", poolToNumInstancesMap, _tableNameWithType);
+      LOGGER.info("Number instances for each pool: {} for entity: {}", poolToNumInstancesMap, _entityName);
 
       // Calculate the pools to select based on the selection config
       Set<Integer> pools = poolToInstanceConfigsMap.keySet();
@@ -105,7 +106,7 @@ public class InstanceTagPoolSelector {
 
         // Directly return the map if all the pools are selected
         if (numPools == numPoolsToSelect) {
-          LOGGER.info("Selecting all {} pools: {} for table: {}", numPools, pools, _tableNameWithType);
+          LOGGER.info("Selecting all {} pools: {} for entity: {}", numPools, pools, _entityName);
           return poolToInstanceConfigsMap;
         }
 
@@ -118,12 +119,12 @@ public class InstanceTagPoolSelector {
       }
 
       // Keep the pools selected
-      LOGGER.info("Selecting pools: {} for table: {}", poolsToSelect, _tableNameWithType);
+      LOGGER.info("Selecting pools: {} for entity: {}", poolsToSelect, _entityName);
       pools.retainAll(poolsToSelect);
     } else {
       // Non-pool based selection
 
-      LOGGER.info("Selecting {} instances for table: {}", numCandidateInstances, _tableNameWithType);
+      LOGGER.info("Selecting {} instances for entity: {}", numCandidateInstances, _entityName);
       // Put all instance configs as pool 0
       poolToInstanceConfigsMap.put(0, candidateInstanceConfigs);
     }

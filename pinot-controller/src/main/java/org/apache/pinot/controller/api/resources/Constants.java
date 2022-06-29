@@ -35,6 +35,7 @@ public class Constants {
 
   public static final String CLUSTER_TAG = "Cluster";
   public static final String TABLE_TAG = "Table";
+  public static final String TABLE_GROUP_TAG = "Groups";
   public static final String USER_TAG = "User";
   public static final String VERSION_TAG = "Version";
   public static final String HEALTH_TAG = "Health";

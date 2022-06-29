@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.instance;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +26,8 @@ import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
@@ -55,19 +58,36 @@ public class InstanceAssignmentDriver {
   public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
       List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions) {
     String tableNameWithType = _tableConfig.getTableName();
-    LOGGER.info("Starting {} instance assignment for table: {}", instancePartitionsType, tableNameWithType);
+    Preconditions.checkState(!TableConfigUtils.isTableInGroup(_tableConfig));
 
     InstanceAssignmentConfig assignmentConfig =
         InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(_tableConfig, instancePartitionsType);
+    String instancePartitionsName = instancePartitionsType.getInstancePartitionsName(
+        TableNameBuilder.extractRawTableName(tableNameWithType));
+    return assignInstances(instancePartitionsName,
+        tableNameWithType, instanceConfigs, assignmentConfig, existingInstancePartitions);
+  }
+
+  public static InstancePartitions assignInstancesToGroup(String groupName,
+      List<InstanceConfig> instanceConfigs, InstanceAssignmentConfig assignmentConfig) {
+    String instancePartitionsName = InstancePartitionsUtils.getGroupInstancePartitionsName(groupName);
+    return assignInstances(instancePartitionsName, groupName, instanceConfigs, assignmentConfig, null);
+  }
+
+  private static InstancePartitions assignInstances(String instancePartitionsName, String entityName,
+      List<InstanceConfig> instanceConfigs, InstanceAssignmentConfig assignmentConfig,
+      @Nullable InstancePartitions existingInstancePartitions) {
+    LOGGER.info("Starting instance assignment for entity: {}", entityName);
+
     InstanceTagPoolSelector tagPoolSelector =
-        new InstanceTagPoolSelector(assignmentConfig.getTagPoolConfig(), tableNameWithType);
+        new InstanceTagPoolSelector(assignmentConfig.getTagPoolConfig(), entityName);
     Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = tagPoolSelector.selectInstances(instanceConfigs);
 
     InstanceConstraintConfig constraintConfig = assignmentConfig.getConstraintConfig();
     List<InstanceConstraintApplier> constraintAppliers = new ArrayList<>();
     if (constraintConfig == null) {
       LOGGER.info("No instance constraint is configured, using default hash-based-rotate instance constraint");
-      constraintAppliers.add(new HashBasedRotateInstanceConstraintApplier(tableNameWithType));
+      constraintAppliers.add(new HashBasedRotateInstanceConstraintApplier(entityName));
     }
     // TODO: support more constraints
     for (InstanceConstraintApplier constraintApplier : constraintAppliers) {
@@ -76,9 +96,8 @@ public class InstanceAssignmentDriver {
 
     InstancePartitionSelector instancePartitionSelector =
         InstancePartitionSelectorFactory.getInstance(assignmentConfig.getPartitionSelector(),
-            assignmentConfig.getReplicaGroupPartitionConfig(), tableNameWithType, existingInstancePartitions);
-    InstancePartitions instancePartitions = new InstancePartitions(
-        instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableNameWithType)));
+            assignmentConfig.getReplicaGroupPartitionConfig(), entityName, existingInstancePartitions);
+    InstancePartitions instancePartitions = new InstancePartitions(instancePartitionsName);
     instancePartitionSelector.selectInstances(poolToInstanceConfigsMap, instancePartitions);
     return instancePartitions;
   }

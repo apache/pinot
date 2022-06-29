@@ -135,6 +135,18 @@ public class SegmentAssignmentUtils {
     return instancesAssigned;
   }
 
+  public static List<String> assignSegmentForColocatedTable(InstancePartitions instancePartitions,
+      int segmentPartitionId) {
+    int numReplicaGroups = instancePartitions.getNumReplicaGroups();
+    int numInstancesPerReplicaGroup = instancePartitions.getInstances(0, 0).size();
+    int instanceIdInReplicaGroup = segmentPartitionId % numInstancesPerReplicaGroup;
+    List<String> instancesAssigned = new ArrayList<>(numReplicaGroups);
+    for (int replicaGroupid = 0; replicaGroupid < numReplicaGroups; replicaGroupid++) {
+      instancesAssigned.add(instancePartitions.getInstances(0, replicaGroupid).get(instanceIdInReplicaGroup));
+    }
+    return instancesAssigned;
+  }
+
   /**
    * Rebalances the table with Helix AutoRebalanceStrategy.
    */

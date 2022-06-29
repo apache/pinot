@@ -29,6 +29,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -54,12 +55,23 @@ public class InstancePartitionsUtils {
     return TableNameBuilder.extractRawTableName(tableName) + TYPE_SUFFIX_SEPARATOR + instancePartitionsType;
   }
 
+  public static String getGroupInstancePartitionsName(String groupName) {
+    return String.format("%s_GROUP", groupName);
+  }
+
   /**
    * Fetches the instance partitions from Helix property store if it exists, or computes it for backward-compatibility.
    */
   public static InstancePartitions fetchOrComputeInstancePartitions(HelixManager helixManager, TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
     String tableNameWithType = tableConfig.getTableName();
+
+    // If table is in a group, use pre-computed instance partitions
+    if (TableConfigUtils.isTableInGroup(tableConfig)) {
+      InstancePartitions instancePartitions = fetchGroupInstancePartitions(helixManager.getHelixPropertyStore(),
+          tableConfig.getTableGroupName());
+      return instancePartitions.withName(instancePartitionsType.getInstancePartitionsName(tableNameWithType));
+    }
 
     // Fetch the instance partitions from property store if it exists
     ZkHelixPropertyStore<ZNRecord> propertyStore = helixManager.getHelixPropertyStore();
@@ -82,6 +94,17 @@ public class InstancePartitionsUtils {
     String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(instancePartitionsName);
     ZNRecord znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
     return znRecord != null ? InstancePartitions.fromZNRecord(znRecord) : null;
+  }
+
+  public static InstancePartitions fetchGroupInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
+      String groupName) {
+    String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
+        getGroupInstancePartitionsName(groupName));
+    ZNRecord znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
+    if (znRecord == null) {
+      throw new RuntimeException("No instance partitions for group found");
+    }
+    return InstancePartitions.fromZNRecord(znRecord);
   }
 
   /**
@@ -139,6 +162,18 @@ public class InstancePartitionsUtils {
       InstancePartitions instancePartitions) {
     String path = ZKMetadataProvider
         .constructPropertyStorePathForInstancePartitions(instancePartitions.getInstancePartitionsName());
+    if (!propertyStore.set(path, instancePartitions.toZNRecord(), AccessOption.PERSISTENT)) {
+      throw new ZkException("Failed to persist instance partitions: " + instancePartitions);
+    }
+  }
+
+  /**
+   * Persists instance partitions for the group to Zookeeper.
+   */
+  public static void persistGroupInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
+      String groupName, InstancePartitions instancePartitions) {
+    String path = ZKMetadataProvider
+        .constructPropertyStorePathForInstancePartitions(getGroupInstancePartitionsName(groupName));
     if (!propertyStore.set(path, instancePartitions.toZNRecord(), AccessOption.PERSISTENT)) {
       throw new ZkException("Failed to persist instance partitions: " + instancePartitions);
     }

@@ -55,6 +55,8 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -131,6 +133,7 @@ public final class TableConfigUtils {
       validateTierConfigList(tableConfig.getTierConfigsList());
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
       validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
+      validateTableGroupConfig(tableConfig);
       if (!skipTypes.contains(ValidationType.UPSERT)) {
         validateUpsertAndDedupConfig(tableConfig, schema);
         validatePartialUpsertStrategies(tableConfig, schema);
@@ -879,6 +882,18 @@ public final class TableConfigUtils {
         }
       }
     }
+  }
+
+  private static void validateTableGroupConfig(TableConfig tableConfig) {
+    if (StringUtils.isBlank(tableConfig.getTableGroupName())) {
+      return;
+    }
+    Preconditions.checkState(tableConfig.getValidationConfig().getReplicaGroupStrategyConfig() != null, "Must provide"
+        + " a partitioning column via replicaGroupStrategyConfig when using table-groups");
+    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig
+        .getInstanceAssignmentConfigMap();
+    Preconditions.checkState(instanceAssignmentConfigMap == null || instanceAssignmentConfigMap.isEmpty(),
+        "Cannot set instance assignment config when table-group is enabled");
   }
 
   private static void sanitize(TableConfig tableConfig) {

@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 
@@ -32,11 +33,16 @@ public class SegmentAssignmentFactory {
 
   public static SegmentAssignment getSegmentAssignment(HelixManager helixManager, TableConfig tableConfig) {
     SegmentAssignment segmentAssignment;
+    boolean isTableInGroup = TableConfigUtils.isTableInGroup(tableConfig);
     if (tableConfig.getTableType() == TableType.OFFLINE) {
-      segmentAssignment =
-          tableConfig.isDimTable() ? new OfflineDimTableSegmentAssignment() : new OfflineSegmentAssignment();
+      if (isTableInGroup) {
+        segmentAssignment = new ColocatedOfflineSegmentAssignment();
+      } else {
+        segmentAssignment =
+            tableConfig.isDimTable() ? new OfflineDimTableSegmentAssignment() : new OfflineSegmentAssignment();
+      }
     } else {
-      segmentAssignment = new RealtimeSegmentAssignment();
+      segmentAssignment = isTableInGroup ? new ColocatedRealtimeSegmentAssignment() : new RealtimeSegmentAssignment();
     }
     segmentAssignment.init(helixManager, tableConfig);
     return segmentAssignment;
