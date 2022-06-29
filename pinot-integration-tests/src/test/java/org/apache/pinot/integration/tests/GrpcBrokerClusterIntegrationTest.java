@@ -134,10 +134,13 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
   public void tearDown()
       throws Exception {
     dropOfflineTable(getTableName());
+    dropRealtimeTable(getTableName());
 
     stopServer();
     stopBroker();
     stopController();
+
+    stopKafka();
     stopZk();
 
     FileUtils.deleteDirectory(_tempDir);
