@@ -43,7 +43,8 @@ public class TableGroupConfigUtils {
     String groupName = tableGroupConfig.getGroupName();
     ZNRecord znRecord = new ZNRecord(groupName);
     Map<String, String> mapFields = new HashMap<>();
-    mapFields.put("instanceAssignmentConfig", JsonUtils.objectToString(tableGroupConfig.getInstanceAssignmentConfig()));
+    mapFields.put(TableGroupConfig.ASSIGNMENT_CONFIG_KEY,
+        JsonUtils.objectToString(tableGroupConfig.getInstanceAssignmentConfig()));
     znRecord.setMapField("config", mapFields);
     return znRecord;
   }
@@ -53,7 +54,7 @@ public class TableGroupConfigUtils {
     String groupName = znRecord.getId();
     Map<String, String> configMap = znRecord.getMapFields().get("config");
     InstanceAssignmentConfig instanceAssignmentConfig = JsonUtils.stringToObject(configMap.get(
-        "instanceAssignmentConfig"), InstanceAssignmentConfig.class);
+        TableGroupConfig.ASSIGNMENT_CONFIG_KEY), InstanceAssignmentConfig.class);
     return new TableGroupConfig(groupName, instanceAssignmentConfig);
   }
 }

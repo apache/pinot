@@ -26,6 +26,8 @@ import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 
 
 public class TableGroupConfig {
+  private static final String GROUP_NAME_CONFIG_KEY = "groupName";
+  public static final String ASSIGNMENT_CONFIG_KEY = "instanceAssignmentConfig";
 
   @JsonPropertyDescription("Name of the table-group")
   private final String _groupName;
@@ -35,8 +37,8 @@ public class TableGroupConfig {
 
   @JsonCreator
   public TableGroupConfig(
-      @JsonProperty(value = "groupName", required = true) String groupName,
-      @JsonProperty(value = "instanceAssignmentConfig", required = true)
+      @JsonProperty(value = GROUP_NAME_CONFIG_KEY, required = true) String groupName,
+      @JsonProperty(value = ASSIGNMENT_CONFIG_KEY, required = true)
           InstanceAssignmentConfig instanceAssignmentConfig) {
     Preconditions.checkArgument(instanceAssignmentConfig != null, "instanceAssignmentConfig should not be null");
     _groupName = groupName;
