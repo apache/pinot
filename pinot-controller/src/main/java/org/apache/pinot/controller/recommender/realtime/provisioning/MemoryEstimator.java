@@ -40,6 +40,7 @@ import org.apache.pinot.controller.recommender.io.metadata.FieldMetadata;
 import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
 import org.apache.pinot.controller.recommender.io.metadata.TimeFieldSpecMetadata;
 import org.apache.pinot.controller.recommender.io.metadata.TimeGranularitySpecMetadata;
+import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
@@ -583,6 +584,11 @@ public class MemoryEstimator {
       segmentGeneratorConfig.setOutDir(outDir);
       segmentGeneratorConfig.setTableName(_tableConfig.getTableName());
       segmentGeneratorConfig.setSequenceId(0);
+
+      CSVRecordReaderConfig recordReaderConfig = new CSVRecordReaderConfig();
+      recordReaderConfig.setEscapeCharacter('\\');
+      segmentGeneratorConfig.setReaderConfig(recordReaderConfig);
+
       return segmentGeneratorConfig;
     }
   }
