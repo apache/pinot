@@ -27,6 +27,7 @@ import com.amazonaws.services.kms.AWSKMS;
 import com.amazonaws.services.kms.AWSKMSClientBuilder;
 import com.amazonaws.services.s3.AmazonS3EncryptionClientV2Builder;
 import com.amazonaws.services.s3.AmazonS3EncryptionV2;
+import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.CopyObjectRequest;
 import com.amazonaws.services.s3.model.CryptoConfigurationV2;
@@ -240,6 +241,11 @@ public class ClientEncryptionS3PinotFS extends BasePinotFS {
       throws IOException {
     try {
       return getObjectMetadata(uri) != null;
+    } catch (AmazonS3Exception s3Exception) {
+      if (s3Exception.getStatusCode() == 404) {
+        return false;
+      }
+      throw new IOException(s3Exception);
     } catch (Exception e) {
       throw new IOException(e);
     }
@@ -581,16 +587,5 @@ public class ClientEncryptionS3PinotFS extends BasePinotFS {
   public void close()
       throws IOException {
     super.close();
-  }
-
-  public static void main(String[] args)
-      throws NoSuchAlgorithmException {
-    KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
-    keyGenerator.init(256);
-    SecretKey secretKey = keyGenerator.generateKey();
-    System.out.println("secretKey = " + secretKey);
-    System.out.println("getAlgorithm = " + secretKey.getAlgorithm());
-    System.out.println("getFormat = " + secretKey.getFormat());
-    System.out.println("getEncoded = " + BytesUtils.toHexString(secretKey.getEncoded()));
   }
 }
