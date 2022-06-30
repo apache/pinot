@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.stage;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.proto.Plan;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.serde.ProtoSerializable;
 import org.apache.pinot.query.planner.serde.ProtoSerializationUtils;
 
@@ -29,10 +30,21 @@ public abstract class AbstractStageNode implements StageNode, ProtoSerializable 
 
   protected final int _stageId;
   protected final List<StageNode> _inputs;
+  protected DataSchema _dataSchema;
 
   public AbstractStageNode(int stageId) {
+    this(stageId, null);
+  }
+
+  public AbstractStageNode(int stageId, DataSchema dataSchema) {
     _stageId = stageId;
+    _dataSchema = dataSchema;
     _inputs = new ArrayList<>();
+  }
+
+  @Override
+  public int getStageId() {
+    return _stageId;
   }
 
   @Override
@@ -46,8 +58,12 @@ public abstract class AbstractStageNode implements StageNode, ProtoSerializable 
   }
 
   @Override
-  public int getStageId() {
-    return _stageId;
+  public DataSchema getDataSchema() {
+    return _dataSchema;
+  }
+
+  public void setDataSchema(DataSchema dataSchema) {
+    _dataSchema = dataSchema;
   }
 
   @Override

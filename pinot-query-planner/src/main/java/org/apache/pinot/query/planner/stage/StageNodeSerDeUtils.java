@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.stage;
 
 import org.apache.pinot.common.proto.Plan;
+import org.apache.pinot.common.utils.DataSchema;
 
 
 public final class StageNodeSerDeUtils {
@@ -28,6 +29,7 @@ public final class StageNodeSerDeUtils {
 
   public static AbstractStageNode deserializeStageNode(Plan.StageNode protoNode) {
     AbstractStageNode stageNode = newNodeInstance(protoNode.getNodeName(), protoNode.getStageId());
+    stageNode.setDataSchema(extractDataSchema(protoNode));
     stageNode.fromObjectField(protoNode.getObjectField());
     for (Plan.StageNode protoChild : protoNode.getInputsList()) {
       stageNode.addInput(deserializeStageNode(protoChild));
@@ -40,10 +42,25 @@ public final class StageNodeSerDeUtils {
         .setStageId(stageNode.getStageId())
         .setNodeName(stageNode.getClass().getSimpleName())
         .setObjectField(stageNode.toObjectField());
+    DataSchema dataSchema = stageNode.getDataSchema();
+    for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
+      builder.addColumnNames(dataSchema.getColumnName(i));
+      builder.addColumnDataTypes(dataSchema.getColumnDataType(i).name());
+    }
     for (StageNode childNode : stageNode.getInputs()) {
       builder.addInputs(serializeStageNode((AbstractStageNode) childNode));
     }
     return builder.build();
+  }
+
+  private static DataSchema extractDataSchema(Plan.StageNode protoNode) {
+    String[] columnDataTypesList = protoNode.getColumnDataTypesList().toArray(new String[]{});
+    String[] columnNames = protoNode.getColumnNamesList().toArray(new String[]{});
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[columnNames.length];
+    for (int i = 0; i < columnNames.length; i++) {
+      columnDataTypes[i] = DataSchema.ColumnDataType.valueOf(columnDataTypesList[i]);
+    }
+    return new DataSchema(columnNames, columnDataTypes);
   }
 
   private static AbstractStageNode newNodeInstance(String nodeName, int stageId) {
