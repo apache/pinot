@@ -59,11 +59,9 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   public int next() {
     while (_nextDocId < _numDocs) {
       int nextDocId = _nextDocId++;
-      int[] length = new int[]{0};
       // TODO: The performance can be improved by batching the docID lookups similar to how it's done in
       //       SVScanDocIdIterator
-      boolean doesValueMatch = _valueMatcher.doesValueMatch(nextDocId, length);
-      _numEntriesScanned += length[0];
+      boolean doesValueMatch = _valueMatcher.doesValueMatch(nextDocId);
       if (doesValueMatch) {
         return nextDocId;
       }
@@ -90,11 +88,9 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
       int limit = docIdIterator.nextBatch(buffer);
       for (int i = 0; i < limit; i++) {
         int nextDocId = buffer[i];
-        int[] length = new int[]{0};
         // TODO: The performance can be improved by batching the docID lookups similar to how it's done in
         //       SVScanDocIdIterator
-        boolean doesValueMatch = _valueMatcher.doesValueMatch(nextDocId, length);
-        _numEntriesScanned += length[0];
+        boolean doesValueMatch = _valueMatcher.doesValueMatch(nextDocId);
         if (doesValueMatch) {
           result.add(nextDocId);
         }
@@ -137,7 +133,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     /**
      * Returns {@code true} if the value for the given document id matches the predicate, {@code false} Otherwise.
      */
-    boolean doesValueMatch(int docId, int[] length);
+    boolean doesValueMatch(int docId);
   }
 
   private class DictIdMatcher implements ValueMatcher {
@@ -145,9 +141,10 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     private final int[] _buffer = new int[_maxNumValuesPerMVEntry];
 
     @Override
-    public boolean doesValueMatch(int docId, int[] length) {
-      length[0] = _reader.getDictIdMV(docId, _buffer, _readerContext);
-      return _predicateEvaluator.applyMV(_buffer, length[0]);
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getDictIdMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
     }
   }
 
@@ -156,9 +153,10 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     private final int[] _buffer = new int[_maxNumValuesPerMVEntry];
 
     @Override
-    public boolean doesValueMatch(int docId, int[] length) {
-      length[0] = _reader.getIntMV(docId, _buffer, _readerContext);
-      return _predicateEvaluator.applyMV(_buffer, length[0]);
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getIntMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
     }
   }
 
@@ -167,9 +165,10 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     private final long[] _buffer = new long[_maxNumValuesPerMVEntry];
 
     @Override
-    public boolean doesValueMatch(int docId, int[] length) {
-      length[0] = _reader.getLongMV(docId, _buffer, _readerContext);
-      return _predicateEvaluator.applyMV(_buffer, length[0]);
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getLongMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
     }
   }
 
@@ -178,9 +177,10 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     private final float[] _buffer = new float[_maxNumValuesPerMVEntry];
 
     @Override
-    public boolean doesValueMatch(int docId, int[] length) {
-      length[0] = _reader.getFloatMV(docId, _buffer, _readerContext);
-      return _predicateEvaluator.applyMV(_buffer, length[0]);
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getFloatMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
     }
   }
 
@@ -189,9 +189,10 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     private final double[] _buffer = new double[_maxNumValuesPerMVEntry];
 
     @Override
-    public boolean doesValueMatch(int docId, int[] length) {
-      length[0] = _reader.getDoubleMV(docId, _buffer, _readerContext);
-      return _predicateEvaluator.applyMV(_buffer, length[0]);
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getDoubleMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
     }
   }
 
@@ -200,9 +201,10 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     private final String[] _buffer = new String[_maxNumValuesPerMVEntry];
 
     @Override
-    public boolean doesValueMatch(int docId, int[] length) {
-      length[0] = _reader.getStringMV(docId, _buffer, _readerContext);
-      return _predicateEvaluator.applyMV(_buffer, length[0]);
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getStringMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
     }
   }
 
@@ -211,9 +213,10 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     private final byte[][] _buffer = new byte[_maxNumValuesPerMVEntry][];
 
     @Override
-    public boolean doesValueMatch(int docId, int[] length) {
-      length[0] = _reader.getBytesMV(docId, _buffer, _readerContext);
-      return _predicateEvaluator.applyMV(_buffer, length[0]);
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getBytesMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
     }
   }
 }
