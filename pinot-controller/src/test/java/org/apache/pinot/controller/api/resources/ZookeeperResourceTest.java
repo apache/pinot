@@ -71,10 +71,10 @@ public class ZookeeperResourceTest {
     urlGet = TEST_INSTANCE.getControllerRequestURLBuilder().forZkGetChildren(path);
     result = ControllerTest.sendGetRequest(urlGet);
 
-    List<ZNRecord> recordList = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
+    List<ZNRecord> recordList1 = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
         new TypeReference<List<ZNRecord>>() { });
-    Assert.assertEquals(recordList.size(), 1);
-    Assert.assertEquals(recordList.get(0), znRecord);
+    Assert.assertEquals(recordList1.size(), 1);
+    Assert.assertEquals(recordList1.get(0), znRecord);
 
     String lorem = "Loremipsumdolorsitametconsecteturadipisicingelitseddoeiusmod"
         + "temporincididuntutlaboreetdoloremagnaaliquaUtenimadminimveniam"
@@ -112,9 +112,9 @@ public class ZookeeperResourceTest {
     urlGet = TEST_INSTANCE.getControllerRequestURLBuilder().forZkGetChildren(path);
     result = ControllerTest.sendGetRequest(urlGet);
 
-    recordList = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
+    List<ZNRecord> recordList3 = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
         new TypeReference<List<ZNRecord>>() { });
-    Assert.assertEquals(recordList.size(), 2);
+    Assert.assertEquals(recordList3.size(), 2);
 
     // CASE 4: put all children back into a different path
     String path4 = path + "/testCase4";
@@ -122,16 +122,16 @@ public class ZookeeperResourceTest {
 
     // validate that zk/putChildren will insert all correctly to another path
     urlPut = TEST_INSTANCE.getControllerRequestURLBuilder().forZkPutChildren(path);
-    String encodedChildrenData = ZookeeperResource.MAPPER.writeValueAsString(recordList);
+    String encodedChildrenData = ZookeeperResource.MAPPER.writeValueAsString(recordList3);
     result = ControllerTest.sendPutRequest(urlPut + "?" + params, encodedChildrenData);
 
     // validate that zk/getChildren from new path should result in the same recordList
     urlGet = TEST_INSTANCE.getControllerRequestURLBuilder().forZkGetChildren(path);
     result = ControllerTest.sendGetRequest(urlGet);
 
-    List<ZNRecord> newRecordList = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
+    List<ZNRecord> recordList4 = ZookeeperResource.MAPPER.readValue(result.getBytes(StandardCharsets.UTF_8),
         new TypeReference<List<ZNRecord>>() { });
-    Assert.assertEquals(newRecordList.get(0), recordList.get(0));
-    Assert.assertEquals(newRecordList.get(1), recordList.get(1));
+    Assert.assertEquals(recordList4.get(0), recordList3.get(0));
+    Assert.assertEquals(recordList4.get(1), recordList3.get(1));
   }
 }
