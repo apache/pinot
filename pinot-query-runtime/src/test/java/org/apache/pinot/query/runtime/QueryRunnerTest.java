@@ -199,7 +199,8 @@ public class QueryRunnerTest {
             + " WHERE a.col3 >= 0 AND b.col3 >= 0", 15},
 
         // Making transform after GROUP-BY, number of rows should be the same as GROUP-BY result.
-        new Object[]{"SELECT a.col2, a.col1, AVG(a.col3) FROM a WHERE a.col3 >= 0 GROUP BY a.col1, a.col2", 5},
+        new Object[]{"SELECT a.col1, a.col2, SUM(a.col3) - MIN(a.col3) FROM a"
+            + " WHERE a.col3 >= 0 GROUP BY a.col1, a.col2", 5},
     };
   }
 }
