@@ -766,12 +766,12 @@ const getAllPeriodicTaskNames = () => {
   });
 };
 
-const getAllTaskTypes = () => {
+const getAllTaskTypes = async () => {
   const finalResponse = {
     columns: ['Task Type', 'Num Tasks in Queue', 'Queue Status'],
     records: []
   }
-  return new Promise((resolve, reject) => {
+  await new Promise((resolve, reject) => {
     getTaskTypes().then(async (response)=>{
       if (_.isArray(response.data)) {
         const promiseArr = [];
@@ -785,6 +785,7 @@ const getAllTaskTypes = () => {
       }
     });
   })
+  return finalResponse;
 };
 
 const getTaskInfo = async (taskType) => {
@@ -824,12 +825,12 @@ const getMinionMetaData = (tableName, taskType) => {
   });
 };
 
-const getTasksList = (tableName, taskType) => {
+const getTasksList = async (tableName, taskType) => {
   const finalResponse = {
     columns: ['Task ID', 'Status'],
     records: []
   }
-  return new Promise((resolve, reject) => {
+  await new Promise((resolve, reject) => {
     getTasks(tableName, taskType).then(async (response)=>{
       const promiseArr = [];
       const fetchInfo = async (taskID, status) => {
@@ -843,6 +844,7 @@ const getTasksList = (tableName, taskType) => {
       resolve(finalResponse);
     });
   })
+  return finalResponse;
 };
 
 const getTaskDebugData = async (taskName) => {

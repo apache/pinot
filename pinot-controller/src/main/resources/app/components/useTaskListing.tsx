@@ -18,15 +18,14 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { makeStyles } from '@material-ui/core';
-import SimpleAccordion from './SimpleAccordion';
+import { TableData } from 'Models';
 import CustomizedTables from './Table';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 
 export default function useTaskListing(props) {
   const { taskType, tableName } = props;
   const [fetching, setFetching] = useState(true);
-  const [tasks, setTasks] = useState({ columns: [], records: [] });
+  const [tasks, setTasks] = useState<TableData>({ records: [], columns: [] });
 
   const fetchData = async () => {
     setFetching(true);
