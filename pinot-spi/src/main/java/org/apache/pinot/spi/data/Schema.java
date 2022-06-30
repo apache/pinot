@@ -37,12 +37,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -751,16 +751,26 @@ public final class Schema implements Serializable {
     int outgoingTimeSize = outgoingGranularitySpec.getTimeUnitSize();
     TimeUnit outgoingTimeUnit = outgoingGranularitySpec.getTimeType();
     String outgoingTimeFormat = outgoingGranularitySpec.getTimeFormat();
-    String[] split = StringUtils.split(outgoingTimeFormat, DateTimeFormatSpec.COLON_SEPARATOR, 2);
-    DateTimeFormatSpec formatSpec;
-    if (split[0].equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString())) {
-      formatSpec = new DateTimeFormatSpec(outgoingTimeSize, outgoingTimeUnit.toString(), split[0]);
+    String[] split = StringUtil.split(outgoingTimeFormat, ':', 2);
+    String timeFormat;
+    if (split[0].equals(DateTimeFieldSpec.TimeFormat.EPOCH.name())) {
+      timeFormat = outgoingTimeSize + ":" + outgoingTimeUnit.name() + ":EPOCH";
     } else {
-      formatSpec = new DateTimeFormatSpec(outgoingTimeSize, outgoingTimeUnit.toString(), split[0], split[1]);
+      timeFormat = outgoingTimeSize + ":" + outgoingTimeUnit.name() + ":SIMPLE_DATE_FORMAT:" + split[1];
     }
-    dateTimeFieldSpec.setFormat(formatSpec.getFormat());
+    // TODO: Switch to new format after releasing 0.11.0
+//    if (split[0].equals(DateTimeFieldSpec.TimeFormat.EPOCH.name())) {
+//      timeFormat = "EPOCH|" + outgoingTimeUnit.name();
+//      if (outgoingTimeSize != 1) {
+//        timeFormat += "|" + outgoingTimeSize;
+//      }
+//      timeFormat = outgoingTimeSize + ":" + outgoingTimeUnit.name() + ":EPOCH";
+//    } else {
+//      timeFormat = "SIMPLE_DATE_FORMAT|" + split[1];
+//    }
+    dateTimeFieldSpec.setFormat(timeFormat);
     DateTimeGranularitySpec granularitySpec = new DateTimeGranularitySpec(outgoingTimeSize, outgoingTimeUnit);
-    dateTimeFieldSpec.setGranularity(granularitySpec.getGranularity());
+    dateTimeFieldSpec.setGranularity(outgoingTimeSize + ":" + outgoingTimeUnit.name());
 
     if (timeFieldSpec.getTransformFunction() != null) {
       dateTimeFieldSpec.setTransformFunction(timeFieldSpec.getTransformFunction());

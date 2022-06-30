@@ -68,15 +68,36 @@ public class SegmentPreprocessingMapper
       String timeColumnValue = _jobConf.get(InternalConfigConstants.TIME_COLUMN_VALUE);
       String pushFrequency = _jobConf.get(InternalConfigConstants.SEGMENT_PUSH_FREQUENCY);
 
-      String timeType = _jobConf.get(InternalConfigConstants.SEGMENT_TIME_TYPE);
-      String timeFormat = _jobConf.get(InternalConfigConstants.SEGMENT_TIME_FORMAT);
+      String timeFormatStr = _jobConf.get(InternalConfigConstants.SEGMENT_TIME_FORMAT);
+      DateTimeFieldSpec.TimeFormat timeFormat;
+      try {
+        timeFormat = DateTimeFieldSpec.TimeFormat.valueOf(timeFormatStr);
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Invalid time format: " + timeFormatStr);
+      }
       DateTimeFormatSpec dateTimeFormatSpec;
-      if (timeFormat.equals(DateTimeFieldSpec.TimeFormat.EPOCH.toString()) || timeFormat.equals(
-          DateTimeFieldSpec.TimeFormat.TIMESTAMP.toString())) {
-        dateTimeFormatSpec = new DateTimeFormatSpec(1, timeType, timeFormat);
-      } else {
-        dateTimeFormatSpec = new DateTimeFormatSpec(1, timeType, timeFormat,
-            _jobConf.get(InternalConfigConstants.SEGMENT_TIME_SDF_PATTERN));
+      switch (timeFormat) {
+        case EPOCH:
+          String timeTypeStr = _jobConf.get(InternalConfigConstants.SEGMENT_TIME_TYPE);
+          try {
+            dateTimeFormatSpec = DateTimeFormatSpec.forEpoch(timeTypeStr);
+          } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid time type: " + timeTypeStr, e);
+          }
+          break;
+        case TIMESTAMP:
+          dateTimeFormatSpec = DateTimeFormatSpec.forTimestamp();
+          break;
+        case SIMPLE_DATE_FORMAT:
+          String sdfPattern = _jobConf.get(InternalConfigConstants.SEGMENT_TIME_SDF_PATTERN);
+          try {
+            dateTimeFormatSpec = DateTimeFormatSpec.forSimpleDateFormat(sdfPattern);
+          } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid SDF pattern: " + sdfPattern, e);
+          }
+          break;
+        default:
+          throw new IllegalStateException("Unsupported time format: " + timeFormat);
       }
       _normalizedDateSegmentNameGenerator =
           new NormalizedDateSegmentNameGenerator(tableName, null, false, "APPEND", pushFrequency, dateTimeFormatSpec,
