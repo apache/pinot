@@ -1421,9 +1421,12 @@ public class PinotLLCRealtimeSegmentManager {
    *   1) setting "isTablePaused" in ideal states to true and
    *   2) sending force commit messages to servers
    */
-  public void pauseConsumption(String tableNameWithType) {
+  public PauseStatus pauseConsumption(String tableNameWithType) {
     IdealState updatedIdealState = updatePauseStatusInIdealState(tableNameWithType, true);
-    sendForceCommitMessageToServers(tableNameWithType, updatedIdealState);
+    Set<String> consumingSegments = findConsumingSegments(updatedIdealState);
+    sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
+    return new PauseStatus(true, consumingSegments, "Pause flag is set. Consuming segments are being committed. "
+        + "Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.");
   }
 
   /**
@@ -1431,20 +1434,21 @@ public class PinotLLCRealtimeSegmentManager {
    *   1) setting "isTablePaused" in ideal states to false and
    *   2) triggering segment validation job to create new consuming segments in ideal states
    */
-  public void resumeConsumption(String tableNameWithType) {
-    updatePauseStatusInIdealState(tableNameWithType, false);
+  public PauseStatus resumeConsumption(String tableNameWithType) {
+    IdealState updatedIdealState = updatePauseStatusInIdealState(tableNameWithType, false);
 
     // trigger realtime segment validation job to resume consumption
     Map<String, String> taskProperties = new HashMap<>();
     taskProperties.put(RealtimeSegmentValidationManager.RECREATE_DELETED_CONSUMING_SEGMENT_KEY, "true");
     _helixResourceManager
         .invokeControllerPeriodicTask(tableNameWithType, Constants.REALTIME_SEGMENT_VALIDATION_MANAGER, taskProperties);
+
+    return new PauseStatus(false, findConsumingSegments(updatedIdealState), "Pause flag is cleared. "
+        + "Consuming segments are being created. Use /pauseStatus endpoint in a few moments to double check.");
   }
 
   private IdealState updatePauseStatusInIdealState(String tableNameWithType, boolean pause) {
     IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
-      Preconditions.checkNotNull(idealState, "Ideal State is null for table " + tableNameWithType);
-      Preconditions.checkState(idealState.isEnabled(), "Ideal State is disabled for table " + tableNameWithType);
       ZNRecord znRecord = idealState.getRecord();
       znRecord.setSimpleField(IS_TABLE_PAUSED, Boolean.valueOf(pause).toString());
       return new IdealState(znRecord);
@@ -1453,8 +1457,7 @@ public class PinotLLCRealtimeSegmentManager {
     return updatedIdealState;
   }
 
-  private void sendForceCommitMessageToServers(String tableNameWithType, IdealState idealState) {
-    Set<String> consumingSegments = findConsumingSegments(idealState);
+  private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
     if (!consumingSegments.isEmpty()) {
       Criteria recipientCriteria = new Criteria();
       recipientCriteria.setInstanceName("%");
@@ -1488,25 +1491,27 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
-   * Return consumption status:
+   * Return pause status:
    *   - the value of `isTablePaused` flag in ideal state
    *   - list of consuming segments
    */
-  public ConsumptionStatus getConsumptionStatus(String tableNameWithType) {
+  public PauseStatus getPauseStatus(String tableNameWithType) {
     IdealState idealState = getIdealState(tableNameWithType);
     String isTablePausedStr = idealState.getRecord().getSimpleField(IS_TABLE_PAUSED);
     Set<String> consumingSegments = findConsumingSegments(idealState);
-    return new ConsumptionStatus(Boolean.parseBoolean(isTablePausedStr), consumingSegments);
+    return new PauseStatus(Boolean.parseBoolean(isTablePausedStr), consumingSegments, null);
   }
 
-  public static class ConsumptionStatus {
+  public static class PauseStatus {
 
     private boolean _isPauseFlagSet;
     private Set<String> _consumingSegments;
+    private String _description;
 
-    ConsumptionStatus(Boolean isPauseFlagSet, Set<String> consumingSegments) {
+    PauseStatus(Boolean isPauseFlagSet, Set<String> consumingSegments, String description) {
       _isPauseFlagSet = isPauseFlagSet;
       _consumingSegments = consumingSegments;
+      _description = description;
     }
 
     @JsonProperty("isPauseFlagSet")
@@ -1517,6 +1522,11 @@ public class PinotLLCRealtimeSegmentManager {
     @JsonProperty("consumingSegments")
     public Set<String> getConsumingSegments() {
       return _consumingSegments;
+    }
+
+    @JsonProperty("description")
+    public String getDescription() {
+      return _description;
     }
   }
 }

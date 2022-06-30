@@ -34,6 +34,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
@@ -64,8 +65,9 @@ public class PinotRealtimeTableResource {
       notes = "Pause the consumption of a realtime table")
   public Response pauseConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    validate(tableNameWithType);
     try {
-      String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       _pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType);
       return Response.ok().build();
     } catch (Exception e) {
@@ -80,8 +82,9 @@ public class PinotRealtimeTableResource {
       notes = "Resume the consumption for a realtime table")
   public Response resumeConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    validate(tableNameWithType);
     try {
-      String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       _pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType);
       return Response.ok().build();
     } catch (Exception e) {
@@ -90,17 +93,30 @@ public class PinotRealtimeTableResource {
   }
 
   @GET
-  @Path("/tables/{tableName}/consumptionStatus")
+  @Path("/tables/{tableName}/pauseStatus")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Return consumption status of a realtime table",
-      notes = "Return consumption status of a realtime table. It can be CONSUMING, PAUSED, CONSUMING(RESUMED)")
+  @ApiOperation(value = "Return pause status of a realtime table",
+      notes = "Return pause status of a realtime table along with list of consuming segments.")
   public Response getConsumptionStatus(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    validate(tableNameWithType);
     try {
-      String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-      return Response.ok().entity(_pinotLLCRealtimeSegmentManager.getConsumptionStatus(tableNameWithType)).build();
+      return Response.ok().entity(_pinotLLCRealtimeSegmentManager.getPauseStatus(tableNameWithType)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  private void validate(String tableNameWithType) {
+    IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
+    if (idealState == null) {
+      throw new ControllerApplicationException(LOGGER, "Ideal State is null for table " + tableNameWithType,
+          Response.Status.NOT_FOUND);
+    }
+    if (!idealState.isEnabled()) {
+      throw new ControllerApplicationException(LOGGER, "Ideal State is disabled for table" + tableNameWithType,
+          Response.Status.BAD_REQUEST);
     }
   }
 }
