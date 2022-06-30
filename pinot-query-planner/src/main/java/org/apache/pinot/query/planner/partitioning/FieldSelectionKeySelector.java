@@ -71,6 +71,6 @@ public class FieldSelectionKeySelector implements KeySelector<Object[], Object[]
     for (int columnIndex : _columnIndices) {
       hashCodeBuilder.append(input[columnIndex]);
     }
-    return hashCodeBuilder.toHashCode();
+    return Math.abs(hashCodeBuilder.toHashCode());
   }
 }
