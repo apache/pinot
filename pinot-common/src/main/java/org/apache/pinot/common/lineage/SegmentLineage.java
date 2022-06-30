@@ -18,15 +18,19 @@
  */
 package org.apache.pinot.common.lineage;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -145,5 +149,20 @@ public class SegmentLineage {
       znRecord.setListField(entry.getKey(), listEntry);
     }
     return znRecord;
+  }
+
+  /**
+   * Returns a json representation of the segment lineage.
+   * Segment lineage entries are sorted in chronological order by default.
+   */
+  public ObjectNode toJsonObject() {
+    ObjectNode jsonObject = JsonUtils.newObjectNode();
+    jsonObject.put("tableNameWithType", _tableNameWithType);
+    LinkedHashMap<String, LineageEntry> sortedLineageEntries = new LinkedHashMap<>();
+    _lineageEntries.entrySet().stream()
+        .sorted(Map.Entry.comparingByValue(Comparator.comparingLong(LineageEntry::getTimestamp)))
+        .forEachOrdered(x -> sortedLineageEntries.put(x.getKey(), x.getValue()));
+    jsonObject.set("lineageEntries", JsonUtils.objectToJsonNode(sortedLineageEntries));
+    return jsonObject;
   }
 }

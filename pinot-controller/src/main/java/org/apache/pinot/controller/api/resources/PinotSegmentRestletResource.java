@@ -60,6 +60,7 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentName;
@@ -217,6 +218,36 @@ public class PinotSegmentRestletResource {
       resultList.add(resultForTable);
     }
     return resultList;
+  }
+
+  @GET
+  @Path("segments/{tableName}/lineage")
+  @Authenticate(AccessType.READ)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "List segment lineage", notes = "List segment lineage in chronologically sorted order")
+  public Response listSegmentLineage(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr) {
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    if (tableType == null) {
+      throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
+          Response.Status.BAD_REQUEST);
+    }
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+    try {
+      Response.ResponseBuilder builder = Response.ok();
+      SegmentLineage segmentLineage = _pinotHelixResourceManager.listSegmentLineage(tableNameWithType);
+      if (segmentLineage != null) {
+        builder.entity(segmentLineage.toJsonObject());
+      }
+      return builder.build();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Exception while listing segment lineage: %s for table: %s.", e.getMessage(),
+              tableNameWithType),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
   }
 
   @Deprecated

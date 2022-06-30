@@ -344,6 +344,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName), "metadata");
   }
 
+  public String forListAllSegmentLineages(String tableName, String tableType) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, "lineage?type=" + tableType);
+  }
+
   public String forListAllCrcInformationForTable(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "segments", "crc");
   }

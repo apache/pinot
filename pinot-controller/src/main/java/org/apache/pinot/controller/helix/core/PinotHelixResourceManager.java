@@ -3275,6 +3275,15 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * List the segment lineage
+   *
+   * @param tableNameWithType
+   */
+  public SegmentLineage listSegmentLineage(String tableNameWithType) {
+      return SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
+  }
+
+  /**
    * Revert the segment replacement
    *
    * 1. Compute validation
