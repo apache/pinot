@@ -57,6 +57,7 @@ import org.apache.zookeeper.data.Stat;
 import org.codehaus.jackson.map.DeserializationConfig;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.SerializationConfig;
+import org.codehaus.jackson.type.TypeReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,6 +139,60 @@ public class ZookeeperResource {
       throw new ControllerApplicationException(LOGGER, "Failed to delete path: " + path,
           Response.Status.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  @PUT
+  @Path("/zk/putChildren")
+  @Authenticate(AccessType.UPDATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Update the content of multiple znRecord node under the same path")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "ZK Path not found"),
+      @ApiResponse(code = 204, message = "No Content"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public SuccessResponse putChildren(
+      @ApiParam(value = "Zookeeper path of parent, must start with /", required = true) @QueryParam("path") String path,
+      @ApiParam(value = "Content") @QueryParam("data") @Nullable String data,
+      @ApiParam(value = "expectedVersion", defaultValue = "-1") @QueryParam("expectedVersion") @DefaultValue("-1")
+          int expectedVersion,
+      @ApiParam(value = "accessOption", defaultValue = "1") @QueryParam("accessOption") @DefaultValue("1")
+          int accessOption,
+      @Nullable String payload) {
+
+    path = validateAndNormalizeZKPath(path, false);
+
+    if (StringUtils.isEmpty(data)) {
+      data = payload;
+    }
+    if (StringUtils.isEmpty(data)) {
+      throw new ControllerApplicationException(LOGGER, "Must provide data through query parameter or payload",
+          Response.Status.BAD_REQUEST);
+    }
+    List<ZNRecord> znRecords;
+    try {
+      znRecords = MAPPER.readValue(data, new TypeReference<List<ZNRecord>>() { });
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to deserialize the data", Response.Status.BAD_REQUEST,
+          e);
+    }
+
+    for (ZNRecord znRecord : znRecords) {
+      String childPath = path + "/" + znRecord.getId();
+      try {
+        boolean result = _pinotHelixResourceManager.setZKData(childPath, znRecord, expectedVersion, accessOption);
+        if (!result) {
+          throw new ControllerApplicationException(LOGGER, "Failed to update path: " + childPath,
+              Response.Status.INTERNAL_SERVER_ERROR);
+        }
+      } catch (Exception e) {
+        throw new ControllerApplicationException(LOGGER, "Failed to update path: " + childPath,
+            Response.Status.INTERNAL_SERVER_ERROR, e);
+      }
+    }
+    return new SuccessResponse("Successfully updated " + znRecords.size() + " ZnRecords under path: " + path);
   }
 
   @PUT
