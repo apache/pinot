@@ -108,7 +108,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     if (_reader.isDictionaryEncoded()) {
       return new DictIdMatcher();
     } else {
-      switch (_reader.getValueType()) {
+      switch (_reader.getStoredType()) {
         case INT:
           return new IntMatcher();
         case LONG:
@@ -123,7 +123,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
           return new BytesMatcher();
         default:
           throw new UnsupportedOperationException("MV Scan not supported for raw MV columns of type "
-              + _reader.getValueType());
+              + _reader.getStoredType());
       }
     }
   }

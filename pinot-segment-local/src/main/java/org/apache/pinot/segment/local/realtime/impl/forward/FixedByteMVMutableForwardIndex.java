@@ -116,7 +116,7 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   private final PinotDataBufferMemoryManager _memoryManager;
   private final String _context;
   private final boolean _isDictionaryEncoded;
-  private final FieldSpec.DataType _valueType;
+  private final FieldSpec.DataType _storedType;
 
   private FixedByteSingleValueMultiColWriter _curHeaderWriter;
   private FixedByteSingleValueMultiColWriter _currentDataWriter;
@@ -126,7 +126,7 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
 
   public FixedByteMVMutableForwardIndex(int maxNumberOfMultiValuesPerRow, int avgMultiValueCount, int rowCountPerChunk,
       int columnSizeInBytes, PinotDataBufferMemoryManager memoryManager, String context, boolean isDictionaryEncoded,
-      FieldSpec.DataType valueType) {
+      FieldSpec.DataType storedType) {
     _memoryManager = memoryManager;
     _context = context;
     int initialCapacity = Math.max(maxNumberOfMultiValuesPerRow, rowCountPerChunk * avgMultiValueCount);
@@ -142,7 +142,7 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     addDataBuffer(initialCapacity);
     //init(_rowCountPerChunk, _columnSizeInBytes, _maxNumberOfMultiValuesPerRow, initialCapacity, _incrementalCapacity);
     _isDictionaryEncoded = isDictionaryEncoded;
-    _valueType = valueType;
+    _storedType = storedType;
   }
 
   private void addHeaderBuffer() {
@@ -223,8 +223,8 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
-  public DataType getValueType() {
-    return _valueType;
+  public DataType getStoredType() {
+    return _storedType;
   }
 
   @Override

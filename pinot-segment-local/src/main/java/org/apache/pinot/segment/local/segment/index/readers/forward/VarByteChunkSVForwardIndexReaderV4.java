@@ -45,7 +45,7 @@ public class VarByteChunkSVForwardIndexReaderV4
 
   private static final int METADATA_ENTRY_SIZE = 8;
 
-  private final FieldSpec.DataType _valueType;
+  private final FieldSpec.DataType _storedType;
   private final int _targetDecompressedChunkSize;
   private final ChunkDecompressor _chunkDecompressor;
   private final ChunkCompressionType _chunkCompressionType;
@@ -53,12 +53,12 @@ public class VarByteChunkSVForwardIndexReaderV4
   private final PinotDataBuffer _metadata;
   private final PinotDataBuffer _chunks;
 
-  public VarByteChunkSVForwardIndexReaderV4(PinotDataBuffer dataBuffer, FieldSpec.DataType valueType) {
+  public VarByteChunkSVForwardIndexReaderV4(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType) {
     if (dataBuffer.getInt(0) < VarByteChunkSVForwardIndexWriterV4.VERSION) {
       throw new IllegalStateException("version " + dataBuffer.getInt(0) + " < "
           + VarByteChunkSVForwardIndexWriterV4.VERSION);
     }
-    _valueType = valueType;
+    _storedType = storedType;
     _targetDecompressedChunkSize = dataBuffer.getInt(4);
     _chunkCompressionType = ChunkCompressionType.valueOf(dataBuffer.getInt(8));
     _chunkDecompressor = ChunkCompressorFactory.getDecompressor(_chunkCompressionType);
@@ -79,8 +79,8 @@ public class VarByteChunkSVForwardIndexReaderV4
   }
 
   @Override
-  public FieldSpec.DataType getValueType() {
-    return _valueType;
+  public FieldSpec.DataType getStoredType() {
+    return _storedType;
   }
 
   @Override

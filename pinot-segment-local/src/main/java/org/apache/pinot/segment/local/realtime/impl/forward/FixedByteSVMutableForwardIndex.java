@@ -52,7 +52,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   private final List<ReaderWithOffset> _readers = new ArrayList<>();
 
   private final boolean _dictionaryEncoded;
-  private final DataType _valueType;
+  private final DataType _storedType;
   private final int _valueSizeInBytes;
   private final int _numRowsPerChunk;
   private final long _chunkSizeInBytes;
@@ -62,16 +62,16 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   private int _capacityInRows = 0;
 
   /**
-   * @param valueType Data type of the values
+   * @param storedType Data type of the values
    * @param numRowsPerChunk Number of rows to pack in one chunk before a new chunk is created.
    * @param memoryManager Memory manager to be used for allocating memory.
    * @param allocationContext Allocation allocationContext.
    */
-  public FixedByteSVMutableForwardIndex(boolean dictionaryEncoded, DataType valueType, int numRowsPerChunk,
+  public FixedByteSVMutableForwardIndex(boolean dictionaryEncoded, DataType storedType, int numRowsPerChunk,
       PinotDataBufferMemoryManager memoryManager, String allocationContext) {
     _dictionaryEncoded = dictionaryEncoded;
-    _valueType = valueType;
-    _valueSizeInBytes = valueType.size();
+    _storedType = storedType;
+    _valueSizeInBytes = storedType.size();
     _numRowsPerChunk = numRowsPerChunk;
     _chunkSizeInBytes = numRowsPerChunk * _valueSizeInBytes;
     _memoryManager = memoryManager;
@@ -90,8 +90,8 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
-  public DataType getValueType() {
-    return _valueType;
+  public DataType getStoredType() {
+    return _storedType;
   }
 
   @Override

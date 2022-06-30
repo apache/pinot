@@ -90,7 +90,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
+      switch (reader.getStoredType()) {
         case JSON:
         case STRING:
           for (int i = 0; i < length; i++) {
@@ -123,7 +123,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
+      switch (reader.getStoredType()) {
         case JSON:
         case STRING:
           for (int i = 0; i < length; i++) {
@@ -156,7 +156,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
+      switch (reader.getStoredType()) {
         case JSON:
         case STRING:
           for (int i = 0; i < length; i++) {
@@ -189,7 +189,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
+      switch (reader.getStoredType()) {
         case JSON:
         case STRING:
           for (int i = 0; i < length; i++) {
@@ -223,7 +223,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
+      switch (reader.getStoredType()) {
         case JSON:
         case STRING:
           for (int i = 0; i < length; i++) {
@@ -256,7 +256,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
+      switch (reader.getStoredType()) {
         case JSON:
         case STRING:
           for (int i = 0; i < length; i++) {
@@ -288,7 +288,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
+      switch (reader.getStoredType()) {
         case JSON:
         case STRING:
           for (int i = 0; i < length; i++) {
@@ -320,7 +320,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
+      switch (reader.getStoredType()) {
         case JSON:
         case STRING:
           for (int i = 0; i < length; i++) {
@@ -352,7 +352,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
+      switch (reader.getStoredType()) {
         case JSON:
         case STRING:
           for (int i = 0; i < length; i++) {
@@ -384,7 +384,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
+      switch (reader.getStoredType()) {
         case JSON:
         case STRING:
           for (int i = 0; i < length; i++) {
@@ -416,7 +416,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
+      switch (reader.getStoredType()) {
         case JSON:
         case STRING:
           for (int i = 0; i < length; i++) {
