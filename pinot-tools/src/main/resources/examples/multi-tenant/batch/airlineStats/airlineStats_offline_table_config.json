@@ -1,0 +1,65 @@
+{
+  "tableName": "airlineStats",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "timeColumnName": "DaysSinceEpoch",
+    "timeType": "DAYS",
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "replication": "1"
+  },
+  "tenants": {
+    "broker": "brokerOne",
+    "server": "serverOne"
+  },
+  "fieldConfigList": [
+    {
+      "name": "ts",
+      "encodingType": "DICTIONARY",
+      "indexTypes": ["TIMESTAMP"],
+      "timestampConfig": {
+        "granularities": [
+          "DAY",
+          "WEEK",
+          "MONTH"
+        ]
+      }
+    }
+  ],
+  "tableIndexConfig": {
+    "loadMode": "MMAP"
+  },
+  "metadata": {
+    "customConfigs": {}
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND",
+      "segmentIngestionFrequency": "DAILY",
+      "batchConfigMaps": [
+        {
+          "inputDirURI": "examples/batch/airlineStats/rawdata",
+          "inputFormat": "avro"
+        }
+      ],
+      "segmentNameSpec": {},
+      "pushSpec": {}
+    },
+    "transformConfigs": [
+      {
+        "columnName": "ts",
+        "transformFunction": "fromEpochDays(DaysSinceEpoch)"
+      },
+      {
+        "columnName": "tsRaw",
+        "transformFunction": "fromEpochDays(DaysSinceEpoch)"
+      }
+    ]
+  },
+  "task": {
+    "taskTypeConfigsMap": {
+      "SegmentGenerationAndPushTask": {
+      }
+    }
+  }
+}

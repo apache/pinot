@@ -1,0 +1,107 @@
+{
+  "metricFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "playerStint"
+    },
+    {
+      "dataType": "INT",
+      "name": "numberOfGames"
+    },
+    {
+      "dataType": "INT",
+      "name": "numberOfGamesAsBatter"
+    },
+    {
+      "dataType": "INT",
+      "name": "AtBatting"
+    },
+    {
+      "dataType": "INT",
+      "name": "runs"
+    },
+    {
+      "dataType": "INT",
+      "name": "hits"
+    },
+    {
+      "dataType": "INT",
+      "name": "doules"
+    },
+    {
+      "dataType": "INT",
+      "name": "tripples"
+    },
+    {
+      "dataType": "INT",
+      "name": "homeRuns"
+    },
+    {
+      "dataType": "INT",
+      "name": "runsBattedIn"
+    },
+    {
+      "dataType": "INT",
+      "name": "stolenBases"
+    },
+    {
+      "dataType": "INT",
+      "name": "caughtStealing"
+    },
+    {
+      "dataType": "INT",
+      "name": "baseOnBalls"
+    },
+    {
+      "dataType": "INT",
+      "name": "strikeouts"
+    },
+    {
+      "dataType": "INT",
+      "name": "intentionalWalks"
+    },
+    {
+      "dataType": "INT",
+      "name": "hitsByPitch"
+    },
+    {
+      "dataType": "INT",
+      "name": "sacrificeHits"
+    },
+    {
+      "dataType": "INT",
+      "name": "sacrificeFlies"
+    },
+    {
+      "dataType": "INT",
+      "name": "groundedIntoDoublePlays"
+    },
+    {
+      "dataType": "INT",
+      "name": "G_old"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "STRING",
+      "name": "playerID"
+    },
+    {
+      "dataType": "INT",
+      "name": "yearID"
+    },
+    {
+      "dataType": "STRING",
+      "name": "teamID"
+    },
+    {
+      "dataType": "STRING",
+      "name": "league"
+    },
+    {
+      "dataType": "STRING",
+      "name": "playerName"
+    }
+  ],
+  "schemaName": "baseballStats"
+}
