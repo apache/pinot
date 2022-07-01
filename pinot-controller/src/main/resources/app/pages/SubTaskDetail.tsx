@@ -20,7 +20,7 @@
 import React, { useEffect, useState } from 'react';
 import { get, find } from 'lodash';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
-import { Grid, makeStyles } from '@material-ui/core';
+import { Grid, makeStyles, Box } from '@material-ui/core';
 import SimpleAccordion from '../components/SimpleAccordion';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 
@@ -121,6 +121,18 @@ const TaskDetail = (props) => {
                 className={classes.queryOutput}
                 autoCursor={false}
               />
+            </SimpleAccordion>
+          </div>
+        </Grid>
+        <Grid item xs={6}>
+          <div className={classes.sqlDiv}>
+            <SimpleAccordion
+              headerTitle="Info"
+              showSearchBox={false}
+            >
+              <Box p={3}>
+                {get(taskDebugData, `info`, '')}
+              </Box>
             </SimpleAccordion>
           </div>
         </Grid>

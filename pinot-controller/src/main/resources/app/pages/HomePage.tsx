@@ -104,14 +104,6 @@ const HomePage = () => {
     <Grid item xs className={classes.gridContainer}>
       <Grid container spacing={3}>
         <Grid item xs={3}>
-          <Link to="/tenants" className={classes.paperLinks}>
-            <Paper className={classes.paper}>
-              <h4>Tenants</h4>
-              <h2>{Array.isArray(tenantsData.records) ? tenantsData.records.length : 0}</h2>
-            </Paper>
-          </Link>
-        </Grid>
-        <Grid item xs={3}>
           <Link to="/controllers" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Controllers</h4>
@@ -140,6 +132,14 @@ const HomePage = () => {
             <Paper className={classes.paper}>
               <h4>Minions</h4>
               <h2>{Array.isArray(instances.Minion) ? instances.Minion.length : 0}</h2>
+            </Paper>
+          </Link>
+        </Grid>
+        <Grid item xs={3}>
+          <Link to="/tenants" className={classes.paperLinks}>
+            <Paper className={classes.paper}>
+              <h4>Tenants</h4>
+              <h2>{Array.isArray(tenantsData.records) ? tenantsData.records.length : 0}</h2>
             </Paper>
           </Link>
         </Grid>

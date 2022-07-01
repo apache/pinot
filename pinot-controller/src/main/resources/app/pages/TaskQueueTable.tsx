@@ -162,11 +162,11 @@ const TaskQueueTable = (props) => {
               />
             </SimpleAccordion>
           </div>
+        </Grid>
+        <Grid item xs={6}>
           <div className={classes.sqlDiv}>
             {minionMetadata.content}
           </div>
-        </Grid>
-        <Grid item xs={6}>
           <div className={classes.sqlDiv}>
             <SimpleAccordion
               headerTitle="Scheduling Errors"

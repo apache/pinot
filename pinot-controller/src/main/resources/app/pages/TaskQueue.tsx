@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { get } from 'lodash';
+import { get, map } from 'lodash';
 import { TableData } from 'Models';
 import { Grid, makeStyles } from '@material-ui/core';
 import SimpleAccordion from '../components/SimpleAccordion';
@@ -65,10 +65,11 @@ const TaskQueue = (props) => {
   const fetchData = async () => {
     setFetching(true);
     const taskInfoRes = await PinotMethodUtils.getTaskInfo(taskType);
-    const tablesResponse:any = await PinotMethodUtils.getTable();
+    const tablesResponse:any = await PinotMethodUtils.getTaskTypeDebugData(taskType);
+    console.log('tablesResponse', tablesResponse);
     setTaskInfo(taskInfoRes);
     setTables((prevState): TableData => {
-      return { ...prevState, records: get(tablesResponse, 'tables', []).map(table => [`${table}_OFFLINE`]) };
+      return { ...prevState, records: map(tablesResponse, table => [get(table, 'subtaskInfos.0.taskConfig.configs.tableName', '')]) };
     });
     setFetching(false);
   };

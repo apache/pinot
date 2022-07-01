@@ -24,7 +24,7 @@ import { DataTable } from 'Models';
 import AppLoader from '../components/AppLoader';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import Instances from '../components/Homepage/InstancesTables';
-import usePeriodicTasks from '../components/usePeriodicTasks';
+// import usePeriodicTasks from '../components/usePeriodicTasks';
 
 const useStyles = makeStyles(() => ({
   gridContainer: {
@@ -45,9 +45,9 @@ const InstanceListingPage = () => {
 
   const isController = !!_.get(instances, 'Controller', false);
 
-  const periodicTasks = usePeriodicTasks({
-    shouldFetchData: isController
-  });
+  // const periodicTasks = usePeriodicTasks({
+  //   shouldFetchData: isController
+  // });
 
   const fetchData = async () => {
     const instanceResponse = await PinotMethodUtils.getAllInstances();
@@ -70,7 +70,7 @@ const InstanceListingPage = () => {
   ) : (
     <Grid item xs className={classes.gridContainer}>
       <Instances instances={instances} clusterName={clusterName} />
-      {isController && periodicTasks.content}
+      {/* {isController && periodicTasks.content} */}
     </Grid>
   );
 };

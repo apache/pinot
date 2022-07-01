@@ -40,7 +40,7 @@ const useTaskTypesTable = () => {
     taskTypes,
     taskTypesTable: !fetching && (
       <CustomizedTables
-        title="Manages the minion tasks and task queues"
+        title="Task Queues"
         data={taskTypes}
         showSearchBox={true}
         inAccordionFormat={true}

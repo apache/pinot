@@ -55,6 +55,8 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/controllers': 'Controllers',
   '/brokers': 'Brokers',
   '/servers': 'Servers',
+  '/minions': 'Minions',
+  '/minion-task-manager': 'Minion Task Manager',
   '/tables': 'Tables',
   '/query': 'Query Console',
   '/cluster': 'Cluster Manager',
@@ -129,16 +131,19 @@ const BreadcrumbsComponent = ({ ...props }) => {
           getClickableLabel('Schemas', '/tables')
         );
       }
-      if (queueTableName && taskType) {
+      if (taskType) {
+        breadcrumbs.push(getClickableLabel('Minion Task Manager', `/minion-task-manager`));
+      }
+      if (queueTableName) {
         breadcrumbs.push(getClickableLabel(taskType, `/task-queue/${taskType}`));
       }
       if (taskID) {
-        breadcrumbs.push(getLabel('Tasks'));
+        breadcrumbs.push(getClickableLabel('Tasks', `/task-queue/${taskType}/tables/${queueTableName}`));
       }
       if (subTaskID) {
-        breadcrumbs.push(getLabel('Sub Tasks'));
+        breadcrumbs.push(getClickableLabel('Sub Tasks', `/task-queue/${taskType}/tables/${queueTableName}/task/${taskID}`));
       }
-      breadcrumbs.push(getLabel(segmentName || tableName || tenantName || instanceName || schemaName || queueTableName || taskType || taskID || subTaskID || 'Query Console'));
+      breadcrumbs.push(getLabel(segmentName || tableName || tenantName || instanceName || schemaName || subTaskID || taskID || queueTableName || taskType || 'Query Console'));
     } else {
       breadcrumbs.push(getLabel(breadcrumbNameMap[location.pathname]));
     }

@@ -308,7 +308,7 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
               </CustomButton>
               <CustomButton
                 onClick={handleDropAction}
-                tooltipTitle="Removes the node from the cluster. Untag & rebalance (to ensure node is not being used by any table), and shutdown instance, before dropping."
+                tooltipTitle={!instanceName.startsWith('Minion_') ? "Removes the node from the cluster. Untag & rebalance (to ensure node is not being used by any table), and shutdown instance, before dropping." : ""}
                 enableTooltip={true}
               >
                 Drop

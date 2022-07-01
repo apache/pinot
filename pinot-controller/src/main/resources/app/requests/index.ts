@@ -97,7 +97,7 @@ export const getTaskTypeTasks = (taskType: string): Promise<AxiosResponse<Operat
   baseApi.get(`/tasks/${taskType}/tasks`, { headers: { ...headers, Accept: 'application/json' } });
 
 export const getTaskTypeState = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.get(`/tasks/${taskType}/taskstates`, { headers: { ...headers, Accept: 'application/json' } });
+  baseApi.get(`/tasks/${taskType}/state`, { headers: { ...headers, Accept: 'application/json' } });
 
 export const stopTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.put(`/tasks/${taskType}/stop`, { headers: { ...headers, Accept: 'application/json' } });
@@ -128,6 +128,9 @@ export const getTasks = (tableName: string, taskType: string): Promise<AxiosResp
 
 export const getTaskDebug = (taskName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/task/${taskName}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getTaskTypeDebug = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/${taskType}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
 
 export const getClusterConfig = (): Promise<AxiosResponse<ClusterConfig>> =>
   baseApi.get('/cluster/configs');

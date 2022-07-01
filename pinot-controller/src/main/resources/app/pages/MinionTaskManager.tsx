@@ -18,7 +18,7 @@
  */
 
 import React from 'react';
-import { Grid, makeStyles } from '@material-ui/core';
+import { Grid, makeStyles, Typography, Box } from '@material-ui/core';
 import useTaskTypesTable from '../components/Homepage/useTaskTypesTable';
 
 const useStyles = makeStyles(() => ({
@@ -36,6 +36,10 @@ const MinionTaskManager = () => {
 
   return (
     <Grid item xs className={classes.gridContainer}>
+      <Box mb={3}>
+        <Typography variant='h5'>Minion Task Manager</Typography>
+        <Typography variant='caption'>Manage the minion tasks queues and tasks</Typography>
+      </Box>
       {taskTypesTable}
     </Grid>
   );

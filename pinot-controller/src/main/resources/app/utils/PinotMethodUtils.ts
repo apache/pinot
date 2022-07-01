@@ -30,6 +30,7 @@ import {
   dropInstance,
   getPeriodicTaskNames,
   getTaskTypes,
+  getTaskTypeDebug,
   getTaskTypeTasks,
   getTaskTypeState,
   stopTasks,
@@ -791,7 +792,7 @@ const getAllTaskTypes = async () => {
 const getTaskInfo = async (taskType) => {
   const tasksRes = await getTaskTypeTasks(taskType);
   const stateRes = await getTaskTypeState(taskType);
-  const state = _.get(stateRes.data, _.first(_.keys(stateRes.data)));
+  const state = _.get(stateRes, 'data', '');
   return [tasksRes?.data?.length || 0, state];
 };
 
@@ -827,7 +828,7 @@ const getMinionMetaData = (tableName, taskType) => {
 
 const getTasksList = async (tableName, taskType) => {
   const finalResponse = {
-    columns: ['Task ID', 'Status'],
+    columns: ['Task ID', 'Status', 'Start Time', 'Execution Time', 'Finish Time', 'Num of Sub Tasks'],
     records: []
   }
   await new Promise((resolve, reject) => {
@@ -835,7 +836,14 @@ const getTasksList = async (tableName, taskType) => {
       const promiseArr = [];
       const fetchInfo = async (taskID, status) => {
         const debugData = await getTaskDebugData(taskID);
-        finalResponse.records.push([taskID, status]);
+        finalResponse.records.push([
+          taskID,
+          status,
+          _.get(debugData, 'data.subtaskInfos.0.startTime', ''),
+          _.get(debugData, 'data.executionStartTime', ''),
+          _.get(debugData, 'data.subtaskInfos.0.finishTime', ''),
+          _.get(debugData, 'data.subtaskCount.total', 0)
+        ]);
       };
       _.each(response.data, async (val, key) => {
         promiseArr.push(fetchInfo(key, val));
@@ -1022,6 +1030,12 @@ const getTable = ()=>{
   })
 };
 
+const getTaskTypeDebugData = (taskType)=>{
+  return getTaskTypeDebug(taskType).then(response=>{
+    return response.data;
+  })
+};
+
 const scheduleTaskAction = (tableName, taskType)=>{
   return sheduleTask(tableName, taskType).then(response=>{
     return response.data;
@@ -1098,6 +1112,7 @@ export default {
   deleteInstance,
   getAllPeriodicTaskNames,
   getAllTaskTypes,
+  getTaskTypeDebugData,
   getTaskInfo,
   stopAllTasks,
   resumeAllTasks,
