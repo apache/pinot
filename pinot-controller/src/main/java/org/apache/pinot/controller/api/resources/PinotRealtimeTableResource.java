@@ -68,8 +68,7 @@ public class PinotRealtimeTableResource {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validate(tableNameWithType);
     try {
-      _pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType);
-      return Response.ok().build();
+      return Response.ok(_pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
@@ -85,8 +84,7 @@ public class PinotRealtimeTableResource {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validate(tableNameWithType);
     try {
-      _pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType);
-      return Response.ok().build();
+      return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }

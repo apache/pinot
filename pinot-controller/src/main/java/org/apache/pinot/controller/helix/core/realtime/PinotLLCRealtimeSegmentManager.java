@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -1425,8 +1426,9 @@ public class PinotLLCRealtimeSegmentManager {
     IdealState updatedIdealState = updatePauseStatusInIdealState(tableNameWithType, true);
     Set<String> consumingSegments = findConsumingSegments(updatedIdealState);
     sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
-    return new PauseStatus(true, consumingSegments, "Pause flag is set. Consuming segments are being committed. "
-        + "Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.");
+    return new PauseStatus(true, consumingSegments, consumingSegments.isEmpty() ? null : "Pause flag is set."
+        + " Consuming segments are being committed."
+        + " Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.");
   }
 
   /**
@@ -1502,6 +1504,7 @@ public class PinotLLCRealtimeSegmentManager {
     return new PauseStatus(Boolean.parseBoolean(isTablePausedStr), consumingSegments, null);
   }
 
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class PauseStatus {
 
     private boolean _isPauseFlagSet;
