@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.protobuf;
 
+import com.github.os72.protobuf.dynamic.DynamicSchema;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.DescriptorProtos;
 import com.google.protobuf.Descriptors;
@@ -28,6 +29,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.ResourceFinder;
@@ -41,8 +43,11 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ProtoBufMessageDecoder.class);
 
   public static final String DESCRIPTOR_FILE_PATH = "descriptorFile";
+  public static final String PROTO_CLASS_NAME = "protoClassName";
+
   private DynamicMessage _dynamicMessage;
   private ProtoBufRecordExtractor _recordExtractor;
+  private String _protoClassName;
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
@@ -50,6 +55,7 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
     Preconditions.checkState(props.containsKey(DESCRIPTOR_FILE_PATH),
         "Protocol Buffer schema descriptor file must be provided");
 
+    _protoClassName  = props.getOrDefault(PROTO_CLASS_NAME, "");
     InputStream descriptorFileInputStream = getDescriptorFileInputStream(props.get(DESCRIPTOR_FILE_PATH));
     Descriptors.Descriptor descriptor = buildProtoBufDescriptor(descriptorFileInputStream);
     _recordExtractor = new ProtoBufRecordExtractor();
@@ -60,10 +66,13 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
   private Descriptors.Descriptor buildProtoBufDescriptor(InputStream fin)
       throws IOException {
     try {
-      DescriptorProtos.FileDescriptorSet set = DescriptorProtos.FileDescriptorSet.parseFrom(fin);
-      Descriptors.FileDescriptor fileDescriptor =
-          Descriptors.FileDescriptor.buildFrom(set.getFile(0), new Descriptors.FileDescriptor[]{});
-      return fileDescriptor.getMessageTypes().get(0);
+      DynamicSchema dynamicSchema = DynamicSchema.parseFrom(fin);
+
+      if (StringUtils.isEmpty(_protoClassName)) {
+        return dynamicSchema.getMessageDescriptor(_protoClassName);
+      } else {
+        return dynamicSchema.getMessageDescriptor(dynamicSchema.getMessageTypes().toArray(new String[]{})[0]);
+      }
     } catch (Descriptors.DescriptorValidationException e) {
       throw new IOException("Descriptor file validation failed", e);
     }
