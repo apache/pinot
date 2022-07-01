@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
@@ -61,6 +62,9 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
       + "this message.")
   private boolean _help = false;
+
+  @CommandLine.Option(names = {"-o", "-option"}, required = false, description = "Additional options '-o key=value'")
+  private Map<String, String> _additionalOptions = new HashMap<>();
 
   private AuthProvider _authProvider;
 
@@ -124,6 +128,11 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
+  public PostQueryCommand setAdditionalOptions(Map<String, String> additionalOptions) {
+    _additionalOptions.putAll(additionalOptions);
+    return this;
+  }
+
   public String run()
       throws Exception {
     if (_brokerHost == null) {
@@ -131,7 +140,12 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     }
     LOGGER.info("Executing command: " + this);
     String url = _brokerProtocol + "://" + _brokerHost + ":" + _brokerPort + "/query/sql";
-    String request = JsonUtils.objectToString(Collections.singletonMap(Request.SQL, _query));
+    Map<String, String> payload = new HashMap<>();
+    payload.put(Request.SQL, _query);
+    if (_additionalOptions != null) {
+      payload.putAll(_additionalOptions);
+    }
+    String request = JsonUtils.objectToString(payload);
     return sendRequest("POST", url, request, makeAuthHeaders(makeAuthProvider(_authProvider,
             _authTokenUrl, _authToken, _user, _password)));
   }

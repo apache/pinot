@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -237,10 +238,15 @@ public class QuickstartRunner {
 
   public JsonNode runQuery(String query)
       throws Exception {
+    return runQuery(query, Collections.emptyMap());
+  }
+
+  public JsonNode runQuery(String query, Map<String, String> additionalOptions)
+      throws Exception {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
     return JsonUtils.stringToJsonNode(
         new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort)).setAuthProvider(_authProvider)
-            .setQuery(query).run());
+            .setAdditionalOptions(additionalOptions).setQuery(query).run());
   }
 
   public static void registerDefaultPinotFS() {

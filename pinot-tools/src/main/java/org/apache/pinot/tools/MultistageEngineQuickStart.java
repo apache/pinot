@@ -29,8 +29,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
+
+import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 
 
 public class MultistageEngineQuickStart extends QuickStartBase {
@@ -90,8 +93,29 @@ public class MultistageEngineQuickStart extends QuickStartBase {
 
     waitForBootstrapToComplete(null);
 
-    printStatus(Quickstart.Color.YELLOW, "***** Offline quickstart setup complete *****");
-    printStatus(Quickstart.Color.YELLOW, "Please use broker port for executing multistage queries");
+    Map<String, String> queryOptions = Collections.singletonMap(
+        CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true");
+
+    printStatus(Quickstart.Color.YELLOW, "***** Multi-stage engine quickstart setup complete *****");
+    String q1 = "SELECT count(*) FROM baseballStats_OFFLINE limit 1";
+    printStatus(Quickstart.Color.YELLOW, "Total number of documents in the table");
+    printStatus(Quickstart.Color.CYAN, "Query : " + q1);
+    printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(q1, queryOptions)));
+    printStatus(Quickstart.Color.GREEN, "***************************************************");
+
+    String q2 = "SELECT a.playerID, a.runs, a.yearID, b.runs, b.yearID"
+        + " FROM baseballStats_OFFLINE AS a JOIN baseballStats_OFFLINE AS b ON a.playerID = b.playerID"
+        + " WHERE a.runs > 160 AND b.runs < 2";
+    printStatus(Quickstart.Color.YELLOW, "Correlate the same player(s) with more than 160-run some year(s) and"
+        + " with less than 2-run some other year(s)");
+    printStatus(Quickstart.Color.CYAN, "Query : " + q2);
+    printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(q2, queryOptions)));
+    printStatus(Quickstart.Color.GREEN, "***************************************************");
+
+    printStatus(Quickstart.Color.GREEN, "***************************************************");
+    printStatus(Quickstart.Color.YELLOW, "Example query run completed.");
+    printStatus(Quickstart.Color.GREEN, "***************************************************");
+    printStatus(Quickstart.Color.YELLOW, "Please use broker port for executing multistage queries.");
     printStatus(Quickstart.Color.GREEN, "***************************************************");
   }
 
