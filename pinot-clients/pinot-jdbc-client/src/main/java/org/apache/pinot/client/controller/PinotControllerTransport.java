@@ -23,6 +23,7 @@ import io.netty.handler.ssl.JdkSslContext;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import javax.annotation.Nullable;
@@ -44,6 +45,12 @@ import org.slf4j.LoggerFactory;
 public class PinotControllerTransport {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotControllerTransport.class);
+
+  private static final long READ_TIMEOUT_MS = 60000L;
+
+  private static final int CONNECT_TIMEOUT_MS = 2000;
+
+  private static final int HANDSHAKE_TIMEOUT_MS = 2000;
 
   Map<String, String> _headers;
   private final String _scheme;
@@ -67,6 +74,19 @@ public class PinotControllerTransport {
     if (sslContext != null) {
       builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
     }
+
+    Properties prop = new Properties();
+    try {
+      prop.load(PinotControllerTransport.class.getClassLoader().getResourceAsStream("version.properties"));
+    } catch (IOException e) {
+      LOGGER.info("Unable to set user agent version");
+    }
+
+    builder.setReadTimeout((int) READ_TIMEOUT_MS)
+            .setConnectTimeout(CONNECT_TIMEOUT_MS)
+            .setHandshakeTimeout(HANDSHAKE_TIMEOUT_MS)
+            .setUserAgent(prop.getProperty("ua", "pinot-jdbc"))
+            .setEnabledProtocols(new String[]{"TLSv1.3", "TLSv1.2", "TLSv1.1"});
 
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }

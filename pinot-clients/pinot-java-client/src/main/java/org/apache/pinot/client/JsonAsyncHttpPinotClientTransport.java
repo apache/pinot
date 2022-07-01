@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -57,6 +58,8 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   private static final long BROKER_READ_TIMEOUT_MS = 60000L;
   private static final int BROKER_CONNECT_TIMEOUT_MS = 2000;
 
+  private static final int BROKER_HANDSHAKE_TIMEOUT_MS = 2000;
+
   private final AsyncHttpClient _httpClient;
 
   public JsonAsyncHttpPinotClientTransport() {
@@ -75,8 +78,18 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
       builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
     }
 
+    Properties prop = new Properties();
+    try {
+      prop.load(JsonAsyncHttpPinotClientTransport.class.getClassLoader().getResourceAsStream("version.properties"));
+    } catch (IOException e) {
+      LOGGER.info("Unable to set user agent version");
+    }
+
     builder.setReadTimeout((int) BROKER_READ_TIMEOUT_MS)
-        .setConnectTimeout(BROKER_CONNECT_TIMEOUT_MS);
+            .setConnectTimeout(BROKER_CONNECT_TIMEOUT_MS)
+            .setHandshakeTimeout(BROKER_HANDSHAKE_TIMEOUT_MS)
+            .setUserAgent(prop.getProperty("ua", "pinot-java"))
+            .setEnabledProtocols(new String[]{"TLSv1.3", "TLSv1.2", "TLSv1.1"});
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }
 
