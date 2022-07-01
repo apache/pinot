@@ -43,6 +43,7 @@ import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.query.runtime.operator.TransformOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
@@ -127,7 +128,9 @@ public class WorkerQueryExecutor {
     } else if (stageNode instanceof FilterNode) {
       throw new UnsupportedOperationException("Unsupported!");
     } else if (stageNode instanceof ProjectNode) {
-      throw new UnsupportedOperationException("Unsupported!");
+      ProjectNode projectNode = (ProjectNode) stageNode;
+      return new TransformOperator(getOperator(requestId, projectNode.getInputs().get(0), metadataMap),
+          projectNode.getProjects(), projectNode.getInputs().get(0).getDataSchema());
     } else {
       throw new UnsupportedOperationException(
           String.format("Stage node type %s is not supported!", stageNode.getClass().getSimpleName()));

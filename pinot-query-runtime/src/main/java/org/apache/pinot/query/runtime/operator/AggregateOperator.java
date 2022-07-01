@@ -159,6 +159,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     switch (((RexExpression.FunctionCall) aggCall).getFunctionName()) {
       case "$SUM":
       case "$SUM0":
+      case "SUM":
         return new SumAggregationFunction(
             ExpressionContext.forIdentifier(
                 ((RexExpression.FunctionCall) aggCall).getFunctionOperands().get(0).toString()));
@@ -167,11 +168,13 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
         return new CountAggregationFunction();
       case "$MIN":
       case "$MIN0":
+      case "MIN":
         return new MinAggregationFunction(
             ExpressionContext.forIdentifier(
                 ((RexExpression.FunctionCall) aggCall).getFunctionOperands().get(0).toString()));
       case "$MAX":
       case "$MAX0":
+      case "MAX":
         return new MaxAggregationFunction(
             ExpressionContext.forIdentifier(
                 ((RexExpression.FunctionCall) aggCall).getFunctionOperands().get(0).toString()));

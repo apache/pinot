@@ -95,6 +95,7 @@ public class StagePlanner {
   }
 
   // non-threadsafe
+  // TODO: add dataSchema (extracted from RelNode schema) to the StageNode.
   private StageNode walkRelPlan(RelNode node, int currentStageId) {
     if (isExchangeNode(node)) {
       // 1. exchangeNode always have only one input, get its input converted as a new stage root.
