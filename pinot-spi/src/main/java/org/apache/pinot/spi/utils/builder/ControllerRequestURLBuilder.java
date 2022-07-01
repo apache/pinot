@@ -451,6 +451,18 @@ public class ControllerRequestURLBuilder {
         "?cardinality=" + cardinality + "&primaryKeySize=" + primaryKeySize + "&numPartitions=" + numPartitions);
   }
 
+  public String forPauseConsumption(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "pauseConsumption");
+  }
+
+  public String forResumeConsumption(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "resumeConsumption");
+  }
+
+  public String forPauseStatus(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "pauseStatus");
+  }
+
   private static String encode(String s) {
     try {
       return URLEncoder.encode(s, "UTF-8");

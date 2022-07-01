@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
@@ -1507,27 +1508,27 @@ public class PinotLLCRealtimeSegmentManager {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class PauseStatus {
 
-    private boolean _isPauseFlagSet;
+    private boolean _pauseFlag;
     private Set<String> _consumingSegments;
     private String _description;
 
-    PauseStatus(Boolean isPauseFlagSet, Set<String> consumingSegments, String description) {
-      _isPauseFlagSet = isPauseFlagSet;
+    @JsonCreator
+    public PauseStatus(@JsonProperty("pauseFlag") boolean pauseFlag,
+        @JsonProperty("consumingSegments") Set<String> consumingSegments,
+        @JsonProperty("description") String description) {
+      _pauseFlag = pauseFlag;
       _consumingSegments = consumingSegments;
       _description = description;
     }
 
-    @JsonProperty("isPauseFlagSet")
-    public boolean isPauseFlagSet() {
-      return _isPauseFlagSet;
+    public boolean getPauseFlag() {
+      return _pauseFlag;
     }
 
-    @JsonProperty("consumingSegments")
     public Set<String> getConsumingSegments() {
       return _consumingSegments;
     }
 
-    @JsonProperty("description")
     public String getDescription() {
       return _description;
     }
