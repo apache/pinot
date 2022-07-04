@@ -257,7 +257,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
         LOGGER.warn("Unexpected cron expression. Hasn't been replicated yet?", assertionError);
       }
       return true;
-    }, TIMEOUT_IN_MS, 500L,"Cron expression didn't change to " + cronExpression);
+    }, TIMEOUT_IN_MS, 500L, "Cron expression didn't change to " + cronExpression);
   }
 
   @AfterClass
