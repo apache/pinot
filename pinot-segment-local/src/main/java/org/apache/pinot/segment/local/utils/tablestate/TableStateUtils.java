@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.utils.tablestate;
 
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -53,15 +54,11 @@ public class TableStateUtils {
     String sessionId = liveInstance.getEphemeralOwner();
     CurrentState currentState =
         dataAccessor.getProperty(keyBuilder.currentState(instanceName, sessionId, tableNameWithType));
-    if (currentState == null) {
-      LOGGER.warn("Failed to find current state for instance: {}, sessionId: {}, table: {}", instanceName, sessionId,
-          tableNameWithType);
-      return false;
-    }
 
     // Check if ideal state and current state matches for all segments assigned to the current instance
     Map<String, Map<String, String>> idealStatesMap = idealState.getRecord().getMapFields();
-    Map<String, String> currentStateMap = currentState.getPartitionStateMap();
+    Map<String, String> currentStateMap = (currentState == null) ? new HashMap<>()
+        : currentState.getPartitionStateMap();
     for (Map.Entry<String, Map<String, String>> entry : idealStatesMap.entrySet()) {
       String segmentName = entry.getKey();
       Map<String, String> instanceStateMap = entry.getValue();
