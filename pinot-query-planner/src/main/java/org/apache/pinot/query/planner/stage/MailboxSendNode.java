@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.stage;
 
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
@@ -36,15 +37,15 @@ public class MailboxSendNode extends AbstractStageNode {
     super(stageId);
   }
 
-  public MailboxSendNode(int stageId, int receiverStageId,
+  public MailboxSendNode(int stageId, DataSchema dataSchema, int receiverStageId,
       RelDistribution.Type exchangeType) {
     // When exchangeType is not HASH_DISTRIBUTE, no partitionKeySelector is needed.
-    this(stageId, receiverStageId, exchangeType, null);
+    this(stageId, dataSchema, receiverStageId, exchangeType, null);
   }
 
-  public MailboxSendNode(int stageId, int receiverStageId,
+  public MailboxSendNode(int stageId, DataSchema dataSchema, int receiverStageId,
       RelDistribution.Type exchangeType, @Nullable KeySelector<Object[], Object[]> partitionKeySelector) {
-    super(stageId);
+    super(stageId, dataSchema);
     _receiverStageId = receiverStageId;
     _exchangeType = exchangeType;
     _partitionKeySelector = partitionKeySelector;

@@ -114,7 +114,7 @@ public class RequestUtils {
   }
 
   public static Expression getFunctionExpression(String canonicalName) {
-    assert canonicalName.equals(canonicalizeFunctionNamePreservingSpecialKey(canonicalName));
+    assert canonicalName.equalsIgnoreCase(canonicalizeFunctionNamePreservingSpecialKey(canonicalName));
     Expression expression = new Expression(ExpressionType.FUNCTION);
     Function function = new Function(canonicalName);
     expression.setFunctionCall(function);

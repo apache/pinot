@@ -72,9 +72,10 @@ public class StagePlanner {
     // global root needs to send results back to the ROOT, a.k.a. the client response node. the last stage only has one
     // receiver so doesn't matter what the exchange type is. setting it to SINGLETON by default.
     StageNode globalReceiverNode =
-        new MailboxReceiveNode(0, globalStageRoot.getStageId(), RelDistribution.Type.SINGLETON);
-    StageNode globalSenderNode = new MailboxSendNode(globalStageRoot.getStageId(), globalReceiverNode.getStageId(),
-        RelDistribution.Type.SINGLETON);
+        new MailboxReceiveNode(0, globalStageRoot.getDataSchema(), globalStageRoot.getStageId(),
+            RelDistribution.Type.SINGLETON);
+    StageNode globalSenderNode = new MailboxSendNode(globalStageRoot.getStageId(), globalStageRoot.getDataSchema(),
+        globalReceiverNode.getStageId(), RelDistribution.Type.SINGLETON);
     globalSenderNode.addInput(globalStageRoot);
     _queryStageMap.put(globalSenderNode.getStageId(), globalSenderNode);
     StageMetadata stageMetadata = _stageMetadataMap.get(globalSenderNode.getStageId());
@@ -94,18 +95,21 @@ public class StagePlanner {
   }
 
   // non-threadsafe
+  // TODO: add dataSchema (extracted from RelNode schema) to the StageNode.
   private StageNode walkRelPlan(RelNode node, int currentStageId) {
     if (isExchangeNode(node)) {
       // 1. exchangeNode always have only one input, get its input converted as a new stage root.
       StageNode nextStageRoot = walkRelPlan(node.getInput(0), getNewStageId());
       RelDistribution distribution = ((LogicalExchange) node).getDistribution();
+      List<Integer> distributionKeys = distribution.getKeys();
       RelDistribution.Type exchangeType = distribution.getType();
 
       // 2. make an exchange sender and receiver node pair
-      StageNode mailboxReceiver = new MailboxReceiveNode(currentStageId, nextStageRoot.getStageId(), exchangeType);
-      StageNode mailboxSender = new MailboxSendNode(nextStageRoot.getStageId(), mailboxReceiver.getStageId(),
-          exchangeType, exchangeType == RelDistribution.Type.HASH_DISTRIBUTED
-          ? new FieldSelectionKeySelector(distribution.getKeys().get(0)) : null);
+      StageNode mailboxReceiver = new MailboxReceiveNode(currentStageId, nextStageRoot.getDataSchema(),
+          nextStageRoot.getStageId(), exchangeType);
+      StageNode mailboxSender = new MailboxSendNode(nextStageRoot.getStageId(), nextStageRoot.getDataSchema(),
+          mailboxReceiver.getStageId(), exchangeType, exchangeType == RelDistribution.Type.HASH_DISTRIBUTED
+          ? new FieldSelectionKeySelector(distributionKeys) : null);
       mailboxSender.addInput(nextStageRoot);
 
       // 3. put the sender side as a completed stage.

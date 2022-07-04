@@ -543,8 +543,7 @@ public class SegmentPrunerTest extends ControllerTest {
 
     TimeSegmentPruner segmentPruner = new TimeSegmentPruner(tableConfig, _propertyStore);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, RAW_TABLE_NAME);
-    DateTimeFormatSpec dateTimeFormatSpec =
-        new DateTimeFormatSpec(schema.getSpecForTimeColumn(TIME_COLUMN).getFormat());
+    DateTimeFormatSpec dateTimeFormatSpec = schema.getSpecForTimeColumn(TIME_COLUMN).getFormatSpec();
 
     Set<String> onlineSegments = new HashSet<>();
     String segment0 = "segment0";

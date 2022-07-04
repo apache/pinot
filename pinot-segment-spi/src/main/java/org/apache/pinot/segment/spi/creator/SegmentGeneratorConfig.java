@@ -264,7 +264,7 @@ public class SegmentGeneratorConfig implements Serializable {
       DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
       if (dateTimeFieldSpec != null) {
         setTimeColumnName(dateTimeFieldSpec.getName());
-        setDateTimeFormatSpec(new DateTimeFormatSpec(dateTimeFieldSpec.getFormat()));
+        setDateTimeFormatSpec(dateTimeFieldSpec.getFormatSpec());
       }
     }
   }

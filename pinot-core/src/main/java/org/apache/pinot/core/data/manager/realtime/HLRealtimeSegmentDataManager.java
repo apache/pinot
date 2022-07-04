@@ -47,7 +47,6 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
@@ -121,7 +120,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             _tableNameWithType);
     DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(_timeColumnName);
     Preconditions.checkNotNull(dateTimeFieldSpec, "Must provide field spec for time column {}", _timeColumnName);
-    _timeType = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat()).getColumnUnit();
+    _timeType = dateTimeFieldSpec.getFormatSpec().getColumnUnit();
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     if (sortedColumns.isEmpty()) {

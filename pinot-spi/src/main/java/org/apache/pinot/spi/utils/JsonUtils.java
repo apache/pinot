@@ -55,8 +55,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.DateTimeFormatSpec;
-import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -598,9 +596,11 @@ public class JsonUtils {
         case DATE_TIME:
           Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", name);
           Preconditions.checkNotNull(timeUnit, "Time unit cannot be null");
-          pinotSchema.addField(new DateTimeFieldSpec(name, dataType,
-              new DateTimeFormatSpec(1, timeUnit.toString(), DateTimeFieldSpec.TimeFormat.EPOCH.toString()).getFormat(),
-              new DateTimeGranularitySpec(1, timeUnit).getGranularity()));
+          // TODO: Switch to new format after releasing 0.11.0
+          //       "EPOCH|" + timeUnit.name()
+          String format = "1:" + timeUnit.name() + ":EPOCH";
+          String granularity = "1:" + timeUnit.name();
+          pinotSchema.addField(new DateTimeFieldSpec(name, dataType, format, granularity));
           break;
         default:
           throw new UnsupportedOperationException("Unsupported field type: " + fieldType + " for field: " + name);

@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.controller.helix;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -52,10 +54,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -181,7 +180,7 @@ public class SegmentStatusCheckerTest {
     allTableNames.add(tableName);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setTimeColumnName("timeColumn").setLLC(true)
-            .setNumReplicas(3).build();
+            .setNumReplicas(3).setStreamConfigs(getStreamConfigMap()).build();
     final LLCSegmentName seg1 = new LLCSegmentName(rawTableName, 1, 0, System.currentTimeMillis());
     final LLCSegmentName seg2 = new LLCSegmentName(rawTableName, 1, 1, System.currentTimeMillis());
     final LLCSegmentName seg3 = new LLCSegmentName(rawTableName, 2, 1, System.currentTimeMillis());
@@ -217,6 +216,9 @@ public class SegmentStatusCheckerTest {
       when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
+      ZNRecord znRecord = new ZNRecord("0");
+      znRecord.setSimpleField(CommonConstants.Segment.Realtime.END_OFFSET, "10000");
+      when(_helixPropertyStore.get(anyString(), any(), anyInt())).thenReturn(znRecord);
     }
     {
       _config = mock(ControllerConf.class);
@@ -251,6 +253,18 @@ public class SegmentStatusCheckerTest {
             100);
     Assert.assertEquals(
         _controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
+    Assert.assertEquals(_controllerMetrics
+        .getValueOfTableGauge(externalView.getId(), ControllerGauge.MISSING_CONSUMING_SEGMENT_TOTAL_COUNT), 2);
+  }
+
+  Map<String, String> getStreamConfigMap() {
+    return ImmutableMap.of(
+        "streamType", "kafka",
+        "stream.kafka.consumer.type", "simple",
+        "stream.kafka.topic.name", "test",
+        "stream.kafka.decoder.class.name", "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder",
+        "stream.kafka.consumer.factory.class.name",
+        "org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory");
   }
 
   @Test

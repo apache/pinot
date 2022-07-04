@@ -18,28 +18,23 @@
  */
 package org.apache.pinot.spi.data;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.EnumUtils;
-import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.utils.StringUtil;
 
 
 /**
  * Class to represent granularity from {@link DateTimeFieldSpec}
  */
 public class DateTimeGranularitySpec {
+  // 'size:timeUnit'
+  private static final char SEPARATOR = ':';
+  private static final int SIZE_POSITION = 0;
+  private static final int TIME_UNIT_POSITION = 1;
+  private static final int NUM_TOKENS = 2;
 
-  public static final String NUMBER_REGEX = "[1-9][0-9]*";
-
-  public static final String COLON_SEPARATOR = ":";
-
-  /* DateTimeFieldSpec granularity is of format size:timeUnit */
-  public static final int GRANULARITY_SIZE_POSITION = 0;
-  public static final int GRANULARITY_UNIT_POSITION = 1;
-  public static final int MAX_GRANULARITY_TOKENS = 2;
-
-  private final String _granularity;
   private final int _size;
   private final TimeUnit _timeUnit;
 
@@ -47,25 +42,34 @@ public class DateTimeGranularitySpec {
    * Constructs a dateTimeGranularitySpec granularity from a string
    */
   public DateTimeGranularitySpec(String granularity) {
-    validateGranularity(granularity);
-    _granularity = granularity;
-    String[] granularityTokens = _granularity.split(COLON_SEPARATOR);
-    _size = Integer.parseInt(granularityTokens[GRANULARITY_SIZE_POSITION]);
-    _timeUnit = TimeUnit.valueOf(granularityTokens[GRANULARITY_UNIT_POSITION]);
+    Preconditions.checkArgument(StringUtils.isNotEmpty(granularity), "Must provide granularity");
+    String[] granularityTokens = StringUtil.split(granularity, SEPARATOR, 2);
+    Preconditions.checkArgument(granularityTokens.length >= NUM_TOKENS,
+        "Invalid granularity: %s, must be of format 'size:timeUnit", granularity);
+    try {
+      _size = Integer.parseInt(granularityTokens[SIZE_POSITION]);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid size: %s in granularity: %s", granularityTokens[SIZE_POSITION], granularity));
+    }
+    Preconditions.checkArgument(_size > 0, "Invalid size: %s in granularity: %s, must be positive", _size, granularity);
+    try {
+      _timeUnit = TimeUnit.valueOf(granularityTokens[TIME_UNIT_POSITION]);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid time unit: %s in granularity: %s", granularityTokens[TIME_UNIT_POSITION],
+              granularity));
+    }
   }
 
   /**
    * Constructs a dateTimeGranularitySpec granularity given the components of a granularity
    */
-  public DateTimeGranularitySpec(int columnSize, TimeUnit columnUnit) {
-    _granularity = Joiner.on(COLON_SEPARATOR).join(columnSize, columnUnit);
-    validateGranularity(_granularity);
-    _size = columnSize;
-    _timeUnit = columnUnit;
-  }
-
-  public String getGranularity() {
-    return _granularity;
+  public DateTimeGranularitySpec(int size, TimeUnit timeUnit) {
+    Preconditions.checkArgument(size > 0, "Invalid size: %s, must be positive", size);
+    Preconditions.checkArgument(timeUnit != null, "Must provide time unit");
+    _size = size;
+    _timeUnit = timeUnit;
   }
 
   public int getSize() {
@@ -77,55 +81,31 @@ public class DateTimeGranularitySpec {
   }
 
   /**
+   * Converts a granularity to millis.
    * <ul>
-   * <li>Convert a granularity to millis.
-   * This method should not do validation of outputGranularity.
-   * The validation should be handled by caller using {@link #validateGranularity}</li>
-   * <ul>
-   * <li>1) granularityToMillis(1:HOURS) = 3600000 (60*60*1000)</li>
-   * <li>2) granularityToMillis(1:MILLISECONDS) = 1</li>
-   * <li>3) granularityToMillis(15:MINUTES) = 900000 (15*60*1000)</li>
-   * </ul>
+   *   <li>1) granularityToMillis(1:HOURS) = 3600000 (60*60*1000)</li>
+   *   <li>2) granularityToMillis(1:MILLISECONDS) = 1</li>
+   *   <li>3) granularityToMillis(15:MINUTES) = 900000 (15*60*1000)</li>
    * </ul>
    */
   public long granularityToMillis() {
     return TimeUnit.MILLISECONDS.convert(_size, _timeUnit);
   }
 
-  /**
-   * Check correctness of granularity of {@link DateTimeFieldSpec}
-   */
-  public static void validateGranularity(String granularity) {
-    Preconditions.checkNotNull(granularity, "Granularity string in dateTimeFieldSpec must not be null");
-
-    String[] granularityTokens = granularity.split(COLON_SEPARATOR);
-    Preconditions.checkState(granularityTokens.length == MAX_GRANULARITY_TOKENS,
-        "Incorrect granularity: %s. Must be of format 'size:timeunit'", granularity);
-    Preconditions.checkState(granularityTokens[GRANULARITY_SIZE_POSITION].matches(NUMBER_REGEX),
-        "Incorrect granularity size: %s. Must be of format '[0-9]+:<TimeUnit>'",
-        granularityTokens[GRANULARITY_SIZE_POSITION]);
-    Preconditions.checkState(EnumUtils.isValidEnum(TimeUnit.class, granularityTokens[GRANULARITY_UNIT_POSITION]),
-        "Incorrect granularity size: %s. Must be of format '[0-9]+:<TimeUnit>'",
-        granularityTokens[GRANULARITY_SIZE_POSITION]);
-  }
-
   @Override
   public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
+    if (this == o) {
       return true;
     }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
-
     DateTimeGranularitySpec that = (DateTimeGranularitySpec) o;
-
-    return EqualityUtils.isEqual(_granularity, that._granularity);
+    return _size == that._size && _timeUnit == that._timeUnit;
   }
 
   @Override
   public int hashCode() {
-    return EqualityUtils.hashCodeOf(_granularity);
+    return Objects.hash(_size, _timeUnit);
   }
 }
