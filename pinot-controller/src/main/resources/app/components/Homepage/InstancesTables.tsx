@@ -19,13 +19,16 @@
 
 import React, {  } from 'react';
 import map from 'lodash/map';
+import get from 'lodash/get';
 import InstanceTable from './InstanceTable';
 
 const Instances = ({instances, clusterName}) => {
+  const order = ['Controller', 'Broker', 'Server', 'Minion'];
   return (
     <>
       {
-        map(instances, (value, key) => {
+        map(order, (key) => {
+          const value = get(instances, key, '');
           return <InstanceTable key={key} name={`${key}s`} instances={value} clusterName={clusterName} />;
         })
       }

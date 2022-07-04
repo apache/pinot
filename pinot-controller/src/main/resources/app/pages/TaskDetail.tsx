@@ -19,6 +19,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { get, each } from 'lodash';
+import moment from 'moment';
 // import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { Grid, makeStyles } from '@material-ui/core';
 // import SimpleAccordion from '../components/SimpleAccordion';
@@ -115,7 +116,7 @@ const TaskDetail = (props) => {
             <strong>Start Time:</strong> {get(taskDebugData, 'startTime', '')}
           </Grid>
           <Grid item xs={12}>
-            <strong>Execution Start Time:</strong> {get(taskDebugData, 'executionStartTime', '')}
+            <strong>Elapsed Time:</strong> {PinotMethodUtils.getElapsedTime(moment(get(taskDebugData, 'startTime'), 'YYYY-MM-DD hh:mm:ss'))}
           </Grid>
           <Grid item xs={12}>
             <strong>Finish Time:</strong> {get(taskDebugData, 'subtaskInfos.0.finishTime', '')}

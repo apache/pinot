@@ -826,9 +826,16 @@ const getMinionMetaData = (tableName, taskType) => {
   });
 };
 
+const getElapsedTime = (startTime) => {
+  const currentTime = moment();
+  const diff = currentTime.diff(startTime);
+  const elapsedTime = diff > (1000 * 60 * 60) ? `${currentTime.diff(startTime, 'hour')} hours` : `${currentTime.diff(startTime, 'minute')} minutes`;
+  return elapsedTime;
+}
+
 const getTasksList = async (tableName, taskType) => {
   const finalResponse = {
-    columns: ['Task ID', 'Status', 'Start Time', 'Execution Time', 'Finish Time', 'Num of Sub Tasks'],
+    columns: ['Task ID', 'Status', 'Start Time', 'Elapsed Time', 'Finish Time', 'Num of Sub Tasks'],
     records: []
   }
   await new Promise((resolve, reject) => {
@@ -836,11 +843,12 @@ const getTasksList = async (tableName, taskType) => {
       const promiseArr = [];
       const fetchInfo = async (taskID, status) => {
         const debugData = await getTaskDebugData(taskID);
+        const startTime = moment(_.get(debugData, 'data.subtaskInfos.0.startTime'), 'YYYY-MM-DD hh:mm:ss');
         finalResponse.records.push([
           taskID,
           status,
-          _.get(debugData, 'data.subtaskInfos.0.startTime', ''),
-          _.get(debugData, 'data.executionStartTime', ''),
+          _.get(debugData, 'data.subtaskInfos.0.startTime'),
+          getElapsedTime(startTime),
           _.get(debugData, 'data.subtaskInfos.0.finishTime', ''),
           _.get(debugData, 'data.subtaskCount.total', 0)
         ]);
@@ -1122,6 +1130,7 @@ export default {
   executeTaskAction,
   getScheduleJobDetail,
   getMinionMetaData,
+  getElapsedTime,
   getTasksList,
   getTaskDebugData,
   deleteSegmentOp,

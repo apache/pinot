@@ -17,13 +17,15 @@
  * under the License.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { get } from 'lodash';
 import moment from 'moment';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { Grid, makeStyles } from '@material-ui/core';
+import { NotificationContext } from '../components/Notification/NotificationContext';
 import SimpleAccordion from '../components/SimpleAccordion';
 import CustomButton from '../components/CustomButton';
+import { useConfirm } from '../components/Confirm';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import useScheduleAdhocModal from '../components/useScheduleAdhocModal';
 import useMinionMetadata from '../components/useMinionMetadata';
@@ -77,6 +79,7 @@ const TaskQueueTable = (props) => {
   const classes = useStyles();
   const { taskType, queueTableName: tableName } = props.match.params;
 
+  const {dispatch} = useContext(NotificationContext);
   const [fetching, setFetching] = useState(true);
   const [jobDetail, setJobDetail] = useState({});
   const [tableDetail, setTableDetail] = useState({});
@@ -99,7 +102,20 @@ const TaskQueueTable = (props) => {
 
   const handleScheduleNow = async () => {
     await PinotMethodUtils.scheduleTaskAction(tableName, taskType);
+    dispatch({
+      type: 'success',
+      message: `${taskType} scheduled successfully`,
+      show: true
+    });
+    await fetchData();
+    scheduleNowConfirm.setConfirmDialog(false);
   };
+
+  const scheduleNowConfirm = useConfirm({
+    dialogTitle: 'Schedule now',
+    dialogContent: 'Are you sure want to schedule now?',
+    successCallback: handleScheduleNow
+  });
 
   const cronExpression = get(jobDetail, 'Triggers.0.CronExpression', '');
   const previousFireTime = get(jobDetail, 'Triggers.0.PreviousFireTime', 0);
@@ -114,7 +130,7 @@ const TaskQueueTable = (props) => {
         >
           <div>
             <CustomButton
-              onClick={() => handleScheduleNow()}
+              onClick={() => scheduleNowConfirm.setConfirmDialog(true)}
               tooltipTitle="Schedule now"
               enableTooltip={true}
             >
@@ -181,6 +197,7 @@ const TaskQueueTable = (props) => {
         </Grid>
       </Grid>
       {scheduleAdhocModal.dialog}
+      {scheduleNowConfirm.confirmComponent}
     </Grid>
   );
 };

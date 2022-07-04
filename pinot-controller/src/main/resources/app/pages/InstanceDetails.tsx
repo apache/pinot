@@ -68,9 +68,16 @@ type Props = {
 const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
   const classes = useStyles();
   const {instanceName} = match.params;
+  let instanceType;
+  if (instanceName.toLowerCase().startsWith('broker')) {
+    instanceType = 'BROKER';
+  } else if (instanceName.toLowerCase().startsWith('minion')) {
+    instanceType = 'MINION';
+  } else {
+    instanceType = 'SERVER';
+  }
   const clutserName = localStorage.getItem('pinot_ui:clusterName');
   const [fetching, setFetching] = useState(true);
-  const [instanceType] = React.useState(instanceName.toLowerCase().startsWith('broker') ? 'BROKER' : 'SERVER');
   const [confirmDialog, setConfirmDialog] = React.useState(false);
   const [dialogDetails, setDialogDetails] = React.useState(null);
 

@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { get, map } from 'lodash';
+import { get, map, uniqBy, first } from 'lodash';
 import { TableData } from 'Models';
 import { Grid, makeStyles } from '@material-ui/core';
 import SimpleAccordion from '../components/SimpleAccordion';
@@ -27,6 +27,7 @@ import CustomButton from '../components/CustomButton';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import { useConfirm } from '../components/Confirm';
 import CustomizedTables from '../components/Table';
+import { cleanupTasks } from '../requests';
 
 const useStyles = makeStyles(() => ({
   gridContainer: {
@@ -66,10 +67,10 @@ const TaskQueue = (props) => {
     setFetching(true);
     const taskInfoRes = await PinotMethodUtils.getTaskInfo(taskType);
     const tablesResponse:any = await PinotMethodUtils.getTaskTypeDebugData(taskType);
-    console.log('tablesResponse', tablesResponse);
     setTaskInfo(taskInfoRes);
     setTables((prevState): TableData => {
-      return { ...prevState, records: map(tablesResponse, table => [get(table, 'subtaskInfos.0.taskConfig.configs.tableName', '')]) };
+      const _records = map(tablesResponse, table => [get(table, 'subtaskInfos.0.taskConfig.configs.tableName', '')]);
+      return { ...prevState, records: uniqBy(_records, (rec) => first(rec)) };
     });
     setFetching(false);
   };
@@ -80,6 +81,7 @@ const TaskQueue = (props) => {
 
   const handleStopAll = async () => {
     await PinotMethodUtils.stopAllTasks(taskType);
+    await fetchData();
     stopAllConfirm.setConfirmDialog(false);
   };
 
@@ -91,11 +93,26 @@ const TaskQueue = (props) => {
 
   const handleResumeAll = async () => {
     await PinotMethodUtils.resumeAllTasks(taskType);
+    await fetchData();
+    resumeAllConfirm.setConfirmDialog(false);
   };
+
+  const resumeAllConfirm = useConfirm({
+    dialogTitle: 'Resume all tasks',
+    dialogContent: 'Are you sure want to resume all the tasks?',
+    successCallback: handleResumeAll
+  });
 
   const handleCleanupAll = async () => {
     await PinotMethodUtils.cleanupAllTasks(taskType);
+    cleanupAllConfirm.setConfirmDialog(false);
   };
+
+  const cleanupAllConfirm = useConfirm({
+    dialogTitle: 'Cleanup all tasks',
+    dialogContent: 'Are you sure want to cleanup all the tasks?',
+    successCallback: handleCleanupAll
+  });
 
   const handleDeleteAll = async () => {
     await PinotMethodUtils.deleteAllTasks(taskType);
@@ -118,28 +135,28 @@ const TaskQueue = (props) => {
           <div>
             <CustomButton
               onClick={() => stopAllConfirm.setConfirmDialog(true)}
-              tooltipTitle="Stop all tasks"
+              tooltipTitle="Stop all running/pending tasks (as well as the task queue) for the given task type. Any new task added will not be picked up until Task Queue is resumed. This is not an instant operation, and the task may take some more time to actually stop."
               enableTooltip={true}
             >
               Stop All
             </CustomButton>
             <CustomButton
-              onClick={handleResumeAll}
-              tooltipTitle="Resume all tasks"
+              onClick={() => resumeAllConfirm.setConfirmDialog(true)}
+              tooltipTitle="Resume all stopped tasks (as well as the task queue) for the given task type. Resumed tasks start from the beginning of the task."
               enableTooltip={true}
             >
               Resume All
             </CustomButton>
             <CustomButton
-              onClick={handleCleanupAll}
-              tooltipTitle="Cleanup all tasks"
+              onClick={() => cleanupAllConfirm.setConfirmDialog(true)}
+              tooltipTitle="Clean up finished tasks (COMPLETED, FAILED) for the given task type. This has no impact on the executing tasks. This happens periodically "
               enableTooltip={true}
             >
               Cleanup All
             </CustomButton>
             <CustomButton
               onClick={() => deleteAllConfirm.setConfirmDialog(true)}
-              tooltipTitle="Delete all tasks"
+              tooltipTitle="Delete all tasks (as well as the task queue) for the given task type."
               enableTooltip={true}
             >
               Delete All
@@ -174,6 +191,8 @@ const TaskQueue = (props) => {
         />
       )}
       {stopAllConfirm.confirmComponent}
+      {resumeAllConfirm.confirmComponent}
+      {cleanupAllConfirm.confirmComponent}
       {deleteAllConfirm.confirmComponent}
     </Grid>
   );
