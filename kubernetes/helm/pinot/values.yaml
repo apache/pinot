@@ -132,7 +132,10 @@ controller:
     v1:
       enabled: false
 
-  resources: {}
+  resources:
+    requests:
+      cpu: "2000m"
+      memory: "1.25Gi"
 
   nodeSelector: {}
 
@@ -223,7 +226,10 @@ broker:
     v1:
       enabled: false
 
-  resources: {}
+  resources:
+    requests:
+      cpu: "2000m"
+      memory: "1.25Gi"
 
   nodeSelector: {}
 
@@ -305,7 +311,10 @@ server:
     nodePort: ""
     protocol: TCP
 
-  resources: {}
+  resources:
+    requests:
+      cpu: "2000m"
+      memory: "1.25Gi"
 
   nodeSelector: {}
 
@@ -385,7 +394,10 @@ minion:
     protocol: TCP
     name: minion
 
-  resources: {}
+  resources:
+    requests:
+      cpu: "2000m"
+      memory: "1.25Gi"
 
   nodeSelector: {}
 
@@ -457,7 +469,10 @@ minionStateless:
     protocol: TCP
     name: minion
 
-  resources: {}
+  resources:
+    requests:
+      cpu: "2000m"
+      memory: "1.25Gi"
 
   nodeSelector: {}
 
