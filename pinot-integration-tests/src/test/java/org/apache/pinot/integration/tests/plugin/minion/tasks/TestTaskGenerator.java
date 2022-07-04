@@ -45,8 +45,6 @@ public class TestTaskGenerator extends BaseTaskGenerator {
 
   @Override
   public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
-    assertEquals(tableConfigs.size(), SimpleMinionClusterIntegrationTest.NUM_TASKS);
-
     // Generate at most 2 tasks
     if (_clusterInfoAccessor.getTaskStates(SimpleMinionClusterIntegrationTest.TASK_TYPE).size()
         >= SimpleMinionClusterIntegrationTest.NUM_TASKS) {
