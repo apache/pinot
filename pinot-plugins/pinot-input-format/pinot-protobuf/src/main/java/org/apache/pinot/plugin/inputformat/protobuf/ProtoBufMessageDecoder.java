@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.inputformat.protobuf;
 
 import com.github.os72.protobuf.dynamic.DynamicSchema;
 import com.google.common.base.Preconditions;
-import com.google.protobuf.DescriptorProtos;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.Message;
@@ -55,7 +54,7 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
     Preconditions.checkState(props.containsKey(DESCRIPTOR_FILE_PATH),
         "Protocol Buffer schema descriptor file must be provided");
 
-    _protoClassName  = props.getOrDefault(PROTO_CLASS_NAME, "");
+    _protoClassName = props.getOrDefault(PROTO_CLASS_NAME, "");
     InputStream descriptorFileInputStream = getDescriptorFileInputStream(props.get(DESCRIPTOR_FILE_PATH));
     Descriptors.Descriptor descriptor = buildProtoBufDescriptor(descriptorFileInputStream);
     _recordExtractor = new ProtoBufRecordExtractor();
@@ -68,7 +67,7 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
     try {
       DynamicSchema dynamicSchema = DynamicSchema.parseFrom(fin);
 
-      if (StringUtils.isEmpty(_protoClassName)) {
+      if (!StringUtils.isEmpty(_protoClassName)) {
         return dynamicSchema.getMessageDescriptor(_protoClassName);
       } else {
         return dynamicSchema.getMessageDescriptor(dynamicSchema.getMessageTypes().toArray(new String[]{})[0]);
