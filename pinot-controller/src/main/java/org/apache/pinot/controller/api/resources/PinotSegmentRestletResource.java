@@ -467,8 +467,11 @@ public class PinotSegmentRestletResource {
         _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload);
     if (msgInfo.getLeft() > 0) {
       try {
-        _pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentName, msgInfo.getRight(),
-            msgInfo.getLeft());
+        if (!_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentName, msgInfo.getRight(),
+            msgInfo.getLeft())) {
+          LOGGER.error("Failed to add reload segment job meta into zookeeper for table {}, segment {}",
+              tableNameWithType, segmentName);
+        }
       } catch (Exception e) {
         LOGGER.error("Failed to add reload segment job meta into zookeeper for table {}, segment {}",
             tableNameWithType, segmentName, e);
@@ -702,7 +705,10 @@ public class PinotSegmentRestletResource {
       perTableMsgData.put(tableNameWithType, msgInfo);
       // Store in ZK
       try {
-        _pinotHelixResourceManager.addNewReloadAllSegmentsJob(tableNameWithType, msgInfo.getRight(), msgInfo.getLeft());
+        if (!_pinotHelixResourceManager.addNewReloadAllSegmentsJob(tableNameWithType, msgInfo.getRight(),
+            msgInfo.getLeft())) {
+          LOGGER.error("Failed to add reload all segments job meta into zookeeper for table {}", tableNameWithType);
+        }
       } catch (Exception e) {
         LOGGER.error("Failed to add reload all segments job meta into zookeeper for table {}", tableNameWithType, e);
       }

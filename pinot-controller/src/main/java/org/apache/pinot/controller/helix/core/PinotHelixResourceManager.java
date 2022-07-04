@@ -2005,7 +2005,7 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void addNewReloadSegmentJob(String tableNameWithType, String segmentName, String jobId,
+  public boolean addNewReloadSegmentJob(String tableNameWithType, String segmentName, String jobId,
       int numberOfMessagesSent) {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.CONTROLLER_JOB_ID, jobId);
@@ -2016,10 +2016,10 @@ public class PinotHelixResourceManager {
     jobMetadata.put(CommonConstants.ControllerJob.CONTROLLER_JOB_MESSAGES_COUNT,
         Integer.toString(numberOfMessagesSent));
     jobMetadata.put(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME, segmentName);
-    addReloadJobToZK(tableNameWithType, jobId, jobMetadata);
+    return addReloadJobToZK(tableNameWithType, jobId, jobMetadata);
   }
 
-  public void addNewReloadAllSegmentsJob(String tableNameWithType, String jobId, int numberOfMessagesSent) {
+  public boolean addNewReloadAllSegmentsJob(String tableNameWithType, String jobId, int numberOfMessagesSent) {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.CONTROLLER_JOB_ID, jobId);
     jobMetadata.put(CommonConstants.ControllerJob.CONTROLLER_JOB_TABLE_NAME_WITH_TYPE, tableNameWithType);
@@ -2029,15 +2029,14 @@ public class PinotHelixResourceManager {
         Long.toString(System.currentTimeMillis()));
     jobMetadata.put(CommonConstants.ControllerJob.CONTROLLER_JOB_MESSAGES_COUNT,
         Integer.toString(numberOfMessagesSent));
-    addReloadJobToZK(tableNameWithType, jobId, jobMetadata);
+    return addReloadJobToZK(tableNameWithType, jobId, jobMetadata);
   }
 
-  private void addReloadJobToZK(String tableNameWithType, String taskId, Map<String, String> taskMetadata) {
+  private boolean addReloadJobToZK(String tableNameWithType, String taskId, Map<String, String> taskMetadata) {
     String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(tableNameWithType);
-    ZNRecord tableJobsZnRecord;
-
-    if (_propertyStore.exists(jobResourcePath, AccessOption.PERSISTENT)) {
-      tableJobsZnRecord = _propertyStore.get(jobResourcePath, null, -1);
+    Stat stat = new Stat();
+    ZNRecord tableJobsZnRecord = _propertyStore.get(jobResourcePath, stat, -1);
+    if (tableJobsZnRecord != null) {
       Map<String, Map<String, String>> tasks = tableJobsZnRecord.getMapFields();
       tasks.put(taskId, taskMetadata);
       if (tasks.size() > CommonConstants.ControllerJob.MAXIMUM_RELOAD_JOBS_IN_ZK) {
@@ -2052,11 +2051,12 @@ public class PinotHelixResourceManager {
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
       }
       tableJobsZnRecord.setMapFields(tasks);
+      return _propertyStore.set(jobResourcePath, tableJobsZnRecord, stat.getVersion(), AccessOption.PERSISTENT);
     } else {
       tableJobsZnRecord = new ZNRecord(jobResourcePath);
       tableJobsZnRecord.setMapField(taskId, taskMetadata);
+      return _propertyStore.set(jobResourcePath, tableJobsZnRecord, AccessOption.PERSISTENT);
     }
-    _propertyStore.set(jobResourcePath, tableJobsZnRecord, AccessOption.PERSISTENT);
   }
 
   @VisibleForTesting

@@ -27,14 +27,14 @@ import org.apache.pinot.segment.spi.IndexSegment;
  */
 public abstract class SegmentDataManager {
   private int _referenceCount = 1;
-  private long _segmentLoadTimeInMillisEpoch = System.currentTimeMillis();
+  private long _loadTimeMs = System.currentTimeMillis();
 
-  public long getSegmentLoadTimeInMillisEpoch() {
-    return _segmentLoadTimeInMillisEpoch;
+  public long getLoadTimeMs() {
+    return _loadTimeMs;
   }
 
-  public void setSegmentLoadTimeInMillisEpoch(long segmentLoadTimeInMillisEpoch) {
-    _segmentLoadTimeInMillisEpoch = segmentLoadTimeInMillisEpoch;
+  public void setLoadTimeMs(long loadTimeMs) {
+    _loadTimeMs = loadTimeMs;
   }
 
   @VisibleForTesting

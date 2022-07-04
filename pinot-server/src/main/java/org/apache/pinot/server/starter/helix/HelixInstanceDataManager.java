@@ -310,7 +310,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       try {
         if (reloadMutableSegment(tableNameWithType, segmentName, segmentDataManager, schema)) {
           // A mutable segment has been found and reloaded.
-          segmentDataManager.setSegmentLoadTimeInMillisEpoch(System.currentTimeMillis());
+          segmentDataManager.setLoadTimeMs(System.currentTimeMillis());
           return;
         }
       } finally {
