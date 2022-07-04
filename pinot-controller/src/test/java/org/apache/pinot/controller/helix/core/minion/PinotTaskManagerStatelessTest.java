@@ -245,17 +245,19 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
 
     // There is no guarantee that previous changes have been applied, therefore we need to
     // retry the check for a bit
-    TestUtils.waitForResult(() -> {
+    TestUtils.waitForCondition(aVoid -> {
       try {
         List<? extends Trigger> triggersOfJob = scheduler.getTriggersOfJob(jobKey);
         Trigger trigger = triggersOfJob.iterator().next();
         assertTrue(trigger instanceof CronTrigger);
         assertEquals(((CronTrigger) trigger).getCronExpression(), cronExpression);
+      } catch (SchedulerException ex) {
+        throw new RuntimeException(ex);
       } catch (AssertionError assertionError) {
         LOGGER.warn("Unexpected cron expression. Hasn't been replicated yet?", assertionError);
       }
-      return null;
-    }, TIMEOUT_IN_MS);
+      return true;
+    }, TIMEOUT_IN_MS, 500L,"Cron expression didn't change to " + cronExpression);
   }
 
   @AfterClass
