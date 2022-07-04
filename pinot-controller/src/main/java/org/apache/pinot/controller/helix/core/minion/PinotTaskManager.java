@@ -39,6 +39,7 @@ import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.minion.TaskGeneratorMostRecentRunInfoUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
@@ -404,8 +405,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       JobDataMap jobDataMap = new JobDataMap();
       jobDataMap.put(PINOT_TASK_MANAGER_KEY, this);
       jobDataMap.put(LEAD_CONTROLLER_MANAGER_KEY, _leadControllerManager);
-      JobDetail jobDetail = JobBuilder.newJob(CronJobScheduleJob.class).withIdentity(tableWithType, taskType)
-          .setJobData(jobDataMap).build();
+      JobDetail jobDetail =
+          JobBuilder.newJob(CronJobScheduleJob.class).withIdentity(tableWithType, taskType).setJobData(jobDataMap)
+              .build();
       try {
         _scheduler.scheduleJob(jobDetail, trigger);
         _controllerMetrics.addValueToTableGauge(getCronJobName(tableWithType, taskType),
@@ -517,7 +519,27 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   private String scheduleTask(PinotTaskGenerator taskGenerator, List<TableConfig> enabledTableConfigs,
       boolean isLeader) {
     LOGGER.info("Trying to schedule task type: {}, isLeader: {}", taskGenerator.getTaskType(), isLeader);
-    List<PinotTaskConfig> pinotTaskConfigs = taskGenerator.generateTasks(enabledTableConfigs);
+    List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+    for (TableConfig tableConfig : enabledTableConfigs) {
+      try {
+        pinotTaskConfigs.addAll(taskGenerator.generateTasks(Collections.singletonList(tableConfig)));
+        try {
+          TaskGeneratorMostRecentRunInfoUtils.saveSuccessRunTsToZk(_pinotHelixResourceManager.getPropertyStore(),
+              tableConfig.getTableName(), taskGenerator.getTaskType(), System.currentTimeMillis());
+        } catch (Exception exception) {
+          LOGGER.warn("Failed to save task generator success timestamp to ZK", exception);
+        }
+      } catch (Exception e) {
+        LOGGER.error("Failed to generate tasks for table {} and task {}", tableConfig.getTableName(),
+            taskGenerator.getTaskType(), e);
+        try {
+          TaskGeneratorMostRecentRunInfoUtils.saveErrorRunMessageToZk(_pinotHelixResourceManager.getPropertyStore(),
+              tableConfig.getTableName(), taskGenerator.getTaskType(), System.currentTimeMillis(), e.getMessage());
+        } catch (Exception exception) {
+          LOGGER.warn("Failed to save task generator error message to ZK", exception);
+        }
+      }
+    }
     if (!isLeader) {
       taskGenerator.nonLeaderCleanUp();
     }
@@ -625,8 +647,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   private synchronized void addTaskTypeMetricsUpdaterIfNeeded(String taskType) {
     if (!_taskTypeMetricsUpdaterMap.containsKey(taskType)) {
       TaskTypeMetricsUpdater taskTypeMetricsUpdater = new TaskTypeMetricsUpdater(taskType, this);
-      _pinotHelixResourceManager.getPropertyStore().subscribeDataChanges(getPropertyStorePathForTaskQueue(taskType),
-          taskTypeMetricsUpdater);
+      _pinotHelixResourceManager.getPropertyStore()
+          .subscribeDataChanges(getPropertyStorePathForTaskQueue(taskType), taskTypeMetricsUpdater);
       _taskTypeMetricsUpdaterMap.put(taskType, taskTypeMetricsUpdater);
     }
   }
