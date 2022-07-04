@@ -29,8 +29,6 @@ import org.apache.pinot.integration.tests.SimpleMinionClusterIntegrationTest;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 
-import static org.testng.Assert.assertEquals;
-
 
 /**
  * Task generator for {@link SimpleMinionClusterIntegrationTest}.
