@@ -37,6 +37,14 @@ public class TableStateUtils {
   private TableStateUtils() {
   }
 
+  /**
+   * Checks if all segments for the given @param tableNameWithType are succesfully loaded
+   * This function will get all segments in IDEALSTATE and CURRENTSTATE for the given table,
+   * and then check if all ONLINE segments in IDEALSTATE match with CURRENTSTATE.
+   * @param helixManager helix manager for the server instance
+   * @param tableNameWithType table name for which segment state is to be checked
+   * @return true if all segments for the given table are succesfully loaded. False otherwise
+   */
   public static boolean isAllSegmentsLoaded(HelixManager helixManager, String tableNameWithType) {
     HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
     PropertyKey.Builder keyBuilder = dataAccessor.keyBuilder();
@@ -57,8 +65,8 @@ public class TableStateUtils {
 
     // Check if ideal state and current state matches for all segments assigned to the current instance
     Map<String, Map<String, String>> idealStatesMap = idealState.getRecord().getMapFields();
-    Map<String, String> currentStateMap = (currentState == null) ? new HashMap<>()
-        : currentState.getPartitionStateMap();
+    Map<String, String> currentStateMap =
+        (currentState == null) ? new HashMap<>() : currentState.getPartitionStateMap();
     for (Map.Entry<String, Map<String, String>> entry : idealStatesMap.entrySet()) {
       String segmentName = entry.getKey();
       Map<String, String> instanceStateMap = entry.getValue();
