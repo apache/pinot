@@ -42,7 +42,7 @@ public class RegexpPatternConverterUtils {
         return "^$";
       case 1:
         if (likePattern.charAt(0) == '%') {
-          return "^.*$";
+          return "";
         }
         break;
       default:
