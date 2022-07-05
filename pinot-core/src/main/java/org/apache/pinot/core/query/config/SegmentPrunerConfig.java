@@ -28,7 +28,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * Config for SegmentPruner.
  */
 public class SegmentPrunerConfig {
-  private static final String SEGMENT_PRUNER_NAMES_KEY = "class";
+  public static final String SEGMENT_PRUNER_NAMES_KEY = "class";
 
   private final int _numSegmentPruners;
   private final List<String> _segmentPrunerNames;

@@ -18,30 +18,35 @@
  */
 package org.apache.pinot.core.query.pruner;
 
-import java.util.List;
-import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.env.PinotConfiguration;
+public class SegmentPrunerStatistics {
 
+  private int _invalidSegments;
 
-public interface SegmentPruner {
+  private int _valuePruned;
 
-  /**
-   * Initializes the segment pruner.
-   */
-  void init(PinotConfiguration config);
+  private int _limitPruned;
 
-  /**
-   * Inspect the query context to determine if the pruner should be applied
-   * @return true if the pruner applies to the query
-   */
-  boolean isApplicableTo(QueryContext query);
+  public int getInvalidSegments() {
+    return _invalidSegments;
+  }
 
-  /**
-   * Prunes the segments based on the query, returns the segments that are not pruned.
-   * <p>Override this method for the pruner logic.
-   *
-   * @param segments The list of segments to be pruned. Implementations must not modify the list.
-   */
-  List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query);
+  public void setInvalidSegments(int invalidSegments) {
+    _invalidSegments = invalidSegments;
+  }
+
+  public int getValuePruned() {
+    return _valuePruned;
+  }
+
+  public void setValuePruned(int valuePruned) {
+    _valuePruned = valuePruned;
+  }
+
+  public int getLimitPruned() {
+    return _limitPruned;
+  }
+
+  public void setLimitPruned(int limitPruned) {
+    _limitPruned = limitPruned;
+  }
 }
