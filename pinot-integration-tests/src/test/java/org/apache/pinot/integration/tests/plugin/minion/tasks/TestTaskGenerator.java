@@ -29,6 +29,8 @@ import org.apache.pinot.integration.tests.SimpleMinionClusterIntegrationTest;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 
+import static org.testng.Assert.assertEquals;
+
 
 /**
  * Task generator for {@link SimpleMinionClusterIntegrationTest}.
@@ -43,6 +45,7 @@ public class TestTaskGenerator extends BaseTaskGenerator {
 
   @Override
   public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
+    assertEquals(tableConfigs.size(), SimpleMinionClusterIntegrationTest.NUM_TASKS);
     // Generate at most 2 tasks
     if (_clusterInfoAccessor.getTaskStates(SimpleMinionClusterIntegrationTest.TASK_TYPE).size()
         >= SimpleMinionClusterIntegrationTest.NUM_TASKS) {
