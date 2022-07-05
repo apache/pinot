@@ -535,16 +535,17 @@ const getTableDetails = (tableName) => {
   });
 };
 
-// This method is used to display summary of a particular segment, replia set as well as JSON format of a tenant table
+// This method is used to display summary of a particular segment, replica set as well as JSON format of a tenant table
 // API: /tables/tableName/externalview
 //      /segments/:tableName/:segmentName/metadata
 // Expected Output: {columns: [], records: []}
 const getSegmentDetails = (tableName, segmentName) => {
-  const tableInfo = tableName.split('_');
+  let baseTableName = tableName.substring(0, tableName.lastIndexOf("_"));
+  let tableType = tableName.substring(tableName.lastIndexOf("_") + 1, tableName.length);
   const promiseArr = [];
   promiseArr.push(getExternalView(tableName));
   promiseArr.push(getSegmentMetadata(tableName, segmentName));
-  promiseArr.push(getSegmentDebugInfo(tableInfo[0], tableInfo[1].toLowerCase()));
+  promiseArr.push(getSegmentDebugInfo(baseTableName, tableType.toLowerCase()));
 
   return Promise.all(promiseArr).then((results) => {
     const obj = results[0].data.OFFLINE || results[0].data.REALTIME;

@@ -87,7 +87,12 @@ public class PulsarPartitionLevelConnectionHandler {
 
   public void close()
       throws IOException {
-    _reader.close();
-    _pulsarClient.close();
+    if (_reader != null) {
+      _reader.close();
+    }
+
+    if (_pulsarClient != null) {
+      _pulsarClient.close();
+    }
   }
 }

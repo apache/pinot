@@ -25,8 +25,7 @@ import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 
 
 public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
-  private final FloatSet _values = new FloatOpenHashSet(INITIAL_HASH_SET_SIZE);
-
+  private FloatSet _values = new FloatOpenHashSet(INITIAL_HASH_SET_SIZE);
   private float[] _sortedValues;
   private boolean _sealed = false;
   private float _prevValue = Float.NEGATIVE_INFINITY;
@@ -37,6 +36,8 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
 
   @Override
   public void collect(Object entry) {
+    assert !_sealed;
+
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
       for (Object obj : values) {
@@ -57,11 +58,9 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
     }
   }
 
-  void addressSorted(float entry) {
-    if (_isSorted) {
-      if (entry < _prevValue) {
-        _isSorted = false;
-      }
+  private void addressSorted(float entry) {
+    if (_sorted) {
+      _sorted = entry >= _prevValue;
       _prevValue = entry;
     }
   }
@@ -100,8 +99,11 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
 
   @Override
   public void seal() {
-    _sortedValues = _values.toFloatArray();
-    Arrays.sort(_sortedValues);
-    _sealed = true;
+    if (!_sealed) {
+      _sortedValues = _values.toFloatArray();
+      _values = null;
+      Arrays.sort(_sortedValues);
+      _sealed = true;
+    }
   }
 }

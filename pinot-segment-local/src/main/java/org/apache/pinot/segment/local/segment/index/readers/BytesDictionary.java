@@ -41,6 +41,11 @@ public class BytesDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int indexOf(ByteArray bytesValue) {
+    return normalizeIndex(binarySearch(bytesValue.getBytes()));
+  }
+
+  @Override
   public int insertionIndexOf(String stringValue) {
     return binarySearch(BytesUtils.toBytes(stringValue));
   }

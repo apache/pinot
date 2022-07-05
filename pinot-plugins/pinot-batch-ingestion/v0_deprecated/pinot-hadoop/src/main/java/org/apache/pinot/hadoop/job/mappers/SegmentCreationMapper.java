@@ -158,7 +158,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
         if (timeColumnName != null) {
           DateTimeFieldSpec dateTimeFieldSpec = _schema.getSpecForTimeColumn(timeColumnName);
           if (dateTimeFieldSpec != null) {
-            dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
+            dateTimeFormatSpec = dateTimeFieldSpec.getFormatSpec();
           }
         }
         _segmentNameGenerator =

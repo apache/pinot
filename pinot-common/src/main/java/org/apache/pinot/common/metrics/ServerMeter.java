@@ -41,6 +41,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false),
   REALTIME_PARTITION_MISMATCH("mismatch", false),
   REALTIME_DEDUP_DROPPED("rows", false),
+  PARTIAL_UPSERT_OUT_OF_ORDER("rows", false),
   ROWS_WITH_ERRORS("rows", false),
   LLC_CONTROLLER_RESPONSE_NOT_SENT("messages", true),
   LLC_CONTROLLER_RESPONSE_COMMIT("messages", true),

@@ -21,12 +21,10 @@ package org.apache.pinot.segment.local.upsert;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.helix.HelixManager;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -38,19 +36,14 @@ public class PartialUpsertHandlerTest {
 
   @Test
   public void testMerge() {
-    HelixManager helixManager = Mockito.mock(HelixManager.class);
-
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
         .addSingleValueDimension("field1", FieldSpec.DataType.LONG)
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
-
-    String realtimeTableName = "testTable_REALTIME";
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.INCREMENT);
     PartialUpsertHandler handler =
-        new PartialUpsertHandler(helixManager, realtimeTableName, schema, partialUpsertStrategies,
-            UpsertConfig.Strategy.OVERWRITE, "hoursSinceEpoch");
+        new PartialUpsertHandler(schema, partialUpsertStrategies, UpsertConfig.Strategy.OVERWRITE, "hoursSinceEpoch");
 
     // both records are null.
     GenericRow previousRecord = new GenericRow();
@@ -97,19 +90,14 @@ public class PartialUpsertHandlerTest {
 
   @Test
   public void testMergeWithDefaultPartialUpsertStrategy() {
-    HelixManager helixManager = Mockito.mock(HelixManager.class);
-
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
         .addSingleValueDimension("field1", FieldSpec.DataType.LONG).addMetric("field2", FieldSpec.DataType.LONG)
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
-
-    String realtimeTableName = "testTable_REALTIME";
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.INCREMENT);
     PartialUpsertHandler handler =
-        new PartialUpsertHandler(helixManager, realtimeTableName, schema, partialUpsertStrategies,
-            UpsertConfig.Strategy.OVERWRITE, "hoursSinceEpoch");
+        new PartialUpsertHandler(schema, partialUpsertStrategies, UpsertConfig.Strategy.OVERWRITE, "hoursSinceEpoch");
 
     // previousRecord is null default value, while newRecord is not.
     GenericRow previousRecord = new GenericRow();

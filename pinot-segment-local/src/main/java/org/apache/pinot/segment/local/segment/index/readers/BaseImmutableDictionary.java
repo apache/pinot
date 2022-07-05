@@ -86,7 +86,7 @@ public abstract class BaseImmutableDictionary implements Dictionary {
   }
 
   protected final int normalizeIndex(int index) {
-    return (index >= 0) ? index : Dictionary.NULL_VALUE_INDEX;
+    return index >= 0 ? index : NULL_VALUE_INDEX;
   }
 
   @Override

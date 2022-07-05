@@ -21,22 +21,19 @@ package org.apache.pinot.segment.local.dedup;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.config.table.HashFunction;
 
 
 public class TableDedupMetadataManager {
   private final Map<Integer, PartitionDedupMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
-  private final HelixManager _helixManager;
   private final String _tableNameWithType;
   private final List<String> _primaryKeyColumns;
   private final ServerMetrics _serverMetrics;
   private final HashFunction _hashFunction;
 
-  public TableDedupMetadataManager(HelixManager helixManager, String tableNameWithType, List<String> primaryKeyColumns,
+  public TableDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns,
       ServerMetrics serverMetrics, HashFunction hashFunction) {
-    _helixManager = helixManager;
     _tableNameWithType = tableNameWithType;
     _primaryKeyColumns = primaryKeyColumns;
     _serverMetrics = serverMetrics;
@@ -45,7 +42,7 @@ public class TableDedupMetadataManager {
 
   public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {
     return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
-        k -> new PartitionDedupMetadataManager(_helixManager, _tableNameWithType, _primaryKeyColumns, k,
-            _serverMetrics, _hashFunction));
+        k -> new PartitionDedupMetadataManager(_tableNameWithType, _primaryKeyColumns, k, _serverMetrics,
+            _hashFunction));
   }
 }

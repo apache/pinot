@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.stage;
 
 import java.util.List;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
@@ -32,8 +33,8 @@ public class TableScanNode extends AbstractStageNode {
     super(stageId);
   }
 
-  public TableScanNode(int stageId, String tableName, List<String> tableScanColumns) {
-    super(stageId);
+  public TableScanNode(int stageId, DataSchema dataSchema, String tableName, List<String> tableScanColumns) {
+    super(stageId, dataSchema);
     _tableName = tableName;
     _tableScanColumns = tableScanColumns;
   }

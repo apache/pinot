@@ -95,7 +95,8 @@ public class ClusterInfoAccessor {
   }
 
   /**
-   * Fetches the ZNRecord under MINION_TASK_METADATA/${taskType} for the given taskType and tableNameWithType
+   * Fetches the ZNRecord under MINION_TASK_METADATA/${tableNameWithType}/${taskType} for the given
+   * taskType and tableNameWithType
    *
    * @param taskType The type of the minion task
    * @param tableNameWithType Table name with type

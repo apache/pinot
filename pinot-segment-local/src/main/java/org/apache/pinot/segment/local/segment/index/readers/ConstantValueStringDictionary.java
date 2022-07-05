@@ -40,6 +40,11 @@ public class ConstantValueStringDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int indexOf(String stringValue) {
+    return stringValue.equals(_value) ? 0 : NULL_VALUE_INDEX;
+  }
+
+  @Override
   public int insertionIndexOf(String stringValue) {
     int result = stringValue.compareTo(_value);
     if (result < 0) {

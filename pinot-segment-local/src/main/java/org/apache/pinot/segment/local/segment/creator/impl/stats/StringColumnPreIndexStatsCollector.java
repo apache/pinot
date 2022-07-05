@@ -19,16 +19,15 @@
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.Arrays;
+import java.util.Set;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class StringColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
-  private final ObjectSet<String> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
-
+  private Set<String> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
   private int _maxRowLength = 0;
@@ -41,6 +40,8 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public void collect(Object entry) {
+    assert !_sealed;
+
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
       int rowLength = 0;
@@ -118,8 +119,11 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public void seal() {
-    _sortedValues = _values.toArray(new String[0]);
-    Arrays.sort(_sortedValues);
-    _sealed = true;
+    if (!_sealed) {
+      _sortedValues = _values.toArray(new String[0]);
+      _values = null;
+      Arrays.sort(_sortedValues);
+      _sealed = true;
+    }
   }
 }

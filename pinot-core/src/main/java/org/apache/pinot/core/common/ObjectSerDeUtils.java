@@ -56,6 +56,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.core.query.distinct.DistinctTable;
@@ -119,7 +120,8 @@ public class ObjectSerDeUtils {
     LongLongPair(28),
     FloatLongPair(29),
     DoubleLongPair(30),
-    StringLongPair(31);
+    StringLongPair(31),
+    Null(100);
     private final int _value;
 
     ObjectType(int value) {
@@ -130,7 +132,11 @@ public class ObjectSerDeUtils {
       return _value;
     }
 
-    public static ObjectType getObjectType(Object value) {
+    public static ObjectType getObjectType(@Nullable Object value) {
+      if (value == null) {
+        return ObjectType.Null;
+      }
+
       if (value instanceof String) {
         return ObjectType.String;
       } else if (value instanceof Long) {

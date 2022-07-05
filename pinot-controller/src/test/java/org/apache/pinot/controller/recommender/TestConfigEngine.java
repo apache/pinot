@@ -133,6 +133,20 @@ public class TestConfigEngine {
   }
 
   @Test
+  void testInvalidColumnInFilterRule()
+      throws InvalidInputException, IOException {
+    loadInput("recommenderInput/InvalidColumnInFilterInput.json");
+    ConfigManager output = new ConfigManager();
+    AbstractRule abstractRule =
+        RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.InvertedSortedIndexJointRule, _input, output);
+    abstractRule.run();
+    assertEquals(output.getIndexConfig().getInvertedIndexColumns().toString(), "[]");
+    assertEquals(_input.getOverWrittenConfigs().getFlaggedQueries().getFlaggedQueries().toString(),
+        "{select i from tableName where a = xyz and t > 500=ERROR: "
+            + "Query is filtering on columns not appearing in schema: [xyz]}");
+  }
+
+  @Test
   void testSortedInvertedIndexJointRuleWithMetricAndDateTimeColumn()
       throws InvalidInputException, IOException {
     loadInput("recommenderInput/SortedInvertedIndexInputWithMetricAndDateTimeColumn.json");
@@ -265,6 +279,18 @@ public class TestConfigEngine {
     assertNotEquals(output.getIndexConfig().getRangeIndexColumns().toString(), "[i]");
     // index can be supported on dimension, date-time and metric columns
     assertEquals(output.getIndexConfig().getRangeIndexColumns().toString(), "[t, j]");
+  }
+
+  /** Verifiy rule that recommends JsonIndex and NoDictionary on JSON columns. */
+  @Test
+  void testJsonIndexRule()
+      throws InvalidInputException, IOException {
+    loadInput("recommenderInput/SegmentSizeRuleInput.json");
+    ConfigManager output = new ConfigManager();
+    AbstractRule abstractRule = RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.JsonIndexRule, _input, output);
+    abstractRule.run();
+    assertEquals(output.getIndexConfig().getJsonIndexColumns().toString(), "[q]");
+    assertEquals(output.getIndexConfig().getNoDictionaryColumns().toString(), "[q]");
   }
 
   @Test
@@ -450,8 +476,8 @@ public class TestConfigEngine {
       throws Exception {
     ConfigManager output = runRecommenderDriver("recommenderInput/SegmentSizeRuleInput.json");
     SegmentSizeRecommendations segmentSizeRecommendations = output.getSegmentSizeRecommendations();
-    assertEquals(segmentSizeRecommendations.getNumSegments(), 2);
-    assertEquals(segmentSizeRecommendations.getNumRowsPerSegment(), 50_000);
+    assertEquals(segmentSizeRecommendations.getNumSegments(), 3);
+    assertEquals(segmentSizeRecommendations.getNumRowsPerSegment(), 33_333);
   }
 
   @Test

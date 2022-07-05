@@ -30,8 +30,8 @@ public class FloatDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public int insertionIndexOf(String stringValue) {
-    return binarySearch(Float.parseFloat(stringValue));
+  public DataType getValueType() {
+    return DataType.FLOAT;
   }
 
   @Override
@@ -40,8 +40,8 @@ public class FloatDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.FLOAT;
+  public int insertionIndexOf(String stringValue) {
+    return binarySearch(Float.parseFloat(stringValue));
   }
 
   @Override

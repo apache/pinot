@@ -1,0 +1,23 @@
+{
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "singleValueField": true,
+      "name": "id"
+    },
+    {
+      "dataType": "STRING",
+      "singleValueField": true,
+      "name": "name"
+    }
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "DAYS",
+      "dataType": "INT",
+      "name": "DaysSinceEpoch"
+    }
+  },
+  "primaryKeyColumns": ["id"],
+  "schemaName": "dedupSchema"
+}

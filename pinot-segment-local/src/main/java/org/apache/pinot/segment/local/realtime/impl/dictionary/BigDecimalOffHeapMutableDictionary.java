@@ -181,6 +181,11 @@ public class BigDecimalOffHeapMutableDictionary extends BaseOffHeapMutableDictio
     return getDictId(bigDecimalValue, BigDecimalUtils.serialize(bigDecimalValue));
   }
 
+  @Override
+  public int indexOf(BigDecimal bigDecimalValue) {
+    return getDictId(bigDecimalValue, BigDecimalUtils.serialize(bigDecimalValue));
+  }
+
   public BigDecimal get(int dictId) {
     return getBigDecimalValue(dictId);
   }

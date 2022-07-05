@@ -20,7 +20,6 @@ package org.apache.pinot.core.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Collections;
 import org.apache.pinot.common.utils.DataSchema;
 
 
@@ -31,7 +30,7 @@ public class MetadataBlock extends BaseDataBlock {
   private static final int VERSION = 1;
 
   public MetadataBlock(DataSchema dataSchema) {
-    super(0, dataSchema, Collections.emptyMap(), new byte[]{0}, new byte[]{0});
+    super(0, dataSchema, new String[0], new byte[]{0}, new byte[]{0});
   }
 
   public MetadataBlock(ByteBuffer byteBuffer)
@@ -40,17 +39,17 @@ public class MetadataBlock extends BaseDataBlock {
   }
 
   @Override
-  protected int getDataBlockVersionType() {
+  public int getDataBlockVersionType() {
     return VERSION + (Type.METADATA.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
   }
 
   @Override
-  protected void positionCursorInFixSizedBuffer(int rowId, int colId) {
+  protected int getOffsetInFixedBuffer(int rowId, int colId) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  protected int positionCursorInVariableBuffer(int rowId, int colId) {
+  protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
     throw new UnsupportedOperationException();
   }
 

@@ -39,6 +39,16 @@ public class ConstantValueFloatDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int indexOf(String stringValue) {
+    return Float.parseFloat(stringValue) == _value ? 0 : NULL_VALUE_INDEX;
+  }
+
+  @Override
+  public int indexOf(float floatValue) {
+    return floatValue == _value ? 0 : NULL_VALUE_INDEX;
+  }
+
+  @Override
   public int insertionIndexOf(String stringValue) {
     float floatValue = Float.parseFloat(stringValue);
     if (floatValue < _value) {

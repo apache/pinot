@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
+import org.apache.pinot.sql.parsers.parser.ParseException;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.rewriter.CompileTimeFunctionsInvoker;
@@ -711,14 +712,21 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("bar"), "'potato'");
 
-    pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "select * from vegetables where name <> 'Brussels sprouts' OPTION (delicious=yes) option(foo=1234) option"
-            + "(bar='potato')");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 3);
-    Assert.assertTrue(pinotQuery.getQueryOptions().containsKey("delicious"));
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("delicious"), "yes");
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("foo"), "1234");
-    Assert.assertEquals(pinotQuery.getQueryOptions().get("bar"), "'potato'");
+    // Assert that wrongly inserted query option will not be parsed.
+    try {
+      CalciteSqlParser.compileToPinotQuery(
+          "select * from vegetables where name <> 'Brussels sprouts' OPTION (delicious=yes) option(foo=1234) option"
+              + "(bar='potato')");
+    } catch (SqlCompilationException e) {
+      Assert.assertTrue(e.getCause() instanceof ParseException);
+      Assert.assertTrue(e.getCause().getMessage().contains("OPTION"));
+    }
+    try {
+      CalciteSqlParser.compileToPinotQuery(
+          "select * from vegetables where name <> 'Brussels OPTION (delicious=yes)");
+    } catch (SqlCompilationException e) {
+      Assert.assertTrue(e.getCause() instanceof ParseException);
+    }
   }
 
   @Test

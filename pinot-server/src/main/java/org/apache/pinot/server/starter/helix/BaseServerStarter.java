@@ -61,7 +61,7 @@ import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
@@ -183,10 +183,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
     int dataTableVersion =
         _serverConf.getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, Server.DEFAULT_CURRENT_DATA_TABLE_VERSION);
     if (dataTableVersion > Server.DEFAULT_CURRENT_DATA_TABLE_VERSION) {
-      throw new UnsupportedOperationException("Setting experimental DataTable version newer than default via config "
-          + "is not allowed. Current default DataTable version: " + Server.DEFAULT_CURRENT_DATA_TABLE_VERSION);
+      LOGGER.warn("Setting experimental DataTable version newer than default via config could result in"
+          + " backward-compatibility issues. Current default DataTable version: "
+          + Server.DEFAULT_CURRENT_DATA_TABLE_VERSION);
     }
-    DataTableBuilder.setCurrentDataTableVersion(dataTableVersion);
+    DataTableFactory.setDataTableVersion(dataTableVersion);
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
@@ -309,6 +310,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
         return Collections.singletonList(Helix.UNTAGGED_SERVER_INSTANCE);
       }
     });
+
+    // Remove disabled partitions
+    updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
 
     // Update admin HTTP/HTTPS port
     int adminHttpPort = Integer.MIN_VALUE;

@@ -27,7 +27,7 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -81,7 +81,7 @@ public class DataBlockTest {
     DataSchema dataSchema = new DataSchema(columnNames.toArray(new String[0]),
         columnDataTypes.toArray(new DataSchema.ColumnDataType[0]));
     List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TEST_ROW_COUNT);
-    DataTableBuilder.setCurrentDataTableVersion(DataTableBuilder.VERSION_4);
+    DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     DataTable dataTableImpl = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema);
     DataTable dataBlockFromDataTable = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTableImpl.toBytes()));
 
@@ -109,8 +109,8 @@ public class DataBlockTest {
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
     List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TEST_ROW_COUNT);
     List<Object[]> columnars = DataBlockTestUtils.convertColumnar(dataSchema, rows);
-    RowDataBlock rowBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
-    ColumnarDataBlock columnarBlock = DataBlockBuilder.buildFromColumns(columnars, dataSchema);
+    RowDataBlock rowBlock = DataBlockBuilder.buildFromRows(rows, null, dataSchema);
+    ColumnarDataBlock columnarBlock = DataBlockBuilder.buildFromColumns(columnars, null, dataSchema);
 
     for (int colId = 0; colId < dataSchema.getColumnNames().length; colId++) {
       DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(colId);

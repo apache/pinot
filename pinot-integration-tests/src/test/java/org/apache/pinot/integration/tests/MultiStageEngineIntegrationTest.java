@@ -24,7 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -82,7 +82,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
     waitForAllDocsLoaded(600_000L);
 
     // Setting data table version to 4
-    DataTableBuilder.setCurrentDataTableVersion(4);
+    DataTableFactory.setDataTableVersion(4);
   }
 
   @Override
@@ -113,10 +113,12 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
   @DataProvider
   public Object[][] multiStageQueryEngineSqlTestSet() {
     return new Object[][] {
-        new Object[]{"SELECT * FROM mytable_OFFLINE", 10, 73},
-        new Object[]{"SELECT CarrierDelay, ArrDelay FROM mytable_OFFLINE WHERE CarrierDelay=15 AND ArrDelay>20", 10, 2},
-        new Object[]{"SELECT * FROM mytable_OFFLINE AS a JOIN mytable_OFFLINE AS b ON a.AirlineID = b.AirlineID "
-            + " WHERE a.CarrierDelay=15 AND a.ArrDelay>20 AND b.ArrDelay<20", 10, 146}
+        new Object[]{"SELECT COUNT(*) FROM mytable_OFFLINE WHERE Carrier='AA'", 1, 1},
+        new Object[]{"SELECT * FROM mytable_OFFLINE WHERE ArrDelay>1000", 2, 73},
+        new Object[]{"SELECT CarrierDelay, ArrDelay FROM mytable_OFFLINE"
+            + " WHERE CarrierDelay=15 AND ArrDelay>20", 172, 2},
+        new Object[]{"SELECT * FROM mytable_OFFLINE AS a JOIN mytable_OFFLINE AS b ON a.Origin = b.Origin "
+            + " WHERE a.Carrier='AA' AND a.ArrDelay>1000 AND b.ArrDelay>1000", 2, 146}
     };
   }
 
@@ -125,7 +127,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
   public void tearDown()
       throws Exception {
     // Setting data table version to 4
-    DataTableBuilder.setCurrentDataTableVersion(3);
+    DataTableFactory.setDataTableVersion(3);
 
     dropOfflineTable(DEFAULT_TABLE_NAME);
 

@@ -78,6 +78,7 @@ const SearchBar = (props) => {
           input: classes.inputInput,
         }}
         inputProps={{ 'aria-label': 'search' }}
+        fullWidth
       />
     </div>
   );

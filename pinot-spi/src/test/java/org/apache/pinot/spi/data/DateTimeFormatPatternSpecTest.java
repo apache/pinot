@@ -18,26 +18,72 @@
  */
 package org.apache.pinot.spi.data;
 
+import java.util.TimeZone;
+import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
+import org.joda.time.DateTimeZone;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
+
 
 public class DateTimeFormatPatternSpecTest {
 
   @Test
   public void testValidateFormat() {
-    DateTimeFormatPatternSpec.validateFormat("yyyy-MM-dd");
-    DateTimeFormatPatternSpec.validateFormat("yyyyMMdd tz(CST)");
-    DateTimeFormatPatternSpec.validateFormat("yyyyMMdd HH tz(GMT+0700)");
-    DateTimeFormatPatternSpec.validateFormat("yyyyMMddHH tz(America/Chicago)");
+    DateTimeFormatPatternSpec dateTimeFormatPatternSpec =
+        new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyy-MM-dd");
+    assertEquals(dateTimeFormatPatternSpec.getSdfPattern(), "yyyy-MM-dd");
+    assertEquals(dateTimeFormatPatternSpec.getDateTimeZone(), DateTimeZone.UTC);
+    assertEquals(dateTimeFormatPatternSpec,
+        new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyy-MM-dd", null));
 
-    // Unknown tz is treated as UTC
-    DateTimeFormatPatternSpec.validateFormat("yyyyMMdd tz(CSEMT)");
-    DateTimeFormatPatternSpec.validateFormat("yyyyMMdd tz(GMT+5000)");
-    DateTimeFormatPatternSpec.validateFormat("yyyyMMddHH tz(HAHA/Chicago)");
+    dateTimeFormatPatternSpec = new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd tz(CST)");
+    assertEquals(dateTimeFormatPatternSpec.getSdfPattern(), "yyyyMMdd");
+    assertEquals(dateTimeFormatPatternSpec.getDateTimeZone(), DateTimeZone.forTimeZone(TimeZone.getTimeZone("CST")));
+    assertEquals(dateTimeFormatPatternSpec,
+        new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd", "CST"));
 
-    // invalid chars will throw
-    assertThrows(IllegalStateException.class, () -> DateTimeFormatPatternSpec.validateFormat("yyyc-MM-dd"));
-    assertThrows(IllegalStateException.class, () -> DateTimeFormatPatternSpec.validateFormat("yyyy-MM-dd ff(a)"));
+    dateTimeFormatPatternSpec =
+        new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd HH tz(GMT+0700)");
+    assertEquals(dateTimeFormatPatternSpec.getSdfPattern(), "yyyyMMdd HH");
+    assertEquals(dateTimeFormatPatternSpec.getDateTimeZone(),
+        DateTimeZone.forTimeZone(TimeZone.getTimeZone("GMT+0700")));
+    assertEquals(dateTimeFormatPatternSpec,
+        new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd HH", "GMT+0700"));
+
+    dateTimeFormatPatternSpec =
+        new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMddHH tz(America/Chicago)");
+    assertEquals(dateTimeFormatPatternSpec.getSdfPattern(), "yyyyMMddHH");
+    assertEquals(dateTimeFormatPatternSpec.getDateTimeZone(),
+        DateTimeZone.forTimeZone(TimeZone.getTimeZone("America/Chicago")));
+    assertEquals(dateTimeFormatPatternSpec,
+        new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMddHH", "America/Chicago"));
+
+    // Unknown time zone is treated as UTC
+    dateTimeFormatPatternSpec = new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd tz(CSEMT)");
+    assertEquals(dateTimeFormatPatternSpec.getSdfPattern(), "yyyyMMdd");
+    assertEquals(dateTimeFormatPatternSpec.getDateTimeZone(), DateTimeZone.UTC);
+    assertEquals(dateTimeFormatPatternSpec,
+        new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd", "CSEMT"));
+
+    dateTimeFormatPatternSpec = new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd tz(GMT+5000)");
+    assertEquals(dateTimeFormatPatternSpec.getSdfPattern(), "yyyyMMdd");
+    assertEquals(dateTimeFormatPatternSpec.getDateTimeZone(), DateTimeZone.UTC);
+    assertEquals(dateTimeFormatPatternSpec,
+        new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd", "GMT+5000"));
+
+    dateTimeFormatPatternSpec =
+        new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd tz(HAHA/Chicago)");
+    assertEquals(dateTimeFormatPatternSpec.getSdfPattern(), "yyyyMMdd");
+    assertEquals(dateTimeFormatPatternSpec.getDateTimeZone(), DateTimeZone.UTC);
+    assertEquals(dateTimeFormatPatternSpec,
+        new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd", "HAHA/Chicago"));
+
+    // Invalid pattern
+    assertThrows(IllegalArgumentException.class,
+        () -> new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyc-MM-dd"));
+    assertThrows(IllegalArgumentException.class,
+        () -> new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, "yyyy-MM-dd ff(a)"));
   }
 }

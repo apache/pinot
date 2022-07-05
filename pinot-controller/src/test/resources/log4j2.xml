@@ -19,12 +19,31 @@
     under the License.
 
 -->
-<Configuration>
+<Configuration  strict="true"
+                xmlns="http://logging.apache.org/log4j/2.0/config"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://logging.apache.org/log4j/2.0/config
+           https://raw.githubusercontent.com/apache/logging-log4j2/2.17.1/log4j-core/src/main/resources/Log4j-config.xsd">
   <Appenders>
     <Console name="console" target="SYSTEM_OUT">
-      <PatternLayout>
-        <pattern>%d{HH:mm:ss.SSS} %c{1} - %m%n</pattern>
-      </PatternLayout>
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} %c{1} - %m%n"/>
     </Console>
   </Appenders>
+  <Loggers>
+    <Logger name="org.apache.zookeeper" level="warn" additivity="false">
+      <AppenderRef ref="console"/>
+    </Logger>
+    <Logger name="org.apache.helix" level="warn" additivity="false">
+      <AppenderRef ref="console"/>
+    </Logger>
+    <Logger name="org.apache.pinot.controller" level="warn" additivity="false">
+      <AppenderRef ref="console"/>
+    </Logger>
+    <Logger name="org.apache.pinot" level="warn" additivity="false">
+      <AppenderRef ref="console"/>
+    </Logger>
+    <Root level="none">
+      <AppenderRef ref="console"/>
+    </Root>
+  </Loggers>
 </Configuration>

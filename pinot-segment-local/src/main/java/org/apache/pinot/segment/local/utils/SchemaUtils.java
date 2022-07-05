@@ -48,6 +48,7 @@ public class SchemaUtils {
 
   // checker to ensure simple date format matches lexicographic ordering.
   private static final Map<Character, Integer> DATETIME_PATTERN_ORDERING = new HashMap<>();
+
   static {
     char[] patternOrdering = new char[]{'y', 'M', 'd', 'H', 'm', 's', 'S'};
     for (int i = 0; i < patternOrdering.length; i++) {
@@ -120,10 +121,10 @@ public class SchemaUtils {
           }
         }
         if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
-          validateTimeFieldSpec(fieldSpec);
+          validateTimeFieldSpec((TimeFieldSpec) fieldSpec);
         }
         if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.DATE_TIME)) {
-          validateDateTimeFieldSpec(fieldSpec);
+          validateDateTimeFieldSpec((DateTimeFieldSpec) fieldSpec);
         }
       }
     }
@@ -132,8 +133,8 @@ public class SchemaUtils {
         transformedColumns.retainAll(argumentColumns));
     if (schema.getPrimaryKeyColumns() != null) {
       for (String primaryKeyColumn : schema.getPrimaryKeyColumns()) {
-        Preconditions
-            .checkState(primaryKeyColumnCandidates.contains(primaryKeyColumn), "The primary key column must exist");
+        Preconditions.checkState(primaryKeyColumnCandidates.contains(primaryKeyColumn),
+            "The primary key column must exist");
       }
     }
   }
@@ -154,8 +155,7 @@ public class SchemaUtils {
   /**
    * Checks for valid incoming and outgoing granularity spec in the time field spec
    */
-  private static void validateTimeFieldSpec(FieldSpec fieldSpec) {
-    TimeFieldSpec timeFieldSpec = (TimeFieldSpec) fieldSpec;
+  private static void validateTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
     TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
     TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
 
@@ -167,28 +167,21 @@ public class SchemaUtils {
       Preconditions.checkState(
           incomingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())
               && outgoingGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString()),
-          "Cannot perform time conversion for time format other than EPOCH. TimeFieldSpec: %s", fieldSpec);
+          "Cannot perform time conversion for time format other than EPOCH. TimeFieldSpec: %s", timeFieldSpec);
     }
   }
 
   /**
    * Checks for valid format and granularity string in dateTimeFieldSpec
    */
-  private static void validateDateTimeFieldSpec(FieldSpec fieldSpec) {
-    DateTimeFieldSpec dateTimeFieldSpec = (DateTimeFieldSpec) fieldSpec;
-    validateDateTimeFormat(dateTimeFieldSpec.getFormat());
-    DateTimeGranularitySpec.validateGranularity(dateTimeFieldSpec.getGranularity());
-  }
-
-  private static void validateDateTimeFormat(String format) {
-    DateTimeFormatSpec dateTimeFormatSpec;
+  private static void validateDateTimeFieldSpec(DateTimeFieldSpec dateTimeFieldSpec) {
+    DateTimeFormatSpec formatSpec;
     try {
-      dateTimeFormatSpec = new DateTimeFormatSpec(format);
+      formatSpec = dateTimeFieldSpec.getFormatSpec();
     } catch (Exception e) {
-      throw new IllegalStateException(String.format("invalid datetime format: %s", format), e);
+      throw new IllegalArgumentException("Invalid format: " + dateTimeFieldSpec.getFormat(), e);
     }
-    // validate the format is correct.
-    String sdfPattern = dateTimeFormatSpec.getSDFPattern();
+    String sdfPattern = formatSpec.getSDFPattern();
     if (sdfPattern != null) {
       // must be in "yyyy MM dd HH mm ss SSS" to make sure it is sorted by both lexicographical and datetime order.
       int[] maxIndexes = new int[]{-1, -1, -1, -1, -1, -1, -1, -1};
@@ -198,11 +191,19 @@ public class SchemaUtils {
       }
       // last index doesn't need to be checked.
       for (int idx = 0; idx < maxIndexes.length - 2; idx++) {
-        Preconditions.checkState(maxIndexes[idx] <= maxIndexes[idx + 1] || maxIndexes[idx + 1] == -1,
+        Preconditions.checkArgument(maxIndexes[idx] <= maxIndexes[idx + 1] || maxIndexes[idx + 1] == -1,
             String.format("SIMPLE_DATE_FORMAT pattern %s has to be sorted by both lexicographical and datetime order",
                 sdfPattern));
         maxIndexes[idx + 1] = Math.max(maxIndexes[idx + 1], maxIndexes[idx]);
       }
     }
+
+    DateTimeGranularitySpec granularitySpec;
+    try {
+      granularitySpec = dateTimeFieldSpec.getGranularitySpec();
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Invalid granularity: " + dateTimeFieldSpec.getGranularity(), e);
+    }
+    Preconditions.checkNotNull(granularitySpec);
   }
 }

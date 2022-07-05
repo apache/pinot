@@ -30,13 +30,17 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 public class BigDecimalDictionary extends BaseImmutableDictionary {
 
   public BigDecimalDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
-    // Works with VarLengthValueBuffer only.
     super(dataBuffer, length, numBytesPerValue, (byte) 0);
   }
 
   @Override
   public DataType getValueType() {
     return DataType.BIG_DECIMAL;
+  }
+
+  @Override
+  public int indexOf(BigDecimal bigDecimalValue) {
+    return binarySearch(bigDecimalValue);
   }
 
   @Override
@@ -61,22 +65,22 @@ public class BigDecimalDictionary extends BaseImmutableDictionary {
 
   @Override
   public int getIntValue(int dictId) {
-    return get(dictId).intValue();
+    return getBigDecimal(dictId).intValue();
   }
 
   @Override
   public long getLongValue(int dictId) {
-    return get(dictId).longValue();
+    return getBigDecimal(dictId).longValue();
   }
 
   @Override
   public float getFloatValue(int dictId) {
-    return get(dictId).floatValue();
+    return getBigDecimal(dictId).floatValue();
   }
 
   @Override
   public double getDoubleValue(int dictId) {
-    return get(dictId).doubleValue();
+    return getBigDecimal(dictId).doubleValue();
   }
 
   @Override
@@ -86,7 +90,7 @@ public class BigDecimalDictionary extends BaseImmutableDictionary {
 
   @Override
   public String getStringValue(int dictId) {
-    return get(dictId).toPlainString();
+    return getBigDecimal(dictId).toPlainString();
   }
 
   @Override

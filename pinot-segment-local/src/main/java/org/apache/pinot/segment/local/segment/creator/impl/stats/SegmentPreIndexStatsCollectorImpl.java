@@ -79,8 +79,8 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
 
   @Override
   public void build() {
-    for (final String column : _columnStatsCollectorMap.keySet()) {
-      _columnStatsCollectorMap.get(column).seal();
+    for (AbstractColumnStatisticsCollector columnStatsCollector : _columnStatsCollectorMap.values()) {
+      columnStatsCollector.seal();
     }
   }
 

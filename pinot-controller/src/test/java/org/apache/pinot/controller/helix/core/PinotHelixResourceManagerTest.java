@@ -19,9 +19,11 @@
 package org.apache.pinot.controller.helix.core;
 
 import com.google.common.collect.BiMap;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -249,7 +251,7 @@ public class PinotHelixResourceManagerTest {
     Assert.assertTrue(response.isSuccessful());
     idealState = TEST_INSTANCE.getHelixAdmin().getResourceIdealState(TEST_INSTANCE.getHelixClusterName(),
         CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    Assert.assertEquals(idealState.getInstanceStateMap(OFFLINE_TABLE_NAME).size(), 0);
+    Assert.assertEquals(idealState.getInstanceStateMap(OFFLINE_TABLE_NAME), Maps.newHashMap());
 
     // Create broker tenant on Brokers
     brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, TEST_INSTANCE.NUM_BROKER_INSTANCES, 0, 0);
@@ -269,8 +271,10 @@ public class PinotHelixResourceManagerTest {
 
     // Untag the brokers
     untagBrokers();
-    Assert.assertEquals(TEST_INSTANCE.getHelixResourceManager().getOnlineUnTaggedBrokerInstanceList().size(),
-        TEST_INSTANCE.NUM_BROKER_INSTANCES);
+    assertEqualsWithoutOrderNoRepetition(
+        TEST_INSTANCE.getHelixResourceManager().getOnlineUnTaggedBrokerInstanceList(),
+        "Broker_localhost_5", "Broker_localhost_4", "Broker_localhost_7", "Broker_localhost_6"
+    );
   }
 
   @Test
@@ -284,9 +288,9 @@ public class PinotHelixResourceManagerTest {
           .setSegmentZKMetadata(TEST_INSTANCE.getPropertyStore(), OFFLINE_TABLE_NAME, segmentZKMetadata);
       List<SegmentZKMetadata> retrievedSegmentsZKMetadata =
           TEST_INSTANCE.getHelixResourceManager().getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
-      Assert.assertEquals(retrievedSegmentsZKMetadata.size(), 1);
       SegmentZKMetadata retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
       Assert.assertEquals(retrievedSegmentZKMetadata.getSegmentName(), segmentName);
+      Assert.assertEquals(retrievedSegmentsZKMetadata.size(), 1);
     }
 
     // Test retrieving REALTIME segment ZK metadata
@@ -297,10 +301,10 @@ public class PinotHelixResourceManagerTest {
           .setSegmentZKMetadata(TEST_INSTANCE.getPropertyStore(), REALTIME_TABLE_NAME, realtimeMetadata);
       List<SegmentZKMetadata> retrievedSegmentsZKMetadata =
           TEST_INSTANCE.getHelixResourceManager().getSegmentsZKMetadata(REALTIME_TABLE_NAME);
-      Assert.assertEquals(retrievedSegmentsZKMetadata.size(), 1);
       SegmentZKMetadata retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
       Assert.assertEquals(retrievedSegmentZKMetadata.getSegmentName(), segmentName);
       Assert.assertEquals(realtimeMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.DONE);
+      Assert.assertEquals(retrievedSegmentsZKMetadata.size(), 1);
     }
   }
 
@@ -314,7 +318,7 @@ public class PinotHelixResourceManagerTest {
 
     Set<String> brokerTenantNames = TEST_INSTANCE.getHelixResourceManager().getAllBrokerTenantNames();
     // Two tenant names expected: [brokerTenant, DefaultTenant]
-    Assert.assertEquals(brokerTenantNames.size(), 2);
+    assertEqualsWithoutOrderNoRepetition(brokerTenantNames, "DefaultTenant", "rBrokerTenant");
     Assert.assertTrue(brokerTenantNames.contains(BROKER_TENANT_NAME));
 
     String testBrokerInstance =
@@ -324,7 +328,7 @@ public class PinotHelixResourceManagerTest {
         .addInstanceTag(TEST_INSTANCE.getHelixClusterName(), testBrokerInstance, "wrong_tag");
 
     brokerTenantNames = TEST_INSTANCE.getHelixResourceManager().getAllBrokerTenantNames();
-    Assert.assertEquals(brokerTenantNames.size(), 2);
+    assertEqualsWithoutOrderNoRepetition(brokerTenantNames, "DefaultTenant", "rBrokerTenant");
     Assert.assertTrue(brokerTenantNames.contains(BROKER_TENANT_NAME));
 
     TEST_INSTANCE.getHelixAdmin()
@@ -333,7 +337,7 @@ public class PinotHelixResourceManagerTest {
     // Server tenant is already created during setup.
     Set<String> serverTenantNames = TEST_INSTANCE.getHelixResourceManager().getAllServerTenantNames();
     // Two tenant names expected: [DefaultTenant, serverTenant]
-    Assert.assertEquals(serverTenantNames.size(), 2);
+    assertEqualsWithoutOrderNoRepetition(serverTenantNames, "DefaultTenant", "rServerTenant");
     Assert.assertTrue(serverTenantNames.contains(SERVER_TENANT_NAME));
 
     String testServerInstance =
@@ -343,15 +347,15 @@ public class PinotHelixResourceManagerTest {
         .addInstanceTag(TEST_INSTANCE.getHelixClusterName(), testServerInstance, "wrong_tag");
 
     serverTenantNames = TEST_INSTANCE.getHelixResourceManager().getAllServerTenantNames();
-    Assert.assertEquals(serverTenantNames.size(), 2);
+    assertEqualsWithoutOrderNoRepetition(serverTenantNames, "DefaultTenant", "rServerTenant");
     Assert.assertTrue(serverTenantNames.contains(SERVER_TENANT_NAME));
 
     TEST_INSTANCE.getHelixAdmin()
         .removeInstanceTag(TEST_INSTANCE.getHelixClusterName(), testServerInstance, "wrong_tag");
 
     untagBrokers();
-    Assert.assertEquals(TEST_INSTANCE.getHelixResourceManager().getOnlineUnTaggedBrokerInstanceList().size(),
-        TEST_INSTANCE.NUM_BROKER_INSTANCES);
+    assertEqualsWithoutOrderNoRepetition(TEST_INSTANCE.getHelixResourceManager().getOnlineUnTaggedBrokerInstanceList(),
+        "Broker_localhost_4", "Broker_localhost_5", "Broker_localhost_6", "Broker_localhost_7");
   }
 
   @Test
@@ -495,7 +499,7 @@ public class PinotHelixResourceManagerTest {
         .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
     SegmentLineage segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(TEST_INSTANCE.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 1);
+    assertEqualsWithoutOrderNoRepetition(segmentLineage.getLineageEntryIds(), lineageEntryId);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsFrom(), new ArrayList<>());
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsTo(), segmentsTo);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getState(), LineageEntryState.IN_PROGRESS);
@@ -565,7 +569,7 @@ public class PinotHelixResourceManagerTest {
         .endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId);
     segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(TEST_INSTANCE.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 1);
+    assertEqualsWithoutOrderNoRepetition(segmentLineage.getLineageEntryIds(), lineageEntryId);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsFrom(), new ArrayList<>());
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsTo(), Arrays.asList("s5", "s6"));
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getState(), LineageEntryState.COMPLETED);
@@ -577,7 +581,7 @@ public class PinotHelixResourceManagerTest {
         .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
     segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(TEST_INSTANCE.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 2);
+    assertEqualsWithoutOrderNoRepetition(segmentLineage.getLineageEntryIds(), lineageEntryId, lineageEntryId2);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsFrom(), Arrays.asList("s1", "s2"));
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getSegmentsTo(),
         Arrays.asList("merged_t1_0", "merged_t1_1"));
@@ -620,7 +624,8 @@ public class PinotHelixResourceManagerTest {
         .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
     segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(TEST_INSTANCE.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 3);
+    assertEqualsWithoutOrderNoRepetition(
+        segmentLineage.getLineageEntryIds(), lineageEntryId, lineageEntryId2, lineageEntryId3);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId3).getSegmentsFrom(), segmentsFrom);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId3).getSegmentsTo(), segmentsTo);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId3).getState(), LineageEntryState.IN_PROGRESS);
@@ -645,7 +650,8 @@ public class PinotHelixResourceManagerTest {
         .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, true);
     segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(TEST_INSTANCE.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 4);
+    assertEqualsWithoutOrderNoRepetition(segmentLineage.getLineageEntryIds(),
+        lineageEntryId, lineageEntryId2, lineageEntryId3, lineageEntryId4);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId3).getSegmentsFrom(), Arrays.asList("s1", "s2"));
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId3).getSegmentsTo(),
         Arrays.asList("merged_t2_0", "merged_t2_1"));
@@ -673,7 +679,8 @@ public class PinotHelixResourceManagerTest {
         .endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, lineageEntryId4);
     segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(TEST_INSTANCE.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 4);
+    assertEqualsWithoutOrderNoRepetition(segmentLineage.getLineageEntryIds(),
+        lineageEntryId, lineageEntryId2, lineageEntryId3, lineageEntryId4);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId4).getSegmentsFrom(), Arrays.asList("s1", "s2"));
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId4).getSegmentsTo(),
         Arrays.asList("merged_t3_0", "merged_t3_1"));
@@ -687,7 +694,8 @@ public class PinotHelixResourceManagerTest {
         .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME, segmentsFrom, segmentsTo, false);
     segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(TEST_INSTANCE.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 5);
+    assertEqualsWithoutOrderNoRepetition(segmentLineage.getLineageEntryIds(),
+        lineageEntryId, lineageEntryId2, lineageEntryId3, lineageEntryId4, lineageEntryId5);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId5).getSegmentsFrom(), segmentsFrom);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId5).getSegmentsTo(), segmentsTo);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId5).getState(), LineageEntryState.IN_PROGRESS);
@@ -812,15 +820,15 @@ public class PinotHelixResourceManagerTest {
         .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, segmentsFrom, segmentsTo, false);
     SegmentLineage segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(TEST_INSTANCE.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME);
-    Assert.assertEquals(segmentLineage.getLineageEntryIds().size(), 1);
+    assertEqualsWithoutOrderNoRepetition(segmentLineage.getLineageEntryIds(), lineageEntryId);
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsFrom(),
         Arrays.asList("s0", "s1", "s2"));
     Assert
         .assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getSegmentsTo(), Arrays.asList("s3", "s4", "s5"));
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId).getState(), LineageEntryState.IN_PROGRESS);
-    Assert.assertEquals(new HashSet<>(TEST_INSTANCE.getHelixResourceManager()
-            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false)),
-        new HashSet<>(Arrays.asList("s0", "s1", "s2")));
+    assertEqualsWithoutOrderNoRepetition(
+        TEST_INSTANCE.getHelixResourceManager().getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false),
+        "s0", "s1", "s2");
 
     // Add new segments
     for (int i = 3; i < 6; i++) {
@@ -829,11 +837,14 @@ public class PinotHelixResourceManagerTest {
           "downloadUrl");
     }
 
-    Assert.assertEquals(TEST_INSTANCE.getHelixResourceManager()
-        .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false).size(), 6);
-    Assert.assertEquals(new HashSet<>(TEST_INSTANCE.getHelixResourceManager()
-            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true)),
-        new HashSet<>(Arrays.asList("s0", "s1", "s2")));
+    assertEqualsWithoutOrderNoRepetition(
+        TEST_INSTANCE.getHelixResourceManager()
+        .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false),
+        "s0", "s1", "s2", "s3", "s4", "s5");
+    assertEqualsWithoutOrderNoRepetition(
+        TEST_INSTANCE.getHelixResourceManager()
+            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true),
+        "s0", "s1", "s2");
 
     // Call end segment replacements
     TEST_INSTANCE.getHelixResourceManager()
@@ -841,9 +852,10 @@ public class PinotHelixResourceManagerTest {
 
     Assert.assertEquals(TEST_INSTANCE.getHelixResourceManager()
         .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false).size(), 6);
-    Assert.assertEquals(new HashSet<>(TEST_INSTANCE.getHelixResourceManager()
-            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true)),
-        new HashSet<>(Arrays.asList("s3", "s4", "s5")));
+    assertEqualsWithoutOrderNoRepetition(
+        TEST_INSTANCE.getHelixResourceManager()
+            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true),
+        "s3", "s4", "s5");
 
     segmentLineage = SegmentLineageAccessHelper
         .getSegmentLineage(TEST_INSTANCE.getPropertyStore(), OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME);
@@ -871,9 +883,10 @@ public class PinotHelixResourceManagerTest {
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId2).getState(), LineageEntryState.IN_PROGRESS);
     Assert.assertEquals(TEST_INSTANCE.getHelixResourceManager()
         .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false).size(), 6);
-    Assert.assertEquals(new HashSet<>(TEST_INSTANCE.getHelixResourceManager()
-            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true)),
-        new HashSet<>(Arrays.asList("s3", "s4", "s5")));
+    assertEqualsWithoutOrderNoRepetition(
+        TEST_INSTANCE.getHelixResourceManager()
+            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true),
+        "s3", "s4", "s5");
     // Try to revert the first entry should fail
     try {
       TEST_INSTANCE.getHelixResourceManager()
@@ -890,9 +903,10 @@ public class PinotHelixResourceManagerTest {
 
     Assert.assertEquals(TEST_INSTANCE.getHelixResourceManager()
         .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false).size(), 7);
-    Assert.assertEquals(new HashSet<>(TEST_INSTANCE.getHelixResourceManager()
-            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true)),
-        new HashSet<>(Arrays.asList("s3", "s4", "s5")));
+    assertEqualsWithoutOrderNoRepetition(
+        TEST_INSTANCE.getHelixResourceManager()
+            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true),
+        "s3", "s4", "s5");
 
     // Start the new protocol (s3, s4, s5) -> (s9, s10, s11) with "forceCleanup = true" to check if 2 different
     // proactive clean-up mechanism works:
@@ -915,12 +929,14 @@ public class PinotHelixResourceManagerTest {
     Assert.assertEquals(segmentLineage.getLineageEntry(lineageEntryId3).getState(), LineageEntryState.IN_PROGRESS);
 
     // Check that the segments from the older lineage gets deleted
-    waitForSegmentsToDelete(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, 3, TIMEOUT_IN_MS);
+    Collections.disjoint(
+        TEST_INSTANCE.getHelixResourceManager().getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false),
+        Arrays.asList("s6", "s7", "s8"));
     Assert.assertEquals(TEST_INSTANCE.getHelixResourceManager()
         .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false).size(), 3);
-    Assert.assertEquals(new HashSet<>(TEST_INSTANCE.getHelixResourceManager()
-            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true)),
-        new HashSet<>(Arrays.asList("s3", "s4", "s5")));
+    assertEqualsWithoutOrderNoRepetition(TEST_INSTANCE.getHelixResourceManager()
+            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true),
+        "s3", "s4", "s5");
 
     // Try to invoke end segment replacement for the reverted entry
     try {
@@ -943,9 +959,9 @@ public class PinotHelixResourceManagerTest {
         .endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, lineageEntryId3);
     Assert.assertEquals(TEST_INSTANCE.getHelixResourceManager()
         .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false).size(), 6);
-    Assert.assertEquals(new HashSet<>(TEST_INSTANCE.getHelixResourceManager()
-            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true)),
-        new HashSet<>(Arrays.asList("s9", "s10", "s11")));
+    assertEqualsWithoutOrderNoRepetition(TEST_INSTANCE.getHelixResourceManager()
+            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true),
+        "s9", "s10", "s11");
 
     // We clean up "segmentsTo" for the lineage entry with "REVERTED" state in 2 places:
     // 1. revertReplaceSegments API will delete segmentsTo
@@ -956,9 +972,9 @@ public class PinotHelixResourceManagerTest {
     TEST_INSTANCE.getHelixResourceManager()
         .revertReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, lineageEntryId3, false);
     waitForSegmentsToDelete(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, 3, TIMEOUT_IN_MS);
-    Assert.assertEquals(new HashSet<>(TEST_INSTANCE.getHelixResourceManager()
-            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true)),
-        new HashSet<>(Arrays.asList("s3", "s4", "s5")));
+    assertEqualsWithoutOrderNoRepetition(TEST_INSTANCE.getHelixResourceManager()
+            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true),
+        "s3", "s4", "s5");
 
     // Re-upload (s9, s10, s11) to test the segment clean up from startReplaceSegments.
     for (int i = 9; i < 12; i++) {
@@ -966,17 +982,20 @@ public class PinotHelixResourceManagerTest {
           SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, "s" + i),
           "downloadUrl");
     }
-    Assert.assertEquals(TEST_INSTANCE.getHelixResourceManager()
-        .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false).size(), 6);
+    assertEqualsWithoutOrderNoRepetition(TEST_INSTANCE.getHelixResourceManager()
+            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false),
+        "s3", "s4", "s5", "s9", "s10", "s11");
 
     // Call startReplaceSegments with (s3, s4, s5) -> (s12, s13, s14). This call should clean up the (s9, s10, s11).
     segmentsTo = Arrays.asList("s12", "s13", "s14");
     String lineageEntryId4 = TEST_INSTANCE.getHelixResourceManager()
         .startReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, segmentsFrom, segmentsTo, true);
-    waitForSegmentsToDelete(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, 3, TIMEOUT_IN_MS);
-    Assert.assertEquals(new HashSet<>(TEST_INSTANCE.getHelixResourceManager()
-            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false)),
-        new HashSet<>(Arrays.asList("s3", "s4", "s5")));
+    Collections.disjoint(
+        TEST_INSTANCE.getHelixResourceManager().getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false),
+        Arrays.asList("s9", "s10", "s11"));
+    assertEqualsWithoutOrderNoRepetition(TEST_INSTANCE.getHelixResourceManager()
+            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false),
+        "s3", "s4", "s5");
 
     // Upload the new segments (s12, s13, s14)
     for (int i = 12; i < 15; i++) {
@@ -988,12 +1007,12 @@ public class PinotHelixResourceManagerTest {
     // Call endReplaceSegments to start to use (s12, s13, s14)
     TEST_INSTANCE.getHelixResourceManager()
         .endReplaceSegments(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, lineageEntryId4);
-    Assert.assertEquals(new HashSet<>(TEST_INSTANCE.getHelixResourceManager()
-            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false)),
-        new HashSet<>(Arrays.asList("s3", "s4", "s5", "s12", "s13", "s14")));
-    Assert.assertEquals(new HashSet<>(TEST_INSTANCE.getHelixResourceManager()
-            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true)),
-        new HashSet<>(Arrays.asList("s12", "s13", "s14")));
+    assertEqualsWithoutOrderNoRepetition(TEST_INSTANCE.getHelixResourceManager()
+            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, false),
+        "s3", "s4", "s5", "s12", "s13", "s14");
+    assertEqualsWithoutOrderNoRepetition(TEST_INSTANCE.getHelixResourceManager()
+            .getSegmentsFor(OFFLINE_SEGMENTS_REPLACE_TEST_REFRESH_TABLE_NAME, true),
+        "s12", "s13", "s14");
 
     // Check empty segmentsFrom won't revert previous lineage with empty segmentsFrom
     // Start a new segment replacement with empty segmentsFrom.
@@ -1305,5 +1324,10 @@ public class PinotHelixResourceManagerTest {
   @AfterClass
   public void tearDown() {
     TEST_INSTANCE.cleanup();
+  }
+
+  private static <T extends Comparable<T>> void assertEqualsWithoutOrderNoRepetition(
+      Collection<T> actual, T... expected) {
+    Assert.assertEquals(new HashSet<>(actual), new HashSet<>(Arrays.asList(expected)));
   }
 }

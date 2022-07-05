@@ -360,10 +360,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_participantHelixManager, _instanceId);
-    boolean instanceConfigUpdated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
+    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
     if (_tlsPort > 0) {
       HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
     }
+    updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
     boolean shouldUpdateBrokerResource = false;
     String brokerTag = null;
     List<String> instanceTags = instanceConfig.getTags();
@@ -376,9 +377,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         brokerTag = Helix.UNTAGGED_BROKER_INSTANCE;
       }
       instanceConfig.addTag(brokerTag);
-      instanceConfigUpdated = true;
+      updated = true;
     }
-    if (instanceConfigUpdated) {
+    if (updated) {
       HelixHelper.updateInstanceConfig(_participantHelixManager, instanceConfig);
     }
     if (shouldUpdateBrokerResource) {

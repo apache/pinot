@@ -31,6 +31,8 @@ import org.apache.pinot.segment.local.segment.index.readers.FloatDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.IntDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.LongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.NullValueVectorReaderImpl;
+import org.apache.pinot.segment.local.segment.index.readers.OnHeapBigDecimalDictionary;
+import org.apache.pinot.segment.local.segment.index.readers.OnHeapBytesDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapDoubleDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapFloatDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapIntDictionary;
@@ -232,37 +234,32 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     int length = metadata.getCardinality();
     switch (dataType.getStoredType()) {
       case INT:
-        return (loadOnHeap) ? new OnHeapIntDictionary(dictionaryBuffer, length)
+        return loadOnHeap ? new OnHeapIntDictionary(dictionaryBuffer, length)
             : new IntDictionary(dictionaryBuffer, length);
-
       case LONG:
-        return (loadOnHeap) ? new OnHeapLongDictionary(dictionaryBuffer, length)
+        return loadOnHeap ? new OnHeapLongDictionary(dictionaryBuffer, length)
             : new LongDictionary(dictionaryBuffer, length);
-
       case FLOAT:
-        return (loadOnHeap) ? new OnHeapFloatDictionary(dictionaryBuffer, length)
+        return loadOnHeap ? new OnHeapFloatDictionary(dictionaryBuffer, length)
             : new FloatDictionary(dictionaryBuffer, length);
-
       case DOUBLE:
-        return (loadOnHeap) ? new OnHeapDoubleDictionary(dictionaryBuffer, length)
+        return loadOnHeap ? new OnHeapDoubleDictionary(dictionaryBuffer, length)
             : new DoubleDictionary(dictionaryBuffer, length);
-
       case BIG_DECIMAL:
         int numBytesPerValue = metadata.getColumnMaxLength();
-        return new BigDecimalDictionary(dictionaryBuffer, length, numBytesPerValue);
-
+        return loadOnHeap ? new OnHeapBigDecimalDictionary(dictionaryBuffer, length, numBytesPerValue)
+            : new BigDecimalDictionary(dictionaryBuffer, length, numBytesPerValue);
       case STRING:
         numBytesPerValue = metadata.getColumnMaxLength();
         byte paddingByte = (byte) metadata.getPaddingCharacter();
         return loadOnHeap ? new OnHeapStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte)
             : new StringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
-
       case BYTES:
         numBytesPerValue = metadata.getColumnMaxLength();
-        return new BytesDictionary(dictionaryBuffer, length, numBytesPerValue);
-
+        return loadOnHeap ? new OnHeapBytesDictionary(dictionaryBuffer, length, numBytesPerValue)
+            : new BytesDictionary(dictionaryBuffer, length, numBytesPerValue);
       default:
-        throw new IllegalStateException("Illegal data type for dictionary: " + dataType);
+        throw new IllegalStateException("Unsupported data type for dictionary: " + dataType);
     }
   }
 

@@ -35,7 +35,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * </ul>
  * <p>This helps avoid creation of double from byte[].
  */
-public class OnHeapDoubleDictionary extends OnHeapDictionary {
+public class OnHeapDoubleDictionary extends BaseImmutableDictionary {
   private final Double2IntOpenHashMap _valToDictId;
   private final double[] _dictIdToVal;
 
@@ -61,13 +61,6 @@ public class OnHeapDoubleDictionary extends OnHeapDictionary {
   }
 
   @Override
-  public int insertionIndexOf(String stringValue) {
-    double doubleValue = Double.parseDouble(stringValue);
-    int index = _valToDictId.get(doubleValue);
-    return (index != Dictionary.NULL_VALUE_INDEX) ? index : Arrays.binarySearch(_dictIdToVal, doubleValue);
-  }
-
-  @Override
   public DataType getValueType() {
     return DataType.DOUBLE;
   }
@@ -75,6 +68,18 @@ public class OnHeapDoubleDictionary extends OnHeapDictionary {
   @Override
   public int indexOf(String stringValue) {
     return _valToDictId.get(Double.parseDouble(stringValue));
+  }
+
+  @Override
+  public int indexOf(double doubleValue) {
+    return _valToDictId.get(doubleValue);
+  }
+
+  @Override
+  public int insertionIndexOf(String stringValue) {
+    double doubleValue = Double.parseDouble(stringValue);
+    int index = _valToDictId.get(doubleValue);
+    return (index != Dictionary.NULL_VALUE_INDEX) ? index : Arrays.binarySearch(_dictIdToVal, doubleValue);
   }
 
   @Override

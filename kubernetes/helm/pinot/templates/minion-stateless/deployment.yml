@@ -1,0 +1,121 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+{{- if .Values.minionStateless.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pinot.minionStateless.fullname" . }}
+  labels:
+    {{- include "pinot.minionStatelessLabels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "pinot.minionStatelessMatchLabels" . | nindent 6 }}
+  replicas: {{ .Values.minionStateless.replicaCount }}
+  template:
+    metadata:
+      labels:
+        {{- include "pinot.minionStatelessLabels" . | nindent 8 }}
+      annotations:
+{{ toYaml .Values.minionStateless.podAnnotations | indent 8 }}
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.minionStateless.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      nodeSelector:
+{{ toYaml .Values.minionStateless.nodeSelector | indent 8 }}
+      affinity:
+{{ toYaml .Values.minionStateless.affinity | indent 8 }}
+      tolerations:
+{{ toYaml .Values.minionStateless.tolerations | indent 8 }}
+      containers:
+      - name: minion-stateless
+        securityContext:
+          {{- toYaml .Values.minionStateless.securityContext | nindent 10 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args: [
+          "StartMinion",
+          "-clusterName", "{{ .Values.cluster.name }}",
+          "-zkAddress", {{ include "zookeeper.url" . | quote }},
+          "-configFileName", "/var/pinot/minion/config/pinot-minion-stateless.conf"
+        ]
+        env:
+          - name: JAVA_OPTS
+            value: "{{ .Values.minionStateless.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.minionStateless.log4j2ConfFile }} -Dplugins.dir={{ .Values.minionStateless.pluginsDir }}"
+{{- if .Values.minionStateless.extraEnv }}
+{{ toYaml .Values.minionStateless.extraEnv | indent 10 }}
+{{- end }}
+        envFrom:
+{{ toYaml .Values.minionStateless.envFrom | indent 10 }}
+        ports:
+          - containerPort: {{ .Values.minionStateless.service.port }}
+            protocol: {{ .Values.minionStateless.service.protocol }}
+            name: {{ .Values.minionStateless.service.name }}
+        {{- if .Values.minionStateless.probes.livenessEnabled }}
+        livenessProbe:
+          initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.periodSeconds }}
+          httpGet:
+            path: {{ .Values.minionStateless.probes.endpoint }}
+            port: {{ .Values.minionStateless.service.port }}
+        {{- end }}
+        {{- if .Values.minionStateless.probes.readinessEnabled }}
+        readinessProbe:
+          initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.periodSeconds }}
+          httpGet:
+            path: {{ .Values.minionStateless.probes.endpoint }}
+            port: {{ .Values.minionStateless.service.port }}
+        {{- end }}
+        volumeMounts:
+          - name: config
+            mountPath: /var/pinot/minion/config
+          {{- if .Values.minionStateless.persistence.enabled }}
+          - name: data
+            mountPath: "{{ .Values.minionStateless.persistence.mountPath }}"
+          {{- end }}
+          {{- if ne (len .Values.minionStateless.persistence.extraVolumeMounts) 0 }}
+{{ toYaml .Values.minionStateless.persistence.extraVolumeMounts | indent 10 }}
+          {{- end }}
+        resources:
+{{ toYaml .Values.minionStateless.resources | indent 12 }}
+      restartPolicy: Always
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "pinot.minionStateless.config" . }}
+      {{- if not .Values.minionStateless.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+      {{- end }}
+      {{- if .Values.minionStateless.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.minionStateless.persistence.pvcName }}
+      {{- end }}
+      {{- if ne (len .Values.minionStateless.persistence.extraVolumes) 0 }}
+{{ toYaml .Values.minionStateless.persistence.extraVolumes | indent 8 }}
+      {{- end }}
+{{- end }}

@@ -617,8 +617,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     if (_tlsPort > 0) {
       updated |= HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
     }
-    updated |= HelixHelper
-        .addDefaultTags(instanceConfig, () -> Collections.singletonList(CommonConstants.Helix.CONTROLLER_INSTANCE));
+    updated |= HelixHelper.addDefaultTags(instanceConfig,
+        () -> Collections.singletonList(CommonConstants.Helix.CONTROLLER_INSTANCE));
+    updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
     if (updated) {
       HelixHelper.updateInstanceConfig(_helixParticipantManager, instanceConfig);
     }

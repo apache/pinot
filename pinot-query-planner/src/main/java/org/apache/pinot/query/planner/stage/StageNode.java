@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.stage;
 
 import java.io.Serializable;
 import java.util.List;
+import org.apache.pinot.common.utils.DataSchema;
 
 
 /**
@@ -32,9 +33,13 @@ import java.util.List;
  */
 public interface StageNode extends Serializable {
 
+  int getStageId();
+
   List<StageNode> getInputs();
 
   void addInput(StageNode stageNode);
 
-  int getStageId();
+  DataSchema getDataSchema();
+
+  void setDataSchema(DataSchema dataSchema);
 }

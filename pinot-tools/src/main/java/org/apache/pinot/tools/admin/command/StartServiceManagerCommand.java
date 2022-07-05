@@ -31,6 +31,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Command;
@@ -218,11 +219,13 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
             ControllerConf.ControllerMode.DUAL, true);
       case BROKER:
         return PinotConfigUtils
-            .generateBrokerConf(_clusterName, _zkAddress, null, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
+            .generateBrokerConf(_clusterName, _zkAddress, null, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT,
+                QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
       case SERVER:
         return PinotConfigUtils
             .generateServerConf(_clusterName, _zkAddress, null, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT,
-                CommonConstants.Server.DEFAULT_ADMIN_API_PORT, CommonConstants.Server.DEFAULT_GRPC_PORT, null, null);
+                CommonConstants.Server.DEFAULT_ADMIN_API_PORT, CommonConstants.Server.DEFAULT_GRPC_PORT,
+                QueryConfig.DEFAULT_QUERY_SERVER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT, null, null);
       default:
         throw new RuntimeException("No default config found for service role: " + serviceRole);
     }

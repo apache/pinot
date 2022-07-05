@@ -27,7 +27,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * Base abstract class for minion task metadata.
  *
  * This metadata gets serialized and stored in zookeeper under the path:
- * MINION_TASK_METADATA/${taskName}/${tableNameWithType}
+ * MINION_TASK_METADATA/${tableNameWithType}/${taskName}
  */
 public abstract class BaseTaskMetadata {
 

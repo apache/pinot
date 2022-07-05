@@ -180,6 +180,11 @@ public class IntOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
     return getDictId(Integer.valueOf(stringValue), null);
   }
 
+  @Override
+  public int indexOf(int intValue) {
+    return getDictId(intValue, null);
+  }
+
   public Integer get(int dictId) {
     return getIntValue(dictId);
   }

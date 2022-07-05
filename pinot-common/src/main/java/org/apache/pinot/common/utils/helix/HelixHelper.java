@@ -667,4 +667,17 @@ public class HelixHelper {
     }
     return false;
   }
+
+  /**
+   * Removes the disabled partitions from the instance config. Sometimes a partition can be accidentally disabled, and
+   * not re-enabled for some reason. When an instance is restarted, we should remove these disabled partitions so that
+   * they can be processed.
+   */
+  public static boolean removeDisabledPartitions(InstanceConfig instanceConfig) {
+    ZNRecord record = instanceConfig.getRecord();
+    String disabledPartitionsKey = InstanceConfig.InstanceConfigProperty.HELIX_DISABLED_PARTITION.name();
+    boolean listUpdated = record.getListFields().remove(disabledPartitionsKey) != null;
+    boolean mapUpdated = record.getMapFields().remove(disabledPartitionsKey) != null;
+    return listUpdated | mapUpdated;
+  }
 }

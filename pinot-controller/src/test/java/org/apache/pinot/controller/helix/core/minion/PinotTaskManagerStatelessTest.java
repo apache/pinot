@@ -41,6 +41,8 @@ import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 import org.quartz.impl.matchers.GroupMatcher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -53,6 +55,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "myTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final long TIMEOUT_IN_MS = 10_000L;
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTaskManagerStatelessTest.class);
 
   @BeforeClass
   public void setUp()
@@ -239,10 +242,22 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
         throw new RuntimeException(e);
       }
     }, TIMEOUT_IN_MS, "JobDetail exiting but missing JobTrigger");
-    List<? extends Trigger> triggersOfJob = scheduler.getTriggersOfJob(jobKey);
-    Trigger trigger = triggersOfJob.iterator().next();
-    assertTrue(trigger instanceof CronTrigger);
-    assertEquals(((CronTrigger) trigger).getCronExpression(), cronExpression);
+
+    // There is no guarantee that previous changes have been applied, therefore we need to
+    // retry the check for a bit
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        List<? extends Trigger> triggersOfJob = scheduler.getTriggersOfJob(jobKey);
+        Trigger trigger = triggersOfJob.iterator().next();
+        assertTrue(trigger instanceof CronTrigger);
+        assertEquals(((CronTrigger) trigger).getCronExpression(), cronExpression);
+      } catch (SchedulerException ex) {
+        throw new RuntimeException(ex);
+      } catch (AssertionError assertionError) {
+        LOGGER.warn("Unexpected cron expression. Hasn't been replicated yet?", assertionError);
+      }
+      return true;
+    }, TIMEOUT_IN_MS, 500L, "Cron expression didn't change to " + cronExpression);
   }
 
   @AfterClass

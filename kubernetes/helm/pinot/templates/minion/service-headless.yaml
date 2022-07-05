@@ -17,6 +17,7 @@
 # under the License.
 #
 
+{{- if .Values.minion.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -31,3 +32,4 @@ spec:
       port: {{ .Values.minion.service.port }}
   selector:
     {{- include "pinot.minionMatchLabels" . | nindent 4 }}
+{{- end }}
