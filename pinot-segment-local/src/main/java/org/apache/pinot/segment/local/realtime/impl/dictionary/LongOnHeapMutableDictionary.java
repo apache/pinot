@@ -168,6 +168,11 @@ public class LongOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
+  public int indexOf(long longValue) {
+    return getDictId(longValue);
+  }
+
+  @Override
   public int getIntValue(int dictId) {
     return (int) getLongValue(dictId);
   }

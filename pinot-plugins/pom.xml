@@ -37,6 +37,7 @@
     <pinot.root>${basedir}/..</pinot.root>
     <plugin.type/>
     <phase.prop>none</phase.prop>
+    <hadoop.dependencies.scope>compile</hadoop.dependencies.scope>
   </properties>
 
   <modules>
@@ -65,6 +66,18 @@
     </dependency>
   </dependencies>
   <profiles>
+    <profile>
+      <id>use-provided-hadoop</id>
+      <activation>
+        <property>
+          <name>useProvidedHadoop</name>
+          <value>true</value>
+        </property>
+      </activation>
+      <properties>
+        <hadoop.dependencies.scope>provided</hadoop.dependencies.scope>
+      </properties>
+    </profile>
     <profile>
       <id>build-shaded-jar</id>
       <activation>
@@ -131,7 +144,7 @@
                     </relocation>
                     <relocation>
                       <pattern>org.apache.commons</pattern>
-                      <shadedPattern>shaded.org.apache.commons</shadedPattern>
+                      <shadedPattern>${shade.prefix}.org.apache.commons</shadedPattern>
                     </relocation>
                   </relocations>
                 </configuration>

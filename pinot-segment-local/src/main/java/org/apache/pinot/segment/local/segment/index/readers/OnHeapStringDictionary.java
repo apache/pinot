@@ -36,7 +36,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
  * </ul>
  * <p>This helps avoid creation of String from byte[], which is expensive as well as creates garbage.
  */
-public class OnHeapStringDictionary extends OnHeapDictionary {
+public class OnHeapStringDictionary extends BaseImmutableDictionary {
   private final byte _paddingByte;
   private final String[] _unpaddedStrings;
   private final Object2IntOpenHashMap<String> _unPaddedStringToIdMap;
@@ -67,6 +67,16 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
     }
   }
 
+  @Override
+  public DataType getValueType() {
+    return DataType.STRING;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    return _unPaddedStringToIdMap.getInt(stringValue);
+  }
+
   /**
    * WARNING: With non-zero padding byte, binary search result might not reflect the real insertion index for the value.
    * E.g. with padding byte 'b', if unpadded value "aa" is in the dictionary, and stored as "aab", then unpadded value
@@ -83,16 +93,6 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
       return _paddingByte == 0 ? Arrays.binarySearch(_unpaddedStrings, stringValue)
           : Arrays.binarySearch(_paddedStrings, padString(stringValue));
     }
-  }
-
-  @Override
-  public DataType getValueType() {
-    return DataType.STRING;
-  }
-
-  @Override
-  public int indexOf(String stringValue) {
-    return _unPaddedStringToIdMap.getInt(stringValue);
   }
 
   @Override

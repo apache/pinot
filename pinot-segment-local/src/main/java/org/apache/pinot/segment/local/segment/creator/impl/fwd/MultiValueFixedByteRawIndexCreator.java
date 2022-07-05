@@ -77,7 +77,8 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
       boolean deriveNumDocsPerChunk, int writerVersion)
       throws IOException {
     File file = new File(baseIndexDir, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
-    int totalMaxLength = maxNumberOfMultiValueElements * valueType.getStoredType().size();
+    // Store the length followed by the values
+    int totalMaxLength = Integer.BYTES + (maxNumberOfMultiValueElements * valueType.getStoredType().size());
     int numDocsPerChunk =
         deriveNumDocsPerChunk ? Math.max(TARGET_MAX_CHUNK_SIZE / (totalMaxLength
             + VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE), 1) : DEFAULT_NUM_DOCS_PER_CHUNK;
@@ -152,7 +153,7 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   public void putDoubleMV(final double[] values) {
 
     byte[] bytes = new byte[Integer.BYTES
-        + values.length * Long.BYTES]; //numValues, bytes required to store the content
+        + values.length * Double.BYTES]; //numValues, bytes required to store the content
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     //write the length
     byteBuffer.putInt(values.length);

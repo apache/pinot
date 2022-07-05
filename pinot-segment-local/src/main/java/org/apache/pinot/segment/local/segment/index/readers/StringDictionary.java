@@ -31,13 +31,13 @@ public class StringDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public int insertionIndexOf(String stringValue) {
-    return binarySearch(stringValue);
+  public DataType getValueType() {
+    return DataType.STRING;
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.STRING;
+  public int insertionIndexOf(String stringValue) {
+    return binarySearch(stringValue);
   }
 
   @Override

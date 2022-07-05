@@ -147,6 +147,11 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   }
 
   @Override
+  public int indexOf(ByteArray bytesValue) {
+    return getDictId(bytesValue, bytesValue.getBytes());
+  }
+
+  @Override
   public byte[] get(int dictId) {
     return getBytesValue(dictId);
   }

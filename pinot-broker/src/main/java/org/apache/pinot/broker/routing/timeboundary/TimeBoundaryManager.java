@@ -78,7 +78,7 @@ public class TimeBoundaryManager {
     DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(_timeColumn);
     Preconditions.checkNotNull(dateTimeSpec, "Field spec must be specified in schema for time column: %s of table: %s",
         _timeColumn, _offlineTableName);
-    _timeFormatSpec = new DateTimeFormatSpec(dateTimeSpec.getFormat());
+    _timeFormatSpec = dateTimeSpec.getFormatSpec();
     Preconditions.checkNotNull(_timeFormatSpec.getColumnUnit(),
         "Time unit must be configured in the field spec for time column: %s of table: %s", _timeColumn,
         _offlineTableName);
@@ -91,7 +91,7 @@ public class TimeBoundaryManager {
     _timeOffsetMs = isHourlyTable ? TimeUnit.HOURS.toMillis(1) : TimeUnit.DAYS.toMillis(1);
 
     LOGGER.info("Constructed TimeBoundaryManager with timeColumn: {}, timeFormat: {}, isHourlyTable: {} for table: {}",
-        _timeColumn, _timeFormatSpec.getFormat(), isHourlyTable, _offlineTableName);
+        _timeColumn, dateTimeSpec.getFormat(), isHourlyTable, _offlineTableName);
   }
 
   /**

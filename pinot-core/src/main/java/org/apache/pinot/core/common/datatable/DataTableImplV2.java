@@ -92,7 +92,7 @@ public class DataTableImplV2 extends BaseDataTable {
       byteBuffer.position(dataSchemaStart);
       _dataSchema = DataSchema.fromBytes(byteBuffer);
       _columnOffsets = new int[_dataSchema.size()];
-      _rowSizeInBytes = DataTableUtils.computeColumnOffsets(_dataSchema, _columnOffsets);
+      _rowSizeInBytes = DataTableUtils.computeColumnOffsets(_dataSchema, _columnOffsets, getVersion());
     } else {
       _dataSchema = null;
       _columnOffsets = null;
@@ -120,6 +120,11 @@ public class DataTableImplV2 extends BaseDataTable {
       _variableSizeDataBytes = null;
       _variableSizeData = null;
     }
+  }
+
+  @Override
+  public int getVersion() {
+    return DataTableFactory.VERSION_2;
   }
 
   private Map<String, String> deserializeMetadata(ByteBuffer buffer)
@@ -165,7 +170,7 @@ public class DataTableImplV2 extends BaseDataTable {
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-    dataOutputStream.writeInt(DataTableBuilder.VERSION_2);
+    dataOutputStream.writeInt(DataTableFactory.VERSION_2);
     dataOutputStream.writeInt(_numRows);
     dataOutputStream.writeInt(_numColumns);
     int dataOffset = HEADER_SIZE;

@@ -101,7 +101,16 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   DROPPED_MINION_INSTANCES("droppedMinionInstances", true),
 
   // Number of online minion instances
-  ONLINE_MINION_INSTANCES("onlineMinionInstances", true);
+  ONLINE_MINION_INSTANCES("onlineMinionInstances", true),
+
+  // Number of partitions with missing consuming segments in ideal state
+  MISSING_CONSUMING_SEGMENT_TOTAL_COUNT("missingConsumingSegmentTotalCount", false),
+
+  // Number of new partitions with missing consuming segments in ideal state
+  MISSING_CONSUMING_SEGMENT_NEW_PARTITION_COUNT("missingConsumingSegmentNewPartitionCount", false),
+
+  // Maximum duration of a missing consuming segment in ideal state (in minutes)
+  MISSING_CONSUMING_SEGMENT_MAX_DURATION_MINUTES("missingSegmentsMaxDurationInMinutes", false);
 
   private final String _gaugeName;
   private final String _unit;

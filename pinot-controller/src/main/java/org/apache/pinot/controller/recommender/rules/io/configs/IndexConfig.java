@@ -33,6 +33,7 @@ public class IndexConfig {
   Set<String> _rangeIndexColumns = new HashSet<>();
   String _sortedColumn = "";
   Set<String> _bloomFilterColumns = new HashSet<>();
+  Set<String> _jsonIndexColumns = new HashSet<>();
 
   Set<String> _noDictionaryColumns = new HashSet<>();
   Set<String> _onHeapDictionaryColumns = new HashSet<>();
@@ -84,6 +85,11 @@ public class IndexConfig {
     _isSortedColumnOverwritten = sortedColumnOverwritten;
   }
 
+  @JsonSetter(nulls = Nulls.SKIP)
+  public void setJsonIndexColumns(Set<String> jsonIndexColumns) {
+    _jsonIndexColumns = jsonIndexColumns;
+  }
+
   public Set<String> getVarLengthDictionaryColumns() {
     return _varLengthDictionaryColumns;
   }
@@ -112,6 +118,10 @@ public class IndexConfig {
     return _rangeIndexColumns;
   }
 
+  public Set<String> getJsonIndexColumns() {
+    return _jsonIndexColumns;
+  }
+
   public boolean hasInvertedIndex(String colname) {
     return _invertedIndexColumns.contains(colname);
   }
@@ -122,6 +132,10 @@ public class IndexConfig {
 
   public boolean hasRangeIndex(String colName) {
     return _rangeIndexColumns.contains(colName);
+  }
+
+  public boolean hasJsonIndex(String colName) {
+    return _jsonIndexColumns.contains(colName);
   }
 
   public boolean hasAnyIndex() {

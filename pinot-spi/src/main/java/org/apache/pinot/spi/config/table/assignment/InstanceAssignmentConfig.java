@@ -28,6 +28,8 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 public class InstanceAssignmentConfig extends BaseJsonConfig {
 
+  @JsonPropertyDescription("Configuration for the strategy to assign instances to partitions")
+  private final PartitionSelector _partitionSelector;
   @JsonPropertyDescription("Configuration for the instance tag and pool of the instance assignment (mandatory)")
   private final InstanceTagPoolConfig _tagPoolConfig;
 
@@ -44,13 +46,26 @@ public class InstanceAssignmentConfig extends BaseJsonConfig {
       @JsonProperty(value = "tagPoolConfig", required = true) InstanceTagPoolConfig tagPoolConfig,
       @JsonProperty("constraintConfig") @Nullable InstanceConstraintConfig constraintConfig,
       @JsonProperty(value = "replicaGroupPartitionConfig", required = true)
-          InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig) {
+          InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig,
+      @JsonProperty("partitionSelector") @Nullable String partitionSelector) {
     Preconditions.checkArgument(tagPoolConfig != null, "'tagPoolConfig' must be configured");
     Preconditions
         .checkArgument(replicaGroupPartitionConfig != null, "'replicaGroupPartitionConfig' must be configured");
     _tagPoolConfig = tagPoolConfig;
     _constraintConfig = constraintConfig;
     _replicaGroupPartitionConfig = replicaGroupPartitionConfig;
+    _partitionSelector =
+        partitionSelector == null ? PartitionSelector.INSTANCE_REPLICA_GROUP_PARTITION_SELECTOR
+            : PartitionSelector.valueOf(partitionSelector);
+  }
+
+  public InstanceAssignmentConfig(InstanceTagPoolConfig tagPoolConfig, InstanceConstraintConfig constraintConfig,
+      InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig) {
+    this(tagPoolConfig, constraintConfig, replicaGroupPartitionConfig, null);
+  }
+
+  public PartitionSelector getPartitionSelector() {
+    return _partitionSelector;
   }
 
   public InstanceTagPoolConfig getTagPoolConfig() {
@@ -64,5 +79,9 @@ public class InstanceAssignmentConfig extends BaseJsonConfig {
 
   public InstanceReplicaGroupPartitionConfig getReplicaGroupPartitionConfig() {
     return _replicaGroupPartitionConfig;
+  }
+
+  public enum PartitionSelector {
+    FD_AWARE_INSTANCE_PARTITION_SELECTOR, INSTANCE_REPLICA_GROUP_PARTITION_SELECTOR
   }
 }

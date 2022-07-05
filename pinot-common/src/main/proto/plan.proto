@@ -43,7 +43,9 @@ message StageNode {
   int32 stageId = 1;
   string nodeName = 2;
   repeated StageNode inputs = 3;
-  ObjectField objectField = 4;
+  repeated string columnNames = 4;
+  repeated string columnDataTypes = 5;
+  ObjectField objectField = 6;
 }
 
 // MemberVariableField defines the serialized format of the member variables of a class object.

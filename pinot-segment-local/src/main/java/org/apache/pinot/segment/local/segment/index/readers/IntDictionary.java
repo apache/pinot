@@ -30,8 +30,8 @@ public class IntDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public int insertionIndexOf(String stringValue) {
-    return binarySearch(Integer.parseInt(stringValue));
+  public DataType getValueType() {
+    return DataType.INT;
   }
 
   @Override
@@ -40,8 +40,8 @@ public class IntDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.INT;
+  public int insertionIndexOf(String stringValue) {
+    return binarySearch(Integer.parseInt(stringValue));
   }
 
   @Override

@@ -862,9 +862,6 @@ public class PinotLLCRealtimeSegmentManager {
    * If so, it should create a new CONSUMING segment for the partition.
    * (this operation is done only if @param recreateDeletedConsumingSegment is set to true,
    * which means it's manually triggered by admin not by automatic periodic task)
-   *
-   * TODO: We need to find a place to detect and update a gauge for nonConsumingPartitionsCount for a table, and
-   * reset it to 0 at the end of validateLLC
    */
   public void ensureAllPartitionsConsuming(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
       boolean recreateDeletedConsumingSegment) {

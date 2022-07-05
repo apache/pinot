@@ -16,11 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.blocks;
+package org.apache.pinot.core.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
 
 
@@ -36,9 +35,9 @@ public class ColumnarDataBlock extends BaseDataBlock {
     super();
   }
 
-  public ColumnarDataBlock(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
+  public ColumnarDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
       byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
-    super(numRows, dataSchema, dictionaryMap, fixedSizeDataBytes, variableSizeDataBytes);
+    super(numRows, dataSchema, stringDictionary, fixedSizeDataBytes, variableSizeDataBytes);
     computeBlockObjectConstants();
   }
 
@@ -67,16 +66,15 @@ public class ColumnarDataBlock extends BaseDataBlock {
   }
 
   @Override
-  protected void positionCursorInFixSizedBuffer(int rowId, int colId) {
-    int position = _cumulativeColumnOffsetSizeInBytes[colId] + _columnSizeInBytes[colId] * rowId;
-    _fixedSizeData.position(position);
+  protected int getOffsetInFixedBuffer(int rowId, int colId) {
+    return _cumulativeColumnOffsetSizeInBytes[colId] + _columnSizeInBytes[colId] * rowId;
   }
 
   @Override
-  protected int positionCursorInVariableBuffer(int rowId, int colId) {
-    positionCursorInFixSizedBuffer(rowId, colId);
-    _variableSizeData.position(_fixedSizeData.getInt());
-    return _fixedSizeData.getInt();
+  protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
+    int offset = getOffsetInFixedBuffer(rowId, colId);
+    _variableSizeData.position(_fixedSizeData.getInt(offset));
+    return _fixedSizeData.getInt(offset + 4);
   }
 
   @Override
@@ -89,7 +87,7 @@ public class ColumnarDataBlock extends BaseDataBlock {
 
   @Override
   public ColumnarDataBlock toDataOnlyDataTable() {
-    return new ColumnarDataBlock(_numRows, _dataSchema, _dictionaryMap, _fixedSizeDataBytes, _variableSizeDataBytes);
+    return new ColumnarDataBlock(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
   }
 
   // TODO: add whole-column access methods.

@@ -201,7 +201,7 @@ public abstract class DataPreprocessingHelper {
       if (timeColumnName != null) {
         DateTimeFieldSpec dateTimeFieldSpec = _pinotTableSchema.getSpecForTimeColumn(timeColumnName);
         if (dateTimeFieldSpec != null) {
-          DateTimeFormatSpec formatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
+          DateTimeFormatSpec formatSpec = dateTimeFieldSpec.getFormatSpec();
           job.getConfiguration().set(InternalConfigConstants.SEGMENT_TIME_TYPE, formatSpec.getColumnUnit().toString());
           job.getConfiguration()
               .set(InternalConfigConstants.SEGMENT_TIME_FORMAT, formatSpec.getTimeFormat().toString());

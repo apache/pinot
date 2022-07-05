@@ -16,10 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.blocks;
+package org.apache.pinot.core.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -37,11 +39,6 @@ public final class DataBlockUtils {
   static {
     EOS_DATA_BLOCK._metadata.put(DataTable.MetadataKey.TABLE.getName(), "END_OF_STREAM");
   }
-  private static final TransferableBlock EOS_TRANSFERABLE_BLOCK = new TransferableBlock(EOS_DATA_BLOCK);
-
-  public static TransferableBlock getEndOfStreamTransferableBlock() {
-    return EOS_TRANSFERABLE_BLOCK;
-  }
 
   public static MetadataBlock getEndOfStreamDataBlock() {
     return EOS_DATA_BLOCK;
@@ -58,22 +55,8 @@ public final class DataBlockUtils {
     return errorBlock;
   }
 
-  public static TransferableBlock getErrorTransferableBlock(Exception e) {
-    return new TransferableBlock(getErrorDataBlock(e));
-  }
-
   public static MetadataBlock getEmptyDataBlock(DataSchema dataSchema) {
     return dataSchema == null ? EOS_DATA_BLOCK : new MetadataBlock(dataSchema);
-  }
-
-  public static TransferableBlock getEmptyTransferableBlock(DataSchema dataSchema) {
-    return new TransferableBlock(getEmptyDataBlock(dataSchema));
-  }
-
-  public static boolean isEndOfStream(TransferableBlock transferableBlock) {
-    return transferableBlock.getType().equals(BaseDataBlock.Type.METADATA)
-        && "END_OF_STREAM".equals(transferableBlock.getDataBlock().getMetadata()
-            .get(DataTable.MetadataKey.TABLE.getName()));
   }
 
   public static BaseDataBlock getDataBlock(ByteBuffer byteBuffer)
@@ -91,6 +74,68 @@ public final class DataBlockUtils {
       default:
         throw new UnsupportedOperationException("Unsupported data table version: " + version + " with type: " + type);
     }
+  }
+
+  public static List<Object[]> extraRows(BaseDataBlock dataBlock) {
+    DataSchema dataSchema = dataBlock.getDataSchema();
+    DataSchema.ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
+    int numRows = dataBlock.getNumberOfRows();
+    int numColumns = storedColumnDataTypes.length;
+
+    List<Object[]> rows = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
+      Object[] row = new Object[numColumns];
+      for (int j = 0; j < numColumns; j++) {
+        switch (storedColumnDataTypes[j]) {
+          // Single-value column
+          case INT:
+            row[j] = dataBlock.getInt(i, j);
+            break;
+          case LONG:
+            row[j] = dataBlock.getLong(i, j);
+            break;
+          case FLOAT:
+            row[j] = dataBlock.getFloat(i, j);
+            break;
+          case DOUBLE:
+            row[j] = dataBlock.getDouble(i, j);
+            break;
+          case BIG_DECIMAL:
+            row[j] = dataBlock.getBigDecimal(i, j);
+            break;
+          case STRING:
+            row[j] = dataBlock.getString(i, j);
+            break;
+          case BYTES:
+            row[j] = dataBlock.getBytes(i, j);
+            break;
+
+          // Multi-value column
+          case INT_ARRAY:
+            row[j] = dataBlock.getIntArray(i, j);
+            break;
+          case LONG_ARRAY:
+            row[j] = dataBlock.getLongArray(i, j);
+            break;
+          case FLOAT_ARRAY:
+            row[j] = dataBlock.getFloatArray(i, j);
+            break;
+          case DOUBLE_ARRAY:
+            row[j] = dataBlock.getDoubleArray(i, j);
+            break;
+          case STRING_ARRAY:
+            row[j] = dataBlock.getStringArray(i, j);
+            break;
+
+          default:
+            throw new IllegalStateException(
+                String.format("Unsupported data type: %s for column: %s", storedColumnDataTypes[j],
+                    dataSchema.getColumnName(j)));
+        }
+      }
+      rows.add(row);
+    }
+    return rows;
   }
 
   /**

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.index.column;
 
+import java.math.BigDecimal;
+import org.apache.pinot.segment.local.segment.index.readers.ConstantValueBigDecimalDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.ConstantValueBytesDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.ConstantValueDoubleDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.ConstantValueFloatDictionary;
@@ -61,6 +63,8 @@ public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProv
         return new ConstantValueFloatDictionary((float) fieldSpec.getDefaultNullValue());
       case DOUBLE:
         return new ConstantValueDoubleDictionary((double) fieldSpec.getDefaultNullValue());
+      case BIG_DECIMAL:
+        return new ConstantValueBigDecimalDictionary((BigDecimal) fieldSpec.getDefaultNullValue());
       case STRING:
         return new ConstantValueStringDictionary((String) fieldSpec.getDefaultNullValue());
       case BYTES:

@@ -74,6 +74,10 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
     return this;
   }
 
+  public String getType() {
+    return _type;
+  }
+
   public String getTmpDir() {
     return _tmpDir;
   }
@@ -98,6 +102,14 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
     _zkExternalAddress = zkExternalAddress;
   }
 
+  public String getConfigFilePath() {
+    return _configFilePath;
+  }
+
+  public void setConfigFilePath(String configFilePath) {
+    _configFilePath = configFilePath;
+  }
+
   @Override
   public String toString() {
     return ("QuickStart -type " + _type);
@@ -112,7 +124,7 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
     return "Run Pinot QuickStart.";
   }
 
-  public static QuickStartBase selectQuickStart(String type)
+  public QuickStartBase selectQuickStart(String type)
           throws NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
     Set<Class<? extends QuickStartBase>> quickStarts = allQuickStarts();
     for (Class<? extends QuickStartBase> quickStart : quickStarts) {
@@ -167,7 +179,7 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
     return validTypes;
   }
 
-  private static Set<Class<? extends QuickStartBase>> allQuickStarts() {
+  protected Set<Class<? extends QuickStartBase>> allQuickStarts() {
     Reflections reflections = new Reflections("org.apache.pinot.tools");
     return reflections.getSubTypesOf(QuickStartBase.class);
   }

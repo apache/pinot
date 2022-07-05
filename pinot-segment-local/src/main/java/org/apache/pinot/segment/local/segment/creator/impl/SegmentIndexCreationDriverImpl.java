@@ -33,7 +33,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
-import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.IntermediateSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
@@ -77,7 +76,6 @@ import org.slf4j.LoggerFactory;
  * Implementation of an index segment creator.
  */
 // TODO: Check resource leaks
-@SuppressWarnings("serial")
 public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDriver {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentIndexCreationDriverImpl.class);
 
@@ -151,12 +149,18 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       LOGGER.info("RecordReaderSegmentCreationDataSource is used");
       dataSource = new RecordReaderSegmentCreationDataSource(recordReader);
     }
-    init(config, dataSource, CompositeTransformer.getDefaultTransformer(config.getTableConfig(), config.getSchema()),
-        ComplexTypeTransformer.getComplexTypeTransformer(config.getTableConfig()));
+    init(config, dataSource, new TransformPipeline(config.getTableConfig(), config.getSchema()));
+  }
+
+  @Deprecated
+  public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
+      RecordTransformer recordTransformer, @Nullable ComplexTypeTransformer complexTypeTransformer)
+      throws Exception {
+    init(config, dataSource, new TransformPipeline(recordTransformer, complexTypeTransformer));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
-      RecordTransformer recordTransformer, @Nullable ComplexTypeTransformer complexTypeTransformer)
+      TransformPipeline transformPipeline)
       throws Exception {
     _config = config;
     _recordReader = dataSource.getRecordReader();
@@ -164,7 +168,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (config.isFailOnEmptySegment()) {
       Preconditions.checkState(_recordReader.hasNext(), "No record in data source");
     }
-    _transformPipeline = new TransformPipeline(recordTransformer, complexTypeTransformer);
+    _transformPipeline = transformPipeline;
+    // Use the same transform pipeline if the data source is backed by a record reader
+    if (dataSource instanceof RecordReaderSegmentCreationDataSource) {
+      ((RecordReaderSegmentCreationDataSource) dataSource).setTransformPipeline(transformPipeline);
+    }
 
     // Initialize stats collection
     _segmentStats = dataSource.gatherStats(
@@ -203,6 +211,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     try {
       // Initialize the index creation using the per-column statistics information
+      // TODO: _indexCreationInfoMap holds the reference to all unique values on heap (ColumnIndexCreationInfo ->
+      //       ColumnStatistics) throughout the segment creation. Find a way to release the memory early.
       _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir);
 
       // Build the index

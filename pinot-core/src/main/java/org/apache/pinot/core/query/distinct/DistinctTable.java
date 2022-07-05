@@ -239,7 +239,8 @@ public class DistinctTable {
   public byte[] toBytes()
       throws IOException {
     // NOTE: Serialize the DistinctTable as a DataTable
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(_dataSchema);
+    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(
+        _dataSchema);
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
     for (Record record : _records) {

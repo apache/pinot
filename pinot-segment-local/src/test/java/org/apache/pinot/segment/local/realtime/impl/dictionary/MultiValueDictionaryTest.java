@@ -22,11 +22,13 @@ import java.util.Random;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.fail;
 
 
@@ -47,11 +49,12 @@ public class MultiValueDictionaryTest {
   }
 
   @Test
-  public void testMultiValueIndexing() {
+  public void testMultiValueIndexingWithDictionary() {
     long seed = System.nanoTime();
     try (LongOnHeapMutableDictionary dict = new LongOnHeapMutableDictionary();
         FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
-            NROWS / 3, Integer.BYTES, new DirectMemoryManager("test"), "indexer")) {
+            NROWS / 3, Integer.BYTES, new DirectMemoryManager("test"), "indexer",
+            true, FieldSpec.DataType.INT)) {
       // Insert rows into the indexer and dictionary
       Random random = new Random(seed);
       for (int row = 0; row < NROWS; row++) {
@@ -76,6 +79,168 @@ public class MultiValueDictionaryTest {
           long value = dict.getLongValue(dictIds[i]);
           assertEquals(value, random.nextLong());
         }
+      }
+    } catch (Throwable t) {
+      fail("Failed with random seed: " + seed, t);
+    }
+  }
+
+  @Test
+  public void testMultiValueIndexingWithRawInt() {
+    long seed = System.nanoTime();
+    try (FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
+            NROWS / 3, Integer.BYTES, new DirectMemoryManager("test"), "indexer",
+            false, FieldSpec.DataType.INT)) {
+      // Insert rows into the indexer
+      Random random = new Random(seed);
+      for (int row = 0; row < NROWS; row++) {
+        int numValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
+        int[] values = new int[numValues];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = random.nextInt();
+        }
+        indexer.setIntMV(row, values);
+      }
+
+      // Read back rows and make sure that the values are good.
+      random = new Random(seed);
+      int[] intValues = new int[MAX_N_VALUES];
+      for (int row = 0; row < NROWS; row++) {
+        int numValues = indexer.getIntMV(row, intValues);
+        assertEquals(numValues, Math.abs(random.nextInt()) % MAX_N_VALUES);
+
+        for (int i = 0; i < numValues; i++) {
+          assertEquals(intValues[i], random.nextInt());
+        }
+      }
+    } catch (Throwable t) {
+      fail("Failed with random seed: " + seed, t);
+    }
+  }
+
+  @Test
+  public void testMultiValueIndexingWithRawLong() {
+    long seed = System.nanoTime();
+    try (FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
+        NROWS / 3, Long.BYTES, new DirectMemoryManager("test"), "indexer",
+        false, FieldSpec.DataType.LONG)) {
+      // Insert rows into the indexer
+      Random random = new Random(seed);
+      for (int row = 0; row < NROWS; row++) {
+        int numValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
+        long[] values = new long[numValues];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = random.nextLong();
+        }
+        indexer.setLongMV(row, values);
+      }
+
+      // Read back rows and make sure that the values are good.
+      random = new Random(seed);
+      long[] longValues = new long[MAX_N_VALUES];
+      for (int row = 0; row < NROWS; row++) {
+        int numValues = indexer.getLongMV(row, longValues);
+        assertEquals(numValues, Math.abs(random.nextInt()) % MAX_N_VALUES);
+
+        for (int i = 0; i < numValues; i++) {
+          assertEquals(longValues[i], random.nextLong());
+        }
+      }
+    } catch (Throwable t) {
+      fail("Failed with random seed: " + seed, t);
+    }
+  }
+
+  @Test
+  public void testMultiValueIndexingWithRawFloat() {
+    long seed = System.nanoTime();
+    try (FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
+        NROWS / 3, Float.BYTES, new DirectMemoryManager("test"), "indexer",
+        false, FieldSpec.DataType.FLOAT)) {
+      // Insert rows into the indexer
+      Random random = new Random(seed);
+      for (int row = 0; row < NROWS; row++) {
+        int numValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
+        float[] values = new float[numValues];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = random.nextFloat();
+        }
+        indexer.setFloatMV(row, values);
+      }
+
+      // Read back rows and make sure that the values are good.
+      random = new Random(seed);
+      float[] floatValues = new float[MAX_N_VALUES];
+      for (int row = 0; row < NROWS; row++) {
+        int numValues = indexer.getFloatMV(row, floatValues);
+        assertEquals(numValues, Math.abs(random.nextInt()) % MAX_N_VALUES);
+
+        for (int i = 0; i < numValues; i++) {
+          assertEquals(floatValues[i], random.nextFloat());
+        }
+      }
+    } catch (Throwable t) {
+      fail("Failed with random seed: " + seed, t);
+    }
+  }
+
+  @Test
+  public void testMultiValueIndexingWithRawDouble() {
+    long seed = System.nanoTime();
+    try (FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
+        NROWS / 3, Double.BYTES, new DirectMemoryManager("test"), "indexer",
+        false, FieldSpec.DataType.DOUBLE)) {
+      // Insert rows into the indexer
+      Random random = new Random(seed);
+      for (int row = 0; row < NROWS; row++) {
+        int numValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
+        double[] values = new double[numValues];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = random.nextDouble();
+        }
+        indexer.setDoubleMV(row, values);
+      }
+
+      // Read back rows and make sure that the values are good.
+      random = new Random(seed);
+      double[] doubleValues = new double[MAX_N_VALUES];
+      for (int row = 0; row < NROWS; row++) {
+        int numValues = indexer.getDoubleMV(row, doubleValues);
+        assertEquals(numValues, Math.abs(random.nextInt()) % MAX_N_VALUES);
+
+        for (int i = 0; i < numValues; i++) {
+          assertEquals(doubleValues[i], random.nextDouble());
+        }
+      }
+    } catch (Throwable t) {
+      fail("Failed with random seed: " + seed, t);
+    }
+  }
+
+  @Test
+  public void testMultiValueIndexingWithRawString() {
+    long seed = System.nanoTime();
+    try (FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
+        NROWS / 3, 24, new DirectMemoryManager("test"), "indexer",
+        false, FieldSpec.DataType.STRING)) {
+      // Insert rows into the indexer
+      Random random = new Random(seed);
+      for (int row = 0; row < NROWS; row++) {
+        int numValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
+        String[] values = new String[numValues];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = "random1";
+        }
+        final int curRow = row;
+        assertThrows(UnsupportedOperationException.class, () -> indexer.setStringMV(curRow, values));
+      }
+
+      // Read back rows and make sure that the values are good.
+      random = new Random(seed);
+      String[] stringValues = new String[MAX_N_VALUES];
+      for (int row = 0; row < NROWS; row++) {
+        final int curRow = row;
+        assertThrows(UnsupportedOperationException.class, () -> indexer.getStringMV(curRow, stringValues));
       }
     } catch (Throwable t) {
       fail("Failed with random seed: " + seed, t);

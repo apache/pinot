@@ -41,7 +41,6 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -243,7 +242,7 @@ public class AutoAddInvertedIndex {
             tableNameWithType);
         continue;
       }
-      TimeUnit timeUnit = new DateTimeFormatSpec(dateTimeSpec.getFormat()).getColumnUnit();
+      TimeUnit timeUnit = dateTimeSpec.getFormatSpec().getColumnUnit();
       if (timeUnit != TimeUnit.DAYS) {
         LOGGER.warn("Table: {}, time column {] has non-DAYS time unit: {}", timeColumnName, timeUnit);
       }

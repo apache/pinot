@@ -30,8 +30,8 @@ public class DoubleDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public int insertionIndexOf(String stringValue) {
-    return binarySearch(Double.parseDouble(stringValue));
+  public DataType getValueType() {
+    return DataType.DOUBLE;
   }
 
   @Override
@@ -40,8 +40,8 @@ public class DoubleDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.DOUBLE;
+  public int insertionIndexOf(String stringValue) {
+    return binarySearch(Double.parseDouble(stringValue));
   }
 
   @Override

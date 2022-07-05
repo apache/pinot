@@ -16,12 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.blocks;
+package org.apache.pinot.core.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -36,9 +37,9 @@ public class RowDataBlock extends BaseDataBlock {
     super();
   }
 
-  public RowDataBlock(int numRows, DataSchema dataSchema, Map<String, Map<Integer, String>> dictionaryMap,
+  public RowDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
       byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
-    super(numRows, dataSchema, dictionaryMap, fixedSizeDataBytes, variableSizeDataBytes);
+    super(numRows, dataSchema, stringDictionary, fixedSizeDataBytes, variableSizeDataBytes);
     computeBlockObjectConstants();
   }
 
@@ -46,6 +47,29 @@ public class RowDataBlock extends BaseDataBlock {
       throws IOException {
     super(byteBuffer);
     computeBlockObjectConstants();
+  }
+
+  @Override
+  public RoaringBitmap getNullRowIds(int colId) {
+    // _fixedSizeData stores two ints per col's null bitmap: offset, and length.
+    int position = _numRows * _rowSizeInBytes + colId * Integer.BYTES * 2;
+    if (position >= _fixedSizeData.limit()) {
+      return null;
+    }
+
+    _fixedSizeData.position(position);
+    int offset = _fixedSizeData.getInt();
+    int bytesLength = _fixedSizeData.getInt();
+    RoaringBitmap nullBitmap;
+    if (bytesLength > 0) {
+      _variableSizeData.position(offset);
+      byte[] nullBitmapBytes = new byte[bytesLength];
+      _variableSizeData.get(nullBitmapBytes);
+      nullBitmap = ObjectSerDeUtils.ROARING_BITMAP_SER_DE.deserialize(nullBitmapBytes);
+    } else {
+      nullBitmap = new RoaringBitmap();
+    }
+    return nullBitmap;
   }
 
   protected void computeBlockObjectConstants() {
@@ -61,16 +85,15 @@ public class RowDataBlock extends BaseDataBlock {
   }
 
   @Override
-  protected void positionCursorInFixSizedBuffer(int rowId, int colId) {
-    int position = rowId * _rowSizeInBytes + _columnOffsets[colId];
-    _fixedSizeData.position(position);
+  protected int getOffsetInFixedBuffer(int rowId, int colId) {
+    return rowId * _rowSizeInBytes + _columnOffsets[colId];
   }
 
   @Override
-  protected int positionCursorInVariableBuffer(int rowId, int colId) {
-    positionCursorInFixSizedBuffer(rowId, colId);
-    _variableSizeData.position(_fixedSizeData.getInt());
-    return _fixedSizeData.getInt();
+  protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
+    int offset = getOffsetInFixedBuffer(rowId, colId);
+    _variableSizeData.position(_fixedSizeData.getInt(offset));
+    return _fixedSizeData.getInt(offset + 4);
   }
 
   @Override
@@ -83,7 +106,7 @@ public class RowDataBlock extends BaseDataBlock {
 
   @Override
   public RowDataBlock toDataOnlyDataTable() {
-    return new RowDataBlock(_numRows, _dataSchema, _dictionaryMap, _fixedSizeDataBytes, _variableSizeDataBytes);
+    return new RowDataBlock(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
   }
 
   // TODO: add whole-row access methods.

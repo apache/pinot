@@ -30,8 +30,8 @@ public class LongDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public int insertionIndexOf(String stringValue) {
-    return binarySearch(Long.parseLong(stringValue));
+  public DataType getValueType() {
+    return DataType.LONG;
   }
 
   @Override
@@ -40,8 +40,8 @@ public class LongDictionary extends BaseImmutableDictionary {
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.LONG;
+  public int insertionIndexOf(String stringValue) {
+    return binarySearch(Long.parseLong(stringValue));
   }
 
   @Override

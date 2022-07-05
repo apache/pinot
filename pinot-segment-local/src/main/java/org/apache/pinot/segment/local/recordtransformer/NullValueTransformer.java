@@ -62,8 +62,7 @@ public class NullValueTransformer implements RecordTransformer {
           schema.getSchemaName());
 
       String defaultTimeString = timeColumnSpec.getDefaultNullValueString();
-      String timeFormat = timeColumnSpec.getFormat();
-      DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(timeFormat);
+      DateTimeFormatSpec dateTimeFormatSpec = timeColumnSpec.getFormatSpec();
       try {
         long defaultTimeMs = dateTimeFormatSpec.fromFormatToMillis(defaultTimeString);
         if (TimeUtils.timeValueInValidRange(defaultTimeMs)) {
@@ -78,7 +77,7 @@ public class NullValueTransformer implements RecordTransformer {
       _defaultNullValues.put(timeColumnName, currentTime);
       LOGGER.info(
           "Default time: {} does not comply with format: {}, using current time: {} as the default time for table: {}",
-          defaultTimeString, timeFormat, currentTime, tableConfig.getTableName());
+          defaultTimeString, timeColumnSpec.getFormat(), currentTime, tableConfig.getTableName());
     }
   }
 

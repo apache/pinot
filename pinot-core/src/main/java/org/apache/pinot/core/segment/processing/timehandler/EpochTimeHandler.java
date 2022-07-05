@@ -43,7 +43,7 @@ public class EpochTimeHandler implements TimeHandler {
       long roundBucketMs, long partitionBucketMs) {
     _timeColumn = fieldSpec.getName();
     _dataType = fieldSpec.getDataType();
-    _formatSpec = new DateTimeFormatSpec(fieldSpec.getFormat());
+    _formatSpec = fieldSpec.getFormatSpec();
     _startTimeMs = startTimeMs;
     _endTimeMs = endTimeMs;
     _negateWindowFilter = negateWindowFilter;

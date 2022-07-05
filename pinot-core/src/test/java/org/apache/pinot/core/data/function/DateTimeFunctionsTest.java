@@ -30,9 +30,10 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
-import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 /**
@@ -47,8 +48,8 @@ public class DateTimeFunctionsTest {
   private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
       Object expectedResult) {
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
-    Assert.assertEquals(evaluator.getArguments(), expectedArguments);
-    Assert.assertEquals(evaluator.evaluate(row), expectedResult);
+    assertEquals(evaluator.getArguments(), expectedArguments);
+    assertEquals(evaluator.evaluate(row), expectedResult);
   }
 
   @Test(dataProvider = "dateTimeFunctionsDataProvider")
@@ -566,5 +567,32 @@ public class DateTimeFunctionsTest {
     List<String> arguments = Collections.singletonList("timeCol");
     testFunction(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
         outputGranularityStr), arguments, row, expectedResult == null ? null : expectedResult.toString());
+  }
+
+  private void testMultipleInvocations(String functionExpression, List<GenericRow> rows, List<Object> expectedResults) {
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
+    int numInvocations = rows.size();
+    assertEquals(expectedResults.size(), numInvocations);
+    for (int i = 0; i < numInvocations; i++) {
+      assertEquals(evaluator.evaluate(rows.get(i)), expectedResults.get(i).toString());
+    }
+  }
+
+  @Test
+  public void testDateTimeConvertMultipleInvocations() {
+    String inputFormatStr = "SIMPLE_DATE_FORMAT|yyyyMMdd";
+    String outputFormatStr = "EPOCH|MILLISECONDS";
+    String outputGranularityStr = "1:DAYS";
+
+    List<GenericRow> rows = new ArrayList<>(10);
+    List<Object> expectedResults = new ArrayList<>(10);
+    for (int i = 0; i < 10; i++) {
+      GenericRow row = new GenericRow();
+      row.putValue("timeCol", 20200101 + i);
+      rows.add(row);
+      expectedResults.add(1577836800000L + 24 * 3600000 * i);
+    }
+    testMultipleInvocations(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
+        outputGranularityStr), rows, expectedResults);
   }
 }

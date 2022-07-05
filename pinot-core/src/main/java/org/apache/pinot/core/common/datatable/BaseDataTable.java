@@ -32,6 +32,7 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -58,7 +59,7 @@ public abstract class BaseDataTable implements DataTable {
     _numColumns = dataSchema.size();
     _dataSchema = dataSchema;
     _columnOffsets = new int[_numColumns];
-    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets);
+    _rowSizeInBytes = DataTableUtils.computeColumnOffsets(dataSchema, _columnOffsets, getVersion());
     _dictionaryMap = dictionaryMap;
     _fixedSizeDataBytes = fixedSizeDataBytes;
     _fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
@@ -83,6 +84,11 @@ public abstract class BaseDataTable implements DataTable {
     _variableSizeData = null;
     _metadata = new HashMap<>();
   }
+
+  /**
+   * get the current data table version.
+   */
+  public abstract int getVersion();
 
   /**
    * Helper method to serialize dictionary map.
@@ -152,26 +158,22 @@ public abstract class BaseDataTable implements DataTable {
 
   @Override
   public int getInt(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getInt();
+    return _fixedSizeData.getInt(rowId * _rowSizeInBytes + _columnOffsets[colId]);
   }
 
   @Override
   public long getLong(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getLong();
+    return _fixedSizeData.getLong(rowId * _rowSizeInBytes + _columnOffsets[colId]);
   }
 
   @Override
   public float getFloat(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getFloat();
+    return _fixedSizeData.getFloat(rowId * _rowSizeInBytes + _columnOffsets[colId]);
   }
 
   @Override
   public double getDouble(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getDouble();
+    return _fixedSizeData.getDouble(rowId * _rowSizeInBytes + _columnOffsets[colId]);
   }
 
   @Override
@@ -184,8 +186,7 @@ public abstract class BaseDataTable implements DataTable {
 
   @Override
   public String getString(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    int dictId = _fixedSizeData.getInt();
+    int dictId = _fixedSizeData.getInt(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     return _dictionaryMap.get(_dataSchema.getColumnName(colId)).get(dictId);
   }
 
@@ -199,6 +200,10 @@ public abstract class BaseDataTable implements DataTable {
   public <T> T getObject(int rowId, int colId) {
     int size = positionCursorInVariableBuffer(rowId, colId);
     int objectTypeValue = _variableSizeData.getInt();
+    if (size == 0) {
+      assert objectTypeValue == ObjectSerDeUtils.ObjectType.Null.getValue();
+      return null;
+    }
     ByteBuffer byteBuffer = _variableSizeData.slice();
     byteBuffer.limit(size);
     return ObjectSerDeUtils.deserialize(byteBuffer, objectTypeValue);
@@ -255,10 +260,15 @@ public abstract class BaseDataTable implements DataTable {
     return strings;
   }
 
+  @Override
+  public RoaringBitmap getNullRowIds(int colId) {
+    return null;
+  }
+
   private int positionCursorInVariableBuffer(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    _variableSizeData.position(_fixedSizeData.getInt());
-    return _fixedSizeData.getInt();
+    int offset = rowId * _rowSizeInBytes + _columnOffsets[colId];
+    _variableSizeData.position(_fixedSizeData.getInt(offset));
+    return _fixedSizeData.getInt(offset + 4);
   }
 
   @Override

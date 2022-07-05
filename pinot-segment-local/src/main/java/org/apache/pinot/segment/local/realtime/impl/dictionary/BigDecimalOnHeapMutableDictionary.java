@@ -169,6 +169,11 @@ public class BigDecimalOnHeapMutableDictionary extends BaseOnHeapMutableDictiona
   }
 
   @Override
+  public int indexOf(BigDecimal bigDecimalValue) {
+    return getDictId(bigDecimalValue);
+  }
+
+  @Override
   public int getIntValue(int dictId) {
     return getBigDecimalValue(dictId).intValue();
   }

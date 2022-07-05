@@ -17,6 +17,7 @@
 # under the License.
 #
 
+{{- if .Values.minion.enabled }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -135,3 +136,4 @@ spec:
           requests:
             storage: {{ .Values.minion.persistence.size }}
   {{ end }}
+{{- end }}

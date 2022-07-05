@@ -75,8 +75,8 @@ public class BenchmarkDictionaryCreation {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int benchmarkIntDictionaryCreation()
       throws IOException {
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_sortedInts, INT_FIELD, INDEX_DIR)) {
-      dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(INT_FIELD, INDEX_DIR)) {
+      dictionaryCreator.build(_sortedInts);
       return dictionaryCreator.indexOfSV(0);
     }
   }
@@ -86,9 +86,8 @@ public class BenchmarkDictionaryCreation {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int benchmarkLongDictionaryCreation()
       throws IOException {
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_sortedLongs, LONG_FIELD,
-        INDEX_DIR)) {
-      dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(LONG_FIELD, INDEX_DIR)) {
+      dictionaryCreator.build(_sortedLongs);
       return dictionaryCreator.indexOfSV(0L);
     }
   }
@@ -98,9 +97,8 @@ public class BenchmarkDictionaryCreation {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int benchmarkFloatDictionaryCreation()
       throws IOException {
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_sortedFloats, FLOAT_FIELD,
-        INDEX_DIR)) {
-      dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(FLOAT_FIELD, INDEX_DIR)) {
+      dictionaryCreator.build(_sortedFloats);
       return dictionaryCreator.indexOfSV(0f);
     }
   }
@@ -110,9 +108,8 @@ public class BenchmarkDictionaryCreation {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int benchmarkDoubleDictionaryCreation()
       throws IOException {
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_sortedDoubles, DOUBLE_FIELD,
-        INDEX_DIR)) {
-      dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(DOUBLE_FIELD, INDEX_DIR)) {
+      dictionaryCreator.build(_sortedDoubles);
       return dictionaryCreator.indexOfSV(0d);
     }
   }
@@ -122,9 +119,8 @@ public class BenchmarkDictionaryCreation {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int benchmarkStringDictionaryCreation()
       throws IOException {
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_sortedStrings, STRING_FIELD,
-        INDEX_DIR)) {
-      dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(STRING_FIELD, INDEX_DIR)) {
+      dictionaryCreator.build(_sortedStrings);
       return dictionaryCreator.indexOfSV("0");
     }
   }
@@ -134,9 +130,8 @@ public class BenchmarkDictionaryCreation {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int benchmarkVarLengthStringDictionaryCreation()
       throws IOException {
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_sortedStrings, STRING_FIELD,
-        INDEX_DIR, true)) {
-      dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(STRING_FIELD, INDEX_DIR, true)) {
+      dictionaryCreator.build(_sortedStrings);
       return dictionaryCreator.indexOfSV("0");
     }
   }

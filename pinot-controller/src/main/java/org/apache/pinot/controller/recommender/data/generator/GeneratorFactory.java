@@ -36,6 +36,9 @@ public class GeneratorFactory {
     if (type == DataType.STRING) {
       return new StringGenerator(cardinality, numberOfValuesPerEntry, entryLength);
     }
+    if (type == DataType.JSON) {
+      return new JsonGenerator(entryLength);
+    }
     if (type == DataType.BYTES) {
       return new BytesGenerator(cardinality, entryLength);
     }

@@ -168,6 +168,11 @@ public class DoubleOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
+  public int indexOf(double doubleValue) {
+    return getDictId(doubleValue);
+  }
+
+  @Override
   public int getIntValue(int dictId) {
     return (int) getDoubleValue(dictId);
   }

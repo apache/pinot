@@ -28,7 +28,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCrea
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -112,43 +112,41 @@ public class ImmutableDictionaryTypeConversionTest {
       _bytesValues[i] = BytesUtils.toByteArray(_stringValues[i]);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_intValues,
-        new DimensionFieldSpec(INT_COLUMN_NAME, FieldSpec.DataType.INT, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
+        new DimensionFieldSpec(INT_COLUMN_NAME, DataType.INT, true), TEMP_DIR)) {
+      dictionaryCreator.build(_intValues);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_longValues,
-        new DimensionFieldSpec(LONG_COLUMN_NAME, FieldSpec.DataType.LONG, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
+        new DimensionFieldSpec(LONG_COLUMN_NAME, DataType.LONG, true), TEMP_DIR)) {
+      dictionaryCreator.build(_longValues);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_floatValues,
-        new DimensionFieldSpec(FLOAT_COLUMN_NAME, FieldSpec.DataType.FLOAT, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
+        new DimensionFieldSpec(FLOAT_COLUMN_NAME, DataType.FLOAT, true), TEMP_DIR)) {
+      dictionaryCreator.build(_floatValues);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_doubleValues,
-        new DimensionFieldSpec(DOUBLE_COLUMN_NAME, FieldSpec.DataType.DOUBLE, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
+        new DimensionFieldSpec(DOUBLE_COLUMN_NAME, DataType.DOUBLE, true), TEMP_DIR)) {
+      dictionaryCreator.build(_doubleValues);
     }
 
-    MetricFieldSpec bigDecimalMetricField = new MetricFieldSpec(BIG_DECIMAL_COLUMN_NAME,
-        FieldSpec.DataType.BIG_DECIMAL);
+    MetricFieldSpec bigDecimalMetricField = new MetricFieldSpec(BIG_DECIMAL_COLUMN_NAME, DataType.BIG_DECIMAL);
     bigDecimalMetricField.setSingleValueField(true);
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_bigDecimalValues,
-        bigDecimalMetricField, TEMP_DIR)) {
-      dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(bigDecimalMetricField, TEMP_DIR)) {
+      dictionaryCreator.build(_bigDecimalValues);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_stringValues,
-        new DimensionFieldSpec(STRING_COLUMN_NAME, FieldSpec.DataType.STRING, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
+        new DimensionFieldSpec(STRING_COLUMN_NAME, DataType.STRING, true), TEMP_DIR)) {
+      dictionaryCreator.build(_stringValues);
       assertEquals(dictionaryCreator.getNumBytesPerEntry(), STRING_LENGTH);
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_bytesValues,
-        new DimensionFieldSpec(BYTES_COLUMN_NAME, FieldSpec.DataType.BYTES, true), TEMP_DIR)) {
-      dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
+        new DimensionFieldSpec(BYTES_COLUMN_NAME, DataType.BYTES, true), TEMP_DIR)) {
+      dictionaryCreator.build(_bytesValues);
       assertEquals(dictionaryCreator.getNumBytesPerEntry(), BYTES_LENGTH);
     }
 
@@ -188,9 +186,8 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testLongDictionary()
       throws Exception {
-    try (LongDictionary longDictionary = new LongDictionary(PinotDataBuffer
-        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
-        NUM_VALUES)) {
+    try (LongDictionary longDictionary = new LongDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
       testNumericDictionary(longDictionary);
     }
   }
@@ -198,9 +195,8 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testOnHeapLongDictionary()
       throws Exception {
-    try (OnHeapLongDictionary onHeapLongDictionary = new OnHeapLongDictionary(PinotDataBuffer
-        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
-        NUM_VALUES)) {
+    try (OnHeapLongDictionary onHeapLongDictionary = new OnHeapLongDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
       testNumericDictionary(onHeapLongDictionary);
     }
   }
@@ -208,9 +204,8 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testFloatDictionary()
       throws Exception {
-    try (FloatDictionary floatDictionary = new FloatDictionary(PinotDataBuffer
-        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
-        NUM_VALUES)) {
+    try (FloatDictionary floatDictionary = new FloatDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
       testNumericDictionary(floatDictionary);
     }
   }
@@ -218,9 +213,9 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testOnHeapFloatDictionary()
       throws Exception {
-    try (OnHeapFloatDictionary onHeapFloatDictionary = new OnHeapFloatDictionary(PinotDataBuffer
-        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
-        NUM_VALUES)) {
+    try (OnHeapFloatDictionary onHeapFloatDictionary = new OnHeapFloatDictionary(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(
+            new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
       testNumericDictionary(onHeapFloatDictionary);
     }
   }
@@ -228,9 +223,8 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testDoubleDictionary()
       throws Exception {
-    try (DoubleDictionary doubleDictionary = new DoubleDictionary(PinotDataBuffer
-        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
-        NUM_VALUES)) {
+    try (DoubleDictionary doubleDictionary = new DoubleDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
       testNumericDictionary(doubleDictionary);
     }
   }
@@ -238,9 +232,9 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testOnHeapDoubleDictionary()
       throws Exception {
-    try (OnHeapDoubleDictionary onHeapDoubleDictionary = new OnHeapDoubleDictionary(PinotDataBuffer
-        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
-        NUM_VALUES)) {
+    try (OnHeapDoubleDictionary onHeapDoubleDictionary = new OnHeapDoubleDictionary(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(
+            new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
       testNumericDictionary(onHeapDoubleDictionary);
     }
   }
@@ -248,10 +242,21 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testBigDecimalDictionary()
       throws Exception {
-    try (BigDecimalDictionary bigDecimalDictionary = new BigDecimalDictionary(PinotDataBuffer
-        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
-        NUM_VALUES, _bigDecimalByteLength)) {
+    try (BigDecimalDictionary bigDecimalDictionary = new BigDecimalDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
+        _bigDecimalByteLength)) {
       testNumericDictionary(bigDecimalDictionary);
+    }
+  }
+
+  @Test
+  public void testOnHeapBigDecimalDictionary()
+      throws Exception {
+    try (OnHeapBigDecimalDictionary onHeapBigDecimalDictionary = new OnHeapBigDecimalDictionary(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(
+            new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
+        _bigDecimalByteLength)) {
+      testNumericDictionary(onHeapBigDecimalDictionary);
     }
   }
 
@@ -283,7 +288,7 @@ public class ImmutableDictionaryTypeConversionTest {
 
     try {
       dictionary.getBytesValue(0);
-      if (dictionary.getClass() != BigDecimalDictionary.class) {
+      if (dictionary.getValueType() != DataType.BIG_DECIMAL) {
         Assert.fail();
       }
     } catch (UnsupportedOperationException e) {
@@ -291,7 +296,7 @@ public class ImmutableDictionaryTypeConversionTest {
     }
     try {
       dictionary.readBytesValues(_dictIds, NUM_VALUES, _bytesValuesBuffer);
-      if (dictionary.getClass() != BigDecimalDictionary.class) {
+      if (dictionary.getValueType() != DataType.BIG_DECIMAL) {
         Assert.fail();
       }
     } catch (UnsupportedOperationException e) {
@@ -302,9 +307,9 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testStringDictionary()
       throws Exception {
-    try (StringDictionary stringDictionary = new StringDictionary(PinotDataBuffer
-        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
-        STRING_LENGTH, (byte) 0)) {
+    try (StringDictionary stringDictionary = new StringDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, STRING_LENGTH,
+        (byte) 0)) {
       testStringDictionary(stringDictionary);
     }
   }
@@ -312,9 +317,10 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testOnHeapStringDictionary()
       throws Exception {
-    try (OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(PinotDataBuffer
-        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
-        STRING_LENGTH, (byte) 0)) {
+    try (OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(
+            new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, STRING_LENGTH,
+        (byte) 0)) {
       testStringDictionary(onHeapStringDictionary);
     }
   }
@@ -348,10 +354,19 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testBytesDictionary()
       throws Exception {
-    try (BytesDictionary bytesDictionary = new BytesDictionary(PinotDataBuffer
-        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
-        BYTES_LENGTH)) {
+    try (BytesDictionary bytesDictionary = new BytesDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, BYTES_LENGTH)) {
       testBytesDictionary(bytesDictionary);
+    }
+  }
+
+  @Test
+  public void testOnHeapBytesDictionary()
+      throws Exception {
+    try (OnHeapBytesDictionary onHeapBytesDictionary = new OnHeapBytesDictionary(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(
+            new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, BYTES_LENGTH)) {
+      testBytesDictionary(onHeapBytesDictionary);
     }
   }
 

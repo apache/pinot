@@ -197,7 +197,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   }
 
   private SuccessResponse uploadSegment(@Nullable String tableName, TableType tableType,
-      @Nullable FormDataMultiPart multiPart, boolean moveSegmentToFinalLocation, boolean enableParallelPushProtection,
+      @Nullable FormDataMultiPart multiPart, boolean copySegmentToFinalLocation, boolean enableParallelPushProtection,
       boolean allowRefresh, HttpHeaders headers, Request request) {
     if (StringUtils.isNotEmpty(tableName)) {
       TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
@@ -213,13 +213,15 @@ public class PinotSegmentUploadDownloadRestletResource {
     extractHttpHeader(headers, CommonConstants.Controller.TABLE_NAME_HTTP_HEADER);
 
     String uploadTypeStr = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
-    String downloadURI = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
+    String sourceDownloadURIStr = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
     String crypterClassNameInHeader = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.CRYPTER);
     String ingestionDescriptor = extractHttpHeader(headers, CommonConstants.Controller.INGESTION_DESCRIPTOR);
 
     File tempEncryptedFile = null;
     File tempDecryptedFile = null;
     File tempSegmentDir = null;
+    // The downloadUri for putting into segment zk metadata
+    String segmentDownloadURIStr = sourceDownloadURIStr;
     try {
       ControllerFilePathProvider provider = ControllerFilePathProvider.getInstance();
       String tempFileName = TMP_DIR_PREFIX + UUID.randomUUID();
@@ -238,20 +240,22 @@ public class PinotSegmentUploadDownloadRestletResource {
                 "Segment file (as multipart/form-data) is required for SEGMENT upload mode",
                 Response.Status.BAD_REQUEST);
           }
-          if (!moveSegmentToFinalLocation && StringUtils.isEmpty(downloadURI)) {
+          if (!copySegmentToFinalLocation && StringUtils.isEmpty(sourceDownloadURIStr)) {
             throw new ControllerApplicationException(LOGGER,
-                "Download URI is required if segment should not be copied to the deep store",
+                "Source download URI is required in header field 'DOWNLOAD_URI' if segment should not be copied to "
+                    + "the deep store",
                 Response.Status.BAD_REQUEST);
           }
           createSegmentFileFromMultipart(multiPart, destFile);
           segmentSizeInBytes = destFile.length();
           break;
         case URI:
-          if (StringUtils.isEmpty(downloadURI)) {
-            throw new ControllerApplicationException(LOGGER, "Download URI is required for URI upload mode",
+          if (StringUtils.isEmpty(sourceDownloadURIStr)) {
+            throw new ControllerApplicationException(LOGGER,
+                "Source download URI is required in header field 'DOWNLOAD_URI' for URI upload mode",
                 Response.Status.BAD_REQUEST);
           }
-          downloadSegmentFileFromURI(downloadURI, destFile, tableName);
+          downloadSegmentFileFromURI(sourceDownloadURIStr, destFile, tableName);
           segmentSizeInBytes = destFile.length();
           break;
         case METADATA:
@@ -260,14 +264,19 @@ public class PinotSegmentUploadDownloadRestletResource {
                 "Segment metadata file (as multipart/form-data) is required for METADATA upload mode",
                 Response.Status.BAD_REQUEST);
           }
-          if (StringUtils.isEmpty(downloadURI)) {
-            throw new ControllerApplicationException(LOGGER, "Download URI is required for METADATA upload mode",
+          if (StringUtils.isEmpty(sourceDownloadURIStr)) {
+            throw new ControllerApplicationException(LOGGER,
+                "Source download URI is required in header field 'DOWNLOAD_URI' for METADATA upload mode",
                 Response.Status.BAD_REQUEST);
           }
-          moveSegmentToFinalLocation = false;
+          // override copySegmentToFinalLocation if override provided in headers:COPY_SEGMENT_TO_DEEP_STORE
+          // else set to false for backward compatibility
+          String copySegmentToDeepStore =
+              extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE);
+          copySegmentToFinalLocation = Boolean.parseBoolean(copySegmentToDeepStore);
           createSegmentFileFromMultipart(multiPart, destFile);
           try {
-            URI segmentURI = new URI(downloadURI);
+            URI segmentURI = new URI(sourceDownloadURIStr);
             PinotFS pinotFS = PinotFSFactory.create(segmentURI.getScheme());
             segmentSizeInBytes = pinotFS.length(segmentURI);
           } catch (Exception e) {
@@ -332,24 +341,25 @@ public class PinotSegmentUploadDownloadRestletResource {
 
       // Update download URI if controller is responsible for moving the segment to the deep store
       URI finalSegmentLocationURI = null;
-      if (moveSegmentToFinalLocation) {
+      if (copySegmentToFinalLocation) {
         URI dataDirURI = provider.getDataDirURI();
         String dataDirPath = dataDirURI.toString();
         String encodedSegmentName = URIUtils.encode(segmentName);
         String finalSegmentLocationPath = URIUtils.getPath(dataDirPath, rawTableName, encodedSegmentName);
         if (dataDirURI.getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
-          downloadURI = URIUtils.getPath(provider.getVip(), "segments", rawTableName, encodedSegmentName);
+          segmentDownloadURIStr = URIUtils.getPath(provider.getVip(), "segments", rawTableName, encodedSegmentName);
         } else {
-          downloadURI = finalSegmentLocationPath;
+          segmentDownloadURIStr = finalSegmentLocationPath;
         }
         finalSegmentLocationURI = URIUtils.getUri(finalSegmentLocationPath);
       }
-      LOGGER.info("Using download URI: {} for segment: {} of table: {} (move segment: {})", downloadURI, segmentFile,
-          tableNameWithType, moveSegmentToFinalLocation);
+      LOGGER.info("Using segment download URI: {} for segment: {} of table: {} (move segment: {})",
+          segmentDownloadURIStr, segmentFile, tableNameWithType, copySegmentToFinalLocation);
 
       ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
-      zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, finalSegmentLocationURI, segmentFile,
-          downloadURI, crypterName, segmentSizeInBytes, enableParallelPushProtection, allowRefresh, headers);
+      zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, uploadType, finalSegmentLocationURI,
+          segmentFile, sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes,
+          enableParallelPushProtection, allowRefresh, headers);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + tableNameWithType);
     } catch (WebApplicationException e) {

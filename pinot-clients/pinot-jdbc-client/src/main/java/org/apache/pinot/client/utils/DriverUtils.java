@@ -20,30 +20,43 @@ package org.apache.pinot.client.utils;
 
 import java.math.BigDecimal;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.MapConfiguration;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class DriverUtils {
-  public static final String SCHEME = "jdbc";
+  public static final String SCHEME = "jdbc:";
   public static final String DRIVER = "pinot";
   public static final Logger LOG = LoggerFactory.getLogger(DriverUtils.class);
   private static final String LIMIT_STATEMENT_REGEX = "\\s(limit)\\s";
 
   // SSL Properties
   public static final String PINOT_JDBC_TLS_PREFIX = "pinot.jdbc.tls";
+
+  // Auth Properties
+  public static final String USER_PROPERTY = "user";
+  public static final String PASSWORD_PROPERTY = "password";
+  public static final String AUTH_HEADER = "Authorization";
 
   private DriverUtils() {
   }
@@ -53,6 +66,22 @@ public class DriverUtils {
         new PinotConfiguration(new MapConfiguration(properties)), PINOT_JDBC_TLS_PREFIX);
     TlsUtils.installDefaultSSLSocketFactory(tlsConfig);
     return TlsUtils.getSslContext();
+  }
+
+  public static void handleAuth(String url, Properties info, Map<String, String> headers)
+      throws SQLException {
+    Map<String, String> urlParams = DriverUtils.getURLParams(url);
+    info.putAll(urlParams);
+
+    if (info.contains(USER_PROPERTY) && !headers.containsKey(AUTH_HEADER)) {
+      String username = info.getProperty(USER_PROPERTY);
+      String password = info.getProperty(PASSWORD_PROPERTY, "");
+      if (StringUtils.isAnyEmpty(username, password)) {
+        throw new SQLException("Empty username or password provided.");
+      }
+      String authToken = BasicAuthUtils.toBasicAuthToken(username, password);
+      headers.put(AUTH_HEADER, authToken);
+    }
   }
 
   public static List<String> getBrokersFromURL(String url) {
@@ -73,7 +102,7 @@ public class DriverUtils {
     try {
       String broker = brokers.get(0);
       String[] hostPort = broker.split(":");
-      URI uri = new URI(SCHEME + ":" + DRIVER, hostPort[0], hostPort[1]);
+      URI uri = new URI(SCHEME + DRIVER, hostPort[0], hostPort[1]);
       return uri.toString();
     } catch (Exception e) {
       LOG.warn("Broker list is either empty or has incorrect format", e);
@@ -82,12 +111,27 @@ public class DriverUtils {
   }
 
   public static String getControllerFromURL(String url) {
-    if (url.toLowerCase().startsWith("jdbc:")) {
+    if (url.regionMatches(true, 0, SCHEME, 0, SCHEME.length())) {
       url = url.substring(5);
     }
     URI uri = URI.create(url);
     String controllerUrl = String.format("%s:%d", uri.getHost(), uri.getPort());
     return controllerUrl;
+  }
+
+  public static Map<String, String> getURLParams(String url) {
+    if (url.regionMatches(true, 0, SCHEME, 0, SCHEME.length())) {
+      url = url.substring(SCHEME.length());
+    }
+    URI uri = URI.create(url);
+    List<NameValuePair> params = URLEncodedUtils.parse(uri, StandardCharsets.UTF_8);
+
+    Map<String, String> paramsMap = new HashMap<>();
+    for (NameValuePair param: params) {
+      paramsMap.put(param.getName(), param.getValue());
+    }
+
+    return paramsMap;
   }
 
   public static Integer getSQLDataType(String columnDataType) {

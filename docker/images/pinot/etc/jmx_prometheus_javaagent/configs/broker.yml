@@ -123,6 +123,11 @@ rules:
   cache: true
   labels:
     table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)\\.queryTotalTimeMs\"><>(\\w+)"
+  name: "pinot_broker_queryTotalTimeMs_$2"
+  cache: true
+  labels:
+    table: "$1"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(\\w+)_(\\w+).serverMissingForRouting\"><>(\\w+)"
   name: "pinot_broker_serverMissingForRouting_$3"
   cache: true

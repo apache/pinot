@@ -62,11 +62,17 @@ public class ServerResponse {
   }
 
   public int getResponseDelayMs() {
-    if (_receiveDataTableTimeMs != 0) {
-      return (int) (_receiveDataTableTimeMs - _submitRequestTimeMs);
-    } else {
+    if (_receiveDataTableTimeMs == 0) {
       return -1;
     }
+    if (_receiveDataTableTimeMs < _submitRequestTimeMs) {
+      // We currently mark a request as submitted after sending the request to the server. In highQPS-lowLatency
+      // usecases, there can be a race condition where the DataTable/response is received before the request is
+      // marked as submitted. Return 0 to avoid reporting negative values.
+      return 0;
+    }
+
+    return (int) (_receiveDataTableTimeMs - _submitRequestTimeMs);
   }
 
   public int getResponseSize() {
