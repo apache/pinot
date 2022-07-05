@@ -135,7 +135,7 @@ public class SegmentPrunerService {
     for (IndexSegment segment : segments) {
       if (!isEmptySegment(segment)) {
         if (isInvalidSegment(segment, query)) {
-          invalid++
+          invalid++;
         } else {
           segments.set(selected++, segment);
         }
