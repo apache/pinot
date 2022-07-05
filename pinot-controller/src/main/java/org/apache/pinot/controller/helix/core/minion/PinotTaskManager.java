@@ -519,19 +519,19 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   private String scheduleTask(PinotTaskGenerator taskGenerator, List<TableConfig> enabledTableConfigs,
       boolean isLeader) {
     LOGGER.info("Trying to schedule task type: {}, isLeader: {}", taskGenerator.getTaskType(), isLeader);
-    List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
-    for (TableConfig tableConfig : enabledTableConfigs) {
-      try {
-        pinotTaskConfigs.addAll(taskGenerator.generateTasks(Collections.singletonList(tableConfig)));
+    List<PinotTaskConfig> pinotTaskConfigs;
+    try {
+      pinotTaskConfigs = taskGenerator.generateTasks(enabledTableConfigs);
+      for (TableConfig tableConfig : enabledTableConfigs) {
         try {
           TaskGeneratorMostRecentRunInfoUtils.saveSuccessRunTsToZk(_pinotHelixResourceManager.getPropertyStore(),
               tableConfig.getTableName(), taskGenerator.getTaskType(), System.currentTimeMillis());
         } catch (Exception exception) {
           LOGGER.warn("Failed to save task generator success timestamp to ZK", exception);
         }
-      } catch (Exception e) {
-        LOGGER.error("Failed to generate tasks for table {} and task {}", tableConfig.getTableName(),
-            taskGenerator.getTaskType(), e);
+      }
+    } catch (Exception e) {
+      for (TableConfig tableConfig : enabledTableConfigs) {
         try {
           TaskGeneratorMostRecentRunInfoUtils.saveErrorRunMessageToZk(_pinotHelixResourceManager.getPropertyStore(),
               tableConfig.getTableName(), taskGenerator.getTaskType(), System.currentTimeMillis(), e.getMessage());
@@ -539,6 +539,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           LOGGER.warn("Failed to save task generator error message to ZK", exception);
         }
       }
+      throw e;
     }
     if (!isLeader) {
       taskGenerator.nonLeaderCleanUp();
