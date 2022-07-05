@@ -45,4 +45,8 @@ public class SqlNodeAndOptions {
   public PinotSqlType getSqlType() {
     return _sqlType;
   }
+
+  public void setExtraOptions(Map<String, String> extractOptionsMap) {
+    _options.putAll(extractOptionsMap);
+  }
 }

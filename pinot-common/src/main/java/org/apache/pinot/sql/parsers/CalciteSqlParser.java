@@ -19,7 +19,6 @@
 package org.apache.pinot.sql.parsers;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,6 +28,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlBasicCall;
@@ -106,18 +106,28 @@ public class CalciteSqlParser {
   }
 
   public static SqlNodeAndOptions compileToSqlNodeAndOptions(String sql)
-      throws Exception {
+      throws SqlCompilationException {
     // Remove the comments from the query
     sql = removeComments(sql);
 
     // Remove the terminating semicolon from the query
     sql = removeTerminatingSemicolon(sql);
 
+    // extract and remove OPTIONS string
+    List<String> options = extractOptionsFromSql(sql);
+    sql = removeOptionsFromSql(sql);
+
     try (StringReader inStream = new StringReader(sql)) {
       SqlParserImpl sqlParser = newSqlParser(inStream);
       SqlNodeList sqlNodeList = sqlParser.SqlStmtsEof();
       // Extract OPTION statements from sql.
-      return extractSqlNodeAndOptions(sqlNodeList);
+      SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
+      // add legacy OPTIONS keyword-based options
+      if (options.size() > 0) {
+        LOGGER.warn("Usage of 'OPTIONS(key=value)' is deprecated, use `SET key = value` instead!");
+        sqlNodeAndOptions.setExtraOptions(extractOptionsMap(options));
+      }
+      return sqlNodeAndOptions;
     } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
     }
@@ -160,21 +170,7 @@ public class CalciteSqlParser {
 
   public static PinotQuery compileToPinotQuery(String sql)
       throws SqlCompilationException {
-    // Remove the comments from the query
-    sql = removeComments(sql);
-
-    // Remove the terminating semicolon from the query
-    sql = removeTerminatingSemicolon(sql);
-
-    SqlNodeAndOptions sqlNodeAndOptions;
-    try (StringReader inStream = new StringReader(sql)) {
-      SqlParserImpl sqlParser = newSqlParser(inStream);
-      SqlNodeList sqlNodeList = sqlParser.SqlStmtsEof();
-      sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
-      // Extract OPTION statements from sql as Calcite Parser doesn't parse it.
-    } catch (Throwable e) {
-      throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
-    }
+    SqlNodeAndOptions sqlNodeAndOptions = compileToSqlNodeAndOptions(sql);
 
     // Compile Sql without OPTION statements.
     PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode());
@@ -456,6 +452,44 @@ public class CalciteSqlParser {
     }
     // Validate
     validate(pinotQuery);
+  }
+
+  @Deprecated
+  private static List<String> extractOptionsFromSql(String sql) {
+    List<String> results = new ArrayList<>();
+    Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
+    while (matcher.find()) {
+      results.add(matcher.group(1));
+    }
+    return results;
+  }
+
+  @Deprecated
+  private static String removeOptionsFromSql(String sql) {
+    Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
+    return matcher.replaceAll("");
+  }
+
+  @Deprecated
+  private static Map<String, String> extractOptionsMap(List<String> optionsStatements) {
+    Map<String, String> options = new HashMap<>();
+    for (String optionsStatement : optionsStatements) {
+      for (String option : optionsStatement.split(",")) {
+        final String[] splits = option.split("=");
+        if (splits.length != 2) {
+          throw new SqlCompilationException("OPTION statement requires two parts separated by '='");
+        }
+        options.put(splits[0].trim(), splits[1].trim());
+      }
+    }
+    return options;
+  }
+
+  private static void setOptions(PinotQuery pinotQuery, List<String> optionsStatements) {
+    if (optionsStatements.isEmpty()) {
+      return;
+    }
+    pinotQuery.setQueryOptions(extractOptionsMap(optionsStatements));
   }
 
   /**
