@@ -26,7 +26,9 @@ import io.netty.handler.ssl.JdkSslContext;
 import io.netty.handler.ssl.SslContext;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
@@ -55,21 +57,20 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   private final Map<String, String> _headers;
   private final String _scheme;
 
-  private static final long BROKER_READ_TIMEOUT_MS = 60000L;
-  private static final int BROKER_CONNECT_TIMEOUT_MS = 2000;
-
-  private static final int BROKER_HANDSHAKE_TIMEOUT_MS = 2000;
-
+  private final long _brokerReadTimeout;
   private final AsyncHttpClient _httpClient;
 
   public JsonAsyncHttpPinotClientTransport() {
+    _brokerReadTimeout = 60000L;
     _headers = new HashMap<>();
     _scheme = CommonConstants.HTTP_PROTOCOL;
     _httpClient = Dsl.asyncHttpClient();
   }
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme,
-    @Nullable SSLContext sslContext) {
+                                           @Nullable SSLContext sslContext, int readTimeout,
+                                           int connectTimeout, int handshakeTimeout, boolean tlsV10Enabled) {
+    _brokerReadTimeout = readTimeout;
     _headers = headers;
     _scheme = scheme;
 
@@ -85,22 +86,36 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
       LOGGER.info("Unable to set user agent version");
     }
 
-    builder.setReadTimeout((int) BROKER_READ_TIMEOUT_MS)
-            .setConnectTimeout(BROKER_CONNECT_TIMEOUT_MS)
-            .setHandshakeTimeout(BROKER_HANDSHAKE_TIMEOUT_MS)
+    builder.setReadTimeout(readTimeout)
+            .setConnectTimeout(connectTimeout)
+            .setHandshakeTimeout(handshakeTimeout)
             .setUserAgent(prop.getProperty("ua", "pinot-java"))
-            .setEnabledProtocols(new String[]{"TLSv1.3", "TLSv1.2", "TLSv1.1"});
+            .setEnabledProtocols(createEnabledProtocols(tlsV10Enabled));
     _httpClient = Dsl.asyncHttpClient(builder.build());
+  }
+
+  private String[] createEnabledProtocols(boolean tlsV10Enabled) {
+    List<String> enabledProtocols = new ArrayList<>();
+    enabledProtocols.add("TLSv1.3");
+    enabledProtocols.add("TLSv1.2");
+    enabledProtocols.add("TLSv1.1");
+    if (tlsV10Enabled) {
+      enabledProtocols.add("TLSv1.0");
+    }
+    LOGGER.debug("Enabled TLS protocols: {}", enabledProtocols);
+    return enabledProtocols.toArray(new String[0]);
   }
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme,
     @Nullable SslContext sslContext) {
+    _brokerReadTimeout = 60000L;
     _headers = headers;
     _scheme = scheme;
 
     Builder builder = Dsl.config();
     if (sslContext != null) {
-      builder.setSslContext(sslContext);
+      builder.setSslContext(sslContext)
+              .setReadTimeout((int) _brokerReadTimeout);
     }
 
     _httpClient = Dsl.asyncHttpClient(builder.build());
@@ -110,7 +125,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   public BrokerResponse executeQuery(String brokerAddress, String query)
     throws PinotClientException {
     try {
-      return executeQueryAsync(brokerAddress, query).get(BROKER_READ_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+      return executeQueryAsync(brokerAddress, query).get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
@@ -133,7 +148,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
       Future<Response> response =
           requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").setBody(json.toString())
               .execute();
-      return new BrokerResponseFuture(response, query, url);
+      return new BrokerResponseFuture(response, query, url, _brokerReadTimeout);
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
@@ -143,7 +158,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   public BrokerResponse executeQuery(String brokerAddress, Request request)
       throws PinotClientException {
     try {
-      return executeQueryAsync(brokerAddress, request).get(BROKER_READ_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+      return executeQueryAsync(brokerAddress, request).get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
@@ -172,11 +187,13 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     private final Future<Response> _response;
     private final String _query;
     private final String _url;
+    private final long _brokerReadTimeout;
 
-    public BrokerResponseFuture(Future<Response> response, String query, String url) {
+    public BrokerResponseFuture(Future<Response> response, String query, String url, long brokerReadTimeout) {
       _response = response;
       _query = query;
       _url = url;
+      _brokerReadTimeout = brokerReadTimeout;
     }
 
     @Override
@@ -197,7 +214,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     @Override
     public BrokerResponse get()
         throws ExecutionException {
-      return get(BROKER_READ_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+      return get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
     }
 
     @Override

@@ -21,7 +21,9 @@ package org.apache.pinot.client.controller;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.JdkSslContext;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
@@ -46,7 +48,7 @@ public class PinotControllerTransport {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotControllerTransport.class);
 
-  private static final long READ_TIMEOUT_MS = 60000L;
+  private static final int READ_TIMEOUT_MS = 60000;
 
   private static final int CONNECT_TIMEOUT_MS = 2000;
 
@@ -58,15 +60,13 @@ public class PinotControllerTransport {
 
 
   public PinotControllerTransport() {
-    this(Collections.emptyMap(), CommonConstants.HTTP_PROTOCOL, null);
-  }
-
-  public PinotControllerTransport(Map<String, String> headers) {
-    this(headers, CommonConstants.HTTP_PROTOCOL, null);
+    this(Collections.emptyMap(), CommonConstants.HTTP_PROTOCOL, null,
+            READ_TIMEOUT_MS, CONNECT_TIMEOUT_MS, HANDSHAKE_TIMEOUT_MS, false);
   }
 
   public PinotControllerTransport(Map<String, String> headers, String scheme,
-      @Nullable SSLContext sslContext) {
+                                  @Nullable SSLContext sslContext, int readTimeout,
+                                  int connectTimeout, int handshakeTimeout, boolean tlsV10Enabled) {
     _headers = headers;
     _scheme = scheme;
 
@@ -82,13 +82,25 @@ public class PinotControllerTransport {
       LOGGER.info("Unable to set user agent version");
     }
 
-    builder.setReadTimeout((int) READ_TIMEOUT_MS)
-            .setConnectTimeout(CONNECT_TIMEOUT_MS)
-            .setHandshakeTimeout(HANDSHAKE_TIMEOUT_MS)
+    builder.setReadTimeout(readTimeout)
+            .setConnectTimeout(connectTimeout)
+            .setHandshakeTimeout(handshakeTimeout)
             .setUserAgent(prop.getProperty("ua", "pinot-jdbc"))
-            .setEnabledProtocols(new String[]{"TLSv1.3", "TLSv1.2", "TLSv1.1"});
+            .setEnabledProtocols(createEnabledProtocols(tlsV10Enabled));
 
     _httpClient = Dsl.asyncHttpClient(builder.build());
+  }
+
+  private String[] createEnabledProtocols(boolean tlsV10Enabled) {
+    List<String> enabledProtocols = new ArrayList<>();
+    enabledProtocols.add("TLSv1.3");
+    enabledProtocols.add("TLSv1.2");
+    enabledProtocols.add("TLSv1.1");
+    if (tlsV10Enabled) {
+      enabledProtocols.add("TLSv1.0");
+    }
+    LOGGER.debug("Enabled TLS protocols: {}", enabledProtocols);
+    return enabledProtocols.toArray(new String[0]);
   }
 
   public TableResponse getAllTables(String controllerAddress) {

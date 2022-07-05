@@ -40,7 +40,7 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers in the given Helix cluster
    */
   public static Connection fromZookeeper(String zkUrl) {
-    return fromZookeeper(zkUrl, getDefault());
+    return fromZookeeper(zkUrl, getDefault(new Properties()));
   }
 
   /**
@@ -83,7 +83,7 @@ public class ConnectionFactory {
     try {
       return new Connection(new Properties(),
           new ControllerBasedBrokerSelector(scheme, controllerHost, controllerPort, brokerUpdateFreqInMillis),
-          getDefault());
+          getDefault(new Properties()));
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
@@ -123,7 +123,7 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers specified in the properties
    */
   public static Connection fromProperties(Properties properties) {
-    return fromProperties(properties, getDefault());
+    return fromProperties(properties, getDefault(properties));
   }
 
   /**
@@ -144,7 +144,7 @@ public class ConnectionFactory {
    * @return A connection to the set of brokers specified
    */
   public static Connection fromHostList(String... brokers) {
-    return fromHostList(Arrays.asList(brokers), getDefault());
+    return fromHostList(Arrays.asList(brokers), getDefault(new Properties()));
   }
 
   /**
@@ -171,9 +171,11 @@ public class ConnectionFactory {
     return new Connection(properties, brokers, transport);
   }
 
-  private static PinotClientTransport getDefault() {
+  private static PinotClientTransport getDefault(Properties connectionProperties) {
     if (_defaultTransport == null) {
-      _defaultTransport = new JsonAsyncHttpPinotClientTransportFactory().buildTransport();
+      _defaultTransport = new JsonAsyncHttpPinotClientTransportFactory()
+              .withConnectionProperties(connectionProperties)
+              .buildTransport();
     }
     return _defaultTransport;
   }
