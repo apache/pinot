@@ -848,7 +848,7 @@ const getTasksList = async (tableName, taskType) => {
           taskID,
           status,
           _.get(debugData, 'data.subtaskInfos.0.startTime'),
-          getElapsedTime(startTime),
+          startTime ? getElapsedTime(startTime) : '',
           _.get(debugData, 'data.subtaskInfos.0.finishTime', ''),
           _.get(debugData, 'data.subtaskCount.total', 0)
         ]);

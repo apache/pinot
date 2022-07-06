@@ -116,7 +116,7 @@ const TaskDetail = (props) => {
             <strong>Start Time:</strong> {get(taskDebugData, 'startTime', '')}
           </Grid>
           <Grid item xs={12}>
-            <strong>Elapsed Time:</strong> {PinotMethodUtils.getElapsedTime(moment(get(taskDebugData, 'startTime'), 'YYYY-MM-DD hh:mm:ss'))}
+            <strong>Elapsed Time:</strong> {get(taskDebugData, 'startTime') ? PinotMethodUtils.getElapsedTime(moment(get(taskDebugData, 'startTime'), 'YYYY-MM-DD hh:mm:ss')) : ''}
           </Grid>
           <Grid item xs={12}>
             <strong>Finish Time:</strong> {get(taskDebugData, 'subtaskInfos.0.finishTime', '')}
