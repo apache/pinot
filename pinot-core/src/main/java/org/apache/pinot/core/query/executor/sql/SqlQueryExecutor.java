@@ -77,7 +77,11 @@ public class SqlQueryExecutor {
     PropertyKey.Builder keyBuilder = helixDataAccessor.keyBuilder();
     ExtraInstanceConfig extraInstanceConfig = new ExtraInstanceConfig(helixDataAccessor.getProperty(
         keyBuilder.instanceConfig(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + instanceId)));
-    return extraInstanceConfig.getComponentUrl();
+    String controllerBaseUrl = extraInstanceConfig.getComponentUrl();
+    if (controllerBaseUrl == null) {
+      throw new RuntimeException("Unable to extract the base url from the leader pinot controller");
+    }
+    return controllerBaseUrl;
   }
 
   /**

@@ -64,7 +64,7 @@ public class ExtraInstanceConfig {
           protocol = CommonConstants.HTTP_PROTOCOL;
           port = _proxy.getPort();
         }
-      } catch (Exception e2) {
+      } catch (Exception ignored) {
       }
     }
     if (port != null) {
