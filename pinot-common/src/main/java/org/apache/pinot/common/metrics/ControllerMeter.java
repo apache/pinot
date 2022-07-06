@@ -46,6 +46,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   LLC_STREAM_DATA_LOSS("dataLoss", false),
   CONTROLLER_PERIODIC_TASK_RUN("periodicTaskRun", false),
   CONTROLLER_PERIODIC_TASK_ERROR("periodicTaskError", false),
+  PERIODIC_TASK_ERROR("periodicTaskError", false),
   NUMBER_TIMES_SCHEDULE_TASKS_CALLED("tasks", true),
   NUMBER_TASKS_SUBMITTED("tasks", false),
   NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED("SegmentUploadTimeouts", true),
