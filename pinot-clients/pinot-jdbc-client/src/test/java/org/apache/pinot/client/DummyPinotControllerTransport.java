@@ -19,12 +19,21 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.Map;
+import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class DummyPinotControllerTransport extends PinotControllerTransport {
+
+  public DummyPinotControllerTransport(Map<String, String> headers, String scheme, @Nullable SSLContext sslContext,
+                                       int readTimeout, int connectTimeout, int handshakeTimeout,
+                                       boolean tlsV10Enabled) {
+    super(headers, scheme, sslContext, readTimeout, connectTimeout, handshakeTimeout, tlsV10Enabled);
+  }
 
   @Override
   public ControllerTenantBrokerResponse getBrokersFromController(String controllerAddress, String tenant) {
@@ -35,5 +44,9 @@ public class DummyPinotControllerTransport extends PinotControllerTransport {
     } catch (Exception e) {
     }
     return ControllerTenantBrokerResponse.empty();
+  }
+
+  public static DummyPinotControllerTransport create() {
+    return new DummyPinotControllerTransport(null, null, null, -1, -1, -1, false);
   }
 }

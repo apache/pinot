@@ -22,7 +22,6 @@ import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.JdkSslContext;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -30,11 +29,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
+import org.apache.pinot.client.JsonAsyncHttpPinotClientTransport;
 import org.apache.pinot.client.PinotClientException;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 import org.apache.pinot.client.controller.response.SchemaResponse;
 import org.apache.pinot.client.controller.response.TableResponse;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.BoundRequestBuilder;
 import org.asynchttpclient.DefaultAsyncHttpClientConfig;
@@ -48,21 +47,10 @@ public class PinotControllerTransport {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotControllerTransport.class);
 
-  private static final int READ_TIMEOUT_MS = 60000;
-
-  private static final int CONNECT_TIMEOUT_MS = 2000;
-
-  private static final int HANDSHAKE_TIMEOUT_MS = 2000;
-
   Map<String, String> _headers;
   private final String _scheme;
   private final AsyncHttpClient _httpClient;
 
-
-  public PinotControllerTransport() {
-    this(Collections.emptyMap(), CommonConstants.HTTP_PROTOCOL, null,
-            READ_TIMEOUT_MS, CONNECT_TIMEOUT_MS, HANDSHAKE_TIMEOUT_MS, false);
-  }
 
   public PinotControllerTransport(Map<String, String> headers, String scheme,
                                   @Nullable SSLContext sslContext, int readTimeout,
@@ -75,20 +63,24 @@ public class PinotControllerTransport {
       builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
     }
 
-    Properties prop = new Properties();
-    try {
-      prop.load(PinotControllerTransport.class.getClassLoader().getResourceAsStream("version.properties"));
-    } catch (IOException e) {
-      LOGGER.info("Unable to set user agent version");
-    }
-
     builder.setReadTimeout(readTimeout)
             .setConnectTimeout(connectTimeout)
             .setHandshakeTimeout(handshakeTimeout)
-            .setUserAgent(prop.getProperty("ua", "pinot-jdbc"))
+            .setUserAgent(getUserAgentVersionFromClassPath())
             .setEnabledProtocols(createEnabledProtocols(tlsV10Enabled));
 
     _httpClient = Dsl.asyncHttpClient(builder.build());
+  }
+
+  private String getUserAgentVersionFromClassPath() {
+    Properties userAgentProperties = new Properties();
+    try {
+      userAgentProperties.load(JsonAsyncHttpPinotClientTransport.class.getClassLoader()
+              .getResourceAsStream("version.properties"));
+    } catch (IOException e) {
+      LOGGER.info("Unable to set user agent version");
+    }
+    return userAgentProperties.getProperty("ua", "unknown");
   }
 
   private String[] createEnabledProtocols(boolean tlsV10Enabled) {

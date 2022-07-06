@@ -40,7 +40,7 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers in the given Helix cluster
    */
   public static Connection fromZookeeper(String zkUrl) {
-    return fromZookeeper(zkUrl, getDefault(new Properties()));
+    return fromZookeeper(zkUrl, getDefault());
   }
 
   /**
@@ -83,7 +83,7 @@ public class ConnectionFactory {
     try {
       return new Connection(new Properties(),
           new ControllerBasedBrokerSelector(scheme, controllerHost, controllerPort, brokerUpdateFreqInMillis),
-          getDefault(new Properties()));
+          getDefault());
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
@@ -144,7 +144,7 @@ public class ConnectionFactory {
    * @return A connection to the set of brokers specified
    */
   public static Connection fromHostList(String... brokers) {
-    return fromHostList(Arrays.asList(brokers), getDefault(new Properties()));
+    return fromHostList(Arrays.asList(brokers), getDefault());
   }
 
   /**
@@ -178,5 +178,9 @@ public class ConnectionFactory {
               .buildTransport();
     }
     return _defaultTransport;
+  }
+
+  private static PinotClientTransport getDefault() {
+    return getDefault(new Properties());
   }
 }

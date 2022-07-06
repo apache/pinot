@@ -57,19 +57,18 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   private final Map<String, String> _headers;
   private final String _scheme;
 
-  private final long _brokerReadTimeout;
+  private final int _brokerReadTimeout;
   private final AsyncHttpClient _httpClient;
 
   public JsonAsyncHttpPinotClientTransport() {
-    _brokerReadTimeout = 60000L;
+    _brokerReadTimeout = 60000;
     _headers = new HashMap<>();
     _scheme = CommonConstants.HTTP_PROTOCOL;
     _httpClient = Dsl.asyncHttpClient();
   }
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme,
-                                           @Nullable SSLContext sslContext, int readTimeout,
-                                           int connectTimeout, int handshakeTimeout, boolean tlsV10Enabled) {
+    @Nullable SSLContext sslContext, int readTimeout, int connectTimeout, int handshakeTimeout, boolean tlsV10Enabled) {
     _brokerReadTimeout = readTimeout;
     _headers = headers;
     _scheme = scheme;
@@ -79,19 +78,42 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
       builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
     }
 
-    Properties prop = new Properties();
-    try {
-      prop.load(JsonAsyncHttpPinotClientTransport.class.getClassLoader().getResourceAsStream("version.properties"));
-    } catch (IOException e) {
-      LOGGER.info("Unable to set user agent version");
+    builder.setReadTimeout(readTimeout)
+            .setConnectTimeout(connectTimeout)
+            .setHandshakeTimeout(handshakeTimeout)
+            .setUserAgent(getUserAgentVersionFromClassPath())
+            .setEnabledProtocols(createEnabledProtocols(tlsV10Enabled));
+    _httpClient = Dsl.asyncHttpClient(builder.build());
+  }
+
+  public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme,
+    @Nullable SslContext sslContext, int readTimeout, int connectTimeout, int handshakeTimeout, boolean tlsV10Enabled) {
+    _brokerReadTimeout = readTimeout;
+    _headers = headers;
+    _scheme = scheme;
+
+    Builder builder = Dsl.config();
+    if (sslContext != null) {
+      builder.setSslContext(sslContext);
     }
 
     builder.setReadTimeout(readTimeout)
             .setConnectTimeout(connectTimeout)
             .setHandshakeTimeout(handshakeTimeout)
-            .setUserAgent(prop.getProperty("ua", "pinot-java"))
+            .setUserAgent(getUserAgentVersionFromClassPath())
             .setEnabledProtocols(createEnabledProtocols(tlsV10Enabled));
     _httpClient = Dsl.asyncHttpClient(builder.build());
+  }
+
+  private String getUserAgentVersionFromClassPath() {
+    Properties userAgentProperties = new Properties();
+    try {
+      userAgentProperties.load(JsonAsyncHttpPinotClientTransport.class.getClassLoader()
+              .getResourceAsStream("version.properties"));
+    } catch (IOException e) {
+      LOGGER.info("Unable to set user agent version");
+    }
+    return userAgentProperties.getProperty("ua", "pinot-java");
   }
 
   private String[] createEnabledProtocols(boolean tlsV10Enabled) {
@@ -104,21 +126,6 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     }
     LOGGER.debug("Enabled TLS protocols: {}", enabledProtocols);
     return enabledProtocols.toArray(new String[0]);
-  }
-
-  public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme,
-    @Nullable SslContext sslContext) {
-    _brokerReadTimeout = 60000L;
-    _headers = headers;
-    _scheme = scheme;
-
-    Builder builder = Dsl.config();
-    if (sslContext != null) {
-      builder.setSslContext(sslContext)
-              .setReadTimeout((int) _brokerReadTimeout);
-    }
-
-    _httpClient = Dsl.asyncHttpClient(builder.build());
   }
 
   @Override
