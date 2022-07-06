@@ -95,7 +95,6 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
       System.out.print(columnName);
       System.out.print("\t");
     }
-    System.out.println();
   }
 
   private void dumpRows(PinotSegmentRecordReader reader, GenericRow reuse, Set<String> mvColumns) {

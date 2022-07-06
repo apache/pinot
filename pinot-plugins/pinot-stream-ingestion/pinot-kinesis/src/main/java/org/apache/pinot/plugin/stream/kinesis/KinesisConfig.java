@@ -62,6 +62,23 @@ public class KinesisConfig {
     _endpoint = props.get(ENDPOINT);
   }
 
+  public KinesisConfig(String streamTopicName, String awsRegion, ShardIteratorType shardIteratorType, String accessKey,
+      String secretKey, String endpoint) {
+    this(streamTopicName, awsRegion, shardIteratorType, accessKey, secretKey, Integer.parseInt(DEFAULT_MAX_RECORDS),
+        endpoint);
+  }
+
+  public KinesisConfig(String streamTopicName, String awsRegion, ShardIteratorType shardIteratorType, String accessKey,
+      String secretKey, int maxRecords, String endpoint) {
+    _streamTopicName = streamTopicName;
+    _awsRegion = awsRegion;
+    _shardIteratorType = shardIteratorType;
+    _accessKey = accessKey;
+    _secretKey = secretKey;
+    _numMaxRecordsToFetch = maxRecords;
+    _endpoint = endpoint;
+  }
+
   public String getStreamTopicName() {
     return _streamTopicName;
   }
