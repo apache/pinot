@@ -82,6 +82,9 @@ public class PinotDriver implements Driver {
       throws SQLException {
     try {
       LOGGER.info("Initiating connection to database for url: " + url);
+      Map<String, String> urlParams = DriverUtils.getURLParams(url);
+      info.putAll(urlParams);
+
       JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
       PinotControllerTransportFactory pinotControllerTransportFactory = new PinotControllerTransportFactory();
 
@@ -101,7 +104,7 @@ public class PinotDriver implements Driver {
 
       Map<String, String> headers = getHeadersFromProperties(info);
 
-      DriverUtils.handleAuth(url, info, headers);
+      DriverUtils.handleAuth(info, headers);
 
       if (!headers.isEmpty()) {
         factory.setHeaders(headers);
