@@ -80,7 +80,7 @@ public class CSVRecordReader implements RecordReader {
         }
       }
       char delimiter = config.getDelimiter();
-      format = format.withDelimiter(delimiter);
+      format = format.withDelimiter(delimiter).withIgnoreSurroundingSpaces(true);
       String csvHeader = config.getHeader();
       if (csvHeader == null) {
         format = format.withHeader();
