@@ -1010,8 +1010,8 @@ public class MutableSegmentImpl implements MutableSegment {
         }
       } catch (Exception e) {
         _logger.error("error encountered when getting record for {} on indexContainer: {}", docId, entry.getKey());
-        throw new RuntimeException("error encountered when getting record for " + docId + " on indexContainer: " +
-            entry.getKey(), e);
+        throw new RuntimeException("error encountered when getting record for " + docId + " on indexContainer: "
+            + entry.getKey(), e);
       }
     }
     return reuse;
