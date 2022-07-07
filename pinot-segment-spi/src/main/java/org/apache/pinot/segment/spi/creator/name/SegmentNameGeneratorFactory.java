@@ -63,7 +63,7 @@ public class SegmentNameGeneratorFactory {
           DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
           Preconditions.checkNotNull(dateTimeFieldSpec,
               "Schema does not contain the time column specified in the table config.");
-          dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
+          dateTimeFormatSpec = dateTimeFieldSpec.getFormatSpec();
         }
         return new NormalizedDateSegmentNameGenerator(tableName, prefix, excludeSequenceId,
             IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig),

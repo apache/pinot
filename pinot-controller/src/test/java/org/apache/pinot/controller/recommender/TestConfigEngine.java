@@ -281,6 +281,18 @@ public class TestConfigEngine {
     assertEquals(output.getIndexConfig().getRangeIndexColumns().toString(), "[t, j]");
   }
 
+  /** Verifiy rule that recommends JsonIndex and NoDictionary on JSON columns. */
+  @Test
+  void testJsonIndexRule()
+      throws InvalidInputException, IOException {
+    loadInput("recommenderInput/SegmentSizeRuleInput.json");
+    ConfigManager output = new ConfigManager();
+    AbstractRule abstractRule = RulesToExecute.RuleFactory.getRule(RulesToExecute.Rule.JsonIndexRule, _input, output);
+    abstractRule.run();
+    assertEquals(output.getIndexConfig().getJsonIndexColumns().toString(), "[q]");
+    assertEquals(output.getIndexConfig().getNoDictionaryColumns().toString(), "[q]");
+  }
+
   @Test
   void testNoDictionaryOnHeapDictionaryJointRule()
       throws InvalidInputException, IOException {
@@ -464,8 +476,8 @@ public class TestConfigEngine {
       throws Exception {
     ConfigManager output = runRecommenderDriver("recommenderInput/SegmentSizeRuleInput.json");
     SegmentSizeRecommendations segmentSizeRecommendations = output.getSegmentSizeRecommendations();
-    assertEquals(segmentSizeRecommendations.getNumSegments(), 2);
-    assertEquals(segmentSizeRecommendations.getNumRowsPerSegment(), 50_000);
+    assertEquals(segmentSizeRecommendations.getNumSegments(), 3);
+    assertEquals(segmentSizeRecommendations.getNumRowsPerSegment(), 33_333);
   }
 
   @Test

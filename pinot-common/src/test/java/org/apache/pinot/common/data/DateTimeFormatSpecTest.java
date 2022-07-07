@@ -249,44 +249,45 @@ public class DateTimeFormatSpecTest {
     });
 
     entries.add(new Object[]{
-        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1, TimeUnit.DAYS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1, TimeUnit.MILLISECONDS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
         "yyyyMMdd", DateTimeZone.UTC
     });
 
     entries.add(new Object[]{
-        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(IST)", 1, TimeUnit.DAYS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
-        "yyyyMMdd", DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(IST)", 1, TimeUnit.MILLISECONDS,
+        DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd", DateTimeZone.forTimeZone(
+        TimeZone.getTimeZone("IST"))
     });
 
     entries.add(new Object[]{
-        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd          tz(IST)", 1, TimeUnit.DAYS,
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd          tz(IST)", 1, TimeUnit.MILLISECONDS,
         DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd",
         DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))
     });
 
     entries.add(new Object[]{
-        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz  (   IST   )  ", 1, TimeUnit.DAYS,
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz  (   IST   )  ", 1, TimeUnit.MILLISECONDS,
         DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd",
         DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))
     });
 
     entries.add(new Object[]{
-        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1, TimeUnit.HOURS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
-        "yyyyMMdd HH", DateTimeZone.UTC
-    });
-
-    entries.add(new Object[]{
-        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH tz(dummy)", 1, TimeUnit.HOURS,
+        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1, TimeUnit.MILLISECONDS,
         DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd HH", DateTimeZone.UTC
     });
 
     entries.add(new Object[]{
-        "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", 1, TimeUnit.HOURS,
+        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH tz(dummy)", 1, TimeUnit.MILLISECONDS,
+        DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd HH", DateTimeZone.UTC
+    });
+
+    entries.add(new Object[]{
+        "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", 1, TimeUnit.MILLISECONDS,
         DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "M/d/yyyy h:mm:ss a", DateTimeZone.UTC
     });
 
     entries.add(new Object[]{
-        "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a tz(Asia/Tokyo)", 1, TimeUnit.HOURS,
+        "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a tz(Asia/Tokyo)", 1, TimeUnit.MILLISECONDS,
         DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "M/d/yyyy h:mm:ss a",
         DateTimeZone.forTimeZone(TimeZone.getTimeZone("Asia/Tokyo"))
     });
@@ -304,96 +305,46 @@ public class DateTimeFormatSpecTest {
     });
 
     entries.add(new Object[]{
-        "SIMPLE_DATE_FORMAT|yyyyMMdd", 1, TimeUnit.DAYS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+        "SIMPLE_DATE_FORMAT|yyyyMMdd", 1, TimeUnit.MILLISECONDS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
         "yyyyMMdd", DateTimeZone.UTC
     });
 
     entries.add(new Object[]{
-        "SIMPLE_DATE_FORMAT|yyyyMMdd|IST", 1, TimeUnit.DAYS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+        "SIMPLE_DATE_FORMAT|yyyyMMdd|IST", 1, TimeUnit.MILLISECONDS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
         "yyyyMMdd", DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))
     });
 
     entries.add(new Object[]{
-        "SIMPLE_DATE_FORMAT|yyyyMMdd|IST", 1, TimeUnit.DAYS,
+        "SIMPLE_DATE_FORMAT|yyyyMMdd|IST", 1, TimeUnit.MILLISECONDS,
         DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd",
         DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))
     });
 
     entries.add(new Object[]{
-        "SIMPLE_DATE_FORMAT|yyyyMMdd|IST", 1, TimeUnit.DAYS,
+        "SIMPLE_DATE_FORMAT|yyyyMMdd|IST", 1, TimeUnit.MILLISECONDS,
         DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd",
         DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))
     });
 
     entries.add(new Object[]{
-        "SIMPLE_DATE_FORMAT|yyyyMMdd HH", 1, TimeUnit.DAYS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+        "SIMPLE_DATE_FORMAT|yyyyMMdd HH", 1, TimeUnit.MILLISECONDS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
         "yyyyMMdd HH", DateTimeZone.UTC
     });
 
     entries.add(new Object[]{
-        "SIMPLE_DATE_FORMAT|yyyyMMdd HH|dummy", 1, TimeUnit.DAYS,
+        "SIMPLE_DATE_FORMAT|yyyyMMdd HH|dummy", 1, TimeUnit.MILLISECONDS,
         DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd HH", DateTimeZone.UTC
     });
 
     entries.add(new Object[]{
-        "SIMPLE_DATE_FORMAT|M/d/yyyy h:mm:ss a", 1, TimeUnit.DAYS,
+        "SIMPLE_DATE_FORMAT|M/d/yyyy h:mm:ss a", 1, TimeUnit.MILLISECONDS,
         DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "M/d/yyyy h:mm:ss a", DateTimeZone.UTC
     });
 
     entries.add(new Object[]{
-        "SIMPLE_DATE_FORMAT|M/d/yyyy h:mm:ss a|Asia/Tokyo", 1, TimeUnit.DAYS,
+        "SIMPLE_DATE_FORMAT|M/d/yyyy h:mm:ss a|Asia/Tokyo", 1, TimeUnit.MILLISECONDS,
         DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "M/d/yyyy h:mm:ss a",
         DateTimeZone.forTimeZone(TimeZone.getTimeZone("Asia/Tokyo"))
-    });
-    return entries.toArray(new Object[entries.size()][]);
-  }
-
-  // Test construct format given its components
-  @Test(dataProvider = "testConstructFormatDataProvider")
-  public void testConstructFormat(int columnSize, TimeUnit columnUnit, String columnTimeFormat, String pattern,
-      DateTimeFormatSpec formatExpected1, DateTimeFormatSpec formatExpected2) {
-    DateTimeFormatSpec formatActual1 = null;
-    try {
-      formatActual1 = new DateTimeFormatSpec(columnSize, columnUnit.toString(), columnTimeFormat);
-    } catch (Exception e) {
-      // invalid arguments
-    }
-    Assert.assertEquals(formatActual1, formatExpected1);
-
-    DateTimeFormatSpec formatActual2 = null;
-    try {
-      formatActual2 = new DateTimeFormatSpec(columnSize, columnUnit.toString(), columnTimeFormat, pattern);
-    } catch (Exception e) {
-      // invalid arguments
-    }
-    Assert.assertEquals(formatActual2, formatExpected2);
-  }
-
-  @DataProvider(name = "testConstructFormatDataProvider")
-  public Object[][] provideTestConstructFormatData() {
-
-    List<Object[]> entries = new ArrayList<>();
-
-    entries.add(new Object[]{1, TimeUnit.HOURS, "EPOCH", null, new DateTimeFormatSpec("1:HOURS:EPOCH"), null});
-    entries.add(new Object[]{1, TimeUnit.HOURS, "EPOCH", "yyyyMMdd", new DateTimeFormatSpec("1:HOURS:EPOCH"), null});
-    entries.add(new Object[]{5, TimeUnit.MINUTES, "EPOCH", null, new DateTimeFormatSpec("5:MINUTES:EPOCH"), null});
-    entries.add(new Object[]{0, TimeUnit.HOURS, "EPOCH", null, null, null});
-    entries.add(new Object[]{1, null, "EPOCH", null, null, null});
-    entries.add(new Object[]{1, TimeUnit.HOURS, null, null, null, null});
-    entries.add(new Object[]{1, TimeUnit.HOURS, "DUMMY", "yyyyMMdd", null, null});
-    entries.add(new Object[]{
-        1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "yyyyMMdd", null,
-        new DateTimeFormatSpec("1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd")
-    });
-    entries.add(new Object[]{
-        1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "yyyyMMdd tz(America/Los_Angeles)", null,
-        new DateTimeFormatSpec("1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/Los_Angeles)")
-    });
-    entries.add(new Object[]{1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", null, null, null});
-    entries.add(new Object[]{-1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "yyyyMMDD", null, null});
-    entries.add(new Object[]{
-        1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "M/d/yyyy h:mm:ss a", null,
-        new DateTimeFormatSpec("1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a")
     });
     return entries.toArray(new Object[entries.size()][]);
   }

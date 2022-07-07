@@ -18,30 +18,59 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
 /**
  * The {@code FieldSelectionKeySelector} simply extract a column value out from a row array {@link Object[]}.
  */
-public class FieldSelectionKeySelector implements KeySelector<Object[], Object> {
+public class FieldSelectionKeySelector implements KeySelector<Object[], Object[]> {
 
   @ProtoProperties
-  private int _columnIndex;
+  private List<Integer> _columnIndices;
 
   public FieldSelectionKeySelector() {
   }
 
   public FieldSelectionKeySelector(int columnIndex) {
-    _columnIndex = columnIndex;
+    _columnIndices = Collections.singletonList(columnIndex);
   }
 
-  public int getColumnIndex() {
-    return _columnIndex;
+  public FieldSelectionKeySelector(List<Integer> columnIndices) {
+    _columnIndices = new ArrayList<>();
+    _columnIndices.addAll(columnIndices);
+  }
+
+  public FieldSelectionKeySelector(int... columnIndices) {
+    _columnIndices = new ArrayList<>();
+    for (int columnIndex : columnIndices) {
+      _columnIndices.add(columnIndex);
+    }
+  }
+
+  public List<Integer> getColumnIndices() {
+    return _columnIndices;
   }
 
   @Override
-  public Object getKey(Object[] input) {
-    return input[_columnIndex];
+  public Object[] getKey(Object[] input) {
+    Object[] key = new Object[_columnIndices.size()];
+    for (int i = 0; i < _columnIndices.size(); i++) {
+      key[i] = input[_columnIndices.get(i)];
+    }
+    return key;
+  }
+
+  @Override
+  public int computeHash(Object[] input) {
+    HashCodeBuilder hashCodeBuilder = new HashCodeBuilder();
+    for (int columnIndex : _columnIndices) {
+      hashCodeBuilder.append(input[columnIndex]);
+    }
+    return Math.abs(hashCodeBuilder.toHashCode());
   }
 }

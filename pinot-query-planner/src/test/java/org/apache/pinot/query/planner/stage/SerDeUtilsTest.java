@@ -39,6 +39,9 @@ public class SerDeUtilsTest extends QueryEnvironmentTestBase {
       Plan.StageNode serializedStageNode = StageNodeSerDeUtils.serializeStageNode((AbstractStageNode) stageNode);
       StageNode deserializedStageNode = StageNodeSerDeUtils.deserializeStageNode(serializedStageNode);
       Assert.assertTrue(isObjectEqual(stageNode, deserializedStageNode));
+      Assert.assertEquals(deserializedStageNode.getStageId(), stageNode.getStageId());
+      Assert.assertEquals(deserializedStageNode.getDataSchema(), stageNode.getDataSchema());
+      Assert.assertEquals(deserializedStageNode.getInputs().size(), stageNode.getInputs().size());
     }
   }
 

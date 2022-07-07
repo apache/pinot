@@ -56,6 +56,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private final boolean _isNullHandlingEnabled;
 
   private Integer _groupIdForNullValue = null;
+  private final boolean _isSingleValueExpression;
 
   private int _numGroups = 0;
 
@@ -66,6 +67,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     _groupKeyMap = createGroupKeyMap(_storedType);
     _globalGroupIdUpperBound = numGroupsLimit;
     _isNullHandlingEnabled = isNullHandlingEnabled;
+    _isSingleValueExpression = transformOperator.getResultMetadata(groupByExpression).isSingleValue();
   }
 
   @Override
@@ -245,8 +247,113 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
   @Override
   public void generateKeysForBlock(TransformBlock transformBlock, int[][] groupKeys) {
-    // TODO: Support generating keys for multi-valued columns.
-    throw new UnsupportedOperationException("Operation not supported");
+    int numDocs = transformBlock.getNumDocs();
+    BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByExpression);
+
+    if (_isSingleValueExpression) {
+      switch (_storedType) {
+        case INT:
+          int[] intValues = blockValSet.getIntValuesSV();
+          for (int i = 0; i < numDocs; i++) {
+            groupKeys[i] = new int[]{getKeyForValue(intValues[i])};
+          }
+          break;
+        case LONG:
+          long[] longValues = blockValSet.getLongValuesSV();
+          for (int i = 0; i < numDocs; i++) {
+            groupKeys[i] = new int[]{getKeyForValue(longValues[i])};
+          }
+          break;
+        case FLOAT:
+          float[] floatValues = blockValSet.getFloatValuesSV();
+          for (int i = 0; i < numDocs; i++) {
+            groupKeys[i] = new int[]{getKeyForValue(floatValues[i])};
+          }
+          break;
+        case DOUBLE:
+          double[] doubleValues = blockValSet.getDoubleValuesSV();
+          for (int i = 0; i < numDocs; i++) {
+            groupKeys[i] = new int[]{getKeyForValue(doubleValues[i])};
+          }
+          break;
+        case STRING:
+          String[] stringValues = blockValSet.getStringValuesSV();
+          for (int i = 0; i < numDocs; i++) {
+            groupKeys[i] = new int[]{getKeyForValue(stringValues[i])};
+          }
+          break;
+        case BYTES:
+          byte[][] byteValues = blockValSet.getBytesValuesSV();
+          for (int i = 0; i < numDocs; i++) {
+            groupKeys[i] = new int[]{getKeyForValue(new ByteArray(byteValues[i]))};
+          }
+          break;
+        default:
+          throw new IllegalArgumentException(
+              "Illegal data type for no-dictionary key generator: " + _storedType);
+      }
+    } else {
+      switch (_storedType) {
+        case INT:
+          int[][] intValues = blockValSet.getIntValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            int mvSize = intValues[i].length;
+            int[] mvKeys = new int[mvSize];
+            for (int j = 0; j < mvSize; j++) {
+              mvKeys[j] = getKeyForValue(intValues[i][j]);
+            }
+            groupKeys[i] = mvKeys;
+          }
+          break;
+        case LONG:
+          long[][] longValues = blockValSet.getLongValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            int mvSize = longValues[i].length;
+            int[] mvKeys = new int[mvSize];
+            for (int j = 0; j < mvSize; j++) {
+              mvKeys[j] = getKeyForValue(longValues[i][j]);
+            }
+            groupKeys[i] = mvKeys;
+          }
+          break;
+        case FLOAT:
+          float[][] floatValues = blockValSet.getFloatValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            int mvSize = floatValues[i].length;
+            int[] mvKeys = new int[mvSize];
+            for (int j = 0; j < mvSize; j++) {
+              mvKeys[j] = getKeyForValue(floatValues[i][j]);
+            }
+            groupKeys[i] = mvKeys;
+          }
+          break;
+        case DOUBLE:
+          double[][] doubleValues = blockValSet.getDoubleValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            int mvSize = doubleValues[i].length;
+            int[] mvKeys = new int[mvSize];
+            for (int j = 0; j < mvSize; j++) {
+              mvKeys[j] = getKeyForValue(doubleValues[i][j]);
+            }
+            groupKeys[i] = mvKeys;
+          }
+          break;
+        case STRING:
+          String[][] stringValues = blockValSet.getStringValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            int mvSize = stringValues[i].length;
+            int[] mvKeys = new int[mvSize];
+            for (int j = 0; j < mvSize; j++) {
+              mvKeys[j] = getKeyForValue(stringValues[i][j]);
+            }
+            groupKeys[i] = mvKeys;
+          }
+          break;
+        default:
+          throw new IllegalArgumentException(
+              "Illegal data type for no-dictionary key generator: " + _storedType);
+      }
+    }
   }
 
   @Override

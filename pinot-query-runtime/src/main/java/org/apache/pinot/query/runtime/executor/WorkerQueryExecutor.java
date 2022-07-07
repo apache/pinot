@@ -30,6 +30,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
+import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
@@ -38,9 +39,11 @@ import org.apache.pinot.query.planner.stage.ProjectNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.query.runtime.operator.TransformOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
@@ -117,10 +120,17 @@ public class WorkerQueryExecutor {
       BaseOperator<TransferableBlock> leftOperator = getOperator(requestId, joinNode.getInputs().get(0), metadataMap);
       BaseOperator<TransferableBlock> rightOperator = getOperator(requestId, joinNode.getInputs().get(1), metadataMap);
       return new HashJoinOperator(leftOperator, rightOperator, joinNode.getCriteria());
+    } else if (stageNode instanceof AggregateNode) {
+      AggregateNode aggregateNode = (AggregateNode) stageNode;
+      BaseOperator<TransferableBlock> inputOperator =
+          getOperator(requestId, aggregateNode.getInputs().get(0), metadataMap);
+      return new AggregateOperator(inputOperator, aggregateNode.getAggCalls(), aggregateNode.getGroupSet());
     } else if (stageNode instanceof FilterNode) {
       throw new UnsupportedOperationException("Unsupported!");
     } else if (stageNode instanceof ProjectNode) {
-      throw new UnsupportedOperationException("Unsupported!");
+      ProjectNode projectNode = (ProjectNode) stageNode;
+      return new TransformOperator(getOperator(requestId, projectNode.getInputs().get(0), metadataMap),
+          projectNode.getProjects(), projectNode.getInputs().get(0).getDataSchema());
     } else {
       throw new UnsupportedOperationException(
           String.format("Stage node type %s is not supported!", stageNode.getClass().getSimpleName()));

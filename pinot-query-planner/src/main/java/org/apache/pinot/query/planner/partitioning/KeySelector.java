@@ -35,4 +35,6 @@ public interface KeySelector<IN, OUT> {
    * @return the key of the input data.
    */
   OUT getKey(IN input);
+
+  int computeHash(IN input);
 }

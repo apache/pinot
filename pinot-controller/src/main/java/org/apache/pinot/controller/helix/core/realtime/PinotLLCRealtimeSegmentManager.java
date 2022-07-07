@@ -862,9 +862,6 @@ public class PinotLLCRealtimeSegmentManager {
    * If so, it should create a new CONSUMING segment for the partition.
    * (this operation is done only if @param recreateDeletedConsumingSegment is set to true,
    * which means it's manually triggered by admin not by automatic periodic task)
-   *
-   * TODO: We need to find a place to detect and update a gauge for nonConsumingPartitionsCount for a table, and
-   * reset it to 0 at the end of validateLLC
    */
   public void ensureAllPartitionsConsuming(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
       boolean recreateDeletedConsumingSegment) {
@@ -1218,12 +1215,18 @@ public class PinotLLCRealtimeSegmentManager {
     StreamPartitionMsgOffset partitionGroupSmallestOffset =
         getPartitionGroupSmallestOffset(streamConfig, partitionGroupId);
 
-    // Start offset must be higher than the start offset of the stream
-    if (partitionGroupSmallestOffset.compareTo(startOffset) > 0) {
-      LOGGER.error("Data lost from offset: {} to: {} for partition: {} of table: {}", startOffset,
-          partitionGroupSmallestOffset, partitionGroupId, tableConfig.getTableName());
+    if (partitionGroupSmallestOffset != null) {
+      // Start offset must be higher than the start offset of the stream
+      if (partitionGroupSmallestOffset.compareTo(startOffset) > 0) {
+        LOGGER.error("Data lost from offset: {} to: {} for partition: {} of table: {}", startOffset,
+            partitionGroupSmallestOffset, partitionGroupId, tableConfig.getTableName());
+        _controllerMetrics.addMeteredTableValue(tableConfig.getTableName(), ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
+        startOffset = partitionGroupSmallestOffset;
+      }
+    } else {
+      LOGGER.error("Smallest offset for partition: {} of table: {} not found. Using startOffset: {}", partitionGroupId,
+          tableConfig.getTableName(), startOffset);
       _controllerMetrics.addMeteredTableValue(tableConfig.getTableName(), ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
-      startOffset = partitionGroupSmallestOffset;
     }
 
     CommittingSegmentDescriptor committingSegmentDescriptor =
@@ -1235,6 +1238,7 @@ public class PinotLLCRealtimeSegmentManager {
         instancePartitionsMap);
   }
 
+  @Nullable
   private StreamPartitionMsgOffset getPartitionGroupSmallestOffset(StreamConfig streamConfig, int partitionGroupId) {
     OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
     streamConfig.setOffsetCriteria(OffsetCriteria.SMALLEST_OFFSET_CRITERIA);

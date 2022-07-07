@@ -34,7 +34,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * (BIG_DECIMAL, STRING, BYTES).
  * <p>For data layout, please refer to the documentation for {@link VarByteChunkSVForwardIndexWriter}
  */
-public final class VarByteChunkSVForwardIndexReader extends BaseChunkSVForwardIndexReader {
+public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardIndexReader {
   private static final int ROW_OFFSET_SIZE = VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
   private final int _maxChunkSize;
@@ -43,7 +43,7 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkSVForwardIn
   private final ThreadLocal<byte[]> _reusableBytes = ThreadLocal.withInitial(() -> new byte[_lengthOfLongestEntry]);
 
   public VarByteChunkSVForwardIndexReader(PinotDataBuffer dataBuffer, DataType valueType) {
-    super(dataBuffer, valueType);
+    super(dataBuffer, valueType, true);
     _maxChunkSize = _numDocsPerChunk * (ROW_OFFSET_SIZE + _lengthOfLongestEntry);
   }
 

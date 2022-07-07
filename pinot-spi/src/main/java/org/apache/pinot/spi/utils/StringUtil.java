@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.spi.utils;
 
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 
 
@@ -33,6 +36,35 @@ public class StringUtil {
    */
   public static String join(String separator, String... keys) {
     return StringUtils.join(keys, separator);
+  }
+
+  /**
+   * Splits the given string with the separator, returns an array with the given max length. When max <= 0, no limit is
+   * applied.
+   */
+  public static String[] split(String str, char separator, int max) {
+    int length = str.length();
+    if (length == 0) {
+      return ArrayUtils.EMPTY_STRING_ARRAY;
+    }
+    if (max == 1) {
+      return new String[]{str};
+    }
+    List<String> list = new ArrayList<>(max);
+    int start = 0;
+    int end = 0;
+    while (end < length) {
+      if (str.charAt(end) == separator) {
+        list.add(str.substring(start, end));
+        start = end + 1;
+        if (list.size() == max - 1) {
+          break;
+        }
+      }
+      end++;
+    }
+    list.add(str.substring(start, length));
+    return list.toArray(new String[0]);
   }
 
   /**

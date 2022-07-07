@@ -83,6 +83,9 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _realtimeTotalCpuTimeNs = 0L;
   private long _numSegmentsPrunedByBroker = 0L;
   private long _numSegmentsPrunedByServer = 0L;
+  private long _numSegmentsPrunedInvalid = 0L;
+  private long _numSegmentsPrunedByLimit = 0L;
+  private long _numSegmentsPrunedByValue = 0L;
   private long _explainPlanNumEmptyFilterSegments = 0L;
   private long _explainPlanNumMatchAllFilterSegments = 0L;
   private int _numRowsResultSet = 0;
@@ -243,6 +246,42 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public void setNumSegmentsPrunedByServer(long numSegmentsPrunedByServer) {
     _numSegmentsPrunedByServer = numSegmentsPrunedByServer;
+  }
+
+  @JsonProperty("numSegmentsPrunedInvalid")
+  @Override
+  public long getNumSegmentsPrunedInvalid() {
+    return _numSegmentsPrunedInvalid;
+  }
+
+  @JsonProperty("numSegmentsPrunedInvalid")
+  @Override
+  public void setNumSegmentsPrunedInvalid(long numSegmentsPrunedInvalid) {
+    _numSegmentsPrunedInvalid = numSegmentsPrunedInvalid;
+  }
+
+  @JsonProperty("numSegmentsPrunedByLimit")
+  @Override
+  public long getNumSegmentsPrunedByLimit() {
+    return _numSegmentsPrunedByLimit;
+  }
+
+  @JsonProperty("numSegmentsPrunedByLimit")
+  @Override
+  public void setNumSegmentsPrunedByLimit(long numSegmentsPrunedByLimit) {
+    _numSegmentsPrunedByLimit = numSegmentsPrunedByLimit;
+  }
+
+  @JsonProperty("numSegmentsPrunedByValue")
+  @Override
+  public long getNumSegmentsPrunedByValue() {
+    return _numSegmentsPrunedByValue;
+  }
+
+  @JsonProperty("numSegmentsPrunedByValue")
+  @Override
+  public void setNumSegmentsPrunedByValue(long numSegmentsPrunedByValue) {
+    _numSegmentsPrunedByValue = numSegmentsPrunedByValue;
   }
 
   @JsonProperty("explainPlanNumEmptyFilterSegments")

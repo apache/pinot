@@ -72,7 +72,15 @@ public class MultiValueFixedByteRawIndexCreatorTest {
   @Test(dataProvider = "compressionTypes")
   public void testMVInt(ChunkCompressionType compressionType)
       throws IOException {
-    testMV(DataType.INT, ints(), x -> x.length, int[]::new, MultiValueFixedByteRawIndexCreator::putIntMV,
+    // This tests varying lengths of MV rows
+    testMV(DataType.INT, ints(false), x -> x.length, int[]::new, MultiValueFixedByteRawIndexCreator::putIntMV,
+        (reader, context, docId, buffer) -> {
+          int length = reader.getIntMV(docId, buffer, context);
+          return Arrays.copyOf(buffer, length);
+        }, compressionType);
+
+    // This tests a fixed length of MV rows to ensure there are no BufferOverflowExceptions on filling up the chunk
+    testMV(DataType.INT, ints(true), x -> x.length, int[]::new, MultiValueFixedByteRawIndexCreator::putIntMV,
         (reader, context, docId, buffer) -> {
           int length = reader.getIntMV(docId, buffer, context);
           return Arrays.copyOf(buffer, length);
@@ -82,7 +90,15 @@ public class MultiValueFixedByteRawIndexCreatorTest {
   @Test(dataProvider = "compressionTypes")
   public void testMVLong(ChunkCompressionType compressionType)
       throws IOException {
-    testMV(DataType.LONG, longs(), x -> x.length, long[]::new, MultiValueFixedByteRawIndexCreator::putLongMV,
+    // This tests varying lengths of MV rows
+    testMV(DataType.LONG, longs(false), x -> x.length, long[]::new, MultiValueFixedByteRawIndexCreator::putLongMV,
+        (reader, context, docId, buffer) -> {
+          int length = reader.getLongMV(docId, buffer, context);
+          return Arrays.copyOf(buffer, length);
+        }, compressionType);
+
+    // This tests a fixed length of MV rows to ensure there are no BufferOverflowExceptions on filling up the chunk
+    testMV(DataType.LONG, longs(true), x -> x.length, long[]::new, MultiValueFixedByteRawIndexCreator::putLongMV,
         (reader, context, docId, buffer) -> {
           int length = reader.getLongMV(docId, buffer, context);
           return Arrays.copyOf(buffer, length);
@@ -92,7 +108,15 @@ public class MultiValueFixedByteRawIndexCreatorTest {
   @Test(dataProvider = "compressionTypes")
   public void testMVFloat(ChunkCompressionType compressionType)
       throws IOException {
-    testMV(DataType.FLOAT, floats(), x -> x.length, float[]::new, MultiValueFixedByteRawIndexCreator::putFloatMV,
+    // This tests varying lengths of MV rows
+    testMV(DataType.FLOAT, floats(false), x -> x.length, float[]::new, MultiValueFixedByteRawIndexCreator::putFloatMV,
+        (reader, context, docId, buffer) -> {
+          int length = reader.getFloatMV(docId, buffer, context);
+          return Arrays.copyOf(buffer, length);
+        }, compressionType);
+
+    // This tests a fixed length of MV rows to ensure there are no BufferOverflowExceptions on filling up the chunk
+    testMV(DataType.FLOAT, floats(true), x -> x.length, float[]::new, MultiValueFixedByteRawIndexCreator::putFloatMV,
         (reader, context, docId, buffer) -> {
           int length = reader.getFloatMV(docId, buffer, context);
           return Arrays.copyOf(buffer, length);
@@ -102,7 +126,17 @@ public class MultiValueFixedByteRawIndexCreatorTest {
   @Test(dataProvider = "compressionTypes")
   public void testMVDouble(ChunkCompressionType compressionType)
       throws IOException {
-    testMV(DataType.DOUBLE, doubles(), x -> x.length, double[]::new, MultiValueFixedByteRawIndexCreator::putDoubleMV,
+    // This tests varying lengths of MV rows
+    testMV(DataType.DOUBLE, doubles(false), x -> x.length, double[]::new,
+        MultiValueFixedByteRawIndexCreator::putDoubleMV,
+        (reader, context, docId, buffer) -> {
+          int length = reader.getDoubleMV(docId, buffer, context);
+          return Arrays.copyOf(buffer, length);
+        }, compressionType);
+
+    // This tests a fixed length of MV rows to ensure there are no BufferOverflowExceptions on filling up the chunk
+    testMV(DataType.DOUBLE, doubles(true), x -> x.length, double[]::new,
+        MultiValueFixedByteRawIndexCreator::putDoubleMV,
         (reader, context, docId, buffer) -> {
           int length = reader.getDoubleMV(docId, buffer, context);
           return Arrays.copyOf(buffer, length);
@@ -125,7 +159,8 @@ public class MultiValueFixedByteRawIndexCreatorTest {
     //read
     final PinotDataBuffer buffer = PinotDataBuffer
         .mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
-    FixedByteChunkMVForwardIndexReader reader = new FixedByteChunkMVForwardIndexReader(buffer, DataType.BYTES);
+    FixedByteChunkMVForwardIndexReader reader = new FixedByteChunkMVForwardIndexReader(buffer,
+        dataType.getStoredType());
     final ChunkReaderContext context = reader.createContext();
     T valueBuffer = constructor.apply(maxElements);
     for (int i = 0; i < numDocs; i++) {
@@ -141,9 +176,9 @@ public class MultiValueFixedByteRawIndexCreatorTest {
     void inject(MultiValueFixedByteRawIndexCreator creator, T input);
   }
 
-  private static List<int[]> ints() {
+  private static List<int[]> ints(boolean isFixedMVRowLength) {
     return IntStream.range(0, 1000)
-        .mapToObj(i -> new int[RANDOM.nextInt(50)])
+        .mapToObj(i -> new int[isFixedMVRowLength ? 50 : RANDOM.nextInt(50)])
         .peek(array -> {
           for (int i = 0; i < array.length; i++) {
             array[i] = RANDOM.nextInt();
@@ -152,9 +187,9 @@ public class MultiValueFixedByteRawIndexCreatorTest {
         .collect(Collectors.toList());
   }
 
-  private static List<long[]> longs() {
+  private static List<long[]> longs(boolean isFixedMVRowLength) {
     return IntStream.range(0, 1000)
-        .mapToObj(i -> new long[RANDOM.nextInt(50)])
+        .mapToObj(i -> new long[isFixedMVRowLength ? 50 : RANDOM.nextInt(50)])
         .peek(array -> {
           for (int i = 0; i < array.length; i++) {
             array[i] = RANDOM.nextLong();
@@ -163,9 +198,9 @@ public class MultiValueFixedByteRawIndexCreatorTest {
         .collect(Collectors.toList());
   }
 
-  private static List<float[]> floats() {
+  private static List<float[]> floats(boolean isFixedMVRowLength) {
     return IntStream.range(0, 1000)
-        .mapToObj(i -> new float[RANDOM.nextInt(50)])
+        .mapToObj(i -> new float[isFixedMVRowLength ? 50 : RANDOM.nextInt(50)])
         .peek(array -> {
           for (int i = 0; i < array.length; i++) {
             array[i] = RANDOM.nextFloat();
@@ -174,9 +209,9 @@ public class MultiValueFixedByteRawIndexCreatorTest {
         .collect(Collectors.toList());
   }
 
-  private static List<double[]> doubles() {
+  private static List<double[]> doubles(boolean isFixedMVRowLength) {
     return IntStream.range(0, 1000)
-        .mapToObj(i -> new double[RANDOM.nextInt(50)])
+        .mapToObj(i -> new double[isFixedMVRowLength ? 50 : RANDOM.nextInt(50)])
         .peek(array -> {
           for (int i = 0; i < array.length; i++) {
             array[i] = RANDOM.nextDouble();

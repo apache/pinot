@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.util;
+package org.apache.pinot.common.utils.helix;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -38,6 +38,11 @@ public class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
   @Override
   public ZNRecord get(String path, Stat stat, int options) {
     return _contents.get(path);
+  }
+
+  @Override
+  public boolean exists(String path, int options) {
+    return _contents.containsKey(path);
   }
 
   @Override
@@ -63,6 +68,12 @@ public class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
     } catch (Exception e) {
       return false;
     }
+  }
+
+  @Override
+  public boolean remove(String path, int options) {
+    _contents.remove(path);
+    return true;
   }
 
   public void setContents(String path, ZNRecord contents)
