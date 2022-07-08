@@ -101,4 +101,16 @@ public class RegexpPatternConverterUtilsTest {
     String luceneRegExpPattern = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePattern);
     assertEquals(luceneRegExpPattern, "C..*");
   }
+
+  @Test
+  public void testLeadingRepeatedWildcards() {
+    String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike("%%%%%%%%%%%%%zz");
+    assertEquals(regexpLikePattern, "zz$");
+  }
+
+  @Test
+  public void testTrailingRepeatedWildcards() {
+    String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike("zz%%%%%%%%%%%%%");
+    assertEquals(regexpLikePattern, "^zz");
+  }
 }

@@ -47,11 +47,18 @@ public class RegexpPatternConverterUtils {
         break;
       default:
         if (likePattern.charAt(0) == '%') {
-          start = 1;
+          start = indexOfFirstDifferent(likePattern, '%');
+          if (start == -1) {
+            return "";
+          }
           prefix = "";
         }
         if (likePattern.charAt(likePattern.length() - 1) == '%') {
-          end = likePattern.length() - 1;
+          end = indexOfLastDifferent(likePattern, '%');
+          if (end == -1) { //this should never happen, but for clarity
+            return "";
+          }
+          end++;
           suffix = "";
         }
         break;
@@ -76,6 +83,24 @@ public class RegexpPatternConverterUtils {
     }
 
     return sb.toString();
+  }
+
+  private static int indexOfFirstDifferent(String str, char character) {
+    for (int i = 0; i < str.length(); i++) {
+      if (str.charAt(i) != character) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  private static int indexOfLastDifferent(String str, char character) {
+    for (int i = str.length() - 1; i > 0; i--) {
+      if (str.charAt(i) != character) {
+        return i;
+      }
+    }
+    return -1;
   }
 
   /**
