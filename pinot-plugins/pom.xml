@@ -142,10 +142,6 @@
                       <pattern>org.apache.kafka</pattern>
                       <shadedPattern>${shade.prefix}.org.apache.kafka</shadedPattern>
                     </relocation>
-                    <relocation>
-                      <pattern>org.apache.commons</pattern>
-                      <shadedPattern>${shade.prefix}.org.apache.commons</shadedPattern>
-                    </relocation>
                   </relocations>
                 </configuration>
               </execution>
