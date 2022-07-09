@@ -470,6 +470,16 @@
               </jvmSettings>
             </program>
             <program>
+              <mainClass>org.apache.pinot.tools.AuthZkBasicQuickstart</mainClass>
+              <name>quick-start-auth-zk</name>
+              <jvmSettings>
+                <initialMemorySize>4G</initialMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
               <mainClass>org.apache.pinot.tools.perf.QueryRunner</mainClass>
               <name>query-runner</name>
               <jvmSettings>
