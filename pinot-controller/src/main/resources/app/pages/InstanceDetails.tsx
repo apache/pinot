@@ -35,6 +35,7 @@ import EditConfigOp from '../components/Homepage/Operations/EditConfigOp';
 import { NotificationContext } from '../components/Notification/NotificationContext';
 import _ from 'lodash';
 import Confirm from '../components/Confirm';
+import Utils from "../utils/Utils";
 
 const useStyles = makeStyles((theme) => ({
   codeMirrorDiv: {
@@ -146,7 +147,8 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
         tag.search('_REALTIME') !== -1 ||
         tag.search('_OFFLINE') !== -1
       ){
-        tenantsList.push(tag.split('_')[0]);
+        let [baseTag, ] = Utils.splitStringByLastUnderscore(tag);
+        tenantsList.push(baseTag);
       }
     });
     return _.uniq(tenantsList);
