@@ -23,6 +23,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.HashMap;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -191,7 +193,17 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
   }
 
-  public static Object getDefaultNullValue(FieldType fieldType, DataType dataType,
+  private static final Map<DataType, Object> FIELD_TYPE_DEFAULT_NULL_VALUE_MAP = new HashMap<>();
+  public static Object getDefaultDimensionNullValue(DataType dataType) {
+    if (!FIELD_TYPE_DEFAULT_NULL_VALUE_MAP.containsKey(dataType)) {
+      FieldType fieldType = dataType.equals(DataType.BIG_DECIMAL) ? FieldType.METRIC : FieldType.DIMENSION;
+      FIELD_TYPE_DEFAULT_NULL_VALUE_MAP.put(
+          dataType, getDefaultNullValue(fieldType, dataType, null));
+    }
+    return FIELD_TYPE_DEFAULT_NULL_VALUE_MAP.get(dataType);
+  }
+
+  private static Object getDefaultNullValue(FieldType fieldType, DataType dataType,
       @Nullable String stringDefaultNullValue) {
     if (stringDefaultNullValue != null) {
       return dataType.convert(stringDefaultNullValue);

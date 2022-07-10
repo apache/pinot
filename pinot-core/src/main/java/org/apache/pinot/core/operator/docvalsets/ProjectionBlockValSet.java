@@ -42,7 +42,9 @@ public class ProjectionBlockValSet implements BlockValSet {
   private final DataBlockCache _dataBlockCache;
   private final String _column;
   private final DataSource _dataSource;
-  private final RoaringBitmap _nullBitmap;
+
+  private boolean _nullBitmapSet;
+  private RoaringBitmap _nullBitmap;
 
   /**
    * Constructor for the class.
@@ -53,25 +55,29 @@ public class ProjectionBlockValSet implements BlockValSet {
     _dataBlockCache = dataBlockCache;
     _column = column;
     _dataSource = dataSource;
-    NullValueVectorReader nullValueReader = _dataSource == null ? null : _dataSource.getNullValueVector();
-    if (nullValueReader != null && nullValueReader.getNullBitmap().getCardinality() > 0) {
-      // Project null bitmap.
-      RoaringBitmap projectedNullBitmap = new RoaringBitmap();
-      int[] docIds = _dataBlockCache.getDocIds();
-      for (int i = 0; i < _dataBlockCache.getNumDocs(); i++) {
-        if (nullValueReader.isNull(docIds[i])) {
-          projectedNullBitmap.add(i);
-        }
-      }
-      _nullBitmap = projectedNullBitmap;
-    } else {
-      _nullBitmap = null;
-    }
+    _nullBitmapSet = false;
   }
 
   @Nullable
   @Override
   public RoaringBitmap getNullBitmap() {
+    if (!_nullBitmapSet) {
+      NullValueVectorReader nullValueReader = _dataSource.getNullValueVector();
+      if (nullValueReader != null && nullValueReader.getNullBitmap().getCardinality() > 0) {
+        // Project null bitmap.
+        RoaringBitmap projectedNullBitmap = new RoaringBitmap();
+        int[] docIds = _dataBlockCache.getDocIds();
+        for (int i = 0; i < _dataBlockCache.getNumDocs(); i++) {
+          if (nullValueReader.isNull(docIds[i])) {
+            projectedNullBitmap.add(i);
+          }
+        }
+        _nullBitmap = projectedNullBitmap;
+      } else {
+        _nullBitmap = null;
+      }
+      _nullBitmapSet = true;
+    }
     return _nullBitmap;
   }
 

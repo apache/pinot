@@ -43,7 +43,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   private static final String EXPLAIN_NAME = "SELECT";
 
   private final IndexSegment _indexSegment;
-  private final boolean _isNullHandlingEnabled;
+  private final boolean _nullHandlingEnabled;
   private final TransformOperator _transformOperator;
   private final List<ExpressionContext> _expressions;
   private final BlockValSet[] _blockValSets;
@@ -57,7 +57,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   public SelectionOnlyOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
-    _isNullHandlingEnabled = queryContext.isNullHandlingEnabled();
+    _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _transformOperator = transformOperator;
     _expressions = expressions;
 
@@ -76,7 +76,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
 
     _numRowsToKeep = queryContext.getLimit();
     _rows = new ArrayList<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
-    _nullBitmaps = _isNullHandlingEnabled ? new RoaringBitmap[numExpressions] : null;
+    _nullBitmaps = _nullHandlingEnabled ? new RoaringBitmap[numExpressions] : null;
   }
 
   @Override
@@ -103,7 +103,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
 
       int numDocsToAdd = Math.min(_numRowsToKeep - _rows.size(), transformBlock.getNumDocs());
       _numDocsScanned += numDocsToAdd;
-      if (_isNullHandlingEnabled) {
+      if (_nullHandlingEnabled) {
         for (int i = 0; i < numExpressions; i++) {
           _nullBitmaps[i] = _blockValSets[i].getNullBitmap();
         }
@@ -126,7 +126,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
       }
     }
 
-    return new IntermediateResultsBlock(_dataSchema, _rows, _isNullHandlingEnabled);
+    return new IntermediateResultsBlock(_dataSchema, _rows, _nullHandlingEnabled);
   }
 
 

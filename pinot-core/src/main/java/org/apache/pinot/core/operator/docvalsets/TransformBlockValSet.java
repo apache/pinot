@@ -44,7 +44,10 @@ import org.roaringbitmap.RoaringBitmap;
 public class TransformBlockValSet implements BlockValSet {
   private final ProjectionBlock _projectionBlock;
   private final TransformFunction _transformFunction;
-  private final RoaringBitmap _nullBitmap;
+  private final ExpressionContext _expression;
+
+  private boolean _nullBitmapSet;
+  private RoaringBitmap _nullBitmap;
 
   private int[] _numMVEntries;
 
@@ -52,27 +55,33 @@ public class TransformBlockValSet implements BlockValSet {
       ExpressionContext expression) {
     _projectionBlock = projectionBlock;
     _transformFunction = transformFunction;
-    RoaringBitmap nullBitmap = null;
-    if (expression.getType() == ExpressionContext.Type.FUNCTION) {
-      Set<String> columns = new HashSet<>();
-      expression.getFunction().getColumns(columns);
-      for (String column : columns) {
-        BlockValSet blockValSet = _projectionBlock.getBlockValueSet(column);
-        RoaringBitmap columnNullBitmap = blockValSet.getNullBitmap();
-        if (columnNullBitmap != null) {
-          if (nullBitmap == null) {
-            nullBitmap = columnNullBitmap.clone();
-          }
-          nullBitmap.or(columnNullBitmap);
-        }
-      }
-    }
-    _nullBitmap = nullBitmap;
+    _expression = expression;
+    _nullBitmapSet = false;
   }
 
   @Nullable
   @Override
   public RoaringBitmap getNullBitmap() {
+    if (!_nullBitmapSet) {
+      RoaringBitmap nullBitmap = null;
+      if (_expression.getType() == ExpressionContext.Type.FUNCTION) {
+        Set<String> columns = new HashSet<>();
+        _expression.getFunction().getColumns(columns);
+        for (String column : columns) {
+          BlockValSet blockValSet = _projectionBlock.getBlockValueSet(column);
+          RoaringBitmap columnNullBitmap = blockValSet.getNullBitmap();
+          if (columnNullBitmap != null) {
+            if (nullBitmap == null) {
+              nullBitmap = columnNullBitmap.clone();
+            }
+            nullBitmap.or(columnNullBitmap);
+          }
+        }
+      }
+      _nullBitmap = nullBitmap;
+      _nullBitmapSet = true;
+    }
+
     // The assumption is that any transformation applied to null values will result in null values.
     // Examples:
     //  CAST(null as STRING) -> null. This is similar to Presto behaviour.

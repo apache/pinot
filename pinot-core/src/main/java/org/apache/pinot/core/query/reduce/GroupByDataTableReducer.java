@@ -279,9 +279,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
               return;
             }
             try {
-              boolean isNullHandlingEnabled = _queryContext.isNullHandlingEnabled();
+              boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
               RoaringBitmap[] nullBitmaps = null;
-              if (isNullHandlingEnabled) {
+              if (nullHandlingEnabled) {
                 nullBitmaps = new RoaringBitmap[_numColumns];
                 for (int i = 0; i < _numColumns; i++) {
                   nullBitmaps[i] = dataTable.getNullRowIds(i);
@@ -322,7 +322,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
                       throw new IllegalStateException();
                   }
                 }
-                if (isNullHandlingEnabled) {
+                if (nullHandlingEnabled) {
                   for (int colId = 0; colId < _numColumns; colId++) {
                     if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
                       values[colId] = null;

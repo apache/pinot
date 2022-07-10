@@ -22,8 +22,10 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -168,11 +170,12 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
 
   public void testQueries() {
     DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
-    boolean isNullHandlingEnabled = true;
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put("nullHandlingEnabled", "true");
     HashSet<Integer> trueIndices = new HashSet<Integer>(Arrays.asList(1, 3, 5));
     {
       String query = "SELECT * FROM testTable";
-      BrokerResponseNative brokerResponse = getBrokerResponse(query, isNullHandlingEnabled);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -193,7 +196,7 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
     }
     {
       String query = "SELECT booleanColumn FROM testTable WHERE booleanColumn";
-      BrokerResponseNative brokerResponse = getBrokerResponse(query, isNullHandlingEnabled);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -208,7 +211,7 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
     }
     {
       String query = "SELECT * FROM testTable ORDER BY booleanColumn DESC LIMIT 4000";
-      BrokerResponseNative brokerResponse = getBrokerResponse(query, isNullHandlingEnabled);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -234,7 +237,7 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
     }
     {
       String query = "SELECT STARTS_WITH(CAST(booleanColumn AS STRING), 'fa') AS boolResult FROM testTable";
-      BrokerResponseNative brokerResponse = getBrokerResponse(query, isNullHandlingEnabled);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,
@@ -255,7 +258,7 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
     }
     {
       String query = "SELECT DISTINCT booleanColumn FROM testTable ORDER BY booleanColumn DESC";
-      BrokerResponseNative brokerResponse = getBrokerResponse(query, isNullHandlingEnabled);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
       assertEquals(dataSchema,

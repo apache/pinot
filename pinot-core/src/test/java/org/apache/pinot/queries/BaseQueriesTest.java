@@ -94,16 +94,7 @@ public abstract class BaseQueriesTest {
    * <p>The result should be equivalent to querying 4 identical index segments.
    */
   protected BrokerResponseNative getBrokerResponse(String query) {
-    return getBrokerResponse(query, PLAN_MAKER, false);
-  }
-
-  /**
-   * Run query on multiple index segments.
-   * <p>Use this to test the whole flow from server to broker.
-   * <p>The result should be equivalent to querying 4 identical index segments.
-   */
-  protected BrokerResponseNative getBrokerResponse(String query, boolean isNullHandlingEnabled) {
-    return getBrokerResponse(query, PLAN_MAKER, isNullHandlingEnabled);
+    return getBrokerResponse(query, PLAN_MAKER);
   }
 
   /**
@@ -121,16 +112,7 @@ public abstract class BaseQueriesTest {
    * <p>The result should be equivalent to querying 4 identical index segments.
    */
   protected BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker) {
-    return getBrokerResponse(query, planMaker, false, null);
-  }
-
-  /**
-   * Run query on multiple index segments with custom plan maker.
-   * <p>Use this to test the whole flow from server to broker.
-   * <p>The result should be equivalent to querying 4 identical index segments.
-   */
-  protected BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker, boolean isNullHandlingEnabled) {
-    return getBrokerResponse(query, planMaker, isNullHandlingEnabled, null);
+    return getBrokerResponse(query, planMaker, null);
   }
 
   /**
@@ -138,9 +120,8 @@ public abstract class BaseQueriesTest {
    * <p>Use this to test the whole flow from server to broker.
    * <p>The result should be equivalent to querying 4 identical index segments.
    */
-  protected BrokerResponseNative getBrokerResponse(String query, boolean isNullHandlingEnabled,
-      @Nullable Map<String, String> extraQueryOptions) {
-    return getBrokerResponse(query, PLAN_MAKER, isNullHandlingEnabled, extraQueryOptions);
+  protected BrokerResponseNative getBrokerResponse(String query, @Nullable Map<String, String> extraQueryOptions) {
+    return getBrokerResponse(query, PLAN_MAKER, extraQueryOptions);
   }
 
   /**
@@ -148,10 +129,9 @@ public abstract class BaseQueriesTest {
    * <p>Use this to test the whole flow from server to broker.
    * <p>The result should be equivalent to querying 4 identical index segments.
    */
-  private BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker, boolean isNullHandlingEnabled,
+  private BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker,
       @Nullable Map<String, String> extraQueryOptions) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    pinotQuery.setNullHandlingEnabled(isNullHandlingEnabled);
     if (extraQueryOptions != null) {
       Map<String, String> queryOptions = pinotQuery.getQueryOptions();
       if (queryOptions == null) {

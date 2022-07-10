@@ -53,7 +53,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private final DataType _storedType;
   private final Map _groupKeyMap;
   private final int _globalGroupIdUpperBound;
-  private final boolean _isNullHandlingEnabled;
+  private final boolean _nullHandlingEnabled;
 
   private Integer _groupIdForNullValue = null;
   private final boolean _isSingleValueExpression;
@@ -61,12 +61,12 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private int _numGroups = 0;
 
   public NoDictionarySingleColumnGroupKeyGenerator(TransformOperator transformOperator,
-      ExpressionContext groupByExpression, int numGroupsLimit, boolean isNullHandlingEnabled) {
+      ExpressionContext groupByExpression, int numGroupsLimit, boolean nullHandlingEnabled) {
     _groupByExpression = groupByExpression;
     _storedType = transformOperator.getResultMetadata(_groupByExpression).getDataType().getStoredType();
     _groupKeyMap = createGroupKeyMap(_storedType);
     _globalGroupIdUpperBound = numGroupsLimit;
-    _isNullHandlingEnabled = isNullHandlingEnabled;
+    _nullHandlingEnabled = nullHandlingEnabled;
     _isSingleValueExpression = transformOperator.getResultMetadata(groupByExpression).isSingleValue();
   }
 
@@ -84,7 +84,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     switch (_storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
-        if (_isNullHandlingEnabled) {
+        if (_nullHandlingEnabled) {
           if (nullBitmap != null && nullBitmap.getCardinality() < numDocs) {
             for (int i = 0; i < numDocs; i++) {
               groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(intValues[i]);
@@ -101,7 +101,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
-        if (_isNullHandlingEnabled) {
+        if (_nullHandlingEnabled) {
           if (nullBitmap != null && nullBitmap.getCardinality() < numDocs) {
             for (int i = 0; i < numDocs; i++) {
               groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(longValues[i]);
@@ -118,7 +118,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         break;
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
-        if (_isNullHandlingEnabled) {
+        if (_nullHandlingEnabled) {
           if (nullBitmap != null && nullBitmap.getCardinality() < numDocs) {
             for (int i = 0; i < numDocs; i++) {
               groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(floatValues[i]);
@@ -135,7 +135,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         break;
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
-        if (_isNullHandlingEnabled) {
+        if (_nullHandlingEnabled) {
           if (nullBitmap != null && nullBitmap.getCardinality() < numDocs) {
             for (int i = 0; i < numDocs; i++) {
               groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(doubleValues[i]);
@@ -152,7 +152,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         break;
       case BIG_DECIMAL:
         BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
-        if (_isNullHandlingEnabled) {
+        if (_nullHandlingEnabled) {
           if (nullBitmap != null && nullBitmap.getCardinality() < numDocs) {
             for (int i = 0; i < numDocs; i++) {
               groupKeys[i] = getKeyForValue(nullBitmap.contains(i) ? null : bigDecimalValues[i]);
@@ -168,7 +168,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
-        if (_isNullHandlingEnabled) {
+        if (_nullHandlingEnabled) {
           if (nullBitmap != null && nullBitmap.getCardinality() < numDocs) {
             for (int i = 0; i < numDocs; i++) {
               groupKeys[i] = getKeyForValue(nullBitmap.contains(i) ? null : stringValues[i]);
@@ -184,7 +184,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (_isNullHandlingEnabled) {
+        if (_nullHandlingEnabled) {
           if (nullBitmap != null && nullBitmap.getCardinality() < numDocs) {
             for (int i = 0; i < numDocs; i++) {
               groupKeys[i] = getKeyForValue(nullBitmap.contains(i) ? null : new ByteArray(bytesValues[i]));

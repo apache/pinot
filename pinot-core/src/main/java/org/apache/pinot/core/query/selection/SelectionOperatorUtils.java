@@ -40,6 +40,7 @@ import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -227,26 +228,25 @@ public class SelectionOperatorUtils {
    *
    * @param rows {@link Collection} of selection rows.
    * @param dataSchema data schema.
-   * @param isNullHandlingEnabled whether null handling is enabled.
+   * @param nullHandlingEnabled whether null handling is enabled.
    * @return data table.
    * @throws Exception
    */
   public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema,
-      boolean isNullHandlingEnabled)
+      boolean nullHandlingEnabled)
       throws Exception {
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
 
     DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(dataSchema);
     RoaringBitmap[] nullBitmaps = null;
-    if (isNullHandlingEnabled) {
+    if (nullHandlingEnabled) {
       nullBitmaps = new RoaringBitmap[numColumns];
       Object[] colDefaultNullValues = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
         if (storedColumnDataTypes[colId] != ColumnDataType.OBJECT && !storedColumnDataTypes[colId].isArray()) {
-          // Store a dummy value that is both a valid numeric, and a valid hex encoded value.
-          String specialVal = "30";
-          colDefaultNullValues[colId] = storedColumnDataTypes[colId].toDataType().convert(specialVal);
+          colDefaultNullValues[colId] =
+              FieldSpec.getDefaultDimensionNullValue(storedColumnDataTypes[colId].toDataType());
         }
         nullBitmaps[colId] = new RoaringBitmap();
       }
@@ -348,7 +348,7 @@ public class SelectionOperatorUtils {
       dataTableBuilder.finishRow();
     }
 
-    if (isNullHandlingEnabled && DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4) {
+    if (nullHandlingEnabled) {
       for (int colId = 0; colId < numColumns; colId++) {
         dataTableBuilder.setNullRowIds(nullBitmaps[colId]);
       }
@@ -426,12 +426,12 @@ public class SelectionOperatorUtils {
    * (Broker side)
    */
   public static List<Object[]> reduceWithoutOrdering(Collection<DataTable> dataTables, int limit,
-      boolean isNullHandlingEnabled) {
+      boolean nullHandlingEnabled) {
     List<Object[]> rows = new ArrayList<>(Math.min(limit, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
     for (DataTable dataTable : dataTables) {
       int numColumns = dataTable.getDataSchema().size();
       RoaringBitmap[] nullBitmaps = null;
-      if (isNullHandlingEnabled) {
+      if (nullHandlingEnabled) {
         nullBitmaps = new RoaringBitmap[numColumns];;
         for (int coldId = 0; coldId < numColumns; coldId++) {
           nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
@@ -447,7 +447,7 @@ public class SelectionOperatorUtils {
         }
       }
 
-      if (isNullHandlingEnabled) {
+      if (nullHandlingEnabled) {
         for (int rowId = 0; rowId < numRows; rowId++) {
           Object[] row = rows.get(rowId);
           for (int colId = 0; colId < numColumns; colId++) {

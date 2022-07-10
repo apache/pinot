@@ -38,7 +38,6 @@ import org.apache.pinot.core.operator.transform.function.TransformFunctionFactor
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.trace.Tracing;
 
 
@@ -94,14 +93,6 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
    */
   public TransformResultMetadata getResultMetadata(ExpressionContext expression) {
     return _transformFunctionMap.get(expression).getResultMetadata();
-  }
-
-  public NullValueVectorReader getNullValueVectorReader(ExpressionContext expression) {
-    DataSource dataSource = _dataSourceMap.get(expression.toString());
-    if (dataSource == null) {
-      return null;
-    }
-    return dataSource.getNullValueVector();
   }
 
   /**

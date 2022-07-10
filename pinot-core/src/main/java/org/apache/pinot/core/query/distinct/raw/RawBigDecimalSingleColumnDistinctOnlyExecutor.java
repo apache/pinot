@@ -33,8 +33,8 @@ import org.roaringbitmap.RoaringBitmap;
 public class RawBigDecimalSingleColumnDistinctOnlyExecutor extends BaseRawBigDecimalSingleColumnDistinctExecutor {
 
   public RawBigDecimalSingleColumnDistinctOnlyExecutor(ExpressionContext expression, DataType dataType, int limit,
-      boolean isNullHandlingEnabled) {
-    super(expression, dataType, limit, isNullHandlingEnabled);
+      boolean nullHandlingEnabled) {
+    super(expression, dataType, limit, nullHandlingEnabled);
   }
 
   @Override

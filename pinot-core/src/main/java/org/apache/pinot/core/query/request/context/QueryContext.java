@@ -38,7 +38,9 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.MemoizedClassAssociation;
+import org.apache.pinot.core.util.QueryOptionsUtils;
 
 
 /**
@@ -82,7 +84,6 @@ public class QueryContext {
   private final Map<String, String> _queryOptions;
   private final Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
   private final boolean _explain;
-  private final boolean _isNullHandlingEnabled;
 
   private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
 
@@ -118,13 +119,15 @@ public class QueryContext {
   private int _minServerGroupTrimSize = InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE;
   // Trim threshold to use for server combine for SQL GROUP BY
   private int _groupTrimThreshold = InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD;
+  // Whether null handling is enabled
+  private boolean _nullHandlingEnabled;
 
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
       List<ExpressionContext> selectExpressions, List<String> aliasList, @Nullable FilterContext filter,
       @Nullable List<ExpressionContext> groupByExpressions, @Nullable FilterContext havingFilter,
       @Nullable List<OrderByExpressionContext> orderByExpressions, int limit, int offset,
       Map<String, String> queryOptions, @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints,
-      boolean explain, boolean isNullHandlingEnabled) {
+      boolean explain) {
     _tableName = tableName;
     _subquery = subquery;
     _selectExpressions = selectExpressions;
@@ -136,9 +139,14 @@ public class QueryContext {
     _limit = limit;
     _offset = offset;
     _queryOptions = queryOptions;
+    if (_queryOptions != null) {
+      setSkipUpsert(QueryOptionsUtils.isSkipUpsert(_queryOptions));
+      setSkipStarTree(QueryOptionsUtils.isSkipStarTree(_queryOptions));
+      setSkipScanFilterReorder(QueryOptionsUtils.isSkipScanFilterReorder(_queryOptions));
+      setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
+    }
     _expressionOverrideHints = expressionOverrideHints;
     _explain = explain;
-    _isNullHandlingEnabled = isNullHandlingEnabled;
   }
 
   /**
@@ -236,13 +244,6 @@ public class QueryContext {
    */
   public boolean isExplain() {
     return _explain;
-  }
-
-  /**
-   * Returns {@code true} if the query has null handling enabled, {@code false} otherwise.
-   */
-  public boolean isNullHandlingEnabled() {
-    return _isNullHandlingEnabled;
   }
 
   /**
@@ -381,6 +382,14 @@ public class QueryContext {
     _groupTrimThreshold = groupTrimThreshold;
   }
 
+  public boolean isNullHandlingEnabled() {
+    return _nullHandlingEnabled;
+  }
+
+  public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
+    _nullHandlingEnabled = nullHandlingEnabled;
+  }
+
   /**
    * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared
    * within the scope of a query.
@@ -422,7 +431,6 @@ public class QueryContext {
     private Map<String, String> _debugOptions;
     private Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
     private boolean _explain;
-    private boolean _isNullHandlingEnabled;
 
     public Builder setTableName(String tableName) {
       _tableName = tableName;
@@ -489,11 +497,6 @@ public class QueryContext {
       return this;
     }
 
-    public Builder setIsNullHandlingEnabled(boolean isNullHandlingEnabled) {
-      _isNullHandlingEnabled = isNullHandlingEnabled;
-      return this;
-    }
-
     public QueryContext build() {
       // TODO: Add validation logic here
 
@@ -502,8 +505,7 @@ public class QueryContext {
       }
       QueryContext queryContext =
           new QueryContext(_tableName, _subquery, _selectExpressions, _aliasList, _filter, _groupByExpressions,
-              _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions, _expressionOverrideHints, _explain,
-              _isNullHandlingEnabled);
+              _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions, _expressionOverrideHints, _explain);
 
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);

@@ -37,8 +37,8 @@ public class RawBigDecimalSingleColumnDistinctOrderByExecutor extends BaseRawBig
   private final PriorityQueue<BigDecimal> _priorityQueue;
 
   public RawBigDecimalSingleColumnDistinctOrderByExecutor(ExpressionContext expression, DataType dataType,
-      OrderByExpressionContext orderByExpression, int limit, boolean isNullHandlingEnabled) {
-    super(expression, dataType, limit, isNullHandlingEnabled);
+      OrderByExpressionContext orderByExpression, int limit, boolean nullHandlingEnabled) {
+    super(expression, dataType, limit, nullHandlingEnabled);
 
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;

@@ -160,6 +160,6 @@ public class QueryContextConverterUtils {
         .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions)
         .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
         .setQueryOptions(pinotQuery.getQueryOptions()).setExpressionOverrideHints(expressionContextOverrideHints)
-        .setExplain(pinotQuery.isExplain()).setIsNullHandlingEnabled(pinotQuery.isNullHandlingEnabled()).build();
+        .setExplain(pinotQuery.isExplain()).build();
   }
 }

@@ -50,7 +50,9 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   private static final String EXPLAIN_NAME = "SELECT_STREAMING_COMBINE";
 
   // Special IntermediateResultsBlock to indicate that this is the last results block for an operator
-  private final IntermediateResultsBlock _lastResultsBlock;
+  private static final IntermediateResultsBlock LAST_RESULTS_BLOCK =
+      new IntermediateResultsBlock(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]),
+          Collections.emptyList(), false);
 
   private final StreamObserver<Server.ServerResponse> _streamObserver;
   private final int _limit;
@@ -61,8 +63,6 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
     super(operators, queryContext, executorService);
     _streamObserver = streamObserver;
     _limit = queryContext.getLimit();
-    _lastResultsBlock = new IntermediateResultsBlock(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]),
-            Collections.emptyList(), queryContext.isNullHandlingEnabled());
   }
 
 
@@ -94,7 +94,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
-      _blockingQueue.offer(_lastResultsBlock);
+      _blockingQueue.offer(LAST_RESULTS_BLOCK);
     }
   }
 
@@ -118,7 +118,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
         // the exception
         return resultsBlock;
       }
-      if (resultsBlock == _lastResultsBlock) {
+      if (resultsBlock == LAST_RESULTS_BLOCK) {
         numOperatorsFinished++;
         continue;
       }
@@ -127,7 +127,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
       assert dataSchema != null && rows != null;
       numRowsCollected += rows.size();
       DataTable dataTable = SelectionOperatorUtils.getDataTableFromRows(
-          rows, dataSchema, resultsBlock.isNullHandlingEnabled());
+          rows, dataSchema, _queryContext.isNullHandlingEnabled());
       _streamObserver.onNext(StreamingResponseUtils.getDataResponse(dataTable));
     }
     // Return an empty results block for the metadata

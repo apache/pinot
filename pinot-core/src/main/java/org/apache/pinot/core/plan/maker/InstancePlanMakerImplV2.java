@@ -151,7 +151,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public Plan makeInstancePlan(List<IndexSegment> indexSegments, QueryContext queryContext,
       ExecutorService executorService) {
-    applyQueryOptions(queryContext);
+    applyExtraQueryOptions(queryContext);
 
     int numSegments = indexSegments.size();
     List<PlanNode> planNodes = new ArrayList<>(numSegments);
@@ -184,18 +184,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode, indexSegments, fetchContexts));
   }
 
-  private void applyQueryOptions(QueryContext queryContext) {
+  private void applyExtraQueryOptions(QueryContext queryContext) {
     Map<String, String> queryOptions = queryContext.getQueryOptions();
-
-    // Set skipUpsert
-    queryContext.setSkipUpsert(QueryOptionsUtils.isSkipUpsert(queryOptions));
-
-    // Set skipStarTree
-    queryContext.setSkipStarTree(QueryOptionsUtils.isSkipStarTree(queryOptions));
-
-    // Set skipScanFilterReorder
-    queryContext.setSkipScanFilterReorder(QueryOptionsUtils.isSkipScanFilterReorder(queryOptions));
-
     // Set maxExecutionThreads
     int maxExecutionThreads;
     Integer maxExecutionThreadsFromQuery = QueryOptionsUtils.getMaxExecutionThreads(queryOptions);
@@ -260,7 +250,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public Plan makeStreamingInstancePlan(List<IndexSegment> indexSegments, QueryContext queryContext,
       ExecutorService executorService, StreamObserver<Server.ServerResponse> streamObserver) {
-    applyQueryOptions(queryContext);
+    applyExtraQueryOptions(queryContext);
 
     List<PlanNode> planNodes = new ArrayList<>(indexSegments.size());
     for (IndexSegment indexSegment : indexSegments) {
