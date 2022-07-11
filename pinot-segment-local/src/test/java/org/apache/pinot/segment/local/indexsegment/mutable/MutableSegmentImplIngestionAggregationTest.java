@@ -153,7 +153,7 @@ public class MutableSegmentImplIngestionAggregationTest {
 
     for (int i = 0; i < NUM_ROWS; i++) {
       // Generate random int to prevent overflow
-      GenericRow row = getRow(random, 1);
+      GenericRow row = getRow(random);
       row.putValue(METRIC, null);
       mutableSegmentImpl.index(row, defaultMetadata);
 
