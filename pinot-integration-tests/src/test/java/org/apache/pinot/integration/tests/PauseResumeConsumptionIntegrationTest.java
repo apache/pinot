@@ -23,7 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.controller.api.resources.PauseStatus;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -107,9 +107,8 @@ public class PauseResumeConsumptionIntegrationTest extends BaseClusterIntegratio
   }
 
   private void verify(boolean pause, int expectedNumRecordsInTable) throws Exception {
-    for (int i = 0; i < 30; i++) {
-      PinotLLCRealtimeSegmentManager.PauseStatus pauseStatus =
-          getControllerRequestClient().getPauseStatus(getTableName());
+    for (int i = 0; i < 60; i++) {
+      PauseStatus pauseStatus = getControllerRequestClient().getPauseStatus(getTableName());
       if (pause && pauseStatus.getPauseFlag() && pauseStatus.getConsumingSegments().isEmpty()) {
         // pause completed
         assertCountStar(expectedNumRecordsInTable);
@@ -122,12 +121,12 @@ public class PauseResumeConsumptionIntegrationTest extends BaseClusterIntegratio
       }
       Thread.sleep(1000L);
     }
-    Assert.fail("Table was not " + (pause ? "paused" : "resumed") + " in 30 seconds!");
+    Assert.fail("Table was not " + (pause ? "paused" : "resumed") + " in 60 seconds!");
   }
 
   private void assertCountStar(int expectedNumRecordsInTable) throws Exception {
     long actualNumRecordsInTable = 0;
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 60; i++) {
       actualNumRecordsInTable = getCurrentCountStarResult();
       if (actualNumRecordsInTable == expectedNumRecordsInTable) {
         return;

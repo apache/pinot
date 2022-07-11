@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -64,6 +61,7 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.Constants;
+import org.apache.pinot.controller.api.resources.PauseStatus;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -1503,34 +1501,5 @@ public class PinotLLCRealtimeSegmentManager {
     String isTablePausedStr = idealState.getRecord().getSimpleField(IS_TABLE_PAUSED);
     Set<String> consumingSegments = findConsumingSegments(idealState);
     return new PauseStatus(Boolean.parseBoolean(isTablePausedStr), consumingSegments, null);
-  }
-
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  public static class PauseStatus {
-
-    private boolean _pauseFlag;
-    private Set<String> _consumingSegments;
-    private String _description;
-
-    @JsonCreator
-    public PauseStatus(@JsonProperty("pauseFlag") boolean pauseFlag,
-        @JsonProperty("consumingSegments") Set<String> consumingSegments,
-        @JsonProperty("description") String description) {
-      _pauseFlag = pauseFlag;
-      _consumingSegments = consumingSegments;
-      _description = description;
-    }
-
-    public boolean getPauseFlag() {
-      return _pauseFlag;
-    }
-
-    public Set<String> getConsumingSegments() {
-      return _consumingSegments;
-    }
-
-    public String getDescription() {
-      return _description;
-    }
   }
 }

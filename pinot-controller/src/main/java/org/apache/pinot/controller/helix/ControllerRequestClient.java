@@ -24,7 +24,7 @@ import java.net.URL;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.controller.api.resources.PauseStatus;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
@@ -170,34 +170,34 @@ public class ControllerRequestClient {
     }
   }
 
-  public PinotLLCRealtimeSegmentManager.PauseStatus pauseConsumption(String tableName)
+  public PauseStatus pauseConsumption(String tableName)
       throws IOException {
     try {
       SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
           _controllerRequestURLBuilder.forPauseConsumption(tableName)).toURI(), null));
-      return JsonUtils.stringToObject(response.getResponse(), PinotLLCRealtimeSegmentManager.PauseStatus.class);
+      return JsonUtils.stringToObject(response.getResponse(), PauseStatus.class);
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
   }
 
-  public PinotLLCRealtimeSegmentManager.PauseStatus resumeConsumption(String tableName)
+  public PauseStatus resumeConsumption(String tableName)
       throws IOException {
     try {
       SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
           _controllerRequestURLBuilder.forResumeConsumption(tableName)).toURI(), null));
-      return JsonUtils.stringToObject(response.getResponse(), PinotLLCRealtimeSegmentManager.PauseStatus.class);
+      return JsonUtils.stringToObject(response.getResponse(), PauseStatus.class);
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
   }
 
-  public PinotLLCRealtimeSegmentManager.PauseStatus getPauseStatus(String tableName)
+  public PauseStatus getPauseStatus(String tableName)
       throws IOException {
     try {
       SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URL(
           _controllerRequestURLBuilder.forPauseStatus(tableName)).toURI()));
-      return JsonUtils.stringToObject(response.getResponse(), PinotLLCRealtimeSegmentManager.PauseStatus.class);
+      return JsonUtils.stringToObject(response.getResponse(), PauseStatus.class);
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

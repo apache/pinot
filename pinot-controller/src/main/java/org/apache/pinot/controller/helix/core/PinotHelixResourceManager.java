@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
@@ -115,6 +114,7 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.api.exception.UserAlreadyExistsException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
+import org.apache.pinot.controller.api.resources.PeriodicTaskInvocationResponse;
 import org.apache.pinot.controller.api.resources.StateType;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -3614,26 +3614,6 @@ public class PinotHelixResourceManager {
     LOGGER.info("[TaskRequestId: {}] Periodic task execution message sent to {} controllers.", periodicTaskRequestId,
         messageCount);
     return new PeriodicTaskInvocationResponse(periodicTaskRequestId, messageCount > 0);
-  }
-
-  public static class PeriodicTaskInvocationResponse {
-    String _taskId;
-    boolean _isSuccessful;
-
-    public PeriodicTaskInvocationResponse(String taskId, boolean isSuccessful) {
-      _taskId = taskId;
-      _isSuccessful = isSuccessful;
-    }
-
-    @JsonProperty("isSuccessful")
-    public boolean isSuccessful() {
-      return _isSuccessful;
-    }
-
-    @JsonProperty("taskId")
-    public String getTaskId() {
-      return _taskId;
-    }
   }
 
   /*

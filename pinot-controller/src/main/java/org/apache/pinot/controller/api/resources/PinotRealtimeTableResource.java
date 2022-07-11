@@ -109,11 +109,11 @@ public class PinotRealtimeTableResource {
   private void validate(String tableNameWithType) {
     IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
     if (idealState == null) {
-      throw new ControllerApplicationException(LOGGER, "Ideal State is null for table " + tableNameWithType,
+      throw new ControllerApplicationException(LOGGER, String.format("Table %s not found!", tableNameWithType),
           Response.Status.NOT_FOUND);
     }
     if (!idealState.isEnabled()) {
-      throw new ControllerApplicationException(LOGGER, "Ideal State is disabled for table" + tableNameWithType,
+      throw new ControllerApplicationException(LOGGER, "Ideal State is disabled for table " + tableNameWithType,
           Response.Status.BAD_REQUEST);
     }
   }
