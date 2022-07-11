@@ -55,7 +55,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private List<RexExpression> _groupSet;
 
   private final AggregationFunction[] _aggregationFunctions;
-  private final int[] _aggregateFunctionInputRefs;
+  private final int[] _aggregationFunctionInputRefs;
   private final DataSchema _resultSchema;
   private final Map<Integer, Object>[] _groupByResultHolders;
   private final Map<Integer, Object[]> _groupByKeyHolder;
@@ -72,13 +72,12 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     _upstreamDataSchema = upstreamDataSchema;
 
     _aggregationFunctions = new AggregationFunction[_aggCalls.size()];
-    _aggregateFunctionInputRefs = new int[_aggCalls.size()];
+    _aggregationFunctionInputRefs = new int[_aggCalls.size()];
     _groupByResultHolders = new Map[_aggCalls.size()];
     _groupByKeyHolder = new HashMap<Integer, Object[]>();
     for (int i = 0; i < aggCalls.size(); i++) {
-      _aggregationFunctions[i] = (toAggregationFunction(aggCalls.get(i)));
-      _aggregateFunctionInputRefs[i] = ((RexExpression.InputRef) ((RexExpression.FunctionCall) aggCalls.get(i))
-          .getFunctionOperands().get(0)).getIndex();
+      _aggregationFunctionInputRefs[i] = toAggregationFunctionRefIndex(aggCalls.get(i));
+      _aggregationFunctions[i] = toAggregationFunction(aggCalls.get(i), _aggregationFunctionInputRefs[i]);
       _groupByResultHolders[i] = new HashMap<Integer, Object>();
     }
 
@@ -97,6 +96,12 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     _resultSchema = new DataSchema(columnNames, columnDataTypes);
 
     _isCumulativeBlockConstructed = false;
+  }
+
+  private int toAggregationFunctionRefIndex(RexExpression rexExpression) {
+    List<RexExpression> functionOperands = ((RexExpression.FunctionCall) rexExpression).getFunctionOperands();
+    Preconditions.checkState(functionOperands.size() < 2);
+    return functionOperands.size() == 0 ? 0 : ((RexExpression.InputRef) functionOperands.get(0)).getIndex();
   }
 
   @Override
@@ -160,10 +165,10 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
         for (int i = 0; i < _aggregationFunctions.length; i++) {
           Object currentRes = _groupByResultHolders[i].get(keyHashCode);
           if (currentRes == null) {
-            _groupByResultHolders[i].put(keyHashCode, row[_aggregateFunctionInputRefs[i]]);
+            _groupByResultHolders[i].put(keyHashCode, row[_aggregationFunctionInputRefs[i]]);
           } else {
             _groupByResultHolders[i].put(keyHashCode,
-                merge(_aggCalls.get(i), currentRes, row[_aggregateFunctionInputRefs[i]]));
+                merge(_aggCalls.get(i), currentRes, row[_aggregationFunctionInputRefs[i]]));
           }
         }
       }
@@ -171,15 +176,14 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
-  private AggregationFunction toAggregationFunction(RexExpression aggCall) {
+  private AggregationFunction toAggregationFunction(RexExpression aggCall, int aggregationFunctionInputRef) {
     Preconditions.checkState(aggCall instanceof RexExpression.FunctionCall);
     switch (((RexExpression.FunctionCall) aggCall).getFunctionName()) {
       case "$SUM":
       case "$SUM0":
       case "SUM":
         return new SumAggregationFunction(
-            ExpressionContext.forIdentifier(
-                ((RexExpression.FunctionCall) aggCall).getFunctionOperands().get(0).toString()));
+            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
       case "$COUNT":
       case "COUNT":
         return new CountAggregationFunction();
@@ -187,14 +191,12 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       case "$MIN0":
       case "MIN":
         return new MinAggregationFunction(
-            ExpressionContext.forIdentifier(
-                ((RexExpression.FunctionCall) aggCall).getFunctionOperands().get(0).toString()));
+            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
       case "$MAX":
       case "$MAX0":
       case "MAX":
         return new MaxAggregationFunction(
-            ExpressionContext.forIdentifier(
-                ((RexExpression.FunctionCall) aggCall).getFunctionOperands().get(0).toString()));
+            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
       default:
         throw new IllegalStateException(
             "Unexpected value: " + ((RexExpression.FunctionCall) aggCall).getFunctionName());
@@ -204,14 +206,18 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private Object merge(RexExpression aggCall, Object left, Object right) {
     Preconditions.checkState(aggCall instanceof RexExpression.FunctionCall);
     switch (((RexExpression.FunctionCall) aggCall).getFunctionName()) {
+      case "SUM":
       case "$SUM":
       case "$SUM0":
         return ((Number) left).doubleValue() + ((Number) right).doubleValue();
+      case "COUNT":
       case "$COUNT":
         return (int) left + (int) right;
+      case "MIN":
       case "$MIN":
       case "$MIN0":
         return Math.min(((Number) left).doubleValue(), ((Number) right).doubleValue());
+      case "MAX":
       case "$MAX":
       case "$MAX0":
         return Math.max(((Number) left).doubleValue(), ((Number) right).doubleValue());
