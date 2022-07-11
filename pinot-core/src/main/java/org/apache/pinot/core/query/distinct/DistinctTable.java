@@ -97,15 +97,14 @@ public class DistinctTable {
         orderByExpressionIndices[i] = columnNames.indexOf(orderByExpression.getExpression().toString());
         comparisonFactors[i] = orderByExpression.isAsc() ? -1 : 1;
       }
-
-      _priorityQueue = new ObjectHeapPriorityQueue<>(initialCapacity, (r1, r2) -> {
-        Object[] values1 = r1.getValues();
-        Object[] values2 = r2.getValues();
-        for (int i = 0; i < numOrderByExpressions; i++) {
-          int index = orderByExpressionIndices[i];
-          Comparable value1 = (Comparable) values1[index];
-          Comparable value2 = (Comparable) values2[index];
-          if (_nullHandlingEnabled) {
+      if (_nullHandlingEnabled) {
+        _priorityQueue = new ObjectHeapPriorityQueue<>(initialCapacity, (r1, r2) -> {
+          Object[] values1 = r1.getValues();
+          Object[] values2 = r2.getValues();
+          for (int i = 0; i < numOrderByExpressions; i++) {
+            int index = orderByExpressionIndices[i];
+            Comparable value1 = (Comparable) values1[index];
+            Comparable value2 = (Comparable) values2[index];
             if (value1 == null) {
               if (value2 == null) {
                 continue;
@@ -114,14 +113,29 @@ public class DistinctTable {
             } else if (value2 == null) {
               return -comparisonFactors[i];
             }
+            int result = value1.compareTo(value2) * comparisonFactors[i];
+            if (result != 0) {
+              return result;
+            }
           }
-          int result = value1.compareTo(value2) * comparisonFactors[i];
-          if (result != 0) {
-            return result;
+          return 0;
+        });
+      } else {
+        _priorityQueue = new ObjectHeapPriorityQueue<>(initialCapacity, (r1, r2) -> {
+          Object[] values1 = r1.getValues();
+          Object[] values2 = r2.getValues();
+          for (int i = 0; i < numOrderByExpressions; i++) {
+            int index = orderByExpressionIndices[i];
+            Comparable value1 = (Comparable) values1[index];
+            Comparable value2 = (Comparable) values2[index];
+            int result = value1.compareTo(value2) * comparisonFactors[i];
+            if (result != 0) {
+              return result;
+            }
           }
-        }
-        return 0;
-      });
+          return 0;
+        });
+      }
     } else {
       _priorityQueue = null;
     }
