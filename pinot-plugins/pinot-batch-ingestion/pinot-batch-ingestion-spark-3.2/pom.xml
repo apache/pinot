@@ -39,7 +39,7 @@
     <scala.major.version>2.12</scala.major.version>
     <spark.version>3.2.1</spark.version>
     <scala.minor.version>2.12.15</scala.minor.version>
-    <spark3.jackson.version>${jackson.version}</spark3.jackson.version>
+    <spark3.jackson.version>2.12.7</spark3.jackson.version>
     <commons-lang3.version>3.11</commons-lang3.version>
   </properties>
 
