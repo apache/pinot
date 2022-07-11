@@ -72,6 +72,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.TableMetadataReader;
+import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -92,6 +93,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *       <li>"/segments/{tableName}/crc": get a map from segment to CRC of the segment (OFFLINE table only)</li>
  *       <li>"/segments/{tableName}/{segmentName}/metadata: get the metadata for a segment</li>
  *       <li>"/segments/{tableName}/metadata: get the metadata for all segments from the server</li>
+ *       <li>"/segments/{tableName}/{segmentName}/tiers": get storage tier for the segment in the table</li>
+ *       <li>"/segments/{tableName}/tiers": get storage tier for all segments in the table</li>
  *     </ul>
  *   </li>
  *   <li>
@@ -715,6 +718,63 @@ public class PinotSegmentRestletResource {
           Status.INTERNAL_SERVER_ERROR, ioe);
     }
     return segmentsMetadata;
+  }
+
+  @GET
+  @Path("segments/{tableName}/tiers")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get storage tier for all segments in the given table", notes = "Get storage tier for all "
+      + "segments in the given table")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Table not found")
+  })
+  public TableTierReader.TableTierDetails getTableTiers(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr) {
+    LOGGER.info("Received a request to get storage tier for all segments for table {}", tableName);
+    return getTableTierInternal(tableName, null, tableTypeStr);
+  }
+
+  @GET
+  @Path("segments/{tableName}/{segmentName}/tiers")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get storage tiers for the given segment", notes = "Get storage tiers for the given segment")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Table or segment not found")
+  })
+  public TableTierReader.TableTierDetails getSegmentTiers(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr) {
+    segmentName = URIUtils.decode(segmentName);
+    LOGGER.info("Received a request to get storage tier for segment {} in table {}", segmentName, tableName);
+    return getTableTierInternal(tableName, segmentName, tableTypeStr);
+  }
+
+  private TableTierReader.TableTierDetails getTableTierInternal(String tableName, @Nullable String segmentName,
+      @Nullable String tableTypeStr) {
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    Preconditions.checkNotNull(tableType, "Table type is required to get table tiers");
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+    TableTierReader tableTierReader = new TableTierReader(_executor, _connectionManager, _pinotHelixResourceManager);
+    TableTierReader.TableTierDetails tableTierDetails;
+    try {
+      tableTierDetails = tableTierReader.getTableTierDetails(tableNameWithType, segmentName,
+          _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+    } catch (Throwable t) {
+      throw new ControllerApplicationException(LOGGER, String
+          .format("Failed to get tier info for segment: %s in table: %s of type: %s", segmentName, tableName,
+              tableTypeStr), Response.Status.INTERNAL_SERVER_ERROR, t);
+    }
+    if (segmentName != null && !tableTierDetails.getSegmentTiers().containsKey(segmentName)) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Segment: %s is not found in table: %s of type: %s", segmentName, tableName, tableTypeStr),
+          Response.Status.NOT_FOUND);
+    }
+    return tableTierDetails;
   }
 
   @GET
