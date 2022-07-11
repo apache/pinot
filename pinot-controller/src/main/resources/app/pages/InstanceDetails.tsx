@@ -33,7 +33,7 @@ import CustomButton from '../components/CustomButton';
 import EditTagsOp from '../components/Homepage/Operations/EditTagsOp';
 import EditConfigOp from '../components/Homepage/Operations/EditConfigOp';
 import { NotificationContext } from '../components/Notification/NotificationContext';
-import _ from 'lodash';
+import { uniq, startCase } from 'lodash';
 import Confirm from '../components/Confirm';
 
 const useStyles = makeStyles((theme) => ({
@@ -106,7 +106,7 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
     const instanceDetails = await PinotMethodUtils.getInstanceDetails(instanceName);
     const tenantListResponse = getTenants(instanceDetails);
     setInstanceConfig(JSON.stringify(configResponse, null, 2));
-    const instanceHost = instanceDetails.hostName.replace(`${_.startCase(instanceType.toLowerCase())}_`, '');
+    const instanceHost = instanceDetails.hostName.replace(`${startCase(instanceType.toLowerCase())}_`, '');
     const instancePutObj = {
       host: instanceHost,
       port: instanceDetails.port,
@@ -156,7 +156,7 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
         tenantsList.push(tag.split('_')[0]);
       }
     });
-    return _.uniq(tenantsList);
+    return uniq(tenantsList);
   };
 
   const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>, tags: Array<string>|null) => {

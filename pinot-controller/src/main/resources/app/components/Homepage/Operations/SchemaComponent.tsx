@@ -23,7 +23,6 @@ import AddIcon from '@material-ui/icons/Add';
 import ClearIcon from '@material-ui/icons/Clear';
 import { Autocomplete } from '@material-ui/lab';
 import { debug } from 'webpack';
-import _ from 'lodash';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({

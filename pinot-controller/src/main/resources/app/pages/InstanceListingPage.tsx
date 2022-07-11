@@ -19,7 +19,7 @@
 
 import React, {useState, useEffect} from 'react';
 import { Grid, makeStyles } from '@material-ui/core';
-import _ from 'lodash';
+import { get, startCase, pick } from 'lodash';
 import { DataTable } from 'Models';
 import AppLoader from '../components/AppLoader';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
@@ -43,7 +43,7 @@ const InstanceListingPage = () => {
   const [instances, setInstances] = useState<DataTable>();
   const [clusterName, setClusterName] = useState('');
 
-  const isController = !!_.get(instances, 'Controller', false);
+  const isController = !!get(instances, 'Controller', false);
 
   // const periodicTasks = usePeriodicTasks({
   //   shouldFetchData: isController
@@ -51,8 +51,8 @@ const InstanceListingPage = () => {
 
   const fetchData = async () => {
     const instanceResponse = await PinotMethodUtils.getAllInstances();
-    const instanceType = _.startCase(window.location.hash.split('/')[1].slice(0, -1));
-    setInstances(_.pick(instanceResponse, instanceType));
+    const instanceType = startCase(window.location.hash.split('/')[1].slice(0, -1));
+    setInstances(pick(instanceResponse, instanceType));
     let clusterNameRes = localStorage.getItem('pinot_ui:clusterName');
     if(!clusterNameRes){
       clusterNameRes = await PinotMethodUtils.getClusterName();

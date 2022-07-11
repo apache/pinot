@@ -22,7 +22,6 @@ import Chip from '@material-ui/core/Chip';
 import Autocomplete, { AutocompleteRenderInputParams } from '@material-ui/lab/Autocomplete';
 import TextField from '@material-ui/core/TextField';
 import { withStyles } from '@material-ui/core';
-import _ from 'lodash';
 
 interface MyInputProps {
   onKeyDown: (event: object) => void;

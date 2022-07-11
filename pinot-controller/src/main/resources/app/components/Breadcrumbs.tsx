@@ -26,7 +26,7 @@ import Link, { LinkProps } from '@material-ui/core/Link';
 import NavigateNextIcon from '@material-ui/icons/NavigateNext';
 import Box from '@material-ui/core/Box';
 import { createStyles, makeStyles, Theme } from '@material-ui/core/styles';
-import _ from 'lodash';
+import { keys } from 'lodash';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -96,7 +96,7 @@ const BreadcrumbsComponent = ({ ...props }) => {
       return getLabel(breadcrumbNameMap['/']);
     }
     const breadcrumbs = [getClickableLabel(breadcrumbNameMap['/'], '/')];
-    const paramsKeys = _.keys(props.match.params);
+    const paramsKeys = keys(props.match.params);
     if(paramsKeys.length){
       const {tenantName, tableName, segmentName, instanceName, schemaName, query, taskType, queueTableName, taskID, subTaskID} = props.match.params;
       if((tenantName || instanceName) && tableName){

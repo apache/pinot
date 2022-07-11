@@ -21,7 +21,7 @@ import React, { useEffect, useState } from 'react';
 import { createStyles, FormControl, Grid, Input, InputLabel, makeStyles, MenuItem, Select, Theme, Tooltip} from '@material-ui/core';
 import AddDeleteComponent from './AddDeleteComponent';
 import MultipleSelectComponent from './MultipleSelectComponent';
-import _ from 'lodash';
+import { isEmpty } from 'lodash';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -81,7 +81,7 @@ export default function AddIngestionComponent({
 
   useEffect(()=>{
     let newTableObj = {...tableObj};
-      if(newTableObj.tableType === "REALTIME" && !newTableObj.streamConfigs && _.isEmpty(newTableObj.streamConfigs) ){
+      if(newTableObj.tableType === "REALTIME" && !newTableObj.streamConfigs && isEmpty(newTableObj.streamConfigs) ){
         newTableObj.tableIndexConfig.streamConfigs =
         {
             "streamType": "kafka",

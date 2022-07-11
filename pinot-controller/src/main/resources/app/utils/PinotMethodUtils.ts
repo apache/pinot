@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import _ from 'lodash';
+import { get, map, each, isEqual, isArray, keys, union } from 'lodash';
 import { DataTable, SQLResult } from 'Models';
 import moment from 'moment';
 import {
@@ -98,7 +98,7 @@ const JSONbig = require('json-bigint')({'storeAsString': true})
 // Expected Output: {columns: [], records: []}
 const getTenantsData = () => {
   return getTenants().then(({ data }) => {
-    const records = _.union(data.SERVER_TENANTS, data.BROKER_TENANTS);
+    const records = union(data.SERVER_TENANTS, data.BROKER_TENANTS);
     const serverPromiseArr = [], brokerPromiseArr = [], tablePromiseArr = [];
     const finalResponse = {
       columns: ['Tenant Name', 'Server', 'Broker', 'Tables'],
@@ -281,11 +281,11 @@ const getQueryResults = (params, checkedOptions) => {
           else if (!queryResponse.aggregationResults[0]?.groupByResult)
           {
             // Simple aggregation query
-            columnList = _.map(queryResponse.aggregationResults, (aggregationResult) => {
+            columnList = map(queryResponse.aggregationResults, (aggregationResult) => {
               return {title: aggregationResult.function};
             });
 
-            dataArray.push(_.map(queryResponse.aggregationResults, (aggregationResult) => {
+            dataArray.push(map(queryResponse.aggregationResults, (aggregationResult) => {
               return aggregationResult.value;
             }));
           }
@@ -295,11 +295,11 @@ const getQueryResults = (params, checkedOptions) => {
             // TODO - Revisit
             const columns = queryResponse.aggregationResults[0].groupByColumns;
             columns.push(queryResponse.aggregationResults[0].function);
-            columnList = _.map(columns, (columnName) => {
+            columnList = map(columns, (columnName) => {
               return columnName;
             });
 
-            dataArray = _.map(queryResponse.aggregationResults[0].groupByResult, (aggregationGroup) => {
+            dataArray = map(queryResponse.aggregationResults[0].groupByResult, (aggregationGroup) => {
               const row = aggregationGroup.group;
               row.push(aggregationGroup.value);
               return row;
@@ -517,7 +517,7 @@ const getSegmentList = (tableName) => {
 };
 
 const getSegmentStatus = (idealSegment, externalViewSegment) => {
-  if(_.isEqual(idealSegment, externalViewSegment)){
+  if(isEqual(idealSegment, externalViewSegment)){
     return 'Good';
   }
   let goodCount = 0;
@@ -570,7 +570,7 @@ const getSegmentDetails = (tableName, segmentName) => {
     if(debugObj && debugObj[0]){
       const debugInfosObj = debugObj[0].segmentDebugInfos?.find((o)=>{return o.segmentName === segmentName});
       if(debugInfosObj){
-        const serverNames = _.keys(debugInfosObj?.serverState || {});
+        const serverNames = keys(debugInfosObj?.serverState || {});
         serverNames?.map((serverName)=>{
           debugInfoObj[serverName] = debugInfosObj.serverState[serverName]?.errorInfo?.errorMessage;
         });
@@ -774,7 +774,7 @@ const getAllTaskTypes = async () => {
   }
   await new Promise((resolve, reject) => {
     getTaskTypes().then(async (response)=>{
-      if (_.isArray(response.data)) {
+      if (isArray(response.data)) {
         const promiseArr = [];
         const fetchInfo = async (taskType) => {
           const [ count, state ] = await getTaskInfo(taskType);
@@ -792,7 +792,7 @@ const getAllTaskTypes = async () => {
 const getTaskInfo = async (taskType) => {
   const tasksRes = await getTaskTypeTasks(taskType);
   const stateRes = await getTaskTypeState(taskType);
-  const state = _.get(stateRes, 'data', '');
+  const state = get(stateRes, 'data', '');
   return [tasksRes?.data?.length || 0, state];
 };
 
@@ -843,17 +843,17 @@ const getTasksList = async (tableName, taskType) => {
       const promiseArr = [];
       const fetchInfo = async (taskID, status) => {
         const debugData = await getTaskDebugData(taskID);
-        const startTime = moment(_.get(debugData, 'data.subtaskInfos.0.startTime'), 'YYYY-MM-DD hh:mm:ss');
+        const startTime = moment(get(debugData, 'data.subtaskInfos.0.startTime'), 'YYYY-MM-DD hh:mm:ss');
         finalResponse.records.push([
           taskID,
           status,
-          _.get(debugData, 'data.subtaskInfos.0.startTime'),
+          get(debugData, 'data.subtaskInfos.0.startTime'),
           startTime ? getElapsedTime(startTime) : '',
-          _.get(debugData, 'data.subtaskInfos.0.finishTime', ''),
-          _.get(debugData, 'data.subtaskCount.total', 0)
+          get(debugData, 'data.subtaskInfos.0.finishTime', ''),
+          get(debugData, 'data.subtaskCount.total', 0)
         ]);
       };
-      _.each(response.data, async (val, key) => {
+      each(response.data, async (val, key) => {
         promiseArr.push(fetchInfo(key, val));
       });
       await Promise.all(promiseArr);
