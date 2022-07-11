@@ -36,6 +36,12 @@ import { NotificationContext } from '../components/Notification/NotificationCont
 import { uniq, startCase } from 'lodash';
 import Confirm from '../components/Confirm';
 
+const instanceTypes = {
+  broker: 'BROKER',
+  minion: 'MINION',
+  server: 'SERVER',
+}
+
 const useStyles = makeStyles((theme) => ({
   codeMirrorDiv: {
     border: '1px #BDCCD9 solid',
@@ -69,12 +75,12 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
   const classes = useStyles();
   const {instanceName} = match.params;
   let instanceType;
-  if (instanceName.toLowerCase().startsWith('broker')) {
-    instanceType = 'BROKER';
-  } else if (instanceName.toLowerCase().startsWith('minion')) {
-    instanceType = 'MINION';
+  if (instanceName.toLowerCase().startsWith(instanceTypes.broker.toLowerCase())) {
+    instanceType = instanceTypes.broker;
+  } else if (instanceName.toLowerCase().startsWith(instanceTypes.minion.toLowerCase())) {
+    instanceType = instanceTypes.minion;
   } else {
-    instanceType = 'SERVER';
+    instanceType = instanceTypes.server;
   }
   const clutserName = localStorage.getItem('pinot_ui:clusterName');
   const [fetching, setFetching] = useState(true);
@@ -315,7 +321,7 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
               </CustomButton>
               <CustomButton
                 onClick={handleDropAction}
-                tooltipTitle={!instanceName.startsWith('Minion_') ? "Removes the node from the cluster. Untag & rebalance (to ensure node is not being used by any table), and shutdown instance, before dropping." : ""}
+                tooltipTitle={instanceType !== instanceTypes.minion ? "Removes the node from the cluster. Untag and rebalance (to ensure the node is not being used by any table) and shutdown the instance before dropping." : ""}
                 enableTooltip={true}
               >
                 Drop

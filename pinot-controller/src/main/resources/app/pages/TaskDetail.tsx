@@ -20,20 +20,9 @@
 import React, { useEffect, useState } from 'react';
 import { get, each } from 'lodash';
 import moment from 'moment';
-// import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { Grid, makeStyles } from '@material-ui/core';
-// import SimpleAccordion from '../components/SimpleAccordion';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import CustomizedTables from '../components/Table';
-
-// const jsonoptions = {
-//   lineNumbers: true,
-//   mode: 'application/json',
-//   styleActiveLine: true,
-//   gutters: ['CodeMirror-lint-markers'],
-//   theme: 'default',
-//   readOnly: true
-// };
 
 const useStyles = makeStyles(() => ({
   gridContainer: {
@@ -127,31 +116,6 @@ const TaskDetail = (props) => {
         </Grid>
       </div>
       <Grid container spacing={2}>
-        {/* <Grid item xs={6}>
-          <div className={classes.sqlDiv}>
-            <SimpleAccordion
-              headerTitle="Task Config"
-              showSearchBox={false}
-            >
-              <CodeMirror
-                options={jsonoptions}
-                value={JSON.stringify(get(taskDebugData, `subtaskInfos.0.taskConfig`, {}), null, '  ')}
-                className={classes.queryOutput}
-                autoCursor={false}
-              />
-            </SimpleAccordion>
-          </div>
-        </Grid>
-        <Grid item xs={6}>
-          <div className={classes.sqlDiv}>
-            <SimpleAccordion
-              headerTitle="Execution Errors"
-              showSearchBox={false}
-            >
-              
-            </SimpleAccordion>
-          </div>
-        </Grid> */}
         <Grid item xs={12}>
           {!fetching && (
             <CustomizedTables

@@ -19,12 +19,11 @@
 
 import React, {useState, useEffect} from 'react';
 import { Grid, makeStyles } from '@material-ui/core';
-import { get, startCase, pick } from 'lodash';
+import { startCase, pick } from 'lodash';
 import { DataTable } from 'Models';
 import AppLoader from '../components/AppLoader';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import Instances from '../components/Homepage/InstancesTables';
-// import usePeriodicTasks from '../components/usePeriodicTasks';
 
 const useStyles = makeStyles(() => ({
   gridContainer: {
@@ -33,7 +32,6 @@ const useStyles = makeStyles(() => ({
     maxHeight: 'calc(100vh - 70px)',
     overflowY: 'auto'
   },
-
 }));
 
 const InstanceListingPage = () => {
@@ -42,12 +40,6 @@ const InstanceListingPage = () => {
   const [fetching, setFetching] = useState(true);
   const [instances, setInstances] = useState<DataTable>();
   const [clusterName, setClusterName] = useState('');
-
-  const isController = !!get(instances, 'Controller', false);
-
-  // const periodicTasks = usePeriodicTasks({
-  //   shouldFetchData: isController
-  // });
 
   const fetchData = async () => {
     const instanceResponse = await PinotMethodUtils.getAllInstances();
@@ -70,7 +62,6 @@ const InstanceListingPage = () => {
   ) : (
     <Grid item xs className={classes.gridContainer}>
       <Instances instances={instances} clusterName={clusterName} />
-      {/* {isController && periodicTasks.content} */}
     </Grid>
   );
 };
