@@ -998,14 +998,20 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
-      String column = entry.getKey();
-      IndexContainer indexContainer = entry.getValue();
-      Object value = getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
-          indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
-      if (_nullHandlingEnabled && indexContainer._nullValueVector.isNull(docId)) {
-        reuse.putDefaultNullValue(column, value);
-      } else {
-        reuse.putValue(column, value);
+      try {
+        String column = entry.getKey();
+        IndexContainer indexContainer = entry.getValue();
+        Object value = getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
+            indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
+        if (_nullHandlingEnabled && indexContainer._nullValueVector.isNull(docId)) {
+          reuse.putDefaultNullValue(column, value);
+        } else {
+          reuse.putValue(column, value);
+        }
+      } catch (Exception e) {
+        _logger.error("error encountered when getting record for {} on indexContainer: {}", docId, entry.getKey());
+        throw new RuntimeException("error encountered when getting record for " + docId + " on indexContainer: "
+            + entry.getKey(), e);
       }
     }
     return reuse;
