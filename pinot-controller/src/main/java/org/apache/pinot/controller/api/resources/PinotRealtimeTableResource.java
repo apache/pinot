@@ -113,7 +113,7 @@ public class PinotRealtimeTableResource {
           Response.Status.NOT_FOUND);
     }
     if (!idealState.isEnabled()) {
-      throw new ControllerApplicationException(LOGGER, "Ideal State is disabled for table " + tableNameWithType,
+      throw new ControllerApplicationException(LOGGER, String.format("Table %s is disabled!", tableNameWithType),
           Response.Status.BAD_REQUEST);
     }
   }

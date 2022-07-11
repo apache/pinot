@@ -37,6 +37,8 @@ import org.testng.annotations.Test;
 
 public class PauseResumeConsumptionIntegrationTest extends BaseClusterIntegrationTestSet {
 
+  private static final int VERIFICATION_RETRY_COUNT = 60;
+
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -107,7 +109,7 @@ public class PauseResumeConsumptionIntegrationTest extends BaseClusterIntegratio
   }
 
   private void verify(boolean pause, int expectedNumRecordsInTable) throws Exception {
-    for (int i = 0; i < 60; i++) {
+    for (int i = 0; i < VERIFICATION_RETRY_COUNT; i++) {
       PauseStatus pauseStatus = getControllerRequestClient().getPauseStatus(getTableName());
       if (pause && pauseStatus.getPauseFlag() && pauseStatus.getConsumingSegments().isEmpty()) {
         // pause completed
@@ -126,7 +128,7 @@ public class PauseResumeConsumptionIntegrationTest extends BaseClusterIntegratio
 
   private void assertCountStar(int expectedNumRecordsInTable) throws Exception {
     long actualNumRecordsInTable = 0;
-    for (int i = 0; i < 60; i++) {
+    for (int i = 0; i < VERIFICATION_RETRY_COUNT; i++) {
       actualNumRecordsInTable = getCurrentCountStarResult();
       if (actualNumRecordsInTable == expectedNumRecordsInTable) {
         return;
