@@ -55,26 +55,46 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private List<RexExpression> _groupSet;
 
   private final AggregationFunction[] _aggregationFunctions;
+  private final int[] _aggregateFunctionInputRefs;
+  private final DataSchema _resultSchema;
   private final Map<Integer, Object>[] _groupByResultHolders;
   private final Map<Integer, Object[]> _groupByKeyHolder;
 
-  private DataSchema _dataSchema;
+  private DataSchema _upstreamDataSchema;
   private boolean _isCumulativeBlockConstructed;
 
   // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
   public AggregateOperator(BaseOperator<TransferableBlock> inputOperator, List<RexExpression> aggCalls,
-      List<RexExpression> groupSet) {
+      List<RexExpression> groupSet, DataSchema upstreamDataSchema) {
     _inputOperator = inputOperator;
     _aggCalls = aggCalls;
     _groupSet = groupSet;
+    _upstreamDataSchema = upstreamDataSchema;
 
     _aggregationFunctions = new AggregationFunction[_aggCalls.size()];
+    _aggregateFunctionInputRefs = new int[_aggCalls.size()];
     _groupByResultHolders = new Map[_aggCalls.size()];
     _groupByKeyHolder = new HashMap<Integer, Object[]>();
     for (int i = 0; i < aggCalls.size(); i++) {
       _aggregationFunctions[i] = (toAggregationFunction(aggCalls.get(i)));
+      _aggregateFunctionInputRefs[i] = ((RexExpression.InputRef) ((RexExpression.FunctionCall) aggCalls.get(i))
+          .getFunctionOperands().get(0)).getIndex();
       _groupByResultHolders[i] = new HashMap<Integer, Object>();
     }
+
+    String[] columnNames = new String[_groupSet.size() + _aggCalls.size()];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[_groupSet.size() + _aggCalls.size()];
+    for (int i = 0; i < _groupSet.size(); i++) {
+      int idx = ((RexExpression.InputRef) groupSet.get(i)).getIndex();
+      columnNames[i] = _upstreamDataSchema.getColumnName(idx);
+      columnDataTypes[i] = _upstreamDataSchema.getColumnDataType(idx);
+    }
+    for (int i = 0; i < _aggCalls.size(); i++) {
+      int idx = i + _groupSet.size();
+      columnNames[idx] = _aggregationFunctions[i].getColumnName();
+      columnDataTypes[idx] = _aggregationFunctions[i].getFinalResultColumnType();
+    }
+    _resultSchema = new DataSchema(columnNames, columnDataTypes);
 
     _isCumulativeBlockConstructed = false;
   }
@@ -118,9 +138,9 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       }
       _isCumulativeBlockConstructed = true;
       if (rows.size() == 0) {
-        return DataBlockUtils.getEmptyDataBlock(_dataSchema);
+        return DataBlockUtils.getEmptyDataBlock(_resultSchema);
       } else {
-        return DataBlockBuilder.buildFromRows(rows, null, _dataSchema);
+        return DataBlockBuilder.buildFromRows(rows, null, _resultSchema);
       }
     } else {
       return DataBlockUtils.getEndOfStreamDataBlock();
@@ -131,9 +151,6 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     TransferableBlock block = _inputOperator.nextBlock();
     while (!TransferableBlockUtils.isEndOfStream(block)) {
       BaseDataBlock dataBlock = block.getDataBlock();
-      if (_dataSchema == null) {
-        _dataSchema = dataBlock.getDataSchema();
-      }
       int numRows = dataBlock.getNumberOfRows();
       for (int rowId = 0; rowId < numRows; rowId++) {
         Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
@@ -143,10 +160,10 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
         for (int i = 0; i < _aggregationFunctions.length; i++) {
           Object currentRes = _groupByResultHolders[i].get(keyHashCode);
           if (currentRes == null) {
-            _groupByResultHolders[i].put(keyHashCode, row[i + _groupSet.size()]);
+            _groupByResultHolders[i].put(keyHashCode, row[_aggregateFunctionInputRefs[i]]);
           } else {
             _groupByResultHolders[i].put(keyHashCode,
-                merge(_aggCalls.get(i), currentRes, row[i + _groupSet.size()]));
+                merge(_aggCalls.get(i), currentRes, row[_aggregateFunctionInputRefs[i]]));
           }
         }
       }
@@ -189,15 +206,15 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     switch (((RexExpression.FunctionCall) aggCall).getFunctionName()) {
       case "$SUM":
       case "$SUM0":
-        return (double) left + (double) right;
+        return ((Number) left).doubleValue() + ((Number) right).doubleValue();
       case "$COUNT":
         return (int) left + (int) right;
       case "$MIN":
       case "$MIN0":
-        return Math.min((double) left, (double) right);
+        return Math.min(((Number) left).doubleValue(), ((Number) right).doubleValue());
       case "$MAX":
       case "$MAX0":
-        return Math.max((double) left, (double) right);
+        return Math.max(((Number) left).doubleValue(), ((Number) right).doubleValue());
       default:
         throw new IllegalStateException(
             "Unexpected value: " + ((RexExpression.FunctionCall) aggCall).getFunctionName());

@@ -124,7 +124,8 @@ public class WorkerQueryExecutor {
       AggregateNode aggregateNode = (AggregateNode) stageNode;
       BaseOperator<TransferableBlock> inputOperator =
           getOperator(requestId, aggregateNode.getInputs().get(0), metadataMap);
-      return new AggregateOperator(inputOperator, aggregateNode.getAggCalls(), aggregateNode.getGroupSet());
+      return new AggregateOperator(inputOperator, aggregateNode.getAggCalls(), aggregateNode.getGroupSet(),
+          aggregateNode.getInputs().get(0).getDataSchema());
     } else if (stageNode instanceof FilterNode) {
       throw new UnsupportedOperationException("Unsupported!");
     } else if (stageNode instanceof ProjectNode) {
