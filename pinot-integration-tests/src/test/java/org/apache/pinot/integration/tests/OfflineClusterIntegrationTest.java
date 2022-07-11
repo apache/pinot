@@ -24,6 +24,8 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -33,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -44,6 +47,8 @@ import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.pinot.client.PinotConnection;
+import org.apache.pinot.client.PinotDriver;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -73,6 +78,7 @@ import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -2326,5 +2332,36 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response.get(COLUMN_LENGTH_MAP_KEY).size(), numTotalColumn);
     assertEquals(response.get(COLUMN_CARDINALITY_MAP_KEY).size(), numTotalColumn);
     assertEquals(response.get(MAX_NUM_MULTI_VALUES_MAP_KEY).size(), numMVColumn);
+  }
+
+
+  @Test
+  public void testJDBCClient()
+      throws Exception {
+    String query = "SELECT count(*) FROM " + getTableName();
+    java.sql.Connection connection = getJDBCConnectionFromController(DEFAULT_CONTROLLER_PORT);
+    Statement statement = connection.createStatement();
+    ResultSet resultSet = statement.executeQuery(query);
+    resultSet.first();
+    Assert.assertTrue(resultSet.getLong(1) > 0);
+
+    connection = getJDBCConnectionFromBrokers(RANDOM.nextInt(), DEFAULT_BROKER_PORT);
+    statement = connection.createStatement();
+    resultSet = statement.executeQuery(query);
+    resultSet.first();
+    Assert.assertTrue(resultSet.getLong(1) > 0);
+  }
+
+  private java.sql.Connection getJDBCConnectionFromController(int controllerPort) throws Exception {
+    PinotDriver pinotDriver = new PinotDriver();
+    Properties jdbcProps = new Properties();
+    return pinotDriver.connect("jdbc:pinot://localhost:" + controllerPort, jdbcProps);
+  }
+
+  private java.sql.Connection getJDBCConnectionFromBrokers(int controllerPort, int brokerPort) throws Exception {
+    PinotDriver pinotDriver = new PinotDriver();
+    Properties jdbcProps = new Properties();
+    jdbcProps.put(PinotConnection.BROKER_LIST, "localhost:" + brokerPort);
+    return pinotDriver.connect("jdbc:pinot://localhost:" + controllerPort, jdbcProps);
   }
 }
