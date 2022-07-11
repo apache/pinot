@@ -336,6 +336,15 @@ const formatBytes = (bytes, decimals = 2) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
+const splitStringByLastUnderscore = (str: string) => {
+  if (!str.includes('_')) {
+    return [str, ''];
+  }
+  let beforeUnderscore = str.substring(0, str.lastIndexOf("_"));
+  let afterUnderscore = str.substring(str.lastIndexOf("_") + 1, str.length);
+  return [beforeUnderscore, afterUnderscore];
+}
+
 export default {
   sortArray,
   tableFormat,
@@ -346,5 +355,6 @@ export default {
   navigateToPreviousPage,
   syncTableSchemaData,
   encodeString,
-  formatBytes
+  formatBytes,
+  splitStringByLastUnderscore
 };

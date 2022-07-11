@@ -540,8 +540,7 @@ const getTableDetails = (tableName) => {
 //      /segments/:tableName/:segmentName/metadata
 // Expected Output: {columns: [], records: []}
 const getSegmentDetails = (tableName, segmentName) => {
-  let baseTableName = tableName.substring(0, tableName.lastIndexOf("_"));
-  let tableType = tableName.substring(tableName.lastIndexOf("_") + 1, tableName.length);
+  let [baseTableName, tableType] = Utils.splitStringByLastUnderscore(tableName)
   const promiseArr = [];
   promiseArr.push(getExternalView(tableName));
   promiseArr.push(getSegmentMetadata(tableName, segmentName));
