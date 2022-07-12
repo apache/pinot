@@ -784,6 +784,14 @@ public class CalciteSqlCompilerTest {
     } catch (SqlCompilationException sce) {
       // expected.
     }
+
+    try {
+      CalciteSqlParser.compileToPinotQuery("select * from vegetables where name <> 'Brussels sprouts'; "
+          + "SET (delicious='yes', foo=1234); select * from meat");
+      Assert.fail("SQL should not be compiled");
+    } catch (SqlCompilationException sce) {
+      // expected.
+    }
   }
 
   @Test

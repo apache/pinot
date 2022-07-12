@@ -145,7 +145,7 @@ public class CalciteSqlParser {
           sqlType = PinotSqlType.DML;
           statementNode = sqlNode;
         } else {
-          throw new SqlCompilationException("SqlNode with statement already exist with type: " + sqlType);
+          throw new SqlCompilationException("SqlNode with executable statement already exist with type: " + sqlType);
         }
       } else if (sqlNode instanceof SqlSetOption) {
         // extract options, these are non-execution statements
@@ -159,12 +159,12 @@ public class CalciteSqlParser {
           sqlType = PinotSqlType.DQL;
           statementNode = sqlNode;
         } else {
-          throw new SqlCompilationException("SqlNode with statement already exist with type: " + sqlType);
+          throw new SqlCompilationException("SqlNode with executable statement already exist with type: " + sqlType);
         }
       }
     }
     if (sqlType == null) {
-      throw new SqlCompilationException("SqlNode with statement not found!");
+      throw new SqlCompilationException("SqlNode with executable statement not found!");
     }
     return new SqlNodeAndOptions(statementNode, sqlType, options);
   }
