@@ -17,23 +17,32 @@
  * under the License.
  */
 
-import React, {  } from 'react';
-import map from 'lodash/map';
-import get from 'lodash/get';
-import InstanceTable from './InstanceTable';
+import React from 'react';
+import { Grid, makeStyles, Typography, Box } from '@material-ui/core';
+import useTaskTypesTable from '../components/Homepage/useTaskTypesTable';
 
-const Instances = ({instances, clusterName}) => {
-  const order = ['Controller', 'Broker', 'Server', 'Minion'];
+const useStyles = makeStyles(() => ({
+  gridContainer: {
+    padding: 20,
+    backgroundColor: 'white',
+    maxHeight: 'calc(100vh - 70px)',
+    overflowY: 'auto'
+  }
+}));
+
+const MinionTaskManager = () => {
+  const classes = useStyles();
+  const { taskTypesTable } = useTaskTypesTable();
+
   return (
-    <>
-      {
-        map(order, (key) => {
-          const value = get(instances, key, '');
-          return <InstanceTable key={key} name={`${key}s`} instances={value} clusterName={clusterName} />;
-        })
-      }
-    </>
+    <Grid item xs className={classes.gridContainer}>
+      <Box mb={3}>
+        <Typography variant='h5'>Minion Task Manager</Typography>
+        <Typography variant='caption'>Manage the minion tasks queues and tasks</Typography>
+      </Box>
+      {taskTypesTable}
+    </Grid>
   );
 };
 
-export default Instances;
+export default MinionTaskManager;

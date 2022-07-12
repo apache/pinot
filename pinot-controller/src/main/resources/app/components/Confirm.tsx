@@ -63,7 +63,7 @@ type Props = {
   dialogNoLabel?: string
 };
 
-const Confirm = ({openDialog, dialogTitle, dialogContent, successCallback, closeDialog, dialogYesLabel, dialogNoLabel}: Props) => {
+const Confirm = ({openDialog, dialogTitle, dialogContent, successCallback, closeDialog, dialogYesLabel = 'Yes', dialogNoLabel = 'No'}: Props) => {
   const classes = useStyles();
   const [open, setOpen] = React.useState(openDialog);
 
@@ -104,3 +104,23 @@ const Confirm = ({openDialog, dialogTitle, dialogContent, successCallback, close
 };
 
 export default Confirm;
+
+export function useConfirm ({ dialogTitle, dialogContent, successCallback, closeDialog, dialogYesLabel, dialogNoLabel }: any) {
+  const [confirmDialog, setConfirmDialog] = React.useState(false);
+
+  return {
+    confirmDialog,
+    setConfirmDialog,
+    confirmComponent: (
+      <Confirm
+        openDialog={confirmDialog}
+        dialogTitle={dialogTitle}
+        dialogContent={dialogContent}
+        successCallback={successCallback}
+        closeDialog={() => setConfirmDialog(false)}
+        dialogYesLabel={dialogYesLabel}
+        dialogNoLabel={dialogNoLabel}
+      />
+    )
+  };
+}

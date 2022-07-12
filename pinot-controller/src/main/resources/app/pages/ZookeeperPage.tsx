@@ -21,7 +21,6 @@
 import React, { useEffect, useState } from 'react';
 import { makeStyles, useTheme } from '@material-ui/core/styles';
 import { Grid, Paper, Tabs, Tab } from '@material-ui/core';
-import _ from 'lodash';
 import AppLoader from '../components/AppLoader';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import TreeDirectory from '../components/Zookeeper/TreeDirectory';

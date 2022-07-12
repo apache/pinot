@@ -26,7 +26,7 @@ import Link, { LinkProps } from '@material-ui/core/Link';
 import NavigateNextIcon from '@material-ui/icons/NavigateNext';
 import Box from '@material-ui/core/Box';
 import { createStyles, makeStyles, Theme } from '@material-ui/core/styles';
-import _ from 'lodash';
+import { keys } from 'lodash';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -55,6 +55,8 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/controllers': 'Controllers',
   '/brokers': 'Brokers',
   '/servers': 'Servers',
+  '/minions': 'Minions',
+  '/minion-task-manager': 'Minion Task Manager',
   '/tables': 'Tables',
   '/query': 'Query Console',
   '/cluster': 'Cluster Manager',
@@ -94,9 +96,9 @@ const BreadcrumbsComponent = ({ ...props }) => {
       return getLabel(breadcrumbNameMap['/']);
     }
     const breadcrumbs = [getClickableLabel(breadcrumbNameMap['/'], '/')];
-    const paramsKeys = _.keys(props.match.params);
+    const paramsKeys = keys(props.match.params);
     if(paramsKeys.length){
-      const {tenantName, tableName, segmentName, instanceName, schemaName, query} = props.match.params;
+      const {tenantName, tableName, segmentName, instanceName, schemaName, query, taskType, queueTableName, taskID, subTaskID} = props.match.params;
       if((tenantName || instanceName) && tableName){
         breadcrumbs.push(
           getClickableLabel(
@@ -129,7 +131,19 @@ const BreadcrumbsComponent = ({ ...props }) => {
           getClickableLabel('Schemas', '/tables')
         );
       }
-      breadcrumbs.push(getLabel(segmentName || tableName || tenantName || instanceName || schemaName || 'Query Console'));
+      if (taskType) {
+        breadcrumbs.push(getClickableLabel('Minion Task Manager', `/minion-task-manager`));
+      }
+      if (queueTableName) {
+        breadcrumbs.push(getClickableLabel(taskType, `/task-queue/${taskType}`));
+      }
+      if (taskID) {
+        breadcrumbs.push(getClickableLabel('Tasks', `/task-queue/${taskType}/tables/${queueTableName}`));
+      }
+      if (subTaskID) {
+        breadcrumbs.push(getClickableLabel('Sub Tasks', `/task-queue/${taskType}/tables/${queueTableName}/task/${taskID}`));
+      }
+      breadcrumbs.push(getLabel(segmentName || tableName || tenantName || instanceName || schemaName || subTaskID || taskID || queueTableName || taskType || 'Query Console'));
     } else {
       breadcrumbs.push(getLabel(breadcrumbNameMap[location.pathname]));
     }
