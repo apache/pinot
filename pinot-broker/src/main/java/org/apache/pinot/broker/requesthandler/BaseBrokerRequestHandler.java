@@ -673,15 +673,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Since X-Forwarded-For can contain comma separated list of values, we convert it to ";" delimiter to avoid
     // downstream parsing errors for other fields where "," is being used
     if (enableClientIpLogging && requesterIdentity != null) {
-      for (Map.Entry<String, String> entries : ((HttpRequesterIdentity) requesterIdentity).getHttpHeaders().entries()) {
-        if (entries.getKey().equalsIgnoreCase("x-forwarded-for")) {
-          if (entries.getValue().contains(",")) {
-            clientIp = String.join(";", entries.getValue().split(","));
+      for (Map.Entry<String, String> entry : ((HttpRequesterIdentity) requesterIdentity).getHttpHeaders().entries()) {
+        String key = entry.getKey();
+        String value = entry.getValue();
+        if (key.equalsIgnoreCase("x-forwarded-for")) {
+          if (value.contains(",")) {
+            clientIp = String.join(";", value.split(","));
           } else {
-            clientIp = entries.getValue();
+            clientIp = value;
           }
-        } else if (entries.getKey().equalsIgnoreCase("x-real-ip")) {
-          clientIp = entries.getValue();
+        } else if (key.equalsIgnoreCase("x-real-ip")) {
+          clientIp = value;
         }
       }
     }
