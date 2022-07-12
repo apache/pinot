@@ -84,7 +84,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
   }
 
   @Override
-  public DataType getValueType() {
+  public DataType getStoredType() {
     return DataType.INT;
   }
 

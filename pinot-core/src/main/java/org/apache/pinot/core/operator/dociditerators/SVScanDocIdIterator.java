@@ -126,7 +126,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     if (_reader.isDictionaryEncoded()) {
       return new DictIdMatcher();
     } else {
-      switch (_reader.getValueType()) {
+      switch (_reader.getStoredType()) {
         case INT:
           return new IntMatcher();
         case LONG:

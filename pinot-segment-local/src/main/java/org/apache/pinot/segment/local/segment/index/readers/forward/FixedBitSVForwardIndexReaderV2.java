@@ -49,7 +49,7 @@ public final class FixedBitSVForwardIndexReaderV2 implements ForwardIndexReader<
   }
 
   @Override
-  public DataType getValueType() {
+  public DataType getStoredType() {
     return DataType.INT;
   }
 

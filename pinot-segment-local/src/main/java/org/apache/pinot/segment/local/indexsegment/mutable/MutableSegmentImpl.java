@@ -1039,7 +1039,7 @@ public class MutableSegmentImpl implements MutableSegment {
     } else {
       // Raw index based
       if (forwardIndex.isSingleValue()) {
-        switch (forwardIndex.getValueType()) {
+        switch (forwardIndex.getStoredType()) {
           case INT:
             return forwardIndex.getInt(docId);
           case LONG:
@@ -1061,7 +1061,7 @@ public class MutableSegmentImpl implements MutableSegment {
         // TODO: support multi-valued column for variable length column types (big decimal, string, bytes)
         int numValues;
         Object[] value;
-        switch (forwardIndex.getValueType()) {
+        switch (forwardIndex.getStoredType()) {
           case INT:
             int[] intValues = forwardIndex.getIntMV(docId);
             numValues = intValues.length;
@@ -1096,7 +1096,7 @@ public class MutableSegmentImpl implements MutableSegment {
             return value;
           default:
             throw new IllegalStateException("No support for MV no dictionary column of type "
-                + forwardIndex.getValueType());
+                + forwardIndex.getStoredType());
         }
       }
     }
