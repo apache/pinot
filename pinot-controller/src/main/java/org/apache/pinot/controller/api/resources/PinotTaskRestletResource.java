@@ -54,6 +54,7 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.minion.TaskGeneratorMostRecentRunInfo;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -229,6 +230,17 @@ public class PinotTaskRestletResource {
           + "Value of > 0 prints subtask details for all tasks)")
       @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
     return _pinotHelixTaskResourceManager.getTasksDebugInfoByTable(taskType, tableNameWithType, verbosity);
+  }
+
+  @GET
+  @Path("/tasks/generator/{tableNameWithType}/{taskType}/debug")
+  @ApiOperation("Fetch task generation information for the recent runs of the given task for the given table")
+  public TaskGeneratorMostRecentRunInfo getTaskGenerationDebugInto(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
+          String tableNameWithType
+  ) {
+    return _pinotHelixTaskResourceManager.getTaskGeneratorDebugInfo(tableNameWithType, taskType);
   }
 
   @GET

@@ -48,6 +48,8 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
 import org.apache.helix.task.WorkflowContext;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
+import org.apache.pinot.common.minion.TaskGeneratorInfoUtils;
+import org.apache.pinot.common.minion.TaskGeneratorMostRecentRunInfo;
 import org.apache.pinot.common.utils.DateTimeUtils;
 import org.apache.pinot.controller.api.exception.NoTaskMetadataException;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
@@ -693,6 +695,12 @@ public class PinotHelixTaskResourceManager {
 
   public String getParentTaskName(String taskType, String taskName) {
     return TASK_PREFIX + taskType + TASK_NAME_SEPARATOR + taskName;
+  }
+
+  public TaskGeneratorMostRecentRunInfo getTaskGeneratorDebugInfo(String tableNameWithType, String taskType) {
+    return TaskGeneratorMostRecentRunInfo.fromZNRecord(
+        TaskGeneratorInfoUtils.fetchTaskGeneratorInfo(_helixResourceManager.getPropertyStore(), tableNameWithType,
+            taskType), tableNameWithType, taskType);
   }
 
   public String getTaskMetadataByTable(String taskType, String tableNameWithType)
