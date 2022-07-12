@@ -19,6 +19,8 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import com.google.common.base.Preconditions;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -533,8 +535,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     } catch (Exception e) {
       for (TableConfig tableConfig : enabledTableConfigs) {
         try {
+          StringWriter errors = new StringWriter();
+          try (PrintWriter pw = new PrintWriter(errors)) {
+            e.printStackTrace(pw);
+          }
           TaskGeneratorMostRecentRunInfoUtils.saveErrorRunMessageToZk(_pinotHelixResourceManager.getPropertyStore(),
-              tableConfig.getTableName(), taskGenerator.getTaskType(), System.currentTimeMillis(), e.getMessage());
+              tableConfig.getTableName(), taskGenerator.getTaskType(), System.currentTimeMillis(), errors.toString());
         } catch (Exception exception) {
           LOGGER.warn("Failed to save task generator error message to ZK", exception);
         }
