@@ -36,11 +36,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -60,6 +63,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
@@ -243,45 +247,55 @@ public class PinotTableRestletResource {
   @Path("/tables")
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
   public String listTables(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
       @ApiParam(value = "name|creationTime|lastModifiedTime") @QueryParam("sortType") String sortTypeStr,
       @ApiParam(value = "true|false") @QueryParam("sortAsc") @DefaultValue("true") boolean sortAsc) {
     try {
-      List<String> tableNames;
       TableType tableType = null;
       if (tableTypeStr != null) {
         tableType = TableType.valueOf(tableTypeStr.toUpperCase());
       }
       SortType sortType = sortTypeStr != null ? SortType.valueOf(sortTypeStr.toUpperCase()) : SortType.NAME;
 
-      if (tableType == null) {
-        if (sortType == SortType.NAME) {
-          tableNames = _pinotHelixResourceManager.getAllRawTables();
-        } else {
-          // NOTE: Need to read actual table names (with type suffix) when not sorting on name because we need to read
-          //       the stats for the ZK records
-          tableNames = _pinotHelixResourceManager.getAllTables();
+      List<String> tableNamesWithType = tableType == null ? _pinotHelixResourceManager.getAllTables()
+          : (tableType == TableType.REALTIME ? _pinotHelixResourceManager.getAllRealtimeTables()
+              : _pinotHelixResourceManager.getAllOfflineTables());
+
+      if (StringUtils.isNotBlank(taskType)) {
+        Set<String> tableNamesForTaskType = new HashSet<>();
+        for (String tableNameWithType : tableNamesWithType) {
+          TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+          if (tableConfig != null && tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig()
+              .isTaskTypeEnabled(taskType)) {
+            tableNamesForTaskType.add(tableNameWithType);
+          }
         }
-      } else {
-        if (tableType == TableType.REALTIME) {
-          tableNames = _pinotHelixResourceManager.getAllRealtimeTables();
-        } else {
-          tableNames = _pinotHelixResourceManager.getAllOfflineTables();
-        }
+        tableNamesWithType.retainAll(tableNamesForTaskType);
       }
 
+      List<String> tableNames;
       if (sortType == SortType.NAME) {
-        tableNames.sort(sortAsc ? null : Comparator.reverseOrder());
+        if (tableType == null && StringUtils.isBlank(taskType)) {
+          List<String> rawTableNames = tableNamesWithType.stream().map(TableNameBuilder::extractRawTableName).distinct()
+              .collect(Collectors.toList());
+          rawTableNames.sort(sortAsc ? null : Comparator.reverseOrder());
+          tableNames = rawTableNames;
+        } else {
+          tableNamesWithType.sort(sortAsc ? null : Comparator.reverseOrder());
+          tableNames = tableNamesWithType;
+        }
       } else {
         int sortFactor = sortAsc ? 1 : -1;
         ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-        int numTables = tableNames.size();
+        int numTables = tableNamesWithType.size();
         List<String> zkPaths = new ArrayList<>(numTables);
-        for (String tableNameWithType : tableNames) {
+        for (String tableNameWithType : tableNamesWithType) {
           zkPaths.add(ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableNameWithType));
         }
         Stat[] stats = propertyStore.getStats(zkPaths, AccessOption.PERSISTENT);
         for (int i = 0; i < numTables; i++) {
-          Preconditions.checkState(stats[i] != null, "Failed to read ZK stats for table: %s", tableNames.get(i));
+          Preconditions.checkState(stats[i] != null, "Failed to read ZK stats for table: %s",
+              tableNamesWithType.get(i));
         }
         IntComparator comparator;
         if (sortType == SortType.CREATIONTIME) {
@@ -295,11 +309,12 @@ public class PinotTableRestletResource {
           stats[i] = stats[j];
           stats[j] = tempStat;
 
-          String tempTableName = tableNames.get(i);
-          tableNames.set(i, tableNames.get(j));
-          tableNames.set(j, tempTableName);
+          String tempTableName = tableNamesWithType.get(i);
+          tableNamesWithType.set(i, tableNamesWithType.get(j));
+          tableNamesWithType.set(j, tempTableName);
         };
         Arrays.quickSort(0, numTables, comparator, swapper);
+       tableNames = tableNamesWithType;
       }
 
       return JsonUtils.newObjectNode().set("tables", JsonUtils.objectToJsonNode(tableNames)).toString();
