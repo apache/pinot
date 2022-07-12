@@ -115,7 +115,9 @@ public class CalciteSqlParser {
 
     // extract and remove OPTIONS string
     List<String> options = extractOptionsFromSql(sql);
-    sql = removeOptionsFromSql(sql);
+    if (!options.isEmpty()) {
+      sql = removeOptionsFromSql(sql);
+    }
 
     try (StringReader inStream = new StringReader(sql)) {
       SqlParserImpl sqlParser = newSqlParser(inStream);
@@ -124,7 +126,6 @@ public class CalciteSqlParser {
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
       // add legacy OPTIONS keyword-based options
       if (options.size() > 0) {
-        LOGGER.warn("Usage of 'OPTIONS(key=value)' is deprecated, use `SET key = value` instead!");
         sqlNodeAndOptions.setExtraOptions(extractOptionsMap(options));
       }
       return sqlNodeAndOptions;
