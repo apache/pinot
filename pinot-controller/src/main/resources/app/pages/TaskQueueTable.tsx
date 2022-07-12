@@ -28,7 +28,7 @@ import CustomButton from '../components/CustomButton';
 import { useConfirm } from '../components/Confirm';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import useScheduleAdhocModal from '../components/useScheduleAdhocModal';
-import useMinionMetadata from '../components/useMinionMetadata';
+import useMinionMetadata from '../components/useMinionMetaData';
 import useTaskListing from '../components/useTaskListing';
 
 const jsonoptions = {
