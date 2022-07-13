@@ -462,7 +462,7 @@ public class PinotTableRestletResourceTest {
   private List<String> getTableNames(String url)
       throws IOException {
     JsonNode tablesJson = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(url)).get("tables");
-    return JsonUtils.jsonNodeToObject(tablesJson, new TypeReference<>() {
+    return JsonUtils.jsonNodeToObject(tablesJson, new TypeReference<List<String>>() {
     });
   }
 
