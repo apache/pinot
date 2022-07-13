@@ -358,10 +358,19 @@ public class PinotTableRestletResourceTest {
     }
   }
 
+  private void deleteAllTables()
+      throws IOException {
+    List<String> tables = getTableNames(_createTableUrl + "?type=offline");
+    tables.addAll(getTableNames(_createTableUrl + "?type=realtime"));
+    for (String tableName : tables) {
+      ControllerTest.sendDeleteRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+    }
+  }
+
   @Test
   public void testListTables()
       throws Exception {
-    // list - empty
+    deleteAllTables();
     List<String> tables = getTableNames(_createTableUrl);
     Assert.assertTrue(tables.isEmpty());
 
