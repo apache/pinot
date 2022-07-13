@@ -69,6 +69,7 @@ import org.yaml.snakeyaml.Yaml;
 public class PerfBenchmarkDriver {
   private static final Logger LOGGER = LoggerFactory.getLogger(PerfBenchmarkDriver.class);
   private static final long BROKER_TIMEOUT_MS = 60_000L;
+  private static final String BROKER_QUERY_PATH = "/query/sql";
 
   private final PerfBenchmarkDriverConf _conf;
   private final String _zkAddress;
@@ -145,8 +146,8 @@ public class PerfBenchmarkDriver {
     }
 
     // Init broker.
-    _queryUrl = StringUtils.isNotBlank(_conf.getBrokerURL()) ? _conf.getBrokerURL()
-        : "http://" + _conf.getBrokerHost() + ":" + _conf.getBrokerPort() + "/query/sql";
+    _queryUrl = StringUtils.isNotBlank(_conf.getBrokerURL()) ? _conf.getBrokerURL() + BROKER_QUERY_PATH
+        : "http://" + _conf.getBrokerHost() + ":" + _conf.getBrokerPort() + BROKER_QUERY_PATH;
 
     // Init server.
     String serverInstanceName = _conf.getServerInstanceName();
