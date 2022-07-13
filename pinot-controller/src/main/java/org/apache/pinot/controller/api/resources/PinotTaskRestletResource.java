@@ -240,7 +240,7 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType
   ) {
-    return _pinotHelixTaskResourceManager.getTaskGeneratorDebugInfo(tableNameWithType, taskType);
+    return _pinotHelixTaskResourceManager.getTaskGeneratorDebugInfoByTable(tableNameWithType, taskType);
   }
 
   @GET
