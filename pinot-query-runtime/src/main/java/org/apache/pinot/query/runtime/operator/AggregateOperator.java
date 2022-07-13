@@ -64,8 +64,8 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private boolean _isCumulativeBlockConstructed;
 
   // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
-  public AggregateOperator(BaseOperator<TransferableBlock> inputOperator, List<RexExpression> aggCalls,
-      List<RexExpression> groupSet, DataSchema upstreamDataSchema) {
+  public AggregateOperator(BaseOperator<TransferableBlock> inputOperator, DataSchema dataSchema,
+      List<RexExpression> aggCalls, List<RexExpression> groupSet, DataSchema upstreamDataSchema) {
     _inputOperator = inputOperator;
     _aggCalls = aggCalls;
     _groupSet = groupSet;
@@ -80,20 +80,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       _aggregationFunctions[i] = toAggregationFunction(aggCalls.get(i), _aggregationFunctionInputRefs[i]);
       _groupByResultHolders[i] = new HashMap<Integer, Object>();
     }
-
-    String[] columnNames = new String[_groupSet.size() + _aggCalls.size()];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[_groupSet.size() + _aggCalls.size()];
-    for (int i = 0; i < _groupSet.size(); i++) {
-      int idx = ((RexExpression.InputRef) groupSet.get(i)).getIndex();
-      columnNames[i] = _upstreamDataSchema.getColumnName(idx);
-      columnDataTypes[i] = _upstreamDataSchema.getColumnDataType(idx);
-    }
-    for (int i = 0; i < _aggCalls.size(); i++) {
-      int idx = i + _groupSet.size();
-      columnNames[idx] = _aggregationFunctions[i].getColumnName();
-      columnDataTypes[idx] = _aggregationFunctions[i].getFinalResultColumnType();
-    }
-    _resultSchema = new DataSchema(columnNames, columnDataTypes);
+    _resultSchema = dataSchema;
 
     _isCumulativeBlockConstructed = false;
   }

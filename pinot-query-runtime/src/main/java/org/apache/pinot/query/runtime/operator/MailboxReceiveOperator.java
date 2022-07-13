@@ -50,14 +50,16 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
   private final RelDistribution.Type _exchangeType;
   private final List<ServerInstance> _sendingStageInstances;
+  private final DataSchema _dataSchema;
   private final String _hostName;
   private final int _port;
   private final long _jobId;
   private final int _stageId;
 
-  public MailboxReceiveOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
+  public MailboxReceiveOperator(MailboxService<Mailbox.MailboxContent> mailboxService, DataSchema dataSchema,
       RelDistribution.Type exchangeType, List<ServerInstance> sendingStageInstances, String hostName, int port,
       long jobId, int stageId) {
+    _dataSchema = dataSchema;
     _mailboxService = mailboxService;
     _exchangeType = exchangeType;
     _sendingStageInstances = sendingStageInstances;
@@ -83,7 +85,6 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   protected TransferableBlock getNextBlock() {
     // TODO: do a round robin check against all MailboxContentStreamObservers and find which one that has data.
     boolean hasOpenedMailbox = true;
-    DataSchema dataSchema = null;
     long timeoutWatermark = System.nanoTime() + DEFAULT_TIMEOUT_NANO;
     while (hasOpenedMailbox && System.nanoTime() < timeoutWatermark) {
       hasOpenedMailbox = false;

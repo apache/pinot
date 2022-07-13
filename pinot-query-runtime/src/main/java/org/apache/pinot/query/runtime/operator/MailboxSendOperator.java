@@ -28,6 +28,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.proto.Mailbox;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
@@ -64,13 +65,15 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   private final long _jobId;
   private final int _stageId;
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
+  private final DataSchema _dataSchema;
   private BaseOperator<TransferableBlock> _dataTableBlockBaseOperator;
   private BaseDataBlock _dataTable;
 
-  public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
+  public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService, DataSchema dataSchema,
       BaseOperator<TransferableBlock> dataTableBlockBaseOperator, List<ServerInstance> receivingStageInstances,
       RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector, String hostName, int port,
       long jobId, int stageId) {
+    _dataSchema = dataSchema;
     _mailboxService = mailboxService;
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
     _receivingStageInstances = receivingStageInstances;
@@ -89,9 +92,10 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
    * we create a {@link org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl} that can handle the
    * creation of MailboxSendOperator we should not use this API.
    */
-  public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService, BaseDataBlock dataTable,
-      List<ServerInstance> receivingStageInstances, RelDistribution.Type exchangeType,
+  public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService, DataSchema dataSchema,
+      BaseDataBlock dataTable, List<ServerInstance> receivingStageInstances, RelDistribution.Type exchangeType,
       KeySelector<Object[], Object[]> keySelector, String hostName, int port, long jobId, int stageId) {
+    _dataSchema = dataSchema;
     _mailboxService = mailboxService;
     _dataTable = dataTable;
     _receivingStageInstances = receivingStageInstances;
@@ -140,7 +144,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
             // we no longer need to send data to the rest of the receiving instances, but we still need to transfer
             // the dataTable over indicating that we are a potential sender. thus next time a random server is selected
             // it might still be useful.
-            dataTable = DataBlockUtils.getEmptyDataBlock(dataTable.getDataSchema());
+            dataTable = DataBlockUtils.getEmptyDataBlock(_dataSchema);
           }
           break;
         case BROADCAST_DISTRIBUTED:

@@ -111,9 +111,10 @@ public class QueryRunner {
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
       MailboxSendOperator mailboxSendOperator =
-          new MailboxSendOperator(_mailboxService, dataBlock, receivingStageMetadata.getServerInstances(),
-              sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), _hostname, _port,
-              serverQueryRequest.getRequestId(), sendNode.getStageId());
+          new MailboxSendOperator(_mailboxService, dataBlock.getDataSchema(), dataBlock,
+              receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(),
+              sendNode.getPartitionKeySelector(), _hostname, _port, serverQueryRequest.getRequestId(),
+              sendNode.getStageId());
       mailboxSendOperator.nextBlock();
     } else {
       _workerExecutor.processQuery(distributedStagePlan, requestMetadataMap, executorService);

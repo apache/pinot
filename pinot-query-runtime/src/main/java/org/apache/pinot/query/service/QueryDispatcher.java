@@ -28,6 +28,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -64,7 +65,7 @@ public class QueryDispatcher {
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(reduceStageId);
     MailboxReceiveOperator mailboxReceiveOperator = createReduceStageOperator(mailboxService,
         queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
-        requestId, reduceNode.getSenderStageId(), mailboxService.getHostname(),
+        requestId, reduceNode.getSenderStageId(), reduceNode.getDataSchema(), mailboxService.getHostname(),
         mailboxService.getMailboxPort());
     return reduceMailboxReceive(mailboxReceiveOperator);
   }
@@ -129,10 +130,11 @@ public class QueryDispatcher {
   }
 
   public static MailboxReceiveOperator createReduceStageOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
-      List<ServerInstance> sendingInstances, long jobId, int stageId, String hostname, int port) {
+      List<ServerInstance> sendingInstances, long jobId, int stageId, DataSchema dataSchema, String hostname,
+      int port) {
     MailboxReceiveOperator mailboxReceiveOperator =
-        new MailboxReceiveOperator(mailboxService, RelDistribution.Type.ANY, sendingInstances, hostname, port, jobId,
-            stageId);
+        new MailboxReceiveOperator(mailboxService, dataSchema, RelDistribution.Type.ANY, sendingInstances, hostname,
+            port, jobId, stageId);
     return mailboxReceiveOperator;
   }
 

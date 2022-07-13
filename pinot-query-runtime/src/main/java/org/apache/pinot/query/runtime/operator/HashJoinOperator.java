@@ -47,20 +47,25 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private final HashMap<Integer, List<Object[]>> _broadcastHashTable;
   private final BaseOperator<TransferableBlock> _leftTableOperator;
   private final BaseOperator<TransferableBlock> _rightTableOperator;
-
-  private DataSchema _leftTableSchema;
-  private DataSchema _rightTableSchema;
-  private int _resultRowSize;
+  private final DataSchema _dataSchema;
+  private final DataSchema _leftTableSchema;
+  private final DataSchema _rightTableSchema;
+  private final int _resultRowSize;
   private boolean _isHashTableBuilt;
   private KeySelector<Object[], Object[]> _leftKeySelector;
   private KeySelector<Object[], Object[]> _rightKeySelector;
 
-  public HashJoinOperator(BaseOperator<TransferableBlock> leftTableOperator,
-      BaseOperator<TransferableBlock> rightTableOperator, List<JoinNode.JoinClause> criteria) {
+  public HashJoinOperator(BaseOperator<TransferableBlock> leftTableOperator, DataSchema leftSchema,
+      BaseOperator<TransferableBlock> rightTableOperator, DataSchema rightSchema, DataSchema outputSchema,
+      List<JoinNode.JoinClause> criteria) {
     _leftKeySelector = criteria.get(0).getLeftJoinKeySelector();
     _rightKeySelector = criteria.get(0).getRightJoinKeySelector();
     _leftTableOperator = leftTableOperator;
     _rightTableOperator = rightTableOperator;
+    _dataSchema = outputSchema;
+    _leftTableSchema = leftSchema;
+    _rightTableSchema = rightSchema;
+    _resultRowSize = _dataSchema.size();
     _isHashTableBuilt = false;
     _broadcastHashTable = new HashMap<>();
   }
@@ -91,7 +96,6 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     if (!_isHashTableBuilt) {
       TransferableBlock rightBlock = _rightTableOperator.nextBlock();
       while (!TransferableBlockUtils.isEndOfStream(rightBlock)) {
-        _rightTableSchema = rightBlock.getDataSchema();
         List<Object[]> container = rightBlock.getContainer();
         // put all the rows into corresponding hash collections keyed by the key selector function.
         for (Object[] row : container) {
@@ -111,8 +115,6 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
     List<Object[]> rows = new ArrayList<>();
-    _leftTableSchema = leftBlock.getDataSchema();
-    _resultRowSize = _leftTableSchema.size() + _rightTableSchema.size();
     List<Object[]> container = leftBlock.getContainer();
     for (Object[] leftRow : container) {
       List<Object[]> hashCollection =

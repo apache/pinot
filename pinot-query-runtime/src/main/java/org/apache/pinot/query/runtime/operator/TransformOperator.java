@@ -45,21 +45,15 @@ public class TransformOperator extends BaseOperator<TransferableBlock> {
   private final int _resultColumnSize;
   private final DataSchema _resultSchema;
 
-  public TransformOperator(BaseOperator<TransferableBlock> upstreamOperator, List<RexExpression> transforms,
-      DataSchema upstreamDataSchema) {
+  public TransformOperator(BaseOperator<TransferableBlock> upstreamOperator, DataSchema dataSchema,
+      List<RexExpression> transforms, DataSchema upstreamDataSchema) {
     _upstreamOperator = upstreamOperator;
     _resultColumnSize = transforms.size();
     _transformOperandsList = new ArrayList<>(_resultColumnSize);
     for (RexExpression rexExpression : transforms) {
       _transformOperandsList.add(TransformOperands.toFunctionOperands(rexExpression, upstreamDataSchema));
     }
-    String[] columnNames = new String[_resultColumnSize];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[_resultColumnSize];
-    for (int i = 0; i < _resultColumnSize; i++) {
-      columnNames[i] = _transformOperandsList.get(i).getResultName();
-      columnDataTypes[i] = _transformOperandsList.get(i).getResultType();
-    }
-    _resultSchema = new DataSchema(columnNames, columnDataTypes);
+    _resultSchema = dataSchema;
   }
 
   @Override
