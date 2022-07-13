@@ -64,7 +64,6 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX = "/CONFIGS/CLUSTER";
   private static final String PROPERTYSTORE_SEGMENT_LINEAGE = "/SEGMENT_LINEAGE";
   private static final String PROPERTYSTORE_MINION_TASK_METADATA_PREFIX = "/MINION_TASK_METADATA";
-  private static final String PROPERTYSTORE_MINION_TASK_GENERATOR_INFO_PREFIX = "/MINION_TASK_GENERATOR_INFO";
 
   public static void setUserConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String username, ZNRecord znRecord) {
     propertyStore.set(constructPropertyStorePathForUserConfig(username), znRecord, AccessOption.PERSISTENT);
@@ -138,10 +137,6 @@ public class ZKMetadataProvider {
   public static String constructPropertyStorePathForMinionTaskMetadataDeprecated(String taskType,
       String tableNameWithType) {
     return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, taskType, tableNameWithType);
-  }
-
-  public static String constructPropertyStorePathForTaskGeneratorInfo(String tableNameWithType, String taskType) {
-    return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_GENERATOR_INFO_PREFIX, tableNameWithType, taskType);
   }
 
   public static boolean isSegmentExisted(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceNameForResource,

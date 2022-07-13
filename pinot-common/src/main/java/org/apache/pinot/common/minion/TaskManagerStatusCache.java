@@ -18,32 +18,15 @@
  */
 package org.apache.pinot.common.minion;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.pinot.spi.utils.JsonUtils;
+import java.util.function.Consumer;
 
 
-/**
- * Base abstract class for task generator info.
- */
-public abstract class BaseTaskGeneratorInfo {
-  /**
-   * @return task type
-   */
-  public abstract String getTaskType();
+public abstract class TaskManagerStatusCache<T extends BaseTaskGeneratorInfo> {
 
-  /**
-   * @return task generator info as a Json string
-   */
-  public String toJsonString() {
-    try {
-      return JsonUtils.objectToString(this);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException(e);
-    }
-  }
+  public abstract T fetchTaskGeneratorInfo(String tableNameWithType, String taskType);
 
-  @Override
-  public String toString() {
-    return toJsonString();
-  }
+  public abstract void saveTaskGeneratorInfo(String tableNameWithType, String taskType,
+      Consumer<T> taskGeneratorMostRecentRunInfoUpdater);
+
+  public abstract void deleteTaskGeneratorInfo(String tableNameWithType, String taskType);
 }

@@ -19,16 +19,13 @@
 package org.apache.pinot.common.minion;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import org.apache.helix.ZNRecord;
 
@@ -39,8 +36,6 @@ import org.apache.helix.ZNRecord;
  * message.
  */
 public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
-  @VisibleForTesting
-  static final String ZNRECORD_DELIMITER = "__";
   @VisibleForTesting
   static final int MAX_NUM_OF_HISTORY_TO_KEEP = 5;
   @VisibleForTesting
@@ -143,44 +138,6 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
     return _version;
   }
 
-  @Override
-  public ZNRecord toZNRecord() {
-    ZNRecord znRecord = new ZNRecord(constructZNRecordId(_tableNameWithType, _taskType));
-    znRecord.setVersion(_version);
-    List<String> mostRecentSuccessTsStringList =
-        _mostRecentSuccessRunTS.stream().map(e -> Long.toString(e)).collect(Collectors.toList());
-    znRecord.setListField(MOST_RECENT_SUCCESS_RUN_TS, mostRecentSuccessTsStringList);
-    Map<String, String> mostRecentErrorsTsStringMap = _mostRecentErrorRunMessage.entrySet().stream()
-        .collect(Collectors.toMap(e -> Long.toString(e.getKey()), Map.Entry::getValue));
-    znRecord.setMapField(MOST_RECENT_ERROR_RUN_MESSAGE, mostRecentErrorsTsStringMap);
-    return znRecord;
-  }
-
-  /**
-   * Creates a {@link TaskGeneratorMostRecentRunInfo} instance from a {@link ZNRecord}
-   * @param znRecord a {@link ZNRecord}
-   * @return a {@link TaskGeneratorMostRecentRunInfo}
-   */
-  public static TaskGeneratorMostRecentRunInfo fromZNRecord(ZNRecord znRecord, String tableNameWithType,
-      String taskType) {
-    Preconditions.checkArgument(Objects.equals(znRecord.getId(), constructZNRecordId(tableNameWithType, taskType)),
-        String.format("the provided ZNRecord is not for table %s and task type %s", tableNameWithType, taskType));
-    List<String> mostRecentSuccessTsStringList = znRecord.getListField(MOST_RECENT_SUCCESS_RUN_TS);
-    if (mostRecentSuccessTsStringList == null) {
-      mostRecentSuccessTsStringList = Collections.EMPTY_LIST;
-    }
-    Map<String, String> mostRecentErrorsTsStringMap = znRecord.getMapField(MOST_RECENT_ERROR_RUN_MESSAGE);
-    if (mostRecentErrorsTsStringMap == null) {
-      mostRecentErrorsTsStringMap = Collections.EMPTY_MAP;
-    }
-
-    return new TaskGeneratorMostRecentRunInfo(tableNameWithType, taskType,
-        mostRecentErrorsTsStringMap.entrySet().stream()
-            .collect(Collectors.toMap(e -> Long.parseLong(e.getKey()), Map.Entry::getValue)),
-        mostRecentSuccessTsStringList.stream().map(Long::parseLong).collect(Collectors.toList()),
-        znRecord.getVersion());
-  }
-
   /**
    * Creates a new empty {@link TaskGeneratorMostRecentRunInfo}
    * @param tableNameWithType the table name with type
@@ -190,9 +147,5 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
   public static TaskGeneratorMostRecentRunInfo newInstance(String tableNameWithType, String taskType) {
     return new TaskGeneratorMostRecentRunInfo(tableNameWithType, taskType, Collections.EMPTY_MAP,
         Collections.EMPTY_LIST, -1);
-  }
-
-  private static String constructZNRecordId(String tableNameWithType, String taskType) {
-    return tableNameWithType + ZNRECORD_DELIMITER + taskType;
   }
 }

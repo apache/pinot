@@ -41,7 +41,8 @@ import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.minion.TaskGeneratorMostRecentRunInfoUtils;
+import org.apache.pinot.common.minion.TaskGeneratorMostRecentRunInfo;
+import org.apache.pinot.common.minion.TaskManagerStatusCache;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
@@ -104,13 +105,17 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
   private final ZkTableConfigChangeListener _zkTableConfigChangeListener = new ZkTableConfigChangeListener();
 
+  private final TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> _taskManagerStatusCache;
+
   public PinotTaskManager(PinotHelixTaskResourceManager helixTaskResourceManager,
       PinotHelixResourceManager helixResourceManager, LeadControllerManager leadControllerManager,
-      ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
+      ControllerConf controllerConf, ControllerMetrics controllerMetrics,
+      TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> taskManagerStatusCache) {
     super("PinotTaskManager", controllerConf.getTaskManagerFrequencyInSeconds(),
         controllerConf.getPinotTaskManagerInitialDelaySeconds(), helixResourceManager, leadControllerManager,
         controllerMetrics);
     _helixTaskResourceManager = helixTaskResourceManager;
+    _taskManagerStatusCache = taskManagerStatusCache;
     _clusterInfoAccessor =
         new ClusterInfoAccessor(helixResourceManager, helixTaskResourceManager, controllerConf, controllerMetrics,
             leadControllerManager);
@@ -526,8 +531,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       pinotTaskConfigs = taskGenerator.generateTasks(enabledTableConfigs);
       for (TableConfig tableConfig : enabledTableConfigs) {
         try {
-          TaskGeneratorMostRecentRunInfoUtils.saveSuccessRunTsToZk(_pinotHelixResourceManager.getPropertyStore(),
-              tableConfig.getTableName(), taskGenerator.getTaskType(), System.currentTimeMillis());
+          _taskManagerStatusCache.saveTaskGeneratorInfo(tableConfig.getTableName(), taskGenerator.getTaskType(),
+              taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addSuccessRunTs(
+                  System.currentTimeMillis()));
         } catch (Exception exception) {
           LOGGER.warn("Failed to save task generator success timestamp to ZK", exception);
         }
@@ -539,8 +545,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           try (PrintWriter pw = new PrintWriter(errors)) {
             e.printStackTrace(pw);
           }
-          TaskGeneratorMostRecentRunInfoUtils.saveErrorRunMessageToZk(_pinotHelixResourceManager.getPropertyStore(),
-              tableConfig.getTableName(), taskGenerator.getTaskType(), System.currentTimeMillis(), errors.toString());
+          _taskManagerStatusCache.saveTaskGeneratorInfo(tableConfig.getTableName(), taskGenerator.getTaskType(),
+              taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addErrorRunMessage(
+                  System.currentTimeMillis(), errors.toString()));
         } catch (Exception exception) {
           LOGGER.warn("Failed to save task generator error message to ZK", exception);
         }
