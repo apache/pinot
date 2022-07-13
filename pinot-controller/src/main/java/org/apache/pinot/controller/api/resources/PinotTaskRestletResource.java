@@ -54,7 +54,8 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.TableNotFoundException;
-import org.apache.pinot.common.minion.TaskGeneratorMostRecentRunInfo;
+import org.apache.pinot.common.minion.BaseTaskGeneratorInfo;
+import org.apache.pinot.common.minion.TaskManagerStatusCache;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -118,6 +119,9 @@ public class PinotTaskRestletResource {
 
   @Inject
   PinotTaskManager _pinotTaskManager;
+
+  @Inject
+  TaskManagerStatusCache _taskManagerStatusCache;
 
   @GET
   @Path("/tasks/tasktypes")
@@ -235,12 +239,12 @@ public class PinotTaskRestletResource {
   @GET
   @Path("/tasks/generator/{tableNameWithType}/{taskType}/debug")
   @ApiOperation("Fetch task generation information for the recent runs of the given task for the given table")
-  public TaskGeneratorMostRecentRunInfo getTaskGenerationDebugInto(
+  public BaseTaskGeneratorInfo getTaskGenerationDebugInto(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType
   ) {
-    return _pinotHelixTaskResourceManager.getTaskGeneratorDebugInfoByTable(tableNameWithType, taskType);
+    return _taskManagerStatusCache.fetchTaskGeneratorInfo(tableNameWithType, taskType);
   }
 
   @GET
