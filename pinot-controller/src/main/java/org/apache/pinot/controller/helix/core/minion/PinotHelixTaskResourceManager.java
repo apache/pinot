@@ -578,6 +578,18 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
+   * Returns TaskGenerator debug info for the given table and taskType
+   * @param tableNameWithType able name with type to filter on
+   * @param taskType Pinot taskType / Helix JobQueue
+   * @return TaskGeneratorMostRecentRunInfo for the given table and taskType
+   */
+  public TaskGeneratorMostRecentRunInfo getTaskGeneratorDebugInfoByTable(String tableNameWithType, String taskType) {
+    return TaskGeneratorMostRecentRunInfo.fromZNRecord(
+        TaskGeneratorInfoUtils.fetchTaskGeneratorInfo(_helixResourceManager.getPropertyStore(), tableNameWithType,
+            taskType), tableNameWithType, taskType);
+  }
+
+  /**
    * Given a taskName, collects status of the (sub)tasks in the taskName.
    *
    * @param taskName      Pinot taskName
@@ -695,12 +707,6 @@ public class PinotHelixTaskResourceManager {
 
   public String getParentTaskName(String taskType, String taskName) {
     return TASK_PREFIX + taskType + TASK_NAME_SEPARATOR + taskName;
-  }
-
-  public TaskGeneratorMostRecentRunInfo getTaskGeneratorDebugInfo(String tableNameWithType, String taskType) {
-    return TaskGeneratorMostRecentRunInfo.fromZNRecord(
-        TaskGeneratorInfoUtils.fetchTaskGeneratorInfo(_helixResourceManager.getPropertyStore(), tableNameWithType,
-            taskType), tableNameWithType, taskType);
   }
 
   public String getTaskMetadataByTable(String taskType, String tableNameWithType)
