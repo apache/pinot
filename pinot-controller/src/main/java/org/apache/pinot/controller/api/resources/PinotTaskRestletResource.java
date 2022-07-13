@@ -55,6 +55,7 @@ import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.minion.BaseTaskGeneratorInfo;
+import org.apache.pinot.common.minion.TaskGeneratorMostRecentRunInfo;
 import org.apache.pinot.common.minion.TaskManagerStatusCache;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -121,7 +122,7 @@ public class PinotTaskRestletResource {
   PinotTaskManager _pinotTaskManager;
 
   @Inject
-  TaskManagerStatusCache _taskManagerStatusCache;
+  TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> _taskManagerStatusCache;
 
   @GET
   @Path("/tasks/tasktypes")
@@ -239,12 +240,18 @@ public class PinotTaskRestletResource {
   @GET
   @Path("/tasks/generator/{tableNameWithType}/{taskType}/debug")
   @ApiOperation("Fetch task generation information for the recent runs of the given task for the given table")
-  public BaseTaskGeneratorInfo getTaskGenerationDebugInto(
+  public TaskGeneratorMostRecentRunInfo getTaskGenerationDebugInto(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
-          String tableNameWithType
-  ) {
-    return _taskManagerStatusCache.fetchTaskGeneratorInfo(tableNameWithType, taskType);
+          String tableNameWithType) {
+    TaskGeneratorMostRecentRunInfo taskGeneratorMostRecentRunInfo =
+        _taskManagerStatusCache.fetchTaskGeneratorInfo(tableNameWithType, taskType);
+    if (taskGeneratorMostRecentRunInfo == null) {
+      throw new ControllerApplicationException(LOGGER, "Task generation information not found",
+          Response.Status.NOT_FOUND);
+    }
+
+    return taskGeneratorMostRecentRunInfo;
   }
 
   @GET
