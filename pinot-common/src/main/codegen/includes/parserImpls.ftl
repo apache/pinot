@@ -73,7 +73,8 @@ SqlInsertFromFile SqlInsertFromFile() :
     }
 }
 
-/* define the rest of the sql into SqlStmtList
+/**
+ * define the rest of the sql into SqlStmtList
  */
 private void SqlStatementList(SqlNodeList list) :
 {

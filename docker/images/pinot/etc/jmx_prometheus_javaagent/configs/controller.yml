@@ -117,6 +117,13 @@ rules:
   labels:
     table: "$1"
     tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.(\\w+)_(\\w+).(\\w+).periodicTaskError\"><>(\\w+)"
+  name: "pinot_controller_periodicTaskError_$4"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    periodicTask: "$3"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableStorageQuotaUtilization.(\\w+)_(\\w+)\"><>(\\w+)"
   name: "pinot_controller_tableStorageQuotaUtilization_$3"
   cache: true

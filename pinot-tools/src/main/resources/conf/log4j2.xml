@@ -40,7 +40,7 @@
   <Loggers>
     <Root level="info" additivity="false">
       <AppenderRef ref="pinotLog"/>
-      <AppenderRef ref="console"/>
+      <AppenderRef ref="console" level="${env:LOG4J_CONSOLE_LEVEL:-info}"/>
     </Root>
     <Logger name="org.apache.pinot.tools.admin" level="info" additivity="false">
       <AppenderRef ref="console"/>

@@ -91,6 +91,27 @@
       <version>${project.version}</version>
     </dependency>
     <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdfs</artifactId>
+      <scope>compile</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>xml-apis</groupId>
+          <artifactId>xml-apis</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>xml-apis</groupId>
+      <artifactId>xml-apis</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-parquet</artifactId>
       <version>${project.version}</version>
@@ -441,6 +462,16 @@
             <program>
               <mainClass>org.apache.pinot.tools.AuthQuickstart</mainClass>
               <name>quick-start-auth</name>
+              <jvmSettings>
+                <initialMemorySize>4G</initialMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.tools.AuthZkBasicQuickstart</mainClass>
+              <name>quick-start-auth-zk</name>
               <jvmSettings>
                 <initialMemorySize>4G</initialMemorySize>
                 <extraArguments>

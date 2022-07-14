@@ -201,6 +201,11 @@ public class QueryRunnerTest {
         // Making transform after GROUP-BY, number of rows should be the same as GROUP-BY result.
         new Object[]{"SELECT a.col1, a.col2, SUM(a.col3) - MIN(a.col3) FROM a"
             + " WHERE a.col3 >= 0 GROUP BY a.col1, a.col2", 5},
+
+        // GROUP BY after JOIN
+        // only 3 GROUP BY key exist because b.col2 cycles between "foo", "bar", "alice".
+        new Object[]{"SELECT a.col1, SUM(b.col3) FROM a JOIN b ON a.col1 = b.col2 "
+            + " WHERE a.col3 >= 0 GROUP BY a.col1", 3},
     };
   }
 }

@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
@@ -57,8 +58,10 @@ public class MultiValueVarByteRawIndexCreatorTest {
   public Object[][] params() {
     return Arrays.stream(ChunkCompressionType.values())
         .flatMap(chunkCompressionType -> IntStream.of(10, 15, 20, 1000).boxed()
-            .flatMap(maxLength -> IntStream.range(1, 20).map(i -> i * 2 - 1).boxed()
-                .map(maxNumEntries -> new Object[]{chunkCompressionType, maxLength, maxNumEntries})))
+            .flatMap(useFullSize -> Stream.of(true, false)
+                .flatMap(maxLength -> IntStream.range(1, 20).map(i -> i * 2 - 1).boxed()
+                    .map(maxNumEntries -> new Object[]{chunkCompressionType, useFullSize, maxLength,
+                        maxNumEntries}))))
         .toArray(Object[][]::new);
   }
 
@@ -83,7 +86,7 @@ public class MultiValueVarByteRawIndexCreatorTest {
   }
 
   @Test(dataProvider = "params")
-  public void testMVString(ChunkCompressionType compressionType, int maxLength, int maxNumEntries)
+  public void testMVString(ChunkCompressionType compressionType, int maxLength, boolean useFullSize, int maxNumEntries)
       throws IOException {
     String column = "testCol-" + UUID.randomUUID();
     int numDocs = 1000;
@@ -93,12 +96,12 @@ public class MultiValueVarByteRawIndexCreatorTest {
     int maxTotalLength = 0;
     int maxElements = 0;
     for (int i = 0; i < numDocs; i++) {
-      int numEntries = random.nextInt(maxNumEntries + 1);
+      int numEntries = useFullSize ? maxNumEntries : random.nextInt(maxNumEntries + 1);
       maxElements = Math.max(numEntries, maxElements);
       String[] values = new String[numEntries];
       int serializedLength = 0;
       for (int j = 0; j < numEntries; j++) {
-        int length = random.nextInt(maxLength);
+        int length = useFullSize ? maxLength : random.nextInt(maxLength + 1);
         serializedLength += length;
         char[] value = new char[length];
         Arrays.fill(value, 'b');
@@ -135,7 +138,7 @@ public class MultiValueVarByteRawIndexCreatorTest {
   }
 
   @Test(dataProvider = "params")
-  public void testMVBytes(ChunkCompressionType compressionType, int maxLength, int maxNumEntries)
+  public void testMVBytes(ChunkCompressionType compressionType, int maxLength, boolean useFullSize, int maxNumEntries)
       throws IOException {
     String column = "testCol-" + UUID.randomUUID();
     int numDocs = 1000;
@@ -145,12 +148,12 @@ public class MultiValueVarByteRawIndexCreatorTest {
     int maxTotalLength = 0;
     int maxElements = 0;
     for (int i = 0; i < numDocs; i++) {
-      int numEntries = random.nextInt(maxNumEntries);
+      int numEntries = useFullSize ? maxNumEntries : random.nextInt(maxNumEntries + 1);
       maxElements = Math.max(numEntries, maxElements);
       byte[][] values = new byte[numEntries][];
       int serializedLength = 0;
       for (int j = 0; j < numEntries; j++) {
-        int length = random.nextInt(maxLength);
+        int length = useFullSize ? maxLength : random.nextInt(maxLength + 1);
         serializedLength += length;
         byte[] value = new byte[length];
         Arrays.fill(value, (byte) 'b');

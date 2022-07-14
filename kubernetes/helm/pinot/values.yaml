@@ -156,7 +156,9 @@ controller:
 
   # Use extraEnv to add individual key value pairs as container environment variables.
   # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
-  extraEnv: []
+  extraEnv:
+    - name: LOG4J_CONSOLE_LEVEL
+      value: info
   #  - name: PINOT_CUSTOM_ENV
   #    value: custom-value
 
@@ -247,7 +249,9 @@ broker:
 
   # Use extraEnv to add individual key value pairs as container environment variables.
   # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
-  extraEnv: []
+  extraEnv:
+    - name: LOG4J_CONSOLE_LEVEL
+      value: info
   #  - name: PINOT_CUSTOM_ENV
   #    value: custom-value
 
@@ -329,7 +333,9 @@ server:
 
   # Use extraEnv to add individual key value pairs as container environment variables.
   # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
-  extraEnv: []
+  extraEnv:
+    - name: LOG4J_CONSOLE_LEVEL
+      value: info
   #  - name: PINOT_CUSTOM_ENV
   #    value: custom-value
 
@@ -409,7 +415,9 @@ minion:
 
   # Use extraEnv to add individual key value pairs as container environment variables.
   # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
-  extraEnv: []
+  extraEnv:
+    - name: LOG4J_CONSOLE_LEVEL
+      value: info
   #  - name: PINOT_CUSTOM_ENV
   #    value: custom-value
 
@@ -478,7 +486,9 @@ minionStateless:
 
   # Use extraEnv to add individual key value pairs as container environment variables.
   # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
-  extraEnv: []
+  extraEnv:
+    - name: LOG4J_CONSOLE_LEVEL
+      value: info
   #  - name: PINOT_CUSTOM_ENV
   #    value: custom-value
 

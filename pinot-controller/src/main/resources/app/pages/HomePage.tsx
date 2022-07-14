@@ -18,7 +18,7 @@
  */
 
 import React, {useState, useEffect} from 'react';
-import { Grid, makeStyles, Paper } from '@material-ui/core';
+import { Grid, makeStyles, Paper, Box } from '@material-ui/core';
 import { TableData, DataTable } from 'Models';
 import { Link } from 'react-router-dom';
 import AppLoader from '../components/AppLoader';
@@ -26,10 +26,12 @@ import PinotMethodUtils from '../utils/PinotMethodUtils';
 import TenantsListing from '../components/Homepage/TenantsListing';
 import Instances from '../components/Homepage/InstancesTables';
 import ClusterConfig from '../components/Homepage/ClusterConfig';
+import useTaskTypesTable from '../components/Homepage/useTaskTypesTable';
 
 const useStyles = makeStyles((theme) => ({
   paper:{
     padding: '10px 0',
+    height: '100%',
     color: '#4285f4',
     borderRadius: 4,
     marginBottom: 15,
@@ -57,7 +59,8 @@ const useStyles = makeStyles((theme) => ({
     overflowY: 'auto'
   },
   paperLinks: {
-    textDecoration: 'none'
+    textDecoration: 'none',
+    height: '100%'
   }
 }));
 
@@ -70,9 +73,12 @@ const HomePage = () => {
   const [clusterName, setClusterName] = useState('');
   const [tables, setTables] = useState([]);
 
+  const { taskTypes, taskTypesTable } = useTaskTypesTable();
+
   const fetchData = async () => {
     const tenantsDataResponse = await PinotMethodUtils.getTenantsData();
     const instanceResponse = await PinotMethodUtils.getAllInstances();
+    const taskTypes = await PinotMethodUtils.getAllTaskTypes();
     const tablesResponse = await PinotMethodUtils.getQueryTablesList({bothType: true});
     const tablesList = [];
     tablesResponse.records.map((record)=>{
@@ -97,15 +103,7 @@ const HomePage = () => {
   ) : (
     <Grid item xs className={classes.gridContainer}>
       <Grid container spacing={3}>
-        <Grid item xs={2}>
-          <Link to="/tenants" className={classes.paperLinks}>
-            <Paper className={classes.paper}>
-              <h4>Tenants</h4>
-              <h2>{Array.isArray(tenantsData.records) ? tenantsData.records.length : 0}</h2>
-            </Paper>
-          </Link>
-        </Grid>
-        <Grid item xs={2}>
+        <Grid item xs={3}>
           <Link to="/controllers" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Controllers</h4>
@@ -113,7 +111,7 @@ const HomePage = () => {
             </Paper>
           </Link>
         </Grid>
-        <Grid item xs={2}>
+        <Grid item xs={3}>
           <Link to="/brokers" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Brokers</h4>
@@ -121,7 +119,7 @@ const HomePage = () => {
             </Paper>
           </Link>
         </Grid>
-        <Grid item xs={2}>
+        <Grid item xs={3}>
           <Link to="/servers" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Servers</h4>
@@ -129,7 +127,23 @@ const HomePage = () => {
             </Paper>
           </Link>
         </Grid>
-        <Grid item xs={2}>
+        <Grid item xs={3}>
+          <Link to="/minions" className={classes.paperLinks}>
+            <Paper className={classes.paper}>
+              <h4>Minions</h4>
+              <h2>{Array.isArray(instances.Minion) ? instances.Minion.length : 0}</h2>
+            </Paper>
+          </Link>
+        </Grid>
+        <Grid item xs={3}>
+          <Link to="/tenants" className={classes.paperLinks}>
+            <Paper className={classes.paper}>
+              <h4>Tenants</h4>
+              <h2>{Array.isArray(tenantsData.records) ? tenantsData.records.length : 0}</h2>
+            </Paper>
+          </Link>
+        </Grid>
+        <Grid item xs={3}>
           <Link to="/tables" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Tables</h4>
@@ -137,9 +151,20 @@ const HomePage = () => {
             </Paper>
           </Link>
         </Grid>
+        <Grid item xs={3}>
+          <Link to="/minion-task-manager" className={classes.paperLinks}>
+            <Paper className={classes.paper}>
+              <h4>Minion Task Manager</h4>
+              <h2>{Array.isArray(taskTypes.records) ? taskTypes?.records?.length : 0}</h2>
+            </Paper>
+          </Link>
+        </Grid>
       </Grid>
+      <Box mb={3} />
       <TenantsListing tenantsData={tenantsData} />
       <Instances instances={instances} clusterName={clusterName} />
+
+      {taskTypesTable}
       <ClusterConfig />
     </Grid>
   );

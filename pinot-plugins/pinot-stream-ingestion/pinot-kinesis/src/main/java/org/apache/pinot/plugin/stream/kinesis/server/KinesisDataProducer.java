@@ -64,37 +64,52 @@ public class KinesisDataProducer implements StreamDataProducer {
   private KinesisClient _kinesisClient;
   private RetryPolicy _retryPolicy;
 
+  public KinesisDataProducer() { }
+
+  public KinesisDataProducer(KinesisClient kinesisClient) {
+    this(kinesisClient, new FixedDelayRetryPolicy(
+        Integer.parseInt(DEFAULT_NUM_RETRIES + 1), Integer.parseInt(DEFAULT_RETRY_DELAY_MILLIS)));
+  }
+
+  public KinesisDataProducer(KinesisClient kinesisClient, RetryPolicy retryPolicy) {
+    _kinesisClient = kinesisClient;
+    _retryPolicy = retryPolicy;
+  }
+
   @Override
   public void init(Properties props) {
-    try {
-      KinesisClientBuilder kinesisClientBuilder;
-      if (props.containsKey(ACCESS) && props.containsKey(SECRET)) {
-        kinesisClientBuilder = KinesisClient.builder().region(Region.of(props.getProperty(REGION)))
-            .credentialsProvider(getLocalAWSCredentials(props))
-            .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
-      } else {
-        kinesisClientBuilder = KinesisClient.builder().region(Region.of(props.getProperty(REGION)))
-            .credentialsProvider(DefaultCredentialsProvider.create())
-            .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
-      }
-
-      if (props.containsKey(ENDPOINT)) {
-        String kinesisEndpoint = props.getProperty(ENDPOINT, DEFAULT_ENDPOINT);
-        try {
-          kinesisClientBuilder = kinesisClientBuilder.endpointOverride(new URI(kinesisEndpoint));
-        } catch (URISyntaxException e) {
-          throw new IllegalArgumentException("URI syntax is not correctly specified for endpoint: " + kinesisEndpoint,
-              e);
+    if (_kinesisClient == null) {
+      try {
+        KinesisClientBuilder kinesisClientBuilder;
+        if (props.containsKey(ACCESS) && props.containsKey(SECRET)) {
+          kinesisClientBuilder = KinesisClient.builder().region(Region.of(props.getProperty(REGION)))
+              .credentialsProvider(getLocalAWSCredentials(props))
+              .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
+        } else {
+          kinesisClientBuilder = KinesisClient.builder().region(Region.of(props.getProperty(REGION)))
+              .credentialsProvider(DefaultCredentialsProvider.create())
+              .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
         }
+
+        if (props.containsKey(ENDPOINT)) {
+          String kinesisEndpoint = props.getProperty(ENDPOINT, DEFAULT_ENDPOINT);
+          try {
+            kinesisClientBuilder = kinesisClientBuilder.endpointOverride(new URI(kinesisEndpoint));
+          } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("URI syntax is not correctly specified for endpoint: " + kinesisEndpoint,
+                e);
+          }
+        }
+
+        _kinesisClient = kinesisClientBuilder.build();
+
+        int numRetries = Integer.parseInt(props.getProperty(NUM_RETRIES, DEFAULT_NUM_RETRIES));
+        long retryDelayMs = Long.parseLong(props.getProperty(RETRY_DELAY_MILLIS, DEFAULT_RETRY_DELAY_MILLIS));
+        _retryPolicy = new FixedDelayRetryPolicy(numRetries + 1, retryDelayMs);
+      } catch (Exception e) {
+        LOGGER.warn("Failed to create a kinesis client due to ", e);
+        _kinesisClient = null;
       }
-
-      _kinesisClient = kinesisClientBuilder.build();
-
-      int numRetries = Integer.parseInt(props.getProperty(NUM_RETRIES, DEFAULT_NUM_RETRIES));
-      long retryDelayMs = Long.parseLong(props.getProperty(RETRY_DELAY_MILLIS, DEFAULT_RETRY_DELAY_MILLIS));
-      _retryPolicy = new FixedDelayRetryPolicy(numRetries + 1, retryDelayMs);
-    } catch (Exception e) {
-      _kinesisClient = null;
     }
   }
 

@@ -33,7 +33,7 @@ import 'codemirror/addon/hint/show-hint';
 import 'codemirror/addon/hint/sql-hint';
 import 'codemirror/addon/hint/show-hint.css';
 import NativeCodeMirror from 'codemirror';
-import _ from 'lodash';
+import { forEach, uniqBy, range as _range } from 'lodash';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 import Switch from '@material-ui/core/Switch';
 import exportFromJSON from 'export-from-json';
@@ -190,6 +190,8 @@ const QueryPage = () => {
     records: [],
   });
 
+  const [warnings, setWarnings] = useState<Array<string>>([]);
+
   const [checked, setChecked] = React.useState({
     tracing: queryParam.get('tracing') === 'true',
     showResultJSON: false,
@@ -226,7 +228,7 @@ const QueryPage = () => {
     }
     const query = cm.getValue();
     const querySplit = query.split(/\r?\n/);
-    _.forEach(selections, (range) => {
+    forEach(selections, (range) => {
       // anchor and head are based on where the selection starts/ends, but for the purpose
       // of determining the line number range of the selection, we need start/end in order.
       const start = Math.min(range.anchor.line, range.head.line);
@@ -240,7 +242,7 @@ const QueryPage = () => {
       if (isLastLineFirstChar && !isSingleLineSelection) {
         end = end - 1;
       }
-      const isEntireSelectionCommented = _.range(start, end + 1).every((line) => {
+      const isEntireSelectionCommented = _range(start, end + 1).every((line) => {
         return querySplit[line].startsWith("--") || querySplit[line].trim().length === 0;
       });
 
@@ -295,9 +297,21 @@ const QueryPage = () => {
     setResultData(results.result || { columns: [], records: [] });
     setQueryStats(results.queryStats || { columns: responseStatCols, records: [] });
     setOutputResult(JSON.stringify(results.data, null, 2) || '');
+    setWarnings(extractWarnings(results));
     setQueryLoader(false);
     queryExecuted.current = false;
   };
+
+  const extractWarnings = (result) => {
+    const warnings: Array<string> = [];
+    const numSegmentsPrunedInvalid = result.data.numSegmentsPrunedInvalid;
+    if (numSegmentsPrunedInvalid) {
+      warnings.push(`There are ${numSegmentsPrunedInvalid} invalid segment/s. This usually means that they were `
+         + `created with an older schema. `
+         + `Please reload the table in order to refresh these segments to the new schema.`);
+    }
+    return warnings;
+  }
 
   const fetchSQLData = async (tableName) => {
     setQueryLoader(true);
@@ -409,7 +423,7 @@ const QueryPage = () => {
 
     Array.prototype.push.apply(defaultHint.list, finalList);
 
-    defaultHint.list = _.uniqBy(defaultHint.list, 'text');
+    defaultHint.list = uniqBy(defaultHint.list, 'text');
     return defaultHint;
   };
 
@@ -517,6 +531,13 @@ const QueryPage = () => {
                   </Alert>
                 ) : (
                   <>
+                    {
+                    warnings.map(warn =>
+                        <Alert severity="warning" className={classes.sqlError}>
+                          {warn}
+                        </Alert>
+                      )
+                    }
                     <Grid item xs style={{ backgroundColor: 'white' }}>
                       {resultData.columns.length ? (
                         <>
