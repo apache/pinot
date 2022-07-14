@@ -113,4 +113,16 @@ public class RegexpPatternConverterUtilsTest {
     String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike("zz%%%%%%%%%%%%%");
     assertEquals(regexpLikePattern, "^zz");
   }
+
+  @Test
+  public void testLeadingSize2() {
+    String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike("%z");
+    assertEquals(regexpLikePattern, "z$");
+  }
+
+  @Test
+  public void testTrailingSize2() {
+    String regexpLikePattern = RegexpPatternConverterUtils.likeToRegexpLike("z%");
+    assertEquals(regexpLikePattern, "^z");
+  }
 }

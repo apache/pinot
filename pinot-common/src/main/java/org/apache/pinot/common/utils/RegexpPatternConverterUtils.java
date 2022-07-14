@@ -95,7 +95,7 @@ public class RegexpPatternConverterUtils {
   }
 
   private static int indexOfLastDifferent(String str, char character) {
-    for (int i = str.length() - 1; i > 0; i--) {
+    for (int i = str.length() - 1; i >= 0; i--) {
       if (str.charAt(i) != character) {
         return i;
       }
