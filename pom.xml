@@ -503,13 +503,6 @@
         <scope>import</scope>
       </dependency>
 
-      <!-- zkclient & helix-core use netty -->
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty</artifactId>
-        <version>3.9.6.Final</version>
-      </dependency>
-
       <dependency>
         <groupId>org.reactivestreams</groupId>
         <artifactId>reactive-streams</artifactId>
