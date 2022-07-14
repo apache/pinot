@@ -40,6 +40,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
+import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -198,7 +199,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     SendingMailbox<Mailbox.MailboxContent> sendingMailbox = _mailboxService.getSendingMailbox(mailboxId);
     Mailbox.MailboxContent mailboxContent = toMailboxContent(mailboxId, dataTable, isEndOfStream);
     sendingMailbox.send(mailboxContent);
-    if (mailboxContent.getMetadataMap().containsKey("finished")) {
+    if (mailboxContent.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY)) {
       sendingMailbox.complete();
     }
   }
@@ -208,7 +209,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     Mailbox.MailboxContent.Builder builder = Mailbox.MailboxContent.newBuilder().setMailboxId(mailboxId)
         .setPayload(ByteString.copyFrom(new TransferableBlock(dataTable).toBytes()));
     if (isEndOfStream) {
-      builder.putMetadata("finished", "true");
+      builder.putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true");
     }
     return builder.build();
   }

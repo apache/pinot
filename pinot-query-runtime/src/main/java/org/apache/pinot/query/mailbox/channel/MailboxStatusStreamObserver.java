@@ -63,8 +63,9 @@ public class MailboxStatusStreamObserver implements StreamObserver<Mailbox.Mailb
     // when received a mailbox status from the receiving end, sending end update the known buffer size available
     // so we can make better throughput send judgement. here is a simple example.
     // TODO: this feedback info is not used to throttle the send speed. it is currently being discarded.
-    if (mailboxStatus.getMetadataMap().containsKey("buffer.size")) {
-      _bufferSize.set(Integer.parseInt(mailboxStatus.getMetadataMap().get("buffer.size")));
+    if (mailboxStatus.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY)) {
+      _bufferSize.set(Integer.parseInt(
+          mailboxStatus.getMetadataMap().get(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY)));
     } else {
       _bufferSize.set(DEFAULT_MAILBOX_QUEUE_CAPACITY); // DEFAULT_AVAILABILITY;
     }
