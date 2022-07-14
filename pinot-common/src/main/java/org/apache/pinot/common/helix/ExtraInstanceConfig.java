@@ -47,8 +47,9 @@ public class ExtraInstanceConfig {
   }
 
   /**
-   * Returns an instance URL from the InstanceConfig. Will set the appropriate protocol and port. Returns null
-   * if the URL cannot be constructed.
+   * Returns an instance URL from the InstanceConfig. Will set the appropriate protocol and port. Note that the helix
+   * participant port will be returned. For the Pinot server this will not correspond to the admin port.
+   * Returns null if the URL cannot be constructed.
    */
   public String getComponentUrl() {
     String protocol = null;
