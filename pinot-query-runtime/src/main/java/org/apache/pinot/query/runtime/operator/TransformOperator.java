@@ -80,7 +80,7 @@ public class TransformOperator extends BaseOperator<TransferableBlock> {
   private TransferableBlock transform(TransferableBlock block)
       throws Exception {
     if (TransferableBlockUtils.isEndOfStream(block)) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_resultSchema);
     }
     List<Object[]> resultRows = new ArrayList<>();
     List<Object[]> container = block.getContainer();

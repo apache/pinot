@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -35,13 +36,16 @@ public final class DataBlockUtils {
   }
 
   private static final DataSchema EMPTY_SCHEMA = new DataSchema(new String[0], new DataSchema.ColumnDataType[0]);
-  private static final MetadataBlock EOS_DATA_BLOCK = new MetadataBlock(EMPTY_SCHEMA);
-  static {
-    EOS_DATA_BLOCK._metadata.put(DataTable.MetadataKey.TABLE.getName(), "END_OF_STREAM");
+
+  public static MetadataBlock getEndOfStreamDataBlock(DataSchema dataSchema) {
+    MetadataBlock metadataBlock = getEmptyDataBlock(dataSchema);
+    metadataBlock._metadata.put(DataTable.MetadataKey.TABLE.getName(), "END_OF_STREAM");
+    return metadataBlock;
   }
 
-  public static MetadataBlock getEndOfStreamDataBlock() {
-    return EOS_DATA_BLOCK;
+  public static boolean isEndOfStream(BaseDataBlock dataBlock) {
+    return dataBlock instanceof MetadataBlock
+        && "END_OF_STREAM".equals(dataBlock.getMetadata().get(DataTable.MetadataKey.TABLE.getName()));
   }
 
   public static MetadataBlock getErrorDataBlock(Exception e) {
@@ -55,8 +59,9 @@ public final class DataBlockUtils {
     return errorBlock;
   }
 
-  public static MetadataBlock getEmptyDataBlock(DataSchema dataSchema) {
-    return dataSchema == null ? EOS_DATA_BLOCK : new MetadataBlock(dataSchema);
+  public static MetadataBlock getEmptyDataBlock(@Nonnull DataSchema dataSchema) {
+    // TODO: support actual metadata for the block.
+    return new MetadataBlock(dataSchema);
   }
 
   public static BaseDataBlock getDataBlock(ByteBuffer byteBuffer)

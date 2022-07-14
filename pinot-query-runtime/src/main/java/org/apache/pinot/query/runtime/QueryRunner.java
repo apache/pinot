@@ -105,7 +105,7 @@ public class QueryRunner {
         // which maps to ROW type of version 3.
         dataBlock = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTable.toBytes()));
       } catch (IOException e) {
-        throw new RuntimeException("Unable to convert byte buffer", e);
+        dataBlock = DataBlockUtils.getErrorDataBlock(e);
       }
 
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();

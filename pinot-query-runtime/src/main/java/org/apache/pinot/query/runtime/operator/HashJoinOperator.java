@@ -112,7 +112,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private TransferableBlock buildJoinedDataBlock(TransferableBlock leftBlock)
       throws Exception {
     if (TransferableBlockUtils.isEndOfStream(leftBlock)) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_dataSchema);
     }
     List<Object[]> rows = new ArrayList<>();
     List<Object[]> container = leftBlock.getContainer();

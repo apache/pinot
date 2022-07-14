@@ -118,7 +118,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     }
     // TODO: we need to at least return one data table with schema if there's no error.
     // we need to condition this on whether there's already things being returned or not.
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(_dataSchema);
   }
 
   public RelDistribution.Type getExchangeType() {

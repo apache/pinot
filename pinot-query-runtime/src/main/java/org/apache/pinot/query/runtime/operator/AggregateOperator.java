@@ -135,7 +135,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
         return DataBlockBuilder.buildFromRows(rows, null, _resultSchema);
       }
     } else {
-      return DataBlockUtils.getEndOfStreamDataBlock();
+      return DataBlockUtils.getEndOfStreamDataBlock(_resultSchema);
     }
   }
 
