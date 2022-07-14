@@ -23,7 +23,6 @@ import { Grid } from '@material-ui/core';
 import { RouteComponentProps, useHistory } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { TableData } from 'Models';
-import _ from 'lodash';
 import AppLoader from '../components/AppLoader';
 import CustomizedTables from '../components/Table';
 import 'codemirror/lib/codemirror.css';

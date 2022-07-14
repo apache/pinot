@@ -66,8 +66,7 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_MINION_TASK_METADATA_PREFIX = "/MINION_TASK_METADATA";
 
   public static void setUserConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String username, ZNRecord znRecord) {
-    propertyStore
-        .set(constructPropertyStorePathForUserConfig(username), znRecord, AccessOption.PERSISTENT);
+    propertyStore.set(constructPropertyStorePathForUserConfig(username), znRecord, AccessOption.PERSISTENT);
   }
 
   public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName,
@@ -130,7 +129,13 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_SEGMENT_LINEAGE, tableNameWithType);
   }
 
-  public static String constructPropertyStorePathForMinionTaskMetadata(String taskType, String tableNameWithType) {
+  public static String constructPropertyStorePathForMinionTaskMetadata(String tableNameWithType, String taskType) {
+    return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, tableNameWithType, taskType);
+  }
+
+  @Deprecated
+  public static String constructPropertyStorePathForMinionTaskMetadataDeprecated(String taskType,
+      String tableNameWithType) {
     return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, taskType, tableNameWithType);
   }
 
@@ -156,8 +161,7 @@ public class ZKMetadataProvider {
     }
   }
 
-  public static void removeUserConfigFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String username) {
+  public static void removeUserConfigFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore, String username) {
     String propertyStorePath = constructPropertyStorePathForUserConfig(username);
     if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
       propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
@@ -224,8 +228,8 @@ public class ZKMetadataProvider {
 
   @Nullable
   public static UserConfig getUserConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String username) {
-    ZNRecord znRecord = propertyStore
-        .get(constructPropertyStorePathForUserConfig(username), null, AccessOption.PERSISTENT);
+    ZNRecord znRecord =
+        propertyStore.get(constructPropertyStorePathForUserConfig(username), null, AccessOption.PERSISTENT);
     if (znRecord == null) {
       return null;
     }
@@ -240,14 +244,13 @@ public class ZKMetadataProvider {
 
   @Nullable
   public static List<UserConfig> getAllUserConfig(ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    List<ZNRecord> znRecordss = propertyStore
-        .getChildren(PROPERTYSTORE_USER_CONFIGS_PREFIX, null, AccessOption.PERSISTENT);
+    List<ZNRecord> znRecordss =
+        propertyStore.getChildren(PROPERTYSTORE_USER_CONFIGS_PREFIX, null, AccessOption.PERSISTENT);
 
     try {
-      return Optional.ofNullable(znRecordss)
-          .orElseGet(() -> {
-            return new ArrayList<>();
-          }).stream().map(AccessControlUserConfigUtils::fromZNRecord).collect(Collectors.toList());
+      return Optional.ofNullable(znRecordss).orElseGet(() -> {
+        return new ArrayList<>();
+      }).stream().map(AccessControlUserConfigUtils::fromZNRecord).collect(Collectors.toList());
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting user list configuration", e);
       return null;
@@ -256,8 +259,7 @@ public class ZKMetadataProvider {
 
   @Nullable
   public static List<String> getAllUserName(ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    return propertyStore
-        .getChildNames(PROPERTYSTORE_USER_CONFIGS_PREFIX, AccessOption.PERSISTENT);
+    return propertyStore.getChildNames(PROPERTYSTORE_USER_CONFIGS_PREFIX, AccessOption.PERSISTENT);
   }
 
   @Nullable

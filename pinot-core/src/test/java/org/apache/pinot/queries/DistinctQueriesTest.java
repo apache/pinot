@@ -92,13 +92,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   private static final String FLOAT_MV_COLUMN = "floatMVColumn";
   private static final String DOUBLE_MV_COLUMN = "doubleMVColumn";
   private static final String STRING_MV_COLUMN = "stringMVColumn";
-
-  // TODO: Fix raw index for MV column then add tests for them
-//  private static final String RAW_INT_MV_COLUMN = "rawIntMVColumn";
-//  private static final String RAW_LONG_MV_COLUMN = "rawLongMVColumn";
-//  private static final String RAW_FLOAT_MV_COLUMN = "rawFloatMVColumn";
-//  private static final String RAW_DOUBLE_MV_COLUMN = "rawDoubleMVColumn";
-//  private static final String RAW_STRING_MV_COLUMN = "rawStringMVColumn";
+  private static final String RAW_INT_MV_COLUMN = "rawIntMVColumn";
+  private static final String RAW_LONG_MV_COLUMN = "rawLongMVColumn";
+  private static final String RAW_FLOAT_MV_COLUMN = "rawFloatMVColumn";
+  private static final String RAW_DOUBLE_MV_COLUMN = "rawDoubleMVColumn";
+  private static final String RAW_STRING_MV_COLUMN = "rawStringMVColumn";
 
   //@formatter:off
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
@@ -121,19 +119,19 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       .addMultiValueDimension(FLOAT_MV_COLUMN, DataType.FLOAT)
       .addMultiValueDimension(DOUBLE_MV_COLUMN, DataType.DOUBLE)
       .addMultiValueDimension(STRING_MV_COLUMN, DataType.STRING)
-//      .addMultiValueDimension(RAW_INT_MV_COLUMN, DataType.INT)
-//      .addMultiValueDimension(RAW_LONG_MV_COLUMN, DataType.LONG)
-//      .addMultiValueDimension(RAW_FLOAT_MV_COLUMN, DataType.FLOAT)
-//      .addMultiValueDimension(RAW_DOUBLE_MV_COLUMN, DataType.DOUBLE)
-//      .addMultiValueDimension(RAW_STRING_MV_COLUMN, DataType.STRING)
+      .addMultiValueDimension(RAW_INT_MV_COLUMN, DataType.INT)
+      .addMultiValueDimension(RAW_LONG_MV_COLUMN, DataType.LONG)
+      .addMultiValueDimension(RAW_FLOAT_MV_COLUMN, DataType.FLOAT)
+      .addMultiValueDimension(RAW_DOUBLE_MV_COLUMN, DataType.DOUBLE)
+      .addMultiValueDimension(RAW_STRING_MV_COLUMN, DataType.STRING)
       .build();
   //@formatter:on
 
   private static final TableConfig TABLE = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setNoDictionaryColumns(
           Arrays.asList(RAW_INT_COLUMN, RAW_LONG_COLUMN, RAW_FLOAT_COLUMN, RAW_DOUBLE_COLUMN, RAW_BIG_DECIMAL_COLUMN,
-              RAW_STRING_COLUMN, RAW_BYTES_COLUMN/*, RAW_INT_MV_COLUMN, RAW_LONG_MV_COLUMN, RAW_FLOAT_MV_COLUMN,
-              RAW_DOUBLE_MV_COLUMN, RAW_STRING_MV_COLUMN*/)).build();
+              RAW_STRING_COLUMN, RAW_BYTES_COLUMN, RAW_INT_MV_COLUMN, RAW_LONG_MV_COLUMN, RAW_FLOAT_MV_COLUMN,
+              RAW_DOUBLE_MV_COLUMN, RAW_STRING_MV_COLUMN)).build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -204,11 +202,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       record.putValue(FLOAT_MV_COLUMN, mvValue);
       record.putValue(DOUBLE_MV_COLUMN, mvValue);
       record.putValue(STRING_MV_COLUMN, mvValue);
-//      record.putValue(RAW_INT_MV_COLUMN, mvValue);
-//      record.putValue(RAW_LONG_MV_COLUMN, mvValue);
-//      record.putValue(RAW_FLOAT_MV_COLUMN, mvValue);
-//      record.putValue(RAW_DOUBLE_MV_COLUMN, mvValue);
-//      record.putValue(RAW_STRING_MV_COLUMN, mvValue);
+      record.putValue(RAW_INT_MV_COLUMN, mvValue);
+      record.putValue(RAW_LONG_MV_COLUMN, mvValue);
+      record.putValue(RAW_FLOAT_MV_COLUMN, mvValue);
+      record.putValue(RAW_DOUBLE_MV_COLUMN, mvValue);
+      record.putValue(RAW_STRING_MV_COLUMN, mvValue);
       uniqueRecords.add(record);
     }
 
@@ -364,6 +362,55 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           }
           assertEquals(actualValues, expectedValues);
         }
+      }
+    }
+    {
+      // Raw MV numeric columns
+      //@formatter:off
+      List<String> queries = Arrays.asList(
+          "SELECT DISTINCT(rawIntMVColumn) FROM testTable",
+          "SELECT DISTINCT(rawLongMVColumn) FROM testTable",
+          "SELECT DISTINCT(rawFloatMVColumn) FROM testTable",
+          "SELECT DISTINCT(rawDoubleMVColumn) FROM testTable"
+      );
+      //@formatter:on
+      // We define a specific result set here since the data read from raw is in the order added
+      Set<Integer> expectedValues = new HashSet<>(Arrays.asList(0, 1, 2, 3, 4, 100, 101, 102, 103, 104));
+      for (String query : queries) {
+        DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
+        DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
+        for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
+          assertEquals(distinctTable.size(), 10);
+          Set<Integer> actualValues = new HashSet<>();
+          for (Record record : distinctTable.getRecords()) {
+            Object[] values = record.getValues();
+            assertEquals(values.length, 1);
+            assertTrue(values[0] instanceof Number);
+            actualValues.add(((Number) values[0]).intValue());
+          }
+          assertEquals(actualValues, expectedValues);
+        }
+      }
+    }
+    {
+      // Raw MV string column
+      //@formatter:off
+      String query = "SELECT DISTINCT(rawStringMVColumn) FROM testTable";
+      //@formatter:on
+      // We define a specific result set here since the data read from raw is in the order added
+      Set<Integer> expectedValues = new HashSet<>(Arrays.asList(0, 1, 2, 3, 4, 100, 101, 102, 103, 104));
+      DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
+      DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
+      for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
+        assertEquals(distinctTable.size(), 10);
+        Set<Integer> actualValues = new HashSet<>();
+        for (Record record : distinctTable.getRecords()) {
+          Object[] values = record.getValues();
+          assertEquals(values.length, 1);
+          assertTrue(values[0] instanceof String);
+          actualValues.add(Integer.parseInt((String) values[0]));
+        }
+        assertEquals(actualValues, expectedValues);
       }
     }
   }
@@ -562,6 +609,85 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals(actualValues, expectedValues);
       }
     }
+    {
+      // Numeric raw MV columns ASC
+      //@formatter:off
+      List<String> queries = Arrays.asList(
+          "SELECT DISTINCT(rawIntMVColumn) FROM testTable ORDER BY rawIntMVColumn",
+          "SELECT DISTINCT(rawLongMVColumn) FROM testTable ORDER BY rawLongMVColumn",
+          "SELECT DISTINCT(rawFloatMVColumn) FROM testTable ORDER BY rawFloatMVColumn",
+          "SELECT DISTINCT(rawDoubleMVColumn) FROM testTable ORDER BY rawDoubleMVColumn"
+      );
+      //@formatter:on
+      Set<Integer> expectedValues = new HashSet<>();
+      for (int i = 0; i < 10; i++) {
+        expectedValues.add(i);
+      }
+      for (String query : queries) {
+        DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
+        DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
+        for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
+          assertEquals(distinctTable.size(), 10);
+          Set<Integer> actualValues = new HashSet<>();
+          for (Record record : distinctTable.getRecords()) {
+            Object[] values = record.getValues();
+            assertEquals(values.length, 1);
+            assertTrue(values[0] instanceof Number);
+            actualValues.add(((Number) values[0]).intValue());
+          }
+          assertEquals(actualValues, expectedValues);
+        }
+      }
+    }
+    {
+      // Numeric raw MV columns DESC
+      //@formatter:off
+      List<String> queries = Arrays.asList(
+          "SELECT DISTINCT(rawIntMVColumn) FROM testTable ORDER BY rawIntMVColumn DESC",
+          "SELECT DISTINCT(rawLongMVColumn) FROM testTable ORDER BY rawLongMVColumn DESC",
+          "SELECT DISTINCT(rawFloatMVColumn) FROM testTable ORDER BY rawFloatMVColumn DESC",
+          "SELECT DISTINCT(rawDoubleMVColumn) FROM testTable ORDER BY rawDoubleMVColumn DESC"
+      );
+      //@formatter:on
+      Set<Integer> expectedValues = new HashSet<>();
+      for (int i = 2 * NUM_UNIQUE_RECORDS_PER_SEGMENT - 10; i < 2 * NUM_UNIQUE_RECORDS_PER_SEGMENT; i++) {
+        expectedValues.add(i);
+      }
+      for (String query : queries) {
+        DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
+        DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
+        for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
+          assertEquals(distinctTable.size(), 10);
+          Set<Integer> actualValues = new HashSet<>();
+          for (Record record : distinctTable.getRecords()) {
+            Object[] values = record.getValues();
+            assertEquals(values.length, 1);
+            assertTrue(values[0] instanceof Number);
+            actualValues.add(((Number) values[0]).intValue());
+          }
+          assertEquals(actualValues, expectedValues);
+        }
+      }
+    }
+    {
+      // String raw MV column
+      String query = "SELECT DISTINCT(rawStringMVColumn) FROM testTable ORDER BY rawStringMVColumn";
+      Set<String> expectedValues =
+          new HashSet<>(Arrays.asList("0", "1", "10", "100", "101", "102", "103", "104", "105", "106"));
+      DistinctTable distinctTable1 = getDistinctTableInnerSegment(query);
+      DistinctTable distinctTable2 = DistinctTable.fromByteBuffer(ByteBuffer.wrap(distinctTable1.toBytes()));
+      for (DistinctTable distinctTable : Arrays.asList(distinctTable1, distinctTable2)) {
+        assertEquals(distinctTable.size(), 10);
+        Set<String> actualValues = new HashSet<>();
+        for (Record record : distinctTable.getRecords()) {
+          Object[] values = record.getValues();
+          assertEquals(values.length, 1);
+          assertTrue(values[0] instanceof String);
+          actualValues.add((String) values[0]);
+        }
+        assertEquals(actualValues, expectedValues);
+      }
+    }
   }
 
   /**
@@ -576,10 +702,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    *   <li>Selecting some columns order by raw BYTES column</li>
    *   <li>Selecting some columns transform, filter, order-by and limit</li>
    *   <li>Selecting some columns with filter that does not match any record</li>
+   *   <li>Selecting all dictionary-encoded raw MV columns</li>
+   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
+   *   <li>Selecting some columns with filter with raw MV</li>
+   *   <li>Selecting some columns order by raw MV column</li>
+   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
    * </ul>
    */
   private void testDistinctInnerSegmentHelper(String[] queries) {
-    assertEquals(queries.length, 8);
+    assertEquals(queries.length, 13);
 
     // Selecting all dictionary-encoded SV columns
     // SELECT DISTINCT intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn
@@ -808,6 +939,148 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       assertEquals(distinctTable.size(), 0);
       assertFalse(distinctTable.isMainTable());
     }
+
+    // Selecting all raw MV columns
+    // SELECT DISTINCT rawIntMVColumn, rawLongMVColumn, rawFloatMVColumn, rawDoubleMVColumn, rawStringMVColumn
+    // FROM testTable LIMIT 10000
+    {
+      DistinctTable distinctTable = getDistinctTableInnerSegment(queries[8]);
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{
+          "rawIntMVColumn", "rawLongMVColumn", "rawFloatMVColumn", "rawDoubleMVColumn", "rawStringMVColumn"
+      }, new ColumnDataType[]{
+          ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE, ColumnDataType.STRING
+      });
+      assertEquals(distinctTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where all 100 * 2^5 unique combinations should be returned
+      int numUniqueCombinations = NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 5);
+      assertEquals(distinctTable.size(), numUniqueCombinations);
+      assertTrue(distinctTable.isMainTable());
+      Set<List<Integer>> actualValues = new HashSet<>();
+      for (Record record : distinctTable.getRecords()) {
+        Object[] values = record.getValues();
+        int intValue = (Integer) values[0];
+        List<Integer> actualValueList =
+            Arrays.asList(intValue, ((Long) values[1]).intValue(), ((Float) values[2]).intValue(),
+                ((Double) values[3]).intValue(), Integer.parseInt((String) values[4]));
+        List<Integer> expectedValues = new ArrayList<>(2);
+        expectedValues.add(intValue % NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        expectedValues.add(intValue % NUM_UNIQUE_RECORDS_PER_SEGMENT + NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        for (Integer actualValue : actualValueList) {
+          assertTrue(expectedValues.contains(actualValue));
+        }
+        actualValues.add(actualValueList);
+      }
+      assertEquals(actualValues.size(), numUniqueCombinations);
+    }
+
+    // Selecting some SV columns (including raw) and some raw MV columns
+    // SELECT DISTINCT longColumn, rawBigDecimalColumn, rawFloatMVColumn, rawStringMVColumn FROM testTable LIMIT 10000
+    {
+      DistinctTable distinctTable = getDistinctTableInnerSegment(queries[9]);
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{
+          "longColumn", "rawBigDecimalColumn", "rawFloatMVColumn", "rawStringMVColumn"
+      }, new ColumnDataType[]{
+          ColumnDataType.LONG, ColumnDataType.BIG_DECIMAL, ColumnDataType.FLOAT, ColumnDataType.STRING
+      });
+      assertEquals(distinctTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where all 100 * 2^2 unique combinations should be returned
+      int numUniqueCombinations = NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 2);
+      assertEquals(distinctTable.size(), numUniqueCombinations);
+      assertTrue(distinctTable.isMainTable());
+      Set<List<Integer>> actualValues = new HashSet<>();
+      for (Record record : distinctTable.getRecords()) {
+        Object[] values = record.getValues();
+        int intValue = ((Long) values[0]).intValue();
+        List<Integer> actualValueList =
+            Arrays.asList(intValue, ((BigDecimal) values[1]).intValue(), ((Float) values[2]).intValue(),
+                Integer.parseInt((String) values[3]));
+        assertEquals((int) actualValueList.get(1), intValue);
+        List<Integer> expectedMVValues = new ArrayList<>(2);
+        expectedMVValues.add(intValue);
+        expectedMVValues.add(intValue + NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        assertTrue(expectedMVValues.contains(actualValueList.get(2)));
+        assertTrue(expectedMVValues.contains(actualValueList.get(3)));
+        actualValues.add(actualValueList);
+      }
+      assertEquals(actualValues.size(), numUniqueCombinations);
+    }
+
+    // Selecting some columns with filter
+    // SELECT DISTINCT stringColumn, bytesColumn, rawIntMVColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000
+    {
+      DistinctTable distinctTable = getDistinctTableInnerSegment(queries[10]);
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{"stringColumn", "bytesColumn", "rawIntMVColumn"},
+          new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.INT});
+      assertEquals(distinctTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where 40 * 2 matched combinations should be returned
+      int numMatchedCombinations = (NUM_UNIQUE_RECORDS_PER_SEGMENT - 60) * 2;
+      assertEquals(distinctTable.size(), numMatchedCombinations);
+      assertTrue(distinctTable.isMainTable());
+      Set<List<Integer>> actualValues = new HashSet<>();
+      for (Record record : distinctTable.getRecords()) {
+        Object[] values = record.getValues();
+        int intValue = Integer.parseInt((String) values[0]);
+        assertTrue(intValue >= 60);
+        List<Integer> actualValueList =
+            Arrays.asList(intValue, Integer.parseInt(new String(((ByteArray) values[1]).getBytes(), UTF_8).trim()),
+                (Integer) values[2]);
+        assertEquals((int) actualValueList.get(1), intValue);
+        assertTrue((Integer) values[2] == intValue || (Integer) values[2] == intValue + NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        actualValues.add(actualValueList);
+      }
+      assertEquals(actualValues.size(), numMatchedCombinations);
+    }
+
+    // Selecting some columns order by raw MV column
+    // SELECT DISTINCT floatColumn, rawDoubleMVColumn FROM testTable ORDER BY rawDoubleMVColumn DESC
+    {
+      DistinctTable distinctTable = getDistinctTableInnerSegment(queries[11]);
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "rawDoubleMVColumn"},
+          new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.DOUBLE});
+      assertEquals(distinctTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where only 10 top values should be returned
+      assertEquals(distinctTable.size(), 10);
+      assertTrue(distinctTable.isMainTable());
+      Set<Integer> expectedValues = new HashSet<>();
+      for (int i = 0; i < 10; i++) {
+        expectedValues.add(NUM_UNIQUE_RECORDS_PER_SEGMENT * 2 - i - 1);
+      }
+      Set<Integer> actualValues = new HashSet<>();
+      for (Record record : distinctTable.getRecords()) {
+        Object[] values = record.getValues();
+        int actualValue = ((Double) values[1]).intValue();
+        assertEquals(((Float) values[0]).intValue(), actualValue - NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        actualValues.add(actualValue);
+      }
+      assertEquals(actualValues, expectedValues);
+    }
+
+    // Selecting some columns with filter that does not match any record
+    // SELECT DISTINCT floatColumn, rawLongMVColumn FROM testTable WHERE stringColumn = 'a' ORDER BY rawLongMVColumn
+    {
+      DistinctTable distinctTable = getDistinctTableInnerSegment(queries[12]);
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "rawLongMVColumn"},
+          new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.LONG});
+      assertEquals(distinctTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where no record should be returned
+      assertEquals(distinctTable.size(), 0);
+      assertTrue(distinctTable.isMainTable());
+    }
   }
 
   /**
@@ -822,6 +1095,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    *   <li>Selecting some columns order by raw BYTES column</li>
    *   <li>Selecting some columns transform, filter, order-by and limit</li>
    *   <li>Selecting some columns with filter that does not match any record</li>
+   *   <li>Selecting all dictionary-encoded raw MV columns</li>
+   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
+   *   <li>Selecting some columns with filter with raw MV</li>
+   *   <li>Selecting some columns order by raw MV column</li>
+   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
    * </ul>
    */
   @Test
@@ -838,7 +1116,14 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         "SELECT DISTINCT intColumn, rawBytesColumn FROM testTable ORDER BY rawBytesColumn LIMIT 5",
         "SELECT DISTINCT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 "
             + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
-        "SELECT DISTINCT floatColumn, longMVColumn FROM testTable WHERE stringColumn = 'a' ORDER BY longMVColumn"
+        "SELECT DISTINCT floatColumn, longMVColumn FROM testTable WHERE stringColumn = 'a' ORDER BY longMVColumn",
+        "SELECT DISTINCT rawIntMVColumn, rawLongMVColumn, rawFloatMVColumn, rawDoubleMVColumn, rawStringMVColumn "
+            + "FROM testTable LIMIT 10000",
+        "SELECT DISTINCT longColumn, rawBigDecimalColumn, rawFloatMVColumn, rawStringMVColumn FROM testTable "
+            + "LIMIT 10000",
+        "SELECT DISTINCT stringColumn, bytesColumn, rawIntMVColumn FROM testTable WHERE rawIntColumn >= 60 LIMIT 10000",
+        "SELECT DISTINCT floatColumn, rawDoubleMVColumn FROM testTable ORDER BY rawDoubleMVColumn DESC",
+        "SELECT DISTINCT floatColumn, rawLongMVColumn FROM testTable WHERE stringColumn = 'a' ORDER BY rawLongMVColumn"
     });
     //@formatter:on
   }
@@ -855,6 +1140,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    *   <li>Selecting some columns order by raw BYTES column</li>
    *   <li>Selecting some columns transform, filter, order-by and limit</li>
    *   <li>Selecting some columns with filter that does not match any record</li>
+   *   <li>Selecting all dictionary-encoded raw MV columns</li>
+   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
+   *   <li>Selecting some columns with filter with raw MV</li>
+   *   <li>Selecting some columns order by raw MV column</li>
+   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
    * </ul>
    */
   @Test
@@ -879,7 +1169,18 @@ public class DistinctQueriesTest extends BaseQueriesTest {
             + "GROUP BY ADD(intColumn, floatColumn), stringColumn "
             + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
         "SELECT floatColumn, longMVColumn FROM testTable WHERE stringColumn = 'a' "
-            + "GROUP BY floatColumn, longMVColumn ORDER BY longMVColumn"
+            + "GROUP BY floatColumn, longMVColumn ORDER BY longMVColumn",
+        "SELECT rawIntMVColumn, rawLongMVColumn, rawFloatMVColumn, rawDoubleMVColumn, rawStringMVColumn "
+            + "FROM testTable GROUP BY rawIntMVColumn, rawLongMVColumn, rawFloatMVColumn, rawDoubleMVColumn, "
+            + "rawStringMVColumn LIMIT 10000",
+        "SELECT longColumn, rawBigDecimalColumn, rawFloatMVColumn, rawStringMVColumn FROM testTable "
+            + "GROUP BY longColumn, rawBigDecimalColumn, rawFloatMVColumn, rawStringMVColumn LIMIT 10000",
+        "SELECT stringColumn, bytesColumn, rawIntMVColumn FROM testTable WHERE rawIntColumn >= 60 "
+            + "GROUP BY stringColumn, bytesColumn, rawIntMVColumn LIMIT 10000",
+        "SELECT floatColumn, rawDoubleMVColumn FROM testTable GROUP BY floatColumn, rawDoubleMVColumn "
+            + "ORDER BY rawDoubleMVColumn DESC",
+        "SELECT floatColumn, rawLongMVColumn FROM testTable WHERE stringColumn = 'a' GROUP BY floatColumn, "
+            + "rawLongMVColumn ORDER BY rawLongMVColumn"
     });
     //@formatter:on
   }
@@ -912,11 +1213,16 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    *     Selecting some columns with filter that does not match any record in one segment but matches some records in
    *     the other segment
    *   </li>
+   *   <li>Selecting all dictionary-encoded raw MV columns</li>
+   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
+   *   <li>Selecting some columns with filter with raw MV</li>
+   *   <li>Selecting some columns order by raw MV column</li>
+   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
    *   TODO: Support alias and add a test for that
    * </ul>
    */
   private void testDistinctInterSegmentHelper(String[] queries) {
-    assertEquals(queries.length, 9);
+    assertEquals(queries.length, 14);
 
     // Selecting all dictionary-encoded SV columns
     // SELECT DISTINCT intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn
@@ -1157,6 +1463,142 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals((int) rows.get(i)[0], expectedValues[i]);
       }
     }
+
+    // Selecting all dictionary-encoded raw MV columns
+    // SELECT DISTINCT rawIntMVColumn, rawLongMVColumn, rawFloatMVColumn, rawDoubleMVColumn, rawStringMVColumn
+    // FROM testTable LIMIT 10000
+    {
+      ResultTable resultTable = getBrokerResponse(queries[9]).getResultTable();
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{
+          "rawIntMVColumn", "rawLongMVColumn", "rawFloatMVColumn", "rawDoubleMVColumn", "rawStringMVColumn"
+      }, new ColumnDataType[]{
+          ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE, ColumnDataType.STRING
+      });
+      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where all 200 * 2^5 unique values should be returned
+      int numUniqueCombinations = 2 * NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 5);
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), numUniqueCombinations);
+      Set<List<Integer>> actualValues = new HashSet<>();
+      for (Object[] row : rows) {
+        int intValue = (Integer) row[0];
+        List<Integer> actualValueList = Arrays.asList(intValue, ((Long) row[1]).intValue(), ((Float) row[2]).intValue(),
+            ((Double) row[3]).intValue(), Integer.parseInt((String) row[4]));
+        List<Integer> expectedValues = new ArrayList<>(2);
+        if (intValue < 1000) {
+          expectedValues.add(intValue % NUM_UNIQUE_RECORDS_PER_SEGMENT);
+          expectedValues.add(intValue % NUM_UNIQUE_RECORDS_PER_SEGMENT + NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        } else {
+          expectedValues.add(intValue % NUM_UNIQUE_RECORDS_PER_SEGMENT + 1000);
+          expectedValues.add(intValue % NUM_UNIQUE_RECORDS_PER_SEGMENT + NUM_UNIQUE_RECORDS_PER_SEGMENT + 1000);
+        }
+        for (Integer actualValue : actualValueList) {
+          assertTrue(expectedValues.contains(actualValue));
+        }
+        actualValues.add(actualValueList);
+      }
+      assertEquals(actualValues.size(), numUniqueCombinations);
+    }
+
+    // Selecting some SV columns (including raw) and some raw MV columns
+    // SELECT DISTINCT longColumn, rawBigDecimalColumn, rawFloatMVColumn, rawStringMVColumn FROM testTable LIMIT 10000
+    {
+      ResultTable resultTable = getBrokerResponse(queries[10]).getResultTable();
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{
+          "longColumn", "rawBigDecimalColumn", "rawFloatMVColumn", "rawStringMVColumn"
+      }, new ColumnDataType[]{
+          ColumnDataType.LONG, ColumnDataType.BIG_DECIMAL, ColumnDataType.FLOAT, ColumnDataType.STRING
+      });
+      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where all 200 * 2^2 unique values should be returned
+      int numUniqueCombinations = 2 * NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 2);
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), numUniqueCombinations);
+      Set<List<Integer>> actualValues = new HashSet<>();
+      for (Object[] row : rows) {
+        int intValue = ((Long) row[0]).intValue();
+        List<Integer> actualValueList =
+            Arrays.asList(intValue, ((BigDecimal) row[1]).intValue(), ((Float) row[2]).intValue(),
+                Integer.parseInt((String) row[3]));
+        assertEquals((int) actualValueList.get(1), intValue);
+        List<Integer> expectedMVValues = new ArrayList<>(2);
+        expectedMVValues.add(intValue);
+        expectedMVValues.add(intValue + NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        assertTrue(expectedMVValues.contains(actualValueList.get(2)));
+        assertTrue(expectedMVValues.contains(actualValueList.get(3)));
+        actualValues.add(actualValueList);
+      }
+      assertEquals(actualValues.size(), numUniqueCombinations);
+    }
+
+    // Selecting some columns with filter
+    // SELECT DISTINCT stringColumn, bytesColumn, rawIntMVColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000
+    {
+      ResultTable resultTable = getBrokerResponse(queries[11]).getResultTable();
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{"stringColumn", "bytesColumn", "rawIntMVColumn"},
+          new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.INT});
+      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where 140 * 2 matched values should be returned
+      int numMatchedCombinations = (2 * NUM_UNIQUE_RECORDS_PER_SEGMENT - 60) * 2;
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), numMatchedCombinations);
+      Set<List<Integer>> actualValues = new HashSet<>();
+      for (Object[] row : rows) {
+        int intValue = Integer.parseInt((String) row[0]);
+        assertTrue(intValue >= 60);
+        List<Integer> actualValueList =
+            Arrays.asList(intValue, Integer.parseInt(new String(BytesUtils.toBytes((String) row[1]), UTF_8).trim()),
+                (Integer) row[2]);
+        assertEquals((int) actualValueList.get(1), intValue);
+        assertTrue((Integer) row[2] == intValue || (Integer) row[2] == intValue + NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        actualValues.add(actualValueList);
+      }
+      assertEquals(actualValues.size(), numMatchedCombinations);
+    }
+
+    // Selecting some columns order by raw MV column
+    // SELECT DISTINCT floatColumn, rawDoubleMVColumn FROM testTable ORDER BY rawDoubleMVColumn DESC
+    {
+      ResultTable resultTable = getBrokerResponse(queries[12]).getResultTable();
+
+      // Check data schema
+      DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "rawDoubleMVColumn"},
+          new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.DOUBLE});
+      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where only 10 top values should be returned
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 10);
+      for (int i = 0; i < 10; i++) {
+        int expectedValue = NUM_UNIQUE_RECORDS_PER_SEGMENT * 2 + 1000 - i - 1;
+        Object[] row = rows.get(i);
+        assertEquals(((Float) row[0]).intValue(), expectedValue - NUM_UNIQUE_RECORDS_PER_SEGMENT);
+        assertEquals(((Double) row[1]).intValue(), expectedValue);
+      }
+    }
+
+    // Selecting some columns with filter that does not match any record
+    // SELECT DISTINCT floatColumn, rawLongMVColumn FROM testTable WHERE stringColumn = 'a' ORDER BY rawLongMVColumn
+    {
+      ResultTable resultTable = getBrokerResponse(queries[13]).getResultTable();
+
+      // Check data schema, where data type should be STRING for all columns
+      DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "rawLongMVColumn"},
+          new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING});
+      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+
+      // Check values, where no record should be returned
+      assertTrue(resultTable.getRows().isEmpty());
+    }
   }
 
   /**
@@ -1175,6 +1617,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    *     Selecting some columns with filter that does not match any record in one segment but matches some records in
    *     the other segment
    *   </li>
+   *   <li>Selecting all dictionary-encoded raw MV columns</li>
+   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
+   *   <li>Selecting some columns with filter with raw MV</li>
+   *   <li>Selecting some columns order by raw MV column</li>
+   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
    *   TODO: Support alias and add a test for that
    * </ul>
    */
@@ -1193,7 +1640,14 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         "SELECT DISTINCT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60 "
             + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
         "SELECT DISTINCT floatColumn, longMVColumn FROM testTable WHERE stringColumn = 'a' ORDER BY longMVColumn",
-        "SELECT DISTINCT intColumn FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5"
+        "SELECT DISTINCT intColumn FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5",
+        "SELECT DISTINCT rawIntMVColumn, rawLongMVColumn, rawFloatMVColumn, rawDoubleMVColumn, rawStringMVColumn "
+            + "FROM testTable LIMIT 10000",
+        "SELECT DISTINCT longColumn, rawBigDecimalColumn, rawFloatMVColumn, rawStringMVColumn FROM testTable "
+            + "LIMIT 10000",
+        "SELECT DISTINCT stringColumn, bytesColumn, rawIntMVColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000",
+        "SELECT DISTINCT floatColumn, rawDoubleMVColumn FROM testTable ORDER BY rawDoubleMVColumn DESC",
+        "SELECT DISTINCT floatColumn, rawLongMVColumn FROM testTable WHERE stringColumn = 'a' ORDER BY rawLongMVColumn"
     });
     //@formatter:on
   }
@@ -1215,6 +1669,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    *     Selecting some columns with filter that does not match any record in one segment but matches some records in
    *     the other segment
    *   </li>
+   *   <li>Selecting all dictionary-encoded raw MV columns</li>
+   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
+   *   <li>Selecting some columns with filter with raw MV</li>
+   *   <li>Selecting some columns order by raw MV column</li>
+   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
    *   TODO: Support alias and add a test for that
    * </ul>
    */
@@ -1241,7 +1700,18 @@ public class DistinctQueriesTest extends BaseQueriesTest {
             + "ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10",
         "SELECT floatColumn, longMVColumn FROM testTable WHERE stringColumn = 'a' "
             + "GROUP BY floatColumn, longMVColumn ORDER BY longMVColumn",
-        "SELECT intColumn FROM testTable WHERE floatColumn > 200 GROUP BY intColumn ORDER BY intColumn ASC LIMIT 5"
+        "SELECT intColumn FROM testTable WHERE floatColumn > 200 GROUP BY intColumn ORDER BY intColumn ASC LIMIT 5",
+        "SELECT rawIntMVColumn, rawLongMVColumn, rawFloatMVColumn, rawDoubleMVColumn, rawStringMVColumn FROM testTable "
+            + "GROUP BY rawIntMVColumn, rawLongMVColumn, rawFloatMVColumn, rawDoubleMVColumn, rawStringMVColumn "
+            + "LIMIT 10000",
+        "SELECT longColumn, rawBigDecimalColumn, rawFloatMVColumn, rawStringMVColumn FROM testTable "
+            + "GROUP BY longColumn, rawBigDecimalColumn, rawFloatMVColumn, rawStringMVColumn LIMIT 10000",
+        "SELECT stringColumn, bytesColumn, rawIntMVColumn FROM testTable WHERE intColumn >= 60 GROUP BY "
+            + "stringColumn, bytesColumn, rawIntMVColumn LIMIT 10000",
+        "SELECT floatColumn, rawDoubleMVColumn FROM testTable GROUP BY floatColumn, rawDoubleMVColumn "
+            + "ORDER BY rawDoubleMVColumn DESC",
+        "SELECT floatColumn, rawLongMVColumn FROM testTable WHERE stringColumn = 'a' GROUP BY floatColumn, "
+            + "rawLongMVColumn ORDER BY rawLongMVColumn"
     });
     //@formatter:on
   }

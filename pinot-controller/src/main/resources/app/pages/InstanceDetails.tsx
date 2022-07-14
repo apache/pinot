@@ -33,8 +33,15 @@ import CustomButton from '../components/CustomButton';
 import EditTagsOp from '../components/Homepage/Operations/EditTagsOp';
 import EditConfigOp from '../components/Homepage/Operations/EditConfigOp';
 import { NotificationContext } from '../components/Notification/NotificationContext';
-import _ from 'lodash';
+import { uniq, startCase } from 'lodash';
 import Confirm from '../components/Confirm';
+import Utils from "../utils/Utils";
+
+const instanceTypes = {
+  broker: 'BROKER',
+  minion: 'MINION',
+  server: 'SERVER',
+}
 
 const useStyles = makeStyles((theme) => ({
   codeMirrorDiv: {
@@ -68,9 +75,16 @@ type Props = {
 const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
   const classes = useStyles();
   const {instanceName} = match.params;
+  let instanceType;
+  if (instanceName.toLowerCase().startsWith(instanceTypes.broker.toLowerCase())) {
+    instanceType = instanceTypes.broker;
+  } else if (instanceName.toLowerCase().startsWith(instanceTypes.minion.toLowerCase())) {
+    instanceType = instanceTypes.minion;
+  } else {
+    instanceType = instanceTypes.server;
+  }
   const clutserName = localStorage.getItem('pinot_ui:clusterName');
   const [fetching, setFetching] = useState(true);
-  const [instanceType] = React.useState(instanceName.toLowerCase().startsWith('broker') ? 'BROKER' : 'SERVER');
   const [confirmDialog, setConfirmDialog] = React.useState(false);
   const [dialogDetails, setDialogDetails] = React.useState(null);
 
@@ -99,7 +113,7 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
     const instanceDetails = await PinotMethodUtils.getInstanceDetails(instanceName);
     const tenantListResponse = getTenants(instanceDetails);
     setInstanceConfig(JSON.stringify(configResponse, null, 2));
-    const instanceHost = instanceDetails.hostName.replace(`${_.startCase(instanceType.toLowerCase())}_`, '');
+    const instanceHost = instanceDetails.hostName.replace(`${startCase(instanceType.toLowerCase())}_`, '');
     const instancePutObj = {
       host: instanceHost,
       port: instanceDetails.port,
@@ -146,10 +160,11 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
         tag.search('_REALTIME') !== -1 ||
         tag.search('_OFFLINE') !== -1
       ){
-        tenantsList.push(tag.split('_')[0]);
+        let [baseTag, ] = Utils.splitStringByLastUnderscore(tag);
+        tenantsList.push(baseTag);
       }
     });
-    return _.uniq(tenantsList);
+    return uniq(tenantsList);
   };
 
   const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>, tags: Array<string>|null) => {
@@ -308,7 +323,7 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
               </CustomButton>
               <CustomButton
                 onClick={handleDropAction}
-                tooltipTitle="Removes the node from the cluster. Untag & rebalance (to ensure node is not being used by any table), and shutdown instance, before dropping."
+                tooltipTitle={instanceType !== instanceTypes.minion ? "Removes the node from the cluster. Untag and rebalance (to ensure the node is not being used by any table) and shutdown the instance before dropping." : ""}
                 enableTooltip={true}
               >
                 Drop

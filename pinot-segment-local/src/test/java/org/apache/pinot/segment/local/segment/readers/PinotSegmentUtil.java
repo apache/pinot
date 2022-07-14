@@ -33,7 +33,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -111,8 +110,7 @@ public class PinotSegmentUtil {
       TimeUnit unit = timeFieldSpec.getIncomingGranularitySpec().getTimeType();
       return generateTimeValue(random, unit);
     } else if (fieldSpec instanceof DateTimeFieldSpec) {
-      DateTimeFieldSpec dateTimeFieldSpec = (DateTimeFieldSpec) fieldSpec;
-      TimeUnit unit = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat()).getColumnUnit();
+      TimeUnit unit = ((DateTimeFieldSpec) fieldSpec).getFormatSpec().getColumnUnit();
       return generateTimeValue(random, unit);
     } else {
       DataType storedType = fieldSpec.getDataType().getStoredType();

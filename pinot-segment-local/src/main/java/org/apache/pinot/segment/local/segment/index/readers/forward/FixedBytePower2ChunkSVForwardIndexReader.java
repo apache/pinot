@@ -30,13 +30,13 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * LONG, FLOAT, DOUBLE).
  * <p>For data layout, please refer to the documentation for {@link FixedByteChunkSVForwardIndexWriter}
  */
-public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkSVForwardIndexReader {
+public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkForwardIndexReader {
   public static final int VERSION = 4;
 
   private final int _shift;
 
   public FixedBytePower2ChunkSVForwardIndexReader(PinotDataBuffer dataBuffer, DataType valueType) {
-    super(dataBuffer, valueType);
+    super(dataBuffer, valueType, true);
     _shift = Integer.numberOfTrailingZeros(_numDocsPerChunk);
   }
 
@@ -44,7 +44,7 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkSVF
   @Override
   public ChunkReaderContext createContext() {
     if (_isCompressed) {
-      return new ChunkReaderContext(_numDocsPerChunk * _valueType.size());
+      return new ChunkReaderContext(_numDocsPerChunk * _storedType.size());
     } else {
       return null;
     }

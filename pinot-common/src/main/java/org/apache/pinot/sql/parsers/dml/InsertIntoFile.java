@@ -26,7 +26,6 @@ import org.apache.calcite.sql.SqlNodeList;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 
@@ -69,7 +68,7 @@ public class InsertIntoFile implements DataManipulationStatement {
     String tableName = operandList.get(0) != null ? StringUtils.joinWith(",", operandList.get(0), operandList.get(1))
         : operandList.get(1).toString();
     // Set Options
-    Map<String, String> optionsMap = CalciteSqlParser.extractOptionsMap(sqlNodeAndOptions.getOptions());
+    Map<String, String> optionsMap = sqlNodeAndOptions.getOptions();
     List<String> inputDirList = new ArrayList<>();
     ((SqlNodeList) operandList.get(2)).getList()
         .forEach(sqlNode1 -> inputDirList.add(sqlNode1.toString().replace("'", "")));

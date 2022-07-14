@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.stage;
 
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
@@ -35,8 +36,8 @@ public class JoinNode extends AbstractStageNode {
     super(stageId);
   }
 
-  public JoinNode(int stageId, JoinRelType joinRelType, List<JoinClause> criteria) {
-    super(stageId);
+  public JoinNode(int stageId, DataSchema dataSchema, JoinRelType joinRelType, List<JoinClause> criteria) {
+    super(stageId, dataSchema);
     _joinRelType = joinRelType;
     _criteria = criteria;
   }
@@ -51,9 +52,9 @@ public class JoinNode extends AbstractStageNode {
 
   public static class JoinClause {
     @ProtoProperties
-    private KeySelector<Object[], Object> _leftJoinKeySelector;
+    private KeySelector<Object[], Object[]> _leftJoinKeySelector;
     @ProtoProperties
-    private KeySelector<Object[], Object> _rightJoinKeySelector;
+    private KeySelector<Object[], Object[]> _rightJoinKeySelector;
 
     public JoinClause() {
     }
@@ -63,11 +64,11 @@ public class JoinNode extends AbstractStageNode {
       _rightJoinKeySelector = rightKeySelector;
     }
 
-    public KeySelector<Object[], Object> getLeftJoinKeySelector() {
+    public KeySelector<Object[], Object[]> getLeftJoinKeySelector() {
       return _leftJoinKeySelector;
     }
 
-    public KeySelector<Object[], Object> getRightJoinKeySelector() {
+    public KeySelector<Object[], Object[]> getRightJoinKeySelector() {
       return _rightJoinKeySelector;
     }
   }

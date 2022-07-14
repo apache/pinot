@@ -25,7 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
-import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.BaseChunkForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
@@ -98,7 +98,7 @@ public class StarTreeLoaderUtils {
         PinotDataBuffer forwardIndexDataBuffer = dataBuffer.view(start, end, ByteOrder.BIG_ENDIAN);
         DataType dataType = ValueAggregatorFactory.getAggregatedValueType(functionColumnPair.getFunctionType());
         FieldSpec fieldSpec = new MetricFieldSpec(metric, dataType);
-        BaseChunkSVForwardIndexReader forwardIndex;
+        BaseChunkForwardIndexReader forwardIndex;
         if (dataType == DataType.BYTES) {
           forwardIndex = new VarByteChunkSVForwardIndexReader(forwardIndexDataBuffer, DataType.BYTES);
         } else {

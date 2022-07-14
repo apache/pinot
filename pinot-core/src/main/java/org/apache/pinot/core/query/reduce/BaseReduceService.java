@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongConsumer;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -143,6 +144,9 @@ public abstract class BaseReduceService {
     private long _offlineTotalCpuTimeNs = 0L;
     private long _realtimeTotalCpuTimeNs = 0L;
     private long _numSegmentsPrunedByServer = 0L;
+    private long _numSegmentsPrunedInvalid = 0L;
+    private long _numSegmentsPrunedByLimit = 0L;
+    private long _numSegmentsPrunedByValue = 0L;
     private long _explainPlanNumEmptyFilterSegments = 0L;
     private long _explainPlanNumMatchAllFilterSegments = 0L;
     private boolean _numGroupsLimitReached = false;
@@ -233,10 +237,11 @@ public abstract class BaseReduceService {
       _realtimeTotalCpuTimeNs =
           _realtimeThreadCpuTimeNs + _realtimeSystemActivitiesCpuTimeNs + _realtimeResponseSerializationCpuTimeNs;
 
-      String numSegmentsPrunedByServer = metadata.get(MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName());
-      if (numSegmentsPrunedByServer != null) {
-        _numSegmentsPrunedByServer += Long.parseLong(numSegmentsPrunedByServer);
-      }
+      withNotNullLongMetadata(metadata, MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER,
+          l -> _numSegmentsPrunedByServer += l);
+      withNotNullLongMetadata(metadata, MetadataKey.NUM_SEGMENTS_PRUNED_INVALID, l -> _numSegmentsPrunedInvalid += l);
+      withNotNullLongMetadata(metadata, MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT, l -> _numSegmentsPrunedByLimit += l);
+      withNotNullLongMetadata(metadata, MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE, l -> _numSegmentsPrunedByValue += l);
 
       String explainPlanNumEmptyFilterSegments =
           metadata.get(MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName());
@@ -286,6 +291,9 @@ public abstract class BaseReduceService {
       brokerResponseNative.setOfflineTotalCpuTimeNs(_offlineTotalCpuTimeNs);
       brokerResponseNative.setRealtimeTotalCpuTimeNs(_realtimeTotalCpuTimeNs);
       brokerResponseNative.setNumSegmentsPrunedByServer(_numSegmentsPrunedByServer);
+      brokerResponseNative.setNumSegmentsPrunedInvalid(_numSegmentsPrunedInvalid);
+      brokerResponseNative.setNumSegmentsPrunedByLimit(_numSegmentsPrunedByLimit);
+      brokerResponseNative.setNumSegmentsPrunedByValue(_numSegmentsPrunedByValue);
       brokerResponseNative.setExplainPlanNumEmptyFilterSegments(_explainPlanNumEmptyFilterSegments);
       brokerResponseNative.setExplainPlanNumMatchAllFilterSegments(_explainPlanNumMatchAllFilterSegments);
       if (_numConsumingSegmentsProcessed > 0) {
@@ -322,6 +330,13 @@ public abstract class BaseReduceService {
           brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
               System.currentTimeMillis() - _minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
         }
+      }
+    }
+
+    private void withNotNullLongMetadata(Map<String, String> metadata, MetadataKey key, LongConsumer consumer) {
+      String strValue = metadata.get(key.getName());
+      if (strValue != null) {
+        consumer.accept(Long.parseLong(strValue));
       }
     }
   }

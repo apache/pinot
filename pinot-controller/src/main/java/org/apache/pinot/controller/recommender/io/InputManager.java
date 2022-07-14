@@ -135,6 +135,7 @@ public class InputManager {
     put(FieldSpec.DataType.DOUBLE, Double.BYTES);
     put(FieldSpec.DataType.BYTES, Byte.BYTES);
     put(FieldSpec.DataType.STRING, Character.BYTES);
+    put(FieldSpec.DataType.JSON, Character.BYTES);
     put(FieldSpec.DataType.BOOLEAN, Integer.BYTES); // Stored internally as an INTEGER
     put(null, DEFAULT_NULL_SIZE);
   }};
@@ -220,15 +221,16 @@ public class InputManager {
     String sortedColumn = _overWrittenConfigs.getIndexConfig().getSortedColumn();
     Set<String> invertedIndexColumns = _overWrittenConfigs.getIndexConfig().getInvertedIndexColumns();
     Set<String> rangeIndexColumns = _overWrittenConfigs.getIndexConfig().getRangeIndexColumns();
+    Set<String> jsonIndexColumns = _overWrittenConfigs.getIndexConfig().getJsonIndexColumns();
     Set<String> noDictionaryColumns = _overWrittenConfigs.getIndexConfig().getNoDictionaryColumns();
 
-    /*Validate if there's conflict between NoDictionaryColumns and dimNamesWithAnyIndex*/
-    Set<String> dimNamesWithAnyIndex = new HashSet<>();
-    dimNamesWithAnyIndex.add(sortedColumn);
-    dimNamesWithAnyIndex.addAll(invertedIndexColumns);
-    dimNamesWithAnyIndex.addAll(rangeIndexColumns);
+    /*Validate if there's conflict between NoDictionaryColumns and dimNamesWithDictionaryDependentIndex*/
+    Set<String> dimNamesWithDictionaryDependentIndex = new HashSet<>();
+    dimNamesWithDictionaryDependentIndex.add(sortedColumn);
+    dimNamesWithDictionaryDependentIndex.addAll(invertedIndexColumns);
+    dimNamesWithDictionaryDependentIndex.addAll(rangeIndexColumns);
     for (String colName : noDictionaryColumns) {
-      if (dimNamesWithAnyIndex.contains(colName)) {
+      if (dimNamesWithDictionaryDependentIndex.contains(colName)) {
         throw new InvalidInputException(
             "Column {0} presents in both overwritten indices and overwritten no dictionary columns", colName);
       }

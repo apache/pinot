@@ -156,7 +156,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
         if (timeColumnName != null) {
           DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(timeColumnName);
           if (dateTimeFieldSpec != null) {
-            dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
+            dateTimeFormatSpec = dateTimeFieldSpec.getFormatSpec();
           }
         }
         return new NormalizedDateSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_PREFIX),

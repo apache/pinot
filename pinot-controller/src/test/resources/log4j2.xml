@@ -33,6 +33,9 @@
     <Logger name="org.apache.zookeeper" level="warn" additivity="false">
       <AppenderRef ref="console"/>
     </Logger>
+    <Logger name="org.apache.helix" level="warn" additivity="false">
+      <AppenderRef ref="console"/>
+    </Logger>
     <Logger name="org.apache.pinot.controller" level="warn" additivity="false">
       <AppenderRef ref="console"/>
     </Logger>

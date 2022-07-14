@@ -184,7 +184,7 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <argLine>-Xms8g -Xmx8g -Dlog4j2.configurationFile=log4j2.xml</argLine>
+        <argLine>-Xms4g -Xmx4g -Dlog4j2.configurationFile=log4j2.xml</argLine>
       </properties>
     </profile>
     <!-- jfim: this profile is overridden in pinot-integration-tests -->
@@ -471,7 +471,7 @@
       <dependency>
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-lang3</artifactId>
-        <version>3.5</version>
+        <version>3.11</version>
       </dependency>
       <dependency>
         <groupId>commons-collections</groupId>
@@ -590,21 +590,6 @@
         <groupId>javax.activation</groupId>
         <artifactId>activation</artifactId>
         <version>1.1.1</version>
-      </dependency>
-      <dependency>
-        <groupId>javax.xml.bind</groupId>
-        <artifactId>jaxb-api</artifactId>
-        <version>2.3.0</version>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.xml.bind</groupId>
-        <artifactId>jaxb-core</artifactId>
-        <version>2.3.0</version>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.xml.bind</groupId>
-        <artifactId>jaxb-impl</artifactId>
-        <version>2.3.0</version>
       </dependency>
       <dependency>
         <groupId>org.apache.helix</groupId>

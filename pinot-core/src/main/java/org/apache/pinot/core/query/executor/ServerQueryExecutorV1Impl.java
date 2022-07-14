@@ -58,6 +58,7 @@ import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.config.QueryExecutorConfig;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
+import org.apache.pinot.core.query.pruner.SegmentPrunerStatistics;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
@@ -289,7 +290,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
     int totalSegments = indexSegments.size();
-    List<IndexSegment> selectedSegments = _segmentPrunerService.prune(indexSegments, queryContext);
+    SegmentPrunerStatistics prunerStats = new SegmentPrunerStatistics();
+    List<IndexSegment> selectedSegments = _segmentPrunerService.prune(indexSegments, queryContext, prunerStats);
     segmentPruneTimer.stopAndRecord();
     int numSelectedSegments = selectedSegments.size();
     LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
@@ -310,6 +312,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       metadata.put(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), "0");
       metadata.put(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), "0");
       metadata.put(MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName(), String.valueOf(totalSegments));
+      addPrunerStats(metadata, prunerStats);
       return dataTable;
     } else {
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
@@ -322,12 +325,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       DataTable dataTable = queryContext.isExplain() ? processExplainPlanQueries(queryPlan) : queryPlan.execute();
       planExecTimer.stopAndRecord();
 
+      Map<String, String> metadata = dataTable.getMetadata();
       // Update the total docs in the metadata based on the un-pruned segments
-      dataTable.getMetadata().put(MetadataKey.TOTAL_DOCS.getName(), Long.toString(numTotalDocs));
+      metadata.put(MetadataKey.TOTAL_DOCS.getName(), Long.toString(numTotalDocs));
 
       // Set the number of pruned segments. This count does not include the segments which returned empty filters
       int prunedSegments = totalSegments - numSelectedSegments;
-      dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName(), String.valueOf(prunedSegments));
+      metadata.put(MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName(), String.valueOf(prunedSegments));
+      addPrunerStats(metadata, prunerStats);
 
       return dataTable;
     }
@@ -574,5 +579,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         handleSubquery(argument, indexSegments, timerContext, executorService, endTimeMs);
       }
     }
+  }
+
+  private void addPrunerStats(Map<String, String> metadata, SegmentPrunerStatistics prunerStats) {
+    metadata.put(MetadataKey.NUM_SEGMENTS_PRUNED_INVALID.getName(), String.valueOf(prunerStats.getInvalidSegments()));
+    metadata.put(MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT.getName(), String.valueOf(prunerStats.getLimitPruned()));
+    metadata.put(MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE.getName(), String.valueOf(prunerStats.getValuePruned()));
   }
 }

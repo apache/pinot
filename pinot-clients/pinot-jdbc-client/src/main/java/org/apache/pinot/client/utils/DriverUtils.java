@@ -68,10 +68,8 @@ public class DriverUtils {
     return TlsUtils.getSslContext();
   }
 
-  public static void handleAuth(String url, Properties info, Map<String, String> headers)
+  public static void handleAuth(Properties info, Map<String, String> headers)
       throws SQLException {
-    Map<String, String> urlParams = DriverUtils.getURLParams(url);
-    info.putAll(urlParams);
 
     if (info.contains(USER_PROPERTY) && !headers.containsKey(AUTH_HEADER)) {
       String username = info.getProperty(USER_PROPERTY);

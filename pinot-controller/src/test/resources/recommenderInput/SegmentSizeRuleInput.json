@@ -72,6 +72,14 @@
         "cardinality":4,
         "numValuesPerEntry":1.00000001,
         "singleValueField": false
+      },
+      {
+        "name": "q",
+        "dataType": "JSON",
+        "cardinality":4,
+        "numValuesPerEntry":1,
+        "averageLength" : 25,
+        "singleValueField": true
       }
     ],
     "metricFieldSpecs": [
@@ -131,7 +139,8 @@
     "select j from tableName where (a=3 and (h = 5 or f >34) and REGEXP_LIKE(i, 'as*')) or ((f = 3  or j in ('#VALUES', 4)) and REGEXP_LIKE(d, 'fl*'))": 2,
     "select f from tableName where (a=0 or (b=1 and (e in ('#VALUES',2) or c=7))) and TEXT_MATCH(d, 'dasd') and MAX(MAX(h,i),j)=4 and t<3": 4,
     "select f from tableName where (a=0 and b=1) or c=7 or (d = 7 and e =1)": 2,
-    "select f from tableName where t between 1 and 1000": 2
+    "select f from tableName where t between 1 and 1000": 2,
+    "select q from tableName where JSON_MATCH(q, '\"$.a\" IS NOT NULL')": 1
   },
   "qps": 400,
   "numMessagesPerSecInKafkaTopic":1000,

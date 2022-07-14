@@ -105,6 +105,57 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
     }
   }
 
+  @Test
+  public void testRemovingSurroundingSpaces() throws IOException {
+    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
+
+    // Create a CSV file where records have two values and the second value contains an extra space.
+    File spaceFile = new File(_tempDir, "space.csv");
+    BufferedWriter writer = new BufferedWriter(new FileWriter(spaceFile));
+    writer.write("col1 ,col2\n");
+    writer.write(" value11, value12");
+    writer.close();
+
+    CSVRecordReader csvRecordReader = new CSVRecordReader();
+    HashSet<String> fieldsToRead = new HashSet<>();
+    fieldsToRead.add("col1");
+    fieldsToRead.add("col2");
+    csvRecordReader.init(spaceFile, fieldsToRead, csvRecordReaderConfig);
+    GenericRow genericRow = new GenericRow();
+    csvRecordReader.rewind();
+
+    // check if parsing succeeded.
+    Assert.assertTrue(csvRecordReader.hasNext());
+    csvRecordReader.next(genericRow);
+    Assert.assertEquals(genericRow.getValue("col1"), "value11");
+    Assert.assertEquals(genericRow.getValue("col2"), "value12");
+  }
+
+  @Test
+  public void testIgnoringSurroundingSpaces() throws IOException {
+    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
+
+    // Create a CSV file where records have two values and the second value contains an extra space.
+    File spaceFile = new File(_tempDir, "space.csv");
+    BufferedWriter writer = new BufferedWriter(new FileWriter(spaceFile));
+    writer.write("col1 ,col2\n");
+    writer.write("\"value11\",\" value12\"");
+    writer.close();
+
+    CSVRecordReader csvRecordReader = new CSVRecordReader();
+    HashSet<String> fieldsToRead = new HashSet<>();
+    fieldsToRead.add("col1");
+    fieldsToRead.add("col2");
+    csvRecordReader.init(spaceFile, fieldsToRead, csvRecordReaderConfig);
+    GenericRow genericRow = new GenericRow();
+    csvRecordReader.rewind();
+
+    // check if parsing succeeded.
+    Assert.assertTrue(csvRecordReader.hasNext());
+    csvRecordReader.next(genericRow);
+    Assert.assertEquals(genericRow.getValue("col1"), "value11");
+    Assert.assertEquals(genericRow.getValue("col2"), " value12");
+  }
   /**
    * Check if we can parse a CSV file that has escaped comma characters within fields.
    */
@@ -135,6 +186,6 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
     Assert.assertTrue(csvRecordReader.hasNext());
     csvRecordReader.next(genericRow);
     Assert.assertEquals(genericRow.getValue("first"), "string1");
-    Assert.assertEquals(genericRow.getValue("second"), " string2, string3");
+    Assert.assertEquals(genericRow.getValue("second"), "string2, string3");
   }
 }

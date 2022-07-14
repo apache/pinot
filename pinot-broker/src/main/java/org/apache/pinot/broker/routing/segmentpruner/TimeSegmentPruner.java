@@ -85,7 +85,7 @@ public class TimeSegmentPruner implements SegmentPruner {
     DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(_timeColumn);
     Preconditions.checkNotNull(dateTimeSpec, "Field spec must be specified in schema for time column: %s of table: %s",
         _timeColumn, _tableNameWithType);
-    _timeFormatSpec = new DateTimeFormatSpec(dateTimeSpec.getFormat());
+    _timeFormatSpec = dateTimeSpec.getFormatSpec();
   }
 
   @Override

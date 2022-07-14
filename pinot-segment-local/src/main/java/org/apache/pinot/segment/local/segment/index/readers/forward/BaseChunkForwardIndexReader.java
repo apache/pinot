@@ -37,13 +37,13 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Base implementation for chunk-based single-value raw (non-dictionary-encoded) forward index reader.
+ * Base implementation for chunk-based raw (non-dictionary-encoded) forward index reader.
  */
-public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReader<ChunkReaderContext> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkSVForwardIndexReader.class);
+public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<ChunkReaderContext> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkForwardIndexReader.class);
 
   protected final PinotDataBuffer _dataBuffer;
-  protected final DataType _valueType;
+  protected final DataType _storedType;
   protected final int _numChunks;
   protected final int _numDocsPerChunk;
   protected final int _lengthOfLongestEntry;
@@ -52,10 +52,11 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
   protected final PinotDataBuffer _dataHeader;
   protected final int _headerEntryChunkOffsetSize;
   protected final PinotDataBuffer _rawData;
+  protected final boolean _isSingleValue;
 
-  public BaseChunkSVForwardIndexReader(PinotDataBuffer dataBuffer, DataType valueType) {
+  public BaseChunkForwardIndexReader(PinotDataBuffer dataBuffer, DataType storedType, boolean isSingleValue) {
     _dataBuffer = dataBuffer;
-    _valueType = valueType;
+    _storedType = storedType;
 
     int headerOffset = 0;
     int version = _dataBuffer.getInt(headerOffset);
@@ -68,8 +69,8 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
     headerOffset += Integer.BYTES;
 
     _lengthOfLongestEntry = _dataBuffer.getInt(headerOffset);
-    if (valueType.isFixedWidth()) {
-      Preconditions.checkState(_lengthOfLongestEntry == valueType.size());
+    if (storedType.isFixedWidth() && isSingleValue) {
+      Preconditions.checkState(_lengthOfLongestEntry == storedType.size());
     }
     headerOffset += Integer.BYTES;
 
@@ -98,6 +99,8 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
 
     // Useful for uncompressed data.
     _rawData = _dataBuffer.view(rawDataStart, _dataBuffer.size());
+
+    _isSingleValue = isSingleValue;
   }
 
   /**
@@ -163,18 +166,18 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
 
   @Override
   public boolean isSingleValue() {
-    return true;
+    return _isSingleValue;
   }
 
   @Override
-  public DataType getValueType() {
-    return _valueType;
+  public DataType getStoredType() {
+    return _storedType;
   }
 
   @Override
   public void readValuesSV(int[] docIds, int length, int[] values, ChunkReaderContext context) {
-    if (getValueType().isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
-      switch (getValueType()) {
+    if (_storedType.isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
+      switch (_storedType) {
         case INT: {
           int minOffset = docIds[0] * Integer.BYTES;
           IntBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Integer.BYTES).asIntBuffer();
@@ -215,8 +218,8 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
 
   @Override
   public void readValuesSV(int[] docIds, int length, long[] values, ChunkReaderContext context) {
-    if (getValueType().isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
-      switch (getValueType()) {
+    if (_storedType.isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
+      switch (_storedType) {
         case INT: {
           int minOffset = docIds[0] * Integer.BYTES;
           IntBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Integer.BYTES).asIntBuffer();
@@ -257,8 +260,8 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
 
   @Override
   public void readValuesSV(int[] docIds, int length, float[] values, ChunkReaderContext context) {
-    if (getValueType().isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
-      switch (getValueType()) {
+    if (_storedType.isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
+      switch (_storedType) {
         case INT: {
           int minOffset = docIds[0] * Integer.BYTES;
           IntBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Integer.BYTES).asIntBuffer();
@@ -299,8 +302,8 @@ public abstract class BaseChunkSVForwardIndexReader implements ForwardIndexReade
 
   @Override
   public void readValuesSV(int[] docIds, int length, double[] values, ChunkReaderContext context) {
-    if (getValueType().isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
-      switch (getValueType()) {
+    if (_storedType.isFixedWidth() && !_isCompressed && isContiguousRange(docIds, length)) {
+      switch (_storedType) {
         case INT: {
           int minOffset = docIds[0] * Integer.BYTES;
           IntBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Integer.BYTES).asIntBuffer();

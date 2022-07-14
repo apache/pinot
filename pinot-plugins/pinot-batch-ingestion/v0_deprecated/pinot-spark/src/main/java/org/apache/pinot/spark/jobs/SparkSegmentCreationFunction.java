@@ -125,7 +125,7 @@ public class SparkSegmentCreationFunction implements Serializable {
         if (timeColumnName != null) {
           DateTimeFieldSpec dateTimeFieldSpec = _schema.getSpecForTimeColumn(timeColumnName);
           if (dateTimeFieldSpec != null) {
-            dateTimeFormatSpec = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
+            dateTimeFormatSpec = dateTimeFieldSpec.getFormatSpec();
           }
         }
         _segmentNameGenerator =
@@ -150,8 +150,8 @@ public class SparkSegmentCreationFunction implements Serializable {
       _logger.warn("Deleting existing file: {}", _localStagingDir);
       FileUtils.forceDelete(_localStagingDir);
     }
-    _logger
-        .info("Making local temporary directories: {}, {}, {}", _localStagingDir, _localInputDir, _localSegmentTarDir);
+    _logger.info("Making local temporary directories: {}, {}, {}", _localStagingDir, _localInputDir,
+        _localSegmentTarDir);
     Preconditions.checkState(_localStagingDir.mkdirs());
     Preconditions.checkState(_localInputDir.mkdir());
     Preconditions.checkState(_localSegmentDir.mkdir());
@@ -250,8 +250,9 @@ public class SparkSegmentCreationFunction implements Serializable {
 
     Path hdfsSegmentTarFile = new Path(_hdfsSegmentTarDir, segmentTarFileName);
     if (_useRelativePath) {
-      Path relativeOutputPath = SegmentCreationJob.getRelativeOutputPath(
-          new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(), hdfsInputFile.toUri(), _hdfsSegmentTarDir);
+      Path relativeOutputPath =
+          SegmentCreationJob.getRelativeOutputPath(new Path(_jobConf.get(JobConfigConstants.PATH_TO_INPUT)).toUri(),
+              hdfsInputFile.toUri(), _hdfsSegmentTarDir);
       hdfsSegmentTarFile = new Path(relativeOutputPath, segmentTarFileName);
     }
     _logger.info("Copying segment tar file from: {} to: {}", localSegmentTarFile, hdfsSegmentTarFile);

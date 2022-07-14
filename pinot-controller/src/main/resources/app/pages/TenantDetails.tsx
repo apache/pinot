@@ -23,7 +23,6 @@ import { FormControlLabel, Grid, Switch, Tooltip } from '@material-ui/core';
 import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { TableData } from 'Models';
-import _ from 'lodash';
 import AppLoader from '../components/AppLoader';
 import CustomizedTables from '../components/Table';
 import TableToolbar from '../components/TableToolbar';

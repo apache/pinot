@@ -436,9 +436,10 @@ public class MutableSegmentImpl implements MutableSegment {
             column, dataType.toString());
         return false;
       }
-      // So don't create dictionary if the column is member of noDictionary, is single-value
-      // and doesn't have an inverted index
-      return fieldSpec.isSingleValueField() && !invertedIndexColumns.contains(column);
+      // So don't create dictionary if the column (1) is member of noDictionary, and (2) is single-value or multi-value
+      // with a fixed-width field, and (3) doesn't have an inverted index
+      return (fieldSpec.isSingleValueField() || fieldSpec.getDataType().isFixedWidth())
+          && !invertedIndexColumns.contains(column);
     }
     // column is not a part of noDictionary set, so create dictionary
     return false;
@@ -764,25 +765,74 @@ public class MutableSegmentImpl implements MutableSegment {
           }
         }
       } else {
-        // Multi-value column (always dictionary-encoded)
+        // Multi-value column
 
         int[] dictIds = indexContainer._dictIds;
 
-        // Update numValues info
-        indexContainer._numValuesInfo.updateMVEntry(dictIds.length);
+        if (dictIds != null) {
+          // Dictionary encoded
+          // Update numValues info
+          indexContainer._numValuesInfo.updateMVEntry(dictIds.length);
 
-        // Update forward index
-        indexContainer._forwardIndex.setDictIdMV(docId, dictIds);
+          // Update forward index
+          indexContainer._forwardIndex.setDictIdMV(docId, dictIds);
 
-        // Update inverted index
-        MutableInvertedIndex invertedIndex = indexContainer._invertedIndex;
-        if (invertedIndex != null) {
-          for (int dictId : dictIds) {
-            try {
-              invertedIndex.add(dictId, docId);
-            } catch (Exception e) {
-              recordIndexingError(FieldConfig.IndexType.INVERTED, e);
+          // Update inverted index
+          MutableInvertedIndex invertedIndex = indexContainer._invertedIndex;
+          if (invertedIndex != null) {
+            for (int dictId : dictIds) {
+              try {
+                invertedIndex.add(dictId, docId);
+              } catch (Exception e) {
+                recordIndexingError(FieldConfig.IndexType.INVERTED, e);
+              }
             }
+          }
+        } else {
+          // Raw MV columns
+
+          // Update forward index and numValues info
+          DataType dataType = fieldSpec.getDataType();
+          switch (dataType.getStoredType()) {
+            case INT:
+              Object[] values = (Object[]) value;
+              int[] intValues = new int[values.length];
+              for (int i = 0; i < values.length; i++) {
+                intValues[i] = (Integer) values[i];
+              }
+              indexContainer._forwardIndex.setIntMV(docId, intValues);
+              indexContainer._numValuesInfo.updateMVEntry(intValues.length);
+              break;
+            case LONG:
+              values = (Object[]) value;
+              long[] longValues = new long[values.length];
+              for (int i = 0; i < values.length; i++) {
+                longValues[i] = (Long) values[i];
+              }
+              indexContainer._forwardIndex.setLongMV(docId, longValues);
+              indexContainer._numValuesInfo.updateMVEntry(longValues.length);
+              break;
+            case FLOAT:
+              values = (Object[]) value;
+              float[] floatValues = new float[values.length];
+              for (int i = 0; i < values.length; i++) {
+                floatValues[i] = (Float) values[i];
+              }
+              indexContainer._forwardIndex.setFloatMV(docId, floatValues);
+              indexContainer._numValuesInfo.updateMVEntry(floatValues.length);
+              break;
+            case DOUBLE:
+              values = (Object[]) value;
+              double[] doubleValues = new double[values.length];
+              for (int i = 0; i < values.length; i++) {
+                doubleValues[i] = (Double) values[i];
+              }
+              indexContainer._forwardIndex.setDoubleMV(docId, doubleValues);
+              indexContainer._numValuesInfo.updateMVEntry(doubleValues.length);
+              break;
+            default:
+              throw new UnsupportedOperationException(
+                  "Unsupported data type: " + dataType + " for MV no-dictionary column: " + column);
           }
         }
       }
@@ -948,14 +998,20 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
-      String column = entry.getKey();
-      IndexContainer indexContainer = entry.getValue();
-      Object value = getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
-          indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
-      if (_nullHandlingEnabled && indexContainer._nullValueVector.isNull(docId)) {
-        reuse.putDefaultNullValue(column, value);
-      } else {
-        reuse.putValue(column, value);
+      try {
+        String column = entry.getKey();
+        IndexContainer indexContainer = entry.getValue();
+        Object value = getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
+            indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
+        if (_nullHandlingEnabled && indexContainer._nullValueVector.isNull(docId)) {
+          reuse.putDefaultNullValue(column, value);
+        } else {
+          reuse.putValue(column, value);
+        }
+      } catch (Exception e) {
+        _logger.error("error encountered when getting record for {} on indexContainer: {}", docId, entry.getKey());
+        throw new RuntimeException("error encountered when getting record for " + docId + " on indexContainer: "
+            + entry.getKey(), e);
       }
     }
     return reuse;
@@ -982,24 +1038,66 @@ public class MutableSegmentImpl implements MutableSegment {
       }
     } else {
       // Raw index based
-      // TODO: support multi-valued column
-      switch (forwardIndex.getValueType()) {
-        case INT:
-          return forwardIndex.getInt(docId);
-        case LONG:
-          return forwardIndex.getLong(docId);
-        case FLOAT:
-          return forwardIndex.getFloat(docId);
-        case DOUBLE:
-          return forwardIndex.getDouble(docId);
-        case BIG_DECIMAL:
-          return forwardIndex.getBigDecimal(docId);
-        case STRING:
-          return forwardIndex.getString(docId);
-        case BYTES:
-          return forwardIndex.getBytes(docId);
-        default:
-          throw new IllegalStateException();
+      if (forwardIndex.isSingleValue()) {
+        switch (forwardIndex.getStoredType()) {
+          case INT:
+            return forwardIndex.getInt(docId);
+          case LONG:
+            return forwardIndex.getLong(docId);
+          case FLOAT:
+            return forwardIndex.getFloat(docId);
+          case DOUBLE:
+            return forwardIndex.getDouble(docId);
+          case BIG_DECIMAL:
+            return forwardIndex.getBigDecimal(docId);
+          case STRING:
+            return forwardIndex.getString(docId);
+          case BYTES:
+            return forwardIndex.getBytes(docId);
+          default:
+            throw new IllegalStateException();
+        }
+      } else {
+        // TODO: support multi-valued column for variable length column types (big decimal, string, bytes)
+        int numValues;
+        Object[] value;
+        switch (forwardIndex.getStoredType()) {
+          case INT:
+            int[] intValues = forwardIndex.getIntMV(docId);
+            numValues = intValues.length;
+            value = new Object[numValues];
+            for (int i = 0; i < numValues; i++) {
+              value[i] = intValues[i];
+            }
+            return value;
+          case LONG:
+            long[] longValues = forwardIndex.getLongMV(docId);
+            numValues = longValues.length;
+            value = new Object[numValues];
+            for (int i = 0; i < numValues; i++) {
+              value[i] = longValues[i];
+            }
+            return value;
+          case FLOAT:
+            float[] floatValues = forwardIndex.getFloatMV(docId);
+            numValues = floatValues.length;
+            value = new Object[numValues];
+            for (int i = 0; i < numValues; i++) {
+              value[i] = floatValues[i];
+            }
+            return value;
+          case DOUBLE:
+            double[] doubleValues = forwardIndex.getDoubleMV(docId);
+            numValues = doubleValues.length;
+            value = new Object[numValues];
+            for (int i = 0; i < numValues; i++) {
+              value[i] = doubleValues[i];
+            }
+            return value;
+          default:
+            throw new IllegalStateException("No support for MV no dictionary column of type "
+                + forwardIndex.getStoredType());
+        }
       }
     }
   }
@@ -1007,6 +1105,15 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public void destroy() {
     _logger.info("Trying to close RealtimeSegmentImpl : {}", _segmentName);
+
+    // Remove the upsert and dedup metadata before closing the readers
+    if (_partitionUpsertMetadataManager != null) {
+      _partitionUpsertMetadataManager.removeSegment(this);
+    }
+
+    if (_partitionDedupMetadataManager != null) {
+      _partitionDedupMetadataManager.removeSegment(this);
+    }
 
     // Gather statistics for off-heap mode
     if (_offHeap) {

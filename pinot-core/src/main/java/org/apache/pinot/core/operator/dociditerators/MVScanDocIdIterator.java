@@ -39,27 +39,30 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   // TODO: Figure out a way to close the reader context
   private final ForwardIndexReaderContext _readerContext;
   private final int _numDocs;
-  private final int[] _dictIdBuffer;
+  private final int _maxNumValuesPerMVEntry;
+  private final ValueMatcher _valueMatcher;
 
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
   public MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs,
-      int maxNumEntriesPerValue) {
+      int maxNumValuesPerMVEntry) {
     _predicateEvaluator = predicateEvaluator;
     _reader = reader;
     _readerContext = reader.createContext();
     _numDocs = numDocs;
-    _dictIdBuffer = new int[maxNumEntriesPerValue];
+    _maxNumValuesPerMVEntry = maxNumValuesPerMVEntry;
+    _valueMatcher = getValueMatcher();
   }
 
   @Override
   public int next() {
     while (_nextDocId < _numDocs) {
       int nextDocId = _nextDocId++;
-      int length = _reader.getDictIdMV(nextDocId, _dictIdBuffer, _readerContext);
-      _numEntriesScanned += length;
-      if (_predicateEvaluator.applyMV(_dictIdBuffer, length)) {
+      // TODO: The performance can be improved by batching the docID lookups similar to how it's done in
+      //       SVScanDocIdIterator
+      boolean doesValueMatch = _valueMatcher.doesValueMatch(nextDocId);
+      if (doesValueMatch) {
         return nextDocId;
       }
     }
@@ -85,9 +88,10 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
       int limit = docIdIterator.nextBatch(buffer);
       for (int i = 0; i < limit; i++) {
         int nextDocId = buffer[i];
-        int length = _reader.getDictIdMV(nextDocId, _dictIdBuffer, _readerContext);
-        _numEntriesScanned += length;
-        if (_predicateEvaluator.applyMV(_dictIdBuffer, length)) {
+        // TODO: The performance can be improved by batching the docID lookups similar to how it's done in
+        //       SVScanDocIdIterator
+        boolean doesValueMatch = _valueMatcher.doesValueMatch(nextDocId);
+        if (doesValueMatch) {
           result.add(nextDocId);
         }
       }
@@ -98,5 +102,121 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   @Override
   public long getNumEntriesScanned() {
     return _numEntriesScanned;
+  }
+
+  private ValueMatcher getValueMatcher() {
+    if (_reader.isDictionaryEncoded()) {
+      return new DictIdMatcher();
+    } else {
+      switch (_reader.getStoredType()) {
+        case INT:
+          return new IntMatcher();
+        case LONG:
+          return new LongMatcher();
+        case FLOAT:
+          return new FloatMatcher();
+        case DOUBLE:
+          return new DoubleMatcher();
+        case STRING:
+          return new StringMatcher();
+        case BYTES:
+          return new BytesMatcher();
+        default:
+          throw new UnsupportedOperationException("MV Scan not supported for raw MV columns of type "
+              + _reader.getStoredType());
+      }
+    }
+  }
+
+  private interface ValueMatcher {
+
+    /**
+     * Returns {@code true} if the value for the given document id matches the predicate, {@code false} Otherwise.
+     */
+    boolean doesValueMatch(int docId);
+  }
+
+  private class DictIdMatcher implements ValueMatcher {
+
+    private final int[] _buffer = new int[_maxNumValuesPerMVEntry];
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getDictIdMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
+    }
+  }
+
+  private class IntMatcher implements ValueMatcher {
+
+    private final int[] _buffer = new int[_maxNumValuesPerMVEntry];
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getIntMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
+    }
+  }
+
+  private class LongMatcher implements ValueMatcher {
+
+    private final long[] _buffer = new long[_maxNumValuesPerMVEntry];
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getLongMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
+    }
+  }
+
+  private class FloatMatcher implements ValueMatcher {
+
+    private final float[] _buffer = new float[_maxNumValuesPerMVEntry];
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getFloatMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
+    }
+  }
+
+  private class DoubleMatcher implements ValueMatcher {
+
+    private final double[] _buffer = new double[_maxNumValuesPerMVEntry];
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getDoubleMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
+    }
+  }
+
+  private class StringMatcher implements ValueMatcher {
+
+    private final String[] _buffer = new String[_maxNumValuesPerMVEntry];
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getStringMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
+    }
+  }
+
+  private class BytesMatcher implements ValueMatcher {
+
+    private final byte[][] _buffer = new byte[_maxNumValuesPerMVEntry][];
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getBytesMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
+    }
   }
 }

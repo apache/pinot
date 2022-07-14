@@ -48,7 +48,7 @@
   <Loggers>
     <Root level="info" additivity="false">
       <!-- Display warnings on the console -->
-      <AppenderRef ref="console" level="warn"/>
+      <AppenderRef ref="console" level="${env:LOG4J_CONSOLE_LEVEL:-warn}"/>
       <!-- Direct most logs to the log file -->
       <AppenderRef ref="controllerLog"/>
     </Root>

@@ -361,7 +361,7 @@ public class RawIndexCreatorTest {
    */
   private Object readValueFromIndex(FixedByteChunkSVForwardIndexReader rawIndexReader, ChunkReaderContext readerContext,
       int docId) {
-    switch (rawIndexReader.getValueType()) {
+    switch (rawIndexReader.getStoredType()) {
       case INT:
         return rawIndexReader.getInt(docId, readerContext);
       case LONG:
@@ -372,7 +372,7 @@ public class RawIndexCreatorTest {
         return rawIndexReader.getDouble(docId, readerContext);
       default:
         throw new IllegalArgumentException(
-            "Illegal data type for fixed width raw index reader: " + rawIndexReader.getValueType());
+            "Illegal data type for fixed width raw index reader: " + rawIndexReader.getStoredType());
     }
   }
 }

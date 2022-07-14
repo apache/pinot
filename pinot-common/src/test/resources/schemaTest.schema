@@ -93,7 +93,7 @@
       "name": "dateTime3",
       "dataType": "TIMESTAMP",
       "format": "1:MILLISECONDS:TIMESTAMP",
-      "granularity": "1:SECOND"
+      "granularity": "1:SECONDS"
     }
   ],
   "schemaName": "schemaTest"
