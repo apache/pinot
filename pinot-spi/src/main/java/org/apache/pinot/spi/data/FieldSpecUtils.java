@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.spi.data;
 
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class FieldSpecUtils {
