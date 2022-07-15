@@ -133,7 +133,7 @@ public class ControllerTest {
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
-  private final Logger _logger;
+  protected final Logger _logger;
 
   public ControllerTest() {
     _logger = LoggerFactory.getLogger(this.getClass());
