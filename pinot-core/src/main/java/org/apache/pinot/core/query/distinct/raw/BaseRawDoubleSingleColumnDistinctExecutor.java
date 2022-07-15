@@ -42,7 +42,7 @@ abstract class BaseRawDoubleSingleColumnDistinctExecutor implements DistinctExec
   final boolean _nullHandlingEnabled;
 
   final DoubleSet _valueSet;
-  int _numNulls;
+  protected boolean _hasNull;
 
   BaseRawDoubleSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit,
       boolean nullHandlingEnabled) {
@@ -63,7 +63,7 @@ abstract class BaseRawDoubleSingleColumnDistinctExecutor implements DistinctExec
     while (valueIterator.hasNext()) {
       records.add(new Record(new Object[]{valueIterator.nextDouble()}));
     }
-    if (_numNulls == 1) {
+    if (_hasNull) {
       records.add(new Record(new Object[]{null}));
     }
     return new DistinctTable(dataSchema, records, _nullHandlingEnabled);

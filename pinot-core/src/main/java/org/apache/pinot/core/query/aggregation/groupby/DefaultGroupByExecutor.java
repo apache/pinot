@@ -85,6 +85,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     int maxInitialResultHolderCapacity = queryContext.getMaxInitialResultHolderCapacity();
     if (hasNoDictionaryGroupByExpression || _nullHandlingEnabled) {
       if (groupByExpressions.length == 1) {
+        // TODO(nhejazi): support MV and dictionary based. No dictionary performance is much worse than dictionary
+        //  based.
         _groupKeyGenerator =
             new NoDictionarySingleColumnGroupKeyGenerator(transformOperator, groupByExpressions[0], numGroupsLimit,
                 _nullHandlingEnabled);

@@ -42,18 +42,29 @@ public class RawDoubleSingleColumnDistinctOnlyExecutor extends BaseRawDoubleSing
     int numDocs = transformBlock.getNumDocs();
     if (blockValueSet.isSingleValue()) {
       double[] values = blockValueSet.getDoubleValuesSV();
-      RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
-      for (int i = 0; i < numDocs; i++) {
-        if (nullBitmap != null && nullBitmap.contains(i)) {
-          _numNulls = 1;
-        } else {
+      if (_nullHandlingEnabled) {
+        // TODO(nhejazi): consider having a separate set of classes to handle the case with null handling enabled.
+        RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
+        for (int i = 0; i < numDocs; i++) {
+          if (nullBitmap != null && nullBitmap.contains(i)) {
+            _hasNull = true;
+          } else {
+            _valueSet.add(values[i]);
+            if (_valueSet.size() >= _limit - (_hasNull ? 1 : 0)) {
+              return true;
+            }
+          }
+        }
+      } else {
+        for (int i = 0; i < numDocs; i++) {
           _valueSet.add(values[i]);
-          if (_valueSet.size() >= _limit - _numNulls) {
+          if (_valueSet.size() >= _limit) {
             return true;
           }
         }
       }
     } else {
+      // TODO(nhejazi): support proper null handling in multi-valued columns.
       double[][] values = blockValueSet.getDoubleValuesMV();
       for (int i = 0; i < numDocs; i++) {
         for (double value : values[i]) {

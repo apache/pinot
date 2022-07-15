@@ -171,7 +171,7 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
   public void testQueries() {
     DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     Map<String, String> queryOptions = new HashMap<>();
-    queryOptions.put("nullHandlingEnabled", "true");
+    queryOptions.put("enableNullHandling", "true");
     HashSet<Integer> trueIndices = new HashSet<Integer>(Arrays.asList(1, 3, 5));
     {
       String query = "SELECT * FROM testTable";

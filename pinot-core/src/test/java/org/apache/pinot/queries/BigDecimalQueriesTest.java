@@ -161,7 +161,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
   public void testQueries() {
     DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     Map<String, String> queryOptions = new HashMap<>();
-    queryOptions.put("nullHandlingEnabled", "true");
+    queryOptions.put("enableNullHandling", "true");
     {
       String query = "SELECT * FROM testTable";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);

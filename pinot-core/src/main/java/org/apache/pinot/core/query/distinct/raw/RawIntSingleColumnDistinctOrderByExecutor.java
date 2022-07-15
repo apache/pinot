@@ -51,11 +51,17 @@ public class RawIntSingleColumnDistinctOrderByExecutor extends BaseRawIntSingleC
     int numDocs = transformBlock.getNumDocs();
     if (blockValueSet.isSingleValue()) {
       int[] values = blockValueSet.getIntValuesSV();
-      RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
-      for (int i = 0; i < numDocs; i++) {
-        if (nullBitmap != null && nullBitmap.contains(i)) {
-          _numNulls = 1;
-        } else {
+      if (_nullHandlingEnabled) {
+        RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
+        for (int i = 0; i < numDocs; i++) {
+          if (nullBitmap != null && nullBitmap.contains(i)) {
+            _hasNull = true;
+          } else {
+            add(values[i]);
+          }
+        }
+      } else {
+        for (int i = 0; i < numDocs; i++) {
           add(values[i]);
         }
       }
@@ -72,7 +78,7 @@ public class RawIntSingleColumnDistinctOrderByExecutor extends BaseRawIntSingleC
 
   private void add(int value) {
     if (!_valueSet.contains(value)) {
-      if (_valueSet.size() < _limit - _numNulls) {
+      if (_valueSet.size() < _limit - (_hasNull ? 1 : 0)) {
         _valueSet.add(value);
         _priorityQueue.enqueue(value);
       } else {

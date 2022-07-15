@@ -31,6 +31,7 @@ import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -63,12 +64,13 @@ public class ProjectionBlockValSet implements BlockValSet {
   public RoaringBitmap getNullBitmap() {
     if (!_nullBitmapSet) {
       NullValueVectorReader nullValueReader = _dataSource.getNullValueVector();
-      if (nullValueReader != null && nullValueReader.getNullBitmap().getCardinality() > 0) {
+      ImmutableRoaringBitmap nullBitmap = nullValueReader != null ? nullValueReader.getNullBitmap() : null;
+      if (nullBitmap != null && nullBitmap.getCardinality() > 0) {
         // Project null bitmap.
         RoaringBitmap projectedNullBitmap = new RoaringBitmap();
         int[] docIds = _dataBlockCache.getDocIds();
         for (int i = 0; i < _dataBlockCache.getNumDocs(); i++) {
-          if (nullValueReader.isNull(docIds[i])) {
+          if (nullBitmap.contains(docIds[i])) {
             projectedNullBitmap.add(i);
           }
         }

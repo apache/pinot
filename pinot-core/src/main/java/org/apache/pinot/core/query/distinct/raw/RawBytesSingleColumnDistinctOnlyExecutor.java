@@ -41,15 +41,24 @@ public class RawBytesSingleColumnDistinctOnlyExecutor extends BaseRawBytesSingle
   public boolean process(TransformBlock transformBlock) {
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
     byte[][] values = blockValueSet.getBytesValuesSV();
-    RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
     int numDocs = transformBlock.getNumDocs();
-    for (int i = 0; i < numDocs; i++) {
-      if (nullBitmap != null && nullBitmap.contains(i)) {
-        values[i] = null;
+    if (_nullHandlingEnabled) {
+      RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
+      for (int i = 0; i < numDocs; i++) {
+        if (nullBitmap != null && nullBitmap.contains(i)) {
+          values[i] = null;
+        }
+        _valueSet.add(new ByteArray(values[i]));
+        if (_valueSet.size() >= _limit) {
+          return true;
+        }
       }
-      _valueSet.add(new ByteArray(values[i]));
-      if (_valueSet.size() >= _limit) {
-        return true;
+    } else {
+      for (int i = 0; i < numDocs; i++) {
+        _valueSet.add(new ByteArray(values[i]));
+        if (_valueSet.size() >= _limit) {
+          return true;
+        }
       }
     }
     return false;

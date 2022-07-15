@@ -56,9 +56,15 @@ public class RawStringSingleColumnDistinctOrderByExecutor extends BaseRawStringS
     int numDocs = transformBlock.getNumDocs();
     if (blockValueSet.isSingleValue()) {
       String[] values = blockValueSet.getStringValuesSV();
-      RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
-      for (int i = 0; i < numDocs; i++) {
-        add(nullBitmap != null && nullBitmap.contains(i) ? null : values[i]);
+      if (_nullHandlingEnabled) {
+        RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
+        for (int i = 0; i < numDocs; i++) {
+          add(nullBitmap != null && nullBitmap.contains(i) ? null : values[i]);
+        }
+      } else {
+        for (int i = 0; i < numDocs; i++) {
+          add(values[i]);
+        }
       }
     } else {
       String[][] values = blockValueSet.getStringValuesMV();

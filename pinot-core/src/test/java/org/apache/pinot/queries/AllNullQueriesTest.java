@@ -286,7 +286,7 @@ public class AllNullQueriesTest extends BaseQueriesTest {
       throws IOException {
     DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     Map<String, String> queryOptions = new HashMap<>();
-    queryOptions.put("nullHandlingEnabled", "true");
+    queryOptions.put("enableNullHandling", "true");
     {
       String query = "SELECT *, 1 FROM testTable";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);

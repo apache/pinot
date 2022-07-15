@@ -57,7 +57,7 @@ public class DistinctPlanNode implements PlanNode {
     List<ExpressionContext> expressions = distinctAggregationFunction.getInputExpressions();
 
     // Use dictionary to solve the query if possible
-    if (_queryContext.getFilter() == null && expressions.size() == 1) {
+    if (_queryContext.getFilter() == null && !_queryContext.isNullHandlingEnabled() && expressions.size() == 1) {
       ExpressionContext expression = expressions.get(0);
       if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
         DataSource dataSource = _indexSegment.getDataSource(expression.getIdentifier());

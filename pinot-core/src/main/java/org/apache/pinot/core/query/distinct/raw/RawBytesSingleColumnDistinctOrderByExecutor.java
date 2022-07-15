@@ -55,25 +55,35 @@ public class RawBytesSingleColumnDistinctOrderByExecutor extends BaseRawBytesSin
   public boolean process(TransformBlock transformBlock) {
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
     byte[][] values = blockValueSet.getBytesValuesSV();
-    RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
     int numDocs = transformBlock.getNumDocs();
-    for (int i = 0; i < numDocs; i++) {
-      ByteArray value = nullBitmap != null && nullBitmap.contains(i) ? null : new ByteArray(values[i]);
-      if (!_valueSet.contains(value)) {
-        if (_valueSet.size() < _limit) {
-          _valueSet.add(value);
-          _priorityQueue.enqueue(value);
-        } else {
-          ByteArray firstValue = _priorityQueue.first();
-          if (_priorityQueue.comparator().compare(value, firstValue) > 0) {
-            _valueSet.remove(firstValue);
-            _valueSet.add(value);
-            _priorityQueue.dequeue();
-            _priorityQueue.enqueue(value);
-          }
-        }
+    if (_nullHandlingEnabled) {
+      RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
+      for (int i = 0; i < numDocs; i++) {
+        ByteArray value = nullBitmap != null && nullBitmap.contains(i) ? null : new ByteArray(values[i]);
+        processInternal(value);
+      }
+    } else {
+      for (int i = 0; i < numDocs; i++) {
+        processInternal(new ByteArray(values[i]));
       }
     }
     return false;
+  }
+
+  private void processInternal(ByteArray value) {
+    if (!_valueSet.contains(value)) {
+      if (_valueSet.size() < _limit) {
+        _valueSet.add(value);
+        _priorityQueue.enqueue(value);
+      } else {
+        ByteArray firstValue = _priorityQueue.first();
+        if (_priorityQueue.comparator().compare(value, firstValue) > 0) {
+          _valueSet.remove(firstValue);
+          _valueSet.add(value);
+          _priorityQueue.dequeue();
+          _priorityQueue.enqueue(value);
+        }
+      }
+    }
   }
 }

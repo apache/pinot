@@ -45,7 +45,7 @@ import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpecUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -336,14 +336,13 @@ public class IntermediateResultsBlock implements Block {
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = _dataSchema.size();
     Iterator<Record> iterator = _table.iterator();
-    RoaringBitmap[] nullBitmaps = null;
     if (_nullHandlingEnabled) {
-      nullBitmaps = new RoaringBitmap[numColumns];
+      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
       Object[] colDefaultNullValues = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
         if (storedColumnDataTypes[colId] != ColumnDataType.OBJECT) {
           colDefaultNullValues[colId] =
-              FieldSpec.getDefaultDimensionNullValue(storedColumnDataTypes[colId].toDataType());
+              FieldSpecUtils.getDefaultNullValue(storedColumnDataTypes[colId].toDataType());
         }
         nullBitmaps[colId] = new RoaringBitmap();
       }
@@ -453,7 +452,7 @@ public class IntermediateResultsBlock implements Block {
       nullBitmaps = new RoaringBitmap[numAggregationFunctions];
       for (int i = 0; i < numAggregationFunctions; i++) {
         if (columnDataTypes[i] != ColumnDataType.OBJECT) {
-          colDefaultNullValues[i] = FieldSpec.getDefaultDimensionNullValue(columnDataTypes[i].toDataType());
+          colDefaultNullValues[i] = FieldSpecUtils.getDefaultNullValue(columnDataTypes[i].toDataType());
         }
         nullBitmaps[i] = new RoaringBitmap();
       }

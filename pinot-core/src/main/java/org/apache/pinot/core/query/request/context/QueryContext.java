@@ -138,12 +138,6 @@ public class QueryContext {
     _limit = limit;
     _offset = offset;
     _queryOptions = queryOptions;
-    if (_queryOptions != null) {
-      setSkipUpsert(QueryOptionsUtils.isSkipUpsert(_queryOptions));
-      setSkipStarTree(QueryOptionsUtils.isSkipStarTree(_queryOptions));
-      setSkipScanFilterReorder(QueryOptionsUtils.isSkipScanFilterReorder(_queryOptions));
-      setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
-    }
     _expressionOverrideHints = expressionOverrideHints;
     _explain = explain;
   }
@@ -505,6 +499,7 @@ public class QueryContext {
       QueryContext queryContext =
           new QueryContext(_tableName, _subquery, _selectExpressions, _aliasList, _filter, _groupByExpressions,
               _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions, _expressionOverrideHints, _explain);
+      queryContext.setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
 
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);

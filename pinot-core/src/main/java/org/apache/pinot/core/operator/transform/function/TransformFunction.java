@@ -25,7 +25,6 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 
 /**
@@ -66,11 +65,6 @@ public interface TransformFunction {
    * @return Dictionary
    */
   Dictionary getDictionary();
-
-  /**
-   * Returns null value vector for the column if exists, or {@code null} if not.
-   */
-  NullValueVectorReader getNullValueVectorReader();
 
   /**
    * Transforms the data from the given projection block to single-valued dictionary Ids.

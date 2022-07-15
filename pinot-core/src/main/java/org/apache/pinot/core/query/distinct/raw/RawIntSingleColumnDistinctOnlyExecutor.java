@@ -42,13 +42,22 @@ public class RawIntSingleColumnDistinctOnlyExecutor extends BaseRawIntSingleColu
     int numDocs = transformBlock.getNumDocs();
     if (blockValueSet.isSingleValue()) {
       int[] values = blockValueSet.getIntValuesSV();
-      RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
-      for (int i = 0; i < numDocs; i++) {
-        if (nullBitmap != null && nullBitmap.contains(i)) {
-          _numNulls = 1;
-        } else {
+      if (_nullHandlingEnabled) {
+        RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
+        for (int i = 0; i < numDocs; i++) {
+          if (nullBitmap != null && nullBitmap.contains(i)) {
+            _hasNull = true;
+          } else {
+            _valueSet.add(values[i]);
+            if (_valueSet.size() >= _limit - (_hasNull ? 1 : 0)) {
+              return true;
+            }
+          }
+        }
+      } else {
+        for (int i = 0; i < numDocs; i++) {
           _valueSet.add(values[i]);
-          if (_valueSet.size() >= _limit - _numNulls) {
+          if (_valueSet.size() >= _limit) {
             return true;
           }
         }

@@ -42,7 +42,7 @@ abstract class BaseRawFloatSingleColumnDistinctExecutor implements DistinctExecu
   final boolean _nullHandlingEnabled;
 
   final FloatSet _valueSet;
-  int _numNulls;
+  protected boolean _hasNull;
 
   BaseRawFloatSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit,
       boolean nullHandlingEnabled) {
@@ -50,7 +50,6 @@ abstract class BaseRawFloatSingleColumnDistinctExecutor implements DistinctExecu
     _dataType = dataType;
     _limit = limit;
     _nullHandlingEnabled = nullHandlingEnabled;
-    _numNulls = 0;
 
     _valueSet = new FloatOpenHashSet(Math.min(limit, MAX_INITIAL_CAPACITY));
   }
@@ -64,7 +63,7 @@ abstract class BaseRawFloatSingleColumnDistinctExecutor implements DistinctExecu
     while (valueIterator.hasNext()) {
       records.add(new Record(new Object[]{valueIterator.nextFloat()}));
     }
-    if (_numNulls == 1) {
+    if (_hasNull) {
       records.add(new Record(new Object[]{null}));
     }
     assert records.size() <= _limit;
