@@ -48,7 +48,6 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
   private final AggregationFunction[] _aggregationFunctions;
   private final List<Pair<AggregationFunction[], TransformOperator>> _aggFunctionsWithTransformOperator;
   private final long _numTotalDocs;
-  private final QueryContext _queryContext;
 
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
@@ -57,12 +56,10 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
   // We can potentially do away with aggregationFunctions parameter, but its cleaner to pass it in than to construct
   // it from aggFunctionsWithTransformOperator
   public FilteredAggregationOperator(AggregationFunction[] aggregationFunctions,
-      List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator, long numTotalDocs,
-      QueryContext queryContext) {
+      List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator, long numTotalDocs) {
     _aggregationFunctions = aggregationFunctions;
     _aggFunctionsWithTransformOperator = aggFunctionsWithTransformOperator;
     _numTotalDocs = numTotalDocs;
-    _queryContext = queryContext;
   }
 
   @Override
@@ -93,8 +90,7 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
       _numEntriesScannedInFilter += transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * transformOperator.getNumColumnsProjected();
     }
-    return new IntermediateResultsBlock(_aggregationFunctions, Arrays.asList(result),
-        _queryContext.isNullHandlingEnabled());
+    return new IntermediateResultsBlock(_aggregationFunctions, Arrays.asList(result));
   }
 
   @Override

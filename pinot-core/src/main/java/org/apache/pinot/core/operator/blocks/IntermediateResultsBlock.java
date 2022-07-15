@@ -95,11 +95,9 @@ public class IntermediateResultsBlock implements Block {
    * <p>For aggregation only, the result is a list of values.
    * <p>For aggregation group-by, the result is a list of maps from group keys to aggregation values.
    */
-  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> aggregationResult,
-      boolean nullHandlingEnabled) {
+  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> aggregationResult) {
     _aggregationFunctions = aggregationFunctions;
     _aggregationResult = aggregationResult;
-    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   /**
@@ -108,8 +106,8 @@ public class IntermediateResultsBlock implements Block {
    * <p>For aggregation group-by, the result is a list of maps from group keys to aggregation values.
    */
   public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> aggregationResult,
-      DataSchema dataSchema, boolean nullHandlingEnabled) {
-    this(aggregationFunctions, aggregationResult, nullHandlingEnabled);
+      DataSchema dataSchema) {
+    this(aggregationFunctions, aggregationResult);
     _dataSchema = dataSchema;
   }
 

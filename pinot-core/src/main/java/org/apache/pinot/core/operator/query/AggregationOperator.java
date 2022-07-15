@@ -29,7 +29,6 @@ import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 
 
@@ -44,17 +43,15 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   private final TransformOperator _transformOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
-  private final QueryContext _queryContext;
 
   private int _numDocsScanned = 0;
 
   public AggregationOperator(AggregationFunction[] aggregationFunctions, TransformOperator transformOperator,
-      long numTotalDocs, boolean useStarTree, QueryContext queryContext) {
+      long numTotalDocs, boolean useStarTree) {
     _aggregationFunctions = aggregationFunctions;
     _transformOperator = transformOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
-    _queryContext = queryContext;
   }
 
   @Override
@@ -73,8 +70,7 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
     }
 
     // Build intermediate result block based on aggregation result from the executor
-    return new IntermediateResultsBlock(_aggregationFunctions, aggregationExecutor.getResult(),
-        _queryContext.isNullHandlingEnabled());
+    return new IntermediateResultsBlock(_aggregationFunctions, aggregationExecutor.getResult());
   }
 
   @Override

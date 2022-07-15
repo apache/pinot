@@ -141,8 +141,7 @@ public class AggregationPlanNode implements PlanNode {
     aggToTransformOpList.add(
         Pair.of(nonFilteredAggregationFunctions.toArray(new AggregationFunction[0]), mainTransformOperator));
 
-    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList, numTotalDocs,
-        _queryContext);
+    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList, numTotalDocs);
   }
 
   /**
@@ -180,8 +179,7 @@ public class AggregationPlanNode implements PlanNode {
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
     if (canOptimizeFilteredCount(filterOperator, aggregationFunctions)) {
-      return new FastFilteredCountOperator(aggregationFunctions, filterOperator, _indexSegment.getSegmentMetadata(),
-          _queryContext);
+      return new FastFilteredCountOperator(aggregationFunctions, filterOperator, _indexSegment.getSegmentMetadata());
     }
 
     if (filterOperator.isResultMatchingAll()) {
@@ -214,8 +212,7 @@ public class AggregationPlanNode implements PlanNode {
               TransformOperator transformOperator =
                   new StarTreeTransformPlanNode(_queryContext, starTreeV2, aggregationFunctionColumnPairs, null,
                       predicateEvaluatorsMap).run();
-              return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, true,
-                  _queryContext);
+              return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, true);
             }
           }
         }
@@ -227,8 +224,7 @@ public class AggregationPlanNode implements PlanNode {
     TransformOperator transformOperator =
         new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
-    return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false,
-        _queryContext);
+    return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false);
   }
 
   /**

@@ -56,7 +56,6 @@ public class ProjectionBlockValSet implements BlockValSet {
     _dataBlockCache = dataBlockCache;
     _column = column;
     _dataSource = dataSource;
-    _nullBitmapSet = false;
   }
 
   @Nullable
