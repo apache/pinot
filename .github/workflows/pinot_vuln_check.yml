@@ -25,12 +25,12 @@ on:
   pull_request:
     branches:
       - master
-    paths-ignore:
-      - "contrib/**"
-      - "docs/**"
-      - "licenses/**"
-      - "licenses-binary/**"
-      - "**.md"
+    paths:
+      - "**/pom.xml"
+      - "**/package.json"
+      - "**/package-lock.json"
+      - "docker/images/pinot/**"
+      - ".github/workflows/**"
 jobs:
   verify-docker:
     name: Verify Docker Image
