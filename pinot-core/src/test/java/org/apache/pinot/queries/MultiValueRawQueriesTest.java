@@ -21,10 +21,13 @@ package org.apache.pinot.queries;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -47,6 +50,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -69,11 +73,13 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
   private final static String MV_FLOAT_COL = "mvFloatCol";
   private final static String MV_DOUBLE_COL = "mvDoubleCol";
   private final static String MV_STRING_COL = "mvStringCol";
+  private final static String MV_STRING_COL_2 = "mvStringCol2";
   private final static String MV_RAW_INT_COL = "mvRawIntCol";
   private final static String MV_RAW_LONG_COL = "mvRawLongCol";
   private final static String MV_RAW_FLOAT_COL = "mvRawFloatCol";
   private final static String MV_RAW_DOUBLE_COL = "mvRawDoubleCol";
   private final static String MV_RAW_STRING_COL = "mvRawStringCol";
+  private final static String MV_RAW_STRING_COL_2 = "mvRawStringCol2";
 
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
       .addSingleValueDimension(SV_INT_COL, FieldSpec.DataType.INT)
@@ -82,30 +88,43 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       .addMultiValueDimension(MV_FLOAT_COL, FieldSpec.DataType.FLOAT)
       .addMultiValueDimension(MV_DOUBLE_COL, FieldSpec.DataType.DOUBLE)
       .addMultiValueDimension(MV_STRING_COL, FieldSpec.DataType.STRING)
+      .addMultiValueDimension(MV_STRING_COL_2, FieldSpec.DataType.STRING)
       .addMultiValueDimension(MV_RAW_INT_COL, FieldSpec.DataType.INT)
       .addMultiValueDimension(MV_RAW_LONG_COL, FieldSpec.DataType.LONG)
       .addMultiValueDimension(MV_RAW_FLOAT_COL, FieldSpec.DataType.FLOAT)
       .addMultiValueDimension(MV_RAW_DOUBLE_COL, FieldSpec.DataType.DOUBLE)
       .addMultiValueDimension(MV_RAW_STRING_COL, FieldSpec.DataType.STRING)
+      .addMultiValueDimension(MV_RAW_STRING_COL_2, FieldSpec.DataType.STRING)
       .build();
 
   private static final DataSchema DATA_SCHEMA = new DataSchema(new String[]{"mvDoubleCol", "mvFloatCol", "mvIntCol",
-      "mvLongCol", "mvRawDoubleCol", "mvRawFloatCol", "mvRawIntCol", "mvRawLongCol", "mvRawStringCol", "mvStringCol",
-      "svIntCol"},
+      "mvLongCol", "mvRawDoubleCol", "mvRawFloatCol", "mvRawIntCol", "mvRawLongCol", "mvRawStringCol",
+      "mvRawStringCol2", "mvStringCol", "mvStringCol2", "svIntCol"},
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.FLOAT_ARRAY,
           DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.LONG_ARRAY,
           DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.FLOAT_ARRAY,
           DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.LONG_ARRAY,
           DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY,
+          DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY,
           DataSchema.ColumnDataType.INT});
 
   private static final TableConfig TABLE = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setNoDictionaryColumns(
-          Arrays.asList(MV_RAW_INT_COL, MV_RAW_LONG_COL, MV_RAW_FLOAT_COL, MV_RAW_DOUBLE_COL, MV_RAW_STRING_COL))
+          Arrays.asList(MV_RAW_INT_COL, MV_RAW_LONG_COL, MV_RAW_FLOAT_COL, MV_RAW_DOUBLE_COL, MV_RAW_STRING_COL,
+              MV_RAW_STRING_COL_2))
       .build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
+
+  private List<String> _sortedStringListOverall;
+
+  private final List<String> _stringList1 = new ArrayList<>();
+  private final List<String> _stringList2 = new ArrayList<>();
+  private final Set<String> _stringSet = new HashSet<>();
+  private final Set<String> _stringSet2 = new HashSet<>();
+
+  private final Random _random = new Random();
 
   @Override
   protected String getFilter() {
@@ -131,6 +150,10 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
     ImmutableSegment segment2 = createSegment(generateRecords(BASE_VALUE_2), SEGMENT_NAME_2);
     _indexSegment = segment1;
     _indexSegments = Arrays.asList(segment1, segment2);
+
+    _sortedStringListOverall = new ArrayList<>(_stringSet);
+    _sortedStringListOverall.addAll(_stringSet2);
+    Collections.sort(_sortedStringListOverall);
   }
 
   @AfterClass
@@ -165,6 +188,16 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       record.putValue(MV_RAW_FLOAT_COL, mvValue);
       record.putValue(MV_RAW_DOUBLE_COL, mvValue);
       record.putValue(MV_RAW_STRING_COL, mvValue);
+
+      String stringVal = RandomStringUtils.randomAlphanumeric(10, 100);
+      String stringVal2 = RandomStringUtils.randomAlphanumeric(10, 100);
+      record.putValue(MV_STRING_COL_2, Arrays.asList(stringVal, stringVal2));
+      record.putValue(MV_RAW_STRING_COL_2, Arrays.asList(stringVal, stringVal2));
+      _stringSet.add(stringVal);
+      _stringSet2.add(stringVal2);
+      _stringList1.add(stringVal);
+      _stringList2.add(stringVal2);
+
       uniqueRecords.add(record);
     }
 
@@ -211,8 +244,8 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       Set<Integer> actualValuesSecond = new HashSet<>();
       for (int i = 0; i < 40; i++) {
         Object[] values = recordRows.get(i);
-        assertEquals(values.length, 11);
-        int svIntValue = (int) values[10];
+        assertEquals(values.length, 13);
+        int svIntValue = (int) values[12];
         int[] intValues = (int[]) values[2];
         assertEquals(intValues[1] - intValues[0], MV_OFFSET);
         assertEquals(svIntValue, intValues[0]);
@@ -243,11 +276,18 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
         assertEquals(doubleValues[1], doubleValuesRaw[1]);
 
         String[] stringValues = (String[]) values[8];
-        String[] stringValuesRaw = (String[]) values[9];
+        String[] stringValuesRaw = (String[]) values[10];
         assertEquals(Integer.parseInt(stringValues[0]), intValues[0]);
         assertEquals(Integer.parseInt(stringValues[1]), intValues[1]);
         assertEquals(stringValues[0], stringValuesRaw[0]);
         assertEquals(stringValues[1], stringValuesRaw[1]);
+
+        String[] stringValues2 = (String[]) values[9];
+        String[] stringValuesRaw2 = (String[]) values[11];
+        assertEquals(stringValues2[0], stringValuesRaw2[0]);
+        assertEquals(stringValues2[1], stringValuesRaw2[1]);
+        assertTrue(_stringSet.contains(stringValuesRaw2[0]));
+        assertTrue(_stringSet2.contains(stringValuesRaw2[1]));
 
         actualValuesFirst.add(intValues[0]);
         actualValuesSecond.add(intValues[1]);
@@ -257,17 +297,18 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
     }
     {
       // Select some dict based MV and some raw MV columns. Validate that the values match for the corresponding rows
-      String query = "SELECT mvIntCol, mvDoubleCol, mvStringCol, mvRawIntCol, mvRawDoubleCol, mvRawStringCol, svIntCol "
-          + "from testTable ORDER BY svIntCol LIMIT 40";
+      String query = "SELECT mvIntCol, mvDoubleCol, mvStringCol, mvRawIntCol, mvRawDoubleCol, mvRawStringCol, "
+          + "svIntCol, mvStringCol2, mvRawStringCol2 from testTable ORDER BY svIntCol LIMIT 40";
       ResultTable resultTable = getBrokerResponse(query).getResultTable();
       assertNotNull(resultTable);
       DataSchema dataSchema = new DataSchema(new String[]{
-          "mvIntCol", "mvDoubleCol", "mvStringCol", "mvRawIntCol", "mvRawDoubleCol", "mvRawStringCol", "svIntCol"
+          "mvIntCol", "mvDoubleCol", "mvStringCol", "mvRawIntCol", "mvRawDoubleCol", "mvRawStringCol", "svIntCol",
+          "mvStringCol2", "mvRawStringCol2"
       }, new DataSchema.ColumnDataType[]{
           DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY,
           DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.INT_ARRAY,
           DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY,
-          DataSchema.ColumnDataType.INT
+          DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY
       });
       assertEquals(resultTable.getDataSchema(), dataSchema);
       List<Object[]> recordRows = resultTable.getRows();
@@ -284,7 +325,7 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       Set<Integer> actualValuesSecond = new HashSet<>();
       for (int i = 0; i < 40; i++) {
         Object[] values = recordRows.get(i);
-        assertEquals(values.length, 7);
+        assertEquals(values.length, 9);
         int[] intValues = (int[]) values[0];
         assertEquals(intValues[1] - intValues[0], MV_OFFSET);
 
@@ -305,6 +346,13 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
         assertEquals(Integer.parseInt(stringValues[1]), intValues[1]);
         assertEquals(stringValues[0], stringValuesRaw[0]);
         assertEquals(stringValues[1], stringValuesRaw[1]);
+
+        String[] stringValues2 = (String[]) values[7];
+        String[] stringValuesRaw2 = (String[]) values[8];
+        assertEquals(stringValues2[0], stringValuesRaw2[0]);
+        assertEquals(stringValues2[1], stringValuesRaw2[1]);
+        assertTrue(_stringSet.contains(stringValuesRaw2[0]));
+        assertTrue(_stringSet2.contains(stringValuesRaw2[1]));
 
         assertEquals(intValues[0], (int) values[6]);
         assertEquals(intValuesRaw[0], (int) values[6]);
@@ -431,6 +479,44 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
         assertEquals((int) values[0], expectedIntValues[i]);
         assertEquals(values[1], expectedDoubleValues[i]);
         assertEquals((String) values[2], expectedStringValues[i]);
+      }
+    }
+    {
+      // Test a group by order by query on variable length string column and compare results with query on dict based
+      // variable length string column
+      String query1 = "SELECT mvRawStringCol2 from testTable GROUP BY mvRawStringCol2 ORDER BY mvRawStringCol2 "
+          + "LIMIT 20";
+      ResultTable resultTable1 = getBrokerResponse(query1).getResultTable();
+      assertNotNull(resultTable1);
+      DataSchema dataSchema1 = new DataSchema(new String[]{
+          "mvRawStringCol2"
+      }, new DataSchema.ColumnDataType[]{
+          DataSchema.ColumnDataType.STRING
+      });
+      assertEquals(resultTable1.getDataSchema(), dataSchema1);
+      List<Object[]> recordRows1 = resultTable1.getRows();
+      assertEquals(recordRows1.size(), 20);
+
+      String query2 = "SELECT mvStringCol2 from testTable GROUP BY mvStringCol2 ORDER BY mvStringCol2 LIMIT 20";
+      ResultTable resultTable2 = getBrokerResponse(query2).getResultTable();
+      assertNotNull(resultTable2);
+      DataSchema dataSchema2 = new DataSchema(new String[]{
+          "mvStringCol2"
+      }, new DataSchema.ColumnDataType[]{
+          DataSchema.ColumnDataType.STRING
+      });
+      assertEquals(resultTable2.getDataSchema(), dataSchema2);
+      List<Object[]> recordRows2 = resultTable2.getRows();
+      assertEquals(recordRows2.size(), 20);
+
+      for (int i = 0; i < 10; i++) {
+        Object[] values1 = recordRows1.get(i);
+        Object[] values2 = recordRows2.get(i);
+        assertEquals(values1.length, 1);
+        assertEquals(values2.length, 1);
+
+        assertEquals(values1[0], values2[0]);
+        assertEquals(values1[0], _sortedStringListOverall.get(i));
       }
     }
     {
@@ -642,7 +728,7 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       List<Object[]> recordRows = resultTable.getRows();
       assertEquals(recordRows.size(), 10);
 
-      for (int i = 0; i < 4; i++) {
+      for (int i = 0; i < 10; i++) {
         Object[] values = recordRows.get(i);
         assertEquals(values.length, 4);
         int[] intVal = (int[]) values[0];
@@ -697,7 +783,7 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       List<Object[]> recordRows = resultTable.getRows();
       assertEquals(recordRows.size(), 8);
 
-      for (int i = 0; i < 4; i++) {
+      for (int i = 0; i < 8; i++) {
         Object[] values = recordRows.get(i);
         assertEquals(values.length, 4);
         int[] intVal = (int[]) values[0];
@@ -733,13 +819,60 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       List<Object[]> recordRows = resultTable.getRows();
       assertEquals(recordRows.size(), 8);
 
-      for (int i = 0; i < 4; i++) {
+      for (int i = 0; i < 8; i++) {
         Object[] values = recordRows.get(i);
         assertEquals(values.length, 1);
         String[] stringVal = (String[]) values[0];
         assertEquals(Integer.parseInt(stringVal[1]) - Integer.parseInt(stringVal[0]), MV_OFFSET);
         assertTrue(Integer.parseInt(stringVal[0]) == 1100 || Integer.parseInt(stringVal[1]) == 1100
             || Integer.parseInt(stringVal[0]) == 1101 || Integer.parseInt(stringVal[1]) == 1101);
+      }
+    }
+    {
+      // Test a select with filter IN query on the variable length string MV raw column identifier
+      int index1 = _random.nextInt(_stringList1.size());
+      int index2 = _random.nextInt(_stringList2.size());
+      while (index2 == index1) {
+        index2 = _random.nextInt(_stringList2.size());
+      }
+      String val1 = _stringList1.get(index1);
+      String val2 = _stringList2.get(index2);
+
+      String query1 = "SELECT mvRawStringCol2 from testTable where mvRawStringCol2 IN ('" + val1 + "', '" + val2
+          + "') LIMIT 10";
+      ResultTable resultTable1 = getBrokerResponse(query1).getResultTable();
+      assertNotNull(resultTable1);
+      DataSchema dataSchema1 = new DataSchema(new String[]{
+          "mvRawStringCol2"
+      }, new DataSchema.ColumnDataType[]{
+          DataSchema.ColumnDataType.STRING_ARRAY
+      });
+      assertEquals(resultTable1.getDataSchema(), dataSchema1);
+      List<Object[]> recordRows1 = resultTable1.getRows();
+      assertEquals(recordRows1.size(), 8);
+
+      String query2 = "SELECT mvStringCol2 from testTable where mvStringCol2 IN ('" + val1 + "', '" + val2
+          + "') LIMIT 10";
+      ResultTable resultTable2 = getBrokerResponse(query2).getResultTable();
+      assertNotNull(resultTable2);
+      DataSchema dataSchema2 = new DataSchema(new String[]{
+          "mvStringCol2"
+      }, new DataSchema.ColumnDataType[]{
+          DataSchema.ColumnDataType.STRING_ARRAY
+      });
+      assertEquals(resultTable2.getDataSchema(), dataSchema2);
+      List<Object[]> recordRows2 = resultTable2.getRows();
+      assertEquals(recordRows2.size(), 8);
+
+      for (int i = 0; i < 8; i++) {
+        Object[] values1 = recordRows1.get(i);
+        Object[] values2 = recordRows2.get(i);
+        assertEquals(values1.length, 1);
+        assertEquals(values2.length, 1);
+        String[] stringVal1 = (String[]) values1[0];
+        String[] stringVal2 = (String[]) values2[0];
+        assertTrue(stringVal1[0].equals(val1) || stringVal1[1].equals(val2));
+        assertTrue(stringVal2[0].equals(val1) || stringVal2[1].equals(val2));
       }
     }
     {
@@ -938,6 +1071,48 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       });
       validateSimpleAggregateQueryResults(resultTable, dataSchema);
     }
+    {
+      // Aggregation on variable length string columns. Only countmv works for string columns with alpha-numeric
+      // characters. Other aggregations work for string columns if the strings are actually numeric strings.
+      String query = "SELECT COUNTMV(mvStringCol2), COUNTMV(mvRawStringCol2) from testTable";
+      ResultTable resultTable = getBrokerResponse(query).getResultTable();
+
+      DataSchema dataSchema = new DataSchema(new String[]{
+          "countmv(mvStringCol2)", "countmv(mvRawStringCol2)"
+      }, new DataSchema.ColumnDataType[]{
+          DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG
+      });
+      assertNotNull(resultTable);
+      assertEquals(resultTable.getDataSchema(), dataSchema);
+      List<Object[]> recordRows = resultTable.getRows();
+      assertEquals(recordRows.size(), 1);
+
+      Object[] values = recordRows.get(0);
+      assertEquals(values.length, 2);
+      long countInt = (long) values[0];
+      long countIntRaw = (long) values[1];
+      assertEquals(countInt, 160);
+      assertEquals(countInt, countIntRaw);
+    }
+    {
+      // Aggregation on variable length string columns. Only countmv works for string columns with alpha-numeric
+      // characters. Other aggregations work for string columns if the strings are actually numeric strings.
+      String query = "SELECT SUMMV(mvStringCol2), SUMMV(mvRawStringCol2) from testTable";
+      ResultTable resultTable = getBrokerResponse(query).getResultTable();
+      assertNull(resultTable);
+
+      query = "SELECT AVGMV(mvStringCol2), AVGMV(mvRawStringCol2) from testTable";
+      resultTable = getBrokerResponse(query).getResultTable();
+      assertNull(resultTable);
+
+      query = "SELECT MINMV(mvStringCol2), MINMV(mvRawStringCol2) from testTable";
+      resultTable = getBrokerResponse(query).getResultTable();
+      assertNull(resultTable);
+
+      query = "SELECT MAXMV(mvStringCol2), MAXMV(mvRawStringCol2) from testTable";
+      resultTable = getBrokerResponse(query).getResultTable();
+      assertNull(resultTable);
+    }
   }
 
   private void validateSimpleAggregateQueryResults(ResultTable resultTable, DataSchema expectedDataSchema) {
@@ -947,6 +1122,7 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
     assertEquals(recordRows.size(), 1);
 
     Object[] values = recordRows.get(0);
+    assertEquals(values.length, 10);
     long countInt = (long) values[0];
     long countIntRaw = (long) values[1];
     assertEquals(countInt, 160);
@@ -1057,6 +1233,29 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
 
       DataSchema dataSchema = new DataSchema(new String[]{
           "mvRawIntCol", "countmv(mvRawLongCol)"
+      }, new DataSchema.ColumnDataType[]{
+          DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG
+      });
+      assertNotNull(resultTable);
+      assertEquals(resultTable.getDataSchema(), dataSchema);
+      List<Object[]> recordRows = resultTable.getRows();
+      assertEquals(recordRows.size(), 10);
+
+      for (int i = 0; i < 10; i++) {
+        Object[] values = resultTable.getRows().get(i);
+        assertEquals(values.length, 2);
+        assertEquals((int) values[0], i);
+        assertEquals((long) values[1], 8);
+      }
+    }
+    {
+      // Aggregation on a single variable length string column, group by on a single MV raw column
+      String query = "SELECT mvRawIntCol, COUNTMV(mvRawStringCol2) from testTable GROUP BY mvRawIntCol ORDER BY "
+          + "mvRawIntCol LIMIT 10";
+      ResultTable resultTable = getBrokerResponse(query).getResultTable();
+
+      DataSchema dataSchema = new DataSchema(new String[]{
+          "mvRawIntCol", "countmv(mvRawStringCol2)"
       }, new DataSchema.ColumnDataType[]{
           DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG
       });
@@ -1227,6 +1426,33 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       validateAggregateWithGroupByQueryResults(resultTable, dataSchema, false);
     }
     {
+      // Aggregation on variable length string columns with group by. Only count aggregations should work
+      String query = "SELECT COUNTMV(mvStringCol2), COUNTMV(mvRawStringCol2), svIntCol, mvRawIntCol from testTable "
+          + "GROUP BY svIntCol, mvRawIntCol ORDER BY svIntCol";
+      ResultTable resultTable = getBrokerResponse(query).getResultTable();
+
+      DataSchema dataSchema = new DataSchema(new String[]{
+          "countmv(mvStringCol2)", "countmv(mvRawStringCol2)", "svIntCol", "mvRawIntCol"
+      }, new DataSchema.ColumnDataType[]{
+          DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.INT,
+          DataSchema.ColumnDataType.INT
+      });
+
+      assertNotNull(resultTable);
+      assertEquals(resultTable.getDataSchema(), dataSchema);
+      List<Object[]> recordRows = resultTable.getRows();
+      assertEquals(recordRows.size(), 10);
+
+      for (int i = 0; i < 10; i++) {
+        Object[] values = recordRows.get(i);
+        assertEquals(values.length, 4);
+        assertEquals(values[0], 8L);
+        assertEquals(values[1], 8L);
+        assertEquals(values[2], i / 2);
+        assertTrue((((int) values[3] - (int) values[2]) == 0) || (((int) values[3] - (int) values[2]) == 100));
+      }
+    }
+    {
       // Aggregation on int columns with group by on 3 columns
       String query = "SELECT COUNTMV(mvIntCol), COUNTMV(mvRawIntCol), SUMMV(mvIntCol), SUMMV(mvRawIntCol), "
           + "MINMV(mvIntCol), MINMV(mvRawIntCol), MAXMV(mvIntCol), MAXMV(mvRawIntCol), AVGMV(mvIntCol), "
@@ -1314,7 +1540,7 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       // Aggregation on string columns with group by on 3 columns
       String query = "SELECT COUNTMV(mvStringCol), COUNTMV(mvRawStringCol), SUMMV(mvStringCol), SUMMV(mvRawStringCol), "
           + "MINMV(mvStringCol), MINMV(mvRawStringCol), MAXMV(mvStringCol), MAXMV(mvRawStringCol), AVGMV(mvStringCol), "
-          + "AVGMV(mvRawStringCol), svIntCol, mvIntCol, mvRawIntCol from testTable GROUP BY svIntCol, mvIntCol,"
+          + "AVGMV(mvRawStringCol), svIntCol, mvIntCol, mvRawIntCol from testTable GROUP BY svIntCol, mvIntCol, "
           + "mvRawIntCol ORDER BY svIntCol";
       ResultTable resultTable = getBrokerResponse(query).getResultTable();
 
@@ -1330,6 +1556,36 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
           DataSchema.ColumnDataType.INT
       });
       validateAggregateWithGroupByQueryResults(resultTable, dataSchema, true);
+    }
+    {
+      // Aggregation on variable length string columns with group by on 3 columns. Only count aggregation should work.
+      String query = "SELECT COUNTMV(mvStringCol2), COUNTMV(mvRawStringCol2), svIntCol, mvIntCol, mvRawIntCol "
+          + "from testTable GROUP BY svIntCol, mvIntCol, mvRawIntCol ORDER BY svIntCol";
+      ResultTable resultTable = getBrokerResponse(query).getResultTable();
+
+      DataSchema dataSchema = new DataSchema(new String[]{
+          "countmv(mvStringCol2)", "countmv(mvRawStringCol2)", "svIntCol", "mvIntCol", "mvRawIntCol"
+      }, new DataSchema.ColumnDataType[]{
+          DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.INT,
+          DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT
+      });
+
+      assertNotNull(resultTable);
+      assertEquals(resultTable.getDataSchema(), dataSchema);
+      List<Object[]> recordRows = resultTable.getRows();
+      assertEquals(recordRows.size(), 10);
+
+      int[] expectedSvIntValues = new int[]{0, 0, 0, 0, 1, 1, 1, 1, 2, 2};
+
+      for (int i = 0; i < 10; i++) {
+        Object[] values = recordRows.get(i);
+        assertEquals(values.length, 5);
+        assertEquals(values[0], 8L);
+        assertEquals(values[1], 8L);
+        assertEquals(values[2], expectedSvIntValues[i]);
+        assertTrue((((int) values[3] - (int) values[2]) == 0) || (((int) values[3] - (int) values[2]) == 100));
+        assertTrue((((int) values[4] - (int) values[2]) == 0) || (((int) values[4] - (int) values[2]) == 100));
+      }
     }
     {
       // Aggregation on int columns with group by on 3 columns, two of them RAW
@@ -1562,6 +1818,31 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       validateAggregateWithGroupByOrderByQueryResults(resultTable, dataSchema);
     }
     {
+      // Aggregation on variable length string columns with order by (same results as simple aggregation)
+      String query = "SELECT COUNTMV(mvStringCol2), COUNTMV(mvRawStringCol2), mvRawIntCol from testTable GROUP BY "
+          + "mvRawIntCol ORDER BY mvRawIntCol";
+      ResultTable resultTable = getBrokerResponse(query).getResultTable();
+
+      DataSchema dataSchema = new DataSchema(new String[]{
+          "countmv(mvStringCol2)", "countmv(mvRawStringCol2)", "mvRawIntCol"
+      }, new DataSchema.ColumnDataType[]{
+          DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.INT
+      });
+
+      assertNotNull(resultTable);
+      assertEquals(resultTable.getDataSchema(), dataSchema);
+      List<Object[]> recordRows = resultTable.getRows();
+      assertEquals(recordRows.size(), 10);
+
+      for (int i = 0; i < 10; i++) {
+        Object[] values = recordRows.get(i);
+        assertEquals(values.length, 3);
+        assertEquals(values[0], 8L);
+        assertEquals(values[1], 8L);
+        assertEquals(values[2], i);
+      }
+    }
+    {
       // Aggregation on int columns with group by order by with order by agg
       String query = "SELECT COUNTMV(mvIntCol), COUNTMV(mvRawIntCol), SUMMV(mvIntCol), SUMMV(mvRawIntCol), "
           + "MINMV(mvIntCol), MINMV(mvRawIntCol), MAXMV(mvIntCol), MAXMV(mvRawIntCol), AVGMV(mvIntCol), "
@@ -1740,6 +2021,28 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       assertEquals(resultTable.getRows().size(), 1);
       Object[] value = resultTable.getRows().get(0);
       assertEquals(value[0], 20.0);
+    }
+    {
+      // Transform within aggregation for variable length raw String MV
+      int index1 = _random.nextInt(_stringList1.size());
+      int index2 = _random.nextInt(_stringList2.size());
+      while (index2 == index1) {
+        index2 = _random.nextInt(_stringList2.size());
+      }
+      String val1 = _stringList1.get(index1);
+      String val2 = _stringList2.get(index2);
+      String query = "SELECT COUNTMV(VALUEIN(mvRawStringCol2, '" + val1 + "', '" + val2 + "')) from testTable "
+          + "WHERE mvRawStringCol2 IN ('" + val1 + "', '" + val2 + "')";
+      ResultTable resultTable = getBrokerResponse(query).getResultTable();
+
+      DataSchema dataSchema = new DataSchema(new String[]{"countmv(valuein(mvRawStringCol2,'" + val1 + "','" + val2
+          + "'))"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
+      assertEquals(resultTable.getDataSchema(), dataSchema);
+
+      assertEquals(resultTable.getRows().size(), 1);
+      Object[] value = resultTable.getRows().get(0);
+      assertEquals(value[0], 8L);
     }
   }
 }

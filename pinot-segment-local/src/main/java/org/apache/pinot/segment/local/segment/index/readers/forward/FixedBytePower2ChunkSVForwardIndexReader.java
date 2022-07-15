@@ -44,7 +44,7 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
   @Override
   public ChunkReaderContext createContext() {
     if (_isCompressed) {
-      return new ChunkReaderContext(_numDocsPerChunk * _valueType.size());
+      return new ChunkReaderContext(_numDocsPerChunk * _storedType.size());
     } else {
       return null;
     }

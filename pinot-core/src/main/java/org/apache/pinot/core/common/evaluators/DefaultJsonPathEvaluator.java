@@ -90,8 +90,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
-        case JSON:
+      switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
             processValue(i, extractFromString(reader, context, docIds[i]), defaultValue, valueBuffer);
@@ -123,8 +122,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
-        case JSON:
+      switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
             processValue(i, extractFromString(reader, context, docIds[i]), defaultValue, valueBuffer);
@@ -156,8 +154,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
-        case JSON:
+      switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
             processValue(i, extractFromString(reader, context, docIds[i]), defaultValue, valueBuffer);
@@ -189,8 +186,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
-        case JSON:
+      switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
             processValue(i, extractFromString(reader, context, docIds[i]), defaultValue, valueBuffer);
@@ -223,8 +219,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
-        case JSON:
+      switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
             processValue(i, extractFromStringWithExactBigDecimal(reader, context, docIds[i]), defaultValue,
@@ -256,8 +251,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
-        case JSON:
+      switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
             processValue(i, extractFromString(reader, context, docIds[i]), valueBuffer);
@@ -288,8 +282,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
-        case JSON:
+      switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
             processList(i, extractFromString(reader, context, docIds[i]), valueBuffer);
@@ -320,8 +313,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
-        case JSON:
+      switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
             processList(i, extractFromString(reader, context, docIds[i]), valueBuffer);
@@ -352,8 +344,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
-        case JSON:
+      switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
             processList(i, extractFromString(reader, context, docIds[i]), valueBuffer);
@@ -384,8 +375,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
-        case JSON:
+      switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
             processList(i, extractFromString(reader, context, docIds[i]), valueBuffer);
@@ -416,8 +406,7 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
         }
       }
     } else {
-      switch (reader.getValueType()) {
-        case JSON:
+      switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
             processList(i, extractFromString(reader, context, docIds[i]), valueBuffer);

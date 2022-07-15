@@ -436,7 +436,7 @@ public class DataFetcher {
     ColumnValueReader(ForwardIndexReader reader, @Nullable Dictionary dictionary) {
       _reader = reader;
       _dictionary = dictionary;
-      _dataType = reader.getValueType();
+      _dataType = reader.getStoredType();
       _singleValue = reader.isSingleValue();
     }
 
@@ -552,7 +552,7 @@ public class DataFetcher {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readStringValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_reader.getValueType()) {
+        switch (_reader.getStoredType()) {
           case INT:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = Integer.toString(_reader.getInt(docIds[i], readerContext));
@@ -603,7 +603,7 @@ public class DataFetcher {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readBytesValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_reader.getValueType()) {
+        switch (_reader.getStoredType()) {
           case STRING:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = BytesUtils.toBytes(_reader.getString(docIds[i], readerContext));

@@ -87,6 +87,51 @@ export const setTableState = (name: string, stateName: string, tableType: string
 export const dropInstance = (name: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`instances/${name}`, { headers });
 
+export const getPeriodicTaskNames = (): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/periodictask/names`, { headers });
+
+export const getTaskTypes = (): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/tasktypes`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getTaskTypeTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/${taskType}/tasks`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getTaskTypeState = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/${taskType}/state`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const stopTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/tasks/${taskType}/stop`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const resumeTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/tasks/${taskType}/resume`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const cleanupTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/tasks/${taskType}/cleanup`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const deleteTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.delete(`/tasks/${taskType}`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const sheduleTask = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.post(`/tasks/schedule?tableName=${tableName}&taskType=${taskType}`, null, { headers: { ...headers, Accept: 'application/json' } });
+
+export const executeTask = (data): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.post(`/tasks/execute`, data, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getJobDetail = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/scheduler/jobDetails?tableName=${tableName}&taskType=${taskType}`, { headers: { ...headers, Accept: 'application/json' } });
+  
+export const getMinionMeta = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/${taskType}/${tableName}/metadata`, { headers: { ...headers, Accept: 'application/json' } });
+  
+export const getTasks = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/${taskType}/${tableName}/state`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getTaskDebug = (taskName: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/task/${taskName}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getTaskTypeDebug = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/${taskType}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
+
 export const getClusterConfig = (): Promise<AxiosResponse<ClusterConfig>> =>
   baseApi.get('/cluster/configs');
 

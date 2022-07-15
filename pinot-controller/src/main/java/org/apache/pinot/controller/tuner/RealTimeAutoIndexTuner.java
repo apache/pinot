@@ -42,4 +42,10 @@ public class RealTimeAutoIndexTuner implements TableConfigTuner {
     initialIndexingConfig.setNoDictionaryColumns(schema.getMetricNames());
     return tableConfig;
   }
+
+  @Override
+  public TableConfig apply(PinotHelixResourceManager pinotHelixResourceManager,
+      TableConfig tableConfig, Schema schema, Map<String, String> extraProperties, Map<String, String> httpHeaders) {
+    return apply(pinotHelixResourceManager, tableConfig, schema, extraProperties);
+  }
 }

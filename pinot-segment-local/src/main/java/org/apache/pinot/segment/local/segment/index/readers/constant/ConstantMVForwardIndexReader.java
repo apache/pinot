@@ -39,7 +39,7 @@ public final class ConstantMVForwardIndexReader implements ForwardIndexReader<Fo
   }
 
   @Override
-  public DataType getValueType() {
+  public DataType getStoredType() {
     return DataType.INT;
   }
 
