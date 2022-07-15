@@ -99,7 +99,7 @@ controller:
     host: pinot-controller
     port: 9000
 
-  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-controller.log"
+  jvmOpts: "-XX=ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-controller.log"
 
   log4j2ConfFile: /opt/pinot/conf/log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -134,7 +134,6 @@ controller:
 
   resources:
     requests:
-      cpu: "2000m"
       memory: "1.25Gi"
 
   nodeSelector: {}
@@ -180,7 +179,7 @@ broker:
     # fsGroup: 2000
   securityContext: {}
 
-  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-broker.log"
+  jvmOpts: "-XX=ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-broker.log"
 
   log4j2ConfFile: /opt/pinot/conf/log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -228,7 +227,6 @@ broker:
 
   resources:
     requests:
-      cpu: "2000m"
       memory: "1.25Gi"
 
   nodeSelector: {}
@@ -313,7 +311,6 @@ server:
 
   resources:
     requests:
-      cpu: "2000m"
       memory: "1.25Gi"
 
   nodeSelector: {}
@@ -367,7 +364,7 @@ minion:
     readinessEnabled: true
 
   dataDir: /var/pinot/minion/data
-  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
+  jvmOpts: "-XX=ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
 
   log4j2ConfFile: /opt/pinot/conf/log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -396,7 +393,6 @@ minion:
 
   resources:
     requests:
-      cpu: "2000m"
       memory: "1.25Gi"
 
   nodeSelector: {}
@@ -448,7 +444,7 @@ minionStateless:
     readinessEnabled: true
 
   dataDir: /var/pinot/minion/data
-  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
+  jvmOpts: "-XX=ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
 
   log4j2ConfFile: /opt/pinot/conf/log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -471,7 +467,6 @@ minionStateless:
 
   resources:
     requests:
-      cpu: "2000m"
       memory: "1.25Gi"
 
   nodeSelector: {}
