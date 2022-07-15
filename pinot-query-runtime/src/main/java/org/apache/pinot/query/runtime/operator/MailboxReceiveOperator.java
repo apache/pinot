@@ -27,6 +27,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.common.datablock.DataBlockUtils;
+import org.apache.pinot.core.common.datablock.MetadataBlock;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -101,6 +102,9 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
               ByteBuffer byteBuffer = mailboxContent.getPayload().asReadOnlyByteBuffer();
               if (byteBuffer.hasRemaining()) {
                 BaseDataBlock dataBlock = DataBlockUtils.getDataBlock(byteBuffer);
+                if (dataBlock instanceof MetadataBlock && !dataBlock.getExceptions().isEmpty()) {
+                  return TransferableBlockUtils.repackErrorBlock((MetadataBlock) dataBlock);
+                }
                 if (dataBlock.getNumberOfRows() > 0) {
                   // here we only return data table block when it is not empty.
                   return new TransferableBlock(dataBlock);

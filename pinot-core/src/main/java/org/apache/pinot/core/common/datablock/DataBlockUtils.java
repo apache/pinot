@@ -26,7 +26,6 @@ import javax.annotation.Nonnull;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
 
 
 public final class DataBlockUtils {
@@ -37,20 +36,8 @@ public final class DataBlockUtils {
 
   private static final DataSchema EMPTY_SCHEMA = new DataSchema(new String[0], new DataSchema.ColumnDataType[0]);
 
-  public static MetadataBlock getEndOfStreamDataBlock(DataSchema dataSchema) {
-    MetadataBlock metadataBlock = getEmptyDataBlock(dataSchema);
-    metadataBlock._metadata.put(DataTable.MetadataKey.TABLE.getName(), "END_OF_STREAM");
-    return metadataBlock;
-  }
-
-  public static boolean isEndOfStream(BaseDataBlock dataBlock) {
-    return dataBlock instanceof MetadataBlock
-        && "END_OF_STREAM".equals(dataBlock.getMetadata().get(DataTable.MetadataKey.TABLE.getName()));
-  }
-
   public static MetadataBlock getErrorDataBlock(Exception e) {
     MetadataBlock errorBlock = new MetadataBlock(EMPTY_SCHEMA);
-    errorBlock._metadata.put(DataTable.MetadataKey.TABLE.getName(), "ERROR");
     if (e instanceof ProcessingException) {
       errorBlock.addException(((ProcessingException) e).getErrorCode(), e.getMessage());
     } else {
@@ -60,7 +47,7 @@ public final class DataBlockUtils {
   }
 
   public static MetadataBlock getEmptyDataBlock(@Nonnull DataSchema dataSchema) {
-    // TODO: support actual metadata for the block.
+    // TODO: add query statistics metadata for the block.
     return new MetadataBlock(dataSchema);
   }
 

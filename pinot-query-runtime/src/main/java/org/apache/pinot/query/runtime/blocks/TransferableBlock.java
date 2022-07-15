@@ -41,15 +41,21 @@ public class TransferableBlock implements Block {
 
   private final BaseDataBlock.Type _type;
   private final DataSchema _dataSchema;
+  private final boolean _isErrorBlock;
 
   private BaseDataBlock _dataBlock;
-
   private List<Object[]> _container;
 
   public TransferableBlock(List<Object[]> container, DataSchema dataSchema, BaseDataBlock.Type containerType) {
+    this(container, dataSchema, containerType, false, false);
+  }
+
+  public TransferableBlock(List<Object[]> container, DataSchema dataSchema, BaseDataBlock.Type containerType,
+      boolean isEndOfStreamBlock, boolean isErrorBlock) {
     _container = container;
     _dataSchema = dataSchema;
     _type = containerType;
+    _isErrorBlock = isErrorBlock;
   }
 
   public TransferableBlock(BaseDataBlock dataBlock) {
@@ -57,6 +63,7 @@ public class TransferableBlock implements Block {
     _dataSchema = dataBlock.getDataSchema();
     _type = dataBlock instanceof ColumnarDataBlock ? BaseDataBlock.Type.COLUMNAR
         : dataBlock instanceof RowDataBlock ? BaseDataBlock.Type.ROW : BaseDataBlock.Type.METADATA;
+    _isErrorBlock = !_dataBlock.getExceptions().isEmpty();
   }
 
   public DataSchema getDataSchema() {
@@ -87,6 +94,8 @@ public class TransferableBlock implements Block {
           case COLUMNAR:
             _dataBlock = DataBlockBuilder.buildFromColumns(_container, null, _dataSchema);
             break;
+          case METADATA:
+            throw new UnsupportedOperationException("Metadata block cannot be constructed from container");
           default:
             throw new UnsupportedOperationException("Unable to build from container with type: " + _type);
         }
@@ -99,6 +108,14 @@ public class TransferableBlock implements Block {
 
   public BaseDataBlock.Type getType() {
     return _type;
+  }
+
+  public boolean isEndOfStreamBlock() {
+    return _type == BaseDataBlock.Type.METADATA;
+  }
+
+  public boolean isErrorBlock() {
+    return _isErrorBlock;
   }
 
   public byte[] toBytes()

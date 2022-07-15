@@ -19,9 +19,8 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.common.datablock.DataBlockUtils;
+import org.apache.pinot.core.common.datablock.MetadataBlock;
 
 
 public final class TransferableBlockUtils {
@@ -30,16 +29,18 @@ public final class TransferableBlockUtils {
   }
 
   public static TransferableBlock getEndOfStreamTransferableBlock(DataSchema dataSchema) {
-    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(dataSchema));
+    return new TransferableBlock(DataBlockUtils.getEmptyDataBlock(dataSchema));
   }
 
   public static TransferableBlock getErrorTransferableBlock(Exception e) {
     return new TransferableBlock(DataBlockUtils.getErrorDataBlock(e));
   }
 
+  public static TransferableBlock repackErrorBlock(MetadataBlock upstreamErrorBlock) {
+    return new TransferableBlock(upstreamErrorBlock);
+  }
+
   public static boolean isEndOfStream(TransferableBlock transferableBlock) {
-    return transferableBlock.getType().equals(BaseDataBlock.Type.METADATA)
-        && "END_OF_STREAM".equals(transferableBlock.getDataBlock().getMetadata()
-        .get(DataTable.MetadataKey.TABLE.getName()));
+    return transferableBlock.isEndOfStreamBlock();
   }
 }

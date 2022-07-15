@@ -23,12 +23,17 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Mailbox;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.common.datablock.DataBlockUtils;
+import org.apache.pinot.core.common.datablock.MetadataBlock;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -36,6 +41,7 @@ import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.executor.WorkerQueryExecutor;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -111,13 +117,54 @@ public class QueryRunner {
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
       MailboxSendOperator mailboxSendOperator =
-          new MailboxSendOperator(_mailboxService, dataBlock.getDataSchema(), dataBlock,
+          new MailboxSendOperator(_mailboxService, sendNode.getDataSchema(),
+              new LeafStageTransferableBlockOperator(dataBlock, sendNode.getDataSchema()),
               receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(),
               sendNode.getPartitionKeySelector(), _hostname, _port, serverQueryRequest.getRequestId(),
               sendNode.getStageId());
       mailboxSendOperator.nextBlock();
+      if (dataBlock.getExceptions().isEmpty()) {
+        mailboxSendOperator.nextBlock();
+      }
     } else {
       _workerExecutor.processQuery(distributedStagePlan, requestMetadataMap, executorService);
+    }
+  }
+
+  private static class LeafStageTransferableBlockOperator extends BaseOperator<TransferableBlock> {
+    private static final String EXPLAIN_NAME = "FAKE_TRANSFER_OPERATOR";
+
+    private final MetadataBlock _endOfStreamBlock;
+    private final BaseDataBlock _baseDataBlock;
+    private final DataSchema _dataSchema;
+    private boolean _hasTransferred;
+
+    private LeafStageTransferableBlockOperator(BaseDataBlock baseDataBlock, DataSchema dataSchema) {
+      _baseDataBlock = baseDataBlock;
+      _dataSchema = dataSchema;
+      _endOfStreamBlock = baseDataBlock.getExceptions().isEmpty() ? DataBlockUtils.getEmptyDataBlock(dataSchema) : null;
+      _hasTransferred = false;
+    }
+
+    @Override
+    public List<Operator> getChildOperators() {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public String toExplainString() {
+      return EXPLAIN_NAME;
+    }
+
+    @Override
+    protected TransferableBlock getNextBlock() {
+      if (!_hasTransferred) {
+        _hasTransferred = true;
+        return new TransferableBlock(_baseDataBlock);
+      } else {
+        return new TransferableBlock(_endOfStreamBlock);
+      }
     }
   }
 

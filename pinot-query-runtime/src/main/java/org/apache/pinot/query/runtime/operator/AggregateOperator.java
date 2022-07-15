@@ -29,8 +29,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
-import org.apache.pinot.core.common.datablock.DataBlockBuilder;
-import org.apache.pinot.core.common.datablock.DataBlockUtils;
+import org.apache.pinot.core.common.datablock.MetadataBlock;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -61,6 +60,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private final Map<Integer, Object[]> _groupByKeyHolder;
 
   private DataSchema _upstreamDataSchema;
+  private MetadataBlock _upstreamErrorBlock;
   private boolean _isCumulativeBlockConstructed;
 
   // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
@@ -70,6 +70,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     _aggCalls = aggCalls;
     _groupSet = groupSet;
     _upstreamDataSchema = upstreamDataSchema;
+    _upstreamErrorBlock = null;
 
     _aggregationFunctions = new AggregationFunction[_aggCalls.size()];
     _aggregationFunctionInputRefs = new int[_aggCalls.size()];
@@ -107,14 +108,17 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   protected TransferableBlock getNextBlock() {
     try {
       cumulateAggregationBlocks();
-      return new TransferableBlock(toResultBlock());
+      return toResultBlock();
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
   }
 
-  private BaseDataBlock toResultBlock()
+  private TransferableBlock toResultBlock()
       throws IOException {
+    if (_upstreamErrorBlock != null) {
+      return TransferableBlockUtils.repackErrorBlock(_upstreamErrorBlock);
+    }
     if (!_isCumulativeBlockConstructed) {
       List<Object[]> rows = new ArrayList<>(_groupByKeyHolder.size());
       for (Map.Entry<Integer, Object[]> e : _groupByKeyHolder.entrySet()) {
@@ -130,36 +134,42 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       }
       _isCumulativeBlockConstructed = true;
       if (rows.size() == 0) {
-        return DataBlockUtils.getEmptyDataBlock(_resultSchema);
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_resultSchema);
       } else {
-        return DataBlockBuilder.buildFromRows(rows, null, _resultSchema);
+        return new TransferableBlock(rows, _resultSchema, BaseDataBlock.Type.ROW);
       }
     } else {
-      return DataBlockUtils.getEndOfStreamDataBlock(_resultSchema);
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_resultSchema);
     }
   }
 
   private void cumulateAggregationBlocks() {
-    TransferableBlock block = _inputOperator.nextBlock();
-    while (!TransferableBlockUtils.isEndOfStream(block)) {
-      BaseDataBlock dataBlock = block.getDataBlock();
-      int numRows = dataBlock.getNumberOfRows();
-      for (int rowId = 0; rowId < numRows; rowId++) {
-        Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
-        Key key = extraRowKey(row, _groupSet);
-        int keyHashCode = key.hashCode();
-        _groupByKeyHolder.put(keyHashCode, key.getValues());
-        for (int i = 0; i < _aggregationFunctions.length; i++) {
-          Object currentRes = _groupByResultHolders[i].get(keyHashCode);
-          if (currentRes == null) {
-            _groupByResultHolders[i].put(keyHashCode, row[_aggregationFunctionInputRefs[i]]);
-          } else {
-            _groupByResultHolders[i].put(keyHashCode,
-                merge(_aggCalls.get(i), currentRes, row[_aggregationFunctionInputRefs[i]]));
+    if (!_isCumulativeBlockConstructed) {
+      TransferableBlock block = _inputOperator.nextBlock();
+      while (!TransferableBlockUtils.isEndOfStream(block)) {
+        BaseDataBlock dataBlock = block.getDataBlock();
+        int numRows = dataBlock.getNumberOfRows();
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataBlock, rowId);
+          Key key = extraRowKey(row, _groupSet);
+          int keyHashCode = key.hashCode();
+          _groupByKeyHolder.put(keyHashCode, key.getValues());
+          for (int i = 0; i < _aggregationFunctions.length; i++) {
+            Object currentRes = _groupByResultHolders[i].get(keyHashCode);
+            if (currentRes == null) {
+              _groupByResultHolders[i].put(keyHashCode, row[_aggregationFunctionInputRefs[i]]);
+            } else {
+              _groupByResultHolders[i].put(keyHashCode,
+                  merge(_aggCalls.get(i), currentRes, row[_aggregationFunctionInputRefs[i]]));
+            }
           }
         }
+        block = _inputOperator.nextBlock();
       }
-      block = _inputOperator.nextBlock();
+      // setting upstream error block
+      if (block.isErrorBlock()) {
+        _upstreamErrorBlock = (MetadataBlock) block.getDataBlock();
+      }
     }
   }
 
@@ -199,7 +209,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
         return ((Number) left).doubleValue() + ((Number) right).doubleValue();
       case "COUNT":
       case "$COUNT":
-        return (int) left + (int) right;
+        return ((Number) left).longValue() + ((Number) right).longValue();
       case "MIN":
       case "$MIN":
       case "$MIN0":

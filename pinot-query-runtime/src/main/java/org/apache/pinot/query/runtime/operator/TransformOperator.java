@@ -29,6 +29,8 @@ import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
+import org.apache.pinot.core.common.datablock.DataBlockUtils;
+import org.apache.pinot.core.common.datablock.MetadataBlock;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -44,6 +46,7 @@ public class TransformOperator extends BaseOperator<TransferableBlock> {
   private final List<TransformOperands> _transformOperandsList;
   private final int _resultColumnSize;
   private final DataSchema _resultSchema;
+  private MetadataBlock _upstreamErrorBlock;
 
   public TransformOperator(BaseOperator<TransferableBlock> upstreamOperator, DataSchema dataSchema,
       List<RexExpression> transforms, DataSchema upstreamDataSchema) {
@@ -79,19 +82,23 @@ public class TransformOperator extends BaseOperator<TransferableBlock> {
 
   private TransferableBlock transform(TransferableBlock block)
       throws Exception {
-    if (TransferableBlockUtils.isEndOfStream(block)) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_resultSchema);
-    }
-    List<Object[]> resultRows = new ArrayList<>();
-    List<Object[]> container = block.getContainer();
-    for (Object[] row : container) {
-      Object[] resultRow = new Object[_resultColumnSize];
-      for (int i = 0; i < _resultColumnSize; i++) {
-        resultRow[i] = _transformOperandsList.get(i).apply(row);
+    if (!TransferableBlockUtils.isEndOfStream(block)) {
+      List<Object[]> resultRows = new ArrayList<>();
+      List<Object[]> container = block.getContainer();
+      for (Object[] row : container) {
+        Object[] resultRow = new Object[_resultColumnSize];
+        for (int i = 0; i < _resultColumnSize; i++) {
+          resultRow[i] = _transformOperandsList.get(i).apply(row);
+        }
+        resultRows.add(resultRow);
       }
-      resultRows.add(resultRow);
+      return new TransferableBlock(resultRows, _resultSchema, BaseDataBlock.Type.ROW);
+    } else if (block.isErrorBlock()) {
+      _upstreamErrorBlock = (MetadataBlock) block.getDataBlock();
+      return TransferableBlockUtils.repackErrorBlock(_upstreamErrorBlock);
+    } else {
+      return new TransferableBlock(DataBlockUtils.getEmptyDataBlock(_resultSchema));
     }
-    return new TransferableBlock(resultRows, _resultSchema, BaseDataBlock.Type.ROW);
   }
 
   private static abstract class TransformOperands {
