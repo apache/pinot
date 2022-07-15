@@ -539,12 +539,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         }
       }
     } catch (Exception e) {
+      StringWriter errors = new StringWriter();
+      try (PrintWriter pw = new PrintWriter(errors)) {
+        e.printStackTrace(pw);
+      }
       for (TableConfig tableConfig : enabledTableConfigs) {
         try {
-          StringWriter errors = new StringWriter();
-          try (PrintWriter pw = new PrintWriter(errors)) {
-            e.printStackTrace(pw);
-          }
           _taskManagerStatusCache.saveTaskGeneratorInfo(tableConfig.getTableName(), taskGenerator.getTaskType(),
               taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addErrorRunMessage(
                   System.currentTimeMillis(), errors.toString()));

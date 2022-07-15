@@ -37,13 +37,7 @@ public class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
 
   @Override
   public ZNRecord get(String path, Stat stat, int options) {
-    ZNRecord znRecord = _contents.get(path);
-    if (znRecord != null) {
-      stat.setVersion(znRecord.getVersion());
-    } else {
-      stat.setVersion(-1);
-    }
-    return znRecord;
+    return _contents.get(path);
   }
 
   @Override
