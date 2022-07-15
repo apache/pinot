@@ -24,14 +24,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.minion.MinionClient;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
@@ -64,17 +68,20 @@ public class SqlQueryExecutor {
   }
 
   private static String getControllerBaseUrl(HelixManager helixManager) {
-    String instanceHostPort = LeadControllerUtils.getHelixClusterLeader(helixManager);
-    if (instanceHostPort == null) {
+    String instanceId = LeadControllerUtils.getHelixClusterLeader(helixManager);
+    if (instanceId == null) {
       throw new RuntimeException("Unable to locate the leader pinot controller, please retry later...");
     }
-    int index = instanceHostPort.lastIndexOf('_');
-    if (index < 0) {
-      throw new RuntimeException("Unable to parse pinot controller instance name for " + instanceHostPort);
+
+    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+    PropertyKey.Builder keyBuilder = helixDataAccessor.keyBuilder();
+    ExtraInstanceConfig extraInstanceConfig = new ExtraInstanceConfig(helixDataAccessor.getProperty(
+        keyBuilder.instanceConfig(CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + instanceId)));
+    String controllerBaseUrl = extraInstanceConfig.getComponentUrl();
+    if (controllerBaseUrl == null) {
+      throw new RuntimeException("Unable to extract the base url from the leader pinot controller");
     }
-    String leaderHost = instanceHostPort.substring(0, index);
-    String leaderPort = instanceHostPort.substring(index + 1);
-    return "http://" + leaderHost + ":" + leaderPort;
+    return controllerBaseUrl;
   }
 
   /**

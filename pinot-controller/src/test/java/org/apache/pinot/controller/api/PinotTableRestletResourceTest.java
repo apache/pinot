@@ -18,12 +18,16 @@
  */
 package org.apache.pinot.controller.api;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.controller.api.resources.TableAndSchemaConfig;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
@@ -352,6 +356,114 @@ public class PinotTableRestletResourceTest {
     } catch (Exception e) {
       Assert.assertTrue(e instanceof IOException);
     }
+  }
+
+  private void deleteAllTables()
+      throws IOException {
+    List<String> tables = getTableNames(_createTableUrl + "?type=offline");
+    tables.addAll(getTableNames(_createTableUrl + "?type=realtime"));
+    for (String tableName : tables) {
+      ControllerTest.sendDeleteRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+    }
+  }
+
+  @Test
+  public void testListTables()
+      throws Exception {
+    deleteAllTables();
+    List<String> tables = getTableNames(_createTableUrl);
+    Assert.assertTrue(tables.isEmpty());
+
+    // post 2 offline, 1 realtime
+    String rawTableName1 = "pqr";
+    TableConfig offlineTableConfig1 = _offlineBuilder.setTableName(rawTableName1).build();
+    ControllerTest.sendPostRequest(_createTableUrl, offlineTableConfig1.toJsonString());
+    TEST_INSTANCE.addDummySchema(rawTableName1);
+    TableConfig realtimeTableConfig1 = _realtimeBuilder.setTableName(rawTableName1).setNumReplicas(2).build();
+    ControllerTest.sendPostRequest(_createTableUrl, realtimeTableConfig1.toJsonString());
+    String rawTableName2 = "abc";
+    TableConfig offlineTableConfig2 = _offlineBuilder.setTableName(rawTableName2).build();
+    ControllerTest.sendPostRequest(_createTableUrl, offlineTableConfig2.toJsonString());
+
+    // list
+    tables = getTableNames(_createTableUrl);
+    Assert.assertEquals(tables, Lists.newArrayList("abc", "pqr"));
+    tables = getTableNames(_createTableUrl + "?sortAsc=false");
+    Assert.assertEquals(tables, Lists.newArrayList("pqr", "abc"));
+    tables = getTableNames(_createTableUrl + "?sortType=creationTime");
+    Assert.assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "pqr_REALTIME", "abc_OFFLINE"));
+    tables = getTableNames(_createTableUrl + "?sortType=creationTime&sortAsc=false");
+    Assert.assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_REALTIME", "pqr_OFFLINE"));
+    tables = getTableNames(_createTableUrl + "?sortType=lastModifiedTime");
+    Assert.assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "pqr_REALTIME", "abc_OFFLINE"));
+    tables = getTableNames(_createTableUrl + "?sortType=lastModifiedTime&sortAsc=false");
+    Assert.assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_REALTIME", "pqr_OFFLINE"));
+
+    // type
+    tables = getTableNames(_createTableUrl + "?type=realtime");
+    Assert.assertEquals(tables, Lists.newArrayList("pqr_REALTIME"));
+    tables = getTableNames(_createTableUrl + "?type=offline");
+    Assert.assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_OFFLINE"));
+    tables = getTableNames(_createTableUrl + "?type=offline&sortAsc=false");
+    Assert.assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE"));
+    tables = getTableNames(_createTableUrl + "?type=offline&sortType=creationTime");
+    Assert.assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE"));
+    tables = getTableNames(_createTableUrl + "?type=offline&sortType=creationTime&sortAsc=false");
+    Assert.assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_OFFLINE"));
+    tables = getTableNames(_createTableUrl + "?type=offline&sortType=lastModifiedTime");
+    Assert.assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE"));
+    tables = getTableNames(_createTableUrl + "?type=offline&sortType=lastModifiedTime&sortAsc=false");
+    Assert.assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_OFFLINE"));
+
+    // update taskType for abc_OFFLINE
+    Map<String, Map<String, String>> taskTypeMap = new HashMap<>();
+    taskTypeMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, new HashMap<>());
+    offlineTableConfig2.setTaskConfig(new TableTaskConfig(taskTypeMap));
+    JsonUtils.stringToJsonNode(ControllerTest.sendPutRequest(
+        TEST_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(rawTableName2),
+        offlineTableConfig2.toJsonString()));
+    // update for pqr_REALTIME
+    taskTypeMap = new HashMap<>();
+    taskTypeMap.put(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, new HashMap<>());
+    realtimeTableConfig1.setTaskConfig(new TableTaskConfig(taskTypeMap));
+    JsonUtils.stringToJsonNode(ControllerTest.sendPutRequest(
+        TEST_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(rawTableName1),
+        realtimeTableConfig1.toJsonString()));
+
+    // list lastModified, taskType
+    tables = getTableNames(_createTableUrl + "?sortType=lastModifiedTime");
+    Assert.assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE", "pqr_REALTIME"));
+    tables = getTableNames(_createTableUrl + "?sortType=lastModifiedTime&sortAsc=false");
+    Assert.assertEquals(tables, Lists.newArrayList("pqr_REALTIME", "abc_OFFLINE", "pqr_OFFLINE"));
+    tables = getTableNames(_createTableUrl + "?taskType=MergeRollupTask");
+    Assert.assertEquals(tables, Lists.newArrayList("abc_OFFLINE"));
+    tables = getTableNames(_createTableUrl + "?taskType=MergeRollupTask&type=realtime");
+    Assert.assertTrue(tables.isEmpty());
+    tables = getTableNames(_createTableUrl + "?taskType=RealtimeToOfflineSegmentsTask");
+    Assert.assertEquals(tables, Lists.newArrayList("pqr_REALTIME"));
+
+    // update taskType for pqr_OFFLINE
+    taskTypeMap = new HashMap<>();
+    taskTypeMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, new HashMap<>());
+    offlineTableConfig1.setTaskConfig(new TableTaskConfig(taskTypeMap));
+    JsonUtils.stringToJsonNode(ControllerTest.sendPutRequest(
+        TEST_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(rawTableName1),
+        offlineTableConfig1.toJsonString()));
+
+    // list lastModified, taskType
+    tables = getTableNames(_createTableUrl + "?taskType=MergeRollupTask");
+    Assert.assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_OFFLINE"));
+    tables = getTableNames(_createTableUrl + "?taskType=MergeRollupTask&sortAsc=false");
+    Assert.assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE"));
+    tables = getTableNames(_createTableUrl + "?taskType=MergeRollupTask&sortType=creationTime");
+    Assert.assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE"));
+  }
+
+  private List<String> getTableNames(String url)
+      throws IOException {
+    JsonNode tablesJson = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(url)).get("tables");
+    return JsonUtils.jsonNodeToObject(tablesJson, new TypeReference<List<String>>() {
+    });
   }
 
   @Test(expectedExceptions = IOException.class)

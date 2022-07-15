@@ -18,15 +18,18 @@
  */
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
@@ -42,7 +45,10 @@ public class MutableColumnStatistics implements ColumnStatistics {
   //       dictionary.
   private final Dictionary _dictionary;
 
-  public MutableColumnStatistics(DataSource dataSource, int[] sortedDocIdIterationOrder) {
+  private int _minElementLength = -1;
+  private int _maxElementLength = -1;
+
+  public MutableColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIdIterationOrder) {
     _dataSource = dataSource;
     _sortedDocIdIterationOrder = sortedDocIdIterationOrder;
     _dictionary = dataSource.getDictionary();
@@ -70,46 +76,57 @@ public class MutableColumnStatistics implements ColumnStatistics {
 
   @Override
   public int getLengthOfShortestElement() {
-    // Length of longest string
-    int minStringLength = Integer.MAX_VALUE;
-
-    // If this column is a string/bytes column, iterate over the dictionary to find the maximum length
-    FieldSpec.DataType dataType = _dataSource.getDataSourceMetadata().getDataType();
-    int length = _dictionary.length();
-
-    if (dataType.equals(FieldSpec.DataType.STRING)) {
-      for (int i = 0; i < length; i++) {
-        minStringLength = Math.min(_dictionary.getStringValue(i).length(), minStringLength);
-      }
-    } else if (dataType.equals(FieldSpec.DataType.BYTES)) {
-      for (int i = 0; i < length; i++) {
-        minStringLength = Math.min(_dictionary.getBytesValue(i).length, minStringLength);
-      }
-    }
-
-    return minStringLength;
+    collectElementLengthIfNeeded();
+    return _minElementLength;
   }
 
   @Override
   public int getLengthOfLargestElement() {
-    // Length of longest string
-    int maximumStringLength = 0;
+    collectElementLengthIfNeeded();
+    return _maxElementLength;
+  }
 
-    // If this column is a string/bytes column, iterate over the dictionary to find the maximum length
-    FieldSpec.DataType dataType = _dataSource.getDataSourceMetadata().getDataType();
-    int length = _dictionary.length();
-
-    if (dataType.equals(FieldSpec.DataType.STRING)) {
-      for (int i = 0; i < length; i++) {
-        maximumStringLength = Math.max(_dictionary.getStringValue(i).length(), maximumStringLength);
-      }
-    } else if (dataType.equals(FieldSpec.DataType.BYTES)) {
-      for (int i = 0; i < length; i++) {
-        maximumStringLength = Math.max(_dictionary.getBytesValue(i).length, maximumStringLength);
-      }
+  private void collectElementLengthIfNeeded() {
+    if (_minElementLength >= 0) {
+      return;
     }
 
-    return maximumStringLength;
+    DataType storedType = _dictionary.getValueType();
+    if (storedType.isFixedWidth()) {
+      _minElementLength = storedType.size();
+      _maxElementLength = storedType.size();
+      return;
+    }
+
+    // If the stored type is not fixed width, iterate over the dictionary to find the min/max element length
+    _minElementLength = Integer.MAX_VALUE;
+    _maxElementLength = 0;
+    int length = _dictionary.length();
+    switch (storedType) {
+      case BIG_DECIMAL:
+        for (int i = 0; i < length; i++) {
+          int elementLength = BigDecimalUtils.byteSize(_dictionary.getBigDecimalValue(i));
+          _minElementLength = Math.min(_minElementLength, elementLength);
+          _maxElementLength = Math.max(_maxElementLength, elementLength);
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          int elementLength = _dictionary.getStringValue(i).getBytes(StandardCharsets.UTF_8).length;
+          _minElementLength = Math.min(_minElementLength, elementLength);
+          _maxElementLength = Math.max(_maxElementLength, elementLength);
+        }
+        break;
+      case BYTES:
+        for (int i = 0; i < length; i++) {
+          int elementLength = _dictionary.getBytesValue(i).length;
+          _minElementLength = Math.min(_minElementLength, elementLength);
+          _maxElementLength = Math.max(_maxElementLength, elementLength);
+        }
+        break;
+      default:
+        throw new IllegalStateException("Unsupported stored type: " + storedType);
+    }
   }
 
   @Override
