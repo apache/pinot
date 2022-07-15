@@ -288,20 +288,18 @@ public class AllNullQueriesTest extends BaseQueriesTest {
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put("enableNullHandling", "true");
     {
-      String query = "SELECT *, 1 FROM testTable";
+      String query = "SELECT * FROM testTable";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
-      assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME, "'1'"},
-          new ColumnDataType[]{columnDataType, ColumnDataType.INT}));
+      assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{columnDataType}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         Object[] row = rows.get(i);
-        assertEquals(row.length, 2);
+        assertEquals(row.length, 1);
         if (row[0] != null) {
           assertEquals(row[0], i);
-          assertEquals(row[1], 1);
         }
       }
     }

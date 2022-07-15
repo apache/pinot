@@ -94,26 +94,27 @@ public class SelectionOperatorUtils {
     }
 
     List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-    for (ExpressionContext selectExpression : selectExpressions) {
-      // Handle a case like: SELECT *, 1 FROM table.
-      if (selectExpression.equals(IDENTIFIER_STAR)) {
-        // For 'SELECT *', sort all columns (ignore columns that start with '$') so that the order is deterministic
-        Set<String> allColumns = indexSegment.getColumnNames();
-        List<String> selectColumns = new ArrayList<>(allColumns.size());
-        for (String column : allColumns) {
-          if (column.charAt(0) != '$') {
-            selectColumns.add(column);
-          }
+    if (selectExpressions.size() == 1 && selectExpressions.get(0).equals(IDENTIFIER_STAR)) {
+      // For 'SELECT *', sort all columns (ignore columns that start with '$') so that the order is deterministic
+      Set<String> allColumns = indexSegment.getColumnNames();
+      List<String> selectColumns = new ArrayList<>(allColumns.size());
+      for (String column : allColumns) {
+        if (column.charAt(0) != '$') {
+          selectColumns.add(column);
         }
-        selectColumns.sort(null);
-        for (String column : selectColumns) {
-          ExpressionContext expression = ExpressionContext.forIdentifier(column);
-          if (!expressionSet.contains(expression)) {
-            expressions.add(expression);
-          }
+      }
+      selectColumns.sort(null);
+      for (String column : selectColumns) {
+        ExpressionContext expression = ExpressionContext.forIdentifier(column);
+        if (!expressionSet.contains(expression)) {
+          expressions.add(expression);
         }
-      } else if (expressionSet.add(selectExpression)) {
-        expressions.add(selectExpression);
+      }
+    } else {
+      for (ExpressionContext selectExpression : selectExpressions) {
+        if (expressionSet.add(selectExpression)) {
+          expressions.add(selectExpression);
+        }
       }
     }
 

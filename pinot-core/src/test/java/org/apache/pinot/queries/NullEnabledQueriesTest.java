@@ -191,21 +191,18 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put("enableNullHandling", "true");
     {
-      String query = "SELECT *, 1 FROM testTable";
+      String query = "SELECT * FROM testTable";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
-      assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME, "'1'"},
-          new ColumnDataType[]{dataType, ColumnDataType.INT}));
+      assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{dataType}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         Object[] row = rows.get(i);
-        assertEquals(row.length, 2);
+        assertEquals(row.length, 1);
         if (row[0] != null) {
           assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + i)) < 1e-1);
-          assertTrue(Math.abs(((Number) row[0]).doubleValue() - (baseValue.doubleValue() + i)) < 1e-1);
-          assertEquals(row[1], 1);
         }
       }
     }
