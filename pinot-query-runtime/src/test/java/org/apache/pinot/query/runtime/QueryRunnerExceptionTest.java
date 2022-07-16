@@ -20,9 +20,7 @@ package org.apache.pinot.query.runtime;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
@@ -37,7 +35,7 @@ import org.testng.annotations.Test;
 public class QueryRunnerExceptionTest extends QueryRunnerTestBase {
 
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
-  public void testSqlWithFinalRowCountChecker(String sql) {
+  public void testSqlWithFinalRowCountChecker(String sql, String exeptionMsg) {
     QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
     Map<String, String> requestMetadataMap =
         ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
@@ -59,15 +57,21 @@ public class QueryRunnerExceptionTest extends QueryRunnerTestBase {
     }
     Preconditions.checkNotNull(mailboxReceiveOperator);
 
-    List<DataTable> dataTableList = QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator);
-    Assert.assertEquals(dataTableList.size(), 1);
+    try {
+      QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator);
+    } catch (RuntimeException rte) {
+      Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
+      Assert.assertTrue(rte.getMessage().contains(exeptionMsg));
+    }
   }
 
   @DataProvider(name = "testDataWithSqlExecutionExceptions")
   private Object[][] provideTestSqlWithExecutionException() {
     return new Object[][] {
-        new Object[]{"SELECT a.col2 - b.col3 FROM a JOIN b ON a.col1 = b.col1"},
-        new Object[]{"SELECT a.col2, b.col1 FROM a JOIN b ON a.col1 = b.col3"},
+        // default planner will auto-cast string column to numeric on JOIN condition, so exception is:
+        // "error while invoking cast function", because the cast cannot be done.
+        new Object[]{"SELECT a.col2 - b.col3 FROM a JOIN b ON a.col1 = b.col1", "transform function: cast"},
+        new Object[]{"SELECT a.col2, b.col1 FROM a JOIN b ON a.col1 = b.col3", "transform function: cast"},
     };
   }
 }

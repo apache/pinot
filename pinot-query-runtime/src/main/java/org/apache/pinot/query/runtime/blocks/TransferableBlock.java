@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
@@ -47,11 +48,12 @@ public class TransferableBlock implements Block {
   private List<Object[]> _container;
 
   public TransferableBlock(List<Object[]> container, DataSchema dataSchema, BaseDataBlock.Type containerType) {
-    this(container, dataSchema, containerType, false, false);
+    this(container, dataSchema, containerType, false);
   }
 
-  public TransferableBlock(List<Object[]> container, DataSchema dataSchema, BaseDataBlock.Type containerType,
-      boolean isEndOfStreamBlock, boolean isErrorBlock) {
+  @VisibleForTesting
+  TransferableBlock(List<Object[]> container, DataSchema dataSchema, BaseDataBlock.Type containerType,
+      boolean isErrorBlock) {
     _container = container;
     _dataSchema = dataSchema;
     _type = containerType;
@@ -70,6 +72,13 @@ public class TransferableBlock implements Block {
     return _dataSchema;
   }
 
+  /**
+   * Retrieve the extracted {@link TransferableBlock#_container} of the transferable block.
+   * If not already constructed. It will use {@link DataBlockUtils} to extract the row/columnar data from the
+   * binary-packed format.
+   *
+   * @return data container.
+   */
   public List<Object[]> getContainer() {
     if (_container == null) {
       switch (_type) {
@@ -84,6 +93,13 @@ public class TransferableBlock implements Block {
     return _container;
   }
 
+  /**
+   * Retrieve the binary-packed version of the data block.
+   * If not already constructed. It will use {@link DataBlockBuilder} to construct the binary-packed format from
+   * the {@link TransferableBlock#_container}.
+   *
+   * @return data block.
+   */
   public BaseDataBlock getDataBlock() {
     if (_dataBlock == null) {
       try {
@@ -106,14 +122,34 @@ public class TransferableBlock implements Block {
     return _dataBlock;
   }
 
+  /**
+   * Return the type of block (one of ROW, COLUMNAR, or METADATA).
+   *
+   * @return return type of block
+   */
   public BaseDataBlock.Type getType() {
     return _type;
   }
 
+  /**
+   * Return whether a transferable block is at the end of a stream.
+   *
+   * <p>End of stream is different from data block with 0-rows. which can indicate that one partition of the execution
+   * returns no rows. but that doesn't mean the rest of the partitions are also finished.
+   * <p>When an exception is caught within a stream, no matter how many outstanding data is pending to be received,
+   * it is considered end of stream because the exception should bubble up immediately.
+   *
+   * @return whether this block is the end of stream.
+   */
   public boolean isEndOfStreamBlock() {
-    return _type == BaseDataBlock.Type.METADATA;
+    return _isErrorBlock || _type == BaseDataBlock.Type.METADATA;
   }
 
+  /**
+   * Return whether a transferable block contains exception.
+   *
+   * @return true if contains exception.
+   */
   public boolean isErrorBlock() {
     return _isErrorBlock;
   }

@@ -37,7 +37,7 @@ public final class TransferableBlockUtils {
   }
 
   public static TransferableBlock repackErrorBlock(MetadataBlock upstreamErrorBlock) {
-    return new TransferableBlock(upstreamErrorBlock);
+    return new TransferableBlock(DataBlockUtils.getErrorDataBlock(upstreamErrorBlock.getExceptions()));
   }
 
   public static boolean isEndOfStream(TransferableBlock transferableBlock) {

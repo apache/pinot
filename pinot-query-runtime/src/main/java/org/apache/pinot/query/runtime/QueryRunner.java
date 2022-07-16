@@ -107,9 +107,14 @@ public class QueryRunner {
       BaseDataBlock dataBlock;
       try {
         DataTable dataTable = _serverExecutor.processQuery(serverQueryRequest, executorService, null);
-        // this works because default DataTableImplV3 will have a version number at beginning,
-        // which maps to ROW type of version 3.
-        dataBlock = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTable.toBytes()));
+        if (!dataTable.getExceptions().isEmpty()) {
+          // if contains exception, directly return a metadata block with the exceptions.
+          dataBlock = DataBlockUtils.getErrorDataBlock(dataTable.getExceptions());
+        } else {
+          // this works because default DataTableImplV3 will have a version number at beginning:
+          // the new DataBlock encodes lower 16 bites as version and upper 16 bites as type (ROW, COLUMNAR, METADATA)
+          dataBlock = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTable.toBytes()));
+        }
       } catch (IOException e) {
         dataBlock = DataBlockUtils.getErrorDataBlock(e);
       }

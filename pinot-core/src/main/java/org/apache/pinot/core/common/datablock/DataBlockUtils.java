@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
@@ -42,6 +43,14 @@ public final class DataBlockUtils {
       errorBlock.addException(((ProcessingException) e).getErrorCode(), e.getMessage());
     } else {
       errorBlock.addException(QueryException.UNKNOWN_ERROR_CODE, e.getMessage());
+    }
+    return errorBlock;
+  }
+
+  public static BaseDataBlock getErrorDataBlock(Map<Integer, String> exceptions) {
+    MetadataBlock errorBlock = new MetadataBlock(EMPTY_SCHEMA);
+    for (Map.Entry<Integer, String> exception : exceptions.entrySet()) {
+      errorBlock.addException(exception.getKey(), exception.getValue());
     }
     return errorBlock;
   }
