@@ -33,8 +33,10 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -227,6 +229,19 @@ public class PinotSegmentRecordReader implements RecordReader {
       } else if (!_skipDefaultNullValues) {
         reuse.putDefaultNullValue(column, columnReader.getValue(docId));
       }
+    }
+  }
+
+  public void getPrimaryKey(int docId, List<String> primaryKeyColumns, PrimaryKey reuse) {
+    int numPrimaryKeyColumns = primaryKeyColumns.size();
+    Object[] values = reuse.getValues();
+    for (int i = 0; i < numPrimaryKeyColumns; i++) {
+      PinotSegmentColumnReader columnReader = _columnReaderMap.get(primaryKeyColumns.get(i));
+      Object value = columnReader.getValue(docId);
+      if (value instanceof byte[]) {
+        value = new ByteArray((byte[]) value);
+      }
+      values[i] = value;
     }
   }
 

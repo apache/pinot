@@ -22,6 +22,7 @@ import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -125,7 +126,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     _upsertIndexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     ((ImmutableSegmentImpl) _upsertIndexSegment).enableUpsert(
         new PartitionUpsertMetadataManager("testTable_REALTIME", 0, serverMetrics, null,
-            HashFunction.NONE), new ThreadSafeMutableRoaringBitmap());
+            HashFunction.NONE, Collections.emptyList()), new ThreadSafeMutableRoaringBitmap());
   }
 
   @AfterClass
