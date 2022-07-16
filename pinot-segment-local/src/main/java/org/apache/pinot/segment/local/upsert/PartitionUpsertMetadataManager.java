@@ -38,6 +38,7 @@ import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -258,9 +259,12 @@ public class PartitionUpsertMetadataManager {
     String segmentName = segment.getSegmentName();
     LOGGER.info("Removing upsert metadata for segment: {}", segmentName);
 
-    if (!Objects.requireNonNull(segment.getValidDocIds()).getMutableRoaringBitmap().isEmpty()) {
+    MutableRoaringBitmap mutableRoaringBitmap =
+        Objects.requireNonNull(segment.getValidDocIds()).getMutableRoaringBitmap();
+
+    if (!mutableRoaringBitmap.isEmpty()) {
       PrimaryKey reuse = new PrimaryKey(new Object[_primaryKeyColumns.size()]);
-      PeekableIntIterator iterator = segment.getValidDocIds().getMutableRoaringBitmap().getIntIterator();
+      PeekableIntIterator iterator = mutableRoaringBitmap.getIntIterator();
       while (iterator.hasNext()) {
         int docId = iterator.next();
         segment.getPrimaryKey(docId, reuse);
