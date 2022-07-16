@@ -82,7 +82,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByExpression);
     if (_nullHandlingEnabled) {
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null) {
+      if (nullBitmap != null && !nullBitmap.isEmpty()) {
         generateKeysForBlockNullHandlingEnabled(transformBlock, groupKeys, nullBitmap);
         return;
       }
@@ -151,7 +151,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
             groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(intValues[i]);
           }
         } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, getKeyForNullValue());
+          Arrays.fill(groupKeys, 0, numDocs, getKeyForNullValue());
         }
         break;
       case LONG:
@@ -161,7 +161,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
             groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(longValues[i]);
           }
         } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, getKeyForNullValue());
+          Arrays.fill(groupKeys, 0, numDocs, getKeyForNullValue());
         }
         break;
       case FLOAT:
@@ -171,7 +171,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
             groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(floatValues[i]);
           }
         } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, getKeyForNullValue());
+          Arrays.fill(groupKeys, 0, numDocs, getKeyForNullValue());
         }
         break;
       case DOUBLE:
@@ -181,7 +181,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
             groupKeys[i] = nullBitmap.contains(i) ? getKeyForNullValue() : getKeyForValue(doubleValues[i]);
           }
         } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, getKeyForNullValue());
+          Arrays.fill(groupKeys, 0, numDocs, getKeyForNullValue());
         }
         break;
       case BIG_DECIMAL:
@@ -191,7 +191,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
             groupKeys[i] = getKeyForValue(nullBitmap.contains(i) ? null : bigDecimalValues[i]);
           }
         } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, getKeyForValue((BigDecimal) null));
+          Arrays.fill(groupKeys, 0, numDocs, getKeyForValue((BigDecimal) null));
         }
         break;
       case STRING:
@@ -201,7 +201,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
             groupKeys[i] = getKeyForValue(nullBitmap.contains(i) ? null : stringValues[i]);
           }
         } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, getKeyForValue((String) null));
+          Arrays.fill(groupKeys, 0, numDocs, getKeyForValue((String) null));
         }
         break;
       case BYTES:
@@ -211,7 +211,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
             groupKeys[i] = getKeyForValue(nullBitmap.contains(i) ? null : new ByteArray(bytesValues[i]));
           }
         } else if (numDocs > 0) {
-          Arrays.fill(groupKeys, getKeyForValue((ByteArray) null));
+          Arrays.fill(groupKeys, 0, numDocs, getKeyForValue((ByteArray) null));
         }
         break;
       default:
@@ -501,15 +501,16 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
     @Override
     public GroupKey next() {
-      if (_iterator.hasNext()) {
-        Int2IntMap.Entry entry = _iterator.next();
-        _groupKey._groupId = entry.getIntValue();
-        _groupKey._keys = new Object[]{entry.getIntKey()};
-      } else if (_groupKeyForNullValue != null) {
+      // TODO(nhejazi): revisit to avoid adding overhead to the regular case where null handling is not enabled.
+      if (_groupKeyForNullValue != null) {
         _groupKey._groupId = _groupKeyForNullValue;
         _groupKey._keys = new Object[]{null};
         _groupKeyForNullValue = null;
+        return _groupKey;
       }
+      Int2IntMap.Entry entry = _iterator.next();
+      _groupKey._groupId = entry.getIntValue();
+      _groupKey._keys = new Object[]{entry.getIntKey()};
       return _groupKey;
     }
 
@@ -537,15 +538,15 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
     @Override
     public GroupKey next() {
-      if (_iterator.hasNext()) {
-        Long2IntMap.Entry entry = _iterator.next();
-        _groupKey._groupId = entry.getIntValue();
-        _groupKey._keys = new Object[]{entry.getLongKey()};
-      } else if (_groupKeyForNullValue != null) {
+      if (_groupKeyForNullValue != null) {
         _groupKey._groupId = _groupKeyForNullValue;
         _groupKey._keys = new Object[]{null};
         _groupKeyForNullValue = null;
+        return _groupKey;
       }
+      Long2IntMap.Entry entry = _iterator.next();
+      _groupKey._groupId = entry.getIntValue();
+      _groupKey._keys = new Object[]{entry.getLongKey()};
       return _groupKey;
     }
 
@@ -573,15 +574,15 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
     @Override
     public GroupKey next() {
-      if (_iterator.hasNext()) {
-        Float2IntMap.Entry entry = _iterator.next();
-        _groupKey._groupId = entry.getIntValue();
-        _groupKey._keys = new Object[]{entry.getFloatKey()};
-      } else if (_groupKeyForNullValue != null) {
+      if (_groupKeyForNullValue != null) {
         _groupKey._groupId = _groupKeyForNullValue;
         _groupKey._keys = new Object[]{null};
         _groupKeyForNullValue = null;
+        return _groupKey;
       }
+      Float2IntMap.Entry entry = _iterator.next();
+      _groupKey._groupId = entry.getIntValue();
+      _groupKey._keys = new Object[]{entry.getFloatKey()};
       return _groupKey;
     }
 
@@ -609,15 +610,15 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
     @Override
     public GroupKey next() {
-      if (_iterator.hasNext()) {
-        Double2IntMap.Entry entry = _iterator.next();
-        _groupKey._groupId = entry.getIntValue();
-        _groupKey._keys = new Object[]{entry.getDoubleKey()};
-      } else if (_groupKeyForNullValue != null) {
+      if (_groupKeyForNullValue != null) {
         _groupKey._groupId = _groupKeyForNullValue;
         _groupKey._keys = new Object[]{null};
         _groupKeyForNullValue = null;
+        return _groupKey;
       }
+      Double2IntMap.Entry entry = _iterator.next();
+      _groupKey._groupId = entry.getIntValue();
+      _groupKey._keys = new Object[]{entry.getDoubleKey()};
       return _groupKey;
     }
 

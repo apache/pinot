@@ -16,15 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.data;
+package org.apache.pinot.spi.utils;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public class FieldSpecUtils {
-  private FieldSpecUtils() {
+public class NullValueUtils {
+  private NullValueUtils() {
   }
 
   private static final Map<DataType, Object> FIELD_TYPE_DEFAULT_NULL_VALUE_MAP = new HashMap<>();

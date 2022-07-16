@@ -178,26 +178,27 @@ public class SelectionOperatorService {
    * (Broker side)
    */
   public void reduceWithOrdering(Collection<DataTable> dataTables, boolean nullHandlingEnabled) {
-    RoaringBitmap[] nullBitmaps = null;
     for (DataTable dataTable : dataTables) {
+      int numRows = dataTable.getNumberOfRows();
       if (nullHandlingEnabled) {
-        if (nullBitmaps == null) {
-          nullBitmaps = new RoaringBitmap[dataTable.getDataSchema().size()];
-        }
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[dataTable.getDataSchema().size()];
         for (int colId = 0; colId < nullBitmaps.length; colId++) {
           nullBitmaps[colId] = dataTable.getNullRowIds(colId);
         }
-      }
-      int numRows = dataTable.getNumberOfRows();
-      for (int rowId = 0; rowId < numRows; rowId++) {
-        Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-        int len = nullBitmaps == null ? 0 : nullBitmaps.length;
-        for (int colId = 0; colId < len; colId++) {
-          if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
-            row[colId] = null;
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+          for (int colId = 0; colId < nullBitmaps.length; colId++) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+              row[colId] = null;
+            }
           }
+          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
         }
-        SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+      } else {
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+        }
       }
     }
   }

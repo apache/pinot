@@ -40,7 +40,7 @@ import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.data.FieldSpecUtils;
+import org.apache.pinot.spi.utils.NullValueUtils;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -247,7 +247,7 @@ public class SelectionOperatorUtils {
       for (int colId = 0; colId < numColumns; colId++) {
         if (storedColumnDataTypes[colId] != ColumnDataType.OBJECT && !storedColumnDataTypes[colId].isArray()) {
           colDefaultNullValues[colId] =
-              FieldSpecUtils.getDefaultNullValue(storedColumnDataTypes[colId].toDataType());
+              NullValueUtils.getDefaultNullValue(storedColumnDataTypes[colId].toDataType());
         }
         nullBitmaps[colId] = new RoaringBitmap();
       }

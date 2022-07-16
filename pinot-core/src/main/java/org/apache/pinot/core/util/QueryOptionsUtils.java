@@ -92,7 +92,8 @@ public class QueryOptionsUtils {
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
     boolean nullHandlingEnabled = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.ENABLE_NULL_HANDLING));
     if (nullHandlingEnabled) {
-      Preconditions.checkState(DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4);
+      Preconditions.checkState(DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4,
+          "Null handling cannot be enabled for data table version smaller than 4");
     }
     return nullHandlingEnabled;
   }

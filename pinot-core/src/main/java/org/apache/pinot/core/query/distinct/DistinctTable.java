@@ -39,7 +39,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.spi.data.FieldSpecUtils;
+import org.apache.pinot.spi.utils.NullValueUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -286,7 +286,7 @@ public class DistinctTable {
       nullBitmaps = new RoaringBitmap[numColumns];
       Object[] colDefaultNullValues = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
-        colDefaultNullValues[colId] = FieldSpecUtils.getDefaultNullValue(storedColumnDataTypes[colId].toDataType());
+        colDefaultNullValues[colId] = NullValueUtils.getDefaultNullValue(storedColumnDataTypes[colId].toDataType());
         nullBitmaps[colId] = new RoaringBitmap();
       }
 
