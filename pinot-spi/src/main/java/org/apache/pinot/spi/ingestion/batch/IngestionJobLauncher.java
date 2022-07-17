@@ -50,7 +50,7 @@ public class IngestionJobLauncher {
   public static final String YAML = "yaml";
 
   public static SegmentGenerationJobSpec getSegmentGenerationJobSpec(String jobSpecFilePath, String propertyFilePath,
-      Map<String, Object> context) {
+      Map<String, Object> context, Map<String, String> environmentValues) {
     Properties properties = new Properties();
     if (propertyFilePath != null) {
       try {
@@ -61,6 +61,13 @@ public class IngestionJobLauncher {
       }
     }
     Map<String, Object> propertiesMap = (Map) properties;
+    if (environmentValues != null) {
+      for (String propertyName: propertiesMap.keySet()) {
+        if (environmentValues.get(propertyName) != null) {
+          propertiesMap.put(propertyName, environmentValues.get(propertyName));
+        }
+      }
+    }
     if (context != null) {
       propertiesMap.putAll(context);
     }
