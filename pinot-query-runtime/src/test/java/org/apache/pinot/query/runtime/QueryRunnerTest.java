@@ -159,6 +159,11 @@ public class QueryRunnerTest {
         // thus the final JOIN result will be 15 x 1 = 15.
         new Object[]{"SELECT * FROM a JOIN b on a.col1 = b.col1", 15},
 
+        // Query with function in JOIN keys, table A and B are both (1, 2, 42, 1, 2), with table A cycling 3 times.
+        // Final result would have 6 x 2 = 12 (6 (1)s on with MOD result 1, on both tables)
+        //     + 9 x 1 = 9 (6 (2)s & 3 (42)s on table A MOD 2 = 0, 1 (42)s on table B MOD 3 = 0): 21 rows in total.
+        new Object[]{"SELECT a.col1, a.col3, b.col3 FROM a JOIN b ON MOD(a.col3, 2) = MOD(b.col3, 3)", 21},
+
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
         // thus the final JOIN result will be 15 x 1 = 15.
         new Object[]{"SELECT * FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2", 15},
