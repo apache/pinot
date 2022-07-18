@@ -39,7 +39,6 @@
     <scala.major.version>2.11</scala.major.version>
     <spark.version>2.4.0</spark.version>
     <scala.minor.version>2.11.11</scala.minor.version>
-    <spark2.jackson.version>2.6.7</spark2.jackson.version>
   </properties>
 
   <dependencies>
@@ -93,18 +92,6 @@
         <exclusion>
           <groupId>jakarta.ws.rs</groupId>
           <artifactId>jakarta.ws.rs-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-databind</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-annotations</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-core</artifactId>
         </exclusion>
         <exclusion>
           <groupId>io.netty</groupId>
@@ -173,51 +160,11 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-core</artifactId>
-      <version>${spark2.jackson.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-      <version>${spark2.jackson.version}</version>
-      <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-annotations</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-core</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-annotations</artifactId>
-      <version>${spark2.jackson.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
       <exclusions>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-databind</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-annotations</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-core</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>org.apache.commons</groupId>
           <artifactId>commons-lang3</artifactId>
@@ -230,18 +177,6 @@
       <version>${project.version}</version>
       <scope>provided</scope>
       <exclusions>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-databind</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-annotations</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-core</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>org.apache.commons</groupId>
           <artifactId>commons-lang3</artifactId>

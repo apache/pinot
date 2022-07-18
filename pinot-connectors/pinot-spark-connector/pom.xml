@@ -36,7 +36,6 @@
     <spark.version>2.4.5</spark.version>
     <circe.version>0.13.0</circe.version>
     <paranameter.version>2.8</paranameter.version>
-    <jackson.module.scala.version>2.12.7</jackson.module.scala.version>
     <scalaxml.version>1.3.0</scalaxml.version>
     <scalatest.version>3.1.1</scalatest.version>
     <shadeBase>org.apache.pinot.\$internal</shadeBase>
@@ -64,7 +63,6 @@
         <dependency>
           <groupId>com.fasterxml.jackson.module</groupId>
           <artifactId>jackson-module-scala_${scala.compat.version}</artifactId>
-          <version>${jackson.module.scala.version}</version>
           <exclusions>
             <exclusion>
               <groupId>com.thoughtworks.paranamer</groupId>
@@ -100,10 +98,6 @@
             <exclusion>
               <groupId>com.thoughtworks.paranamer</groupId>
               <artifactId>paranamer</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>com.fasterxml.jackson.module</groupId>
-              <artifactId>jackson-module-scala_${scala.compat.version}</artifactId>
             </exclusion>
             <exclusion>
               <groupId>org.scala-lang.modules</groupId>
