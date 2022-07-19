@@ -259,12 +259,13 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tasks/generator/{tableNameWithType}/{taskType}/debug")
   @ApiOperation("Fetch task generation information for the recent runs of the given task for the given table")
-  public List<JsonNode> getTaskGenerationDebugInto(
+  public String getTaskGenerationDebugInto(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,
       @ApiParam(value = "Whether to only lookup local cache for logs", defaultValue = "false") @QueryParam("localOnly")
-          boolean localOnly) {
+          boolean localOnly)
+      throws JsonProcessingException {
 
     if (localOnly) {
       BaseTaskGeneratorInfo taskGeneratorMostRecentRunInfo =
@@ -274,7 +275,7 @@ public class PinotTaskRestletResource {
             Response.Status.NOT_FOUND);
       }
 
-      return List.of(JsonUtils.objectToJsonNode(taskGeneratorMostRecentRunInfo));
+      return JsonUtils.objectToString(List.of(taskGeneratorMostRecentRunInfo));
     }
 
     // Call all controllers
@@ -299,7 +300,7 @@ public class PinotTaskRestletResource {
       }
     });
 
-    return result;
+    return JsonUtils.objectToString(result);
   }
 
   @GET
