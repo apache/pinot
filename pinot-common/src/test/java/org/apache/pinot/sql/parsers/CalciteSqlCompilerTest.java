@@ -2502,6 +2502,16 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testCatalogNameResolvedToDefault() {
+    // Pinot doesn't support catalog. However, for backward compatibility, if a catalog is provided, we will resolve
+    // the table from our default catalog. this means `a.foo` will be equivalent to `foo`.
+    PinotQuery randomCatalogQuery = CalciteSqlParser.compileToPinotQuery("SELECT count(*) FROM rand_catalog.foo");
+    PinotQuery defaultCatalogQuery = CalciteSqlParser.compileToPinotQuery("SELECT count(*) FROM default.foo");
+    Assert.assertEquals(randomCatalogQuery.getDataSource().getTableName(), "rand_catalog.foo");
+    Assert.assertEquals(defaultCatalogQuery.getDataSource().getTableName(), "default.foo");
+  }
+
+  @Test
   public void testInvalidQueryWithSemicolon() {
     Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(";"));
 

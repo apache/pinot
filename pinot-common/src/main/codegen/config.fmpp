@@ -164,7 +164,7 @@ data: {
       "DEC"
       "DECIMAL"
       "DECLARE"
-#     "DEFAULT"
+      "DEFAULT_"
       "DEFERRABLE"
       "DEFERRED"
 #     "DEFINE"
