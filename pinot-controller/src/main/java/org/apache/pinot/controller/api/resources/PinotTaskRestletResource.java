@@ -275,7 +275,7 @@ public class PinotTaskRestletResource {
             Response.Status.NOT_FOUND);
       }
 
-      return JsonUtils.objectToString(List.of(taskGeneratorMostRecentRunInfo));
+      return JsonUtils.objectToString(taskGeneratorMostRecentRunInfo);
     }
 
     // Call all controllers
