@@ -123,7 +123,7 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
     }
 
     if (StringUtils.isBlank(spec.getAuthToken())) {
-      spec.setAuthToken(makeAuthProvider(_authProvider, _authToken, _user, _password, _authTokenUrl).getTaskToken());
+      spec.setAuthToken(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password).getTaskToken());
     }
 
     try {
