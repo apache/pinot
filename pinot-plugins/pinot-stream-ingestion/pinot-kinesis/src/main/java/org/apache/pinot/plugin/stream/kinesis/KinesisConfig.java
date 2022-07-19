@@ -40,6 +40,7 @@ public class KinesisConfig {
   public static final String IAM_ROLE_BASED_ACCESS_ENABLED = "iamRoleBasedAccessEnabled";
   public static final String ROLE_ARN = "roleArn";
   public static final String ROLE_SESSION_NAME = "roleSessionName";
+  public static final String EXTERNAL_ID = "externalId";
   public static final String SESSION_DURATION_SECONDS = "sessionDurationSeconds";
   public static final String ASYNC_SESSION_UPDATED_ENABLED = "asyncSessionUpdateEnabled";
 
@@ -62,6 +63,7 @@ public class KinesisConfig {
   private boolean _iamRoleBasedAccess;
   private String _roleArn;
   private String _roleSessionName;
+  private String _externalId;
   private int _sessionDurationSeconds;
   private boolean _asyncSessionUpdateEnabled;
 
@@ -82,10 +84,12 @@ public class KinesisConfig {
         Boolean.parseBoolean(props.getOrDefault(IAM_ROLE_BASED_ACCESS_ENABLED, DEFAULT_IAM_ROLE_BASED_ACCESS_ENABLED));
     _roleArn = props.get(ROLE_ARN);
     _roleSessionName = props.get(ROLE_SESSION_NAME);
+    _externalId = props.get(EXTERNAL_ID);
     _sessionDurationSeconds =
         Integer.parseInt(props.getOrDefault(SESSION_DURATION_SECONDS, DEFAULT_SESSION_DURATION_SECONDS));
     _asyncSessionUpdateEnabled =
         Boolean.parseBoolean(props.getOrDefault(ASYNC_SESSION_UPDATED_ENABLED, DEFAULT_ASYNC_SESSION_UPDATED_ENABLED));
+
 
     if (_iamRoleBasedAccess) {
       Preconditions.checkNotNull(_roleArn,
@@ -135,6 +139,10 @@ public class KinesisConfig {
 
   public String getRoleSessionName() {
     return _roleSessionName;
+  }
+
+  public String getExternalId() {
+    return _externalId;
   }
 
   public int getSessionDurationSeconds() {

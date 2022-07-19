@@ -90,9 +90,18 @@ public class KinesisConnectionHandler {
 
       AwsCredentialsProvider awsCredentialsProvider;
       if (_kinesisConfig.isIamRoleBasedAccess()) {
-        AssumeRoleRequest assumeRoleRequest = AssumeRoleRequest.builder().roleArn(_kinesisConfig.getRoleArn())
-            .roleSessionName(_kinesisConfig.getRoleSessionName())
-            .durationSeconds(_kinesisConfig.getSessionDurationSeconds()).build();
+        AssumeRoleRequest.Builder assumeRoleRequestBuilder =
+            AssumeRoleRequest.builder().roleArn(_kinesisConfig.getRoleArn())
+                .roleSessionName(_kinesisConfig.getRoleSessionName())
+                .durationSeconds(_kinesisConfig.getSessionDurationSeconds());
+
+        AssumeRoleRequest assumeRoleRequest;
+        if (StringUtils.isNotEmpty(_kinesisConfig.getExternalId())) {
+          assumeRoleRequest = assumeRoleRequestBuilder.externalId(_kinesisConfig.getExternalId()).build();
+        } else {
+          assumeRoleRequest = assumeRoleRequestBuilder.build();
+        }
+
         StsClient stsClient = StsClient.builder().region(Region.of(_region)).build();
         StsAssumeRoleCredentialsProvider stsAssumeRoleCredentialsProvider =
             StsAssumeRoleCredentialsProvider.builder().stsClient(stsClient).refreshRequest(assumeRoleRequest)
