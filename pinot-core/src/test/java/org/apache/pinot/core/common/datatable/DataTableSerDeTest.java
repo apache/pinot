@@ -80,7 +80,7 @@ public class DataTableSerDeTest {
           .put(MetadataKey.NUM_SEGMENTS_QUERIED.getName(), String.valueOf(6))
           .put(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), String.valueOf(6))
           .put(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), String.valueOf(1))
-          .put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), String.valueOf(1))
+          .put(MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(), String.valueOf(1))
           .put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), String.valueOf(100L))
           .put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(200L))
           .put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true")
