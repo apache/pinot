@@ -93,8 +93,8 @@ public class MultistageEngineQuickStart extends QuickStartBase {
 
     waitForBootstrapToComplete(null);
 
-    Map<String, String> queryOptions = Collections.singletonMap(
-        CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true");
+    Map<String, String> queryOptions = Collections.singletonMap("queryOptions",
+        CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE + "=true");
 
     printStatus(Quickstart.Color.YELLOW, "***** Multi-stage engine quickstart setup complete *****");
     String q1 = "SELECT count(*) FROM baseballStats_OFFLINE limit 1";

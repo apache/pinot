@@ -100,7 +100,7 @@ public class PinotClientRequest {
     try {
       ObjectNode requestJson = JsonUtils.newObjectNode();
       requestJson.put(Request.SQL, query);
-      String queryOptions = constructSqlQueryOptions();
+      String queryOptions = constructSqlQueryOptions(requestJson);
       requestJson.put(Request.QUERY_OPTIONS, queryOptions);
       if (traceEnabled != null) {
         requestJson.put(Request.TRACE, traceEnabled);
@@ -133,7 +133,7 @@ public class PinotClientRequest {
       if (!requestJson.has(Request.SQL)) {
         throw new IllegalStateException("Payload is missing the query string field 'sql'");
       }
-      String queryOptions = constructSqlQueryOptions();
+      String queryOptions = constructSqlQueryOptions(requestJson);
       // the only query options as of now are sql related. do not allow any custom query options in sql endpoint
       ObjectNode sqlRequestJson = ((ObjectNode) requestJson).put(Request.QUERY_OPTIONS, queryOptions);
       BrokerResponse brokerResponse = executeSqlQuery(sqlRequestJson, makeHttpIdentity(requestContext), false);
@@ -175,10 +175,14 @@ public class PinotClientRequest {
     }
   }
 
-  // TODO: Remove the SQL query options after releasing 0.11.0
-  private String constructSqlQueryOptions() {
-    return Request.QueryOptionKey.GROUP_BY_MODE + "=" + Request.SQL + ";" + Request.QueryOptionKey.RESPONSE_FORMAT + "="
-        + Request.SQL;
+  private String constructSqlQueryOptions(JsonNode requestJson) {
+    String queryOptions = "";
+    if (requestJson.has("queryOptions")) {
+      queryOptions = requestJson.get("queryOptions").asText() + ";";
+    }
+    // TODO: Remove this SQL query options after releasing 0.11.0
+    return queryOptions + Request.QueryOptionKey.GROUP_BY_MODE + "=" + Request.SQL + ";"
+        + Request.QueryOptionKey.RESPONSE_FORMAT + "=" + Request.SQL;
   }
 
   private static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {
