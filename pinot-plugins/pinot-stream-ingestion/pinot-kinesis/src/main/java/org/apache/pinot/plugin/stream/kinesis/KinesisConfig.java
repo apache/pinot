@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.pinot.spi.stream.StreamConfig;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
@@ -83,20 +85,17 @@ public class KinesisConfig {
     _iamRoleBasedAccess =
         Boolean.parseBoolean(props.getOrDefault(IAM_ROLE_BASED_ACCESS_ENABLED, DEFAULT_IAM_ROLE_BASED_ACCESS_ENABLED));
     _roleArn = props.get(ROLE_ARN);
-    _roleSessionName = props.get(ROLE_SESSION_NAME);
+    _roleSessionName =
+        props.getOrDefault(ROLE_SESSION_NAME, Joiner.on("-").join("pinot", "kinesis", UUID.randomUUID()));
     _externalId = props.get(EXTERNAL_ID);
     _sessionDurationSeconds =
         Integer.parseInt(props.getOrDefault(SESSION_DURATION_SECONDS, DEFAULT_SESSION_DURATION_SECONDS));
     _asyncSessionUpdateEnabled =
         Boolean.parseBoolean(props.getOrDefault(ASYNC_SESSION_UPDATED_ENABLED, DEFAULT_ASYNC_SESSION_UPDATED_ENABLED));
 
-
     if (_iamRoleBasedAccess) {
       Preconditions.checkNotNull(_roleArn,
           "Must provide 'roleArn' in stream config for table %s if iamRoleBasedAccess is enabled",
-          streamConfig.getTableNameWithType());
-      Preconditions.checkNotNull(_roleSessionName,
-          "Must provide 'roleSessionName' in stream config for table %s if iamRoleBasedAccess is enabled",
           streamConfig.getTableNameWithType());
     }
   }
