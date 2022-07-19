@@ -1,10 +1,3 @@
-package org.apache.pinot.common.minion;
-
-import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
-
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,6 +16,13 @@ import java.util.function.Consumer;
  * specific language governing permissions and limitations
  * under the License.
  */
+
+package org.apache.pinot.common.minion;
+
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+
 public class InMemoryTaskManagerStatusCache extends TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> {
 
   private static class TaskGeneratorCacheKey {
