@@ -62,7 +62,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
   // special IntermediateResultsBlock into the BlockingQueue to awake the main thread
   private static final IntermediateResultsBlock LAST_RESULTS_BLOCK =
       new IntermediateResultsBlock(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]),
-          Collections.emptyList());
+          Collections.emptyList(), false);
 
   // Use an AtomicInteger to track the number of operators skipped (no result inserted into the BlockingQueue)
   private final AtomicInteger _numOperatorsSkipped = new AtomicInteger();

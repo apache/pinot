@@ -33,7 +33,7 @@ public class DictionaryBasedSingleColumnDistinctOnlyExecutor extends BaseDiction
 
   public DictionaryBasedSingleColumnDistinctOnlyExecutor(ExpressionContext expression, Dictionary dictionary,
       DataType dataType, int limit) {
-    super(expression, dictionary, dataType, limit);
+    super(expression, dictionary, dataType, limit, false);
   }
 
   @Override

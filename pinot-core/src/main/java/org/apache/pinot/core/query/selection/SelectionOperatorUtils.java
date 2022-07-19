@@ -42,6 +42,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.NullValueUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -227,16 +229,42 @@ public class SelectionOperatorUtils {
    *
    * @param rows {@link Collection} of selection rows.
    * @param dataSchema data schema.
+   * @param nullHandlingEnabled whether null handling is enabled.
    * @return data table.
    * @throws Exception
    */
-  public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema)
+  public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema,
+      boolean nullHandlingEnabled)
       throws Exception {
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
 
-    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(
-        dataSchema);
+    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(dataSchema);
+    RoaringBitmap[] nullBitmaps = null;
+    if (nullHandlingEnabled) {
+      nullBitmaps = new RoaringBitmap[numColumns];
+      Object[] colDefaultNullValues = new Object[numColumns];
+      for (int colId = 0; colId < numColumns; colId++) {
+        if (storedColumnDataTypes[colId] != ColumnDataType.OBJECT && !storedColumnDataTypes[colId].isArray()) {
+          colDefaultNullValues[colId] =
+              NullValueUtils.getDefaultNullValue(storedColumnDataTypes[colId].toDataType());
+        }
+        nullBitmaps[colId] = new RoaringBitmap();
+      }
+
+      int rowId = 0;
+      for (Object[] row : rows) {
+        for (int i = 0; i < numColumns; i++) {
+          Object columnValue = row[i];
+          if (columnValue == null) {
+            row[i] = colDefaultNullValues[i];
+            nullBitmaps[i].add(rowId);
+          }
+        }
+        rowId++;
+      }
+    }
+
     for (Object[] row : rows) {
       dataTableBuilder.startRow();
       for (int i = 0; i < numColumns; i++) {
@@ -321,6 +349,11 @@ public class SelectionOperatorUtils {
       dataTableBuilder.finishRow();
     }
 
+    if (nullHandlingEnabled) {
+      for (int colId = 0; colId < numColumns; colId++) {
+        dataTableBuilder.setNullRowIds(nullBitmaps[colId]);
+      }
+    }
     return dataTableBuilder.build();
   }
 
@@ -393,15 +426,36 @@ public class SelectionOperatorUtils {
    * Reduces a collection of {@link DataTable}s to selection rows for selection queries without <code>ORDER BY</code>.
    * (Broker side)
    */
-  public static List<Object[]> reduceWithoutOrdering(Collection<DataTable> dataTables, int limit) {
+  public static List<Object[]> reduceWithoutOrdering(Collection<DataTable> dataTables, int limit,
+      boolean nullHandlingEnabled) {
     List<Object[]> rows = new ArrayList<>(Math.min(limit, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
     for (DataTable dataTable : dataTables) {
+      int numColumns = dataTable.getDataSchema().size();
+      RoaringBitmap[] nullBitmaps = null;
+      if (nullHandlingEnabled) {
+        nullBitmaps = new RoaringBitmap[numColumns];;
+        for (int coldId = 0; coldId < numColumns; coldId++) {
+          nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
+        }
+      }
+
       int numRows = dataTable.getNumberOfRows();
       for (int rowId = 0; rowId < numRows; rowId++) {
         if (rows.size() < limit) {
           rows.add(extractRowFromDataTable(dataTable, rowId));
         } else {
-          return rows;
+          break;
+        }
+      }
+
+      if (nullHandlingEnabled) {
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = rows.get(rowId);
+          for (int colId = 0; colId < numColumns; colId++) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+              row[colId] = null;
+            }
+          }
         }
       }
     }
@@ -450,7 +504,10 @@ public class SelectionOperatorUtils {
       Object[] resultRow = new Object[numColumns];
       for (int i = 0; i < numColumns; i++) {
         int index = (columnNameToIndexMap != null) ? columnNameToIndexMap.get(selectionColumns.get(i)) : i;
-        resultRow[i] = resultColumnDataTypes[i].convertAndFormat(row[index]);
+        Object value = row[index];
+        if (value != null) {
+          resultRow[i] = resultColumnDataTypes[i].convertAndFormat(value);
+        }
       }
       resultRows.add(resultRow);
     }

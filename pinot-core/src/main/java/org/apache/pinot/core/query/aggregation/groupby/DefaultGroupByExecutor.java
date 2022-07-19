@@ -51,6 +51,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][]);
 
   protected final AggregationFunction[] _aggregationFunctions;
+  protected final boolean _nullHandlingEnabled;
   protected final GroupKeyGenerator _groupKeyGenerator;
   protected final GroupByResultHolder[] _groupByResultHolders;
   protected final boolean _hasMVGroupByExpression;
@@ -68,6 +69,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       TransformOperator transformOperator) {
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
+    _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
 
     boolean hasMVGroupByExpression = false;
     boolean hasNoDictionaryGroupByExpression = false;
@@ -81,10 +83,12 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     // Initialize group key generator
     int numGroupsLimit = queryContext.getNumGroupsLimit();
     int maxInitialResultHolderCapacity = queryContext.getMaxInitialResultHolderCapacity();
-    if (hasNoDictionaryGroupByExpression) {
+    if (hasNoDictionaryGroupByExpression || _nullHandlingEnabled) {
       if (groupByExpressions.length == 1) {
+        // TODO(nhejazi): support MV and dictionary based when null handling is enabled.
         _groupKeyGenerator =
-            new NoDictionarySingleColumnGroupKeyGenerator(transformOperator, groupByExpressions[0], numGroupsLimit);
+            new NoDictionarySingleColumnGroupKeyGenerator(transformOperator, groupByExpressions[0], numGroupsLimit,
+                _nullHandlingEnabled);
       } else {
         _groupKeyGenerator =
             new NoDictionaryMultiColumnGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit);

@@ -272,6 +272,7 @@ public class CommonConstants {
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
+        public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
 
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated

@@ -35,6 +35,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock> {
@@ -42,18 +43,21 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   private static final String EXPLAIN_NAME = "SELECT";
 
   private final IndexSegment _indexSegment;
+  private final boolean _nullHandlingEnabled;
   private final TransformOperator _transformOperator;
   private final List<ExpressionContext> _expressions;
   private final BlockValSet[] _blockValSets;
   private final DataSchema _dataSchema;
   private final int _numRowsToKeep;
   private final List<Object[]> _rows;
+  private final RoaringBitmap[] _nullBitmaps;
 
   private int _numDocsScanned = 0;
 
   public SelectionOnlyOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
+    _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _transformOperator = transformOperator;
     _expressions = expressions;
 
@@ -72,6 +76,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
 
     _numRowsToKeep = queryContext.getLimit();
     _rows = new ArrayList<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
+    _nullBitmaps = _nullHandlingEnabled ? new RoaringBitmap[numExpressions] : null;
   }
 
   @Override
@@ -98,15 +103,30 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
 
       int numDocsToAdd = Math.min(_numRowsToKeep - _rows.size(), transformBlock.getNumDocs());
       _numDocsScanned += numDocsToAdd;
-      for (int i = 0; i < numDocsToAdd; i++) {
-        _rows.add(blockValueFetcher.getRow(i));
+      if (_nullHandlingEnabled) {
+        for (int i = 0; i < numExpressions; i++) {
+          _nullBitmaps[i] = _blockValSets[i].getNullBitmap();
+        }
+        for (int docId = 0; docId < numDocsToAdd; docId++) {
+          Object[] values = blockValueFetcher.getRow(docId);
+          for (int colId = 0; colId < numExpressions; colId++) {
+            if (_nullBitmaps[colId] != null && _nullBitmaps[colId].contains(docId)) {
+              values[colId] = null;
+            }
+          }
+          _rows.add(values);
+        }
+      } else {
+        for (int i = 0; i < numDocsToAdd; i++) {
+          _rows.add(blockValueFetcher.getRow(i));
+        }
       }
       if (_rows.size() == _numRowsToKeep) {
         break;
       }
     }
 
-    return new IntermediateResultsBlock(_dataSchema, _rows);
+    return new IntermediateResultsBlock(_dataSchema, _rows, _nullHandlingEnabled);
   }
 
 

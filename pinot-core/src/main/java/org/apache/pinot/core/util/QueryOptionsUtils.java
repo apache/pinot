@@ -21,6 +21,7 @@ package org.apache.pinot.core.util;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 
 
@@ -86,5 +87,14 @@ public class QueryOptionsUtils {
   public static Integer getMinServerGroupTrimSize(Map<String, String> queryOptions) {
     String minServerGroupTrimSizeString = queryOptions.get(Request.QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE);
     return minServerGroupTrimSizeString != null ? Integer.parseInt(minServerGroupTrimSizeString) : null;
+  }
+
+  public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
+    boolean nullHandlingEnabled = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.ENABLE_NULL_HANDLING));
+    if (nullHandlingEnabled) {
+      Preconditions.checkState(DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4,
+          "Null handling cannot be enabled for data table version smaller than 4");
+    }
+    return nullHandlingEnabled;
   }
 }

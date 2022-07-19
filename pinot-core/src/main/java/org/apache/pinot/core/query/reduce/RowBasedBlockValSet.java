@@ -26,6 +26,7 @@ import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -49,6 +50,14 @@ public class RowBasedBlockValSet implements BlockValSet {
     _pinotDataType = PinotDataType.getPinotDataTypeForExecution(columnDataType);
     _rows = rows;
     _columnIndex = columnIndex;
+  }
+
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap() {
+    // TODO: The assumption for now is that the rows in RowBasedBlockValSet contain non-null values.
+    //  Update to pass nullBitmap in constructor if rows have null values. Alternatively, compute nullBitmap on the fly.
+    return null;
   }
 
   @Override

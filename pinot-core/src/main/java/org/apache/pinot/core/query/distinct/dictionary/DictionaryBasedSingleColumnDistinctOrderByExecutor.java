@@ -38,7 +38,7 @@ public class DictionaryBasedSingleColumnDistinctOrderByExecutor
 
   public DictionaryBasedSingleColumnDistinctOrderByExecutor(ExpressionContext expression, Dictionary dictionary,
       DataType dataType, OrderByExpressionContext orderByExpressionContext, int limit) {
-    super(expression, dictionary, dataType, limit);
+    super(expression, dictionary, dataType, limit, false);
 
     assert orderByExpressionContext.getExpression().equals(expression);
     int comparisonFactor = orderByExpressionContext.isAsc() ? -1 : 1;

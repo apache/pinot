@@ -39,13 +39,17 @@ abstract class BaseRawDoubleSingleColumnDistinctExecutor implements DistinctExec
   final ExpressionContext _expression;
   final DataType _dataType;
   final int _limit;
+  final boolean _nullHandlingEnabled;
 
   final DoubleSet _valueSet;
+  protected boolean _hasNull;
 
-  BaseRawDoubleSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit) {
+  BaseRawDoubleSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit,
+      boolean nullHandlingEnabled) {
     _expression = expression;
     _dataType = dataType;
     _limit = limit;
+    _nullHandlingEnabled = nullHandlingEnabled;
 
     _valueSet = new DoubleOpenHashSet(Math.min(limit, MAX_INITIAL_CAPACITY));
   }
@@ -59,6 +63,9 @@ abstract class BaseRawDoubleSingleColumnDistinctExecutor implements DistinctExec
     while (valueIterator.hasNext()) {
       records.add(new Record(new Object[]{valueIterator.nextDouble()}));
     }
-    return new DistinctTable(dataSchema, records);
+    if (_hasNull) {
+      records.add(new Record(new Object[]{null}));
+    }
+    return new DistinctTable(dataSchema, records, _nullHandlingEnabled);
   }
 }

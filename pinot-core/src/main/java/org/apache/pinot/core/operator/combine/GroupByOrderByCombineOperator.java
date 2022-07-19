@@ -236,7 +236,8 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
 
     IndexedTable indexedTable = _indexedTable;
     indexedTable.finish(false);
-    IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(indexedTable);
+    IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(
+        indexedTable, _queryContext.isNullHandlingEnabled());
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
     mergedBlock.setNumResizes(indexedTable.getNumResizes());
     mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());

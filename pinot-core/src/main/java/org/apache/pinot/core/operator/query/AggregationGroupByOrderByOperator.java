@@ -125,15 +125,15 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       if (groupByExecutor.getNumGroups() > trimSize) {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
-        IntermediateResultsBlock resultsBlock =
-            new IntermediateResultsBlock(_aggregationFunctions, intermediateRecords, _dataSchema);
+        IntermediateResultsBlock resultsBlock = new IntermediateResultsBlock(
+            _aggregationFunctions, intermediateRecords, _dataSchema);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
         return resultsBlock;
       }
     }
 
-    IntermediateResultsBlock resultsBlock =
-        new IntermediateResultsBlock(_aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
+    IntermediateResultsBlock resultsBlock = new IntermediateResultsBlock(
+        _aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
     return resultsBlock;
   }

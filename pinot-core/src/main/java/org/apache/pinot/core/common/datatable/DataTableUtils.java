@@ -208,8 +208,8 @@ public class DataTableUtils {
     ColumnDataType[] columnDataTypes = new ColumnDataType[columnNames.length];
     // NOTE: Use STRING column data type as default for distinct query
     Arrays.fill(columnDataTypes, ColumnDataType.STRING);
-    DistinctTable distinctTable =
-        new DistinctTable(new DataSchema(columnNames, columnDataTypes), Collections.emptySet());
+    DistinctTable distinctTable = new DistinctTable(
+        new DataSchema(columnNames, columnDataTypes), Collections.emptySet(), queryContext.isNullHandlingEnabled());
 
     // Build the data table
     DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(

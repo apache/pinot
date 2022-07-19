@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -29,6 +30,12 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * (Transform layer).
  */
 public interface BlockValSet {
+
+  /**
+   * Returns the null value bitmap in the value set.
+   */
+  @Nullable
+  RoaringBitmap getNullBitmap();
 
   /**
    * Returns the data type of the values in the value set.

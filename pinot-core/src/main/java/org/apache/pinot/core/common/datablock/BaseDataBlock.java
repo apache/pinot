@@ -27,10 +27,12 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.common.datatable.DataTableUtils;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -200,6 +202,11 @@ public abstract class BaseDataBlock implements DataTable {
     }
   }
 
+  @Override
+  public int getVersion() {
+    return DataTableFactory.VERSION_4;
+  }
+
   /**
    * Return the int serialized form of the data block version and type.
    * @return
@@ -239,6 +246,7 @@ public abstract class BaseDataBlock implements DataTable {
     return _numRows;
   }
 
+  @Nullable
   @Override
   public RoaringBitmap getNullRowIds(int colId) {
     return null;

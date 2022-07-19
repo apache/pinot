@@ -40,6 +40,8 @@ import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.NullValueUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -66,16 +68,19 @@ public class DistinctTable {
 
   // Available in main DistinctTable only
   private final int _limit;
+  private final boolean _nullHandlingEnabled;
   private final ObjectSet<Record> _recordSet;
   private final PriorityQueue<Record> _priorityQueue;
 
   /**
    * Constructor of the main DistinctTable which can be used to add records and merge other DistinctTables.
    */
-  public DistinctTable(DataSchema dataSchema, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit) {
+  public DistinctTable(DataSchema dataSchema, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
+      boolean nullHandlingEnabled) {
     _dataSchema = dataSchema;
     _isMainTable = true;
     _limit = limit;
+    _nullHandlingEnabled = nullHandlingEnabled;
 
     // NOTE: When LIMIT is smaller than or equal to the MAX_INITIAL_CAPACITY, no resize is required.
     int initialCapacity = Math.min(limit, DistinctExecutor.MAX_INITIAL_CAPACITY);
@@ -92,20 +97,45 @@ public class DistinctTable {
         orderByExpressionIndices[i] = columnNames.indexOf(orderByExpression.getExpression().toString());
         comparisonFactors[i] = orderByExpression.isAsc() ? -1 : 1;
       }
-      _priorityQueue = new ObjectHeapPriorityQueue<>(initialCapacity, (r1, r2) -> {
-        Object[] values1 = r1.getValues();
-        Object[] values2 = r2.getValues();
-        for (int i = 0; i < numOrderByExpressions; i++) {
-          int index = orderByExpressionIndices[i];
-          Comparable value1 = (Comparable) values1[index];
-          Comparable value2 = (Comparable) values2[index];
-          int result = value1.compareTo(value2) * comparisonFactors[i];
-          if (result != 0) {
-            return result;
+      if (_nullHandlingEnabled) {
+        _priorityQueue = new ObjectHeapPriorityQueue<>(initialCapacity, (r1, r2) -> {
+          Object[] values1 = r1.getValues();
+          Object[] values2 = r2.getValues();
+          for (int i = 0; i < numOrderByExpressions; i++) {
+            int index = orderByExpressionIndices[i];
+            Comparable value1 = (Comparable) values1[index];
+            Comparable value2 = (Comparable) values2[index];
+            if (value1 == null) {
+              if (value2 == null) {
+                continue;
+              }
+              return comparisonFactors[i];
+            } else if (value2 == null) {
+              return -comparisonFactors[i];
+            }
+            int result = value1.compareTo(value2) * comparisonFactors[i];
+            if (result != 0) {
+              return result;
+            }
           }
-        }
-        return 0;
-      });
+          return 0;
+        });
+      } else {
+        _priorityQueue = new ObjectHeapPriorityQueue<>(initialCapacity, (r1, r2) -> {
+          Object[] values1 = r1.getValues();
+          Object[] values2 = r2.getValues();
+          for (int i = 0; i < numOrderByExpressions; i++) {
+            int index = orderByExpressionIndices[i];
+            Comparable value1 = (Comparable) values1[index];
+            Comparable value2 = (Comparable) values2[index];
+            int result = value1.compareTo(value2) * comparisonFactors[i];
+            if (result != 0) {
+              return result;
+            }
+          }
+          return 0;
+        });
+      }
     } else {
       _priorityQueue = null;
     }
@@ -114,13 +144,21 @@ public class DistinctTable {
   /**
    * Constructor of the wrapper DistinctTable which can only be merged into the main DistinctTable.
    */
-  public DistinctTable(DataSchema dataSchema, Collection<Record> records) {
+  public DistinctTable(DataSchema dataSchema, Collection<Record> records, boolean nullHandlingEnabled) {
     _dataSchema = dataSchema;
     _records = records;
+    _nullHandlingEnabled = nullHandlingEnabled;
     _isMainTable = false;
     _limit = Integer.MIN_VALUE;
     _recordSet = null;
     _priorityQueue = null;
+  }
+
+  /**
+   * Constructor of the wrapper DistinctTable which can only be merged into the main DistinctTable.
+   */
+  public DistinctTable(DataSchema dataSchema, Collection<Record> records) {
+    this(dataSchema, records, false);
   }
 
   /**
@@ -243,6 +281,28 @@ public class DistinctTable {
         _dataSchema);
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
+    RoaringBitmap[] nullBitmaps = null;
+    if (_nullHandlingEnabled) {
+      nullBitmaps = new RoaringBitmap[numColumns];
+      Object[] colDefaultNullValues = new Object[numColumns];
+      for (int colId = 0; colId < numColumns; colId++) {
+        colDefaultNullValues[colId] = NullValueUtils.getDefaultNullValue(storedColumnDataTypes[colId].toDataType());
+        nullBitmaps[colId] = new RoaringBitmap();
+      }
+
+      int rowId = 0;
+      for (Record record : _records) {
+        Object[] values = record.getValues();
+        for (int colId = 0; colId < numColumns; colId++) {
+          if (values[colId] == null) {
+            values[colId] = colDefaultNullValues[colId];
+            nullBitmaps[colId].add(rowId);
+          }
+        }
+        rowId++;
+      }
+    }
+
     for (Record record : _records) {
       dataTableBuilder.startRow();
       Object[] values = record.getValues();
@@ -276,6 +336,11 @@ public class DistinctTable {
       }
       dataTableBuilder.finishRow();
     }
+    if (_nullHandlingEnabled) {
+      for (int colId = 0; colId < numColumns; colId++) {
+        dataTableBuilder.setNullRowIds(nullBitmaps[colId]);
+      }
+    }
     return dataTableBuilder.build().toBytes();
   }
 
@@ -290,6 +355,12 @@ public class DistinctTable {
     int numRecords = dataTable.getNumberOfRows();
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
+    RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
+    boolean nullHandlingEnabled = false;
+    for (int colId = 0; colId < numColumns; colId++) {
+      nullBitmaps[colId] = dataTable.getNullRowIds(colId);
+      nullHandlingEnabled |= nullBitmaps[colId] != null;
+    }
     List<Record> records = new ArrayList<>(numRecords);
     for (int i = 0; i < numRecords; i++) {
       Object[] values = new Object[numColumns];
@@ -322,6 +393,17 @@ public class DistinctTable {
         }
       }
       records.add(new Record(values));
+    }
+
+    if (nullHandlingEnabled) {
+      for (int i = 0; i < records.size(); i++) {
+        Object[] values = records.get(i).getValues();
+        for (int j = 0; j < numColumns; j++) {
+          if (nullBitmaps[j] != null && nullBitmaps[j].contains(i)) {
+            values[j] = null;
+          }
+        }
+      }
     }
     return new DistinctTable(dataSchema, records);
   }

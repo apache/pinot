@@ -85,12 +85,13 @@ public class SelectionDataTableReducer implements DataTableReducer {
       if (limit > 0 && _queryContext.getOrderByExpressions() != null) {
         // Selection order-by
         SelectionOperatorService selectionService = new SelectionOperatorService(_queryContext, dataSchema);
-        selectionService.reduceWithOrdering(dataTableMap.values());
+        selectionService.reduceWithOrdering(dataTableMap.values(), _queryContext.isNullHandlingEnabled());
         brokerResponseNative.setResultTable(selectionService.renderResultTableWithOrdering());
       } else {
         // Selection only
         List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
-        List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), limit);
+        List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), limit,
+            _queryContext.isNullHandlingEnabled());
         brokerResponseNative.setResultTable(
             SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, dataSchema, selectionColumns));
       }

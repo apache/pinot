@@ -25,10 +25,13 @@ import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
+import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -41,6 +44,9 @@ public class ProjectionBlockValSet implements BlockValSet {
   private final String _column;
   private final DataSource _dataSource;
 
+  private boolean _nullBitmapSet;
+  private RoaringBitmap _nullBitmap;
+
   /**
    * Constructor for the class.
    * The dataBlockCache is initialized in {@link ProjectionOperator} so that it can be reused across multiple calls to
@@ -50,6 +56,30 @@ public class ProjectionBlockValSet implements BlockValSet {
     _dataBlockCache = dataBlockCache;
     _column = column;
     _dataSource = dataSource;
+  }
+
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap() {
+    if (!_nullBitmapSet) {
+      NullValueVectorReader nullValueReader = _dataSource.getNullValueVector();
+      ImmutableRoaringBitmap nullBitmap = nullValueReader != null ? nullValueReader.getNullBitmap() : null;
+      if (nullBitmap != null && !nullBitmap.isEmpty()) {
+        // Project null bitmap.
+        RoaringBitmap projectedNullBitmap = new RoaringBitmap();
+        int[] docIds = _dataBlockCache.getDocIds();
+        for (int i = 0; i < _dataBlockCache.getNumDocs(); i++) {
+          if (nullBitmap.contains(docIds[i])) {
+            projectedNullBitmap.add(i);
+          }
+        }
+        _nullBitmap = projectedNullBitmap;
+      } else {
+        _nullBitmap = null;
+      }
+      _nullBitmapSet = true;
+    }
+    return _nullBitmap;
   }
 
   @Override

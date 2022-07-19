@@ -52,7 +52,7 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
   // Special IntermediateResultsBlock to indicate that this is the last results block for an operator
   private static final IntermediateResultsBlock LAST_RESULTS_BLOCK =
       new IntermediateResultsBlock(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]),
-          Collections.emptyList());
+          Collections.emptyList(), false);
 
   private final StreamObserver<Server.ServerResponse> _streamObserver;
   private final int _limit;
@@ -126,7 +126,8 @@ public class StreamingSelectionOnlyCombineOperator extends BaseCombineOperator {
       Collection<Object[]> rows = resultsBlock.getSelectionResult();
       assert dataSchema != null && rows != null;
       numRowsCollected += rows.size();
-      DataTable dataTable = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema);
+      DataTable dataTable = SelectionOperatorUtils.getDataTableFromRows(
+          rows, dataSchema, _queryContext.isNullHandlingEnabled());
       _streamObserver.onNext(StreamingResponseUtils.getDataResponse(dataTable));
     }
     // Return an empty results block for the metadata

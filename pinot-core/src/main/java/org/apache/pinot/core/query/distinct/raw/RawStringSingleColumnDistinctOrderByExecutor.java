@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -35,13 +36,18 @@ public class RawStringSingleColumnDistinctOrderByExecutor extends BaseRawStringS
   private final PriorityQueue<String> _priorityQueue;
 
   public RawStringSingleColumnDistinctOrderByExecutor(ExpressionContext expression, DataType dataType,
-      OrderByExpressionContext orderByExpression, int limit) {
-    super(expression, dataType, limit);
+      OrderByExpressionContext orderByExpression, int limit, boolean nullHandlingEnabled) {
+    super(expression, dataType, limit, nullHandlingEnabled);
 
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;
-    _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
-        (s1, s2) -> s1.compareTo(s2) * comparisonFactor);
+    if (nullHandlingEnabled) {
+      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
+          (s1, s2) -> s1 == null ? (s2 == null ? 0 : 1) : (s2 == null ? -1 : s1.compareTo(s2)) * comparisonFactor);
+    } else {
+      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
+          (s1, s2) -> s1.compareTo(s2) * comparisonFactor);
+    }
   }
 
   @Override
@@ -50,8 +56,15 @@ public class RawStringSingleColumnDistinctOrderByExecutor extends BaseRawStringS
     int numDocs = transformBlock.getNumDocs();
     if (blockValueSet.isSingleValue()) {
       String[] values = blockValueSet.getStringValuesSV();
-      for (int i = 0; i < numDocs; i++) {
-        add(values[i]);
+      if (_nullHandlingEnabled) {
+        RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
+        for (int i = 0; i < numDocs; i++) {
+          add(nullBitmap != null && nullBitmap.contains(i) ? null : values[i]);
+        }
+      } else {
+        for (int i = 0; i < numDocs; i++) {
+          add(values[i]);
+        }
       }
     } else {
       String[][] values = blockValueSet.getStringValuesMV();

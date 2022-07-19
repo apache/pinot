@@ -46,6 +46,8 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.NullValueUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -54,6 +56,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 @SuppressWarnings("rawtypes")
 public class IntermediateResultsBlock implements Block {
   private DataSchema _dataSchema;
+  private boolean _nullHandlingEnabled;
   private Collection<Object[]> _selectionResult;
   private AggregationFunction[] _aggregationFunctions;
   private List<Object> _aggregationResult;
@@ -80,9 +83,11 @@ public class IntermediateResultsBlock implements Block {
   /**
    * Constructor for selection result.
    */
-  public IntermediateResultsBlock(DataSchema dataSchema, Collection<Object[]> selectionResult) {
+  public IntermediateResultsBlock(DataSchema dataSchema, Collection<Object[]> selectionResult,
+      boolean nullHandlingEnabled) {
     _dataSchema = dataSchema;
     _selectionResult = selectionResult;
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   /**
@@ -116,9 +121,10 @@ public class IntermediateResultsBlock implements Block {
     _intermediateRecords = intermediateRecords;
   }
 
-  public IntermediateResultsBlock(Table table) {
+  public IntermediateResultsBlock(Table table, boolean nullHandlingEnabled) {
     _table = table;
     _dataSchema = table.getDataSchema();
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   /**
@@ -127,6 +133,7 @@ public class IntermediateResultsBlock implements Block {
   public IntermediateResultsBlock(ProcessingException processingException, Exception e) {
     _processingExceptions = new ArrayList<>();
     _processingExceptions.add(QueryException.getException(processingException, e));
+    _nullHandlingEnabled = false;
   }
 
   /**
@@ -311,16 +318,47 @@ public class IntermediateResultsBlock implements Block {
       throws IOException {
     DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(_dataSchema);
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
+    int numColumns = _dataSchema.size();
     Iterator<Record> iterator = _table.iterator();
-    while (iterator.hasNext()) {
-      Record record = iterator.next();
-      dataTableBuilder.startRow();
-      int columnIndex = 0;
-      for (Object value : record.getValues()) {
-        setDataTableColumn(storedColumnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
-        columnIndex++;
+    if (_nullHandlingEnabled) {
+      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
+      Object[] colDefaultNullValues = new Object[numColumns];
+      for (int colId = 0; colId < numColumns; colId++) {
+        if (storedColumnDataTypes[colId] != ColumnDataType.OBJECT) {
+          colDefaultNullValues[colId] =
+              NullValueUtils.getDefaultNullValue(storedColumnDataTypes[colId].toDataType());
+        }
+        nullBitmaps[colId] = new RoaringBitmap();
       }
-      dataTableBuilder.finishRow();
+      int rowId = 0;
+      while (iterator.hasNext()) {
+        Object[] values = iterator.next().getValues();
+        dataTableBuilder.startRow();
+        for (int columnIndex = 0; columnIndex < values.length; columnIndex++) {
+          Object value = values[columnIndex];
+          if (value == null) {
+            value = colDefaultNullValues[columnIndex];
+            nullBitmaps[columnIndex].add(rowId);
+          }
+          setDataTableColumn(storedColumnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
+        }
+        dataTableBuilder.finishRow();
+        rowId++;
+      }
+      for (int colId = 0; colId < numColumns; colId++) {
+        dataTableBuilder.setNullRowIds(nullBitmaps[colId]);
+      }
+    } else {
+      while (iterator.hasNext()) {
+        Record record = iterator.next();
+        dataTableBuilder.startRow();
+        int columnIndex = 0;
+        for (Object value : record.getValues()) {
+          setDataTableColumn(storedColumnDataTypes[columnIndex], dataTableBuilder, columnIndex, value);
+          columnIndex++;
+        }
+        dataTableBuilder.finishRow();
+      }
     }
     DataTable dataTable = dataTableBuilder.build();
     return attachMetadataToDataTable(dataTable);
@@ -376,7 +414,8 @@ public class IntermediateResultsBlock implements Block {
 
   private DataTable getSelectionResultDataTable()
       throws Exception {
-    return attachMetadataToDataTable(SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _dataSchema));
+    return attachMetadataToDataTable(SelectionOperatorUtils.getDataTableFromRows(
+        _selectionResult, _dataSchema, _nullHandlingEnabled));
   }
 
   private DataTable getAggregationResultDataTable()

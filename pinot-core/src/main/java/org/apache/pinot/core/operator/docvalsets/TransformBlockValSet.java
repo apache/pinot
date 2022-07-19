@@ -19,7 +19,10 @@
 package org.apache.pinot.core.operator.docvalsets;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -30,6 +33,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -40,12 +44,50 @@ import org.apache.pinot.spi.trace.Tracing;
 public class TransformBlockValSet implements BlockValSet {
   private final ProjectionBlock _projectionBlock;
   private final TransformFunction _transformFunction;
+  private final ExpressionContext _expression;
+
+  private boolean _nullBitmapSet;
+  private RoaringBitmap _nullBitmap;
 
   private int[] _numMVEntries;
 
-  public TransformBlockValSet(ProjectionBlock projectionBlock, TransformFunction transformFunction) {
+  public TransformBlockValSet(ProjectionBlock projectionBlock, TransformFunction transformFunction,
+      ExpressionContext expression) {
     _projectionBlock = projectionBlock;
     _transformFunction = transformFunction;
+    _expression = expression;
+  }
+
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap() {
+    if (!_nullBitmapSet) {
+      RoaringBitmap nullBitmap = null;
+      if (_expression.getType() == ExpressionContext.Type.FUNCTION) {
+        Set<String> columns = new HashSet<>();
+        _expression.getFunction().getColumns(columns);
+        for (String column : columns) {
+          BlockValSet blockValSet = _projectionBlock.getBlockValueSet(column);
+          RoaringBitmap columnNullBitmap = blockValSet.getNullBitmap();
+          if (columnNullBitmap != null) {
+            if (nullBitmap == null) {
+              nullBitmap = columnNullBitmap.clone();
+            }
+            nullBitmap.or(columnNullBitmap);
+          }
+        }
+      }
+      _nullBitmap = nullBitmap;
+      _nullBitmapSet = true;
+    }
+
+    // The assumption is that any transformation applied to null values will result in null values.
+    // Examples:
+    //  CAST(null as STRING) -> null. This is similar to Presto behaviour.
+    //  YEAR(null) -> null. This is similar to Presto behaviour.
+    // TODO(nhejazi): revisit this part in the future because some transform functions can take null input and return
+    //  non-null result (e.g. isNull()), and we should move this logic into the specific transform function.
+    return _nullBitmap;
   }
 
   @Override

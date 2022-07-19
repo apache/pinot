@@ -42,6 +42,8 @@ public interface DataTable {
 
   Map<Integer, String> getExceptions();
 
+  int getVersion();
+
   byte[] toBytes()
       throws IOException;
 
@@ -77,6 +79,7 @@ public interface DataTable {
 
   String[] getStringArray(int rowId, int colId);
 
+  @Nullable
   RoaringBitmap getNullRowIds(int colId);
 
   DataTable toMetadataOnlyDataTable();

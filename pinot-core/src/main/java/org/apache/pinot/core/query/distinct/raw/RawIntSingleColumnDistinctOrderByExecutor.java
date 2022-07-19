@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -35,8 +36,8 @@ public class RawIntSingleColumnDistinctOrderByExecutor extends BaseRawIntSingleC
   private final IntPriorityQueue _priorityQueue;
 
   public RawIntSingleColumnDistinctOrderByExecutor(ExpressionContext expression, DataType dataType,
-      OrderByExpressionContext orderByExpression, int limit) {
-    super(expression, dataType, limit);
+      OrderByExpressionContext orderByExpression, int limit, boolean nullHandlingEnabled) {
+    super(expression, dataType, limit, nullHandlingEnabled);
 
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;
@@ -50,8 +51,19 @@ public class RawIntSingleColumnDistinctOrderByExecutor extends BaseRawIntSingleC
     int numDocs = transformBlock.getNumDocs();
     if (blockValueSet.isSingleValue()) {
       int[] values = blockValueSet.getIntValuesSV();
-      for (int i = 0; i < numDocs; i++) {
-        add(values[i]);
+      if (_nullHandlingEnabled) {
+        RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
+        for (int i = 0; i < numDocs; i++) {
+          if (nullBitmap != null && nullBitmap.contains(i)) {
+            _hasNull = true;
+          } else {
+            add(values[i]);
+          }
+        }
+      } else {
+        for (int i = 0; i < numDocs; i++) {
+          add(values[i]);
+        }
       }
     } else {
       int[][] values = blockValueSet.getIntValuesMV();
@@ -66,7 +78,7 @@ public class RawIntSingleColumnDistinctOrderByExecutor extends BaseRawIntSingleC
 
   private void add(int value) {
     if (!_valueSet.contains(value)) {
-      if (_valueSet.size() < _limit) {
+      if (_valueSet.size() < _limit - (_hasNull ? 1 : 0)) {
         _valueSet.add(value);
         _priorityQueue.enqueue(value);
       } else {

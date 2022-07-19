@@ -57,7 +57,7 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
       columnDataTypes[i] = ColumnDataType.fromDataTypeSV(dataTypes.get(i));
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    _distinctTable = new DistinctTable(dataSchema, orderByExpressions, limit);
+    _distinctTable = new DistinctTable(dataSchema, orderByExpressions, limit, false);
   }
 
   @Override
