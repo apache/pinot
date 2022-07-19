@@ -89,34 +89,48 @@ public class KinesisConnectionHandler {
       KinesisClientBuilder kinesisClientBuilder;
 
       AwsCredentialsProvider awsCredentialsProvider;
-      if (_kinesisConfig.isIamRoleBasedAccess()) {
-        AssumeRoleRequest.Builder assumeRoleRequestBuilder =
-            AssumeRoleRequest.builder().roleArn(_kinesisConfig.getRoleArn())
-                .roleSessionName(_kinesisConfig.getRoleSessionName())
-                .durationSeconds(_kinesisConfig.getSessionDurationSeconds());
-
-        AssumeRoleRequest assumeRoleRequest;
-        if (StringUtils.isNotEmpty(_kinesisConfig.getExternalId())) {
-          assumeRoleRequest = assumeRoleRequestBuilder.externalId(_kinesisConfig.getExternalId()).build();
-        } else {
-          assumeRoleRequest = assumeRoleRequestBuilder.build();
-        }
-
-        StsClient stsClient = StsClient.builder().region(Region.of(_region)).build();
-        StsAssumeRoleCredentialsProvider stsAssumeRoleCredentialsProvider =
-            StsAssumeRoleCredentialsProvider.builder().stsClient(stsClient).refreshRequest(assumeRoleRequest)
-                .asyncCredentialUpdateEnabled(_kinesisConfig.isAsyncSessionUpdateEnabled()).build();
-        awsCredentialsProvider = stsAssumeRoleCredentialsProvider;
-      } else if (StringUtils.isNotBlank(_accessKey) && StringUtils.isNotBlank(_secretKey)) {
+      if (StringUtils.isNotBlank(_accessKey) && StringUtils.isNotBlank(_secretKey)) {
         AwsBasicCredentials awsBasicCredentials = AwsBasicCredentials.create(_accessKey, _secretKey);
         awsCredentialsProvider = StaticCredentialsProvider.create(awsBasicCredentials);
       } else {
         awsCredentialsProvider = DefaultCredentialsProvider.create();
       }
 
-      kinesisClientBuilder = KinesisClient.builder().region(Region.of(_region))
-          .credentialsProvider(awsCredentialsProvider)
-          .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
+      if (_kinesisConfig.isIamRoleBasedAccess()) {
+        AssumeRoleRequest.Builder assumeRoleRequestBuilder =
+            AssumeRoleRequest.builder()
+                .roleArn(_kinesisConfig.getRoleArn())
+                .roleSessionName(_kinesisConfig.getRoleSessionName())
+                .durationSeconds(_kinesisConfig.getSessionDurationSeconds());
+
+        AssumeRoleRequest assumeRoleRequest;
+        if (StringUtils.isNotEmpty(_kinesisConfig.getExternalId())) {
+          assumeRoleRequest = assumeRoleRequestBuilder
+              .externalId(_kinesisConfig.getExternalId())
+              .build();
+        } else {
+          assumeRoleRequest = assumeRoleRequestBuilder.build();
+        }
+
+        StsClient stsClient =
+            StsClient.builder()
+                .region(Region.of(_region))
+                .credentialsProvider(awsCredentialsProvider)
+                .build();
+
+        awsCredentialsProvider =
+            StsAssumeRoleCredentialsProvider.builder()
+                .stsClient(stsClient)
+                .refreshRequest(assumeRoleRequest)
+                .asyncCredentialUpdateEnabled(_kinesisConfig.isAsyncSessionUpdateEnabled())
+                .build();
+      }
+
+      kinesisClientBuilder =
+          KinesisClient.builder()
+              .region(Region.of(_region))
+              .credentialsProvider(awsCredentialsProvider)
+              .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
 
       if (StringUtils.isNotBlank(_endpoint)) {
         try {
