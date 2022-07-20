@@ -35,7 +35,6 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.slf4j.Logger;
@@ -62,7 +61,7 @@ public class PinotControllerPeriodicTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/run")
   @ApiOperation(value = "Run periodic task against table. If table name is missing, task will run against all tables.")
-  public String runPeriodicTask(
+  public Response runPeriodicTask(
       @ApiParam(value = "Periodic task name", required = true) @QueryParam("taskname") String periodicTaskName,
       @ApiParam(value = "Name of the table") @QueryParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE | REALTIME") @QueryParam("type") String tableType) {
@@ -87,11 +86,9 @@ public class PinotControllerPeriodicTaskRestletResource {
       tableName = matchingTableNamesWithType.get(0);
     }
 
-    Pair<String, Integer> taskExecutionDetails = _pinotHelixResourceManager
-        .invokeControllerPeriodicTask(tableName, periodicTaskName, null);
-
-    return "{\"Log Request Id\": \"" + taskExecutionDetails.getLeft()
-        + "\",\"Controllers notified\":" + (taskExecutionDetails.getRight() > 0) + "}";
+    return Response.ok()
+        .entity(_pinotHelixResourceManager.invokeControllerPeriodicTask(tableName, periodicTaskName, null))
+        .build();
   }
 
   @GET

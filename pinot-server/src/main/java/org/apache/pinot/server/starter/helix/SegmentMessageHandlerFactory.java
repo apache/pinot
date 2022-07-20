@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import java.util.Set;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
 import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.messages.ForceCommitMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
@@ -61,6 +63,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         return new SegmentReloadMessageHandler(new SegmentReloadMessage(message), _metrics, context);
       case TableDeletionMessage.DELETE_TABLE_MSG_SUB_TYPE:
         return new TableDeletionMessageHandler(new TableDeletionMessage(message), _metrics, context);
+      case ForceCommitMessage.FORCE_COMMIT_MSG_SUB_TYPE:
+        return new ForceCommitMessageHandler(new ForceCommitMessage(message), _metrics, context);
       default:
         LOGGER.warn("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
             message.getPartitionName());
@@ -160,6 +164,34 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       _logger.info("Handling table deletion message");
       try {
         _instanceDataManager.deleteTable(_tableNameWithType);
+        helixTaskResult.setSuccess(true);
+      } catch (Exception e) {
+        _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETE_TABLE_FAILURES, 1);
+        Utils.rethrowException(e);
+      }
+      return helixTaskResult;
+    }
+  }
+
+  private class ForceCommitMessageHandler extends DefaultMessageHandler {
+
+    private String _tableName;
+    private Set<String> _segmentNames;
+
+    public ForceCommitMessageHandler(ForceCommitMessage forceCommitMessage, ServerMetrics metrics,
+        NotificationContext ctx) {
+      super(forceCommitMessage, metrics, ctx);
+      _tableName = forceCommitMessage.getTableName();
+      _segmentNames = forceCommitMessage.getSegmentNames();
+    }
+
+    @Override
+    public HelixTaskResult handleMessage()
+        throws InterruptedException {
+      HelixTaskResult helixTaskResult = new HelixTaskResult();
+      _logger.info("Handling force commit message for table {} segments {}", _tableName, _segmentNames);
+      try {
+        _instanceDataManager.forceCommit(_tableName, _segmentNames);
         helixTaskResult.setSuccess(true);
       } catch (Exception e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETE_TABLE_FAILURES, 1);

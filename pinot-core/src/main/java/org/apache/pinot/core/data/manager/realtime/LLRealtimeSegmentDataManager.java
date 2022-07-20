@@ -244,6 +244,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
   private volatile boolean _endOfPartitionGroup = false;
+  private volatile boolean _forceCommitMessageReceived = false;
   private StreamPartitionMsgOffset _finalOffset; // Used when we want to catch up to this one
   private volatile boolean _shouldStop = false;
 
@@ -295,8 +296,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     switch (_state) {
       case INITIAL_CONSUMING:
         // The segment has been created, and we have not posted a segmentConsumed() message on the controller yet.
-        // We need to consume as much data as available, until we have either reached the max number of rows or
-        // the max time we are allowed to consume.
+        // We need to consume as much data as available, until we have encountered one of the following scenarios:
+        //   - the max number of rows has been reached
+        //   - the max time we are allowed to consume has passed;
+        //   - partition group is ended
+        //   - force commit message has been received
         if (now >= _consumeEndTime) {
           if (_realtimeSegment.getNumDocsIndexed() == 0) {
             _segmentLogger.info("No events came in, extending time by {} hours", TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
@@ -317,6 +321,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           _segmentLogger.info("Stopping consumption due to end of partitionGroup reached nRows={} numRowsIndexed={}, "
               + "numRowsConsumed={}", _segmentMaxRowCount, _numRowsIndexed, _numRowsConsumed);
           _stopReason = SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP;
+          return true;
+        } else if (_forceCommitMessageReceived) {
+          _segmentLogger.info("Stopping consumption due to force commit - numRowsConsumed={} numRowsIndexed={}",
+              _numRowsConsumed, _numRowsIndexed);
+          _stopReason = SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED;
           return true;
         }
         return false;
@@ -1534,5 +1543,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   @Override
   public String getSegmentName() {
     return _segmentNameStr;
+  }
+
+  public void forceCommit() {
+    _forceCommitMessageReceived = true;
   }
 }
