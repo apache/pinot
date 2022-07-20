@@ -39,6 +39,18 @@ public class KinesisConfig {
   public static final String ENDPOINT = "endpoint";
 
   // IAM role configs
+  /**
+   * Enable Role based access to AWS.
+   * iamRoleBasedAccessEnabled - Set it to `true` to enable role based access, default: false
+   * roleArn - Required. specify the ARN of the role the client should assume.
+   * roleSessionName - session name to be used when creating a role based session. default: pinot-kineis-uuid
+   * externalId - string external id value required by role's policy. default: null
+   * sessionDurationSeconds - The duration, in seconds, of the role session. Default: 900
+   * asyncSessionUpdateEnabled -
+   *        Configure whether the provider should fetch credentials asynchronously in the background.
+   *       If this is true, threads are less likely to block when credentials are loaded,
+   *       but additional resources are used to maintain the provider. Default - `true`
+   */
   public static final String IAM_ROLE_BASED_ACCESS_ENABLED = "iamRoleBasedAccessEnabled";
   public static final String ROLE_ARN = "roleArn";
   public static final String ROLE_SESSION_NAME = "roleSessionName";
