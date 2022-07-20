@@ -30,6 +30,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -59,6 +60,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  */
 @SuppressWarnings("rawtypes")
 public class SelectionOperatorService {
+  private final QueryContext _queryContext;
   private final List<String> _selectionColumns;
   private final DataSchema _dataSchema;
   private final int _offset;
@@ -72,6 +74,7 @@ public class SelectionOperatorService {
    * @param dataSchema data schema.
    */
   public SelectionOperatorService(QueryContext queryContext, DataSchema dataSchema) {
+    _queryContext = queryContext;
     _selectionColumns = SelectionOperatorUtils.getSelectionColumns(queryContext, dataSchema);
     _dataSchema = dataSchema;
     // Select rows from offset to offset + limit.
@@ -114,24 +117,51 @@ public class SelectionOperatorService {
       multipliers[i] = orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
     }
 
-    return (o1, o2) -> {
-      for (int i = 0; i < numValuesToCompare; i++) {
-        int index = valueIndices[i];
-        Object v1 = o1[index];
-        Object v2 = o2[index];
-        int result;
-        if (useDoubleComparison[i]) {
-          result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
-        } else {
-          //noinspection unchecked
-          result = ((Comparable) v1).compareTo(v2);
+    if (_queryContext.isNullHandlingEnabled()) {
+      return (o1, o2) -> {
+        for (int i = 0; i < numValuesToCompare; i++) {
+          int index = valueIndices[i];
+          Object v1 = o1[index];
+          Object v2 = o2[index];
+          if (v1 == null) {
+            // The default null ordering is: 'NULLS LAST'.
+            return v2 == null ? 0 : -multipliers[i];
+          } else if (v2 == null) {
+            return multipliers[i];
+          }
+          int result;
+          if (useDoubleComparison[i]) {
+            result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
+          } else {
+            //noinspection unchecked
+            result = ((Comparable) v1).compareTo(v2);
+          }
+          if (result != 0) {
+            return result * multipliers[i];
+          }
         }
-        if (result != 0) {
-          return result * multipliers[i];
+        return 0;
+      };
+    } else {
+      return (o1, o2) -> {
+        for (int i = 0; i < numValuesToCompare; i++) {
+          int index = valueIndices[i];
+          Object v1 = o1[index];
+          Object v2 = o2[index];
+          int result;
+          if (useDoubleComparison[i]) {
+            result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
+          } else {
+            //noinspection unchecked
+            result = ((Comparable) v1).compareTo(v2);
+          }
+          if (result != 0) {
+            return result * multipliers[i];
+          }
         }
-      }
-      return 0;
-    };
+        return 0;
+      };
+    }
   }
 
   /**
@@ -147,12 +177,28 @@ public class SelectionOperatorService {
    * Reduces a collection of {@link DataTable}s to selection rows for selection queries with <code>ORDER BY</code>.
    * (Broker side)
    */
-  public void reduceWithOrdering(Collection<DataTable> dataTables) {
+  public void reduceWithOrdering(Collection<DataTable> dataTables, boolean nullHandlingEnabled) {
     for (DataTable dataTable : dataTables) {
       int numRows = dataTable.getNumberOfRows();
-      for (int rowId = 0; rowId < numRows; rowId++) {
-        Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-        SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+      if (nullHandlingEnabled) {
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[dataTable.getDataSchema().size()];
+        for (int colId = 0; colId < nullBitmaps.length; colId++) {
+          nullBitmaps[colId] = dataTable.getNullRowIds(colId);
+        }
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+          for (int colId = 0; colId < nullBitmaps.length; colId++) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+              row[colId] = null;
+            }
+          }
+          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+        }
+      } else {
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+        }
       }
     }
   }
@@ -186,7 +232,10 @@ public class SelectionOperatorService {
       assert row != null;
       Object[] extractedRow = new Object[numColumns];
       for (int i = 0; i < numColumns; i++) {
-        extractedRow[i] = resultColumnDataTypes[i].convertAndFormat(row[columnIndices[i]]);
+        Object value = row[columnIndices[i]];
+        if (value != null) {
+          extractedRow[i] = resultColumnDataTypes[i].convertAndFormat(value);
+        }
       }
       rowsInSelectionResults.addFirst(extractedRow);
     }

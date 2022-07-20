@@ -998,17 +998,36 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
-      String column = entry.getKey();
-      IndexContainer indexContainer = entry.getValue();
-      Object value = getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
-          indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
-      if (_nullHandlingEnabled && indexContainer._nullValueVector.isNull(docId)) {
-        reuse.putDefaultNullValue(column, value);
-      } else {
-        reuse.putValue(column, value);
+      try {
+        String column = entry.getKey();
+        IndexContainer indexContainer = entry.getValue();
+        Object value = getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
+            indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
+        if (_nullHandlingEnabled && indexContainer._nullValueVector.isNull(docId)) {
+          reuse.putDefaultNullValue(column, value);
+        } else {
+          reuse.putValue(column, value);
+        }
+      } catch (Exception e) {
+        _logger.error("error encountered when getting record for {} on indexContainer: {}", docId, entry.getKey());
+        throw new RuntimeException("error encountered when getting record for " + docId + " on indexContainer: "
+            + entry.getKey(), e);
       }
     }
     return reuse;
+  }
+
+  @Override
+  public void getPrimaryKey(int docId, PrimaryKey reuse) {
+    int numPrimaryKeyColumns = _partitionUpsertMetadataManager.getPrimaryKeyColumns().size();
+    Object[] values = reuse.getValues();
+    for (int i = 0; i < numPrimaryKeyColumns; i++) {
+      IndexContainer indexContainer = _indexContainerMap.get(
+          _partitionUpsertMetadataManager.getPrimaryKeyColumns().get(i));
+      Object value = getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
+          indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
+      values[i] = value;
+    }
   }
 
   /**
@@ -1033,7 +1052,7 @@ public class MutableSegmentImpl implements MutableSegment {
     } else {
       // Raw index based
       if (forwardIndex.isSingleValue()) {
-        switch (forwardIndex.getValueType()) {
+        switch (forwardIndex.getStoredType()) {
           case INT:
             return forwardIndex.getInt(docId);
           case LONG:
@@ -1055,7 +1074,7 @@ public class MutableSegmentImpl implements MutableSegment {
         // TODO: support multi-valued column for variable length column types (big decimal, string, bytes)
         int numValues;
         Object[] value;
-        switch (forwardIndex.getValueType()) {
+        switch (forwardIndex.getStoredType()) {
           case INT:
             int[] intValues = forwardIndex.getIntMV(docId);
             numValues = intValues.length;
@@ -1090,7 +1109,7 @@ public class MutableSegmentImpl implements MutableSegment {
             return value;
           default:
             throw new IllegalStateException("No support for MV no dictionary column of type "
-                + forwardIndex.getValueType());
+                + forwardIndex.getStoredType());
         }
       }
     }
@@ -1099,6 +1118,15 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public void destroy() {
     _logger.info("Trying to close RealtimeSegmentImpl : {}", _segmentName);
+
+    // Remove the upsert and dedup metadata before closing the readers
+    if (_partitionUpsertMetadataManager != null) {
+      _partitionUpsertMetadataManager.removeSegment(this);
+    }
+
+    if (_partitionDedupMetadataManager != null) {
+      _partitionDedupMetadataManager.removeSegment(this);
+    }
 
     // Gather statistics for off-heap mode
     if (_offHeap) {

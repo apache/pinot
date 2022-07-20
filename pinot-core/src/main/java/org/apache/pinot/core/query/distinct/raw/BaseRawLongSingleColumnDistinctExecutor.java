@@ -39,13 +39,17 @@ abstract class BaseRawLongSingleColumnDistinctExecutor implements DistinctExecut
   final ExpressionContext _expression;
   final DataType _dataType;
   final int _limit;
+  final boolean _nullHandlingEnabled;
 
   final LongSet _valueSet;
+  protected boolean _hasNull;
 
-  BaseRawLongSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit) {
+  BaseRawLongSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit,
+      boolean nullHandlingEnabled) {
     _expression = expression;
     _dataType = dataType;
     _limit = limit;
+    _nullHandlingEnabled = nullHandlingEnabled;
 
     _valueSet = new LongOpenHashSet(Math.min(limit, MAX_INITIAL_CAPACITY));
   }
@@ -59,6 +63,10 @@ abstract class BaseRawLongSingleColumnDistinctExecutor implements DistinctExecut
     while (valueIterator.hasNext()) {
       records.add(new Record(new Object[]{valueIterator.nextLong()}));
     }
-    return new DistinctTable(dataSchema, records);
+    if (_hasNull) {
+      records.add(new Record(new Object[]{null}));
+    }
+    assert records.size() <= _limit;
+    return new DistinctTable(dataSchema, records, _nullHandlingEnabled);
   }
 }

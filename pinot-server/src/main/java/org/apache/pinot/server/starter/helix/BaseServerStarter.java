@@ -183,8 +183,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     int dataTableVersion =
         _serverConf.getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, Server.DEFAULT_CURRENT_DATA_TABLE_VERSION);
     if (dataTableVersion > Server.DEFAULT_CURRENT_DATA_TABLE_VERSION) {
-      throw new UnsupportedOperationException("Setting experimental DataTable version newer than default via config "
-          + "is not allowed. Current default DataTable version: " + Server.DEFAULT_CURRENT_DATA_TABLE_VERSION);
+      LOGGER.warn("Setting experimental DataTable version newer than default via config could result in"
+          + " backward-compatibility issues. Current default DataTable version: "
+          + Server.DEFAULT_CURRENT_DATA_TABLE_VERSION);
     }
     DataTableFactory.setDataTableVersion(dataTableVersion);
 

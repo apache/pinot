@@ -63,7 +63,7 @@ public class MutableSegmentImplUpsertComparisonColTest {
     File jsonFile = new File(dataResourceUrl.getFile());
     _partitionUpsertMetadataManager =
         new TableUpsertMetadataManager("testTable_REALTIME", Mockito.mock(ServerMetrics.class), null,
-            HashFunction.NONE).getOrCreatePartitionManager(0);
+            HashFunction.NONE, _schema.getPrimaryKeyColumns()).getOrCreatePartitionManager(0);
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
             false, true, new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "offset", null), "secondsSinceEpoch",

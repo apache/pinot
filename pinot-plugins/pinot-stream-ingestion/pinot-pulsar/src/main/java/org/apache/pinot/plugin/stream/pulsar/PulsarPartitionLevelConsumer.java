@@ -46,11 +46,13 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarPartitionLevelConsumer.class);
   private final ExecutorService _executorService;
+  private boolean _enableKeyValueStitch = false;
 
   public PulsarPartitionLevelConsumer(String clientId, StreamConfig streamConfig,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
     super(clientId, streamConfig, partitionGroupConsumptionStatus.getPartitionGroupId());
     _executorService = Executors.newSingleThreadExecutor();
+    _enableKeyValueStitch = _config.getEnableKeyValueStitch();
   }
 
   /**
@@ -76,10 +78,12 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
       // The fetchMessages has thrown an exception. Most common cause is the timeout.
       // We return the records fetched till now along with the next start offset.
       pulsarResultFuture.cancel(true);
-      return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId));
+      return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId),
+          _enableKeyValueStitch);
     } catch (Exception e) {
       LOGGER.warn("Error while fetching records from Pulsar", e);
-      return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId));
+      return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId),
+          _enableKeyValueStitch);
     }
   }
 
@@ -103,10 +107,12 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
         }
       }
 
-      return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId));
+      return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId),
+          _enableKeyValueStitch);
     } catch (PulsarClientException e) {
       LOGGER.warn("Error consuming records from Pulsar topic", e);
-      return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId));
+      return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId),
+          _enableKeyValueStitch);
     }
   }
 

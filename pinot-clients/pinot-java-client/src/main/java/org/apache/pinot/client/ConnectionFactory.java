@@ -173,9 +173,13 @@ public class ConnectionFactory {
 
   private static PinotClientTransport getDefault(Properties connectionProperties) {
     if (_defaultTransport == null) {
-      _defaultTransport = new JsonAsyncHttpPinotClientTransportFactory()
+      synchronized (ConnectionFactory.class) {
+        if (_defaultTransport == null) {
+          _defaultTransport = new JsonAsyncHttpPinotClientTransportFactory()
               .withConnectionProperties(connectionProperties)
               .buildTransport();
+        }
+      }
     }
     return _defaultTransport;
   }

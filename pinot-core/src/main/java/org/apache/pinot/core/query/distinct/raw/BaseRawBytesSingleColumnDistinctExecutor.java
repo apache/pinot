@@ -39,13 +39,16 @@ abstract class BaseRawBytesSingleColumnDistinctExecutor implements DistinctExecu
   final ExpressionContext _expression;
   final DataType _dataType;
   final int _limit;
+  final boolean _nullHandlingEnabled;
 
   final ObjectSet<ByteArray> _valueSet;
 
-  BaseRawBytesSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit) {
+  BaseRawBytesSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit,
+      boolean nullHandlingEnabled) {
     _expression = expression;
     _dataType = dataType;
     _limit = limit;
+    _nullHandlingEnabled = nullHandlingEnabled;
 
     _valueSet = new ObjectOpenHashSet<>(Math.min(limit, MAX_INITIAL_CAPACITY));
   }
@@ -58,6 +61,6 @@ abstract class BaseRawBytesSingleColumnDistinctExecutor implements DistinctExecu
     for (ByteArray value : _valueSet) {
       records.add(new Record(new Object[]{value}));
     }
-    return new DistinctTable(dataSchema, records);
+    return new DistinctTable(dataSchema, records, _nullHandlingEnabled);
   }
 }

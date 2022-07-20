@@ -42,4 +42,16 @@ public interface TableConfigTuner {
    */
   TableConfig apply(@Nullable PinotHelixResourceManager pinotHelixResourceManager,
       TableConfig tableConfig, Schema schema, Map<String, String> extraProperties);
+
+  /**
+   * Apply tuner to a {@link TableConfig}.
+   *
+   * @param pinotHelixResourceManager Pinot Helix Resource Manager to access Helix resources
+   * @param tableConfig tableConfig that needs to be tuned.
+   * @param schema Table schema
+   * @param extraProperties extraProperties for the tuner implementation.
+   * @param httpHeaders Http headers required for any remote calls
+   */
+  TableConfig apply(@Nullable PinotHelixResourceManager pinotHelixResourceManager,
+      TableConfig tableConfig, Schema schema, Map<String, String> extraProperties, Map<String, String> httpHeaders);
 }

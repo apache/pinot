@@ -64,7 +64,7 @@ public class EmptySelectionOperator extends BaseOperator<IntermediateResultsBloc
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    return new IntermediateResultsBlock(_dataSchema, Collections.emptyList());
+    return new IntermediateResultsBlock(_dataSchema, Collections.emptyList(), false);
   }
 
 

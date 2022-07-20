@@ -154,7 +154,7 @@ public class PinotClientRequest {
     } catch (Exception e) {
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
     }
-    PinotSqlType sqlType = CalciteSqlParser.extractSqlType(sqlNodeAndOptions.getSqlNode());
+    PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     if (onlyDql && sqlType != PinotSqlType.DQL) {
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR,
           new UnsupportedOperationException("Unsupported SQL type - " + sqlType + ", GET API only supports DQL.")));

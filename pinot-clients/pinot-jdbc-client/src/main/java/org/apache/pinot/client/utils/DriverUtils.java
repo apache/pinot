@@ -70,6 +70,7 @@ public class DriverUtils {
 
   public static void handleAuth(Properties info, Map<String, String> headers)
       throws SQLException {
+
     if (info.contains(USER_PROPERTY) && !headers.containsKey(AUTH_HEADER)) {
       String username = info.getProperty(USER_PROPERTY);
       String password = info.getProperty(PASSWORD_PROPERTY, "");

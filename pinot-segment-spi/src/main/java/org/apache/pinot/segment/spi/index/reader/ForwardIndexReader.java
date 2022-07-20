@@ -47,7 +47,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * Returns the data type of the values in the forward index. Returns {@link DataType#INT} for dictionary-encoded
    * forward index.
    */
-  DataType getValueType();
+  DataType getStoredType();
 
   /**
    * Creates a new {@link ForwardIndexReaderContext} of the reader which can be used to accelerate the reads.
@@ -123,7 +123,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @param context Reader context
    */
   default void readValuesSV(int[] docIds, int length, int[] values, T context) {
-    switch (getValueType()) {
+    switch (getStoredType()) {
       case INT:
         for (int i = 0; i < length; i++) {
           values[i] = getInt(docIds[i], context);
@@ -167,7 +167,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @param context Reader context
    */
   default void readValuesSV(int[] docIds, int length, long[] values, T context) {
-    switch (getValueType()) {
+    switch (getStoredType()) {
       case INT:
         for (int i = 0; i < length; i++) {
           values[i] = getInt(docIds[i], context);
@@ -211,7 +211,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @param context Reader context
    */
   default void readValuesSV(int[] docIds, int length, float[] values, T context) {
-    switch (getValueType()) {
+    switch (getStoredType()) {
       case INT:
         for (int i = 0; i < length; i++) {
           values[i] = getInt(docIds[i], context);
@@ -255,7 +255,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @param context Reader context
    */
   default void readValuesSV(int[] docIds, int length, double[] values, T context) {
-    switch (getValueType()) {
+    switch (getStoredType()) {
       case INT:
         for (int i = 0; i < length; i++) {
           values[i] = getInt(docIds[i], context);
@@ -301,7 +301,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   default void readValuesSV(int[] docIds, int length, BigDecimal[] values, T context) {
     // todo(nhejazi): add raw index support to the BIG_DECIMAL type. In most of the cases, it will be more efficient
     //  to store big decimal as raw.
-    switch (getValueType()) {
+    switch (getStoredType()) {
       case INT:
         for (int i = 0; i < length; i++) {
           values[i] = BigDecimal.valueOf(getInt(docIds[i], context));
@@ -432,7 +432,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @param context Reader context
    */
   default void readValuesMV(int[] docIds, int length, int maxNumValuesPerMVEntry, int[][] values, T context) {
-    switch (getValueType()) {
+    switch (getStoredType()) {
       case INT:
         for (int i = 0; i < length; i++) {
           values[i] = getIntMV(docIds[i], context);
@@ -479,7 +479,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
         }
         break;
       default:
-        throw new IllegalArgumentException("readValuesMV not supported for type " + getValueType());
+        throw new IllegalArgumentException("readValuesMV not supported for type " + getStoredType());
     }
   }
 
@@ -492,7 +492,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @param context Reader context
    */
   default void readValuesMV(int[] docIds, int length, int maxNumValuesPerMVEntry, long[][] values, T context) {
-    switch (getValueType()) {
+    switch (getStoredType()) {
       case INT:
         int[] intValueBuffer = new int[maxNumValuesPerMVEntry];
         for (int i = 0; i < length; i++) {
@@ -539,7 +539,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
         }
         break;
       default:
-        throw new IllegalArgumentException("readValuesMV not supported for type " + getValueType());
+        throw new IllegalArgumentException("readValuesMV not supported for type " + getStoredType());
     }
   }
 
@@ -552,7 +552,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @param context Reader context
    */
   default void readValuesMV(int[] docIds, int length, int maxNumValuesPerMVEntry, float[][] values, T context) {
-    switch (getValueType()) {
+    switch (getStoredType()) {
       case INT:
         int[] intValueBuffer = new int[maxNumValuesPerMVEntry];
         for (int i = 0; i < length; i++) {
@@ -599,7 +599,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
         }
         break;
       default:
-        throw new IllegalArgumentException("readValuesMV not supported for type " + getValueType());
+        throw new IllegalArgumentException("readValuesMV not supported for type " + getStoredType());
     }
   }
 
@@ -612,7 +612,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @param context Reader context
    */
   default void readValuesMV(int[] docIds, int length, int maxNumValuesPerMVEntry, double[][] values, T context) {
-    switch (getValueType()) {
+    switch (getStoredType()) {
       case INT:
         int[] intValueBuffer = new int[maxNumValuesPerMVEntry];
         for (int i = 0; i < length; i++) {
@@ -659,7 +659,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
         }
         break;
       default:
-        throw new IllegalArgumentException("readValuesMV not supported for type " + getValueType());
+        throw new IllegalArgumentException("readValuesMV not supported for type " + getStoredType());
     }
   }
 
@@ -672,7 +672,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @param context Reader context
    */
   default void readValuesMV(int[] docIds, int length, int maxNumValuesPerMVEntry, String[][] values, T context) {
-    switch (getValueType()) {
+    switch (getStoredType()) {
       case INT:
         int[] intValueBuffer = new int[maxNumValuesPerMVEntry];
         for (int i = 0; i < length; i++) {
@@ -719,7 +719,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
         }
         break;
       default:
-        throw new IllegalArgumentException("readValuesMV not supported for type " + getValueType());
+        throw new IllegalArgumentException("readValuesMV not supported for type " + getStoredType());
     }
   }
 

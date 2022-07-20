@@ -33,14 +33,14 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * Single-value forward index reader-writer for variable length values (STRING and BYTES).
  */
 public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
-  private final DataType _valueType;
+  private final DataType _storedType;
   private final MutableOffHeapByteArrayStore _byteArrayStore;
   private int _lengthOfShortestElement;
   private int _lengthOfLongestElement;
 
-  public VarByteSVMutableForwardIndex(DataType valueType, PinotDataBufferMemoryManager memoryManager,
+  public VarByteSVMutableForwardIndex(DataType storedType, PinotDataBufferMemoryManager memoryManager,
       String allocationContext, int estimatedMaxNumberOfValues, int estimatedAverageStringLength) {
-    _valueType = valueType;
+    _storedType = storedType;
     _byteArrayStore = new MutableOffHeapByteArrayStore(memoryManager, allocationContext, estimatedMaxNumberOfValues,
         estimatedAverageStringLength);
     _lengthOfShortestElement = Integer.MAX_VALUE;
@@ -58,8 +58,8 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
-  public DataType getValueType() {
-    return _valueType;
+  public DataType getStoredType() {
+    return _storedType;
   }
 
   @Override

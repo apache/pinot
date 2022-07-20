@@ -31,6 +31,7 @@ import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunct
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctExecutorFactory;
 import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
@@ -44,15 +45,18 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
   private final DistinctAggregationFunction _distinctAggregationFunction;
   private final TransformOperator _transformOperator;
   private final DistinctExecutor _distinctExecutor;
+  private final QueryContext _queryContext;
 
   private int _numDocsScanned = 0;
 
   public DistinctOperator(IndexSegment indexSegment, DistinctAggregationFunction distinctAggregationFunction,
-      TransformOperator transformOperator) {
+      TransformOperator transformOperator, QueryContext queryContext) {
     _indexSegment = indexSegment;
     _distinctAggregationFunction = distinctAggregationFunction;
     _transformOperator = transformOperator;
-    _distinctExecutor = DistinctExecutorFactory.getDistinctExecutor(distinctAggregationFunction, transformOperator);
+    _queryContext = queryContext;
+    _distinctExecutor = DistinctExecutorFactory.getDistinctExecutor(
+        distinctAggregationFunction, transformOperator, _queryContext.isNullHandlingEnabled());
   }
 
   @Override

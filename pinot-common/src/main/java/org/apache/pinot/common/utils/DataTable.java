@@ -42,6 +42,8 @@ public interface DataTable {
 
   Map<Integer, String> getExceptions();
 
+  int getVersion();
+
   byte[] toBytes()
       throws IOException;
 
@@ -77,6 +79,7 @@ public interface DataTable {
 
   String[] getStringArray(int rowId, int colId);
 
+  @Nullable
   RoaringBitmap getNullRowIds(int colId);
 
   DataTable toMetadataOnlyDataTable();
@@ -103,7 +106,7 @@ public interface DataTable {
     NUM_SEGMENTS_QUERIED("numSegmentsQueried", MetadataValueType.INT),
     NUM_SEGMENTS_PROCESSED("numSegmentsProcessed", MetadataValueType.INT),
     NUM_SEGMENTS_MATCHED("numSegmentsMatched", MetadataValueType.INT),
-    NUM_CONSUMING_SEGMENTS_PROCESSED("numConsumingSegmentsProcessed", MetadataValueType.INT),
+    NUM_CONSUMING_SEGMENTS_QUERIED("numConsumingSegmentsQueried", MetadataValueType.INT),
     MIN_CONSUMING_FRESHNESS_TIME_MS("minConsumingFreshnessTimeMs", MetadataValueType.LONG),
     TOTAL_DOCS("totalDocs", MetadataValueType.LONG),
     NUM_GROUPS_LIMIT_REACHED("numGroupsLimitReached", MetadataValueType.STRING),
@@ -116,6 +119,9 @@ public interface DataTable {
     SYSTEM_ACTIVITIES_CPU_TIME_NS("systemActivitiesCpuTimeNs", MetadataValueType.LONG),
     RESPONSE_SER_CPU_TIME_NS("responseSerializationCpuTimeNs", MetadataValueType.LONG),
     NUM_SEGMENTS_PRUNED_BY_SERVER("numSegmentsPrunedByServer", MetadataValueType.INT),
+    NUM_SEGMENTS_PRUNED_INVALID("numSegmentsPrunedByInvalid", MetadataValueType.INT),
+    NUM_SEGMENTS_PRUNED_BY_LIMIT("numSegmentsPrunedByLimit", MetadataValueType.INT),
+    NUM_SEGMENTS_PRUNED_BY_VALUE("numSegmentsPrunedByValue", MetadataValueType.INT),
     EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS("explainPlanNumEmptyFilterSegments", MetadataValueType.INT),
     EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS("explainPlanNumMatchAllFilterSegments", MetadataValueType.INT);
 

@@ -25,7 +25,7 @@ import SchemaComponent from './SchemaComponent';
 import CustomCodemirror from '../../CustomCodemirror';
 import PinotMethodUtils from '../../../utils/PinotMethodUtils';
 import { NotificationContext } from '../../Notification/NotificationContext';
-import _ from 'lodash';
+import { isEmpty, isArray } from 'lodash';
 import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
 
 const useStyles = makeStyles((theme: Theme) =>
@@ -57,10 +57,10 @@ export default function AddSchemaOp({
 
     const returnValue = (data,key) =>{
         Object.keys(data).map(async (o)=>{
-          if(!_.isEmpty(data[o]) && typeof data[o] === "object"){
+          if(!isEmpty(data[o]) && typeof data[o] === "object"){
             await returnValue(data[o],key);
           }
-          else if(!_.isEmpty(data[o]) && _.isArray(data[o])){
+          else if(!isEmpty(data[o]) && isArray(data[o])){
             data[o].map(async (obj)=>{
               await returnValue(obj,key);
             })

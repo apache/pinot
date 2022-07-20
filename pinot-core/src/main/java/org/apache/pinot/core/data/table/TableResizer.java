@@ -84,15 +84,39 @@ public class TableResizer {
       _orderByValueExtractors[i] = getOrderByValueExtractor(orderByExpression.getExpression());
       comparators[i] = orderByExpression.isAsc() ? Comparator.naturalOrder() : Comparator.reverseOrder();
     }
-    _intermediateRecordComparator = (o1, o2) -> {
-      for (int i = 0; i < _numOrderByExpressions; i++) {
-        int result = comparators[i].compare(o1._values[i], o2._values[i]);
-        if (result != 0) {
-          return result;
+    boolean nullHandlingEnabled = queryContext.isNullHandlingEnabled();
+    if (nullHandlingEnabled) {
+      _intermediateRecordComparator = (o1, o2) -> {
+        for (int i = 0; i < _numOrderByExpressions; i++) {
+          Object v1 = o1._values[i];
+          Object v2 = o2._values[i];
+          if (v1 == null) {
+            if (v2 == null) {
+              continue;
+            }
+            // The default null ordering is NULLS LAST, regardless of the ordering direction.
+            return 1;
+          } else if (v2 == null) {
+            return -1;
+          }
+          int result = comparators[i].compare(v1, v2);
+          if (result != 0) {
+            return result;
+          }
         }
-      }
-      return 0;
-    };
+        return 0;
+      };
+    } else {
+      _intermediateRecordComparator = (o1, o2) -> {
+        for (int i = 0; i < _numOrderByExpressions; i++) {
+          int result = comparators[i].compare(o1._values[i], o2._values[i]);
+          if (result != 0) {
+            return result;
+          }
+        }
+        return 0;
+      };
+    }
   }
 
   /**

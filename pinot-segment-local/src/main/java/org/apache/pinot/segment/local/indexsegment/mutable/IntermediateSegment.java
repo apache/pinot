@@ -55,6 +55,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
@@ -222,6 +223,19 @@ public class IntermediateSegment implements MutableSegment {
       reuse.putValue(column, value);
     }
     return reuse;
+  }
+
+  @Override
+  public void getPrimaryKey(int docId, PrimaryKey reuse) {
+    int numPrimaryKeyColumns = _schema.getPrimaryKeyColumns().size();
+    Object[] values = reuse.getValues();
+    for (int i = 0; i < numPrimaryKeyColumns; i++) {
+      IntermediateIndexContainer indexContainer = _indexContainerMap.get(
+          _schema.getPrimaryKeyColumns().get(i));
+      Object value = getValue(docId, indexContainer.getForwardIndex(), indexContainer.getDictionary(),
+          indexContainer.getNumValuesInfo().getMaxNumValuesPerMVEntry());
+      values[i] = value;
+    }
   }
 
   @Override

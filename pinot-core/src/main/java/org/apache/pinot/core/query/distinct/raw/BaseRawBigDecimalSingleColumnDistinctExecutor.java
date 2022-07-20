@@ -39,13 +39,16 @@ public abstract class BaseRawBigDecimalSingleColumnDistinctExecutor implements D
   final ExpressionContext _expression;
   final DataType _dataType;
   final int _limit;
+  final boolean _nullHandlingEnabled;
 
   final ObjectSet<BigDecimal> _valueSet;
 
-  BaseRawBigDecimalSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit) {
+  BaseRawBigDecimalSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit,
+      boolean nullHandlingEnabled) {
     _expression = expression;
     _dataType = dataType;
     _limit = limit;
+    _nullHandlingEnabled = nullHandlingEnabled;
 
     _valueSet = new ObjectOpenHashSet<>(Math.min(limit, MAX_INITIAL_CAPACITY));
   }
@@ -58,6 +61,6 @@ public abstract class BaseRawBigDecimalSingleColumnDistinctExecutor implements D
     for (BigDecimal value : _valueSet) {
       records.add(new Record(new Object[]{value}));
     }
-    return new DistinctTable(dataSchema, records);
+    return new DistinctTable(dataSchema, records, _nullHandlingEnabled);
   }
 }

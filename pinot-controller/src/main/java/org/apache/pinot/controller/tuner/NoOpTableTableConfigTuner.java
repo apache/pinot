@@ -32,4 +32,10 @@ public class NoOpTableTableConfigTuner implements TableConfigTuner {
       TableConfig initialConfig, Schema schema, Map<String, String> extraProperties) {
     return initialConfig;
   }
+
+  @Override
+  public TableConfig apply(PinotHelixResourceManager pinotHelixResourceManager,
+      TableConfig initialConfig, Schema schema, Map<String, String> extraProperties, Map<String, String> httpHeaders) {
+    return initialConfig;
+  }
 }

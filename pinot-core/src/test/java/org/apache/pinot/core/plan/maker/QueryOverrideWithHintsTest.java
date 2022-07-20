@@ -42,6 +42,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.Test;
 
@@ -91,6 +92,10 @@ public class QueryOverrideWithHintsTest {
     @Override
     public GenericRow getRecord(int docId, GenericRow reuse) {
       return null;
+    }
+
+    @Override
+    public void getPrimaryKey(int docId, PrimaryKey reuse) {
     }
 
     @Override

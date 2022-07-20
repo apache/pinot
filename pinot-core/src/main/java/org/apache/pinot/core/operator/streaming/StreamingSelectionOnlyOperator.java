@@ -42,6 +42,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<IntermediateRes
   private static final String EXPLAIN_NAME = "SELECT_STREAMING";
 
   private final IndexSegment _indexSegment;
+  private final boolean _nullHandlingEnabled;
   private final TransformOperator _transformOperator;
   private final List<ExpressionContext> _expressions;
   private final BlockValSet[] _blockValSets;
@@ -53,6 +54,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<IntermediateRes
   public StreamingSelectionOnlyOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
+    _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _transformOperator = transformOperator;
     _expressions = expressions;
 
@@ -95,7 +97,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<IntermediateRes
       rows.add(blockValueFetcher.getRow(i));
     }
     _numDocsScanned += numDocs;
-    return new IntermediateResultsBlock(_dataSchema, rows);
+    return new IntermediateResultsBlock(_dataSchema, rows, _nullHandlingEnabled);
   }
 
 

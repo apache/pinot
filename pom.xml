@@ -125,20 +125,20 @@
     <parquet.version>1.11.1</parquet.version>
     <helix.version>0.9.8</helix.version>
     <zkclient.version>0.7</zkclient.version>
-    <jackson.version>2.10.0</jackson.version>
+    <jackson.version>2.12.7</jackson.version>
     <zookeeper.version>3.5.8</zookeeper.version>
     <async-http-client.version>2.12.3</async-http-client.version>
     <jersey.version>2.35</jersey.version>
     <grizzly.version>2.4.4</grizzly.version>
     <hk2.version>2.6.1</hk2.version>
-    <swagger.version>1.5.16</swagger.version>
+    <swagger.version>1.6.6</swagger.version>
     <hadoop.version>2.10.1</hadoop.version>
     <antlr.version>4.6</antlr.version>
     <jsonpath.version>2.7.0</jsonpath.version>
     <quartz.version>2.3.2</quartz.version>
     <calcite.version>1.29.0</calcite.version>
     <lucene.version>8.2.0</lucene.version>
-    <reflections.version>0.9.9</reflections.version>
+    <reflections.version>0.9.11</reflections.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
     <commons-lang.version>2.6</commons-lang.version>
     <!-- pinot-common, commons-configuration, hadoop-common, hadoop-client use commons-logging -->
@@ -471,7 +471,7 @@
       <dependency>
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-lang3</artifactId>
-        <version>3.5</version>
+        <version>3.11</version>
       </dependency>
       <dependency>
         <groupId>commons-collections</groupId>
@@ -501,13 +501,6 @@
         <version>${netty.version}</version>
         <type>pom</type>
         <scope>import</scope>
-      </dependency>
-
-      <!-- zkclient & helix-core use netty -->
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty</artifactId>
-        <version>3.9.6.Final</version>
       </dependency>
 
       <dependency>
@@ -590,21 +583,6 @@
         <groupId>javax.activation</groupId>
         <artifactId>activation</artifactId>
         <version>1.1.1</version>
-      </dependency>
-      <dependency>
-        <groupId>javax.xml.bind</groupId>
-        <artifactId>jaxb-api</artifactId>
-        <version>2.3.0</version>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.xml.bind</groupId>
-        <artifactId>jaxb-core</artifactId>
-        <version>2.3.0</version>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.xml.bind</groupId>
-        <artifactId>jaxb-impl</artifactId>
-        <version>2.3.0</version>
       </dependency>
       <dependency>
         <groupId>org.apache.helix</groupId>
@@ -714,49 +692,11 @@
 
       <!-- Jackson -->
       <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-annotations</artifactId>
+        <groupId>com.fasterxml.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
         <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-core</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-databind</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.dataformat</groupId>
-        <artifactId>jackson-dataformat-xml</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.dataformat</groupId>
-        <artifactId>jackson-dataformat-yaml</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.datatype</groupId>
-        <artifactId>jackson-datatype-joda</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.jaxrs</groupId>
-        <artifactId>jackson-jaxrs-base</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.jaxrs</groupId>
-        <artifactId>jackson-jaxrs-json-provider</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.module</groupId>
-        <artifactId>jackson-module-jaxb-annotations</artifactId>
-        <version>${jackson.version}</version>
+        <scope>import</scope>
+        <type>pom</type>
       </dependency>
 
       <!-- Hadoop -->
@@ -991,28 +931,12 @@
             <artifactId>commons-dbcp2</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>com.fasterxml.jackson.dataformat</groupId>
-            <artifactId>jackson-dataformat-yaml</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>com.yahoo.datasketches</groupId>
             <artifactId>sketches-core</artifactId>
           </exclusion>
           <exclusion>
             <groupId>net.hydromatic</groupId>
             <artifactId>aggdesigner-algorithm</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-annotations</artifactId>
           </exclusion>
           <exclusion>
             <groupId>com.jayway.jsonpath</groupId>
@@ -1671,6 +1595,7 @@
             <exclude>HEADER</exclude>
             <exclude>LICENSE*</exclude>
             <exclude>NOTICE*</exclude>
+            <exclude>.trivyignore</exclude>
 
             <!-- js, css files that are exact copies of the third-party works. In this case, the original header has to
             be kept. Please refer to 'Treatment of Third-party works' in https://www.apache.org/legal/src-headers.html
@@ -1788,6 +1713,7 @@
             <!-- Docker and Kubernetes (not part of the distribution) -->
             <exclude>kubernetes/**</exclude>
             <exclude>docker/**</exclude>
+            <exclude>.trivyignore</exclude>
 
             <!-- Pinot-Druid Benchmark (not part of the distribution) -->
             <exclude>contrib/**</exclude>

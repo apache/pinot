@@ -242,6 +242,48 @@ public interface BrokerResponse {
   void setNumSegmentsPrunedByServer(long numSegmentsPrunedByServer);
 
   /**
+   * Get the total number of segments pruned due to invalid data or schema.
+   *
+   * This value is always lower or equal than {@link #getNumSegmentsPrunedByServer()}
+   */
+  long getNumSegmentsPrunedInvalid();
+
+  /**
+   * Set the total number of segments pruned due to invalid data or schema.
+   *
+   * This value is always lower or equal than {@link #getNumSegmentsPrunedByServer()}
+   */
+  void setNumSegmentsPrunedInvalid(long numSegmentsPrunedInvalid);
+
+  /**
+   * Get the total number of segments pruned by applying the limit optimization.
+   *
+   * This value is always lower or equal than {@link #getNumSegmentsPrunedByServer()}
+   */
+  long getNumSegmentsPrunedByLimit();
+
+  /**
+   * Set the total number of segments pruned by applying the limit optimization.
+   *
+   * This value is always lower or equal than {@link #getNumSegmentsPrunedByServer()}
+   */
+  void setNumSegmentsPrunedByLimit(long numSegmentsPrunedByLimit);
+
+  /**
+   * Get the total number of segments pruned applying value optimizations, like bloom filters.
+   *
+   * This value is always lower or equal than {@link #getNumSegmentsPrunedByServer()}
+   */
+  long getNumSegmentsPrunedByValue();
+
+  /**
+   * Set the total number of segments pruned applying value optimizations, like bloom filters.
+   *
+   * This value is always lower or equal than {@link #getNumSegmentsPrunedByServer()}
+   */
+  void setNumSegmentsPrunedByValue(long numSegmentsPrunedByValue);
+
+  /**
    * Get the total number of segments with an EmptyFilterOperator when Explain Plan is called
    */
   long getExplainPlanNumEmptyFilterSegments();

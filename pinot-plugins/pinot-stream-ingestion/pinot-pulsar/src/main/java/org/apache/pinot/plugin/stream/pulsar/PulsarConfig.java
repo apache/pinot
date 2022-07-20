@@ -36,6 +36,7 @@ public class PulsarConfig {
   public static final String BOOTSTRAP_SERVERS = "bootstrap.servers";
   public static final String AUTHENTICATION_TOKEN = "authenticationToken";
   public static final String TLS_TRUST_CERTS_FILE_PATH = "tlsTrustCertsFilePath";
+  public static final String ENABLE_KEY_VALUE_STITCH = "enableKeyValueStitch";
 
   private String _pulsarTopicName;
   private String _subscriberId;
@@ -44,6 +45,7 @@ public class PulsarConfig {
   private SubscriptionInitialPosition _subscriptionInitialPosition;
   private String _authenticationToken;
   private String _tlsTrustCertsFilePath;
+  private boolean _enableKeyValueStitch;
 
   public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
@@ -56,8 +58,12 @@ public class PulsarConfig {
     _authenticationToken = streamConfigMap.get(authenticationTokenKey);
 
     String tlsTrustCertsFilePathKey = StreamConfigProperties.
-            constructStreamProperty(STREAM_TYPE, TLS_TRUST_CERTS_FILE_PATH);
+        constructStreamProperty(STREAM_TYPE, TLS_TRUST_CERTS_FILE_PATH);
     _tlsTrustCertsFilePath = streamConfigMap.get(tlsTrustCertsFilePathKey);
+
+    String enableKeyValueStitchKey = StreamConfigProperties.
+        constructStreamProperty(STREAM_TYPE, ENABLE_KEY_VALUE_STITCH);
+    _enableKeyValueStitch = Boolean.parseBoolean(streamConfigMap.get(enableKeyValueStitchKey));
 
     Preconditions.checkNotNull(_bootstrapServers, "No brokers provided in the config");
 
@@ -84,7 +90,7 @@ public class PulsarConfig {
   }
 
   public SubscriptionInitialPosition getInitialSubscriberPosition() {
-   return _subscriptionInitialPosition;
+    return _subscriptionInitialPosition;
   }
 
   public String getAuthenticationToken() {
@@ -93,5 +99,9 @@ public class PulsarConfig {
 
   public String getTlsTrustCertsFilePath() {
     return _tlsTrustCertsFilePath;
+  }
+
+  public boolean getEnableKeyValueStitch() {
+    return _enableKeyValueStitch;
   }
 }

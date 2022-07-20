@@ -109,7 +109,7 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
     SegmentGenerationJobSpec spec;
     try {
       spec = IngestionJobLauncher.getSegmentGenerationJobSpec(jobSpecFilePath, propertyFilePath,
-          GroovyTemplateUtils.getTemplateContext(_values));
+          GroovyTemplateUtils.getTemplateContext(_values), System.getenv());
     } catch (Exception e) {
       LOGGER.error("Got exception to generate IngestionJobSpec for data ingestion job - ", e);
       throw e;
@@ -123,7 +123,7 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
     }
 
     if (StringUtils.isBlank(spec.getAuthToken())) {
-      spec.setAuthToken(makeAuthProvider(_authProvider, _authToken, _user, _password, _authTokenUrl).getTaskToken());
+      spec.setAuthToken(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password).getTaskToken());
     }
 
     try {

@@ -40,6 +40,8 @@ public interface SegmentPruner {
   /**
    * Prunes the segments based on the query, returns the segments that are not pruned.
    * <p>Override this method for the pruner logic.
+   *
+   * @param segments The list of segments to be pruned. Implementations must not modify the list.
    */
   List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query);
 }

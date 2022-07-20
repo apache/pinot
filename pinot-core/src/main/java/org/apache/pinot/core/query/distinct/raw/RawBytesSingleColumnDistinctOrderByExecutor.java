@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -36,13 +37,18 @@ public class RawBytesSingleColumnDistinctOrderByExecutor extends BaseRawBytesSin
   private final PriorityQueue<ByteArray> _priorityQueue;
 
   public RawBytesSingleColumnDistinctOrderByExecutor(ExpressionContext expression, DataType dataType,
-      OrderByExpressionContext orderByExpression, int limit) {
-    super(expression, dataType, limit);
+      OrderByExpressionContext orderByExpression, int limit, boolean nullHandlingEnabled) {
+    super(expression, dataType, limit, nullHandlingEnabled);
 
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;
-    _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
-        (b1, b2) -> b1.compareTo(b2) * comparisonFactor);
+    if (nullHandlingEnabled) {
+      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
+          (b1, b2) -> b1 == null ? (b2 == null ? 0 : 1) : (b2 == null ? -1 : b1.compareTo(b2)) * comparisonFactor);
+    } else {
+      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
+          (b1, b2) -> b1.compareTo(b2) * comparisonFactor);
+    }
   }
 
   @Override
@@ -50,23 +56,34 @@ public class RawBytesSingleColumnDistinctOrderByExecutor extends BaseRawBytesSin
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
     byte[][] values = blockValueSet.getBytesValuesSV();
     int numDocs = transformBlock.getNumDocs();
-    for (int i = 0; i < numDocs; i++) {
-      ByteArray value = new ByteArray(values[i]);
-      if (!_valueSet.contains(value)) {
-        if (_valueSet.size() < _limit) {
-          _valueSet.add(value);
-          _priorityQueue.enqueue(value);
-        } else {
-          ByteArray firstValue = _priorityQueue.first();
-          if (_priorityQueue.comparator().compare(value, firstValue) > 0) {
-            _valueSet.remove(firstValue);
-            _valueSet.add(value);
-            _priorityQueue.dequeue();
-            _priorityQueue.enqueue(value);
-          }
-        }
+    if (_nullHandlingEnabled) {
+      RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
+      for (int i = 0; i < numDocs; i++) {
+        ByteArray value = nullBitmap != null && nullBitmap.contains(i) ? null : new ByteArray(values[i]);
+        processInternal(value);
+      }
+    } else {
+      for (int i = 0; i < numDocs; i++) {
+        processInternal(new ByteArray(values[i]));
       }
     }
     return false;
+  }
+
+  private void processInternal(ByteArray value) {
+    if (!_valueSet.contains(value)) {
+      if (_valueSet.size() < _limit) {
+        _valueSet.add(value);
+        _priorityQueue.enqueue(value);
+      } else {
+        ByteArray firstValue = _priorityQueue.first();
+        if (_priorityQueue.comparator().compare(value, firstValue) > 0) {
+          _valueSet.remove(firstValue);
+          _valueSet.add(value);
+          _priorityQueue.dequeue();
+          _priorityQueue.enqueue(value);
+        }
+      }
+    }
   }
 }

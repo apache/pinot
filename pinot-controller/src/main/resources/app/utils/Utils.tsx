@@ -20,7 +20,7 @@
 
 import React from 'react';
 import ReactDiffViewer, {DiffMethod} from 'react-diff-viewer';
-import _ from 'lodash';
+import { map, isEqual, findIndex, findLast } from 'lodash';
 import app_state from '../app_state';
 
 const sortArray = function (sortingArr, keyName, ascendingFlag) {
@@ -90,7 +90,7 @@ const getSegmentStatus = (idealStateObj, externalViewObj) => {
   let segmentStatus = {value: 'Good', tooltip: null, component: null};
   idealSegmentKeys.map((segmentKey) => {
     if (segmentStatus.value === 'Good') {
-      if (!_.isEqual(idealStateObj[segmentKey], externalViewObj[segmentKey])) {
+      if (!isEqual(idealStateObj[segmentKey], externalViewObj[segmentKey])) {
         let segmentStatusComponent = (
             <ReactDiffViewer
                 oldValue={JSON.stringify(idealStateObj, null, 2)}
@@ -128,7 +128,7 @@ const generateCodeMirrorOptions = (array, type, modeType?) => {
   const arr = [];
   // eslint-disable-next-line no-shadow
   const nestedFields = (arrayList, type, level, oldObj?) => {
-    _.map(arrayList, (a) => {
+    map(arrayList, (a) => {
       const obj = {
         text: a.displayName || a.name || a,
         displayText: a.displayName || a.name || a,
@@ -162,7 +162,7 @@ const generateCodeMirrorOptions = (array, type, modeType?) => {
       if (oldObj === undefined) {
         arr.push(obj);
       } else {
-        const index = _.findIndex(
+        const index = findIndex(
           arr,
           (n) => n.filterText === oldObj.filterText
         );
@@ -200,7 +200,7 @@ const generateCodeMirrorOptions = (array, type, modeType?) => {
 
 const pushNestedObjectInArray = (pathArr, obj, targetList, modeType) => {
   const rollOverFields = (target) => {
-    _.map(target, (list) => {
+    map(target, (list) => {
       if (pathArr === list.filterText) {
         if (modeType === 'sql') {
           obj.displayText = `${pathArr}.${obj.displayText}`;
@@ -227,7 +227,7 @@ const pushNestedObjectInArray = (pathArr, obj, targetList, modeType) => {
 const getNestedObjPathFromList = (list, obj) => {
   const str = [];
   const recursiveFunc = (arr, level) => {
-    _.map(arr, (a) => {
+    map(arr, (a) => {
       if (a.fields) {
         str.push(a.filterText);
         recursiveFunc(a.fields, level + 1);
@@ -235,7 +235,7 @@ const getNestedObjPathFromList = (list, obj) => {
         str.push(a.filterText);
       }
     });
-    return _.findLast(str);
+    return findLast(str);
   };
   return recursiveFunc(list, 0);
 };
@@ -336,6 +336,15 @@ const formatBytes = (bytes, decimals = 2) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
+const splitStringByLastUnderscore = (str: string) => {
+  if (!str.includes('_')) {
+    return [str, ''];
+  }
+  let beforeUnderscore = str.substring(0, str.lastIndexOf("_"));
+  let afterUnderscore = str.substring(str.lastIndexOf("_") + 1, str.length);
+  return [beforeUnderscore, afterUnderscore];
+}
+
 export default {
   sortArray,
   tableFormat,
@@ -346,5 +355,6 @@ export default {
   navigateToPreviousPage,
   syncTableSchemaData,
   encodeString,
-  formatBytes
+  formatBytes,
+  splitStringByLastUnderscore
 };

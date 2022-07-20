@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.core.query.executor.QueryExecutor;
@@ -75,7 +74,6 @@ public abstract class PriorityScheduler extends QueryScheduler {
       LOGGER.error("Out of capacity for table {}, message: {}", queryRequest.getTableNameWithType(), e.getMessage());
       return immediateErrorResponse(queryRequest, QueryException.SERVER_OUT_OF_CAPACITY_ERROR);
     }
-    _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERIES, 1);
     return schedQueryContext.getResultFuture();
   }
 

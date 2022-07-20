@@ -99,7 +99,7 @@ controller:
     host: pinot-controller
     port: 9000
 
-  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-controller.log"
+  jvmOpts: "-XX=ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-controller.log"
 
   log4j2ConfFile: /opt/pinot/conf/log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -132,7 +132,9 @@ controller:
     v1:
       enabled: false
 
-  resources: {}
+  resources:
+    requests:
+      memory: "1.25Gi"
 
   nodeSelector: {}
 
@@ -156,7 +158,9 @@ controller:
 
   # Use extraEnv to add individual key value pairs as container environment variables.
   # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
-  extraEnv: []
+  extraEnv:
+    - name: LOG4J_CONSOLE_LEVEL
+      value: info
   #  - name: PINOT_CUSTOM_ENV
   #    value: custom-value
 
@@ -177,7 +181,7 @@ broker:
     # fsGroup: 2000
   securityContext: {}
 
-  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-broker.log"
+  jvmOpts: "-XX=ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-broker.log"
 
   log4j2ConfFile: /opt/pinot/conf/log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -223,7 +227,9 @@ broker:
     v1:
       enabled: false
 
-  resources: {}
+  resources:
+    requests:
+      memory: "1.25Gi"
 
   nodeSelector: {}
 
@@ -247,7 +253,9 @@ broker:
 
   # Use extraEnv to add individual key value pairs as container environment variables.
   # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
-  extraEnv: []
+  extraEnv:
+    - name: LOG4J_CONSOLE_LEVEL
+      value: info
   #  - name: PINOT_CUSTOM_ENV
   #    value: custom-value
 
@@ -305,7 +313,9 @@ server:
     nodePort: ""
     protocol: TCP
 
-  resources: {}
+  resources:
+    requests:
+      memory: "1.25Gi"
 
   nodeSelector: {}
 
@@ -329,7 +339,9 @@ server:
 
   # Use extraEnv to add individual key value pairs as container environment variables.
   # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
-  extraEnv: []
+  extraEnv:
+    - name: LOG4J_CONSOLE_LEVEL
+      value: info
   #  - name: PINOT_CUSTOM_ENV
   #    value: custom-value
 
@@ -358,7 +370,7 @@ minion:
     readinessEnabled: true
 
   dataDir: /var/pinot/minion/data
-  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
+  jvmOpts: "-XX=ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
 
   log4j2ConfFile: /opt/pinot/conf/log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -385,7 +397,9 @@ minion:
     protocol: TCP
     name: minion
 
-  resources: {}
+  resources:
+    requests:
+      memory: "1.25Gi"
 
   nodeSelector: {}
 
@@ -409,7 +423,9 @@ minion:
 
   # Use extraEnv to add individual key value pairs as container environment variables.
   # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
-  extraEnv: []
+  extraEnv:
+    - name: LOG4J_CONSOLE_LEVEL
+      value: info
   #  - name: PINOT_CUSTOM_ENV
   #    value: custom-value
 
@@ -436,7 +452,7 @@ minionStateless:
     readinessEnabled: true
 
   dataDir: /var/pinot/minion/data
-  jvmOpts: "-Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
+  jvmOpts: "-XX=ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
 
   log4j2ConfFile: /opt/pinot/conf/log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -457,7 +473,9 @@ minionStateless:
     protocol: TCP
     name: minion
 
-  resources: {}
+  resources:
+    requests:
+      memory: "1.25Gi"
 
   nodeSelector: {}
 
@@ -478,7 +496,9 @@ minionStateless:
 
   # Use extraEnv to add individual key value pairs as container environment variables.
   # ref: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
-  extraEnv: []
+  extraEnv:
+    - name: LOG4J_CONSOLE_LEVEL
+      value: info
   #  - name: PINOT_CUSTOM_ENV
   #    value: custom-value
 
@@ -506,7 +526,9 @@ zookeeper:
 
   ## Configure Zookeeper resource requests and limits
   ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
-  resources: {}
+  resources:
+    requests:
+      memory: "1.25Gi"
 
   ## Replicas
   replicaCount: 1
@@ -521,10 +543,9 @@ zookeeper:
     ## The most recent snapshots amount (and corresponding transaction logs) to retain
     snapRetainCount: 5
 
-  ## Environmental variables to set in Zookeeper
-  env:
-    ## The JVM heap size to allocate to Zookeeper
-    ZK_HEAP_SIZE: "256M"
+  ## Size (in MB) for the Java Heap options (Xmx and Xms)
+  ## This env var is ignored if Xmx an Xms are configured via `zookeeper.jvmFlags`
+  heapSize: "1024"
 
   persistence:
     enabled: true

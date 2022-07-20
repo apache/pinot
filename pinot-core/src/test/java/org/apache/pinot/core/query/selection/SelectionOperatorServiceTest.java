@@ -210,7 +210,7 @@ public class SelectionOperatorServiceTest {
     assertTrue(dataSchema.isTypeCompatibleWith(_compatibleDataSchema));
     dataSchema.upgradeToCover(_compatibleDataSchema);
     assertEquals(dataSchema, _upgradedDataSchema);
-    DataTable dataTable = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema);
+    DataTable dataTable = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema, false);
     Object[] expectedRow1 = {
         0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0},
         new String[]{"9"}, BytesUtils.toByteArray("1020")

@@ -21,6 +21,11 @@ import HomePage from './pages/HomePage';
 import TenantsListingPage from './pages/TenantsListingPage';
 import InstanceListingPage from './pages/InstanceListingPage';
 import TablesListingPage from './pages/TablesListingPage';
+import MinionTaskManager from './pages/MinionTaskManager';
+import TaskQueue from './pages/TaskQueue';
+import TaskQueueTable from './pages/TaskQueueTable';
+import TaskDetail from './pages/TaskDetail';
+import SubTaskDetail from './pages/SubTaskDetail';
 import TenantsPage from './pages/Tenants';
 import TenantPageDetails from './pages/TenantDetails';
 import QueryPage from './pages/Query';
@@ -38,7 +43,13 @@ export default [
   { path: '/controllers', Component: InstanceListingPage },
   { path: '/brokers', Component: InstanceListingPage },
   { path: '/servers', Component: InstanceListingPage },
+  { path: '/minions', Component: InstanceListingPage },
   { path: '/tables', Component: TablesListingPage },
+  { path: '/minion-task-manager', Component: MinionTaskManager },
+  { path: '/task-queue/:taskType', Component: TaskQueue },
+  { path: '/task-queue/:taskType/tables/:queueTableName', Component: TaskQueueTable },
+  { path: '/task-queue/:taskType/tables/:queueTableName/task/:taskID', Component: TaskDetail },
+  { path: '/task-queue/:taskType/tables/:queueTableName/task/:taskID/sub-task/:subTaskID', Component: SubTaskDetail },
   { path: '/tenants/:tenantName', Component: TenantsPage },
   { path: '/tenants/:tenantName/table/:tableName', Component: TenantPageDetails },
   { path: '/tenants/schema/:schemaName', Component: SchemaPageDetails },

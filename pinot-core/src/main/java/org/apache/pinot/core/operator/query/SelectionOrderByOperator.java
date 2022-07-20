@@ -74,6 +74,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   private static final String EXPLAIN_NAME = "SELECT_ORDERBY";
 
   private final IndexSegment _indexSegment;
+  private final boolean _nullHandlingEnabled;
   // Deduped order-by expressions followed by output expressions from SelectionOperatorUtils.extractExpressions()
   private final List<ExpressionContext> _expressions;
   private final TransformOperator _transformOperator;
@@ -89,6 +90,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   public SelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, TransformOperator transformOperator, boolean allOrderByColsPreSorted) {
     _indexSegment = indexSegment;
+    _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _expressions = expressions;
     _transformOperator = transformOperator;
     _allOrderByColsPreSorted = allOrderByColsPreSorted;
@@ -141,46 +143,95 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       multipliers[i] = _orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
     }
 
-    return (o1, o2) -> {
-      for (int i = 0; i < numValuesToCompare; i++) {
-        int index = valueIndices[i];
+    if (_nullHandlingEnabled) {
+      return (Object[] o1, Object[] o2) -> {
+        for (int i = 0; i < numValuesToCompare; i++) {
+          int index = valueIndices[i];
 
-        // TODO: Evaluate the performance of casting to Comparable and avoid the switch
-        Object v1 = o1[index];
-        Object v2 = o2[index];
-        int result;
-        switch (storedTypes[i]) {
-          case INT:
-            result = ((Integer) v1).compareTo((Integer) v2);
-            break;
-          case LONG:
-            result = ((Long) v1).compareTo((Long) v2);
-            break;
-          case FLOAT:
-            result = ((Float) v1).compareTo((Float) v2);
-            break;
-          case DOUBLE:
-            result = ((Double) v1).compareTo((Double) v2);
-            break;
-          case BIG_DECIMAL:
-            result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
-            break;
-          case STRING:
-            result = ((String) v1).compareTo((String) v2);
-            break;
-          case BYTES:
-            result = ((ByteArray) v1).compareTo((ByteArray) v2);
-            break;
-          // NOTE: Multi-value columns are not comparable, so we should not reach here
-          default:
-            throw new IllegalStateException();
+          // TODO: Evaluate the performance of casting to Comparable and avoid the switch
+          Object v1 = o1[index];
+          Object v2 = o2[index];
+          if (v1 == null) {
+            // The default null ordering is: 'NULLS LAST', regardless of the ordering direction.
+            return v2 == null ? 0 : -multipliers[i];
+          } else if (v2 == null) {
+            return multipliers[i];
+          }
+          int result;
+          switch (storedTypes[i]) {
+            case INT:
+              result = ((Integer) v1).compareTo((Integer) v2);
+              break;
+            case LONG:
+              result = ((Long) v1).compareTo((Long) v2);
+              break;
+            case FLOAT:
+              result = ((Float) v1).compareTo((Float) v2);
+              break;
+            case DOUBLE:
+              result = ((Double) v1).compareTo((Double) v2);
+              break;
+            case BIG_DECIMAL:
+              result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
+              break;
+            case STRING:
+              result = ((String) v1).compareTo((String) v2);
+              break;
+            case BYTES:
+              result = ((ByteArray) v1).compareTo((ByteArray) v2);
+              break;
+            // NOTE: Multi-value columns are not comparable, so we should not reach here
+            default:
+              throw new IllegalStateException();
+          }
+          if (result != 0) {
+            return result * multipliers[i];
+          }
         }
-        if (result != 0) {
-          return result * multipliers[i];
+        return 0;
+      };
+    } else {
+      return (Object[] o1, Object[] o2) -> {
+        for (int i = 0; i < numValuesToCompare; i++) {
+          int index = valueIndices[i];
+
+          // TODO: Evaluate the performance of casting to Comparable and avoid the switch
+          Object v1 = o1[index];
+          Object v2 = o2[index];
+          int result;
+          switch (storedTypes[i]) {
+            case INT:
+              result = ((Integer) v1).compareTo((Integer) v2);
+              break;
+            case LONG:
+              result = ((Long) v1).compareTo((Long) v2);
+              break;
+            case FLOAT:
+              result = ((Float) v1).compareTo((Float) v2);
+              break;
+            case DOUBLE:
+              result = ((Double) v1).compareTo((Double) v2);
+              break;
+            case BIG_DECIMAL:
+              result = ((BigDecimal) v1).compareTo((BigDecimal) v2);
+              break;
+            case STRING:
+              result = ((String) v1).compareTo((String) v2);
+              break;
+            case BYTES:
+              result = ((ByteArray) v1).compareTo((ByteArray) v2);
+              break;
+            // NOTE: Multi-value columns are not comparable, so we should not reach here
+            default:
+              throw new IllegalStateException();
+          }
+          if (result != 0) {
+            return result * multipliers[i];
+          }
         }
-      }
-      return 0;
-    };
+        return 0;
+      };
+    }
   }
 
   @Override
@@ -208,6 +259,20 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = transformBlock.getNumDocs();
+      if (_nullHandlingEnabled) {
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
+        for (int i = 0; i < numExpressions; i++) {
+          nullBitmaps[i] = blockValSets[i].getNullBitmap();
+        }
+        for (int rowId = 0; rowId < numDocsFetched && (_numDocsScanned < _numRowsToKeep); rowId++) {
+          Object[] row = blockValueFetcher.getRow(rowId);
+          for (int colId = 0; colId < numExpressions; colId++) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+              row[colId] = null;
+            }
+          }
+        }
+      }
       for (int i = 0; i < numDocsFetched && (_numDocsScanned < _numRowsToKeep); i++) {
         SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
         _numDocsScanned++;
@@ -228,7 +293,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new IntermediateResultsBlock(dataSchema, _rows);
+    return new IntermediateResultsBlock(dataSchema, _rows, _nullHandlingEnabled);
   }
 
   /**
@@ -248,8 +313,25 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = transformBlock.getNumDocs();
-      for (int i = 0; i < numDocsFetched; i++) {
-        SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
+      if (_nullHandlingEnabled) {
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
+        for (int i = 0; i < numExpressions; i++) {
+          nullBitmaps[i] = blockValSets[i].getNullBitmap();
+        }
+        for (int rowId = 0; rowId < numDocsFetched; rowId++) {
+          // Note: Everytime blockValueFetcher.getRow is called, a new row instance is created.
+          Object[] row = blockValueFetcher.getRow(rowId);
+          for (int colId = 0; colId < numExpressions; colId++) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+              row[colId] = null;
+            }
+          }
+          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+        }
+      } else {
+        for (int i = 0; i < numDocsFetched; i++) {
+          SelectionOperatorUtils.addToPriorityQueue(blockValueFetcher.getRow(i), _rows, _numRowsToKeep);
+        }
       }
       _numDocsScanned += numDocsFetched;
     }
@@ -266,7 +348,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new IntermediateResultsBlock(dataSchema, _rows);
+    return new IntermediateResultsBlock(dataSchema, _rows, _nullHandlingEnabled);
   }
 
   /**
@@ -288,14 +370,33 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = transformBlock.getNumDocs();
       int[] docIds = transformBlock.getDocIds();
-      for (int i = 0; i < numDocsFetched; i++) {
-        // NOTE: We pre-allocate the complete row so that we can fill up the non-order-by output expression values later
-        //       without creating extra rows or re-constructing the priority queue. We can change the values in-place
-        //       because the comparator only compare the values for the order-by expressions.
-        Object[] row = new Object[numExpressions];
-        blockValueFetcher.getRow(i, row, 0);
-        row[numOrderByExpressions] = docIds[i];
-        SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+      if (_nullHandlingEnabled) {
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numOrderByExpressions];
+        for (int i = 0; i < numOrderByExpressions; i++) {
+          nullBitmaps[i] = blockValSets[i].getNullBitmap();
+        }
+        for (int rowId = 0; rowId < numDocsFetched; rowId++) {
+          Object[] row = new Object[numExpressions];
+          blockValueFetcher.getRow(rowId, row, 0);
+          row[numOrderByExpressions] = docIds[rowId];
+          for (int colId = 0; colId < numOrderByExpressions; colId++) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+              row[colId] = null;
+            }
+          }
+          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+        }
+      } else {
+        for (int i = 0; i < numDocsFetched; i++) {
+          // NOTE: We pre-allocate the complete row so that we can fill up the non-order-by output expression values
+          // later
+          //       without creating extra rows or re-constructing the priority queue. We can change the values in-place
+          //       because the comparator only compare the values for the order-by expressions.
+          Object[] row = new Object[numExpressions];
+          blockValueFetcher.getRow(i, row, 0);
+          row[numOrderByExpressions] = docIds[i];
+          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+        }
       }
       _numDocsScanned += numDocsFetched;
     }
@@ -366,7 +467,7 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new IntermediateResultsBlock(dataSchema, _rows);
+    return new IntermediateResultsBlock(dataSchema, _rows, _nullHandlingEnabled);
   }
 
 

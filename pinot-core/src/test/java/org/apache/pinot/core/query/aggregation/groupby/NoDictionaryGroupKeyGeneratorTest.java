@@ -199,7 +199,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
     if (numGroupByColumns == 1) {
       groupKeyGenerator = new NoDictionarySingleColumnGroupKeyGenerator(_transformOperator,
           ExpressionContext.forIdentifier(COLUMNS.get(groupByColumnIndexes[0])),
-          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, false);
     } else {
       ExpressionContext[] groupByExpressions = new ExpressionContext[numGroupByColumns];
       for (int i = 0; i < numGroupByColumns; i++) {

@@ -23,6 +23,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -30,8 +31,9 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  */
 public class RawDoubleSingleColumnDistinctOnlyExecutor extends BaseRawDoubleSingleColumnDistinctExecutor {
 
-  public RawDoubleSingleColumnDistinctOnlyExecutor(ExpressionContext expression, DataType dataType, int limit) {
-    super(expression, dataType, limit);
+  public RawDoubleSingleColumnDistinctOnlyExecutor(ExpressionContext expression, DataType dataType, int limit,
+      boolean nullHandlingEnabled) {
+    super(expression, dataType, limit, nullHandlingEnabled);
   }
 
   @Override
@@ -40,13 +42,29 @@ public class RawDoubleSingleColumnDistinctOnlyExecutor extends BaseRawDoubleSing
     int numDocs = transformBlock.getNumDocs();
     if (blockValueSet.isSingleValue()) {
       double[] values = blockValueSet.getDoubleValuesSV();
-      for (int i = 0; i < numDocs; i++) {
-        _valueSet.add(values[i]);
-        if (_valueSet.size() >= _limit) {
-          return true;
+      if (_nullHandlingEnabled) {
+        // TODO(nhejazi): consider having a separate set of classes to handle the case with null handling enabled.
+        RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
+        for (int i = 0; i < numDocs; i++) {
+          if (nullBitmap != null && nullBitmap.contains(i)) {
+            _hasNull = true;
+          } else {
+            _valueSet.add(values[i]);
+            if (_valueSet.size() >= _limit - (_hasNull ? 1 : 0)) {
+              return true;
+            }
+          }
+        }
+      } else {
+        for (int i = 0; i < numDocs; i++) {
+          _valueSet.add(values[i]);
+          if (_valueSet.size() >= _limit) {
+            return true;
+          }
         }
       }
     } else {
+      // TODO(nhejazi): support proper null handling in multi-valued columns.
       double[][] values = blockValueSet.getDoubleValuesMV();
       for (int i = 0; i < numDocs; i++) {
         for (double value : values[i]) {

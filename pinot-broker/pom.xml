@@ -84,14 +84,6 @@
       <artifactId>swagger-jaxrs</artifactId>
       <exclusions>
         <exclusion>
-          <groupId>com.fasterxml.jackson.jaxrs</groupId>
-          <artifactId>jackson-jaxrs-json-provider</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.module</groupId>
-          <artifactId>jackson-module-jaxb-annotations</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>javax.ws.rs</groupId>
           <artifactId>jsr311-api</artifactId>
         </exclusion>
@@ -108,6 +100,10 @@
     <dependency>
       <groupId>org.glassfish.hk2</groupId>
       <artifactId>hk2-locator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
     </dependency>
 
     <!-- Test -->

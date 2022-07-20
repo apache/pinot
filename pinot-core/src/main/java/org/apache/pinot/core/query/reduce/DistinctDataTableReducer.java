@@ -33,6 +33,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 
 
@@ -41,9 +42,11 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
  */
 public class DistinctDataTableReducer implements DataTableReducer {
   private final DistinctAggregationFunction _distinctAggregationFunction;
+  private final QueryContext _queryContext;
 
-  DistinctDataTableReducer(DistinctAggregationFunction distinctAggregationFunction) {
+  DistinctDataTableReducer(DistinctAggregationFunction distinctAggregationFunction, QueryContext queryContext) {
     _distinctAggregationFunction = distinctAggregationFunction;
+    _queryContext = queryContext;
   }
 
   /**
@@ -83,7 +86,8 @@ public class DistinctDataTableReducer implements DataTableReducer {
     } else {
       // Construct a main DistinctTable and merge all non-empty DistinctTables into it
       DistinctTable mainDistinctTable = new DistinctTable(nonEmptyDistinctTables.get(0).getDataSchema(),
-          _distinctAggregationFunction.getOrderByExpressions(), _distinctAggregationFunction.getLimit());
+          _distinctAggregationFunction.getOrderByExpressions(), _distinctAggregationFunction.getLimit(),
+          _queryContext.isNullHandlingEnabled());
       for (DistinctTable distinctTable : nonEmptyDistinctTables) {
         mainDistinctTable.mergeTable(distinctTable);
       }
@@ -101,7 +105,10 @@ public class DistinctDataTableReducer implements DataTableReducer {
       Object[] values = iterator.next().getValues();
       Object[] row = new Object[numColumns];
       for (int i = 0; i < numColumns; i++) {
-        row[i] = columnDataTypes[i].convertAndFormat(values[i]);
+        Object value = values[i];
+        if (value != null) {
+          row[i] = columnDataTypes[i].convertAndFormat(value);
+        }
       }
       rows.add(row);
     }

@@ -108,7 +108,7 @@ public class PinotQueryResource {
       String queryOptions)
       throws Exception {
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
-    PinotSqlType sqlType = CalciteSqlParser.extractSqlType(sqlNodeAndOptions.getSqlNode());
+    PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     switch (sqlType) {
       case DQL:
         return getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
@@ -130,7 +130,7 @@ public class PinotQueryResource {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
       SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
-      PinotSqlType sqlType = CalciteSqlParser.extractSqlType(sqlNodeAndOptions.getSqlNode());
+      PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
       if (sqlType == PinotSqlType.DQL) {
         return getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
       }

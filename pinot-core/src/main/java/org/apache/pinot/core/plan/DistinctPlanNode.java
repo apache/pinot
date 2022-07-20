@@ -32,6 +32,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 
 /**
@@ -56,21 +57,29 @@ public class DistinctPlanNode implements PlanNode {
     List<ExpressionContext> expressions = distinctAggregationFunction.getInputExpressions();
 
     // Use dictionary to solve the query if possible
-    if (_queryContext.getFilter() == null && expressions.size() == 1) {
+    if (_queryContext.getFilter() == null && !_queryContext.isNullHandlingEnabled() && expressions.size() == 1) {
       ExpressionContext expression = expressions.get(0);
       if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
         DataSource dataSource = _indexSegment.getDataSource(expression.getIdentifier());
         Dictionary dictionary = dataSource.getDictionary();
         if (dictionary != null) {
           DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
-          return new DictionaryBasedDistinctOperator(dataSourceMetadata.getDataType(), distinctAggregationFunction,
-              dictionary, dataSourceMetadata.getNumDocs());
+          // If nullHandlingEnabled is set to true, and the column contains null values, call DistinctOperator instead
+          // of DictionaryBasedDistinctOperator since nullValueVectorReader is a form of a filter.
+          // TODO: reserve special value in dictionary (e.g. -1) for null in the future so
+          //  DictionaryBasedDistinctOperator can be reused since it is more efficient than DistinctOperator for
+          //  dictionary-encoded columns.
+          NullValueVectorReader nullValueReader = dataSource.getNullValueVector();
+          if (nullValueReader == null || nullValueReader.getNullBitmap().getCardinality() == 0) {
+            return new DictionaryBasedDistinctOperator(dataSourceMetadata.getDataType(), distinctAggregationFunction,
+                dictionary, dataSourceMetadata.getNumDocs(), _queryContext.isNullHandlingEnabled());
+          }
         }
       }
     }
 
     TransformOperator transformOperator =
         new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
-    return new DistinctOperator(_indexSegment, distinctAggregationFunction, transformOperator);
+    return new DistinctOperator(_indexSegment, distinctAggregationFunction, transformOperator, _queryContext);
   }
 }

@@ -4,7 +4,7 @@
   "segmentsConfig": {
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-    "schemaName": "baseball",
+    "schemaName": "baseballStats",
     "replication": "1"
   },
   "tenants": {

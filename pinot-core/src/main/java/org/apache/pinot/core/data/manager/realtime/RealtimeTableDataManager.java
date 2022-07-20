@@ -134,8 +134,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     try {
       _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
     } catch (IOException | ClassNotFoundException e) {
-      _logger.error("Error reading history object for table {} from {}", _tableNameWithType,
-          statsFile.getAbsolutePath(), e);
+      _logger
+          .error("Error reading history object for table {} from {}", _tableNameWithType, statsFile.getAbsolutePath(),
+              e);
       File savedFile = new File(_tableDataDir, STATS_FILE_NAME + "." + UUID.randomUUID());
       try {
         FileUtils.moveFile(statsFile, savedFile);
@@ -198,6 +199,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _primaryKeyColumns = schema.getPrimaryKeyColumns();
       Preconditions.checkState(!CollectionUtils.isEmpty(_primaryKeyColumns),
           "Primary key columns must be configured for upsert");
+
       String comparisonColumn = upsertConfig.getComparisonColumn();
       _upsertComparisonColumn =
           comparisonColumn != null ? comparisonColumn : tableConfig.getValidationConfig().getTimeColumnName();
@@ -211,7 +213,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
       _tableUpsertMetadataManager =
           new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics, partialUpsertHandler,
-              upsertConfig.getHashFunction());
+              upsertConfig.getHashFunction(), _primaryKeyColumns);
     }
   }
 
@@ -369,6 +371,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           }
         }
       }
+
       segmentDataManager =
           new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
               indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
@@ -428,8 +431,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     for (String primaryKeyColumn : _primaryKeyColumns) {
       columnToReaderMap.put(primaryKeyColumn, new PinotSegmentColumnReader(immutableSegment, primaryKeyColumn));
     }
-    columnToReaderMap.put(_upsertComparisonColumn,
-        new PinotSegmentColumnReader(immutableSegment, _upsertComparisonColumn));
+    columnToReaderMap
+        .put(_upsertComparisonColumn, new PinotSegmentColumnReader(immutableSegment, _upsertComparisonColumn));
     int numTotalDocs = immutableSegment.getSegmentMetadata().getTotalDocs();
     int numPrimaryKeyColumns = _primaryKeyColumns.size();
     Iterator<RecordInfo> recordInfoIterator = new Iterator<RecordInfo>() {
@@ -535,8 +538,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private boolean isPeerSegmentDownloadEnabled(TableConfig tableConfig) {
     return
         CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())
-            || CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(
-            tableConfig.getValidationConfig().getPeerSegmentDownloadScheme());
+            || CommonConstants.HTTPS_PROTOCOL
+            .equalsIgnoreCase(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme());
   }
 
   private void downloadSegmentFromPeer(String segmentName, String downloadScheme,
