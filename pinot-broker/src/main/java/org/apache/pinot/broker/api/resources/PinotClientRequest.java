@@ -180,9 +180,7 @@ public class PinotClientRequest {
     if (requestJson.has("queryOptions")) {
       queryOptions = requestJson.get("queryOptions").asText() + ";";
     }
-    // TODO: Remove this SQL query options after releasing 0.11.0
-    return queryOptions + Request.QueryOptionKey.GROUP_BY_MODE + "=" + Request.SQL + ";"
-        + Request.QueryOptionKey.RESPONSE_FORMAT + "=" + Request.SQL;
+    return queryOptions;
   }
 
   private static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {
