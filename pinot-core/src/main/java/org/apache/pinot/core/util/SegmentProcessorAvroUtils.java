@@ -74,7 +74,10 @@ public final class SegmentProcessorAvroUtils {
   public static Schema convertPinotSchemaToAvroSchema(org.apache.pinot.spi.data.Schema pinotSchema) {
     SchemaBuilder.FieldAssembler<org.apache.avro.Schema> fieldAssembler = SchemaBuilder.record("record").fields();
 
-    for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
+    List<FieldSpec> orderedFieldSpecs = pinotSchema.getAllFieldSpecs().stream()
+        .sorted()
+        .collect(Collectors.toList());
+    for (FieldSpec fieldSpec : orderedFieldSpecs) {
       String name = fieldSpec.getName();
       DataType storedType = fieldSpec.getDataType().getStoredType();
       if (fieldSpec.isSingleValueField()) {
