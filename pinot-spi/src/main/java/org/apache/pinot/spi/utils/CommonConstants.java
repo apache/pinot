@@ -273,6 +273,14 @@ public class CommonConstants {
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
+
+        // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
+        @Deprecated
+        public static final String PRESERVE_TYPE = "preserveType";
+        @Deprecated
+        public static final String RESPONSE_FORMAT = "responseFormat";
+        @Deprecated
+        public static final String GROUP_BY_MODE = "groupByMode";
       }
 
       public static class QueryOptionValue {

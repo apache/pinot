@@ -1449,6 +1449,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   @VisibleForTesting
   static void setOptions(PinotQuery pinotQuery, long requestId, String query, JsonNode jsonRequest) {
     Map<String, String> queryOptions = new HashMap<>();
+    // TODO: Remove the SQL query options after releasing 0.11.0
+    queryOptions.put(Broker.Request.QueryOptionKey.GROUP_BY_MODE, Broker.Request.SQL);
+    queryOptions.put(Broker.Request.QueryOptionKey.RESPONSE_FORMAT, Broker.Request.SQL);
     if (jsonRequest.has(Broker.Request.DEBUG_OPTIONS)) {
       Map<String, String> debugOptions = getOptionsFromJson(jsonRequest, Broker.Request.DEBUG_OPTIONS);
       if (!debugOptions.isEmpty()) {
