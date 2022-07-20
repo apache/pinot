@@ -29,6 +29,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -55,6 +56,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.model.InstanceConfig;
@@ -141,6 +143,9 @@ public class PinotTaskRestletResource {
 
   @Inject
   HttpConnectionManager _connectionManager;
+
+  @Context
+  private UriInfo info;
 
   @GET
   @Path("/tasks/tasktypes")
@@ -266,7 +271,6 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Whether to only lookup local cache for logs", defaultValue = "false") @QueryParam("localOnly")
           boolean localOnly)
       throws JsonProcessingException {
-
     if (localOnly) {
       BaseTaskGeneratorInfo taskGeneratorMostRecentRunInfo =
           _taskManagerStatusCache.fetchTaskGeneratorInfo(tableNameWithType, taskType);
@@ -280,9 +284,11 @@ public class PinotTaskRestletResource {
 
     // Call all controllers
     List<InstanceConfig> controllers = _pinotHelixResourceManager.getAllControllerInstanceConfigs();
+    // Relying on original schema that was used to query the controller
+    URI uri = info.getRequestUri();
+    String scheme = uri.getScheme();
     List<String> controllerUrls = controllers.stream().map(controller -> {
-      // TODO (saurabh) : How to figure out https vs http?
-      return String.format("http://%s:%d/tasks/generator/%s/%s/debug?localOnly=true", controller.getHostName(),
+      return String.format("%s://%s:%d/tasks/generator/%s/%s/debug?localOnly=true", scheme, controller.getHostName(),
           Integer.parseInt(controller.getPort()), tableNameWithType, taskType);
     }).collect(Collectors.toList());
 
