@@ -840,7 +840,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private void recordIndexingError(FieldConfig.IndexType indexType, Exception exception) {
-    _logger.error("failed to index value with {}", indexType, exception);
+    _logger.debug("failed to index value with {}", indexType, exception);
     if (_serverMetrics != null) {
       String metricKeyName = _realtimeTableName + "-" + indexType + "-indexingError";
       _serverMetrics.addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
@@ -848,7 +848,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private void recordIndexingError(String indexType) {
-    _logger.error("failed to index value with {}", indexType);
+    _logger.debug("failed to index value with {}", indexType);
     if (_serverMetrics != null) {
       String metricKeyName = _realtimeTableName + "-" + indexType + "-indexingError";
       _serverMetrics.addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
