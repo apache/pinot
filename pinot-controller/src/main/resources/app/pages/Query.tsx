@@ -317,8 +317,8 @@ const QueryPage = () => {
          + `Please reload the table in order to refresh these segments to the new schema.`);
     }
     if (checked.useMSE) {
-      warnings.push(`Using Multi-Stage Query Engine is an experimental feature. Please report any bugs to `
-          + `Apache Pinot Slack channel`);
+      warnings.push(`Using Multi-Stage Query Engine/s. This is an experimental feature. Please report any bugs to `
+          + `Apache Pinot Slack channel.`);
     }
     return warnings;
   }
