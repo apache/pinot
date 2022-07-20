@@ -145,7 +145,7 @@ public class PinotTaskRestletResource {
   HttpConnectionManager _connectionManager;
 
   @Context
-  private UriInfo info;
+  private UriInfo _uriInfo;
 
   @GET
   @Path("/tasks/tasktypes")
@@ -285,7 +285,7 @@ public class PinotTaskRestletResource {
     // Call all controllers
     List<InstanceConfig> controllers = _pinotHelixResourceManager.getAllControllerInstanceConfigs();
     // Relying on original schema that was used to query the controller
-    URI uri = info.getRequestUri();
+    URI uri = _uriInfo.getRequestUri();
     String scheme = uri.getScheme();
     List<String> controllerUrls = controllers.stream().map(controller -> {
       return String.format("%s://%s:%d/tasks/generator/%s/%s/debug?localOnly=true", scheme, controller.getHostName(),
