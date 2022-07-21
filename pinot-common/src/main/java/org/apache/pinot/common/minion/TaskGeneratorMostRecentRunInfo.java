@@ -19,10 +19,15 @@
 package org.apache.pinot.common.minion;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
+
 
 /**
  * a task generator running history which keeps the most recent several success run timestamp and the most recent
@@ -60,8 +65,11 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
   /**
    * Gets the timestamp to error message map of the most recent several error runs
    */
-  public TreeMap<Long, String> getMostRecentErrorRunMessages() {
-    return _mostRecentErrorRunMessages;
+  public TreeMap<String, String> getMostRecentErrorRunMessages() {
+    TreeMap<String, String> result = new TreeMap<>();
+    _mostRecentErrorRunMessages.forEach((timestamp, error) -> result.put(
+        OffsetDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.of("UTC")).toString(), error));
+    return result;
   }
 
   /**
@@ -79,8 +87,10 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
   /**
    * Gets the timestamp of the most recent several success runs
    */
-  public List<Long> getMostRecentSuccessRunTS() {
-    return _mostRecentSuccessRunTS;
+  public List<String> getMostRecentSuccessRunTS() {
+    return _mostRecentSuccessRunTS.stream()
+        .map(timestamp -> OffsetDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.of("UTC")).toString())
+        .collect(Collectors.toList());
   }
 
   /**
