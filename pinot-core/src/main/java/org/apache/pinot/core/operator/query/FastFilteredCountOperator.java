@@ -38,14 +38,16 @@ public class FastFilteredCountOperator extends BaseOperator<IntermediateResultsB
   private final BaseFilterOperator _filterOperator;
   private final AggregationFunction[] _aggregationFunctions;
   private final SegmentMetadata _segmentMetadata;
+  private final boolean _nullHandlingEnabled;
 
   private long _docsCounted;
 
   public FastFilteredCountOperator(AggregationFunction[] aggregationFunctions, BaseFilterOperator filterOperator,
-      SegmentMetadata segmentMetadata) {
+      SegmentMetadata segmentMetadata, boolean nullHandlingEnabled) {
     _filterOperator = filterOperator;
     _segmentMetadata = segmentMetadata;
     _aggregationFunctions = aggregationFunctions;
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   @Override
@@ -65,7 +67,7 @@ public class FastFilteredCountOperator extends BaseOperator<IntermediateResultsB
     List<Object> aggregates = new ArrayList<>(1);
     aggregates.add(count);
     _docsCounted += count;
-    return new IntermediateResultsBlock(_aggregationFunctions, aggregates);
+    return new IntermediateResultsBlock(_aggregationFunctions, aggregates, _nullHandlingEnabled);
   }
 
   @Override

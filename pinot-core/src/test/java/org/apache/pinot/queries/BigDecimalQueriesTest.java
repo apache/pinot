@@ -397,16 +397,16 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       assertEquals(dataSchema,
           new DataSchema(new String[]{"maxValue"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
       List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 5);
-      assertEquals(rows.get(0)[0], 0.0);
+      // The default null ordering is: 'NULLS LAST'. This is why the number of returned value is 4 and not 5.
+      assertEquals(rows.size(), 4);
       int i = 0;
-      for (int index = 1; index < 5; index++) {
-        Object[] row = rows.get(index);
-        assertEquals(row.length, 1);
+      for (int index = 0; index < 4; index++) {
         if (i % 4 == 3) {
           // Null values are inserted at: index % 4 == 3.
           i++;
         }
+        Object[] row = rows.get(index);
+        assertEquals(row.length, 1);
         assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)).doubleValue());
         i++;
       }

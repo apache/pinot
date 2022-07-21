@@ -28,11 +28,13 @@ import org.apache.pinot.common.request.context.FilterContext;
 public class OrRowMatcher implements RowMatcher {
   private final RowMatcher[] _childMatchers;
 
-  public OrRowMatcher(List<FilterContext> childFilters, ValueExtractorFactory valueExtractorFactory) {
+  public OrRowMatcher(List<FilterContext> childFilters, ValueExtractorFactory valueExtractorFactory,
+      boolean nullHandlingEnabled) {
     int numChildren = childFilters.size();
     _childMatchers = new RowMatcher[numChildren];
     for (int i = 0; i < numChildren; i++) {
-      _childMatchers[i] = RowMatcherFactory.getRowMatcher(childFilters.get(i), valueExtractorFactory);
+      _childMatchers[i] = RowMatcherFactory.getRowMatcher(childFilters.get(i), valueExtractorFactory,
+          nullHandlingEnabled);
     }
   }
 

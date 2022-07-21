@@ -77,7 +77,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
   protected IntermediateResultsBlock getNextBlock() {
     DistinctTable distinctTable = buildResult();
     return new IntermediateResultsBlock(new AggregationFunction[]{_distinctAggregationFunction},
-        Collections.singletonList(distinctTable));
+        Collections.singletonList(distinctTable), distinctTable.getDataSchema(), _nullHandlingEnabled);
   }
 
   /**

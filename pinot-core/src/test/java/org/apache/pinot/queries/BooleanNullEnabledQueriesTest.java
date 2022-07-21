@@ -195,6 +195,21 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       }
     }
     {
+      String query = "SELECT booleanColumn FROM testTable WHERE booleanColumn = false";
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{"booleanColumn"}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 10);
+      for (int i = 0; i < 10; i++) {
+        Object[] row = rows.get(i);
+        assertEquals(row.length, 1);
+        assertEquals(row[0], false);
+      }
+    }
+    {
       String query = "SELECT booleanColumn FROM testTable WHERE booleanColumn";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
@@ -274,6 +289,43 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       Object[] thirdRow = rows.get(2);
       assertEquals(thirdRow.length, 1);
       assertEquals(thirdRow[0], false);
+    }
+    {
+      String query =
+          "SELECT COUNT(*) AS count, booleanColumn FROM testTable GROUP BY booleanColumn ORDER BY booleanColumn";
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema, new DataSchema(new String[]{"count", "booleanColumn"},
+          new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.BOOLEAN}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 3);
+      Object[] firstRow = rows.get(0);
+      assertEquals(firstRow.length, 2);
+      assertEquals(firstRow[0], (long) 1716);
+      assertEquals(firstRow[1], false);
+      Object[] secondRow = rows.get(1);
+      assertEquals(secondRow.length, 2);
+      assertEquals(secondRow[0], (long) 1716);
+      assertEquals(secondRow[1], true);
+      Object[] thirdRow = rows.get(2);
+      assertEquals(thirdRow.length, 2);
+      assertEquals(thirdRow[0], (long) 568);
+      assertNull(thirdRow[1]);
+    }
+    {
+      String query =
+          "SELECT MAX(booleanColumn) AS maxBoolean FROM testTable GROUP BY booleanColumn HAVING maxBoolean < 1 ORDER "
+              + "BY booleanColumn";
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema, new DataSchema(new String[]{"maxBoolean"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 1);
+      Object[] row = rows.get(0);
+      assertEquals(row.length, 1);
+      assertEquals(row[0], 0.0);
     }
     DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_3);
   }

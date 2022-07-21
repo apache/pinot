@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -30,15 +31,26 @@ import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.roaringbitmap.RoaringBitmap;
 
 
-public class CountAggregationFunction implements AggregationFunction<Long, Long> {
-  private static final String COLUMN_NAME = "count_star";
-  private static final String RESULT_COLUMN_NAME = "count(*)";
+public class CountAggregationFunction extends BaseSingleInputAggregationFunction<Long, Long> {
   private static final double DEFAULT_INITIAL_VALUE = 0.0;
   // Special expression used by star-tree to pass in BlockValSet
   private static final ExpressionContext STAR_TREE_COUNT_STAR_EXPRESSION =
       ExpressionContext.forIdentifier(AggregationFunctionColumnPair.STAR);
+
+  private final String _columnName;
+  private final String _resultColumnName;
+  private final boolean _nullHandlingEnabled;
+
+  public CountAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+    super(expression);
+    String expStr = expression.toString();
+    _columnName = expStr.equals("*") ? "star" : expStr;
+    _resultColumnName = expStr.equals("*") ? "*" : expStr;
+    _nullHandlingEnabled = nullHandlingEnabled;
+  }
 
   @Override
   public AggregationFunctionType getType() {
@@ -47,17 +59,20 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
 
   @Override
   public String getColumnName() {
-    return COLUMN_NAME;
+    return getType().getName() + "_" + _columnName;
   }
 
   @Override
   public String getResultColumnName() {
-    return RESULT_COLUMN_NAME;
+    return getType().getName().toLowerCase() + "(" + _resultColumnName + ")";
   }
 
   @Override
   public List<ExpressionContext> getInputExpressions() {
-    return Collections.emptyList();
+    if (Objects.equals(_expression.getIdentifier(), AggregationFunctionColumnPair.STAR)) {
+      return Collections.emptyList();
+    }
+    return super.getInputExpressions();
   }
 
   @Override
@@ -75,6 +90,20 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     if (blockValSetMap.isEmpty()) {
       aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
+    } else if (!blockValSetMap.containsKey(STAR_TREE_COUNT_STAR_EXPRESSION)) {
+      if (!_nullHandlingEnabled) {
+        aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
+        return;
+      }
+      assert blockValSetMap.size() == 1;
+      BlockValSet blockValSet = blockValSetMap.values().iterator().next();
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+      int numNulls = 0;
+      if (nullBitmap != null) {
+        numNulls = nullBitmap.getCardinality();
+      }
+      assert numNulls <= length;
+      aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + (length - numNulls));
     } else {
       // Star-tree pre-aggregated values
       long[] valueArray = blockValSetMap.get(STAR_TREE_COUNT_STAR_EXPRESSION).getLongValuesSV();
@@ -89,7 +118,7 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    if (blockValSetMap.isEmpty()) {
+    if (blockValSetMap.isEmpty() || !blockValSetMap.containsKey(STAR_TREE_COUNT_STAR_EXPRESSION)) {
       for (int i = 0; i < length; i++) {
         int groupKey = groupKeyArray[i];
         groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
@@ -107,7 +136,7 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    if (blockValSetMap.isEmpty()) {
+    if (blockValSetMap.isEmpty() || !blockValSetMap.containsKey(STAR_TREE_COUNT_STAR_EXPRESSION)) {
       for (int i = 0; i < length; i++) {
         for (int groupKey : groupKeysArray[i]) {
           groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
@@ -132,7 +161,8 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
 
   @Override
   public Long extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    return (long) groupByResultHolder.getDoubleResult(groupKey);
+    Double result = groupByResultHolder.getDoubleResult(groupKey);
+    return result == null ? null : result.longValue();
   }
 
   @Override

@@ -48,14 +48,17 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
   private final PredicateEvaluator _rangePredicateEvaluator;
   private final DataSource _dataSource;
   private final int _numDocs;
+  private final boolean _nullHandlingEnabled;
 
   @SuppressWarnings("unchecked")
-  public RangeIndexBasedFilterOperator(PredicateEvaluator rangePredicateEvaluator, DataSource dataSource, int numDocs) {
+  public RangeIndexBasedFilterOperator(PredicateEvaluator rangePredicateEvaluator, DataSource dataSource, int numDocs,
+      boolean nullHandlingEnabled) {
     _rangePredicateEvaluator = rangePredicateEvaluator;
     _rangeEvaluator = RangeEvaluator.of((RangeIndexReader<ImmutableRoaringBitmap>) dataSource.getRangeIndex(),
         rangePredicateEvaluator);
     _dataSource = dataSource;
     _numDocs = numDocs;
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   @Override
@@ -80,7 +83,7 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     }
     // Need to scan the first and last range as they might be partially matched
     ScanBasedFilterOperator scanBasedFilterOperator =
-        new ScanBasedFilterOperator(_rangePredicateEvaluator, _dataSource, _numDocs);
+        new ScanBasedFilterOperator(_rangePredicateEvaluator, _dataSource, _numDocs, _nullHandlingEnabled);
     FilterBlockDocIdSet scanBasedDocIdSet = scanBasedFilterOperator.getNextBlock().getBlockDocIdSet();
     MutableRoaringBitmap docIds = ((ScanBasedDocIdIterator) scanBasedDocIdSet.iterator()).applyAnd(partialMatches);
     if (matches != null) {

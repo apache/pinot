@@ -131,12 +131,13 @@ class SumAvgGapfillProcessor extends BaseGapfillProcessor {
     _filteredMap = new HashMap<>();
 
     if (_queryContext.getSubquery() != null && _queryContext.getFilter() != null) {
-      _postGapfillFilterHandler = new GapfillFilterHandler(_queryContext.getFilter(), dataSchema);
+      _postGapfillFilterHandler = new GapfillFilterHandler(_queryContext.getFilter(), dataSchema,
+          _queryContext.isNullHandlingEnabled());
     }
 
     if (_queryContext.getHavingFilter() != null) {
-      _postAggregateHavingFilterHandler =
-          new GapfillFilterHandler(_queryContext.getHavingFilter(), resultTableSchema);
+      _postAggregateHavingFilterHandler = new GapfillFilterHandler(_queryContext.getHavingFilter(), resultTableSchema,
+          _queryContext.isNullHandlingEnabled());
     }
 
     initializeAggregationValues(rows, dataSchema);

@@ -16,28 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce.filter;
 
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.core.query.reduce.filter.RowMatcher;
-import org.apache.pinot.core.query.reduce.filter.RowMatcherFactory;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 
 
 /**
- * Handler for HAVING clause.
+ * Predicate matcher and null handler.
  */
-public class HavingFilterHandler {
-  private final RowMatcher _rowMatcher;
+public class PredicateRowMatcherAndNullHandler extends PredicateRowMatcher {
 
-  public HavingFilterHandler(FilterContext havingFilter, PostAggregationHandler postAggregationHandler,
-      boolean nullHandlingEnabled) {
-    _rowMatcher = RowMatcherFactory.getRowMatcher(havingFilter, postAggregationHandler, nullHandlingEnabled);
+  public PredicateRowMatcherAndNullHandler(Predicate predicate, ValueExtractor valueExtractor) {
+    super(predicate, valueExtractor);
   }
 
-  /**
-   * Returns {@code true} if the given row matches the HAVING clause, {@code false} otherwise.
-   */
+  @Override
   public boolean isMatch(Object[] row) {
-    return _rowMatcher.isMatch(row);
+    Object value = _valueExtractor.extract(row);
+    if (value == null) {
+      return false;
+    }
+    return isMatch(value);
   }
 }

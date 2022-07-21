@@ -42,7 +42,7 @@ public class AggregationFunctionFactoryTest {
         AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
     assertTrue(aggregationFunction instanceof CountAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.COUNT);
-    assertEquals(aggregationFunction.getColumnName(), "count_star");
+    assertEquals(aggregationFunction.getColumnName(), "count_column");
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
     function = getFunction("MiN");

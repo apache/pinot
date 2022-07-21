@@ -51,11 +51,12 @@ class CountGapfillProcessor extends BaseGapfillProcessor {
       List<Object[]> rows, DataSchema dataSchema, DataSchema resultTableSchema) {
     DataSchema.ColumnDataType timeColumnDataType = resultTableSchema.getColumnDataTypes()[0];
     if (_queryContext.getSubquery() != null && _queryContext.getFilter() != null) {
-      _postGapfillFilterHandler = new GapfillFilterHandler(_queryContext.getFilter(), dataSchema);
+      _postGapfillFilterHandler = new GapfillFilterHandler(_queryContext.getFilter(), dataSchema,
+          _queryContext.isNullHandlingEnabled());
     }
     if (_queryContext.getHavingFilter() != null) {
-      _postAggregateHavingFilterHandler =
-          new GapfillFilterHandler(_queryContext.getHavingFilter(), resultTableSchema);
+      _postAggregateHavingFilterHandler = new GapfillFilterHandler(_queryContext.getHavingFilter(),
+          resultTableSchema, _queryContext.isNullHandlingEnabled());
     }
 
     int rowIndex = 0;

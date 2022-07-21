@@ -198,13 +198,13 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
         if (numPredicateEvaluators == 1) {
           // Single predicate evaluator
           childFilterOperators
-              .add(FilterOperatorUtils.getLeafFilterOperator(predicateEvaluators.get(0), dataSource, numDocs));
+              .add(FilterOperatorUtils.getLeafFilterOperator(predicateEvaluators.get(0), dataSource, numDocs, false));
         } else {
           // Predicate evaluators conjoined with OR
           List<BaseFilterOperator> orChildFilterOperators = new ArrayList<>(numPredicateEvaluators);
           for (PredicateEvaluator childPredicateEvaluator : predicateEvaluators) {
             orChildFilterOperators
-                .add(FilterOperatorUtils.getLeafFilterOperator(childPredicateEvaluator, dataSource, numDocs));
+                .add(FilterOperatorUtils.getLeafFilterOperator(childPredicateEvaluator, dataSource, numDocs, false));
           }
           childFilterOperators.add(
               FilterOperatorUtils.getOrFilterOperator(_queryContext, orChildFilterOperators, numDocs));

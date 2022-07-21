@@ -40,7 +40,7 @@ public class GapfillFilterHandler implements ValueExtractorFactory {
   private final DataSchema _dataSchema;
   private final Map<String, Integer> _indexes;
 
-  public GapfillFilterHandler(FilterContext filter, DataSchema dataSchema) {
+  public GapfillFilterHandler(FilterContext filter, DataSchema dataSchema, boolean nullHandlingEnabled) {
     _dataSchema = dataSchema;
     _indexes = new HashMap<>();
     for (int i = 0; i < _dataSchema.size(); i++) {
@@ -48,7 +48,7 @@ public class GapfillFilterHandler implements ValueExtractorFactory {
       // TODO: Please refer to {@link PostAggregationHandler} on how to handle the index for aggregation queries.
       _indexes.put(_dataSchema.getColumnName(i), i);
     }
-    _rowMatcher = RowMatcherFactory.getRowMatcher(filter, this);
+    _rowMatcher = RowMatcherFactory.getRowMatcher(filter, this, nullHandlingEnabled);
   }
 
   /**

@@ -30,7 +30,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * Predicate matcher.
  */
 public class PredicateRowMatcher implements RowMatcher {
-  private final ValueExtractor _valueExtractor;
+  protected final ValueExtractor _valueExtractor;
+
   private final DataType _valueType;
   private final PredicateEvaluator _predicateEvaluator;
 
@@ -42,7 +43,10 @@ public class PredicateRowMatcher implements RowMatcher {
 
   @Override
   public boolean isMatch(Object[] row) {
-    Object value = _valueExtractor.extract(row);
+    return isMatch(_valueExtractor.extract(row));
+  }
+
+  protected boolean isMatch(Object value) {
     switch (_valueType) {
       case INT:
         return _predicateEvaluator.applySV((int) value);
