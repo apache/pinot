@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.minion;
 
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.google.common.annotations.VisibleForTesting;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
  * a task generator running history which keeps the most recent several success run timestamp and the most recent
  * several error run messages.
  */
+@JsonPropertyOrder({"tableNameWithType", "taskType", "mostRecentSuccessRunTS", "mostRecentErrorRunMessages"})
 public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
   @VisibleForTesting
   static final int MAX_NUM_OF_HISTORY_TO_KEEP = 5;
