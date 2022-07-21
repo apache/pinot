@@ -22,12 +22,12 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
-import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ClusterConstraints;
 import org.apache.helix.model.ConstraintItem;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.Message;
+import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
@@ -81,6 +81,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
 
     // Disable delay rebalance feature
     IdealState idealState = _helixResourceManager.getTableIdealState(Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+    assert idealState != null;
     idealState.setDelayRebalanceEnabled(false);
     idealState.setMinActiveReplicas(1);
     _helixAdmin.updateIdealState(getHelixClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME, idealState);
@@ -239,6 +240,13 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
     // The first Pinot-only controller should be the MASTER for all partitions
     checkInstanceState(helixAdmin);
 
+    // Sets the minimum active replicas so that a recovery rebalance will be retriggered right away.
+    // Otherwise we rely on delayed rebalance to move partitions from offline instance.
+    IdealState idealState =
+        helixAdmin.getResourceIdealState(getHelixClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+    idealState.setMinActiveReplicas(1);
+    helixAdmin.updateIdealState(getHelixClusterName(), Helix.LEAD_CONTROLLER_RESOURCE_NAME, idealState);
+
     // Start the second Pinot-only controller
     properties = getDefaultControllerConfiguration();
     properties.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.PINOT_ONLY);
@@ -288,7 +296,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
       }
       for (String partition : partitionSet) {
         Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
-        if (stateMap.size() != 1 || !stateMap.values().contains(expectedInstanceState)) {
+        if (stateMap.size() != 1 || !stateMap.containsValue(expectedInstanceState)) {
           return false;
         }
       }
@@ -300,7 +308,7 @@ public class PinotControllerModeStatelessTest extends ControllerTest {
   public void cleanUpCluster() {
     ZkClient zkClient = new ZkClient(getZkUrl());
     if (zkClient.exists("/" + getHelixClusterName())) {
-      zkClient.deleteRecursive("/" + getHelixClusterName());
+      zkClient.deleteRecursively("/" + getHelixClusterName());
     }
     zkClient.close();
   }

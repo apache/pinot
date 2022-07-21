@@ -23,8 +23,8 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.Message;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
 /**
