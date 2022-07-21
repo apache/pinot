@@ -148,6 +148,8 @@ public class SegmentCompletionProtocol {
   public static final String REASON_TIME_LIMIT = "timeLimit";
   // Stop reason sent by server as end of partitionGroup reached
   public static final String REASON_END_OF_PARTITION_GROUP = "endOfPartitionGroup";
+  // Stop reason sent by server as force commit message received
+  public static final String REASON_FORCE_COMMIT_MESSAGE_RECEIVED = "forceCommitMessageReceived";
 
   // Canned responses
   public static final Response RESP_NOT_LEADER =

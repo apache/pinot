@@ -196,12 +196,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     // Gather stats for realtime consuming segments
-    int numConsumingSegments = 0;
+    int numConsumingSegmentsQueried = 0;
     long minIndexTimeMs = Long.MAX_VALUE;
     long minIngestionTimeMs = Long.MAX_VALUE;
     for (IndexSegment indexSegment : indexSegments) {
       if (indexSegment instanceof MutableSegment) {
-        numConsumingSegments += 1;
+        numConsumingSegmentsQueried += 1;
         SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
         long indexTimeMs = segmentMetadata.getLastIndexedTimestamp();
         if (indexTimeMs != Long.MIN_VALUE && indexTimeMs < minIndexTimeMs) {
@@ -263,11 +263,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, numMissingSegments);
     }
 
-    if (numConsumingSegments > 0) {
+    if (numConsumingSegmentsQueried > 0) {
       long minConsumingFreshnessTimeMs = minIngestionTimeMs != Long.MAX_VALUE ? minIngestionTimeMs : minIndexTimeMs;
       LOGGER.debug("Request {} queried {} consuming segments with minConsumingFreshnessTimeMs: {}", requestId,
-          numConsumingSegments, minConsumingFreshnessTimeMs);
-      metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), Integer.toString(numConsumingSegments));
+          numConsumingSegmentsQueried, minConsumingFreshnessTimeMs);
+      metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(), Integer.toString(numConsumingSegmentsQueried));
       metadata.put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), Long.toString(minConsumingFreshnessTimeMs));
     }
 

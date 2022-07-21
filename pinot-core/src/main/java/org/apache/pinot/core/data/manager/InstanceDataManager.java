@@ -163,4 +163,9 @@ public interface InstanceDataManager {
    * uploaded segment file. Servers utilize segment uploader to upload llc segment to segment store.
    */
   SegmentUploader getSegmentUploader();
+
+  /**
+   * Immediately stop consumption and start committing the consuming segments.
+   */
+  void forceCommit(String tableNameWithType, Set<String> segmentNames);
 }

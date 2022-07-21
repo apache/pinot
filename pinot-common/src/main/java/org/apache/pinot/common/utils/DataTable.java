@@ -106,7 +106,7 @@ public interface DataTable {
     NUM_SEGMENTS_QUERIED("numSegmentsQueried", MetadataValueType.INT),
     NUM_SEGMENTS_PROCESSED("numSegmentsProcessed", MetadataValueType.INT),
     NUM_SEGMENTS_MATCHED("numSegmentsMatched", MetadataValueType.INT),
-    NUM_CONSUMING_SEGMENTS_PROCESSED("numConsumingSegmentsProcessed", MetadataValueType.INT),
+    NUM_CONSUMING_SEGMENTS_QUERIED("numConsumingSegmentsQueried", MetadataValueType.INT),
     MIN_CONSUMING_FRESHNESS_TIME_MS("minConsumingFreshnessTimeMs", MetadataValueType.LONG),
     TOTAL_DOCS("totalDocs", MetadataValueType.LONG),
     NUM_GROUPS_LIMIT_REACHED("numGroupsLimitReached", MetadataValueType.STRING),
