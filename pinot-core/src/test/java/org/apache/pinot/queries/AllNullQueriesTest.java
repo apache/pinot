@@ -297,8 +297,8 @@ public class AllNullQueriesTest extends BaseQueriesTest {
     if (columnDataType != ColumnDataType.STRING) {
       {
         String query = String.format(
-            "SELECT count(*) as count1, count(%s) as count2, min(%s) as min, max(%s) as max FROM testTable", COLUMN_NAME,
-            COLUMN_NAME, COLUMN_NAME);
+            "SELECT count(*) as count1, count(%s) as count2, min(%s) as min, max(%s) as max FROM testTable",
+            COLUMN_NAME, COLUMN_NAME, COLUMN_NAME);
         BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
         ResultTable resultTable = brokerResponse.getResultTable();
         DataSchema dataSchema = resultTable.getDataSchema();
@@ -405,14 +405,16 @@ public class AllNullQueriesTest extends BaseQueriesTest {
     }
     if (columnDataType != ColumnDataType.STRING) {
       {
-        String query = String.format("SELECT COUNT(%s) AS count, MIN(%s) AS min, MAX(%s) AS max, AVG(%s) AS avg," +
-                " SUM(%s) AS sum FROM testTable LIMIT 1000", COLUMN_NAME, COLUMN_NAME, COLUMN_NAME, COLUMN_NAME,
+        String query = String.format("SELECT COUNT(%s) AS count, MIN(%s) AS min, MAX(%s) AS max, AVG(%s) AS avg,"
+                + " SUM(%s) AS sum FROM testTable LIMIT 1000", COLUMN_NAME, COLUMN_NAME, COLUMN_NAME, COLUMN_NAME,
             COLUMN_NAME);
         BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
         ResultTable resultTable = brokerResponse.getResultTable();
         DataSchema dataSchema = resultTable.getDataSchema();
-        assertEquals(dataSchema, new DataSchema(new String[]{"count", "min", "max", "avg", "sum"}, new ColumnDataType[]{
-            ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
+        assertEquals(dataSchema, new DataSchema(new String[]{"count", "min", "max", "avg", "sum"},
+            new ColumnDataType[] {
+                ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE,
+                ColumnDataType.DOUBLE
         }));
         List<Object[]> rows = resultTable.getRows();
         assertEquals(rows.size(), 1);
@@ -550,9 +552,9 @@ public class AllNullQueriesTest extends BaseQueriesTest {
       {
         // MODE cannot handle BIG_DECIMAL yet.
         if (dataType != DataType.BIG_DECIMAL) {
-          String query = String.format("SELECT AVG(%s) AS avg, MODE(%s) AS mode, DISTINCTCOUNT(%s) as distinct_count FROM"
-                  + " testTable GROUP BY %s ORDER BY %s LIMIT 200", COLUMN_NAME, COLUMN_NAME, COLUMN_NAME, COLUMN_NAME,
-              COLUMN_NAME);
+          String query = String.format("SELECT AVG(%s) AS avg, MODE(%s) AS mode, DISTINCTCOUNT(%s) as distinct_count"
+                  + " FROM testTable GROUP BY %s ORDER BY %s LIMIT 200", COLUMN_NAME, COLUMN_NAME, COLUMN_NAME,
+              COLUMN_NAME, COLUMN_NAME);
           BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
           ResultTable resultTable = brokerResponse.getResultTable();
           DataSchema dataSchema = resultTable.getDataSchema();

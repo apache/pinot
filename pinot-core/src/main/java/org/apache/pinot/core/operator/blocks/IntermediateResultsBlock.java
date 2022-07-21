@@ -465,8 +465,8 @@ public class IntermediateResultsBlock implements Block {
     if (_nullHandlingEnabled) {
       for (int i = 0; i < numAggregationFunctions; i++) {
         Object value = _aggregationResult.get(i);
-        // OBJECT (e.g. DistinctTable) calls toBytes() (e.g. DistinctTable.toBytes()) which takes care of replacing nulls
-        // with default values, and building presence vector and serializing both.
+        // OBJECT (e.g. DistinctTable) calls toBytes() (e.g. DistinctTable.toBytes()) which takes care of replacing
+        // nulls with default values, and building presence vector and serializing both.
         if (columnDataTypes[i] != ColumnDataType.OBJECT) {
           if (value == null) {
             value = colDefaultNullValues[i];
