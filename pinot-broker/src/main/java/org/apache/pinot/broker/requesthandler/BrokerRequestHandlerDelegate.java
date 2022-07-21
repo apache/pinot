@@ -77,8 +77,8 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     if (_isMultiStageQueryEngineEnabled && _multiStageWorkerRequestHandler != null) {
       if (request.has("queryOptions")) {
         Map<String, String> queryOptionMap = BaseBrokerRequestHandler.getOptionsFromJson(request, "queryOptions");
-        if ("true".equalsIgnoreCase(queryOptionMap.getOrDefault(
-            CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "false"))) {
+        if (Boolean.parseBoolean(queryOptionMap.get(
+            CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
           return _multiStageWorkerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
         }
       }

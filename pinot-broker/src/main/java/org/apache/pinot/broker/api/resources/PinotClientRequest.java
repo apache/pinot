@@ -131,8 +131,8 @@ public class PinotClientRequest {
       if (!requestJson.has(Request.SQL)) {
         throw new IllegalStateException("Payload is missing the query string field 'sql'");
       }
-      ObjectNode sqlRequestJson = (ObjectNode) requestJson;
-      BrokerResponse brokerResponse = executeSqlQuery(sqlRequestJson, makeHttpIdentity(requestContext), false);
+      BrokerResponse brokerResponse = executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext),
+          false);
       asyncResponse.resume(brokerResponse.toJsonString());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST request", e);
@@ -170,15 +170,6 @@ public class PinotClientRequest {
             new UnsupportedOperationException("Unsupported SQL type - " + sqlType)));
     }
   }
-
-  private String constructSqlQueryOptions(JsonNode requestJson) {
-    String queryOptions = "";
-    if (requestJson.has("queryOptions")) {
-      queryOptions = requestJson.get("queryOptions").asText() + ";";
-    }
-    return queryOptions;
-  }
-
   private static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {
     Multimap<String, String> headers = ArrayListMultimap.create();
     context.getHeaderNames().forEach(key -> context.getHeaders(key).forEach(value -> headers.put(key, value)));
