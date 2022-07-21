@@ -178,25 +178,27 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
 
   private AggregationFunction toAggregationFunction(RexExpression aggCall, int aggregationFunctionInputRef) {
     Preconditions.checkState(aggCall instanceof RexExpression.FunctionCall);
+    // TODO(Rong Rong): query options are not supported by the new engine at this moment.
     switch (((RexExpression.FunctionCall) aggCall).getFunctionName()) {
       case "$SUM":
       case "$SUM0":
       case "SUM":
         return new SumAggregationFunction(
-            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
+            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)), false);
       case "$COUNT":
       case "COUNT":
-        return new CountAggregationFunction();
+        return new CountAggregationFunction(
+            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)), false);
       case "$MIN":
       case "$MIN0":
       case "MIN":
         return new MinAggregationFunction(
-            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
+            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)), false);
       case "$MAX":
       case "$MAX0":
       case "MAX":
         return new MaxAggregationFunction(
-            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
+            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)), false);
       default:
         throw new IllegalStateException(
             "Unexpected value: " + ((RexExpression.FunctionCall) aggCall).getFunctionName());
