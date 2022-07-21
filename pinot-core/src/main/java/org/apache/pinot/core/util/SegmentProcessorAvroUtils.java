@@ -75,8 +75,8 @@ public final class SegmentProcessorAvroUtils {
     SchemaBuilder.FieldAssembler<org.apache.avro.Schema> fieldAssembler = SchemaBuilder.record("record").fields();
 
     List<FieldSpec> orderedFieldSpecs = pinotSchema.getAllFieldSpecs().stream()
-        .sorted()
-        .collect(Collectors.toList());
+        .sorted(comparing(FieldSpec::getName))
+        .collect(toList());
     for (FieldSpec fieldSpec : orderedFieldSpecs) {
       String name = fieldSpec.getName();
       DataType storedType = fieldSpec.getDataType().getStoredType();
