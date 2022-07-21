@@ -53,6 +53,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryOptionsUtils;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -252,10 +253,32 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         return new AggregationPlanNode(indexSegment, queryContext);
       }
     } else if (QueryContextUtils.isSelectionQuery(queryContext)) {
+      validateSelectionOrderByExpressions(indexSegment, queryContext);
       return new SelectionPlanNode(indexSegment, queryContext);
     } else {
       assert QueryContextUtils.isDistinctQuery(queryContext);
       return new DistinctPlanNode(indexSegment, queryContext);
+    }
+  }
+
+  private void validateSelectionOrderByExpressions(IndexSegment indexSegment, QueryContext queryContext) {
+    if (queryContext.getLimit() == 0 || queryContext.getOrderByExpressions() == null
+        || queryContext.getOrderByExpressions().size() == 0) {
+      return;
+    }
+
+    // Check that the first ORDER BY expression is not a MV identifier expression otherwise throw an exception.
+    // Order-by for MV column identifier as first expression will fail during query execution anyways, this validation
+    // during planning is meant to return a meaningful message to the end user.
+    OrderByExpressionContext orderByExpressionContext = queryContext.getOrderByExpressions().get(0);
+    if (orderByExpressionContext.getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
+      String columnName = orderByExpressionContext.getExpression().getIdentifier();
+
+      ColumnMetadata columnMetadata = indexSegment.getSegmentMetadata().getColumnMetadataMap().get(columnName);
+      if (!columnMetadata.isSingleValue()) {
+        throw new UnsupportedOperationException("Selection Order-By cannot have an MV identifier column("
+            + columnName + ") as the first order-by expression");
+      }
     }
   }
 

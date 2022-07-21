@@ -51,6 +51,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -386,15 +387,65 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
     }
   }
 
+  /**
+   * Today selection ORDER BY only on MV columns (irrespective of whether it's dictionary based or raw) doesn't work
+   * as the semantics of how such queries should behave isn't clear. If the MV column is the first expression in the
+   * ORDER BY, the planner fails the query. The query would have failed at execution anyways. For backward
+   * compatibility we allow queries with a mix of SV and MV columns provided the SV column is the first order-by
+   * expression.
+   */
   @Test
-  public void testNonAggregateMVGroupBY() {
+  public void testSelectionOrderBy() {
     {
-      // TODO: Today selection ORDER BY only on MV columns (irrespective of whether it's dictionary based or raw)
-      //       doesn't work. Fix ORDER BY only for MV columns
       String query = "SELECT mvFloatCol from testTable WHERE mvFloatCol < 5 ORDER BY mvFloatCol LIMIT 10";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertEquals(brokerResponseNative.getProcessingExceptions().size(), 2);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
+
+      String query1 = "SELECT mvRawFloatCol from testTable WHERE mvRawFloatCol < 5 ORDER BY mvRawFloatCol LIMIT 10";
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query1));
     }
+    {
+      String query = "SELECT mvFloatCol, svIntCol from testTable WHERE mvFloatCol < 5 ORDER BY mvFloatCol, svIntCol "
+          + "LIMIT 10";
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
+
+      String query1 = "SELECT mvRawFloatCol, svIntCol from testTable WHERE mvRawFloatCol < 5 ORDER BY mvRawFloatCol, "
+          + "svIntCol LIMIT 10";
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query1));
+    }
+    {
+      String query = "SELECT svIntCol, mvRawFloatCol from testTable WHERE mvRawFloatCol < 5 ORDER BY svIntCol, "
+          + "mvRawFloatCol LIMIT 10";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertEquals(brokerResponseNative.getExceptionsSize(), 0);
+      ResultTable resultTable = getBrokerResponse(query).getResultTable();
+      assertNotNull(resultTable);
+      DataSchema dataSchema = new DataSchema(new String[]{
+          "svIntCol", "mvRawFloatCol"
+      }, new DataSchema.ColumnDataType[]{
+          DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.FLOAT_ARRAY
+      });
+      assertEquals(resultTable.getDataSchema(), dataSchema);
+      List<Object[]> recordRows = resultTable.getRows();
+      assertEquals(recordRows.size(), 10);
+
+      int[] expectedSVInts = new int[]{0, 0, 0, 0, 1, 1, 1, 1, 2, 2};
+
+      for (int i = 0; i < 10; i++) {
+        Object[] values = recordRows.get(i);
+        assertEquals(values.length, 2);
+        int svValue = (int) values[0];
+        assertEquals(svValue, expectedSVInts[i]);
+        float[] floats = (float[]) values[1];
+        assertEquals(floats.length, 2);
+
+        assertEquals((float) svValue, floats[0]);
+        assertEquals(floats[0] + 100, floats[1]);
+      }
+    }
+  }
+
+  @Test
+  public void testNonAggregateMVGroupBy() {
     {
       // Test a group by query on some raw MV rows. Order by on SV column added for determinism
       String query = "SELECT svIntCol, mvRawFloatCol, mvRawDoubleCol, mvRawStringCol from testTable GROUP BY "
