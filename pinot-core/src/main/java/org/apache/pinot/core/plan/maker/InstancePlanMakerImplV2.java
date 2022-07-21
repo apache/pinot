@@ -273,11 +273,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     OrderByExpressionContext orderByExpressionContext = queryContext.getOrderByExpressions().get(0);
     if (orderByExpressionContext.getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
       String columnName = orderByExpressionContext.getExpression().getIdentifier();
-
-      ColumnMetadata columnMetadata = indexSegment.getSegmentMetadata().getColumnMetadataMap().get(columnName);
-      if (!columnMetadata.isSingleValue()) {
-        throw new UnsupportedOperationException("Selection Order-By cannot have an MV identifier column("
-            + columnName + ") as the first order-by expression");
+      if (!indexSegment.getDataSource(columnName).getDataSourceMetadata().isSingleValue()) {
+        throw new UnsupportedOperationException("Selection Order-By cannot have an MV identifier column(" + columnName
+            + ") as the first order-by expression");
       }
     }
   }
