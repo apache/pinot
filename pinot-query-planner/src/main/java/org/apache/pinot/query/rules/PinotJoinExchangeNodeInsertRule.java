@@ -79,7 +79,7 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       rightExchange = LogicalExchange.create(rightInput,
           RelDistributions.hash(conditions.get(1)));
     } else { // if (hints.contains(PinotRelationalHints.USE_BROADCAST_JOIN))
-      leftExchange = LogicalExchange.create(leftInput, RelDistributions.SINGLETON);
+      leftExchange = LogicalExchange.create(leftInput, RelDistributions.RANDOM_DISTRIBUTED);
       rightExchange = LogicalExchange.create(rightInput, RelDistributions.BROADCAST_DISTRIBUTED);
     }
 

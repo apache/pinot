@@ -112,7 +112,18 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     try {
       switch (_exchangeType) {
         case SINGLETON:
-          // TODO: singleton or random distribution should've been distinguished in planning phase.
+          ServerInstance singletonInstance = null;
+          for (ServerInstance serverInstance : _receivingStageInstances) {
+            // TODO: determine singleton instance at constructor.
+            if (serverInstance.getHostname().equals(_mailboxService.getHostname())
+                && serverInstance.getQueryMailboxPort() == _mailboxService.getMailboxPort()) {
+              Preconditions.checkState(singletonInstance == null,
+                  "multiple instance found for singleton exchange type!");
+              singletonInstance = serverInstance;
+            }
+          }
+          sendDataTableBlock(singletonInstance, dataBlock);
+          break;
         case RANDOM_DISTRIBUTED:
           if (isEndOfStream) {
             for (ServerInstance serverInstance : _receivingStageInstances) {

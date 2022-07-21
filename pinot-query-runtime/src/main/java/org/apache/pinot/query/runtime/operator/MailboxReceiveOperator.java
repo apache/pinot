@@ -34,6 +34,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
+import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.service.QueryConfig;
@@ -51,6 +52,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
 
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
   private final RelDistribution.Type _exchangeType;
+  private final KeySelector<Object[], Object[]> _keySelector;
   private final List<ServerInstance> _sendingStageInstances;
   private final DataSchema _dataSchema;
   private final String _hostName;
@@ -61,8 +63,8 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   private TransferableBlock _upstreamErrorBlock;
 
   public MailboxReceiveOperator(MailboxService<Mailbox.MailboxContent> mailboxService, DataSchema dataSchema,
-      RelDistribution.Type exchangeType, List<ServerInstance> sendingStageInstances, String hostName, int port,
-      long jobId, int stageId) {
+      List<ServerInstance> sendingStageInstances, RelDistribution.Type exchangeType,
+      KeySelector<Object[], Object[]> keySelector, String hostName, int port, long jobId, int stageId) {
     _dataSchema = dataSchema;
     _mailboxService = mailboxService;
     _exchangeType = exchangeType;
@@ -73,6 +75,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     _stageId = stageId;
     _timeout = QueryConfig.DEFAULT_TIMEOUT_NANO;
     _upstreamErrorBlock = null;
+    _keySelector = keySelector;
   }
 
   @Override
