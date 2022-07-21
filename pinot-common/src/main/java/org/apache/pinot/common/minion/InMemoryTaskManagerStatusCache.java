@@ -26,8 +26,8 @@ import java.util.function.Consumer;
 public class InMemoryTaskManagerStatusCache extends TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> {
 
   private static class TaskGeneratorCacheKey {
-    String _tableNameWithType;
-    String _taskType;
+    final String _tableNameWithType;
+    final String _taskType;
 
     private TaskGeneratorCacheKey(String tableNameWithType, String taskType) {
       _tableNameWithType = tableNameWithType;

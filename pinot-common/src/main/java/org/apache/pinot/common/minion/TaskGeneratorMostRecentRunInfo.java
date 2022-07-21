@@ -22,62 +22,27 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.PriorityQueue;
-import java.util.Queue;
 import java.util.TreeMap;
-import javax.annotation.Nonnull;
-import org.apache.helix.ZNRecord;
-
 
 /**
  * a task generator running history which keeps the most recent several success run timestamp and the most recent
- * several error run
- * message.
+ * several error run messages.
  */
 public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
   @VisibleForTesting
   static final int MAX_NUM_OF_HISTORY_TO_KEEP = 5;
-  @VisibleForTesting
-  static final String MOST_RECENT_SUCCESS_RUN_TS = "mostRecentSuccessRunTs";
-  @VisibleForTesting
-  static final String MOST_RECENT_ERROR_RUN_MESSAGE = "mostRecentErrorRunMessage";
-
   private final String _taskType;
   private final String _tableNameWithType;
   // the timestamp to error message map of the most recent several error runs
-  @Nonnull
-  private final TreeMap<Long, String> _mostRecentErrorRunMessage;
+  private final TreeMap<Long, String> _mostRecentErrorRunMessages;
   // the timestamp of the most recent several success runs
-  @Nonnull
   private final List<Long> _mostRecentSuccessRunTS;
-  private final int _version;
 
-  private TaskGeneratorMostRecentRunInfo(String tableNameWithType, String taskType,
-      Map<Long, String> mostRecentErrorRunMessage, List<Long> mostRecentSuccessRunTS, int version) {
+  private TaskGeneratorMostRecentRunInfo(String tableNameWithType, String taskType) {
     _tableNameWithType = tableNameWithType;
     _taskType = taskType;
-    // sort and keep the most recent several error messages
-    _mostRecentErrorRunMessage = new TreeMap<>();
-    mostRecentErrorRunMessage.forEach((k, v) -> {
-      _mostRecentErrorRunMessage.put(k, v);
-      if (_mostRecentErrorRunMessage.size() > MAX_NUM_OF_HISTORY_TO_KEEP) {
-        _mostRecentErrorRunMessage.remove(_mostRecentErrorRunMessage.firstKey());
-      }
-    });
-    // sort and keep the most recent several timestamp
-    Queue<Long> sortedTs = new PriorityQueue<>();
-    mostRecentSuccessRunTS.forEach(e -> {
-      sortedTs.offer(e);
-      if (sortedTs.size() > MAX_NUM_OF_HISTORY_TO_KEEP) {
-        sortedTs.poll();
-      }
-    });
+    _mostRecentErrorRunMessages = new TreeMap<>();
     _mostRecentSuccessRunTS = new ArrayList<>();
-    while (!sortedTs.isEmpty()) {
-      _mostRecentSuccessRunTS.add(sortedTs.poll());
-    }
-    _version = version;
   }
 
   /**
@@ -95,8 +60,8 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
   /**
    * Gets the timestamp to error message map of the most recent several error runs
    */
-  public TreeMap<Long, String> getMostRecentErrorRunMessage() {
-    return _mostRecentErrorRunMessage;
+  public TreeMap<Long, String> getMostRecentErrorRunMessages() {
+    return _mostRecentErrorRunMessages;
   }
 
   /**
@@ -105,9 +70,9 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
    * @param message An error message.
    */
   public void addErrorRunMessage(long ts, String message) {
-    _mostRecentErrorRunMessage.put(ts, message);
-    if (_mostRecentErrorRunMessage.size() > MAX_NUM_OF_HISTORY_TO_KEEP) {
-      _mostRecentErrorRunMessage.remove(_mostRecentErrorRunMessage.firstKey());
+    _mostRecentErrorRunMessages.put(ts, message);
+    if (_mostRecentErrorRunMessages.size() > MAX_NUM_OF_HISTORY_TO_KEEP) {
+      _mostRecentErrorRunMessages.remove(_mostRecentErrorRunMessages.firstKey());
     }
   }
 
@@ -132,20 +97,12 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
   }
 
   /**
-   * Returns the current information version, it should be consistent with the corresponding {@link ZNRecord} version.
-   */
-  public int getVersion() {
-    return _version;
-  }
-
-  /**
    * Creates a new empty {@link TaskGeneratorMostRecentRunInfo}
    * @param tableNameWithType the table name with type
    * @param taskType the task type.
    * @return a new empty {@link TaskGeneratorMostRecentRunInfo}
    */
   public static TaskGeneratorMostRecentRunInfo newInstance(String tableNameWithType, String taskType) {
-    return new TaskGeneratorMostRecentRunInfo(tableNameWithType, taskType, Collections.EMPTY_MAP,
-        Collections.EMPTY_LIST, -1);
+    return new TaskGeneratorMostRecentRunInfo(tableNameWithType, taskType);
   }
 }

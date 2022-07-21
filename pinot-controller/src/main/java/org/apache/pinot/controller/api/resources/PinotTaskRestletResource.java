@@ -302,7 +302,7 @@ public class PinotTaskRestletResource {
       try {
         result.add(JsonUtils.stringToJsonNode(resp));
       } catch (IOException e) {
-        LOGGER.error("Failed to parse ");
+        LOGGER.error("Failed to parse controller response {}", resp, e);
       }
     });
 

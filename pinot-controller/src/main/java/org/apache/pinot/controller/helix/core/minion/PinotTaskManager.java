@@ -528,15 +528,16 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     LOGGER.info("Trying to schedule task type: {}, isLeader: {}", taskGenerator.getTaskType(), isLeader);
     List<PinotTaskConfig> pinotTaskConfigs;
     try {
+      /* TODO taskGenerator may skip generating tasks for some of the tables being passed to it.
+        In that case, we should not be storing success timestamps for those table. Same with exceptions that should
+        only be associated with the table for which it was raised and not every eligible table. We can have the
+        generateTasks() return a list of TaskGeneratorMostRecentRunInfo for each table
+       */
       pinotTaskConfigs = taskGenerator.generateTasks(enabledTableConfigs);
       for (TableConfig tableConfig : enabledTableConfigs) {
-        try {
-          _taskManagerStatusCache.saveTaskGeneratorInfo(tableConfig.getTableName(), taskGenerator.getTaskType(),
-              taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addSuccessRunTs(
-                  System.currentTimeMillis()));
-        } catch (Exception exception) {
-          LOGGER.warn("Failed to save task generator success timestamp to ZK", exception);
-        }
+        _taskManagerStatusCache.saveTaskGeneratorInfo(tableConfig.getTableName(), taskGenerator.getTaskType(),
+            taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addSuccessRunTs(
+                System.currentTimeMillis()));
       }
     } catch (Exception e) {
       StringWriter errors = new StringWriter();
@@ -544,13 +545,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         e.printStackTrace(pw);
       }
       for (TableConfig tableConfig : enabledTableConfigs) {
-        try {
-          _taskManagerStatusCache.saveTaskGeneratorInfo(tableConfig.getTableName(), taskGenerator.getTaskType(),
-              taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addErrorRunMessage(
-                  System.currentTimeMillis(), errors.toString()));
-        } catch (Exception exception) {
-          LOGGER.warn("Failed to save task generator error message to ZK", exception);
-        }
+        _taskManagerStatusCache.saveTaskGeneratorInfo(tableConfig.getTableName(), taskGenerator.getTaskType(),
+            taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addErrorRunMessage(
+                System.currentTimeMillis(), errors.toString()));
       }
       throw e;
     }
