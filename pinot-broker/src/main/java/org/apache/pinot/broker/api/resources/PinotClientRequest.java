@@ -100,8 +100,6 @@ public class PinotClientRequest {
     try {
       ObjectNode requestJson = JsonUtils.newObjectNode();
       requestJson.put(Request.SQL, query);
-      String queryOptions = constructSqlQueryOptions(requestJson);
-      requestJson.put(Request.QUERY_OPTIONS, queryOptions);
       if (traceEnabled != null) {
         requestJson.put(Request.TRACE, traceEnabled);
       }
@@ -133,9 +131,7 @@ public class PinotClientRequest {
       if (!requestJson.has(Request.SQL)) {
         throw new IllegalStateException("Payload is missing the query string field 'sql'");
       }
-      String queryOptions = constructSqlQueryOptions(requestJson);
-      // the only query options as of now are sql related. do not allow any custom query options in sql endpoint
-      ObjectNode sqlRequestJson = ((ObjectNode) requestJson).put(Request.QUERY_OPTIONS, queryOptions);
+      ObjectNode sqlRequestJson = (ObjectNode) requestJson;
       BrokerResponse brokerResponse = executeSqlQuery(sqlRequestJson, makeHttpIdentity(requestContext), false);
       asyncResponse.resume(brokerResponse.toJsonString());
     } catch (Exception e) {

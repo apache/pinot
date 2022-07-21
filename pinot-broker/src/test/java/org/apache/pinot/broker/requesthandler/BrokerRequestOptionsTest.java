@@ -33,6 +33,8 @@ import org.testng.annotations.Test;
  * Tests the various options set in the broker request
  */
 public class BrokerRequestOptionsTest {
+  // TODO: remove this legacy option size checker after 0.11 release cut.
+  private static final int LEGACY_PQL_QUERY_OPTION_SIZE = 2;
 
   @Test
   public void testSetOptions() {
@@ -44,7 +46,7 @@ public class BrokerRequestOptionsTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     BaseBrokerRequestHandler.setOptions(pinotQuery, requestId, query, jsonRequest);
     Assert.assertNull(pinotQuery.getDebugOptions());
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0 + LEGACY_PQL_QUERY_OPTION_SIZE);
 
     // TRACE
     // Has trace false
@@ -52,14 +54,14 @@ public class BrokerRequestOptionsTest {
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     BaseBrokerRequestHandler.setOptions(pinotQuery, requestId, query, jsonRequest);
     Assert.assertNull(pinotQuery.getDebugOptions());
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0 + LEGACY_PQL_QUERY_OPTION_SIZE);
 
     // Has trace true
     jsonRequest.put(Request.TRACE, true);
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     BaseBrokerRequestHandler.setOptions(pinotQuery, requestId, query, jsonRequest);
     Assert.assertNull(pinotQuery.getDebugOptions());
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1 + LEGACY_PQL_QUERY_OPTION_SIZE);
     Assert.assertEquals(pinotQuery.getQueryOptions().get(Request.TRACE), "true");
 
     // DEBUG_OPTIONS (debug options will also be included as query options)
@@ -70,7 +72,6 @@ public class BrokerRequestOptionsTest {
     BaseBrokerRequestHandler.setOptions(pinotQuery, requestId, query, jsonRequest);
     Assert.assertEquals(pinotQuery.getDebugOptionsSize(), 1);
     Assert.assertEquals(pinotQuery.getDebugOptions().get("debugOption1"), "foo");
-    Assert.assertEquals(pinotQuery.getQueryOptions(), pinotQuery.getDebugOptions());
 
     // Has multiple debugOptions
     jsonRequest.put(Request.DEBUG_OPTIONS, "debugOption1=foo;debugOption2=bar");
@@ -79,7 +80,6 @@ public class BrokerRequestOptionsTest {
     Assert.assertEquals(pinotQuery.getDebugOptionsSize(), 2);
     Assert.assertEquals(pinotQuery.getDebugOptions().get("debugOption1"), "foo");
     Assert.assertEquals(pinotQuery.getDebugOptions().get("debugOption2"), "bar");
-    Assert.assertEquals(pinotQuery.getQueryOptions(), pinotQuery.getDebugOptions());
 
     // Invalid debug options
     jsonRequest.put(Request.DEBUG_OPTIONS, "debugOption1");
@@ -100,14 +100,14 @@ public class BrokerRequestOptionsTest {
     pinotQuery.setQueryOptions(queryOptions);
     BaseBrokerRequestHandler.setOptions(pinotQuery, requestId, query, jsonRequest);
     Assert.assertNull(pinotQuery.getDebugOptions());
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1 + LEGACY_PQL_QUERY_OPTION_SIZE);
     Assert.assertEquals(pinotQuery.getQueryOptions().get("queryOption1"), "foo");
 
     // Has queryOptions in query
     pinotQuery = CalciteSqlParser.compileToPinotQuery("SET queryOption1='foo'; select * from testTable");
     BaseBrokerRequestHandler.setOptions(pinotQuery, requestId, query, jsonRequest);
     Assert.assertNull(pinotQuery.getDebugOptions());
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1 + LEGACY_PQL_QUERY_OPTION_SIZE);
     Assert.assertEquals(pinotQuery.getQueryOptions().get("queryOption1"), "foo");
 
     // Has query options in json payload
@@ -115,7 +115,7 @@ public class BrokerRequestOptionsTest {
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     BaseBrokerRequestHandler.setOptions(pinotQuery, requestId, query, jsonRequest);
     Assert.assertNull(pinotQuery.getDebugOptions());
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1 + LEGACY_PQL_QUERY_OPTION_SIZE);
     Assert.assertEquals(pinotQuery.getQueryOptions().get("queryOption1"), "foo");
 
     // Has query options in both json payload and pinotQuery, pinotQuery takes priority
@@ -123,7 +123,7 @@ public class BrokerRequestOptionsTest {
     pinotQuery = CalciteSqlParser.compileToPinotQuery("SET queryOption1='foo'; select * from testTable;");
     BaseBrokerRequestHandler.setOptions(pinotQuery, requestId, query, jsonRequest);
     Assert.assertNull(pinotQuery.getDebugOptions());
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 2);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 2 + LEGACY_PQL_QUERY_OPTION_SIZE);
     Assert.assertEquals(pinotQuery.getQueryOptions().get("queryOption1"), "foo");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("queryOption2"), "moo");
 
@@ -136,7 +136,7 @@ public class BrokerRequestOptionsTest {
     BaseBrokerRequestHandler.setOptions(pinotQuery, requestId, query, jsonRequest);
     Assert.assertEquals(pinotQuery.getDebugOptionsSize(), 1);
     Assert.assertEquals(pinotQuery.getDebugOptions().get("debugOption1"), "foo");
-    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 4);
+    Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 4 + LEGACY_PQL_QUERY_OPTION_SIZE);
     Assert.assertEquals(pinotQuery.getQueryOptions().get("queryOption1"), "bar");
     Assert.assertEquals(pinotQuery.getQueryOptions().get("queryOption2"), "moo");
     Assert.assertEquals(pinotQuery.getQueryOptions().get(Request.TRACE), "true");
