@@ -21,6 +21,7 @@ package org.apache.pinot.core.util;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.avro.Schema;
