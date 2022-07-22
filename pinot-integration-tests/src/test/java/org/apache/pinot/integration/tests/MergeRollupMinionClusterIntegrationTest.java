@@ -70,6 +70,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
   private static final String SINGLE_LEVEL_CONCAT_TEST_TABLE = "myTable1";
   private static final String SINGLE_LEVEL_ROLLUP_TEST_TABLE = "myTable2";
   private static final String MULTI_LEVEL_CONCAT_TEST_TABLE = "myTable3";
+  private static final long TIMEOUT_IN_MS = 10_000L;
 
   protected PinotHelixTaskResourceManager _helixTaskResourceManager;
   protected PinotTaskManager _taskManager;
@@ -315,12 +316,21 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         }
       }
 
-      // Check num total doc of merged segments are the same as the original segments
-      JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
-      SqlResultComparator.areEqual(actualJson, expectedJson, sqlQuery);
-      // Check query routing
-      int numSegmentsQueried = actualJson.get("numSegmentsQueried").asInt();
-      assertEquals(numSegmentsQueried, expectedNumSegmentsQueried[numTasks]);
+      final int finalNumTasks = numTasks;
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          // Check num total doc of merged segments are the same as the original segments
+          JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+          if (!SqlResultComparator.areEqual(actualJson, expectedJson, sqlQuery)) {
+            return false;
+          }
+          // Check query routing
+          int numSegmentsQueried = actualJson.get("numSegmentsQueried").asInt();
+          return numSegmentsQueried == expectedNumSegmentsQueried[finalNumTasks];
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }, TIMEOUT_IN_MS, "Timeout while validating segments");
     }
     // Check total tasks
     assertEquals(numTasks, 5);
@@ -411,14 +421,22 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         }
       }
 
-      // Check total doc of merged segments are less than the original segments
-      JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
-      assertTrue(
-          actualJson.get("resultTable").get("rows").get(0).get(0).asInt() < expectedJson.get("resultTable").get("rows")
-              .get(0).get(0).asInt());
-      // Check query routing
-      int numSegmentsQueried = actualJson.get("numSegmentsQueried").asInt();
-      assertEquals(numSegmentsQueried, expectedNumSegmentsQueried[numTasks]);
+      final int finalNumTasks = numTasks;
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          // Check total doc of merged segments are less than the original segments
+          JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+          if (actualJson.get("resultTable").get("rows").get(0).get(0).asInt() >= expectedJson.get("resultTable")
+              .get("rows").get(0).get(0).asInt()) {
+            return false;
+          }
+          // Check query routing
+          int numSegmentsQueried = actualJson.get("numSegmentsQueried").asInt();
+          return numSegmentsQueried == expectedNumSegmentsQueried[finalNumTasks];
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }, TIMEOUT_IN_MS, "Timeout while validating segments");
     }
 
     // Check total doc is half of the original after all merge tasks are finished
@@ -557,12 +575,21 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         }
       }
 
-      // Check total doc of merged segments are the same as the original segments
-      JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
-      SqlResultComparator.areEqual(actualJson, expectedJson, sqlQuery);
-      // Check query routing
-      int numSegmentsQueried = actualJson.get("numSegmentsQueried").asInt();
-      assertEquals(numSegmentsQueried, expectedNumSegmentsQueried[numTasks]);
+      final int finalNumTasks = numTasks;
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          // Check total doc of merged segments are the same as the original segments
+          JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+          if (!SqlResultComparator.areEqual(actualJson, expectedJson, sqlQuery)) {
+            return false;
+          }
+          // Check query routing
+          int numSegmentsQueried = actualJson.get("numSegmentsQueried").asInt();
+          return numSegmentsQueried == expectedNumSegmentsQueried[finalNumTasks];
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }, TIMEOUT_IN_MS, "Timeout while validating segments");
     }
     // Check total tasks
     assertEquals(numTasks, 8);

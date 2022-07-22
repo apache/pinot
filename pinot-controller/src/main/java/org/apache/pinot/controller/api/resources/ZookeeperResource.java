@@ -19,6 +19,11 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.annotations.VisibleForTesting;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -47,17 +52,14 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang.StringUtils;
-import org.apache.helix.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.introspect.CodehausJacksonIntrospector;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.zookeeper.data.Stat;
-import org.codehaus.jackson.map.DeserializationConfig;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.SerializationConfig;
-import org.codehaus.jackson.type.TypeReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,16 +75,16 @@ public class ZookeeperResource {
 
   // Helix uses codehaus.jackson.map.ObjectMapper, hence we can't use pinot JsonUtils here.
   @VisibleForTesting
-  static final ObjectMapper MAPPER = new ObjectMapper();
+  static final ObjectMapper MAPPER = (new ObjectMapper()).setAnnotationIntrospector(new CodehausJacksonIntrospector());
 
   static {
-    // Configuration should be identical to org.apache.helix.manager.zk.ZNRecordSerializer.
-    MAPPER.configure(SerializationConfig.Feature.INDENT_OUTPUT, true);
-    MAPPER.configure(SerializationConfig.Feature.AUTO_DETECT_FIELDS, true);
-    MAPPER.configure(SerializationConfig.Feature.CAN_OVERRIDE_ACCESS_MODIFIERS, true);
-    MAPPER.configure(DeserializationConfig.Feature.AUTO_DETECT_FIELDS, true);
-    MAPPER.configure(DeserializationConfig.Feature.AUTO_DETECT_SETTERS, true);
-    MAPPER.configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+    // Configuration should be identical to org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer.
+
+    MAPPER.enable(SerializationFeature.INDENT_OUTPUT);
+    MAPPER.enable(new MapperFeature[]{MapperFeature.AUTO_DETECT_FIELDS});
+    MAPPER.enable(new MapperFeature[]{MapperFeature.CAN_OVERRIDE_ACCESS_MODIFIERS});
+    MAPPER.enable(new MapperFeature[]{MapperFeature.AUTO_DETECT_SETTERS});
+    MAPPER.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
   }
 
   @Inject
