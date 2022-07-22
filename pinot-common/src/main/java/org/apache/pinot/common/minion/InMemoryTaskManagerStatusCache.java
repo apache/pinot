@@ -23,7 +23,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-public class InMemoryTaskManagerStatusCache extends TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> {
+public class InMemoryTaskManagerStatusCache implements TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> {
 
   private static class TaskGeneratorCacheKey {
     final String _tableNameWithType;

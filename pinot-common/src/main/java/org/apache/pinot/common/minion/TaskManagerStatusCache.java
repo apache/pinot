@@ -21,12 +21,12 @@ package org.apache.pinot.common.minion;
 import java.util.function.Consumer;
 
 
-public abstract class TaskManagerStatusCache<T extends BaseTaskGeneratorInfo> {
+public interface TaskManagerStatusCache<T extends BaseTaskGeneratorInfo> {
 
-  public abstract T fetchTaskGeneratorInfo(String tableNameWithType, String taskType);
+  T fetchTaskGeneratorInfo(String tableNameWithType, String taskType);
 
-  public abstract void saveTaskGeneratorInfo(String tableNameWithType, String taskType,
+  void saveTaskGeneratorInfo(String tableNameWithType, String taskType,
       Consumer<T> taskGeneratorMostRecentRunInfoUpdater);
 
-  public abstract void deleteTaskGeneratorInfo(String tableNameWithType, String taskType);
+  void deleteTaskGeneratorInfo(String tableNameWithType, String taskType);
 }

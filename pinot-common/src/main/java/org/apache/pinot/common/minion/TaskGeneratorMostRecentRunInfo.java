@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -70,7 +71,8 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
   public TreeMap<String, String> getMostRecentErrorRunMessages() {
     TreeMap<String, String> result = new TreeMap<>();
     _mostRecentErrorRunMessages.forEach((timestamp, error) -> result.put(
-        OffsetDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.of("UTC")).toString(), error));
+        OffsetDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.of(ZoneOffset.UTC.toString())).toString(),
+        error));
     return result;
   }
 
@@ -90,8 +92,9 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
    * Gets the timestamp of the most recent several success runs
    */
   public List<String> getMostRecentSuccessRunTS() {
-    return _mostRecentSuccessRunTS.stream()
-        .map(timestamp -> OffsetDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.of("UTC")).toString())
+    return _mostRecentSuccessRunTS.stream().map(
+            timestamp -> OffsetDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.of(ZoneOffset.UTC.toString()))
+                .toString())
         .collect(Collectors.toList());
   }
 
