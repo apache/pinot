@@ -166,8 +166,8 @@
     To change kafka connector dependency, we only need to update this version number config.
     TODO: figure out a way to inject kafka dependency instead of explicitly setting the kafka module dependency -->
     <kafka.version>2.0</kafka.version>
-    <protobuf.version>3.20.1</protobuf.version>
-    <grpc.version>1.46.0</grpc.version>
+    <protobuf.version>3.19.2</protobuf.version>
+    <grpc.version>1.41.0</grpc.version>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
