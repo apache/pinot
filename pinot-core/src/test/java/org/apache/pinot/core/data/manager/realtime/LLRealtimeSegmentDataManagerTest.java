@@ -27,6 +27,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
@@ -41,7 +42,6 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
-import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -512,12 +512,12 @@ public class LLRealtimeSegmentDataManagerTest {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
+      // We should still get false because there is no messages fetched
       _timeNow += Fixtures.MAX_TIME_FOR_SEGMENT_CLOSE_MS + 1;
-      // We should still get false, since the number of records in the realtime segment is 0
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
-      replaceRealtimeSegment(segmentDataManager, 10);
-      // Now we can test when we are far ahead in time
-      _timeNow += Fixtures.MAX_TIME_FOR_SEGMENT_CLOSE_MS;
+      // Once there are messages fetched, and the time exceeds the extended hour, we should get true
+      setHasMessagesFetched(segmentDataManager, true);
+      _timeNow += TimeUnit.HOURS.toMillis(1);
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
       Assert.assertEquals(segmentDataManager.getStopReason(), SegmentCompletionProtocol.REASON_TIME_LIMIT);
       segmentDataManager.destroy();
@@ -579,14 +579,11 @@ public class LLRealtimeSegmentDataManagerTest {
     }
   }
 
-  // Replace the realtime segment with a mock that returns numDocs for raw doc count.
-  private void replaceRealtimeSegment(FakeLLRealtimeSegmentDataManager segmentDataManager, int numDocs)
+  private void setHasMessagesFetched(FakeLLRealtimeSegmentDataManager segmentDataManager, boolean hasMessagesFetched)
       throws Exception {
-    MutableSegmentImpl mockSegmentImpl = mock(MutableSegmentImpl.class);
-    when(mockSegmentImpl.getNumDocsIndexed()).thenReturn(numDocs);
-    Field segmentImpl = LLRealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
-    segmentImpl.setAccessible(true);
-    segmentImpl.set(segmentDataManager, mockSegmentImpl);
+    Field field = LLRealtimeSegmentDataManager.class.getDeclaredField("_hasMessagesFetched");
+    field.setAccessible(true);
+    field.set(segmentDataManager, hasMessagesFetched);
   }
 
   // If commit fails, make sure that we do not re-build the segment when we try to commit again.
@@ -743,7 +740,7 @@ public class LLRealtimeSegmentDataManagerTest {
     public Field _state;
     public Field _shouldStop;
     public Field _stopReason;
-    private Field _streamMsgOffsetFactory;
+    private final Field _streamMsgOffsetFactory;
     public LinkedList<LongMsgOffset> _consumeOffsets = new LinkedList<>();
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
     public boolean _commitSegmentCalled = false;
