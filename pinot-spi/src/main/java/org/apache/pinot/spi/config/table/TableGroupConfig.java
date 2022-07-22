@@ -22,9 +22,16 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 
 
+/**
+ * TableGroupConfig can be used to set the configs for a table-group, which mainly includes
+ * the InstanceAssignmentConfig that specifies properties like number of replica-groups,
+ * number of replica-group partitions, etc. The config for a table-group can be viewed/edited
+ * in the UI at /groups/{groupName}.
+ */
 public class TableGroupConfig {
   private static final String GROUP_NAME_CONFIG_KEY = "groupName";
   public static final String ASSIGNMENT_CONFIG_KEY = "instanceAssignmentConfig";
@@ -55,5 +62,22 @@ public class TableGroupConfig {
 
   public void setInstanceAssignmentConfig(InstanceAssignmentConfig instanceAssignmentConfig) {
     _instanceAssignmentConfig = instanceAssignmentConfig;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    TableGroupConfig that = (TableGroupConfig) o;
+    return _groupName.equals(that._groupName) && _instanceAssignmentConfig.equals(that._instanceAssignmentConfig);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_groupName, _instanceAssignmentConfig);
   }
 }

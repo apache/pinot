@@ -121,6 +121,11 @@ public class PinotTableGroupRestletResource {
     }
   }
 
+  /**
+   * Re-computing Instance Assignment for a table-group means that the servers eligible for data-assignment
+   * for the group (represented via InstancePartitions) should be re-computed. This doesn't change the
+   * InstancePartitions for the existing tables in the table-group. To do that, you'll need to issue
+   */
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/groups/{groupName}/recompute")

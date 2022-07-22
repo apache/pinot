@@ -564,6 +564,26 @@ public final class TableConfigUtils {
     validateAggregateMetricsForUpsertConfig(tableConfig);
   }
 
+  @VisibleForTesting
+  static void validateTableGroupConfig(TableConfig tableConfig) {
+    if (StringUtils.isBlank(tableConfig.getTableGroupName())) {
+      return;
+    }
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    Preconditions.checkState(indexingConfig != null, "Provide partitioning columns via segmentPartitionConfig in "
+        + "indexingConfig");
+    SegmentPartitionConfig segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
+    Preconditions.checkState(segmentPartitionConfig != null, "Provide partitioning columns via column partition map "
+        + "in segmentPartitionConfig");
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = segmentPartitionConfig.getColumnPartitionMap();
+    Preconditions.checkState(columnPartitionConfigMap != null && columnPartitionConfigMap.size() > 0,
+        "Must provide at least 1 partitioning column. Set columnPartitionMap.");
+    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig
+        .getInstanceAssignmentConfigMap();
+    Preconditions.checkState(instanceAssignmentConfigMap == null || instanceAssignmentConfigMap.isEmpty(),
+        "Cannot set instance assignment config when table-group is enabled");
+  }
+
   /**
    * Validates metrics aggregation when upsert config is enabled
    * - Metrics aggregation cannot be enabled when Upsert Config is enabled.
@@ -884,25 +904,6 @@ public final class TableConfigUtils {
         }
       }
     }
-  }
-
-  private static void validateTableGroupConfig(TableConfig tableConfig) {
-    if (StringUtils.isBlank(tableConfig.getTableGroupName())) {
-      return;
-    }
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    Preconditions.checkState(indexingConfig != null, "Provide partitioning columns via segmentPartitionConfig in "
-        + "indexingConfig");
-    SegmentPartitionConfig segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
-    Preconditions.checkState(segmentPartitionConfig != null, "Provide partitioning columns via column partition map "
-        + "in segmentPartitionConfig");
-    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = segmentPartitionConfig.getColumnPartitionMap();
-    Preconditions.checkState(columnPartitionConfigMap != null && columnPartitionConfigMap.size() > 0,
-        "Must provide at least 1 partitioning column. Set columnPartitionMap.");
-    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig
-        .getInstanceAssignmentConfigMap();
-    Preconditions.checkState(instanceAssignmentConfigMap == null || instanceAssignmentConfigMap.isEmpty(),
-        "Cannot set instance assignment config when table-group is enabled");
   }
 
   private static void sanitize(TableConfig tableConfig) {

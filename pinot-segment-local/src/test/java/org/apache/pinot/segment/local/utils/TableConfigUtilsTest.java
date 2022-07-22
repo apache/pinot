@@ -1557,6 +1557,34 @@ public class TableConfigUtilsTest {
     }
   }
 
+  @Test
+  public void testValidateTableGroupConfig() {
+    TableConfig tableConfigWithoutTableGroup =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+            .build();
+    TableConfigUtils.validateTableGroupConfig(tableConfigWithoutTableGroup);
+
+    TableConfig tableConfigWithTableGroupOnly =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+            .setTableGroupName("test-table-group")
+            .build();
+    try {
+      TableConfigUtils.validateTableGroupConfig(tableConfigWithTableGroupOnly);
+      Assert.fail("Validation should have failed since segment partition config not set");
+    } catch (IllegalStateException ignored) {
+    }
+
+    Map<String, ColumnPartitionConfig> columnPartitionMap = new HashMap<>();
+    columnPartitionMap.put("partitioningColumn", new ColumnPartitionConfig("Murmur", 4));
+    TableConfig tableConfigWithSegmentPartitionConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+            .setTableGroupName("test-table-group")
+            .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionMap))
+            .build();
+
+    TableConfigUtils.validateTableGroupConfig(tableConfigWithSegmentPartitionConfig);
+  }
+
   private Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");

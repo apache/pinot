@@ -57,7 +57,6 @@ public class TableConfigUtils {
 
   private static final String FIELD_MISSING_MESSAGE_TEMPLATE = "Mandatory field '%s' is missing";
 
-  // TODO: Add check to ensure partitioning is enabled if table-group is set.
   public static TableConfig fromZNRecord(ZNRecord znRecord)
       throws IOException {
     Map<String, String> simpleFields = znRecord.getSimpleFields();
