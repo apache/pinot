@@ -55,7 +55,36 @@ public class HealthCheckResource {
       @ApiResponse(code = 503, message = "Server is not healthy")
   })
   public String checkHealth() {
-    Status status = ServiceStatus.getServiceStatus(_instanceId);
+    return getReadinessStatus(_instanceId);
+  }
+
+  @GET
+  @Path("/health/liveness")
+  @Produces(MediaType.TEXT_PLAIN)
+  @ApiOperation(value = "Checking server liveness status.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Server is healthy"),
+      @ApiResponse(code = 503, message = "Server is not healthy")
+  })
+  public String checkLiveness() {
+    // Returns OK since if we reached here, the admin application is running.
+    return "OK";
+  }
+
+  @GET
+  @Path("/health/readiness")
+  @Produces(MediaType.TEXT_PLAIN)
+  @ApiOperation(value = "Checking server instance health")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Server is healthy"),
+      @ApiResponse(code = 503, message = "Server is not healthy")
+  })
+  public String checkReadiness() {
+    return getReadinessStatus(_instanceId);
+  }
+
+  private static String getReadinessStatus(String instanceId) throws WebApplicationException {
+    Status status = ServiceStatus.getServiceStatus(instanceId);
     if (status == Status.GOOD) {
       return "OK";
     }
