@@ -22,7 +22,6 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.google.common.annotations.VisibleForTesting;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -71,7 +70,7 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
   public TreeMap<String, String> getMostRecentErrorRunMessages() {
     TreeMap<String, String> result = new TreeMap<>();
     _mostRecentErrorRunMessages.forEach((timestamp, error) -> result.put(
-        OffsetDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.of(ZoneOffset.UTC.toString())).toString(),
+        OffsetDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneOffset.UTC).toString(),
         error));
     return result;
   }
@@ -93,7 +92,7 @@ public class TaskGeneratorMostRecentRunInfo extends BaseTaskGeneratorInfo {
    */
   public List<String> getMostRecentSuccessRunTS() {
     return _mostRecentSuccessRunTS.stream().map(
-            timestamp -> OffsetDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.of(ZoneOffset.UTC.toString()))
+            timestamp -> OffsetDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneOffset.UTC)
                 .toString())
         .collect(Collectors.toList());
   }
