@@ -186,6 +186,10 @@ public abstract class QueryScheduler {
             MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE.getName(), INVALID_SEGMENTS_COUNT));
     long numSegmentsConsuming = Long.parseLong(
         dataTableMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(), INVALID_SEGMENTS_COUNT));
+    long numConsumingSegmentsProcessed = Long.parseLong(
+        dataTableMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), INVALID_SEGMENTS_COUNT));
+    long numConsumingSegmentsMatched = Long.parseLong(
+        dataTableMetadata.getOrDefault(MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName(), INVALID_SEGMENTS_COUNT));
     long minConsumingFreshnessMs = Long.parseLong(
         dataTableMetadata.getOrDefault(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), INVALID_FRESHNESS_MS));
     int numResizes =
@@ -242,11 +246,13 @@ public abstract class QueryScheduler {
     // Please add new entries at the end
     if (_queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned, numSegmentsPrunedInvalid)) {
       LOGGER.info("Processed requestId={},table={},"
-              + "segments(queried/processed/matched/consuming/invalid/limit/value)={}/{}/{}/{}/{}/{}/{},"
+              + "segments(queried/processed/matched/consumingQueried/consumingProcessed/consumingMatched/"
+              + "invalid/limit/value)={}/{}/{}/{}/{}/{}/{}/{}/{},"
               + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},minConsumingFreshnessMs={},"
               + "broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},"
               + "threadCpuTimeNs(total/thread/sysActivity/resSer)={}/{}/{}/{}", requestId, tableNameWithType,
           numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming,
+          numConsumingSegmentsProcessed, numConsumingSegmentsMatched,
           numSegmentsPrunedInvalid, numSegmentsPrunedByLimit, numSegmentsPrunedByValue, schedulerWaitMs,
           timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
