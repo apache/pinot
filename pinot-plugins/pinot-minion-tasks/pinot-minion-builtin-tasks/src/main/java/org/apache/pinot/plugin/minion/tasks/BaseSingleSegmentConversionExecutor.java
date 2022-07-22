@@ -159,9 +159,9 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       NameValuePair tableNameParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME,
           TableNameBuilder.extractRawTableName(tableNameWithType));
       NameValuePair tableTypeParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE,
-              TableNameBuilder.getTableTypeFromTableName(tableNameWithType).toString());
+          TableNameBuilder.getTableTypeFromTableName(tableNameWithType).toString());
       List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter,
-              tableTypeParameter);
+          tableTypeParameter);
 
       // Upload the tarred segment
       SegmentConversionUtils.uploadSegment(configs, httpHeaders, parameters, tableNameWithType, segmentName, uploadURL,
