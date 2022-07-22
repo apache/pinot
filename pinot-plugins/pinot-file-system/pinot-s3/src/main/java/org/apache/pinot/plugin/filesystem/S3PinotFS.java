@@ -172,10 +172,6 @@ public class S3PinotFS extends BasePinotFS {
       switch (_serverSideEncryption) {
         case AWS_KMS:
           _ssekmsKeyId = s3Config.getSseKmsKeyId();
-          if (_ssekmsKeyId == null) {
-            throw new UnsupportedOperationException(
-                "Missing required config: 'sseKmsKeyId' when AWS_KMS is used for server side encryption");
-          }
           _ssekmsEncryptionContext = s3Config.getSsekmsEncryptionContext();
           break;
         case AES256:
