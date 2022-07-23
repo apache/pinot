@@ -22,8 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -48,6 +46,7 @@ import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
+import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -57,24 +56,20 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
-import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.local.upsert.PartialUpsertHandler;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
-import org.apache.pinot.segment.local.utils.RecordInfo;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 
@@ -119,8 +114,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   private TableDedupMetadataManager _tableDedupMetadataManager;
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
-  private List<String> _primaryKeyColumns;
-  private String _upsertComparisonColumn;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
@@ -134,9 +127,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     try {
       _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
     } catch (IOException | ClassNotFoundException e) {
-      _logger
-          .error("Error reading history object for table {} from {}", _tableNameWithType, statsFile.getAbsolutePath(),
-              e);
+      _logger.error("Error reading history object for table {} from {}", _tableNameWithType,
+          statsFile.getAbsolutePath(), e);
       File savedFile = new File(_tableDataDir, STATS_FILE_NAME + "." + UUID.randomUUID());
       try {
         FileUtils.moveFile(statsFile, savedFile);
@@ -182,10 +174,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
 
-      _primaryKeyColumns = schema.getPrimaryKeyColumns();
-      Preconditions.checkState(!CollectionUtils.isEmpty(_primaryKeyColumns),
+      List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
+      Preconditions.checkState(!CollectionUtils.isEmpty(primaryKeyColumns),
           "Primary key columns must be configured for dedup");
-      _tableDedupMetadataManager = new TableDedupMetadataManager(_tableNameWithType, _primaryKeyColumns, _serverMetrics,
+      _tableDedupMetadataManager = new TableDedupMetadataManager(_tableNameWithType, primaryKeyColumns, _serverMetrics,
           dedupConfig.getHashFunction());
     }
 
@@ -196,24 +188,25 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
 
-      _primaryKeyColumns = schema.getPrimaryKeyColumns();
-      Preconditions.checkState(!CollectionUtils.isEmpty(_primaryKeyColumns),
+      List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
+      Preconditions.checkState(!CollectionUtils.isEmpty(primaryKeyColumns),
           "Primary key columns must be configured for upsert");
 
       String comparisonColumn = upsertConfig.getComparisonColumn();
-      _upsertComparisonColumn =
-          comparisonColumn != null ? comparisonColumn : tableConfig.getValidationConfig().getTimeColumnName();
+      if (comparisonColumn == null) {
+        comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
+      }
 
       PartialUpsertHandler partialUpsertHandler = null;
       if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
         assert upsertConfig.getPartialUpsertStrategies() != null;
         partialUpsertHandler = new PartialUpsertHandler(schema, upsertConfig.getPartialUpsertStrategies(),
-            upsertConfig.getDefaultPartialUpsertStrategy(), _upsertComparisonColumn);
+            upsertConfig.getDefaultPartialUpsertStrategy(), comparisonColumn);
       }
 
       _tableUpsertMetadataManager =
-          new TableUpsertMetadataManager(_tableNameWithType, _serverMetrics, partialUpsertHandler,
-              upsertConfig.getHashFunction(), _primaryKeyColumns);
+          new TableUpsertMetadataManager(_tableNameWithType, primaryKeyColumns, comparisonColumn,
+              upsertConfig.getHashFunction(), partialUpsertHandler, _serverMetrics);
     }
   }
 
@@ -390,9 +383,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   public void addSegment(ImmutableSegment immutableSegment) {
     if (isUpsertEnabled()) {
-      handleUpsert((ImmutableSegmentImpl) immutableSegment);
+      handleUpsert(immutableSegment);
+      return;
     }
 
+    // TODO: Change dedup handling to handle segment replacement
     if (isDedupEnabled()) {
       buildDedupMeta((ImmutableSegmentImpl) immutableSegment);
     }
@@ -403,8 +398,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // TODO(saurabh) refactor commons code with handleUpsert
     String segmentName = immutableSegment.getSegmentName();
     Integer partitionGroupId =
-        SegmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager,
-            _primaryKeyColumns.get(0));
+        SegmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, null);
     Preconditions.checkNotNull(partitionGroupId,
         String.format("PartitionGroupId is not available for segment: '%s' (dedup-enabled table: %s)", segmentName,
             _tableNameWithType));
@@ -414,53 +408,33 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     partitionDedupMetadataManager.addSegment(immutableSegment);
   }
 
-  private void handleUpsert(ImmutableSegmentImpl immutableSegment) {
+  private void handleUpsert(ImmutableSegment immutableSegment) {
     String segmentName = immutableSegment.getSegmentName();
-    Integer partitionGroupId =
-        SegmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager,
-            _primaryKeyColumns.get(0));
-    Preconditions.checkNotNull(partitionGroupId,
-        String.format("PartitionGroupId is not available for segment: '%s' (upsert-enabled table: %s)", segmentName,
+    _logger.info("Adding immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
+
+    Integer partitionId =
+        SegmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, null);
+    Preconditions.checkNotNull(partitionId,
+        String.format("Failed to get partition id for segment: %s (upsert-enabled table: %s)", segmentName,
             _tableNameWithType));
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
-        _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionGroupId);
-    ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
-    immutableSegment.enableUpsert(partitionUpsertMetadataManager, validDocIds);
+        _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
 
-    Map<String, PinotSegmentColumnReader> columnToReaderMap = new HashMap<>();
-    for (String primaryKeyColumn : _primaryKeyColumns) {
-      columnToReaderMap.put(primaryKeyColumn, new PinotSegmentColumnReader(immutableSegment, primaryKeyColumn));
+    _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
+        immutableSegment.getSegmentMetadata().getTotalDocs());
+    _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
+    ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
+    SegmentDataManager oldSegmentManager = _segmentDataManagerMap.put(segmentName, newSegmentManager);
+    if (oldSegmentManager == null) {
+      partitionUpsertMetadataManager.addSegment(immutableSegment);
+      _logger.info("Added new immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
+    } else {
+      IndexSegment oldSegment = oldSegmentManager.getSegment();
+      partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+      _logger.info("Replaced {} segment: {} of upsert-enabled table: {}",
+          oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, _tableNameWithType);
+      releaseSegment(oldSegmentManager);
     }
-    columnToReaderMap
-        .put(_upsertComparisonColumn, new PinotSegmentColumnReader(immutableSegment, _upsertComparisonColumn));
-    int numTotalDocs = immutableSegment.getSegmentMetadata().getTotalDocs();
-    int numPrimaryKeyColumns = _primaryKeyColumns.size();
-    Iterator<RecordInfo> recordInfoIterator = new Iterator<RecordInfo>() {
-      private int _docId = 0;
-
-      @Override
-      public boolean hasNext() {
-        return _docId < numTotalDocs;
-      }
-
-      @Override
-      public RecordInfo next() {
-        Object[] values = new Object[numPrimaryKeyColumns];
-        for (int i = 0; i < numPrimaryKeyColumns; i++) {
-          Object value = columnToReaderMap.get(_primaryKeyColumns.get(i)).getValue(_docId);
-          if (value instanceof byte[]) {
-            value = new ByteArray((byte[]) value);
-          }
-          values[i] = value;
-        }
-        PrimaryKey primaryKey = new PrimaryKey(values);
-        Object upsertComparisonValue = columnToReaderMap.get(_upsertComparisonColumn).getValue(_docId);
-        Preconditions.checkState(upsertComparisonValue instanceof Comparable,
-            "Upsert comparison column: %s must be comparable", _upsertComparisonColumn);
-        return new RecordInfo(primaryKey, _docId++, (Comparable) upsertComparisonValue);
-      }
-    };
-    partitionUpsertMetadataManager.addSegment(immutableSegment, recordInfoIterator);
   }
 
   @Override
@@ -538,8 +512,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private boolean isPeerSegmentDownloadEnabled(TableConfig tableConfig) {
     return
         CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())
-            || CommonConstants.HTTPS_PROTOCOL
-            .equalsIgnoreCase(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme());
+            || CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(
+            tableConfig.getValidationConfig().getPeerSegmentDownloadScheme());
   }
 
   private void downloadSegmentFromPeer(String segmentName, String downloadScheme,

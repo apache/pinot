@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -37,7 +38,7 @@ public class SegmentUtils {
   // path.
   @Nullable
   public static Integer getRealtimeSegmentPartitionId(String segmentName, String realtimeTableName,
-      HelixManager helixManager, String partitionColumn) {
+      HelixManager helixManager, @Nullable String partitionColumn) {
     // A fast path if the segmentName is an LLC segment name: get the partition id from the name directly
     LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
     if (llcSegmentName != null) {
@@ -50,8 +51,15 @@ public class SegmentUtils {
         "Failed to find segment ZK metadata for segment: %s of table: %s", segmentName, realtimeTableName);
     SegmentPartitionMetadata segmentPartitionMetadata = segmentZKMetadata.getPartitionMetadata();
     if (segmentPartitionMetadata != null) {
-      ColumnPartitionMetadata columnPartitionMetadata =
-          segmentPartitionMetadata.getColumnPartitionMap().get(partitionColumn);
+      Map<String, ColumnPartitionMetadata> columnPartitionMap = segmentPartitionMetadata.getColumnPartitionMap();
+      ColumnPartitionMetadata columnPartitionMetadata = null;
+      if (partitionColumn != null) {
+        columnPartitionMetadata = columnPartitionMap.get(partitionColumn);
+      } else {
+        if (columnPartitionMap.size() == 1) {
+          columnPartitionMetadata = columnPartitionMap.values().iterator().next();
+        }
+      }
       if (columnPartitionMetadata != null && columnPartitionMetadata.getPartitions().size() == 1) {
         return columnPartitionMetadata.getPartitions().iterator().next();
       }
