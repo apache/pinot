@@ -122,11 +122,11 @@ public class PartitionUpsertMetadataManager {
    */
   public void addSegment(ImmutableSegment segment) {
     String segmentName = segment.getSegmentName();
-    _logger.info("Adding upsert metadata for segment: {}, primary key count: {}", segmentName,
+    _logger.info("Adding segment: {}, current primary key count: {}", segmentName,
         _primaryKeyToRecordLocationMap.size());
 
     if (segment instanceof EmptyIndexSegment) {
-      _logger.info("Skip adding upsert metadata for empty segment: {}", segmentName);
+      _logger.info("Skip adding empty segment: {}", segmentName);
       return;
     }
 
@@ -140,7 +140,7 @@ public class PartitionUpsertMetadataManager {
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
         numPrimaryKeys);
 
-    _logger.info("Finish adding upsert metadata for segment: {}, primary key count: {}", segmentName, numPrimaryKeys);
+    _logger.info("Finished adding segment: {}, current primary key count: {}", segmentName, numPrimaryKeys);
   }
 
   private Iterator<RecordInfo> getRecordInfoIterator(ImmutableSegment segment) {
@@ -289,8 +289,8 @@ public class PartitionUpsertMetadataManager {
     Preconditions.checkArgument(segmentName.equals(oldSegment.getSegmentName()),
         "Cannot replace segment with different name for table: {}, old segment: {}, new segment: {}",
         _tableNameWithType, oldSegment.getSegmentName(), segmentName);
-    _logger.info("Replacing upsert metadata for {} segment: {}",
-        oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName);
+    _logger.info("Replacing {} segment: {}", oldSegment instanceof ImmutableSegment ? "immutable" : "mutable",
+        segmentName);
 
     addSegment(newSegment);
 
@@ -299,17 +299,21 @@ public class PartitionUpsertMetadataManager {
     if (validDocIds != null && !validDocIds.isEmpty()) {
       int numDocsNotReplaced = validDocIds.getCardinality();
       if (_partialUpsertHandler != null) {
-        _logger.error("Got {} primary keys not replaced when replacing segment: {} for partial upsert table. This can "
+        // For partial-upsert table, because we do not restore the original record location when removing the primary
+        // keys not replaced, it can potentially cause inconsistency between replicas. This can happen when a consuming
+        // segment is replaced by a committed segment that is consumed from a different server with different records
+        // (some stream consumer cannot guarantee consuming the messages in the same order).
+        _logger.error("{} primary keys not replaced when replacing segment: {} for partial-upsert table. This can "
             + "potentially cause inconsistency between replicas", numDocsNotReplaced, segmentName);
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_ROWS_NOT_REPLACED,
             numDocsNotReplaced);
       } else {
-        _logger.info("Got {} primary keys not replaced when replacing segment: {}", numDocsNotReplaced, segmentName);
+        _logger.info("{} primary keys not replaced when replacing segment: {}", numDocsNotReplaced, segmentName);
       }
       removeSegment(oldSegment);
     }
 
-    _logger.info("Finish replacing upsert metadata for segment: {}", segmentName);
+    _logger.info("Finished replacing segment: {}", segmentName);
   }
 
   /**
@@ -317,18 +321,18 @@ public class PartitionUpsertMetadataManager {
    */
   public void removeSegment(IndexSegment segment) {
     String segmentName = segment.getSegmentName();
-    _logger.info("Removing upsert metadata for segment: {}, primary key count: {}", segmentName,
+    _logger.info("Removing {} segment: {}, current primary key count: {}",
+        segment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName,
         _primaryKeyToRecordLocationMap.size());
 
     MutableRoaringBitmap validDocIds =
         segment.getValidDocIds() != null ? segment.getValidDocIds().getMutableRoaringBitmap() : null;
     if (validDocIds == null || validDocIds.isEmpty()) {
-      _logger.info("Skipping removing upsert metadata for segment without valid docs: {}", segmentName);
+      _logger.info("Skip removing segment without valid docs: {}", segmentName);
       return;
     }
 
-    _logger.info("Trying to remove {} primary keys from upsert metadata for segment: {}", validDocIds.getCardinality(),
-        segmentName);
+    _logger.info("Removing {} primary keys for segment: {}", validDocIds.getCardinality(), segmentName);
     PrimaryKey primaryKey = new PrimaryKey(new Object[_primaryKeyColumns.size()]);
     PeekableIntIterator iterator = validDocIds.getIntIterator();
     while (iterator.hasNext()) {
@@ -348,7 +352,7 @@ public class PartitionUpsertMetadataManager {
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
         numPrimaryKeys);
 
-    _logger.info("Finish removing upsert metadata for segment: {}, primary key count: {}", segmentName, numPrimaryKeys);
+    _logger.info("Finished removing segment: {}, current primary key count: {}", segmentName, numPrimaryKeys);
   }
 
   /**
