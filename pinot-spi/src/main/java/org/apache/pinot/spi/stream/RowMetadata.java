@@ -20,6 +20,7 @@ package org.apache.pinot.spi.stream;
 
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
@@ -40,4 +41,9 @@ public interface RowMetadata {
    *         Long.MIN_VALUE if not available
    */
   long getIngestionTimeMs();
+
+  default GenericRow getHeaders(){
+    return null;
+  }
+
 }

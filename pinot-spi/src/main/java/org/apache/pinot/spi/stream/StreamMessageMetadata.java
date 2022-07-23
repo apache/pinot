@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.spi.stream;
 
+import org.apache.pinot.spi.data.readers.GenericRow;
+
+
 /**
  * A class that provides metadata associated with the message of a stream, for e.g.,
  * ingestion-timestamp of the message.
@@ -25,6 +28,8 @@ package org.apache.pinot.spi.stream;
 public class StreamMessageMetadata implements RowMetadata {
 
   private final long _ingestionTimeMs;
+
+  GenericRow _headers;
 
   /**
    * Construct the stream based message/row message metadata
@@ -39,5 +44,14 @@ public class StreamMessageMetadata implements RowMetadata {
   @Override
   public long getIngestionTimeMs() {
     return _ingestionTimeMs;
+  }
+
+  @Override
+  public GenericRow getHeaders() {
+    return _headers;
+  }
+
+  public void setHeaders(GenericRow headers) {
+    _headers = headers;
   }
 }
