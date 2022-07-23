@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
+import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockUtils;
-import org.apache.pinot.core.common.datablock.MetadataBlock;
 
 
 public final class TransferableBlockUtils {
@@ -29,15 +29,15 @@ public final class TransferableBlockUtils {
   }
 
   public static TransferableBlock getEndOfStreamTransferableBlock(DataSchema dataSchema) {
-    return new TransferableBlock(DataBlockUtils.getEmptyDataBlock(dataSchema));
+    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(dataSchema));
   }
 
   public static TransferableBlock getErrorTransferableBlock(Exception e) {
     return new TransferableBlock(DataBlockUtils.getErrorDataBlock(e));
   }
 
-  public static TransferableBlock repackErrorBlock(MetadataBlock upstreamErrorBlock) {
-    return new TransferableBlock(DataBlockUtils.getErrorDataBlock(upstreamErrorBlock.getExceptions()));
+  public static TransferableBlock getErrorTransferableBlock(Map<Integer, String> exceptions) {
+    return new TransferableBlock(DataBlockUtils.getErrorDataBlock(exceptions));
   }
 
   public static boolean isEndOfStream(TransferableBlock transferableBlock) {

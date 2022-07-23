@@ -69,7 +69,7 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
       throws IOException {
     return Mailbox.MailboxContent.newBuilder().setMailboxId(mailboxId)
         .putAllMetadata(ImmutableMap.of("key", "value", ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true"))
-        .setPayload(ByteString.copyFrom(new TransferableBlock(DataBlockUtils.getEmptyDataBlock(new DataSchema(
+        .setPayload(ByteString.copyFrom(new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(new DataSchema(
             new String[]{"foo", "bar"},
             new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING}))
         ).toBytes()))

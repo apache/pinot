@@ -119,6 +119,8 @@ public class QueryDispatcher {
     while (true) {
       transferableBlock = mailboxReceiveOperator.nextBlock();
       if (TransferableBlockUtils.isEndOfStream(transferableBlock)) {
+        // TODO: we only received bubble up error from the execution stage tree.
+        // TODO: query dispatch should also send cancel signal to the rest of the execution stage tree.
         if (transferableBlock.isErrorBlock()) {
           throw new RuntimeException("Received error query execution result block: "
               + transferableBlock.getDataBlock().getExceptions());

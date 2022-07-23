@@ -33,7 +33,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
-import org.apache.pinot.core.common.datablock.DataBlockUtils;
 import org.apache.pinot.core.common.datablock.MetadataBlock;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -69,7 +68,6 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
   private final int _stageId;
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
   private final DataSchema _dataSchema;
-  private final MetadataBlock _endOfStreamBlock;
   private BaseOperator<TransferableBlock> _dataTableBlockBaseOperator;
 
   public MailboxSendOperator(MailboxService<Mailbox.MailboxContent> mailboxService, DataSchema dataSchema,
@@ -88,7 +86,6 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     _stageId = stageId;
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPE.contains(_exchangeType),
         String.format("Exchange type '%s' is not supported yet", _exchangeType));
-    _endOfStreamBlock = DataBlockUtils.getEmptyDataBlock(_dataSchema);
   }
 
   @Override

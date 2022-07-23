@@ -142,7 +142,7 @@ public class TransferableBlock implements Block {
    * @return whether this block is the end of stream.
    */
   public boolean isEndOfStreamBlock() {
-    return _isErrorBlock || _type == BaseDataBlock.Type.METADATA;
+    return _type == BaseDataBlock.Type.METADATA;
   }
 
   /**

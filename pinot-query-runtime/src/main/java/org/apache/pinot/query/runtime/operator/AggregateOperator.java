@@ -29,7 +29,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
-import org.apache.pinot.core.common.datablock.MetadataBlock;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -60,7 +59,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private final Map<Integer, Object[]> _groupByKeyHolder;
 
   private DataSchema _upstreamDataSchema;
-  private MetadataBlock _upstreamErrorBlock;
+  private TransferableBlock _upstreamErrorBlock;
   private boolean _isCumulativeBlockConstructed;
 
   // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
@@ -107,17 +106,17 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   @Override
   protected TransferableBlock getNextBlock() {
     try {
-      cumulateAggregationBlocks();
-      return toResultBlock();
+      consumeInputBlocks();
+      return produceAggregatedBlock();
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
   }
 
-  private TransferableBlock toResultBlock()
+  private TransferableBlock produceAggregatedBlock()
       throws IOException {
     if (_upstreamErrorBlock != null) {
-      return TransferableBlockUtils.repackErrorBlock(_upstreamErrorBlock);
+      return _upstreamErrorBlock;
     }
     if (!_isCumulativeBlockConstructed) {
       List<Object[]> rows = new ArrayList<>(_groupByKeyHolder.size());
@@ -143,7 +142,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
-  private void cumulateAggregationBlocks() {
+  private void consumeInputBlocks() {
     if (!_isCumulativeBlockConstructed) {
       TransferableBlock block = _inputOperator.nextBlock();
       while (!TransferableBlockUtils.isEndOfStream(block)) {
@@ -168,7 +167,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       }
       // setting upstream error block
       if (block.isErrorBlock()) {
-        _upstreamErrorBlock = (MetadataBlock) block.getDataBlock();
+        _upstreamErrorBlock = block;
       }
     }
   }

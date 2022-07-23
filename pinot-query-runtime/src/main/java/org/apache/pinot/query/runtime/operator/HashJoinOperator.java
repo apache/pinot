@@ -27,7 +27,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.common.datablock.DataBlockUtils;
-import org.apache.pinot.core.common.datablock.MetadataBlock;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.stage.JoinNode;
@@ -54,7 +53,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private final DataSchema _rightTableSchema;
   private final int _resultRowSize;
   private boolean _isHashTableBuilt;
-  private MetadataBlock _upstreamErrorBlock;
+  private TransferableBlock _upstreamErrorBlock;
   private KeySelector<Object[], Object[]> _leftKeySelector;
   private KeySelector<Object[], Object[]> _rightKeySelector;
 
@@ -91,7 +90,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     // Build JOIN hash table
     buildBroadcastHashTable();
     if (_upstreamErrorBlock != null) {
-      return TransferableBlockUtils.repackErrorBlock(_upstreamErrorBlock);
+      return _upstreamErrorBlock;
     }
     // JOIN each left block with the right block.
     try {
@@ -115,7 +114,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
         rightBlock = _rightTableOperator.nextBlock();
       }
       if (rightBlock.isErrorBlock()) {
-        _upstreamErrorBlock = (MetadataBlock) rightBlock.getDataBlock();
+        _upstreamErrorBlock = rightBlock;
       }
       _isHashTableBuilt = true;
     }
@@ -135,10 +134,10 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
       }
       return new TransferableBlock(rows, computeSchema(), BaseDataBlock.Type.ROW);
     } else if (leftBlock.isErrorBlock()) {
-      _upstreamErrorBlock = (MetadataBlock) leftBlock.getDataBlock();
-      return TransferableBlockUtils.repackErrorBlock(_upstreamErrorBlock);
+      _upstreamErrorBlock = leftBlock;
+      return _upstreamErrorBlock;
     } else {
-      return new TransferableBlock(DataBlockUtils.getEmptyDataBlock(_resultSchema));
+      return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(_resultSchema));
     }
   }
 

@@ -56,6 +56,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   private final int _port;
   private final long _jobId;
   private final int _stageId;
+  private TransferableBlock _upstreamErrorBlock;
 
   public MailboxReceiveOperator(MailboxService<Mailbox.MailboxContent> mailboxService, DataSchema dataSchema,
       RelDistribution.Type exchangeType, List<ServerInstance> sendingStageInstances, String hostName, int port,
@@ -68,6 +69,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     _port = port;
     _jobId = jobId;
     _stageId = stageId;
+    _upstreamErrorBlock = null;
   }
 
   @Override
@@ -84,6 +86,9 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
 
   @Override
   protected TransferableBlock getNextBlock() {
+    if (_upstreamErrorBlock != null) {
+      return _upstreamErrorBlock;
+    }
     // TODO: do a round robin check against all MailboxContentStreamObservers and find which one that has data.
     boolean hasOpenedMailbox = true;
     long timeoutWatermark = System.nanoTime() + DEFAULT_TIMEOUT_NANO;
@@ -103,7 +108,8 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
               if (byteBuffer.hasRemaining()) {
                 BaseDataBlock dataBlock = DataBlockUtils.getDataBlock(byteBuffer);
                 if (dataBlock instanceof MetadataBlock && !dataBlock.getExceptions().isEmpty()) {
-                  return TransferableBlockUtils.repackErrorBlock((MetadataBlock) dataBlock);
+                  _upstreamErrorBlock = TransferableBlockUtils.getErrorTransferableBlock(dataBlock.getExceptions());
+                  return _upstreamErrorBlock;
                 }
                 if (dataBlock.getNumberOfRows() > 0) {
                   // here we only return data table block when it is not empty.

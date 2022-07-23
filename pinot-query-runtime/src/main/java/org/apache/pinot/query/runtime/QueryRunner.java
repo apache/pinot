@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
@@ -112,10 +111,10 @@ public class QueryRunner {
           dataBlock = DataBlockUtils.getErrorDataBlock(dataTable.getExceptions());
         } else {
           // this works because default DataTableImplV3 will have a version number at beginning:
-          // the new DataBlock encodes lower 16 bites as version and upper 16 bites as type (ROW, COLUMNAR, METADATA)
+          // the new DataBlock encodes lower 16 bits as version and upper 16 bits as type (ROW, COLUMNAR, METADATA)
           dataBlock = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTable.toBytes()));
         }
-      } catch (IOException e) {
+      } catch (Exception e) {
         dataBlock = DataBlockUtils.getErrorDataBlock(e);
       }
 
@@ -136,8 +135,19 @@ public class QueryRunner {
     }
   }
 
+  /**
+   * Leaf-stage transfer block opreator is used to wrap around the leaf stage process results. They are passed to the
+   * Pinot server to execute query thus only one {@link DataTable} were returned. However, to conform with the
+   * intermediate stage operators. an additional {@link MetadataBlock} needs to be transfer after the data block.
+   *
+   * <p>In order to achieve this:
+   * <ul>
+   *   <li>The leaf-stage result is split into data payload block and metadata payload block.</li>
+   *   <li>In case the leaf-stage result contains error or only metadata, we skip the data payload block.</li>
+   * </ul>
+   */
   private static class LeafStageTransferableBlockOperator extends BaseOperator<TransferableBlock> {
-    private static final String EXPLAIN_NAME = "FAKE_TRANSFER_OPERATOR";
+    private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
 
     private final MetadataBlock _endOfStreamBlock;
     private final BaseDataBlock _baseDataBlock;
@@ -147,7 +157,8 @@ public class QueryRunner {
     private LeafStageTransferableBlockOperator(BaseDataBlock baseDataBlock, DataSchema dataSchema) {
       _baseDataBlock = baseDataBlock;
       _dataSchema = dataSchema;
-      _endOfStreamBlock = baseDataBlock.getExceptions().isEmpty() ? DataBlockUtils.getEmptyDataBlock(dataSchema) : null;
+      _endOfStreamBlock = baseDataBlock.getExceptions().isEmpty()
+          ? DataBlockUtils.getEndOfStreamDataBlock(dataSchema) : null;
       _hasTransferred = false;
     }
 
