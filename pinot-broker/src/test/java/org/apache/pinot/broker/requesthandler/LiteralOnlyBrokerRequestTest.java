@@ -122,6 +122,23 @@ public class LiteralOnlyBrokerRequestTest {
         CalciteSqlParser.compileToPinotQuery("SELECT count(*) from foo " + "where bar = fromBase64('aGVsbG8h')")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
         "SELECT count(*) from foo " + "where bar = fromUtf8(fromBase64('aGVsbG8h'))")));
+    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
+        .compileToPinotQuery("SELECT count(*) from myTable where regexpReplace(col1, \"b(..)\", \"X$1Y\")  = "
+            + "\"fooXarYXazY\"")));
+    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
+        .compileToPinotQuery("SELECT count(*) from myTable where regexpReplace(col1, \"b(..)\", \"X$1Y\", 10)  = "
+            + "\"fooXarYXazY\"")));
+    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
+        .compileToPinotQuery("SELECT count(*) from myTable where regexpReplace(col1, \"b(..)\", \"X$1Y\", 10 , 1)  = "
+            + "\"fooXarYXazY\"")));
+    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
+        .compileToPinotQuery("SELECT count(*) from myTable where regexpReplace(col1, \"b(..)\", \"X$1Y\", 10 , 1, "
+            + "\"i\")  = "
+            + "\"fooXarYXazY\"")));
+    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
+        .compileToPinotQuery("SELECT count(*) from myTable where regexpReplace(col1, \"b(..)\", \"X$1Y\", 10 , 1, "
+            + "\"m\")  = "
+            + "\"fooXarYXazY\"")));
   }
 
   @Test
