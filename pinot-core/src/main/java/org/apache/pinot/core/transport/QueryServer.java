@@ -23,8 +23,10 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
+import io.netty.channel.kqueue.KQueue;
 import io.netty.channel.kqueue.KQueueEventLoopGroup;
 import io.netty.channel.kqueue.KQueueServerSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -45,6 +47,8 @@ import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.util.OsCheck;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -57,10 +61,11 @@ public class QueryServer {
   private final ServerMetrics _serverMetrics;
   private final TlsConfig _tlsConfig;
   private final AccessControl _accessControl;
+  public static final Logger LOGGER = LoggerFactory.getLogger(QueryServer.class);
 
-  private EventLoopGroup _bossGroup;
-  private EventLoopGroup _workerGroup;
-  private Class<? extends ServerSocketChannel> _channelClass;
+  private final EventLoopGroup _bossGroup;
+  private final EventLoopGroup _workerGroup;
+  private final Class<? extends ServerSocketChannel> _channelClass;
   private Channel _channel;
 
 
@@ -94,20 +99,37 @@ public class QueryServer {
     _serverMetrics = serverMetrics;
     _tlsConfig = tlsConfig;
     _accessControl = accessControl;
-    if (nettyConfig != null && nettyConfig.isNativeTransportsEnabled()
-        && OsCheck.getOperatingSystemType() == OsCheck.OSType.Linux) {
+
+    boolean enableNativeTransports = nettyConfig != null && nettyConfig.isNativeTransportsEnabled();
+    OsCheck.OSType operatingSystemType = OsCheck.getOperatingSystemType();
+    if (enableNativeTransports
+        && operatingSystemType == OsCheck.OSType.Linux
+        && Epoll.isAvailable()) {
       _bossGroup = new EpollEventLoopGroup();
       _workerGroup = new EpollEventLoopGroup();
       _channelClass = EpollServerSocketChannel.class;
-    } else if (nettyConfig != null && nettyConfig.isNativeTransportsEnabled()
-        && OsCheck.getOperatingSystemType() == OsCheck.OSType.MacOS) {
+      LOGGER.info("Using Epoll event loop");
+    } else if (enableNativeTransports
+        && operatingSystemType == OsCheck.OSType.MacOS
+        && KQueue.isAvailable()) {
       _bossGroup = new KQueueEventLoopGroup();
       _workerGroup = new KQueueEventLoopGroup();
       _channelClass = KQueueServerSocketChannel.class;
+      LOGGER.info("Using KQueue event loop");
     } else {
       _bossGroup = new NioEventLoopGroup();
       _workerGroup = new NioEventLoopGroup();
       _channelClass = NioServerSocketChannel.class;
+      StringBuilder log= new StringBuilder("Using NIO event loop");
+      if (operatingSystemType == OsCheck.OSType.Linux
+          && enableNativeTransports) {
+        log.append(", as Epoll is not available: ").append(Epoll.unavailabilityCause());
+      }
+      else if (operatingSystemType == OsCheck.OSType.MacOS
+          && enableNativeTransports) {
+        log.append(", as KQueue is not available: ").append(KQueue.unavailabilityCause());
+      }
+      LOGGER.info(log.toString());
     }
   }
 
