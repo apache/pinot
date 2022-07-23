@@ -105,13 +105,12 @@ public class ServerChannels {
     } else {
       _eventLoopGroup = new NioEventLoopGroup();
       _channelClass = NioSocketChannel.class;
-      StringBuilder log= new StringBuilder("Using NIO event loop");
+      StringBuilder log = new StringBuilder("Using NIO event loop");
       if (operatingSystemType == OsCheck.OSType.Linux
-          && enableNativeTransports){
+          && enableNativeTransports) {
         log.append(", as Epoll is not available: ").append(Epoll.unavailabilityCause());
-      }
-      else if (operatingSystemType == OsCheck.OSType.MacOS
-          && enableNativeTransports){
+      } else if (operatingSystemType == OsCheck.OSType.MacOS
+          && enableNativeTransports) {
         log.append(", as KQueue is not available: ").append(KQueue.unavailabilityCause());
       }
       LOGGER.info(log.toString());

@@ -120,12 +120,11 @@ public class QueryServer {
       _bossGroup = new NioEventLoopGroup();
       _workerGroup = new NioEventLoopGroup();
       _channelClass = NioServerSocketChannel.class;
-      StringBuilder log= new StringBuilder("Using NIO event loop");
+      StringBuilder log = new StringBuilder("Using NIO event loop");
       if (operatingSystemType == OsCheck.OSType.Linux
           && enableNativeTransports) {
         log.append(", as Epoll is not available: ").append(Epoll.unavailabilityCause());
-      }
-      else if (operatingSystemType == OsCheck.OSType.MacOS
+      } else if (operatingSystemType == OsCheck.OSType.MacOS
           && enableNativeTransports) {
         log.append(", as KQueue is not available: ").append(KQueue.unavailabilityCause());
       }
