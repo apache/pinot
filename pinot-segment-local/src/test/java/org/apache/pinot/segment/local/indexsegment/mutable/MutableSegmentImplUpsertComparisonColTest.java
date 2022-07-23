@@ -35,11 +35,12 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.mockito.Mockito;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.mock;
 
 
 public class MutableSegmentImplUpsertComparisonColTest {
@@ -62,15 +63,15 @@ public class MutableSegmentImplUpsertComparisonColTest {
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     _partitionUpsertMetadataManager =
-        new TableUpsertMetadataManager("testTable_REALTIME", Mockito.mock(ServerMetrics.class), null,
-            HashFunction.NONE, _schema.getPrimaryKeyColumns()).getOrCreatePartitionManager(0);
-    _mutableSegmentImpl = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false, true, new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "offset", null), "secondsSinceEpoch",
-            _partitionUpsertMetadataManager, null);
+        new TableUpsertMetadataManager("testTable_REALTIME", _schema.getPrimaryKeyColumns(), "offset",
+            HashFunction.NONE, null, mock(ServerMetrics.class)).getOrCreatePartitionManager(0);
+    _mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(),
+            Collections.emptySet(), false, true, new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "offset", null),
+            "secondsSinceEpoch", _partitionUpsertMetadataManager, null);
     GenericRow reuse = new GenericRow();
-    try (RecordReader recordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.JSON, jsonFile, _schema.getColumnNames(), null)) {
+    try (RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.JSON, jsonFile,
+        _schema.getColumnNames(), null)) {
       while (recordReader.hasNext()) {
         recordReader.next(reuse);
         GenericRow transformedRow = _recordTransformer.transform(reuse);
