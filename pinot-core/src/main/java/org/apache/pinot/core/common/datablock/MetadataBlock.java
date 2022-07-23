@@ -29,6 +29,10 @@ import org.apache.pinot.common.utils.DataSchema;
 public class MetadataBlock extends BaseDataBlock {
   private static final int VERSION = 1;
 
+  public MetadataBlock() {
+    super(0, null, new String[0], new byte[]{0}, new byte[]{0});
+  }
+
   public MetadataBlock(DataSchema dataSchema) {
     super(0, dataSchema, new String[0], new byte[]{0}, new byte[]{0});
   }

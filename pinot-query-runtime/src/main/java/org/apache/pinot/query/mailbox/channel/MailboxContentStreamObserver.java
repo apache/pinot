@@ -91,9 +91,9 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
       int remainingCapacity = _receivingBuffer.remainingCapacity() - 1;
       Mailbox.MailboxStatus.Builder builder =
           Mailbox.MailboxStatus.newBuilder().setMailboxId(mailboxContent.getMailboxId())
-              .putMetadata("buffer.size", String.valueOf(remainingCapacity));
-      if (mailboxContent.getMetadataMap().get("finished") != null) {
-        builder.putMetadata("finished", "true");
+              .putMetadata(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY, String.valueOf(remainingCapacity));
+      if (mailboxContent.getMetadataMap().get(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY) != null) {
+        builder.putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true");
       }
       Mailbox.MailboxStatus status = builder.build();
       // returns the buffer available size to sender for rate controller / throttling.
