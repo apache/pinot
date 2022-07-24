@@ -31,6 +31,7 @@ import org.apache.avro.generic.GenericData.Record;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.config.types.Password;
+import org.apache.kafka.common.errors.SerializationException;
 import org.apache.kafka.common.security.ssl.DefaultSslEngineFactory;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractorConfig;
@@ -38,6 +39,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -48,6 +51,7 @@ import static com.google.common.base.Preconditions.checkState;
  * NOTE: Do not use schema in the implementation, as schema will be removed from the params
  */
 public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaConfluentSchemaRegistryAvroMessageDecoder.class);
   private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
   private static final String SCHEMA_REGISTRY_OPTS_PREFIX = "schema.registry.";
   private KafkaAvroDeserializer _deserializer;
@@ -103,12 +107,37 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
 
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
-    Record avroRecord = (Record) _deserializer.deserialize(_topicName, payload);
-    return _avroRecordExtractor.extract(avroRecord, destination);
+    try {
+      Record avroRecord = (Record) _deserializer.deserialize(_topicName, payload);
+      return _avroRecordExtractor.extract(avroRecord, destination);
+    } catch (RuntimeException e) {
+      ignoreOrRethrowException(e);
+      return null;
+    }
   }
 
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
+  }
+
+  /**
+   * This method handles specific serialisation exceptions. If the exception cannot be ignored the method
+   * re-throws the exception.
+   *
+   * @param e exception to handle
+   */
+  private void ignoreOrRethrowException(RuntimeException e) {
+    if (isUnknownMagicByte(e) || isUnknownMagicByte(e.getCause())) {
+      // Do nothing, the message is not an Avro message and can't be decoded
+      LOGGER.error("Caught exception while decoding row in topic {}, discarding row", _topicName, e);
+      return;
+    }
+    throw e;
+  }
+
+  private boolean isUnknownMagicByte(Throwable e) {
+    return e != null && e instanceof SerializationException && e.getMessage() != null && e.getMessage().toLowerCase()
+        .contains("unknown magic byte");
   }
 }
