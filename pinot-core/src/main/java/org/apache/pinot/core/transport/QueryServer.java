@@ -56,12 +56,12 @@ import org.slf4j.LoggerFactory;
  * Brokers.
  */
 public class QueryServer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryServer.class);
   private final int _port;
   private final QueryScheduler _queryScheduler;
   private final ServerMetrics _serverMetrics;
   private final TlsConfig _tlsConfig;
   private final AccessControl _accessControl;
-  public static final Logger LOGGER = LoggerFactory.getLogger(QueryServer.class);
 
   private final EventLoopGroup _bossGroup;
   private final EventLoopGroup _workerGroup;

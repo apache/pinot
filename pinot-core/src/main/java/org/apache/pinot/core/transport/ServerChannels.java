@@ -66,9 +66,9 @@ import org.slf4j.LoggerFactory;
  */
 @ThreadSafe
 public class ServerChannels {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerChannels.class);
   public static final String CHANNEL_LOCK_TIMEOUT_MSG = "Timeout while acquiring channel lock";
   private static final long TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS = 5_000L;
-  public static final Logger LOGGER = LoggerFactory.getLogger(ServerChannels.class);
 
   private final QueryRouter _queryRouter;
   private final BrokerMetrics _brokerMetrics;
