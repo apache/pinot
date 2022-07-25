@@ -22,6 +22,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import javax.net.ssl.SSLContext;
+import org.apache.pinot.client.ConnectionTimeouts;
+import org.apache.pinot.client.TlsProtocols;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -30,7 +32,6 @@ public class PinotControllerTransportFactory {
   private static final String DEFAULT_CONTROLLER_CONNECT_TIMEOUT = "2000";
   private static final String DEFAULT_CONTROLLER_HANDSHAKE_TIMEOUT = "2000";
   private static final String DEFAULT_CONTROLLER_TLS_V10_ENABLED = "false";
-  public static final String DEFAULT_PINOT_CLIENT_UA = "pinot-client";
 
   private Map<String, String> _headers = new HashMap<>();
   private String _scheme = CommonConstants.HTTP_PROTOCOL;
@@ -42,8 +43,9 @@ public class PinotControllerTransportFactory {
   private int _handshakeTimeout = Integer.parseInt(DEFAULT_CONTROLLER_HANDSHAKE_TIMEOUT);
 
   public PinotControllerTransport buildTransport() {
-    return new PinotControllerTransport(_headers, _scheme, _sslContext, _readTimeout, _connectTimeout,
-            _handshakeTimeout, _tlsV10Enabled);
+    ConnectionTimeouts connectionTimeouts = ConnectionTimeouts.create(_readTimeout, _connectTimeout, _handshakeTimeout);
+    TlsProtocols tlsProtocols = TlsProtocols.defaultProtocols(_tlsV10Enabled);
+    return new PinotControllerTransport(_headers, _scheme, _sslContext, connectionTimeouts, tlsProtocols);
   }
 
   public Map<String, String> getHeaders() {

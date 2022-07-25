@@ -29,10 +29,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 public class DummyPinotControllerTransport extends PinotControllerTransport {
 
-  public DummyPinotControllerTransport(Map<String, String> headers, String scheme, @Nullable SSLContext sslContext,
-                                       int readTimeout, int connectTimeout, int handshakeTimeout,
-                                       boolean tlsV10Enabled) {
-    super(headers, scheme, sslContext, readTimeout, connectTimeout, handshakeTimeout, tlsV10Enabled);
+  public DummyPinotControllerTransport(Map<String, String> headers, String scheme, @Nullable SSLContext sslContext) {
+    super(headers, scheme, sslContext,
+            ConnectionTimeouts.create(1000, 1000, 1000),
+            TlsProtocols.defaultProtocols(true));
   }
 
   @Override
@@ -47,6 +47,6 @@ public class DummyPinotControllerTransport extends PinotControllerTransport {
   }
 
   public static DummyPinotControllerTransport create() {
-    return new DummyPinotControllerTransport(null, null, null, -1, -1, -1, false);
+    return new DummyPinotControllerTransport(null, null, null);
   }
 }

@@ -45,10 +45,10 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
 
   @Override
   public PinotClientTransport buildTransport() {
-    return new JsonAsyncHttpPinotClientTransport(
-            _headers, _scheme, _sslContext, _readTimeout, _connectTimeout, _handshakeTimeout, _tlsV10Enabled);
+    ConnectionTimeouts connectionTimeouts = ConnectionTimeouts.create(_readTimeout, _connectTimeout, _handshakeTimeout);
+    TlsProtocols tlsProtocols = TlsProtocols.defaultProtocols(_tlsV10Enabled);
+    return new JsonAsyncHttpPinotClientTransport(_headers, _scheme, _sslContext, connectionTimeouts, tlsProtocols);
   }
-
   public Map<String, String> getHeaders() {
     return _headers;
   }
