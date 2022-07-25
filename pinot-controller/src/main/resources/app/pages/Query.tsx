@@ -317,7 +317,7 @@ const QueryPage = () => {
          + `Please reload the table in order to refresh these segments to the new schema.`);
     }
     if (checked.useMSE) {
-      warnings.push(`Using Multi-Stage Query Engine. This is an experimental feature. Please report any bugs to `
+      warnings.push(`Using V2 Multi-Stage Query Engine. This is an experimental feature. Please report any bugs to `
           + `Apache Pinot Slack channel.`);
     }
     return warnings;
@@ -510,7 +510,7 @@ const QueryPage = () => {
                     onChange={handleChange}
                     checked={checked.useMSE}
                 />
-                Use Multi-Stage Engine
+                Use V2 Engine
               </Grid>
 
               <Grid item xs={3}>

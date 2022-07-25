@@ -124,7 +124,13 @@ public class PinotQueryResource {
       String queryOptions)
       throws Exception {
     if (queryOptions != null && queryOptions.contains(QueryOptionKey.USE_MULTISTAGE_ENGINE)) {
-      return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders);
+      if (_controllerConf.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED,
+          CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
+        return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders);
+      } else {
+        throw new UnsupportedOperationException("V2 Multi-Stage query engine not enabled. "
+            + "Please see https://docs.pinot.apache.org/ for instruction to enable V2 engine.");
+      }
     } else {
       SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
       PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();

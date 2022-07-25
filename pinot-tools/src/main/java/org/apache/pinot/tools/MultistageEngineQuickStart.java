@@ -97,7 +97,7 @@ public class MultistageEngineQuickStart extends QuickStartBase {
         CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE + "=true");
 
     printStatus(Quickstart.Color.YELLOW, "***** Multi-stage engine quickstart setup complete *****");
-    String q1 = "SELECT count(*) FROM baseballStats_OFFLINE limit 1";
+    String q1 = "SELECT count(*) FROM baseballStats_OFFLINE";
     printStatus(Quickstart.Color.YELLOW, "Total number of documents in the table");
     printStatus(Quickstart.Color.CYAN, "Query : " + q1);
     printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(q1, queryOptions)));
@@ -115,8 +115,8 @@ public class MultistageEngineQuickStart extends QuickStartBase {
     printStatus(Quickstart.Color.GREEN, "***************************************************");
     printStatus(Quickstart.Color.YELLOW, "Example query run completed.");
     printStatus(Quickstart.Color.GREEN, "***************************************************");
-    printStatus(Quickstart.Color.YELLOW, "Please use broker port for executing multistage queries.");
-    printStatus(Quickstart.Color.GREEN, "***************************************************");
+    printStatus(Quickstart.Color.GREEN,
+        "You can always go to http://localhost:9000 to play around in the query console");
   }
 
   public static void main(String[] args)
