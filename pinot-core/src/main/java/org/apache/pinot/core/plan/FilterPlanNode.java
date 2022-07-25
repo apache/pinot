@@ -275,8 +275,7 @@ public class FilterPlanNode implements PlanNode {
                         dataSource.getDataSourceMetadata().getDataType());
               }
               _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
-              return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs,
-                  _queryContext.isNullHandlingEnabled());
+              return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
             case JSON_MATCH:
               JsonIndexReader jsonIndex = dataSource.getJsonIndex();
               Preconditions.checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index",
@@ -301,8 +300,7 @@ public class FilterPlanNode implements PlanNode {
                   PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
                       dataSource.getDataSourceMetadata().getDataType());
               _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
-              return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs,
-                  _queryContext.isNullHandlingEnabled());
+              return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
           }
         }
       default:

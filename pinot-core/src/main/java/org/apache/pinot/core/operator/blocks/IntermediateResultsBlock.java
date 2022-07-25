@@ -103,17 +103,6 @@ public class IntermediateResultsBlock implements Block {
   }
 
   /**
-   * Constructor for aggregation result.
-   * <p>For aggregation only, the result is a list of values.
-   * <p>For aggregation group-by, the result is a list of maps from group keys to aggregation values.
-   */
-  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> aggregationResult,
-      DataSchema dataSchema, boolean nullHandlingEnabled) {
-    this(aggregationFunctions, aggregationResult, nullHandlingEnabled);
-    _dataSchema = dataSchema;
-  }
-
-  /**
    * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult}.
    */
   public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,

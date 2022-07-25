@@ -35,7 +35,7 @@ public class FilterOperatorUtils {
    * Returns the leaf filter operator (i.e. not {@link AndFilterOperator} or {@link OrFilterOperator}).
    */
   public static BaseFilterOperator getLeafFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource,
-      int numDocs, boolean nullHandlingEnabled) {
+      int numDocs) {
     if (predicateEvaluator.isAlwaysFalse()) {
       return EmptyFilterOperator.getInstance();
     } else if (predicateEvaluator.isAlwaysTrue()) {
@@ -54,9 +54,9 @@ public class FilterOperatorUtils {
         return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
       }
       if (dataSource.getRangeIndex() != null) {
-        return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
+        return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
       }
-      return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
+      return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
     } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
       if (dataSource.getFSTIndex() != null && dataSource.getDataSourceMetadata().isSorted()) {
         return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
@@ -64,7 +64,7 @@ public class FilterOperatorUtils {
       if (dataSource.getFSTIndex() != null && dataSource.getInvertedIndex() != null) {
         return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
       }
-      return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
+      return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
     } else {
       if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null) {
         return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
@@ -72,7 +72,7 @@ public class FilterOperatorUtils {
       if (dataSource.getInvertedIndex() != null) {
         return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
       }
-      return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
+      return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
     }
   }
 
