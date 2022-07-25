@@ -434,7 +434,7 @@ public class MutableSegmentImpl implements MutableSegment {
           || dataType == BYTES)) {
         _logger.info(
             "Aggregate metrics is enabled. Will create dictionary in consuming segment for column {} of type {}",
-            column, dataType.toString());
+            column, dataType);
         return false;
       }
       // So don't create dictionary if the column (1) is member of noDictionary, and (2) is single-value or multi-value
@@ -489,7 +489,7 @@ public class MutableSegmentImpl implements MutableSegment {
         }
       }
     }
-    _logger.info("Newly added columns: " + _newlyAddedColumnsFieldMap.toString());
+    _logger.info("Newly added columns: " + _newlyAddedColumnsFieldMap);
   }
 
   @Override
@@ -1012,35 +1012,34 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
+      String column = entry.getKey();
+      IndexContainer indexContainer = entry.getValue();
+      Object value;
       try {
-        String column = entry.getKey();
-        IndexContainer indexContainer = entry.getValue();
-        Object value = getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
+        value = getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
             indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
-        if (_nullHandlingEnabled && indexContainer._nullValueVector.isNull(docId)) {
-          reuse.putDefaultNullValue(column, value);
-        } else {
-          reuse.putValue(column, value);
-        }
       } catch (Exception e) {
-        _logger.error("error encountered when getting record for {} on indexContainer: {}", docId, entry.getKey());
-        throw new RuntimeException("error encountered when getting record for " + docId + " on indexContainer: "
-            + entry.getKey(), e);
+        throw new RuntimeException(
+            String.format("Caught exception while reading value for docId: %d, column: %s", docId, column), e);
+      }
+      if (_nullHandlingEnabled && indexContainer._nullValueVector.isNull(docId)) {
+        reuse.putDefaultNullValue(column, value);
+      } else {
+        reuse.putValue(column, value);
       }
     }
     return reuse;
   }
 
   @Override
-  public void getPrimaryKey(int docId, PrimaryKey reuse) {
-    int numPrimaryKeyColumns = _partitionUpsertMetadataManager.getPrimaryKeyColumns().size();
-    Object[] values = reuse.getValues();
-    for (int i = 0; i < numPrimaryKeyColumns; i++) {
-      IndexContainer indexContainer = _indexContainerMap.get(
-          _partitionUpsertMetadataManager.getPrimaryKeyColumns().get(i));
-      Object value = getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
+  public Object getValue(int docId, String column) {
+    try {
+      IndexContainer indexContainer = _indexContainerMap.get(column);
+      return getValue(docId, indexContainer._forwardIndex, indexContainer._dictionary,
           indexContainer._numValuesInfo._maxNumValuesPerMVEntry);
-      values[i] = value;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Caught exception while reading value for docId: %d, column: %s", docId, column), e);
     }
   }
 
@@ -1122,8 +1121,8 @@ public class MutableSegmentImpl implements MutableSegment {
             }
             return value;
           default:
-            throw new IllegalStateException("No support for MV no dictionary column of type "
-                + forwardIndex.getStoredType());
+            throw new IllegalStateException(
+                "No support for MV no dictionary column of type " + forwardIndex.getStoredType());
         }
       }
     }

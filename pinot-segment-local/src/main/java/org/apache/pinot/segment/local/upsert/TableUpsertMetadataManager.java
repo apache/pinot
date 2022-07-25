@@ -34,25 +34,26 @@ import org.apache.pinot.spi.config.table.HashFunction;
 public class TableUpsertMetadataManager {
   private final Map<Integer, PartitionUpsertMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
   private final String _tableNameWithType;
-  private final ServerMetrics _serverMetrics;
-  private final PartialUpsertHandler _partialUpsertHandler;
-  private final HashFunction _hashFunction;
   private final List<String> _primaryKeyColumns;
+  private final String _comparisonColumn;
+  private final HashFunction _hashFunction;
+  private final PartialUpsertHandler _partialUpsertHandler;
+  private final ServerMetrics _serverMetrics;
 
-  public TableUpsertMetadataManager(String tableNameWithType, ServerMetrics serverMetrics,
-      @Nullable PartialUpsertHandler partialUpsertHandler, HashFunction hashFunction,
-      List<String> primaryKeyColumns) {
+  public TableUpsertMetadataManager(String tableNameWithType, List<String> primaryKeyColumns, String comparisonColumn,
+      HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, ServerMetrics serverMetrics) {
     _tableNameWithType = tableNameWithType;
-    _serverMetrics = serverMetrics;
-    _partialUpsertHandler = partialUpsertHandler;
-    _hashFunction = hashFunction;
     _primaryKeyColumns = primaryKeyColumns;
+    _comparisonColumn = comparisonColumn;
+    _hashFunction = hashFunction;
+    _partialUpsertHandler = partialUpsertHandler;
+    _serverMetrics = serverMetrics;
   }
 
   public PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
     return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
-        k -> new PartitionUpsertMetadataManager(_tableNameWithType, k, _serverMetrics, _partialUpsertHandler,
-            _hashFunction, _primaryKeyColumns));
+        k -> new PartitionUpsertMetadataManager(_tableNameWithType, k, _primaryKeyColumns, _comparisonColumn,
+            _hashFunction, _partialUpsertHandler, _serverMetrics));
   }
 
   public boolean isPartialUpsertEnabled() {

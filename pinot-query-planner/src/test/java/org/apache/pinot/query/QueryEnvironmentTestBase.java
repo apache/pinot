@@ -56,10 +56,6 @@ public class QueryEnvironmentTestBase {
             + " GROUP BY a.col1, a.col2"},
         new Object[]{"SELECT a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2 "
             + " WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1"},
-        new Object[]{"SELECT a.col1, a.col3, b.col3 FROM a JOIN b ON MOD(a.col3, 2) = MOD(b.col3, 2)"},
-        new Object[]{"SELECT a.col1, a.col3, i.maxVal FROM a JOIN "
-            + "  (SELECT b.col1 AS joinKey, MAX(b.col3) AS maxVal FROM b GROUP BY b.col1) AS i "
-            + "  ON a.col1 = i.joinKey"},
     };
   }
 }

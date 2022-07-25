@@ -48,8 +48,7 @@ public class DataBlockTest {
 
     BaseDataBlock dataBlock = DataBlockUtils.getErrorDataBlock(originalException);
     dataBlock.addException(processingException);
-    Assert.assertEquals(dataBlock.getDataSchema().getColumnNames().length, 0);
-    Assert.assertEquals(dataBlock.getDataSchema().getColumnDataTypes().length, 0);
+    Assert.assertNull(dataBlock.getDataSchema());
     Assert.assertEquals(dataBlock.getNumberOfRows(), 0);
 
     // Assert processing exception and original exception both matches.

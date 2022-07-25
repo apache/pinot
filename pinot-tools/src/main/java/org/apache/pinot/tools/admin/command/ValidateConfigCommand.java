@@ -22,11 +22,10 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.apache.helix.PropertyPathConfig;
-import org.apache.helix.PropertyType;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -103,9 +102,9 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
       throw new RuntimeException("Need to specify at least one of -schema and -tableConfig");
     }
 
-    LOGGER.info("Connecting to Zookeeper: {}, cluster: ", _zkAddress, _clusterName);
+    LOGGER.info("Connecting to Zookeeper: {}, cluster: {}", _zkAddress, _clusterName);
     ZNRecordSerializer serializer = new ZNRecordSerializer();
-    String path = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, _clusterName);
+    String path = PropertyPathBuilder.propertyStore(_clusterName);
     _helixPropertyStore = new ZkHelixPropertyStore<>(_zkAddress, serializer, path);
 
     LOGGER.info("\n\n-------------------- Starting Validation --------------------");

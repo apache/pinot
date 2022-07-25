@@ -37,6 +37,7 @@
     <localstack-utils.version>0.2.19</localstack-utils.version>
     <awaitility.version>3.0.0</awaitility.version>
     <aws.sdk.version>2.14.28</aws.sdk.version>
+    <testcontainers.version>1.17.3</testcontainers.version>
   </properties>
 
   <build>
@@ -322,6 +323,30 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-yammer</artifactId>
       <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-confluent-avro</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers</artifactId>
+      <version>${testcontainers.version}</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>net.java.dev.jna</groupId>
+          <artifactId>jna</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>kafka</artifactId>
+      <version>${testcontainers.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>cloud.localstack</groupId>

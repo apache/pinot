@@ -42,6 +42,7 @@ public interface SegmentPruner {
    * <p>Override this method for the pruner logic.
    *
    * @param segments The list of segments to be pruned. Implementations must not modify the list.
+   *                 TODO: Revisit this because the caller doesn't require not changing the input segments
    */
   List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query);
 }

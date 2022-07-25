@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.common.minion;
 
-import org.I0Itec.zkclient.exception.ZkException;
 import org.apache.helix.AccessOption;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.store.HelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.helix.FakePropertyStore;
 import org.apache.zookeeper.data.Stat;

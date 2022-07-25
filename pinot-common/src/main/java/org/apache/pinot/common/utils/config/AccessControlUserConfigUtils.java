@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.helix.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.user.AccessType;
 import org.apache.pinot.spi.config.user.UserConfig;
 

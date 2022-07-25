@@ -31,12 +31,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import org.apache.helix.PropertyPathConfig;
-import org.apache.helix.PropertyType;
-import org.apache.helix.ZNRecord;
+import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -117,8 +116,8 @@ public class AutoAddInvertedIndex {
     _controllerAddress = controllerAddress;
     _brokerAddress = brokerAddress;
     _helixAdmin = new ZKHelixAdmin(zkAddress);
-    _propertyStore = new ZkHelixPropertyStore<>(zkAddress, new ZNRecordSerializer(),
-        PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, clusterName));
+    _propertyStore =
+        new ZkHelixPropertyStore<>(zkAddress, new ZNRecordSerializer(), PropertyPathBuilder.propertyStore(clusterName));
     _strategy = strategy;
     _mode = mode;
   }

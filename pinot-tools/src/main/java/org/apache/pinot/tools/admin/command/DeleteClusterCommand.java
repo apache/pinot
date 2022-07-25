@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.helix.manager.zk.ZkClient;
+import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -27,6 +27,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.common.datablock.DataBlockUtils;
+import org.apache.pinot.core.common.datablock.MetadataBlock;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -50,14 +51,17 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
   private final RelDistribution.Type _exchangeType;
   private final List<ServerInstance> _sendingStageInstances;
+  private final DataSchema _dataSchema;
   private final String _hostName;
   private final int _port;
   private final long _jobId;
   private final int _stageId;
+  private TransferableBlock _upstreamErrorBlock;
 
-  public MailboxReceiveOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
+  public MailboxReceiveOperator(MailboxService<Mailbox.MailboxContent> mailboxService, DataSchema dataSchema,
       RelDistribution.Type exchangeType, List<ServerInstance> sendingStageInstances, String hostName, int port,
       long jobId, int stageId) {
+    _dataSchema = dataSchema;
     _mailboxService = mailboxService;
     _exchangeType = exchangeType;
     _sendingStageInstances = sendingStageInstances;
@@ -65,6 +69,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     _port = port;
     _jobId = jobId;
     _stageId = stageId;
+    _upstreamErrorBlock = null;
   }
 
   @Override
@@ -81,9 +86,11 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
 
   @Override
   protected TransferableBlock getNextBlock() {
+    if (_upstreamErrorBlock != null) {
+      return _upstreamErrorBlock;
+    }
     // TODO: do a round robin check against all MailboxContentStreamObservers and find which one that has data.
     boolean hasOpenedMailbox = true;
-    DataSchema dataSchema = null;
     long timeoutWatermark = System.nanoTime() + DEFAULT_TIMEOUT_NANO;
     while (hasOpenedMailbox && System.nanoTime() < timeoutWatermark) {
       hasOpenedMailbox = false;
@@ -100,6 +107,10 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
               ByteBuffer byteBuffer = mailboxContent.getPayload().asReadOnlyByteBuffer();
               if (byteBuffer.hasRemaining()) {
                 BaseDataBlock dataBlock = DataBlockUtils.getDataBlock(byteBuffer);
+                if (dataBlock instanceof MetadataBlock && !dataBlock.getExceptions().isEmpty()) {
+                  _upstreamErrorBlock = TransferableBlockUtils.getErrorTransferableBlock(dataBlock.getExceptions());
+                  return _upstreamErrorBlock;
+                }
                 if (dataBlock.getNumberOfRows() > 0) {
                   // here we only return data table block when it is not empty.
                   return new TransferableBlock(dataBlock);
@@ -117,7 +128,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     }
     // TODO: we need to at least return one data table with schema if there's no error.
     // we need to condition this on whether there's already things being returned or not.
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(_dataSchema);
   }
 
   public RelDistribution.Type getExchangeType() {

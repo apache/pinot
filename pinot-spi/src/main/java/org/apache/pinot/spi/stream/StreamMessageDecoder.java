@@ -20,6 +20,7 @@ package org.apache.pinot.spi.stream;
 
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -52,8 +53,10 @@ public interface StreamMessageDecoder<T> {
    * Decodes a row.
    *
    * @param payload The buffer from which to read the row.
-   * @return A new row decoded from the buffer
+   * @return A new row decoded from the buffer. If the returned value is <code>null</code> the row is dropped from the
+   *         segment.
    */
+  @Nullable
   GenericRow decode(T payload, GenericRow destination);
 
   /**
@@ -63,7 +66,9 @@ public interface StreamMessageDecoder<T> {
    * @param offset The offset into the array from which the row contents starts
    * @param length The length of the row contents in bytes
    * @param destination The {@link GenericRow} to write the decoded row into
-   * @return A new row decoded from the buffer
+   * @return A new row decoded from the buffer If the returned value is <code>null</code> the row is dropped from the
+   *         segment.
    */
+  @Nullable
   GenericRow decode(T payload, int offset, int length, GenericRow destination);
 }

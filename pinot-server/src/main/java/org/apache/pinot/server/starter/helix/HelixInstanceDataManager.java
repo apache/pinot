@@ -40,9 +40,9 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -251,6 +251,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       SegmentRefreshSemaphore segmentRefreshSemaphore)
       throws Exception {
     LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
+    long startTime = System.currentTimeMillis();
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkNotNull(tableConfig);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
@@ -282,7 +283,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
           String.format("Failed to reload %d/%d segments: %s in table: %s", failedSegments.size(),
               segmentsMetadata.size(), failedSegments, tableNameWithType), sampleException.get());
     }
-    LOGGER.info("Reloaded all segments in table: {}", tableNameWithType);
+    LOGGER.info("Reloaded all segments in table: {}. Duration: {}", tableNameWithType,
+        (System.currentTimeMillis() - startTime));
   }
 
   private void reloadSegment(String tableNameWithType, SegmentMetadata segmentMetadata, TableConfig tableConfig,

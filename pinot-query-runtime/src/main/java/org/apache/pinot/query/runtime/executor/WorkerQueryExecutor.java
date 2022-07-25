@@ -100,38 +100,39 @@ public class WorkerQueryExecutor {
   }
 
   // TODO: split this PhysicalPlanner into a separate module
+  // TODO: optimize this into a framework. (physical planner)
   private BaseOperator<TransferableBlock> getOperator(long requestId, StageNode stageNode,
       Map<Integer, StageMetadata> metadataMap) {
-    // TODO: optimize this into a framework. (physical planner)
     if (stageNode instanceof MailboxReceiveNode) {
       MailboxReceiveNode receiveNode = (MailboxReceiveNode) stageNode;
       List<ServerInstance> sendingInstances = metadataMap.get(receiveNode.getSenderStageId()).getServerInstances();
-      return new MailboxReceiveOperator(_mailboxService, RelDistribution.Type.ANY, sendingInstances, _hostName, _port,
-          requestId, receiveNode.getSenderStageId());
+      return new MailboxReceiveOperator(_mailboxService, receiveNode.getDataSchema(), RelDistribution.Type.ANY,
+          sendingInstances, _hostName, _port, requestId, receiveNode.getSenderStageId());
     } else if (stageNode instanceof MailboxSendNode) {
       MailboxSendNode sendNode = (MailboxSendNode) stageNode;
       BaseOperator<TransferableBlock> nextOperator = getOperator(requestId, sendNode.getInputs().get(0), metadataMap);
       StageMetadata receivingStageMetadata = metadataMap.get(sendNode.getReceiverStageId());
-      return new MailboxSendOperator(_mailboxService, nextOperator, receivingStageMetadata.getServerInstances(),
-          sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), _hostName, _port, requestId,
-          sendNode.getStageId());
+      return new MailboxSendOperator(_mailboxService, sendNode.getDataSchema(), nextOperator,
+          receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(), sendNode.getPartitionKeySelector(),
+          _hostName, _port, requestId, sendNode.getStageId());
     } else if (stageNode instanceof JoinNode) {
       JoinNode joinNode = (JoinNode) stageNode;
       BaseOperator<TransferableBlock> leftOperator = getOperator(requestId, joinNode.getInputs().get(0), metadataMap);
       BaseOperator<TransferableBlock> rightOperator = getOperator(requestId, joinNode.getInputs().get(1), metadataMap);
-      return new HashJoinOperator(leftOperator, rightOperator, joinNode.getCriteria());
+      return new HashJoinOperator(leftOperator, joinNode.getInputs().get(0).getDataSchema(), rightOperator,
+          joinNode.getInputs().get(1).getDataSchema(), joinNode.getDataSchema(), joinNode.getCriteria());
     } else if (stageNode instanceof AggregateNode) {
       AggregateNode aggregateNode = (AggregateNode) stageNode;
       BaseOperator<TransferableBlock> inputOperator =
           getOperator(requestId, aggregateNode.getInputs().get(0), metadataMap);
-      return new AggregateOperator(inputOperator, aggregateNode.getAggCalls(), aggregateNode.getGroupSet(),
-          aggregateNode.getInputs().get(0).getDataSchema());
+      return new AggregateOperator(inputOperator, aggregateNode.getDataSchema(), aggregateNode.getAggCalls(),
+          aggregateNode.getGroupSet(), aggregateNode.getInputs().get(0).getDataSchema());
     } else if (stageNode instanceof FilterNode) {
       throw new UnsupportedOperationException("Unsupported!");
     } else if (stageNode instanceof ProjectNode) {
       ProjectNode projectNode = (ProjectNode) stageNode;
       return new TransformOperator(getOperator(requestId, projectNode.getInputs().get(0), metadataMap),
-          projectNode.getProjects(), projectNode.getInputs().get(0).getDataSchema());
+          projectNode.getDataSchema(), projectNode.getProjects(), projectNode.getInputs().get(0).getDataSchema());
     } else {
       throw new UnsupportedOperationException(
           String.format("Stage node type %s is not supported!", stageNode.getClass().getSimpleName()));

@@ -26,14 +26,13 @@ import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
-import org.apache.helix.PropertyPathConfig;
-import org.apache.helix.PropertyType;
-import org.apache.helix.ZNRecord;
+import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +60,7 @@ public class PinotZKChanger {
       throw new RuntimeException(e);
     }
     ZNRecordSerializer serializer = new ZNRecordSerializer();
-    String path = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, clusterName);
+    String path = PropertyPathBuilder.propertyStore(clusterName);
     _propertyStore = new ZkHelixPropertyStore<>(zkAddress, serializer, path);
   }
 

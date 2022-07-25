@@ -243,6 +243,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
+  private volatile boolean _hasMessagesFetched = false;
   private volatile boolean _endOfPartitionGroup = false;
   private volatile boolean _forceCommitMessageReceived = false;
   private StreamPartitionMsgOffset _finalOffset; // Used when we want to catch up to this one
@@ -302,7 +303,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         //   - partition group is ended
         //   - force commit message has been received
         if (now >= _consumeEndTime) {
-          if (_realtimeSegment.getNumDocsIndexed() == 0) {
+          if (!_hasMessagesFetched) {
             _segmentLogger.info("No events came in, extending time by {} hours", TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
             _consumeEndTime += TimeUnit.HOURS.toMillis(TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
             return false;
@@ -573,12 +574,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       streamMessageCount++;
     }
     updateCurrentDocumentCountMetrics();
-    if (streamMessageCount != 0) {
-      if (_segmentLogger.isDebugEnabled()) {
+    if (messagesAndOffsets.getUnfilteredMessageCount() > 0) {
+      _hasMessagesFetched = true;
+      if (streamMessageCount > 0 && _segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}",
             indexedMessageCount, streamMessageCount, _currentOffset);
       }
-    } else if (messagesAndOffsets.getUnfilteredMessageCount() == 0) {
+    } else {
       if (_segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("empty batch received - sleeping for {}ms", idlePipeSleepTimeMillis);
       }
