@@ -115,10 +115,20 @@ public class StagePlanner {
       // 2. make an exchange sender and receiver node pair
       KeySelector<Object[], Object[]> keySelector = exchangeType == RelDistribution.Type.HASH_DISTRIBUTED
           ? new FieldSelectionKeySelector(distributionKeys) : null;
-      StageNode mailboxReceiver = new MailboxReceiveNode(currentStageId, nextStageRoot.getDataSchema(),
-          nextStageRoot.getStageId(), exchangeType, keySelector);
-      StageNode mailboxSender = new MailboxSendNode(nextStageRoot.getStageId(), nextStageRoot.getDataSchema(),
-          mailboxReceiver.getStageId(), exchangeType, keySelector);
+
+      StageNode mailboxReceiver;
+      StageNode mailboxSender;
+      if (canSkipShuffle(nextStageRoot, keySelector)) {
+        mailboxReceiver = new MailboxReceiveNode(currentStageId, nextStageRoot.getDataSchema(),
+            nextStageRoot.getStageId(), RelDistribution.Type.SINGLETON, keySelector);
+        mailboxSender = new MailboxSendNode(nextStageRoot.getStageId(), nextStageRoot.getDataSchema(),
+            mailboxReceiver.getStageId(), RelDistribution.Type.SINGLETON, keySelector);
+      } else {
+        mailboxReceiver = new MailboxReceiveNode(currentStageId, nextStageRoot.getDataSchema(),
+            nextStageRoot.getStageId(), exchangeType, keySelector);
+        mailboxSender = new MailboxSendNode(nextStageRoot.getStageId(), nextStageRoot.getDataSchema(),
+            mailboxReceiver.getStageId(), exchangeType, keySelector);
+      }
       mailboxSender.addInput(nextStageRoot);
 
       // 3. put the sender side as a completed stage.
@@ -139,6 +149,15 @@ public class StagePlanner {
       updateStageMetadata(currentStageId, stageNode, _stageMetadataMap);
       return stageNode;
     }
+  }
+
+  private boolean canSkipShuffle(StageNode stageNode, KeySelector<Object[], Object[]> keySelector) {
+    Set<Integer> originSet = stageNode.getPartitionKeys();
+    if (!originSet.isEmpty() && keySelector != null) {
+      Set<Integer> targetSet = new HashSet<>(((FieldSelectionKeySelector) keySelector).getColumnIndices());
+      return targetSet.containsAll(originSet);
+    }
+    return false;
   }
 
   private static void updateStageMetadata(int stageId, StageNode node, Map<Integer, StageMetadata> stageMetadataMap) {
@@ -204,6 +223,12 @@ public class StagePlanner {
       // hash distribution key is partition key.
       FieldSelectionKeySelector keySelector = (FieldSelectionKeySelector)
           ((MailboxReceiveNode) node).getPartitionKeySelector();
+      if (keySelector != null) {
+        node.setPartitionKeys(new HashSet<>(keySelector.getColumnIndices()));
+      }
+    } else if (node instanceof MailboxSendNode) {
+      FieldSelectionKeySelector keySelector = (FieldSelectionKeySelector)
+          ((MailboxSendNode) node).getPartitionKeySelector();
       if (keySelector != null) {
         node.setPartitionKeys(new HashSet<>(keySelector.getColumnIndices()));
       }

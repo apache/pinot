@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
@@ -77,8 +78,20 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     _dataSchema = dataSchema;
     _mailboxService = mailboxService;
     _dataTableBlockBaseOperator = dataTableBlockBaseOperator;
-    _receivingStageInstances = receivingStageInstances;
     _exchangeType = exchangeType;
+    if (_exchangeType == RelDistribution.Type.SINGLETON) {
+      ServerInstance singletonInstance = null;
+      for (ServerInstance serverInstance : receivingStageInstances) {
+        if (serverInstance.getHostname().equals(_mailboxService.getHostname())
+            && serverInstance.getQueryMailboxPort() == _mailboxService.getMailboxPort()) {
+          Preconditions.checkState(singletonInstance == null, "multiple instance found for singleton exchange type!");
+          singletonInstance = serverInstance;
+        }
+      }
+      _receivingStageInstances = Collections.singletonList(singletonInstance);
+    } else {
+      _receivingStageInstances = receivingStageInstances;
+    }
     _keySelector = keySelector;
     _serverHostName = hostName;
     _serverPort = port;
@@ -112,17 +125,7 @@ public class MailboxSendOperator extends BaseOperator<TransferableBlock> {
     try {
       switch (_exchangeType) {
         case SINGLETON:
-          ServerInstance singletonInstance = null;
-          for (ServerInstance serverInstance : _receivingStageInstances) {
-            // TODO: determine singleton instance at constructor.
-            if (serverInstance.getHostname().equals(_mailboxService.getHostname())
-                && serverInstance.getQueryMailboxPort() == _mailboxService.getMailboxPort()) {
-              Preconditions.checkState(singletonInstance == null,
-                  "multiple instance found for singleton exchange type!");
-              singletonInstance = serverInstance;
-            }
-          }
-          sendDataTableBlock(singletonInstance, dataBlock);
+          sendDataTableBlock(_receivingStageInstances.get(0), dataBlock);
           break;
         case RANDOM_DISTRIBUTED:
           if (isEndOfStream) {

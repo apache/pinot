@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
@@ -68,7 +70,19 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     _dataSchema = dataSchema;
     _mailboxService = mailboxService;
     _exchangeType = exchangeType;
-    _sendingStageInstances = sendingStageInstances;
+    if (_exchangeType == RelDistribution.Type.SINGLETON) {
+      ServerInstance singletonInstance = null;
+      for (ServerInstance serverInstance : sendingStageInstances) {
+        if (serverInstance.getHostname().equals(_mailboxService.getHostname())
+            && serverInstance.getQueryMailboxPort() == _mailboxService.getMailboxPort()) {
+          Preconditions.checkState(singletonInstance == null, "multiple instance found for singleton exchange type!");
+          singletonInstance = serverInstance;
+        }
+      }
+      _sendingStageInstances = Collections.singletonList(singletonInstance);
+    } else {
+      _sendingStageInstances = sendingStageInstances;
+    }
     _hostName = hostName;
     _port = port;
     _jobId = jobId;
