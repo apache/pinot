@@ -29,7 +29,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class MaxMVAggregationFunction extends MaxAggregationFunction {
 
   public MaxMVAggregationFunction(ExpressionContext expression) {
-    super(expression, false);
+    super(expression);
   }
 
   @Override

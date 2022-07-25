@@ -29,7 +29,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class AvgMVAggregationFunction extends AvgAggregationFunction {
 
   public AvgMVAggregationFunction(ExpressionContext expression) {
-    super(expression, false);
+    super(expression);
   }
 
   @Override

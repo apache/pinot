@@ -29,7 +29,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class SumMVAggregationFunction extends SumAggregationFunction {
 
   public SumMVAggregationFunction(ExpressionContext expression) {
-    super(expression, false);
+    super(expression);
   }
 
   @Override

@@ -37,6 +37,10 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   private Integer _groupKeyForNullValue = null;
 
+  public SumAggregationFunction(ExpressionContext expression) {
+    this(expression, false);
+  }
+
   public SumAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     _nullHandlingEnabled = nullHandlingEnabled;

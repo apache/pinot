@@ -29,7 +29,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class MinMVAggregationFunction extends MinAggregationFunction {
 
   public MinMVAggregationFunction(ExpressionContext expression) {
-    super(expression, false);
+    super(expression);
   }
 
   @Override

@@ -44,6 +44,10 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
   private final String _resultColumnName;
   private final boolean _nullHandlingEnabled;
 
+  public CountAggregationFunction(ExpressionContext expression) {
+    this(expression, false);
+  }
+
   public CountAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     String expStr = expression.toString();

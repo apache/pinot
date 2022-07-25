@@ -35,7 +35,7 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
    */
   public CountMVAggregationFunction(ExpressionContext expression) {
     // TODO(nhejazi): support proper null handling for aggregation functions on MV columns.
-    super(expression, false);
+    super(expression);
   }
 
   @Override

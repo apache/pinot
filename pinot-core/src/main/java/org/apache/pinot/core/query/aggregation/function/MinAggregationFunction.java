@@ -38,6 +38,10 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
   // stores id of the groupKey where the corresponding value is null.
   private Integer _groupKeyForNullValue = null;
 
+  public MinAggregationFunction(ExpressionContext expression) {
+    this(expression, false);
+  }
+
   public MinAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     _nullHandlingEnabled = nullHandlingEnabled;

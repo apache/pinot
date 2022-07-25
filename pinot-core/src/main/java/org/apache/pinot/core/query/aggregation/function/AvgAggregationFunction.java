@@ -39,6 +39,10 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
 
   private Integer _groupKeyForNullValue = null;
 
+  public AvgAggregationFunction(ExpressionContext expression) {
+    this(expression, false);
+  }
+
   public AvgAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     _nullHandlingEnabled = nullHandlingEnabled;
