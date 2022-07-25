@@ -508,34 +508,7 @@ public class AllNullQueriesTest extends BaseQueriesTest {
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 0);
     }
-    {
-      String query = String.format("SELECT COUNT(%s) AS count, MIN(%s) AS min, MAX(%s) AS max, SUM(%s) AS sum"
-              + " FROM testTable GROUP BY %s HAVING max < %s ORDER BY max", COLUMN_NAME, COLUMN_NAME, COLUMN_NAME,
-          COLUMN_NAME, COLUMN_NAME, 20);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      assertTrue(resultTable == null || resultTable.getRows().size() == 0);
-    }
     if (columnDataType != ColumnDataType.STRING) {
-      {
-        String query = String.format("SELECT COUNT(%s) AS count, MIN(%s) AS min, MAX(%s) AS max, SUM(%s) AS sum" + " "
-                + "FROM testTable GROUP BY %s ORDER BY max", COLUMN_NAME, COLUMN_NAME, COLUMN_NAME, COLUMN_NAME,
-            COLUMN_NAME);
-        BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-        ResultTable resultTable = brokerResponse.getResultTable();
-        DataSchema dataSchema = resultTable.getDataSchema();
-        assertEquals(dataSchema, new DataSchema(new String[]{"count", "min", "max", "sum"}, new ColumnDataType[]{
-            ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
-        }));
-        List<Object[]> rows = resultTable.getRows();
-        assertEquals(rows.size(), 1);
-        Object[] row = rows.get(0);
-        assertEquals(row.length, 4);
-        assertEquals(row[0], 4000L);
-        assertNull(row[1]);
-        assertNull(row[2]);
-        assertNull(row[3]);
-      }
       {
         String query = String.format(
             "SELECT AVG(%s) AS avg FROM testTable GROUP BY %s ORDER BY avg LIMIT 20", COLUMN_NAME, COLUMN_NAME);

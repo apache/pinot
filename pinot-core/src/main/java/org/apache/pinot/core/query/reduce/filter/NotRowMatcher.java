@@ -27,9 +27,8 @@ import org.apache.pinot.common.request.context.FilterContext;
 public class NotRowMatcher implements RowMatcher {
   private final RowMatcher _childMatcher;
 
-  public NotRowMatcher(FilterContext childFilter, ValueExtractorFactory valueExtractorFactory,
-      boolean nullHandlingEnabled) {
-    _childMatcher = RowMatcherFactory.getRowMatcher(childFilter, valueExtractorFactory, nullHandlingEnabled);
+  public NotRowMatcher(FilterContext childFilter, ValueExtractorFactory valueExtractorFactory) {
+    _childMatcher = RowMatcherFactory.getRowMatcher(childFilter, valueExtractorFactory);
   }
 
   @Override

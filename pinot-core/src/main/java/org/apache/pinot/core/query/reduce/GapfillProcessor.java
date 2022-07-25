@@ -120,13 +120,12 @@ public class GapfillProcessor extends BaseGapfillProcessor {
 
     GapfillFilterHandler postGapfillFilterHandler = null;
     if (_queryContext.getSubquery() != null && _queryContext.getFilter() != null) {
-      postGapfillFilterHandler = new GapfillFilterHandler(_queryContext.getFilter(), dataSchema,
-          _queryContext.isNullHandlingEnabled());
+      postGapfillFilterHandler = new GapfillFilterHandler(_queryContext.getFilter(), dataSchema);
     }
     GapfillFilterHandler postAggregateHavingFilterHandler = null;
     if (_queryContext.getHavingFilter() != null) {
-      postAggregateHavingFilterHandler = new GapfillFilterHandler(_queryContext.getHavingFilter(),
-          dataSchemaForAggregatedResult, _queryContext.isNullHandlingEnabled());
+      postAggregateHavingFilterHandler =
+          new GapfillFilterHandler(_queryContext.getHavingFilter(), dataSchemaForAggregatedResult);
     }
     long start = _startMs;
     ColumnDataType[] resultColumnDataTypes = dataSchema.getColumnDataTypes();

@@ -531,27 +531,6 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      String query = String.format(
-          "SELECT AVG(%s) AS avg FROM testTable GROUP BY %s HAVING %s < %s ORDER BY avg LIMIT 20",
-          COLUMN_NAME, COLUMN_NAME, COLUMN_NAME,
-          baseValue.doubleValue() + 30);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
-      assertEquals(dataSchema, new DataSchema(new String[]{"avg"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
-      List<Object[]> rows = resultTable.getRows();
-      int i = 0;
-      for (Object[] row : rows) {
-        if (i % 2 == 1) {
-          // Null values are inserted at: index % 2 == 1.
-          i++;
-        }
-        assertEquals(row.length, 1);
-        assertTrue(Math.abs((Double) row[0] - (baseValue.doubleValue() + i)) < 1e-1);
-        i++;
-      }
-    }
-    {
       String query = String.format("SELECT AVG(%s) AS avg, MODE(%s) AS mode, DISTINCTCOUNT(%s) as distinct_count"
               + " FROM testTable GROUP BY %s HAVING avg < %s ORDER BY %s LIMIT 200",
           COLUMN_NAME, COLUMN_NAME, COLUMN_NAME, COLUMN_NAME,
@@ -601,28 +580,6 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         i++;
       }
       assertNull(rows.get(rows.size() - 1)[0]);
-    }
-    {
-      int lowerLimit = 991;
-      String query = String.format(
-          "SELECT MAX(%s) AS max FROM testTable GROUP BY %s HAVING max > %s ORDER BY max", COLUMN_NAME, COLUMN_NAME,
-          baseValue.doubleValue() + lowerLimit);
-      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
-      assertEquals(dataSchema,
-          new DataSchema(new String[]{"max"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
-      List<Object[]> rows = resultTable.getRows();
-      int i = lowerLimit;
-      for (Object[] row : rows) {
-        if (i % 2 == 1) {
-          // Null values are inserted at: index % 2 == 1.
-          i++;
-        }
-        assertEquals(row.length, 1);
-        assertTrue(Math.abs((Double) row[0] - (baseValue.doubleValue() + i)) < 1e-1);
-        i++;
-      }
     }
     DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_3);
   }

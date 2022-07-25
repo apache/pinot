@@ -283,20 +283,6 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       assertEquals(thirdRow[0], (long) 568);
       assertNull(thirdRow[1]);
     }
-    {
-      String query =
-          "SELECT MAX(booleanColumn) AS maxBoolean FROM testTable GROUP BY booleanColumn HAVING maxBoolean < 1 ORDER "
-              + "BY booleanColumn";
-      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
-      assertEquals(dataSchema, new DataSchema(new String[]{"maxBoolean"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
-      List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 1);
-      Object[] row = rows.get(0);
-      assertEquals(row.length, 1);
-      assertEquals(row[0], 0.0);
-    }
     DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_3);
   }
 
