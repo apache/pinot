@@ -27,7 +27,9 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.server.starter.ServerInstance;
@@ -47,23 +49,44 @@ public class ControllerJobStatusResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Task status", notes = "Return status of the given task")
   public String taskStatus(@PathParam("tableNameWithType") String tableNameWithType,
-      @QueryParam("reloadJobTimestamp") long reloadJobSubmissionTimestamp)
+      @QueryParam("reloadJobTimestamp") long reloadJobSubmissionTimestamp,
+      @QueryParam("segmentName") String segmentName)
       throws Exception {
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
-    List<SegmentDataManager> allSegments = tableDataManager.acquireAllSegments();
-    try {
-      long successCount = 0;
-      for (SegmentDataManager segmentDataManager : allSegments) {
-        if (segmentDataManager.getLoadTimeMs() >= reloadJobSubmissionTimestamp) {
-          successCount++;
+
+    if (segmentName == null) {
+      // All segments
+      List<SegmentDataManager> allSegments = tableDataManager.acquireAllSegments();
+      try {
+        long successCount = 0;
+        for (SegmentDataManager segmentDataManager : allSegments) {
+          if (segmentDataManager.getLoadTimeMs() >= reloadJobSubmissionTimestamp) {
+            successCount++;
+          }
+        }
+        SegmentReloadStatusValue segmentReloadStatusValue =
+            new SegmentReloadStatusValue(allSegments.size(), successCount);
+        return JsonUtils.objectToString(segmentReloadStatusValue);
+      } finally {
+        for (SegmentDataManager segmentDataManager : allSegments) {
+          tableDataManager.releaseSegment(segmentDataManager);
         }
       }
-      SegmentReloadStatusValue segmentReloadStatusValue =
-          new SegmentReloadStatusValue(allSegments.size(), successCount);
-      return JsonUtils.objectToString(segmentReloadStatusValue);
-    } finally {
-      for (SegmentDataManager segmentDataManager : allSegments) {
+    } else {
+      SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+      if (segmentDataManager == null) {
+        throw new WebApplicationException("Segment: " + segmentName + " is not found", Response.Status.NOT_FOUND);
+      }
+      try {
+        int successCount = 0;
+        if (segmentDataManager.getLoadTimeMs() >= reloadJobSubmissionTimestamp) {
+          successCount = 1;
+        }
+        SegmentReloadStatusValue segmentReloadStatusValue =
+            new SegmentReloadStatusValue(1, successCount);
+        return JsonUtils.objectToString(segmentReloadStatusValue);
+      } finally {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }

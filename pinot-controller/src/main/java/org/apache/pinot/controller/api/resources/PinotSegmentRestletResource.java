@@ -64,6 +64,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
@@ -617,6 +618,12 @@ public class PinotSegmentRestletResource {
           "Failed to find controller job: " + reloadJobId + " for table: " + tableNameWithType, Status.NOT_FOUND);
     }
 
+    String singleSegmentName = null;
+    if (controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONTROLLER_JOB_TYPE).equals(
+        ControllerJobType.RELOAD_SEGMENT.toString())) {
+      singleSegmentName = controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME);
+    }
+
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
     CompletionServiceHelper completionServiceHelper =
@@ -626,8 +633,11 @@ public class PinotSegmentRestletResource {
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
       String reloadTaskStatusEndpoint =
-          endpoint + "/controllerJob/reloadStatus/" + tableNameWithType + "/?reloadJobTimestamp="
+          endpoint + "/controllerJob/reloadStatus/" + tableNameWithType + "?reloadJobTimestamp="
               + controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONTROLLER_JOB_SUBMISSION_TIME);
+      if (singleSegmentName != null) {
+        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + singleSegmentName;
+      }
       serverUrls.add(reloadTaskStatusEndpoint);
     }
 

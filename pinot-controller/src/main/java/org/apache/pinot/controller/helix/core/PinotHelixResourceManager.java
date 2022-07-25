@@ -2036,7 +2036,7 @@ public class PinotHelixResourceManager {
   private boolean addReloadJobToZK(String tableNameWithType, String taskId, Map<String, String> jobMetadata) {
     String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob();
     Stat stat = new Stat();
-    ZNRecord tableJobsZnRecord = _propertyStore.get(jobResourcePath, stat, -1);
+    ZNRecord tableJobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
     jobMetadata.put(CommonConstants.ControllerJob.CONTROLLER_JOB_TABLE_NAME_WITH_TYPE, tableNameWithType);
     if (tableJobsZnRecord != null) {
       Map<String, Map<String, String>> tasks = tableJobsZnRecord.getMapFields();
