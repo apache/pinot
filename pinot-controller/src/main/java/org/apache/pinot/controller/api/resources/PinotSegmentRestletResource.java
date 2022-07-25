@@ -59,8 +59,8 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -465,18 +465,23 @@ public class PinotSegmentRestletResource {
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
     Pair<Integer, String> msgInfo =
         _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload);
+    boolean zkJobMetaWriteSuccess = false;
     if (msgInfo.getLeft() > 0) {
       try {
-        if (!_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentName, msgInfo.getRight(),
+        if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentName, msgInfo.getRight(),
             msgInfo.getLeft())) {
+          zkJobMetaWriteSuccess = true;
+        } else {
           LOGGER.error("Failed to add reload segment job meta into zookeeper for table {}, segment {}",
               tableNameWithType, segmentName);
         }
       } catch (Exception e) {
-        LOGGER.error("Failed to add reload segment job meta into zookeeper for table {}, segment {}",
-            tableNameWithType, segmentName, e);
+        LOGGER.error("Failed to add reload segment job meta into zookeeper for table {}, segment {}", tableNameWithType,
+            segmentName, e);
       }
-      return new SuccessResponse("Sent " + msgInfo + " reload messages");
+      return new SuccessResponse(
+          String.format("Submitted reload job id: %s, sent %d reload messages. Job meta ZK storage status: %s",
+              msgInfo.getRight(), msgInfo.getLeft(), zkJobMetaWriteSuccess ? "SUCCESS" : "FAILED"));
     } else {
       throw new ControllerApplicationException(LOGGER,
           "Failed to find segment: " + segmentName + " in table: " + tableName, Status.NOT_FOUND);
@@ -605,8 +610,7 @@ public class PinotSegmentRestletResource {
     TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
     String tableNameWithType = TableNameBuilder.forType(tableTypeFromRequest).tableNameWithType(tableName);
     Map<String, List<String>> serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
-    Map<String, String> controllerJobZKMetadata =
-        _pinotHelixResourceManager.getControllerJobZKMetadata(tableNameWithType, reloadJobId);
+    Map<String, String> controllerJobZKMetadata = _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId);
 
     if (controllerJobZKMetadata == null) {
       throw new ControllerApplicationException(LOGGER,
@@ -699,21 +703,28 @@ public class PinotSegmentRestletResource {
     List<String> tableNamesWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
             LOGGER);
-    Map<String, Pair<Integer, String>> perTableMsgData = new LinkedHashMap<>();
+    Map<String, Map<String, String>> perTableMsgData = new LinkedHashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
       Pair<Integer, String> msgInfo = _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload);
-      perTableMsgData.put(tableNameWithType, msgInfo);
+      Map<String, String> tableReloadMeta = new HashMap<>();
+      tableReloadMeta.put("numberOfMessagesSent", String.valueOf(msgInfo.getLeft()));
+      tableReloadMeta.put("reloadMessageId", msgInfo.getRight());
+      perTableMsgData.put(tableNameWithType, tableReloadMeta);
       // Store in ZK
       try {
-        if (!_pinotHelixResourceManager.addNewReloadAllSegmentsJob(tableNameWithType, msgInfo.getRight(),
+        if (_pinotHelixResourceManager.addNewReloadAllSegmentsJob(tableNameWithType, msgInfo.getRight(),
             msgInfo.getLeft())) {
+          tableReloadMeta.put("reloadJobMetaZKStorageStatus", "SUCCESS");
+        } else {
+          tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
           LOGGER.error("Failed to add reload all segments job meta into zookeeper for table {}", tableNameWithType);
         }
       } catch (Exception e) {
+        tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
         LOGGER.error("Failed to add reload all segments job meta into zookeeper for table {}", tableNameWithType, e);
       }
     }
-    return new SuccessResponse("Sent " + perTableMsgData + " reload messages");
+    return new SuccessResponse("Reload segments table level details: " + perTableMsgData);
   }
 
   @Deprecated

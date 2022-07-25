@@ -110,8 +110,8 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX, instancePartitionsName);
   }
 
-  public static String constructPropertyStorePathForControllerJob(String resourceName) {
-    return StringUtil.join("/", PROPERTYSTORE_CONTROLLER_JOBS_PREFIX, resourceName);
+  public static String constructPropertyStorePathForControllerJob() {
+    return StringUtil.join("/", PROPERTYSTORE_CONTROLLER_JOBS_PREFIX);
   }
 
   public static String constructPropertyStorePathForResource(String resourceName) {
