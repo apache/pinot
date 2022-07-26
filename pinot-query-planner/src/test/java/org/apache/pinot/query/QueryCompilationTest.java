@@ -18,22 +18,15 @@
  */
 package org.apache.pinot.query;
 
-import com.google.common.collect.ImmutableList;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.context.PlannerContext;
-import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
-import org.apache.pinot.query.planner.StageMetadata;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class QueryEnvironmentTest extends QueryEnvironmentTestBase {
+public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
   @Test(dataProvider = "testQueryParserDataProvider")
   public void testQueryParser(String query, String digest)
@@ -45,7 +38,7 @@ public class QueryEnvironmentTest extends QueryEnvironmentTestBase {
   }
 
   @Test(dataProvider = "testQueryDataProvider")
-  public void testQueryToRel(String query)
+  public void testQueryPlanWithoutException(String query)
       throws Exception {
     try {
       QueryPlan queryPlan = _queryEnvironment.planQuery(query);
@@ -63,44 +56,6 @@ public class QueryEnvironmentTest extends QueryEnvironmentTestBase {
     } catch (RuntimeException e) {
       Assert.assertTrue(e.getCause().getMessage().contains(exceptionSnippet));
     }
-  }
-
-  @Test
-  public void testQueryAndAssertStageContentForJoin()
-      throws Exception {
-    String query = "SELECT * FROM a JOIN b ON a.col1 = b.col2";
-    QueryPlan queryPlan = _queryEnvironment.planQuery(query);
-    Assert.assertEquals(queryPlan.getQueryStageMap().size(), 4);
-    Assert.assertEquals(queryPlan.getStageMetadataMap().size(), 4);
-    for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
-      List<String> tables = e.getValue().getScannedTables();
-      if (tables.size() == 1) {
-        // table scan stages; for tableA it should have 2 hosts, for tableB it should have only 1
-        Assert.assertEquals(
-            e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toList()),
-            tables.get(0).equals("a") ? ImmutableList.of("Server_localhost_1", "Server_localhost_2")
-                : ImmutableList.of("Server_localhost_1"));
-      } else if (!PlannerUtils.isRootStage(e.getKey())) {
-        // join stage should have both servers used.
-        Assert.assertEquals(
-            e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toList()),
-            ImmutableList.of("Server_localhost_1", "Server_localhost_2"));
-      } else {
-        // reduce stage should have the reducer instance.
-        Assert.assertEquals(
-            e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toList()),
-            ImmutableList.of("Server_localhost_3"));
-      }
-    }
-  }
-
-  @Test
-  public void testQueryProjectFilterPushdownForJoin() {
-    String query = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
-        + "WHERE a.col3 >= 0 AND a.col2 IN  ('a', 'b') AND b.col3 < 0";
-    QueryPlan queryPlan = _queryEnvironment.planQuery(query);
-    Assert.assertEquals(queryPlan.getQueryStageMap().size(), 4);
-    Assert.assertEquals(queryPlan.getStageMetadataMap().size(), 4);
   }
 
   @DataProvider(name = "testQueryParserDataProvider")
