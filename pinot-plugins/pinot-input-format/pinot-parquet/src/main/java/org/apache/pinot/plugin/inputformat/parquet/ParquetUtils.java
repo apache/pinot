@@ -49,7 +49,7 @@ public class ParquetUtils {
       throws IOException {
     //noinspection unchecked
     return AvroParquetReader.<GenericRecord>builder(path).disableCompatibility().withDataModel(GenericData.get())
-        .withConf(getParquetAvroReaderConfiguration()).build();
+        .withConf(getParquetHadoopConfiguration()).build();
   }
 
   /**
@@ -58,7 +58,7 @@ public class ParquetUtils {
   public static ParquetWriter<GenericRecord> getParquetAvroWriter(Path path, Schema schema)
       throws IOException {
     return AvroParquetWriter.<GenericRecord>builder(path).withSchema(schema)
-        .withConf(getParquetAvroReaderConfiguration()).build();
+        .withConf(getParquetHadoopConfiguration()).build();
   }
 
   /**
@@ -67,7 +67,7 @@ public class ParquetUtils {
   public static Schema getParquetAvroSchema(Path path)
       throws IOException {
     ParquetMetadata footer =
-        ParquetFileReader.readFooter(getParquetAvroReaderConfiguration(), path, ParquetMetadataConverter.NO_FILTER);
+        ParquetFileReader.readFooter(getParquetHadoopConfiguration(), path, ParquetMetadataConverter.NO_FILTER);
     Map<String, String> metaData = footer.getFileMetaData().getKeyValueMetaData();
     String schemaString = metaData.get("parquet.avro.schema");
     if (schemaString == null) {
@@ -82,7 +82,7 @@ public class ParquetUtils {
     }
   }
 
-  private static Configuration getParquetAvroReaderConfiguration() {
+  public static Configuration getParquetHadoopConfiguration() {
     // The file path used in ParquetRecordReader is a local file path without prefix 'file:///',
     // so we have to make sure that the configuration item 'fs.defaultFS' is set to 'file:///'
     // in case that user's hadoop conf overwrite this item
