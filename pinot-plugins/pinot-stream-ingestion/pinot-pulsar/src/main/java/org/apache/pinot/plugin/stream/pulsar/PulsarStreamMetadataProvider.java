@@ -118,7 +118,6 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
     }
 
     PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, clientId);
-    Consumer consumer = null;
     try {
       List<String> partitionedTopicNameList = _pulsarClient.getPartitionsForTopic(_topic).get();
 
@@ -127,30 +126,28 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
 
         for (int p = newPartitionStartIndex; p < partitionedTopicNameList.size(); p++) {
 
-          consumer = _pulsarClient.newConsumer().topic(partitionedTopicNameList.get(p))
+          try (Consumer<byte[]> consumer = _pulsarClient.newConsumer().topic(partitionedTopicNameList.get(p))
               .subscriptionInitialPosition(pulsarConfig.getInitialSubscriberPosition())
-              .subscriptionName(ConsumerName.generateRandomName()).subscribe();
+              .subscriptionName(ConsumerName.generateRandomName()).subscribe()) {
 
-          Message message = consumer.receive(timeoutMillis, TimeUnit.MILLISECONDS);
-          if (message != null) {
-            newPartitionGroupMetadataList.add(
-                new PartitionGroupMetadata(p, new MessageIdStreamOffset(message.getMessageId())));
-          } else {
-            MessageId lastMessageId;
-            try {
-              lastMessageId = (MessageId) consumer.getLastMessageIdAsync().get(timeoutMillis, TimeUnit.MILLISECONDS);
-            } catch (TimeoutException t) {
-              lastMessageId = MessageId.latest;
+            Message message = consumer.receive(timeoutMillis, TimeUnit.MILLISECONDS);
+            if (message != null) {
+              newPartitionGroupMetadataList.add(
+                  new PartitionGroupMetadata(p, new MessageIdStreamOffset(message.getMessageId())));
+            } else {
+              MessageId lastMessageId =
+                  (MessageId) consumer.getLastMessageIdAsync().get(timeoutMillis, TimeUnit.MILLISECONDS);
+              newPartitionGroupMetadataList.add(
+                  new PartitionGroupMetadata(p, new MessageIdStreamOffset(lastMessageId)));
             }
+          } catch (TimeoutException t) {
             newPartitionGroupMetadataList.add(
-                new PartitionGroupMetadata(p, new MessageIdStreamOffset(lastMessageId)));
+                new PartitionGroupMetadata(p, new MessageIdStreamOffset(MessageId.latest)));
           }
         }
       }
     } catch (Exception e) {
       LOGGER.warn("Error encountered while calculating pulsar partition group metadata: " + e.getMessage(), e);
-    } finally {
-      closeConsumer(consumer);
     }
 
     return newPartitionGroupMetadataList;
