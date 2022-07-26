@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.protobuf;
 
+import com.google.common.base.Preconditions;
 import com.google.protobuf.DescriptorProtos;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
@@ -25,14 +26,12 @@ import com.google.protobuf.Message;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
-import org.apache.pinot.spi.utils.ResourceFinder;
 
 
 public class ProtoBufRecordReader implements RecordReader {
@@ -67,30 +66,27 @@ public class ProtoBufRecordReader implements RecordReader {
       throws IOException {
     _dataFile = dataFile;
     ProtoBufRecordReaderConfig protoBufRecordReaderConfig = (ProtoBufRecordReaderConfig) recordReaderConfig;
-    InputStream fin = getDescriptorFileInputStream(protoBufRecordReaderConfig);
-    Descriptors.Descriptor descriptor = buildProtoBufDescriptor(fin);
+    Preconditions.checkNotNull(protoBufRecordReaderConfig.getDescriptorFile(),
+        "Protocol Buffer schema descriptor file must be provided");
+    Descriptors.Descriptor descriptor = buildProtoBufDescriptor(protoBufRecordReaderConfig);
     _recordExtractor = new ProtoBufRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
     _dynamicMessage = DynamicMessage.getDefaultInstance(descriptor);
     init();
   }
 
-  private Descriptors.Descriptor buildProtoBufDescriptor(InputStream fin)
+  private Descriptors.Descriptor buildProtoBufDescriptor(ProtoBufRecordReaderConfig protoBufRecordReaderConfig)
       throws IOException {
     try {
+      InputStream fin = ProtoBufUtils.getDescriptorFileInputStream(
+          protoBufRecordReaderConfig.getDescriptorFile().toString());
       DescriptorProtos.FileDescriptorSet set = DescriptorProtos.FileDescriptorSet.parseFrom(fin);
       Descriptors.FileDescriptor fileDescriptor =
           Descriptors.FileDescriptor.buildFrom(set.getFile(0), new Descriptors.FileDescriptor[]{});
       return fileDescriptor.getMessageTypes().get(0);
-    } catch (Descriptors.DescriptorValidationException e) {
-      throw new IOException("Descriptor file validation failed", e);
+    } catch (Exception e) {
+      throw new IOException("Failed to create Protobuf descriptor", e);
     }
-  }
-
-  private InputStream getDescriptorFileInputStream(ProtoBufRecordReaderConfig protoBufRecordReaderConfig)
-      throws IOException {
-    URI descriptorFileURI = protoBufRecordReaderConfig.getDescriptorFile();
-    return ResourceFinder.openResource(descriptorFileURI);
   }
 
   @Override

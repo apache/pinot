@@ -25,19 +25,16 @@ import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.Message;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.apache.pinot.spi.utils.ResourceFinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 //TODO: Add support for Schema Registry
-//TODO: Making descriptor file accessible on all servers
 public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ProtoBufMessageDecoder.class);
 
@@ -55,7 +52,8 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
         "Protocol Buffer schema descriptor file must be provided");
 
     _protoClassName = props.getOrDefault(PROTO_CLASS_NAME, "");
-    InputStream descriptorFileInputStream = getDescriptorFileInputStream(props.get(DESCRIPTOR_FILE_PATH));
+    InputStream descriptorFileInputStream = ProtoBufUtils.getDescriptorFileInputStream(
+        props.get(DESCRIPTOR_FILE_PATH));
     Descriptors.Descriptor descriptor = buildProtoBufDescriptor(descriptorFileInputStream);
     _recordExtractor = new ProtoBufRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
@@ -95,11 +93,5 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
     }
     _recordExtractor.extract(message, destination);
     return destination;
-  }
-
-  private InputStream getDescriptorFileInputStream(String descriptorFilePath)
-      throws IOException {
-    URI descriptorFileURI = URI.create(descriptorFilePath);
-    return ResourceFinder.openResource(descriptorFileURI);
   }
 }
