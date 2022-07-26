@@ -29,6 +29,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -48,6 +49,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
@@ -55,6 +57,7 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -104,48 +107,76 @@ public class PinotQueryResource {
     }
   }
 
-  private String executeSqlQuery(@Context HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
-      String queryOptions)
-      throws Exception {
-    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
-    PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
-    switch (sqlType) {
-      case DQL:
-        return getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
-      case DML:
-        Map<String, String> headers =
-            httpHeaders.getRequestHeaders().entrySet().stream().filter(entry -> !entry.getValue().isEmpty())
-                .map(entry -> Pair.of(entry.getKey(), entry.getValue().get(0)))
-                .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-        return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers).toJsonString();
-      default:
-        throw new UnsupportedOperationException("Unsupported SQL type - " + sqlType);
-    }
-  }
-
   @GET
   @Path("sql")
   public String handleGetSql(@QueryParam("sql") String sqlQuery, @QueryParam("trace") String traceEnabled,
       @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
-      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
-      PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
-      if (sqlType == PinotSqlType.DQL) {
-        return getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
-      }
-      throw new UnsupportedOperationException("Unsupported SQL type - " + sqlType);
+      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
     }
   }
 
-  public String getQueryResponse(String query, String traceEnabled, String queryOptions, HttpHeaders httpHeaders) {
-    return getQueryResponse(query, null, traceEnabled, queryOptions, httpHeaders);
+  private String executeSqlQuery(@Context HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
+      String queryOptions)
+      throws Exception {
+    if (queryOptions != null && queryOptions.contains(QueryOptionKey.USE_MULTISTAGE_ENGINE)) {
+      if (_controllerConf.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED,
+          CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
+        return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders);
+      } else {
+        throw new UnsupportedOperationException("V2 Multi-Stage query engine not enabled. "
+            + "Please see https://docs.pinot.apache.org/ for instruction to enable V2 engine.");
+      }
+    } else {
+      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
+      PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
+      switch (sqlType) {
+        case DQL:
+          return getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
+        case DML:
+          Map<String, String> headers =
+              httpHeaders.getRequestHeaders().entrySet().stream().filter(entry -> !entry.getValue().isEmpty())
+                  .map(entry -> Pair.of(entry.getKey(), entry.getValue().get(0)))
+                  .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+          return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers).toJsonString();
+        default:
+          throw new UnsupportedOperationException("Unsupported SQL type - " + sqlType);
+      }
+    }
   }
 
-  public String getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled, String queryOptions,
+  private String getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders) {
+
+    // Validate data access
+    // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
+    AccessControl accessControl = _accessControlFactory.create();
+    if (!accessControl.hasAccess(httpHeaders)) {
+      return QueryException.ACCESS_DENIED_ERROR.toString();
+    }
+
+    // Get brokers, only DEFAULT tenant is supported for now.
+    // TODO: implement logic that only allows executing query where all accessed tables are within the same tenant.
+    List<String> instanceIds = new ArrayList<>(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(
+        TagNameUtils.DEFAULT_TENANT_NAME));
+    if (instanceIds.isEmpty()) {
+      return QueryException.BROKER_RESOURCE_MISSING_ERROR.toString();
+    }
+
+    instanceIds.retainAll(_pinotHelixResourceManager.getOnlineInstanceList());
+    if (instanceIds.isEmpty()) {
+      return QueryException.BROKER_INSTANCE_MISSING_ERROR.toString();
+    }
+
+    // Send query to a random broker.
+    String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
+    return sendRequestToBroker(query, instanceId, "false", queryOptions, httpHeaders);
+  }
+
+  private String getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled, String queryOptions,
       HttpHeaders httpHeaders) {
     // Get resource table name.
     String tableName;
@@ -180,6 +211,11 @@ public class PinotQueryResource {
 
     // Send query to a random broker.
     String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
+    return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
+  }
+
+  private String sendRequestToBroker(String query, String instanceId, String traceEnabled, String queryOptions,
+      HttpHeaders httpHeaders) {
     InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
     if (instanceConfig == null) {
       LOGGER.error("Instance {} not found", instanceId);

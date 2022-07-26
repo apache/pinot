@@ -102,7 +102,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
   public void testMultiStageQuery(String sql, int expectedNumOfRows, int expectedNumOfColumns)
       throws IOException {
     JsonNode multiStageResponse = JsonUtils.stringToJsonNode(
-        sendPostRequest(_brokerBaseApiUrl + "/query/sql", "{\"useMultistageEngine\": true, \"sql\":\"" + sql + "\"}"));
+        sendPostRequest(_brokerBaseApiUrl + "/query/sql",
+            "{\"queryOptions\":\"useMultistageEngine=true\", \"sql\":\"" + sql + "\"}"));
     Assert.assertTrue(multiStageResponse.has("resultTable"));
     ArrayNode jsonNode = (ArrayNode) multiStageResponse.get("resultTable").get("rows");
     // TODO: assert actual result data payload.

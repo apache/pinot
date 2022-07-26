@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -74,9 +75,12 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       RequestContext requestContext)
       throws Exception {
     if (_isMultiStageQueryEngineEnabled && _multiStageWorkerRequestHandler != null) {
-      JsonNode node = request.get(CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE);
-      if (node != null && node.asBoolean()) {
-        return _multiStageWorkerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
+      if (request.has("queryOptions")) {
+        Map<String, String> queryOptionMap = BaseBrokerRequestHandler.getOptionsFromJson(request, "queryOptions");
+        if (Boolean.parseBoolean(queryOptionMap.get(
+            CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
+          return _multiStageWorkerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
+        }
       }
     }
     return _singleStageBrokerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
