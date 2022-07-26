@@ -104,6 +104,21 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
         .compileToPinotQuery("SELECT count(*) from foo "
             + "where bar = decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253')")));
+    Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
+        .compileToPinotQuery("SELECT toBase64('hello!'),"
+            + " fromBase64('aGVsbG8h') FROM myTable")));
+    Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
+        .compileToPinotQuery("SELECT toBase64('hello!'),"
+            + " fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') FROM myTable")));
+    Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
+        .compileToPinotQuery("SELECT fromBase64('aGVsbG8h'),"
+            + " fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') FROM myTable")));
+    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
+        .compileToPinotQuery("SELECT count(*) from foo "
+            + "where bar = toBase64('hello!')")));
+    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
+        .compileToPinotQuery("SELECT count(*) from foo "
+            + "where bar = fromBase64('aGVsbG8h')")));
   }
 
   @Test
@@ -115,6 +130,9 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
         "SELECT encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') AS encoded, "
             + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') AS decoded")));
+    Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
+        "SELECT toBase64('hello!') AS encoded, "
+            + "fromBase64('aGVsbG8h') AS decoded")));
   }
 
   @Test
@@ -210,6 +228,26 @@ public class LiteralOnlyBrokerRequestTest {
         "key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
     Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[1].toString(),
         "key1=value 1&key2=value@!$2&key3=value%3");
+    Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
+
+    request = JsonUtils.stringToJsonNode(
+        "{\"sql\":\"SELECT toBase64('hello!') AS encoded, "
+            + "fromBase64('aGVsbG8h') AS decoded\"}");
+    requestStats = Tracing.getTracer().createRequestScope();
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    System.out.println(brokerResponse.getResultTable());
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "encoded");
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
+        DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(1), "decoded");
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(1),
+        DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0).length, 2);
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[0].toString(),
+        "aGVsbG8h");
+    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[1].toString(),
+        "hello!");
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
   }
 

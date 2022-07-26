@@ -1890,6 +1890,29 @@ public class CalciteSqlCompilerTest {
     decoded = and.getOperands().get(1).getFunctionCall().getOperands().get(1).getLiteral().getStringValue();
     Assert.assertEquals(encoded, "key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
     Assert.assertEquals(decoded, "key1=value 1&key2=value@!$2&key3=value%3");
+
+    query = "select toBase64('hello!'), fromBase64('aGVsbG8h') from mytable";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    String encodedBase64 = pinotQuery.getSelectList().get(0).getLiteral().getStringValue();
+    String decodedBase64 = pinotQuery.getSelectList().get(1).getLiteral().getStringValue();
+    Assert.assertEquals(encodedBase64, "aGVsbG8h");
+    Assert.assertEquals(decodedBase64, "hello!");
+
+    query = "select a from mytable where foo = toBase64('hello!') and bar = fromBase64('aGVsbG8h')";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    and = pinotQuery.getFilterExpression().getFunctionCall();
+    encoded = and.getOperands().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue();
+    decoded = and.getOperands().get(1).getFunctionCall().getOperands().get(1).getLiteral().getStringValue();
+    Assert.assertEquals(encoded, "aGVsbG8h");
+    Assert.assertEquals(decoded, "hello!");
+
+    query = "select  from mytable where foo = toBase64('hello!') and bar = fromBase64('aGVsbG8h')";
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    and = pinotQuery.getFilterExpression().getFunctionCall();
+    encoded = and.getOperands().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue();
+    decoded = and.getOperands().get(1).getFunctionCall().getOperands().get(1).getLiteral().getStringValue();
+    Assert.assertEquals(encoded, "aGVsbG8h");
+    Assert.assertEquals(decoded, "hello!");
   }
 
   @Test
@@ -2012,6 +2035,42 @@ public class CalciteSqlCompilerTest {
     Assert.assertNotNull(expression.getFunctionCall());
     Assert.assertEquals(expression.getFunctionCall().getOperator(), "count");
     Assert.assertEquals(expression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "*");
+
+    expression = CalciteSqlParser.compileToExpression("toBase64('hello!')");
+    Assert.assertNotNull(expression.getFunctionCall());
+    pinotQuery.setFilterExpression(expression);
+    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
+    expression = pinotQuery.getFilterExpression();
+    Assert.assertNotNull(expression.getLiteral());
+    Assert.assertEquals(expression.getLiteral().getFieldValue(),
+        "aGVsbG8h");
+
+    expression =
+        CalciteSqlParser.compileToExpression("fromBase64('aGVsbG8h')");
+    Assert.assertNotNull(expression.getFunctionCall());
+    pinotQuery.setFilterExpression(expression);
+    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
+    expression = pinotQuery.getFilterExpression();
+    Assert.assertNotNull(expression.getLiteral());
+    Assert.assertEquals(expression.getLiteral().getFieldValue(), "hello!");
+
+    expression = CalciteSqlParser.compileToExpression("fromBase64(foo)");
+    Assert.assertNotNull(expression.getFunctionCall());
+    pinotQuery.setFilterExpression(expression);
+    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
+    expression = pinotQuery.getFilterExpression();
+    Assert.assertNotNull(expression.getFunctionCall());
+    Assert.assertEquals(expression.getFunctionCall().getOperator(), "frombase64");
+    Assert.assertEquals(expression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "foo");
+
+    expression = CalciteSqlParser.compileToExpression("toBase64(foo)");
+    Assert.assertNotNull(expression.getFunctionCall());
+    pinotQuery.setFilterExpression(expression);
+    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
+    expression = pinotQuery.getFilterExpression();
+    Assert.assertNotNull(expression.getFunctionCall());
+    Assert.assertEquals(expression.getFunctionCall().getOperator(), "tobase64");
+    Assert.assertEquals(expression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "foo");
   }
 
   @Test
