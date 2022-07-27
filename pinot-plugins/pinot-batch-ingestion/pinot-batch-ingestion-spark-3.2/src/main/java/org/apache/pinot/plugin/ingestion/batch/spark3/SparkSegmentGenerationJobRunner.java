@@ -191,6 +191,13 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       }
     }
 
+    if (filteredFiles.isEmpty()) {
+      throw new RuntimeException(
+          String.format("No file found in the input directory: %s matching includeFileNamePattern: %s,"
+                  + " excludeFileNamePattern: %s", _spec.getInputDirURI(), _spec.getIncludeFileNamePattern(),
+              _spec.getExcludeFileNamePattern()));
+    }
+
     LOGGER.info("Found {} files to create Pinot segments!", filteredFiles.size());
     try {
       JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());

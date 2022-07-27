@@ -108,6 +108,16 @@ public interface BrokerResponse {
   long getNumConsumingSegmentsQueried();
 
   /**
+   * Get number of consuming segments processed by server after server side pruning
+   */
+  long getNumConsumingSegmentsProcessed();
+
+  /**
+   * Get number of consuming segments that had at least one matching document
+   */
+  long getNumConsumingSegmentsMatched();
+
+  /**
    * Get the minimum freshness timestamp across consuming segments that were queried
    */
   long getMinConsumingFreshnessTimeMs();

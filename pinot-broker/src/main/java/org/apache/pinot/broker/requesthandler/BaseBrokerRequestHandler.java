@@ -670,7 +670,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_queryLogRateLimiter.tryAcquire() || forceLog(brokerResponse, totalTimeMs)) {
       // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
       LOGGER.info("requestId={},table={},timeMs={},docs={}/{},entries={}/{},"
-              + "segments(queried/processed/matched/consuming/unavailable):{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
+              + "segments(queried/processed/matched/consumingQueried/consumingMatched/consumingProcessed/unavailable):"
+              + "{}/{}/{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
               + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},"
               + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},"
               + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},query={}", requestId, tableName,
@@ -678,6 +679,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           brokerResponse.getNumEntriesScannedInFilter(), brokerResponse.getNumEntriesScannedPostFilter(),
           brokerResponse.getNumSegmentsQueried(), brokerResponse.getNumSegmentsProcessed(),
           brokerResponse.getNumSegmentsMatched(), brokerResponse.getNumConsumingSegmentsQueried(),
+          brokerResponse.getNumConsumingSegmentsProcessed(), brokerResponse.getNumConsumingSegmentsMatched(),
           numUnavailableSegments, brokerResponse.getMinConsumingFreshnessTimeMs(),
           brokerResponse.getNumServersResponded(), brokerResponse.getNumServersQueried(),
           brokerResponse.isNumGroupsLimitReached(), requestContext.getReduceTimeMillis(),
@@ -1420,7 +1422,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     throw new BadQueryRequestException("Unknown columnName '" + columnName + "' found in the query");
   }
 
-  private static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
+  public static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
     return Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=')
         .split(request.get(optionsKey).asText());
   }
@@ -1477,6 +1479,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (!queryOptions.isEmpty()) {
       LOGGER.debug("Query options are set to: {} for request {}: {}", queryOptions, requestId, query);
     }
+    // TODO: Remove the SQL query options after releasing 0.11.0
+    // The query engine will break if these 2 options are missing during version upgrade.
+    queryOptions.put(Broker.Request.QueryOptionKey.GROUP_BY_MODE, Broker.Request.SQL);
+    queryOptions.put(Broker.Request.QueryOptionKey.RESPONSE_FORMAT, Broker.Request.SQL);
   }
 
   /**

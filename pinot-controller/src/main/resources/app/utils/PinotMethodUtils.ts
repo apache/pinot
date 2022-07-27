@@ -254,7 +254,7 @@ const getAsObject = (str: SQLResult) => {
 // This method is used to display query output in tabular format as well as JSON format on query page
 // API: /:urlName (Eg: sql or pql)
 // Expected Output: {columns: [], records: []}
-const getQueryResults = (params, checkedOptions) => {
+const getQueryResults = (params) => {
   return getQueryResult(params).then(({ data }) => {
     let queryResponse = getAsObject(data);
 
@@ -268,46 +268,7 @@ const getQueryResults = (params, checkedOptions) => {
       errorStr = JSON.stringify(queryResponse.exceptions, null, 2);
     } else
     {
-      if (checkedOptions.querySyntaxPQL === true)
-      {
-        if (queryResponse)
-        {
-          if (queryResponse.selectionResults)
-          {
-            // Selection query
-            columnList = queryResponse.selectionResults.columns;
-            dataArray = queryResponse.selectionResults.results;
-          }
-          else if (!queryResponse.aggregationResults[0]?.groupByResult)
-          {
-            // Simple aggregation query
-            columnList = map(queryResponse.aggregationResults, (aggregationResult) => {
-              return {title: aggregationResult.function};
-            });
-
-            dataArray.push(map(queryResponse.aggregationResults, (aggregationResult) => {
-              return aggregationResult.value;
-            }));
-          }
-          else if (queryResponse.aggregationResults[0]?.groupByResult)
-          {
-            // Aggregation group by query
-            // TODO - Revisit
-            const columns = queryResponse.aggregationResults[0].groupByColumns;
-            columns.push(queryResponse.aggregationResults[0].function);
-            columnList = map(columns, (columnName) => {
-              return columnName;
-            });
-
-            dataArray = map(queryResponse.aggregationResults[0].groupByResult, (aggregationGroup) => {
-              const row = aggregationGroup.group;
-              row.push(aggregationGroup.value);
-              return row;
-            });
-          }
-        }
-      }
-      else if (queryResponse.resultTable?.dataSchema?.columnNames?.length)
+      if (queryResponse.resultTable?.dataSchema?.columnNames?.length)
       {
         columnList = queryResponse.resultTable.dataSchema.columnNames;
         dataArray = queryResponse.resultTable.rows;
