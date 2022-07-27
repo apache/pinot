@@ -19,7 +19,9 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -35,8 +37,7 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
   private static final double DEFAULT_INITIAL_VALUE = Double.NEGATIVE_INFINITY;
   private final boolean _nullHandlingEnabled;
 
-  // stores id of the groupKey where the corresponding value is null.
-  private Integer _groupKeyForNullValue = null;
+  private Set<Integer> _groupKeysWithNonNullValue;
 
   public MaxAggregationFunction(ExpressionContext expression) {
     this(expression, false);
@@ -212,7 +213,18 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
     if (_nullHandlingEnabled) {
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        aggregateGroupBySVNullHandlingEnabled(length, groupKeyArray, groupByResultHolder, valueArray, nullBitmap);
+        _groupKeysWithNonNullValue = new HashSet<>();
+        if (nullBitmap.getCardinality() < length) {
+          for (int i = 0; i < length; i++) {
+            double value = valueArray[i];
+            int groupKey = groupKeyArray[i];
+            double result = groupByResultHolder.getDoubleResult(groupKey);
+            if (!nullBitmap.contains(i) && value > result) {
+              groupByResultHolder.setValueForKey(groupKey, value);
+              _groupKeysWithNonNullValue.add(groupKey);
+            }
+          }
+        }
         return;
       }
     }
@@ -223,28 +235,6 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
       if (value > groupByResultHolder.getDoubleResult(groupKey)) {
         groupByResultHolder.setValueForKey(groupKey, value);
       }
-    }
-  }
-
-  private void aggregateGroupBySVNullHandlingEnabled(int length, int[] groupKeyArray,
-      GroupByResultHolder groupByResultHolder, double[] valueArray, RoaringBitmap nullBitmap) {
-    if (nullBitmap.getCardinality() < length) {
-      for (int i = 0; i < length; i++) {
-        double value = valueArray[i];
-        int groupKey = groupKeyArray[i];
-        double result = groupByResultHolder.getDoubleResult(groupKey);
-        // Preserve null group key.
-        if (nullBitmap.contains(i)) {
-          // The default value of un-initialized result could be -Infinity (dim column), so don't compare value
-          // w/ result. There should be only one groupKey for the null value.
-          assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKey;
-          _groupKeyForNullValue = groupKey;
-        } else if (value > result) {
-          groupByResultHolder.setValueForKey(groupKey, value);
-        }
-      }
-    } else {
-      _groupKeyForNullValue = groupKeyArray[0];
     }
   }
 
@@ -269,8 +259,7 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public Double extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    // Checking _nullHandlingEnabled here is redundant.
-    if (_groupKeyForNullValue != null && _groupKeyForNullValue == groupKey) {
+    if (_nullHandlingEnabled && !_groupKeysWithNonNullValue.contains(groupKey)) {
       return null;
     }
     return groupByResultHolder.getDoubleResult(groupKey);

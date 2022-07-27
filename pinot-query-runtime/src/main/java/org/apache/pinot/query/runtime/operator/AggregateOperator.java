@@ -180,21 +180,21 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       case "$SUM0":
       case "SUM":
         return new SumAggregationFunction(
-            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)), false);
+            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
       case "$COUNT":
       case "COUNT":
         return new CountAggregationFunction(
-            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)), false);
+            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
       case "$MIN":
       case "$MIN0":
       case "MIN":
         return new MinAggregationFunction(
-            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)), false);
+            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
       case "$MAX":
       case "$MAX0":
       case "MAX":
         return new MaxAggregationFunction(
-            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)), false);
+            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
       default:
         throw new IllegalStateException(
             "Unexpected value: " + ((RexExpression.FunctionCall) aggCall).getFunctionName());

@@ -51,8 +51,8 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
   public CountAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     String expStr = expression.toString();
-    _columnName = expStr.equals("*") ? "star" : expStr;
-    _resultColumnName = expStr.equals("*") ? "*" : expStr;
+    _columnName = expStr.equals("*") || !nullHandlingEnabled ? "star" : expStr;
+    _resultColumnName = expStr.equals("*") || !nullHandlingEnabled ? "*" : expStr;
     _nullHandlingEnabled = nullHandlingEnabled;
   }
 
@@ -123,6 +123,32 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     if (blockValSetMap.isEmpty() || !blockValSetMap.containsKey(STAR_TREE_COUNT_STAR_EXPRESSION)) {
+      if (_nullHandlingEnabled && !blockValSetMap.isEmpty()) {
+        // In Presto, null values are not counted:
+        // SELECT count(id) as count, key FROM (VALUES (null, 1), (null, 1), (null, 2), (1, 3), (null, 3)) AS t(id,
+        // key)  GROUP BY key ORDER BY key DESC;
+        // count | key
+        //-------+-----
+        //     1 |   3
+        //     0 |   2
+        //     0 |   1
+        assert blockValSetMap.size() == 1;
+        BlockValSet blockValSet = blockValSetMap.values().iterator().next();
+        RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+        if (nullBitmap != null && !nullBitmap.isEmpty()) {
+          if (nullBitmap.getCardinality() == length) {
+            return;
+          }
+          for (int i = 0; i < length; i++) {
+            if (!nullBitmap.contains(i)) {
+              int groupKey = groupKeyArray[i];
+              groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
+            }
+          }
+          return;
+        }
+      }
+
       for (int i = 0; i < length; i++) {
         int groupKey = groupKeyArray[i];
         groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
@@ -165,8 +191,7 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
 
   @Override
   public Long extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    Double result = groupByResultHolder.getDoubleResult(groupKey);
-    return result == null ? null : result.longValue();
+    return (long) groupByResultHolder.getDoubleResult(groupKey);
   }
 
   @Override

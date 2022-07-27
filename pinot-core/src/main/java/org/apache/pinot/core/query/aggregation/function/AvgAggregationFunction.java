@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -37,7 +39,7 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
   private final boolean _nullHandlingEnabled;
 
-  private Integer _groupKeyForNullValue = null;
+  private Set<Integer> _groupKeysWithNonNullValue;
 
   public AvgAggregationFunction(ExpressionContext expression) {
     this(expression, false);
@@ -161,21 +163,17 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
 
   private void aggregateGroupBySVNullHandlingEnabled(int length, int[] groupKeyArray,
       GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
+    _groupKeysWithNonNullValue = new HashSet<>();
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
       if (nullBitmap.getCardinality() < length) {
         for (int i = 0; i < length; i++) {
           if (!nullBitmap.contains(i)) {
-            setGroupByResult(groupKeyArray[i], groupByResultHolder, doubleValues[i], 1L);
-          } else {
-            // Preserve null group key.
-            // There should be only one groupKey for the null value.
-            assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKeyArray[i];
-            _groupKeyForNullValue = groupKeyArray[i];
+            int groupKey = groupKeyArray[i];
+            setGroupByResult(groupKey, groupByResultHolder, doubleValues[i], 1L);
+            _groupKeysWithNonNullValue.add(groupKey);
           }
         }
-      } else {
-        _groupKeyForNullValue = groupKeyArray[0];
       }
     } else {
       // Serialized AvgPair
@@ -183,16 +181,12 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
       if (nullBitmap.getCardinality() < length) {
         for (int i = 0; i < length; i++) {
           if (!nullBitmap.contains(i)) {
+            int groupKey = groupKeyArray[i];
             AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-            setGroupByResult(groupKeyArray[i], groupByResultHolder, avgPair.getSum(), avgPair.getCount());
-          } else {
-            // Preserve null group key.
-            assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKeyArray[i];
-            _groupKeyForNullValue = groupKeyArray[i];
+            setGroupByResult(groupKey, groupByResultHolder, avgPair.getSum(), avgPair.getCount());
+            _groupKeysWithNonNullValue.add(groupKey);
           }
         }
-      } else {
-        _groupKeyForNullValue = groupKeyArray[0];
       }
     }
   }
@@ -245,8 +239,7 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
 
   @Override
   public AvgPair extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    if (_groupKeyForNullValue != null && _groupKeyForNullValue == groupKey) {
-      // Preserve nulls
+    if (_nullHandlingEnabled && !_groupKeysWithNonNullValue.contains(groupKey)) {
       return null;
     }
     AvgPair avgPair = groupByResultHolder.getResult(groupKey);

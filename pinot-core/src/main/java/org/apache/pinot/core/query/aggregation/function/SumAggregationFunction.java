@@ -19,7 +19,9 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -35,7 +37,7 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
   private static final double DEFAULT_VALUE = 0.0;
   private final boolean _nullHandlingEnabled;
 
-  private Integer _groupKeyForNullValue = null;
+  private Set<Integer> _groupKeysWithNonNullValue;
 
   public SumAggregationFunction(ExpressionContext expression) {
     this(expression, false);
@@ -196,7 +198,24 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
     if (_nullHandlingEnabled) {
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        aggregateGroupBySVNullHandlingEnabled(length, groupKeyArray, groupByResultHolder, valueArray, nullBitmap);
+        _groupKeysWithNonNullValue = new HashSet<>();
+        if (nullBitmap.getCardinality() < length) {
+          for (int i = 0; i < length; i++) {
+            if (!nullBitmap.contains(i)) {
+              int groupKey = groupKeyArray[i];
+              groupByResultHolder.setValueForKey(groupKey,
+                  groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
+              // In presto:
+              // SELECT sum (cast(id AS DOUBLE)) as sum,  min(id) as min, max(id) as max, key FROM (VALUES (null, 1),
+              // (null, 2)) AS t(id, key)  GROUP BY key ORDER BY max DESC;
+              // sum  | min  | max  | key
+              //------+------+------+-----
+              // NULL | NULL | NULL |   2
+              // NULL | NULL | NULL |   1
+              _groupKeysWithNonNullValue.add(groupKey);
+            }
+          }
+        }
         return;
       }
     }
@@ -204,25 +223,6 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
       groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
-    }
-  }
-
-  private void aggregateGroupBySVNullHandlingEnabled(int length, int[] groupKeyArray,
-      GroupByResultHolder groupByResultHolder, double[] valueArray, RoaringBitmap nullBitmap) {
-    if (nullBitmap.getCardinality() < length) {
-      for (int i = 0; i < length; i++) {
-        int groupKey = groupKeyArray[i];
-        // Preserve null group key.
-        if (nullBitmap.contains(i)) {
-          // There should be only one groupKey for the null value.
-          assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKey;
-          _groupKeyForNullValue = groupKey;
-        } else {
-          groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
-        }
-      }
-    } else {
-      _groupKeyForNullValue = groupKeyArray[0];
     }
   }
 
@@ -245,7 +245,7 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public Double extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    if (_groupKeyForNullValue != null && _groupKeyForNullValue == groupKey) {
+    if (_nullHandlingEnabled && !_groupKeysWithNonNullValue.contains(groupKey)) {
       return null;
     }
     return groupByResultHolder.getDoubleResult(groupKey);
