@@ -563,7 +563,6 @@ public class StringFunctions {
   }
 
   /**
-   *
    * @param input utf-8 encoded String
    * @return Base64 encoded String
    */
@@ -574,7 +573,6 @@ public class StringFunctions {
   }
 
   /**
-   *
    * @param input Base64 encoded String
    * @return utf8 encoded String
    */

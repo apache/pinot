@@ -593,11 +593,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String sqlQuery = "SELECT encodeUrl('key1=value 1&key2=value@!$2&key3=value%3'), "
         + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') FROM myTable";
     JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
-    JsonNode resultTable = response.get("resultTable");
-    JsonNode dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"encodeUrl('key1=value 1&key2=value@!$2&key3=value%3')\",\"decodeUrl"
-            + "('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253')\"]");
     String encodedString = response.get("resultTable").get("rows").get(0).get(0).asText();
     String expectedUrlStr = encodeUrl("key1=value 1&key2=value@!$2&key3=value%3");
     assertEquals(encodedString, expectedUrlStr);
@@ -654,17 +649,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertEquals(decoded, fromBase64(toBase64(original)));
     }
 
-    // encoding NULL should fail
+    // invalid argument
     sqlQuery = "SELECT toBase64() FROM myTable";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
 
-    // decoding NULL should fail
+    // invalid argument
     sqlQuery = "SELECT fromBase64() FROM myTable";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
 
-    // decoding invalid encoded argument should fail
+    // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM myTable";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
