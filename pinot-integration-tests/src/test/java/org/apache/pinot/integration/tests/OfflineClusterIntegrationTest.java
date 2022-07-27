@@ -621,6 +621,29 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String expectedDecodedStr = fromBase64("aGVsbG8h");
     assertEquals(decodedString, expectedDecodedStr);
 
+    // long string literal encode
+    sqlQuery =
+        "SELECT toBase64('this is a long string that will encode to more than 76 characters using base64') FROM "
+            + "myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    encodedString = rows.get(0).get(0).asText();
+    assertEquals(encodedString,
+        toBase64("this is a long string that will encode to more than 76 characters using base64"));
+
+    // long string literal decode
+    sqlQuery =
+        "SELECT fromBase64"
+        + "('dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0"
+        + "')FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    decodedString = rows.get(0).get(0).asText();
+    assertEquals(decodedString, fromBase64(
+        "dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0"));
+
     // non-string literal
     sqlQuery = "SELECT toBase64(123), fromBase64(toBase64(123)), 123 FROM myTable";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
