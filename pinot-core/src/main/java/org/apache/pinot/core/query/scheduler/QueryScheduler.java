@@ -199,6 +199,9 @@ public abstract class QueryScheduler {
     long responseSerializationCpuTimeNs =
         Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), "0"));
     long totalCpuTimeNs = threadCpuTimeNs + systemActivitiesCpuTimeNs + responseSerializationCpuTimeNs;
+    boolean queryHasMVSelectionOrderBy =
+        Boolean.parseBoolean(dataTableMetadata.getOrDefault(MetadataKey.QUERY_HAS_MV_SELECTION_ORDER_BY.getName(),
+            Boolean.FALSE.toString()));
 
     if (numDocsScanned > 0) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
@@ -233,6 +236,13 @@ public abstract class QueryScheduler {
       _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.TOTAL_CPU_TIME_NS, totalCpuTimeNs,
           TimeUnit.NANOSECONDS);
     }
+    if (queryHasMVSelectionOrderBy) {
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_HAS_MV_SELECTION_ORDER_BY, 1);
+    }
+
+    // Remove the 'QUERY_HAS_MV_SELECTION_ORDER_BY' metadata from the DataTable as the Broker does not need to know
+    // about this metadata or emit a metric related to it
+    dataTableMetadata.remove(MetadataKey.QUERY_HAS_MV_SELECTION_ORDER_BY.getName());
 
     TimerContext timerContext = queryRequest.getTimerContext();
     int numSegmentsQueried = queryRequest.getSegmentsToQuery().size();

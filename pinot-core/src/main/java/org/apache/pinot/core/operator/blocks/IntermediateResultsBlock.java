@@ -74,6 +74,7 @@ public class IntermediateResultsBlock implements Block {
   private long _resizeTimeMs;
   private long _executionThreadCpuTimeNs;
   private int _numServerThreads;
+  private boolean _queryHasMVSelectionOrderBy;
 
   private Table _table;
 
@@ -287,6 +288,14 @@ public class IntermediateResultsBlock implements Block {
     _numGroupsLimitReached = numGroupsLimitReached;
   }
 
+  public boolean isQueryHasMVSelectionOrderBy() {
+    return _queryHasMVSelectionOrderBy;
+  }
+
+  public void setQueryHasMVSelectionOrderBy(boolean queryHasMVSelectionOrderBy) {
+    _queryHasMVSelectionOrderBy = queryHasMVSelectionOrderBy;
+  }
+
   /**
    * Get the collection of intermediate records
    */
@@ -474,6 +483,9 @@ public class IntermediateResultsBlock implements Block {
     dataTable.getMetadata().put(MetadataKey.TOTAL_DOCS.getName(), String.valueOf(_numTotalDocs));
     if (_numGroupsLimitReached) {
       dataTable.getMetadata().put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
+    }
+    if (_queryHasMVSelectionOrderBy) {
+      dataTable.getMetadata().put(MetadataKey.QUERY_HAS_MV_SELECTION_ORDER_BY.getName(), Boolean.TRUE.toString());
     }
     if (_processingExceptions != null && !_processingExceptions.isEmpty()) {
       for (ProcessingException exception : _processingExceptions) {
