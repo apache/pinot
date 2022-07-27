@@ -33,10 +33,6 @@ import io.netty.channel.kqueue.KQueueSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
-import io.netty.handler.codec.LengthFieldPrepender;
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.SslProvider;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -50,7 +46,6 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.core.util.OsCheck;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
@@ -162,36 +157,19 @@ public class ServerChannels {
             @Override
             protected void initChannel(SocketChannel ch) {
               if (_tlsConfig != null) {
-                attachSSLHandler(ch);
+                // Add SSL handler first to encrypt and decrypt everything.
+                ch.pipeline().addLast(
+                    ChannelHandlerFactory.SSL, ChannelHandlerFactory.getClientTlsHandler(_tlsConfig, ch));
               }
 
-              ch.pipeline()
-                  .addLast(new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, Integer.BYTES, 0, Integer.BYTES),
-                      new LengthFieldPrepender(Integer.BYTES),
-                      // NOTE: data table de-serialization happens inside this handler
-                      // Revisit if this becomes a bottleneck
-                      new DataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
+              ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldBasedFrameDecoder());
+              ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldPrepender());
+              // NOTE: data table de-serialization happens inside this handler
+              // Revisit if this becomes a bottleneck
+              ch.pipeline().addLast(
+                  ChannelHandlerFactory.getDataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
             }
           });
-    }
-
-    void attachSSLHandler(SocketChannel ch) {
-      try {
-        SslContextBuilder sslContextBuilder =
-            SslContextBuilder.forClient().sslProvider(SslProvider.valueOf(_tlsConfig.getSslProvider()));
-
-        if (_tlsConfig.getKeyStorePath() != null) {
-          sslContextBuilder.keyManager(TlsUtils.createKeyManagerFactory(_tlsConfig));
-        }
-
-        if (_tlsConfig.getTrustStorePath() != null) {
-          sslContextBuilder.trustManager(TlsUtils.createTrustManagerFactory(_tlsConfig));
-        }
-
-        ch.pipeline().addLast("ssl", sslContextBuilder.build().newHandler(ch.alloc()));
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
     }
 
     void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
