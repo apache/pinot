@@ -82,6 +82,7 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import software.amazon.awssdk.services.kinesis.model.InvalidArgumentException;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.decodeUrl;
 import static org.apache.pinot.common.function.scalar.StringFunctions.encodeUrl;
@@ -611,7 +612,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testBase64Func()
       throws Exception {
 
-    // literal
+    // string literal
     String sqlQuery = "SELECT toBase64('hello!'), " + "fromBase64('aGVsbG8h') FROM myTable";
     JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
     JsonNode resultTable = response.get("resultTable");
@@ -626,7 +627,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String expectedDecodedStr = fromBase64("aGVsbG8h");
     assertEquals(decodedString, expectedDecodedStr);
 
-    // non-string
+    // non-string literal
     sqlQuery = "SELECT toBase64(123), fromBase64(toBase64(123)), 123 FROM myTable";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
@@ -654,6 +655,21 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertEquals(decoded, fromBase64(toBase64(original)));
     }
 
+    // encoding NULL should fail
+    sqlQuery = "SELECT toBase64() FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
+
+    // decoding NULL should fail
+    sqlQuery = "SELECT fromBase64() FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
+
+    // decoding invalid encoded argument should fail
+    sqlQuery = "SELECT fromBase64('hello!') FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
+
     // string literal used in a filter
     sqlQuery = "SELECT * FROM myTable WHERE fromBase64('aGVsbG8h') != Carrier AND toBase64('hello!') != Carrier LIMIT 10";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
@@ -662,7 +678,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(rows.size(), 10);
 
     // non-string literal used in a filter
-    sqlQuery = "SELECT * FROM myTable WHERE fromBase64(AirlineID) != Carrier LIMIT 10";
+    sqlQuery = "SELECT * FROM myTable WHERE fromBase64(toBase64(AirlineID)) != Carrier LIMIT 10";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
     rows = resultTable.get("rows");
@@ -683,6 +699,42 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
+
+    // string identifier used in group by order by
+    sqlQuery = "SELECT Carrier as originalCol, toBase64(Carrier) as encoded, fromBase64(toBase64(Carrier)) as decoded "
+        + "FROM myTable GROUP BY Carrier, toBase64(Carrier), fromBase64(toBase64(Carrier)) ORDER BY toBase64(Carrier) LIMIT 10";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"STRING\",\"STRING\"]");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      String original = rows.get(0).asText();
+      String encoded = rows.get(1).asText();
+      String decoded = rows.get(2).asText();
+      assertEquals(original, decoded);
+      assertEquals(encoded, toBase64(original));
+      assertEquals(decoded, fromBase64(toBase64(original)));
+    }
+
+    // non-string identifier used in group by order by
+    sqlQuery = "SELECT AirlineID as originalCol, toBase64(AirlineID) as encoded, fromBase64(toBase64(AirlineID)) as decoded "
+        + "FROM myTable GROUP BY AirlineID, toBase64(AirlineID), fromBase64(toBase64(AirlineID)) ORDER BY toBase64(AirlineID) LIMIT 10";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"LONG\",\"STRING\",\"STRING\"]");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      String original = rows.get(0).asText();
+      String encoded = rows.get(1).asText();
+      String decoded = rows.get(2).asText();
+      assertEquals(original, decoded);
+      assertEquals(encoded, toBase64(original));
+      assertEquals(decoded, fromBase64(toBase64(original)));
+    }
   }
 
   @Test

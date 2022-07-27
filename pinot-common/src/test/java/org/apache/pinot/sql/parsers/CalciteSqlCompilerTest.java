@@ -1906,13 +1906,23 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(encoded, "aGVsbG8h");
     Assert.assertEquals(decoded, "hello!");
 
-    query = "select  from mytable where foo = toBase64('hello!') and bar = fromBase64('aGVsbG8h')";
+    query = "select toBase64('hello!'), fromBase64('aGVsbG8h') from mytable where foo = toBase64('hello!') and bar = fromBase64('aGVsbG8h')";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     and = pinotQuery.getFilterExpression().getFunctionCall();
     encoded = and.getOperands().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue();
     decoded = and.getOperands().get(1).getFunctionCall().getOperands().get(1).getLiteral().getStringValue();
     Assert.assertEquals(encoded, "aGVsbG8h");
     Assert.assertEquals(decoded, "hello!");
+
+    query = "select fromBase64('hello') from mytable";
+    Exception expectedError = null;
+    try {
+      CalciteSqlParser.compileToPinotQuery(query);
+    } catch (Exception e) {
+      expectedError = e;
+    }
+    Assert.assertNotNull(expectedError);
+    Assert.assertTrue(expectedError instanceof SqlCompilationException);
   }
 
   @Test
