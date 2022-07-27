@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.pinot.spi.stream.StreamConfig;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
@@ -36,9 +38,32 @@ public class KinesisConfig {
   public static final String MAX_RECORDS_TO_FETCH = "maxRecordsToFetch";
   public static final String ENDPOINT = "endpoint";
 
+  // IAM role configs
+  /**
+   * Enable Role based access to AWS.
+   * iamRoleBasedAccessEnabled - Set it to `true` to enable role based access, default: false
+   * roleArn - Required. specify the ARN of the role the client should assume.
+   * roleSessionName - session name to be used when creating a role based session. default: pinot-kineis-uuid
+   * externalId - string external id value required by role's policy. default: null
+   * sessionDurationSeconds - The duration, in seconds, of the role session. Default: 900
+   * asyncSessionUpdateEnabled -
+   *        Configure whether the provider should fetch credentials asynchronously in the background.
+   *       If this is true, threads are less likely to block when credentials are loaded,
+   *       but additional resources are used to maintain the provider. Default - `true`
+   */
+  public static final String IAM_ROLE_BASED_ACCESS_ENABLED = "iamRoleBasedAccessEnabled";
+  public static final String ROLE_ARN = "roleArn";
+  public static final String ROLE_SESSION_NAME = "roleSessionName";
+  public static final String EXTERNAL_ID = "externalId";
+  public static final String SESSION_DURATION_SECONDS = "sessionDurationSeconds";
+  public static final String ASYNC_SESSION_UPDATED_ENABLED = "asyncSessionUpdateEnabled";
+
   // TODO: this is a starting point, until a better default is figured out
   public static final String DEFAULT_MAX_RECORDS = "20";
   public static final String DEFAULT_SHARD_ITERATOR_TYPE = ShardIteratorType.LATEST.toString();
+  public static final String DEFAULT_IAM_ROLE_BASED_ACCESS_ENABLED = "false";
+  public static final String DEFAULT_SESSION_DURATION_SECONDS = "900";
+  public static final String DEFAULT_ASYNC_SESSION_UPDATED_ENABLED = "true";
 
   private final String _streamTopicName;
   private final String _awsRegion;
@@ -47,6 +72,14 @@ public class KinesisConfig {
   private final String _accessKey;
   private final String _secretKey;
   private final String _endpoint;
+
+  // IAM Role values
+  private boolean _iamRoleBasedAccess;
+  private String _roleArn;
+  private String _roleSessionName;
+  private String _externalId;
+  private int _sessionDurationSeconds;
+  private boolean _asyncSessionUpdateEnabled;
 
   public KinesisConfig(StreamConfig streamConfig) {
     Map<String, String> props = streamConfig.getStreamConfigsMap();
@@ -60,23 +93,23 @@ public class KinesisConfig {
     _accessKey = props.get(ACCESS_KEY);
     _secretKey = props.get(SECRET_KEY);
     _endpoint = props.get(ENDPOINT);
-  }
 
-  public KinesisConfig(String streamTopicName, String awsRegion, ShardIteratorType shardIteratorType, String accessKey,
-      String secretKey, String endpoint) {
-    this(streamTopicName, awsRegion, shardIteratorType, accessKey, secretKey, Integer.parseInt(DEFAULT_MAX_RECORDS),
-        endpoint);
-  }
+    _iamRoleBasedAccess =
+        Boolean.parseBoolean(props.getOrDefault(IAM_ROLE_BASED_ACCESS_ENABLED, DEFAULT_IAM_ROLE_BASED_ACCESS_ENABLED));
+    _roleArn = props.get(ROLE_ARN);
+    _roleSessionName =
+        props.getOrDefault(ROLE_SESSION_NAME, Joiner.on("-").join("pinot", "kinesis", UUID.randomUUID()));
+    _externalId = props.get(EXTERNAL_ID);
+    _sessionDurationSeconds =
+        Integer.parseInt(props.getOrDefault(SESSION_DURATION_SECONDS, DEFAULT_SESSION_DURATION_SECONDS));
+    _asyncSessionUpdateEnabled =
+        Boolean.parseBoolean(props.getOrDefault(ASYNC_SESSION_UPDATED_ENABLED, DEFAULT_ASYNC_SESSION_UPDATED_ENABLED));
 
-  public KinesisConfig(String streamTopicName, String awsRegion, ShardIteratorType shardIteratorType, String accessKey,
-      String secretKey, int maxRecords, String endpoint) {
-    _streamTopicName = streamTopicName;
-    _awsRegion = awsRegion;
-    _shardIteratorType = shardIteratorType;
-    _accessKey = accessKey;
-    _secretKey = secretKey;
-    _numMaxRecordsToFetch = maxRecords;
-    _endpoint = endpoint;
+    if (_iamRoleBasedAccess) {
+      Preconditions.checkNotNull(_roleArn,
+          "Must provide 'roleArn' in stream config for table %s if iamRoleBasedAccess is enabled",
+          streamConfig.getTableNameWithType());
+    }
   }
 
   public String getStreamTopicName() {
@@ -105,5 +138,29 @@ public class KinesisConfig {
 
   public String getEndpoint() {
     return _endpoint;
+  }
+
+  public boolean isIamRoleBasedAccess() {
+    return _iamRoleBasedAccess;
+  }
+
+  public String getRoleArn() {
+    return _roleArn;
+  }
+
+  public String getRoleSessionName() {
+    return _roleSessionName;
+  }
+
+  public String getExternalId() {
+    return _externalId;
+  }
+
+  public int getSessionDurationSeconds() {
+    return _sessionDurationSeconds;
+  }
+
+  public boolean isAsyncSessionUpdateEnabled() {
+    return _asyncSessionUpdateEnabled;
   }
 }

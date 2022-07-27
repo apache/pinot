@@ -24,6 +24,7 @@ import java.net.URISyntaxException;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.http.apache.ApacheSdkHttpService;
@@ -33,6 +34,9 @@ import software.amazon.awssdk.services.kinesis.KinesisClientBuilder;
 import software.amazon.awssdk.services.kinesis.model.ListShardsRequest;
 import software.amazon.awssdk.services.kinesis.model.ListShardsResponse;
 import software.amazon.awssdk.services.kinesis.model.Shard;
+import software.amazon.awssdk.services.sts.StsClient;
+import software.amazon.awssdk.services.sts.auth.StsAssumeRoleCredentialsProvider;
+import software.amazon.awssdk.services.sts.model.AssumeRoleRequest;
 
 
 /**
@@ -45,6 +49,7 @@ public class KinesisConnectionHandler {
   private final String _accessKey;
   private final String _secretKey;
   private final String _endpoint;
+  private final KinesisConfig _kinesisConfig;
 
   public KinesisConnectionHandler(KinesisConfig kinesisConfig) {
     _stream = kinesisConfig.getStreamTopicName();
@@ -52,6 +57,7 @@ public class KinesisConnectionHandler {
     _accessKey = kinesisConfig.getAccessKey();
     _secretKey = kinesisConfig.getSecretKey();
     _endpoint = kinesisConfig.getEndpoint();
+    _kinesisConfig = kinesisConfig;
     createConnection();
   }
 
@@ -62,6 +68,7 @@ public class KinesisConnectionHandler {
     _accessKey = kinesisConfig.getAccessKey();
     _secretKey = kinesisConfig.getSecretKey();
     _endpoint = kinesisConfig.getEndpoint();
+    _kinesisConfig = kinesisConfig;
     _kinesisClient = kinesisClient;
   }
 
@@ -80,16 +87,50 @@ public class KinesisConnectionHandler {
   public void createConnection() {
     if (_kinesisClient == null) {
       KinesisClientBuilder kinesisClientBuilder;
+
+      AwsCredentialsProvider awsCredentialsProvider;
       if (StringUtils.isNotBlank(_accessKey) && StringUtils.isNotBlank(_secretKey)) {
         AwsBasicCredentials awsBasicCredentials = AwsBasicCredentials.create(_accessKey, _secretKey);
-        kinesisClientBuilder = KinesisClient.builder().region(Region.of(_region))
-            .credentialsProvider(StaticCredentialsProvider.create(awsBasicCredentials))
-            .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
+        awsCredentialsProvider = StaticCredentialsProvider.create(awsBasicCredentials);
       } else {
-        kinesisClientBuilder =
-            KinesisClient.builder().region(Region.of(_region)).credentialsProvider(DefaultCredentialsProvider.create())
-                .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
+        awsCredentialsProvider = DefaultCredentialsProvider.create();
       }
+
+      if (_kinesisConfig.isIamRoleBasedAccess()) {
+        AssumeRoleRequest.Builder assumeRoleRequestBuilder =
+            AssumeRoleRequest.builder()
+                .roleArn(_kinesisConfig.getRoleArn())
+                .roleSessionName(_kinesisConfig.getRoleSessionName())
+                .durationSeconds(_kinesisConfig.getSessionDurationSeconds());
+
+        AssumeRoleRequest assumeRoleRequest;
+        if (StringUtils.isNotEmpty(_kinesisConfig.getExternalId())) {
+          assumeRoleRequest = assumeRoleRequestBuilder
+              .externalId(_kinesisConfig.getExternalId())
+              .build();
+        } else {
+          assumeRoleRequest = assumeRoleRequestBuilder.build();
+        }
+
+        StsClient stsClient =
+            StsClient.builder()
+                .region(Region.of(_region))
+                .credentialsProvider(awsCredentialsProvider)
+                .build();
+
+        awsCredentialsProvider =
+            StsAssumeRoleCredentialsProvider.builder()
+                .stsClient(stsClient)
+                .refreshRequest(assumeRoleRequest)
+                .asyncCredentialUpdateEnabled(_kinesisConfig.isAsyncSessionUpdateEnabled())
+                .build();
+      }
+
+      kinesisClientBuilder =
+          KinesisClient.builder()
+              .region(Region.of(_region))
+              .credentialsProvider(awsCredentialsProvider)
+              .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
 
       if (StringUtils.isNotBlank(_endpoint)) {
         try {
