@@ -59,6 +59,10 @@ public class InstancePartitionsUtils {
     return String.format("%s_GROUP", groupName);
   }
 
+  public static String getGroupInstancePartitionsName(String groupName, String instancePartitionsType) {
+    return String.format("%s_%s", groupName, instancePartitionsType);
+  }
+
   /**
    * Fetches the instance partitions from Helix property store if it exists, or computes it for backward-compatibility.
    */
@@ -68,9 +72,8 @@ public class InstancePartitionsUtils {
 
     // If table is in a group, use pre-computed instance partitions
     if (TableConfigUtils.isTableInGroup(tableConfig)) {
-      InstancePartitions instancePartitions = fetchGroupInstancePartitions(helixManager.getHelixPropertyStore(),
-          tableConfig.getTableGroupName());
-      return instancePartitions.withName(instancePartitionsType.getInstancePartitionsName(tableNameWithType));
+      return fetchGroupInstancePartitions(helixManager.getHelixPropertyStore(),
+          tableConfig.getTableGroupName(), instancePartitionsType);
     }
 
     // Fetch the instance partitions from property store if it exists
@@ -100,6 +103,17 @@ public class InstancePartitionsUtils {
       String groupName) {
     String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
         getGroupInstancePartitionsName(groupName));
+    ZNRecord znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
+    if (znRecord == null) {
+      throw new RuntimeException("No instance partitions for group found");
+    }
+    return InstancePartitions.fromZNRecord(znRecord);
+  }
+
+  public static InstancePartitions fetchGroupInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
+      String groupName, InstancePartitionsType instancePartitionsType) {
+    String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
+        instancePartitionsType.getInstancePartitionsName(groupName));
     ZNRecord znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
     if (znRecord == null) {
       throw new RuntimeException("No instance partitions for group found");
@@ -168,15 +182,22 @@ public class InstancePartitionsUtils {
   }
 
   /**
-   * Persists instance partitions for the group to Zookeeper.
+   * Persists instance partitions for the group to Zookeeper. The instance partitions received are
+   * "group instance partitions", which essentially means their name has a "_GROUP" suffix. When
+   * persisting the instance-partitions however, we persist 3-copies: 1 for each instance partitions type.
    */
   public static void persistGroupInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
       String groupName, InstancePartitions instancePartitions) {
-    String path = ZKMetadataProvider
-        .constructPropertyStorePathForInstancePartitions(getGroupInstancePartitionsName(groupName));
-    if (!propertyStore.set(path, instancePartitions.toZNRecord(), AccessOption.PERSISTENT)) {
-      throw new ZkException("Failed to persist instance partitions: " + instancePartitions);
-    }
+    Preconditions.checkState(instancePartitions.getInstancePartitionsName().contains("_GROUP"));
+    InstancePartitions offlineInstancePartitions =
+        instancePartitions.withName(InstancePartitionsType.OFFLINE.getInstancePartitionsName(groupName));
+    InstancePartitions consumingInstancePartitions =
+        instancePartitions.withName(InstancePartitionsType.CONSUMING.getInstancePartitionsName(groupName));
+    InstancePartitions completedInstancePartitions =
+        instancePartitions.withName(InstancePartitionsType.COMPLETED.getInstancePartitionsName(groupName));
+    persistInstancePartitions(propertyStore, offlineInstancePartitions);
+    persistInstancePartitions(propertyStore, consumingInstancePartitions);
+    persistInstancePartitions(propertyStore, completedInstancePartitions);
   }
 
   /**

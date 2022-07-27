@@ -421,14 +421,8 @@ public class TableRebalancer {
     if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
       if (isTableInGroup) {
         InstancePartitions groupInstancePartitions = InstancePartitionsUtils.fetchGroupInstancePartitions(
-            _helixManager.getHelixPropertyStore(), tableConfig.getTableGroupName());
-        InstancePartitions instancePartitions = groupInstancePartitions.withName(InstancePartitionsUtils
-            .getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
-        if (!dryRun) {
-          LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
-          InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);
-        }
-        return instancePartitions;
+            _helixManager.getHelixPropertyStore(), tableConfig.getTableGroupName(), instancePartitionsType);
+        return groupInstancePartitions;
       } else if (reassignInstances) {
         InstancePartitions existingInstancePartitions =
             InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),

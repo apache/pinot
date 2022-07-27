@@ -22,7 +22,9 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -43,6 +45,7 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.spi.config.table.TableGroupConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -154,9 +157,17 @@ public class PinotTableGroupRestletResource {
   public String getTableGroupInstancePartitions(
       @ApiParam(value = "name of group") @PathParam("groupName") String groupName) {
     try {
-      InstancePartitions instancePartitions = InstancePartitionsUtils.fetchGroupInstancePartitions(
-          _pinotHelixResourceManager.getPropertyStore(), groupName);
-      return JsonUtils.objectToString(instancePartitions);
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new HashMap<>();
+      instancePartitionsMap.put(InstancePartitionsType.OFFLINE,
+          InstancePartitionsUtils.fetchGroupInstancePartitions(_pinotHelixResourceManager.getPropertyStore(),
+              groupName, InstancePartitionsType.OFFLINE));
+      instancePartitionsMap.put(InstancePartitionsType.CONSUMING,
+          InstancePartitionsUtils.fetchGroupInstancePartitions(_pinotHelixResourceManager.getPropertyStore(),
+              groupName, InstancePartitionsType.CONSUMING));
+      instancePartitionsMap.put(InstancePartitionsType.COMPLETED,
+          InstancePartitionsUtils.fetchGroupInstancePartitions(_pinotHelixResourceManager.getPropertyStore(),
+              groupName, InstancePartitionsType.COMPLETED));
+      return JsonUtils.objectToString(instancePartitionsMap);
     } catch (IOException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }

@@ -213,7 +213,7 @@ public class PinotInstanceAssignmentRestletResource {
     String tableNameWithType = tableConfig.getTableName();
     if (TableConfigUtils.isTableInGroup(tableConfig)) {
       instancePartitionsMap.put(instancePartitionsType, InstancePartitionsUtils.fetchGroupInstancePartitions(
-          _resourceManager.getPropertyStore(), tableConfig.getTableGroupName()));
+          _resourceManager.getPropertyStore(), tableConfig.getTableGroupName(), instancePartitionsType));
       return;
     }
     InstancePartitions existingInstancePartitions =

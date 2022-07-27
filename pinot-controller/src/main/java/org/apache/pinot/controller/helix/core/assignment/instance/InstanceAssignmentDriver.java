@@ -68,6 +68,10 @@ public class InstanceAssignmentDriver {
         tableNameWithType, instanceConfigs, assignmentConfig, existingInstancePartitions);
   }
 
+  /**
+   * Assigns instance to a given group, and returns the "group instance partitions", which essentially
+   * means that the InstancePartitions name has a _GROUP suffix.
+   */
   public static InstancePartitions assignInstancesToGroup(String groupName,
       List<InstanceConfig> instanceConfigs, InstanceAssignmentConfig assignmentConfig) {
     String instancePartitionsName = InstancePartitionsUtils.getGroupInstancePartitionsName(groupName);

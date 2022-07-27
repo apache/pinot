@@ -1697,17 +1697,11 @@ public class PinotHelixResourceManager {
       List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
       for (InstancePartitionsType instancePartitionsType : instancePartitionsTypesToAssign) {
         InstancePartitions instancePartitions;
-        if (isTableInGroup) {
-          instancePartitions = InstancePartitionsUtils.fetchGroupInstancePartitions(_propertyStore,
-              tableConfig.getTableGroupName());
-          instancePartitions =
-              instancePartitions.withName(InstancePartitionsUtils.getInstancePartitionsName(rawTableName,
-                  instancePartitionsType.name()));
-        } else {
+        if (!isTableInGroup) {
           instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType, instanceConfigs, null);
+          LOGGER.info("Persisting instance partitions: {}", instancePartitions);
+          InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
         }
-        LOGGER.info("Persisting instance partitions: {}", instancePartitions);
-        InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
       }
     }
   }
