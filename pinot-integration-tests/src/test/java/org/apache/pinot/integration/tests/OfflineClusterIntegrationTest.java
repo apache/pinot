@@ -82,7 +82,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import software.amazon.awssdk.services.kinesis.model.InvalidArgumentException;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.decodeUrl;
 import static org.apache.pinot.common.function.scalar.StringFunctions.encodeUrl;
@@ -671,7 +670,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
 
     // string literal used in a filter
-    sqlQuery = "SELECT * FROM myTable WHERE fromBase64('aGVsbG8h') != Carrier AND toBase64('hello!') != Carrier LIMIT 10";
+    sqlQuery =
+        "SELECT * FROM myTable WHERE fromBase64('aGVsbG8h') != Carrier AND toBase64('hello!') != Carrier LIMIT 10";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
     rows = resultTable.get("rows");
@@ -692,7 +692,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(rows.size(), 10);
 
     // non-string identifier used in a filter
-    sqlQuery = "SELECT fromBase64(toBase64(AirlineID)), AirlineID FROM myTable WHERE fromBase64(toBase64(AirlineID)) = AirlineID LIMIT 10";
+    sqlQuery =
+        "SELECT fromBase64(toBase64(AirlineID)), AirlineID FROM myTable WHERE fromBase64(toBase64(AirlineID)) = "
+            + "AirlineID LIMIT 10";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
@@ -702,7 +704,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // string identifier used in group by order by
     sqlQuery = "SELECT Carrier as originalCol, toBase64(Carrier) as encoded, fromBase64(toBase64(Carrier)) as decoded "
-        + "FROM myTable GROUP BY Carrier, toBase64(Carrier), fromBase64(toBase64(Carrier)) ORDER BY toBase64(Carrier) LIMIT 10";
+        + "FROM myTable GROUP BY Carrier, toBase64(Carrier), fromBase64(toBase64(Carrier)) ORDER BY toBase64(Carrier)"
+        + " LIMIT 10";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
@@ -719,8 +722,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
 
     // non-string identifier used in group by order by
-    sqlQuery = "SELECT AirlineID as originalCol, toBase64(AirlineID) as encoded, fromBase64(toBase64(AirlineID)) as decoded "
-        + "FROM myTable GROUP BY AirlineID, toBase64(AirlineID), fromBase64(toBase64(AirlineID)) ORDER BY toBase64(AirlineID) LIMIT 10";
+    sqlQuery =
+        "SELECT AirlineID as originalCol, toBase64(AirlineID) as encoded, fromBase64(toBase64(AirlineID)) as decoded "
+            + "FROM myTable GROUP BY AirlineID, toBase64(AirlineID), fromBase64(toBase64(AirlineID)) ORDER BY "
+            + "toBase64(AirlineID) LIMIT 10";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
@@ -745,7 +750,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String sqlQuery =
         "SELECT 1, now() as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as "
             + "today, now(), ago('PT1H'), encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') as encodedUrl, "
-            + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') as decodedUrl, toBase64('hello!') as toBase64, fromBase64('aGVsbG8h') as fromBase64";
+            + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') as decodedUrl, toBase64"
+            + "('hello!') as toBase64, fromBase64('aGVsbG8h') as fromBase64";
     JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
     long currentTsMax = System.currentTimeMillis();
     long oneHourAgoTsMax = currentTsMax - ONE_HOUR_IN_MS;
