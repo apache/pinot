@@ -40,6 +40,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -473,12 +474,12 @@ public class PinotSegmentRestletResource {
             msgInfo.getLeft())) {
           zkJobMetaWriteSuccess = true;
         } else {
-          LOGGER.error("Failed to add reload segment job meta into zookeeper for table {}, segment {}",
+          LOGGER.error("Failed to add reload segment job meta into zookeeper for table: {}, segment: {}",
               tableNameWithType, segmentName);
         }
       } catch (Exception e) {
-        LOGGER.error("Failed to add reload segment job meta into zookeeper for table {}, segment {}", tableNameWithType,
-            segmentName, e);
+        LOGGER.error("Failed to add reload segment job meta into zookeeper for table: {}, segment: {}",
+            tableNameWithType, segmentName, e);
       }
       return new SuccessResponse(
           String.format("Submitted reload job id: %s, sent %d reload messages. Job meta ZK storage status: %s",
@@ -599,28 +600,30 @@ public class PinotSegmentRestletResource {
   }
 
   @GET
-  @Path("tables/{tableName}/segmentReloadStatus/{jobId}")
+  @Path("segments/segmentReloadStatus/{jobId}")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get status for a submitted reload operation",
       notes = "Get status for a submitted reload operation")
   public ServerReloadControllerJobStatusResponse getReloadJobStatus(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Reload job id", required = true) @PathParam("jobId") String reloadJobId)
       throws Exception {
-    TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
-    String tableNameWithType = TableNameBuilder.forType(tableTypeFromRequest).tableNameWithType(tableName);
-    Map<String, List<String>> serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
     Map<String, String> controllerJobZKMetadata = _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId);
-
     if (controllerJobZKMetadata == null) {
-      throw new ControllerApplicationException(LOGGER,
-          "Failed to find controller job: " + reloadJobId + " for table: " + tableNameWithType, Status.NOT_FOUND);
+      throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + reloadJobId,
+          Status.NOT_FOUND);
     }
 
+    String tableNameWithType =
+        controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONTROLLER_JOB_TABLE_NAME_WITH_TYPE);
+    Map<String, List<String>> serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+
     String singleSegmentName = null;
-    if (controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONTROLLER_JOB_TYPE).equals(
-        ControllerJobType.RELOAD_SEGMENT.toString())) {
+    if (controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONTROLLER_JOB_TYPE)
+        .equals(ControllerJobType.RELOAD_SEGMENT.toString())) {
+      // No need to query servers where this segment is not supposed to be hosted
+      serverToSegments = serverToSegments.entrySet().stream().filter(kv -> kv.getValue()
+              .contains(controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME)))
+          .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
       singleSegmentName = controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME);
     }
 
@@ -647,7 +650,8 @@ public class PinotSegmentRestletResource {
     ServerReloadControllerJobStatusResponse serverReloadControllerJobStatusResponse =
         new ServerReloadControllerJobStatusResponse();
     serverReloadControllerJobStatusResponse.setSuccessCount(0);
-    serverReloadControllerJobStatusResponse.setTotalSegmentCount(0);
+    serverReloadControllerJobStatusResponse.setTotalSegmentCount(
+        _pinotHelixResourceManager.getSegmentsCount(tableNameWithType));
     serverReloadControllerJobStatusResponse.setTotalServersQueried(serverUrls.size());
     serverReloadControllerJobStatusResponse.setTotalServerCallsFailed(serviceResponse._failedResponseCount);
 
@@ -656,8 +660,6 @@ public class PinotSegmentRestletResource {
       try {
         ServerReloadControllerJobStatusResponse response =
             JsonUtils.stringToObject(responseString, ServerReloadControllerJobStatusResponse.class);
-        serverReloadControllerJobStatusResponse.setTotalSegmentCount(
-            serverReloadControllerJobStatusResponse.getTotalSegmentCount() + response.getTotalSegmentCount());
         serverReloadControllerJobStatusResponse.setSuccessCount(
             serverReloadControllerJobStatusResponse.getSuccessCount() + response.getSuccessCount());
       } catch (Exception e) {
@@ -727,11 +729,11 @@ public class PinotSegmentRestletResource {
           tableReloadMeta.put("reloadJobMetaZKStorageStatus", "SUCCESS");
         } else {
           tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
-          LOGGER.error("Failed to add reload all segments job meta into zookeeper for table {}", tableNameWithType);
+          LOGGER.error("Failed to add reload all segments job meta into zookeeper for table: {}", tableNameWithType);
         }
       } catch (Exception e) {
         tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
-        LOGGER.error("Failed to add reload all segments job meta into zookeeper for table {}", tableNameWithType, e);
+        LOGGER.error("Failed to add reload all segments job meta into zookeeper for table: {}", tableNameWithType, e);
       }
     }
     return new SuccessResponse("Reload segments table level details: " + perTableMsgData);

@@ -559,19 +559,19 @@ public class CommonConstants {
 
   public static class ControllerJob {
     /**
-     * Task ZK props
+     * Controller job ZK props
      */
-    public static final String CONTROLLER_JOB_TYPE = "controller.job.type";
-    public static final String CONTROLLER_JOB_TABLE_NAME_WITH_TYPE = "controller.job.table.name";
-    public static final String CONTROLLER_JOB_ID = "controller.job.id";
-    public static final String CONTROLLER_JOB_SUBMISSION_TIME = "controller.job.submission.time";
-    public static final String CONTROLLER_JOB_MESSAGES_COUNT = "controller.job.messages.count";
+    public static final String CONTROLLER_JOB_TYPE = "jobType";
+    public static final String CONTROLLER_JOB_TABLE_NAME_WITH_TYPE = "tableName";
+    public static final String CONTROLLER_JOB_ID = "jobId";
+    public static final String CONTROLLER_JOB_SUBMISSION_TIME = "submissionTime";
+    public static final String CONTROLLER_JOB_MESSAGES_COUNT = "messageCount";
 
+    public static final Integer MAXIMUM_CONTROLLER_JOBS_IN_ZK = 100;
     /**
-     * Segment reload task ZK props
+     * Segment reload job ZK props
      */
-    public static final Integer MAXIMUM_RELOAD_JOBS_IN_ZK = 100;
-    public static final String SEGMENT_RELOAD_JOB_SEGMENT_NAME = "task.reload.segment.segmentName";
+    public static final String SEGMENT_RELOAD_JOB_SEGMENT_NAME = "segmentName";
   }
 
   public static class Segment {
