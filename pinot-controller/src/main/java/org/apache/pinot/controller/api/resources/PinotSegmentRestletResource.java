@@ -697,7 +697,7 @@ public class PinotSegmentRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reload all segments", notes = "Reload all segments")
-  public SuccessResponse reloadAllSegments(
+  public Map<String, Map<String, String>> reloadAllSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
@@ -736,7 +736,7 @@ public class PinotSegmentRestletResource {
         LOGGER.error("Failed to add reload all segments job meta into zookeeper for table: {}", tableNameWithType, e);
       }
     }
-    return new SuccessResponse("Reload segments table level details: " + perTableMsgData);
+    return perTableMsgData;
   }
 
   @Deprecated
