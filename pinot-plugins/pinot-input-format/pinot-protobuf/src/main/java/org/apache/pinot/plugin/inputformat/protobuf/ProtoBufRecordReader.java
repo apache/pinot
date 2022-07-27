@@ -40,7 +40,7 @@ public class ProtoBufRecordReader implements RecordReader {
 
   private InputStream _inputStream;
   private boolean _hasNext;
-  private DynamicMessage _dynamicMessage;
+  private Message.Builder _builder;
 
   private boolean hasMoreToRead()
       throws IOException {
@@ -71,7 +71,8 @@ public class ProtoBufRecordReader implements RecordReader {
     Descriptors.Descriptor descriptor = buildProtoBufDescriptor(protoBufRecordReaderConfig);
     _recordExtractor = new ProtoBufRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
-    _dynamicMessage = DynamicMessage.getDefaultInstance(descriptor);
+    DynamicMessage dynamicMessage = DynamicMessage.getDefaultInstance(descriptor);
+    _builder = dynamicMessage.newBuilderForType();
     init();
   }
 
@@ -105,11 +106,12 @@ public class ProtoBufRecordReader implements RecordReader {
       throws IOException {
     Message message;
     try {
-      Message.Builder builder = _dynamicMessage.newBuilderForType();
-      builder.mergeDelimitedFrom(_inputStream);
-      message = builder.build();
+      _builder.mergeDelimitedFrom(_inputStream);
+      message = _builder.build();
     } catch (Exception e) {
       throw new IOException("Caught exception while reading protobuf object", e);
+    } finally {
+      _builder.clear();
     }
     _recordExtractor.extract(message, reuse);
     _hasNext = hasMoreToRead();

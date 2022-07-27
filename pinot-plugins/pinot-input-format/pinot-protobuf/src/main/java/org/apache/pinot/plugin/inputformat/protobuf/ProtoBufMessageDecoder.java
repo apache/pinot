@@ -41,9 +41,9 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
   public static final String DESCRIPTOR_FILE_PATH = "descriptorFile";
   public static final String PROTO_CLASS_NAME = "protoClassName";
 
-  private DynamicMessage _dynamicMessage;
   private ProtoBufRecordExtractor _recordExtractor;
   private String _protoClassName;
+  private Message.Builder _builder;
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
@@ -57,7 +57,8 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
     Descriptors.Descriptor descriptor = buildProtoBufDescriptor(descriptorFileInputStream);
     _recordExtractor = new ProtoBufRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
-    _dynamicMessage = DynamicMessage.getDefaultInstance(descriptor);
+    DynamicMessage dynamicMessage = DynamicMessage.getDefaultInstance(descriptor);
+    _builder = dynamicMessage.newBuilderForType();
   }
 
   private Descriptors.Descriptor buildProtoBufDescriptor(InputStream fin)
@@ -84,12 +85,13 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     Message message;
     try {
-      Message.Builder builder = _dynamicMessage.newBuilderForType();
-      builder.mergeFrom(payload);
-      message = builder.build();
+      _builder.mergeFrom(payload);
+      message = _builder.build();
     } catch (Exception e) {
       LOGGER.error("Not able to decode protobuf message", e);
       return destination;
+    } finally {
+      _builder.clear();
     }
     _recordExtractor.extract(message, destination);
     return destination;
