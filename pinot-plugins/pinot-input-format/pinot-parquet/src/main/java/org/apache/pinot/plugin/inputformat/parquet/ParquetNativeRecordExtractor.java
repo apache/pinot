@@ -60,6 +60,7 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
 
   private Set<String> _fields;
   private boolean _extractAll = false;
+  private boolean _treatBinaryAsString = false;
 
   public static BigDecimal binaryToDecimal(Binary value, int precision, int scale) {
     /*
@@ -90,13 +91,15 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
   }
 
   @Override
-  public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
+  public void init(@Nullable Set<String> fields, RecordExtractorConfig conf) {
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
       _fields = Collections.emptySet();
     } else {
       _fields = ImmutableSet.copyOf(fields);
     }
+    _treatBinaryAsString =
+        conf instanceof ParquetRecordExtractorConfig && ((ParquetRecordExtractorConfig) conf)._treatBinaryAsString;
   }
 
   @Override
@@ -157,7 +160,7 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
           return from.getValueToString(fieldIndex, index);
         case BINARY:
         case FIXED_LEN_BYTE_ARRAY:
-          if (originalType == OriginalType.UTF8) {
+          if (originalType == OriginalType.UTF8 || _treatBinaryAsString) {
             return from.getValueToString(fieldIndex, index);
           }
           if (originalType == OriginalType.DECIMAL) {
@@ -263,5 +266,22 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
     // value is Object[]
     Object[] values = (Object[]) value;
     return super.convertMultiValue(Arrays.asList(values));
+  }
+
+  public static class ParquetRecordExtractorConfig implements RecordExtractorConfig {
+    private static final String TREAT_BINARY_AS_STRING = "treatBinaryAsString";
+    private boolean _treatBinaryAsString = false;
+
+    public ParquetRecordExtractorConfig() {
+    }
+
+    public ParquetRecordExtractorConfig(boolean treatBinaryAsString) {
+      _treatBinaryAsString = treatBinaryAsString;
+    }
+
+    @Override
+    public void init(Map<String, String> props) {
+      _treatBinaryAsString = Boolean.parseBoolean(props.getOrDefault(TREAT_BINARY_AS_STRING, "false"));
+    }
   }
 }

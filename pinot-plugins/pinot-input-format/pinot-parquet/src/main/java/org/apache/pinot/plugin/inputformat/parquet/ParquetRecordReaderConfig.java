@@ -27,7 +27,9 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
  */
 public class ParquetRecordReaderConfig implements RecordReaderConfig {
   private static final String USE_PARQUET_AVRO_RECORDER_READER = "useParquetAvroRecordReader";
+  private static final String TREAT_BINARY_AS_STRING = "treatBinaryAsString";
   private boolean _useParquetAvroRecordReader = true;
+  private boolean _treatBinaryAsString = false;
   private Configuration _conf;
 
   public ParquetRecordReaderConfig() {
@@ -36,6 +38,7 @@ public class ParquetRecordReaderConfig implements RecordReaderConfig {
   public ParquetRecordReaderConfig(Configuration conf) {
     _conf = conf;
     _useParquetAvroRecordReader = conf.getBoolean(USE_PARQUET_AVRO_RECORDER_READER, true);
+    _treatBinaryAsString = conf.getBoolean(TREAT_BINARY_AS_STRING, false);
   }
 
   public boolean useParquetAvroRecordReader() {
@@ -44,6 +47,14 @@ public class ParquetRecordReaderConfig implements RecordReaderConfig {
 
   public void setUseParquetAvroRecordReader(boolean useParquetAvroRecordReader) {
     _useParquetAvroRecordReader = useParquetAvroRecordReader;
+  }
+
+  public boolean isTreatBinaryAsString() {
+    return _treatBinaryAsString;
+  }
+
+  public void setTreatBinaryAsString(boolean treatBinaryAsString) {
+    _treatBinaryAsString = treatBinaryAsString;
   }
 
   public Configuration getConfig() {

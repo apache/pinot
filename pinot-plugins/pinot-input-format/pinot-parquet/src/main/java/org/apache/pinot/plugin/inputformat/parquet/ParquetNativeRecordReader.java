@@ -35,6 +35,7 @@ import org.apache.parquet.io.ColumnIOFactory;
 import org.apache.parquet.io.MessageColumnIO;
 import org.apache.parquet.schema.MessageType;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
@@ -61,7 +62,14 @@ public class ParquetNativeRecordReader implements RecordReader {
     _dataFilePath = new Path(dataFile.getAbsolutePath());
     _hadoopConf = ParquetUtils.getParquetHadoopConfiguration();
     _recordExtractor = new ParquetNativeRecordExtractor();
-    _recordExtractor.init(fieldsToRead, null);
+
+    RecordExtractorConfig recordExtractorConfig = null;
+    if (recordReaderConfig instanceof ParquetRecordReaderConfig) {
+      ParquetRecordReaderConfig castedConf = (ParquetRecordReaderConfig) recordReaderConfig;
+      recordExtractorConfig =
+          new ParquetNativeRecordExtractor.ParquetRecordExtractorConfig(castedConf.isTreatBinaryAsString());
+    }
+    _recordExtractor.init(fieldsToRead, recordExtractorConfig);
 
     _parquetReadOptions = ParquetReadOptions.builder()
         .withMetadataFilter(ParquetMetadataConverter.NO_FILTER)

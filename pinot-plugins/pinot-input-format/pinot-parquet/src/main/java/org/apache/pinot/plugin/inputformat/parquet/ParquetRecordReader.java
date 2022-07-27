@@ -38,11 +38,16 @@ public class ParquetRecordReader implements RecordReader {
   @Override
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
-    if (recordReaderConfig == null || ((ParquetRecordReaderConfig) recordReaderConfig).useParquetAvroRecordReader()) {
+    if (recordReaderConfig == null) {
       _internalParquetRecordReader = new ParquetAvroRecordReader();
     } else {
-      _useAvroParquetRecordReader = false;
-      _internalParquetRecordReader = new ParquetNativeRecordReader();
+      ParquetRecordReaderConfig config = (ParquetRecordReaderConfig) recordReaderConfig;
+      if (config.useParquetAvroRecordReader()) {
+        _internalParquetRecordReader = new ParquetAvroRecordReader();
+      } else {
+        _useAvroParquetRecordReader = false;
+        _internalParquetRecordReader = new ParquetNativeRecordReader();
+      }
     }
     _internalParquetRecordReader.init(dataFile, fieldsToRead, recordReaderConfig);
   }
