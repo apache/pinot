@@ -532,7 +532,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               messagesAndOffsets.getMessageLengthAtIndex(index), reuse);
       if (msgMetadata.getHeaders() != null) {
         for (Map.Entry<String, Object> entrySet : msgMetadata.getHeaders().getFieldToValueMap().entrySet()) {
-          decodedRow.putValue(entrySet.getKey(), entrySet.getValue());
+          decodedRow.putValue("header$" + entrySet.getKey(), entrySet.getValue());
         }
       }
       if (decodedRow != null) {

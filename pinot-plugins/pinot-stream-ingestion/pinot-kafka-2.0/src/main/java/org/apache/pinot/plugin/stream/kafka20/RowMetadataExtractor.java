@@ -30,7 +30,7 @@ import org.apache.pinot.spi.stream.StreamMessageMetadata;
 public interface RowMetadataExtractor {
   static RowMetadataExtractor build(boolean populateMetadata) {
     return record -> {
-      if (populateMetadata) {
+      if (!populateMetadata) {
         return null;
       } else {
         StreamMessageMetadata streamMessageMetadata = new StreamMessageMetadata(record.timestamp());

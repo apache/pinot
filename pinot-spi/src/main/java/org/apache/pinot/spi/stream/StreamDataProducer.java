@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
@@ -34,6 +35,10 @@ public interface StreamDataProducer {
 
   void produce(String topic, byte[] key, byte[] payload);
 
+  default void produce(String topic, byte[] key, byte[] payload, GenericRow headers) {
+    produce(topic, key, payload);
+  }
+
   void close();
 
   /**
@@ -43,7 +48,7 @@ public interface StreamDataProducer {
    * @param rows the rows
    */
   default void produceBatch(String topic, List<byte[]> rows) {
-    for (byte[] row: rows) {
+    for (byte[] row : rows) {
       produce(topic, row);
     }
   }
@@ -55,7 +60,7 @@ public interface StreamDataProducer {
    * @param payloadWithKey the payload rows with key
    */
   default void produceKeyedBatch(String topic, List<RowWithKey> payloadWithKey) {
-    for (RowWithKey rowWithKey: payloadWithKey) {
+    for (RowWithKey rowWithKey : payloadWithKey) {
       if (rowWithKey.getKey() == null) {
         produce(topic, rowWithKey.getPayload());
       } else {

@@ -69,6 +69,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -350,7 +351,9 @@ public class ClusterIntegrationTestUtils {
           producer.produce(kafkaTopic, Longs.toByteArray(System.currentTimeMillis()), null);
         }
       }
+      int docId = 0;
       for (File avroFile : avroFiles) {
+
         try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
           BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
           GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(reader.getSchema());
@@ -365,7 +368,9 @@ public class ClusterIntegrationTestUtils {
             byte[] keyBytes = (partitionColumn == null) ? Longs.toByteArray(System.currentTimeMillis())
                 : (genericRecord.get(partitionColumn)).toString().getBytes();
             byte[] bytes = outputStream.toByteArray();
-            producer.produce(kafkaTopic, keyBytes, bytes);
+            GenericRow headerGenericRow = new GenericRow();
+            headerGenericRow.putValue("docId", String.valueOf(docId++).getBytes());
+            producer.produce(kafkaTopic, keyBytes, bytes, headerGenericRow);
           }
         }
       }

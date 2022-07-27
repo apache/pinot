@@ -19,11 +19,16 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -58,8 +63,13 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
+    schema.addField(new DimensionFieldSpec("rowId", FieldSpec.DataType.STRING, true));
     addSchema(schema);
     TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(new ArrayList<>());
+    tableConfig.setIngestionConfig(ingestionConfig);
+    tableConfig.getIngestionConfig().getTransformConfigs().add(new TransformConfig("rowId","fromUtf8(header$docId)"));
     addTableConfig(tableConfig);
 
     // Push data into Kafka
@@ -76,6 +86,8 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+
+    Thread.currentThread().join();
   }
 
   protected void createSegmentsAndUpload(List<File> avroFile, Schema schema, TableConfig tableConfig)
