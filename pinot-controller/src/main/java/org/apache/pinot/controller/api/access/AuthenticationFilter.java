@@ -95,7 +95,6 @@ public class AuthenticationFilter implements ContainerRequestFilter {
   AccessType extractAccessType(Method endpointMethod) {
     // default access type
     AccessType accessType = AccessType.READ;
-
     if (endpointMethod.isAnnotationPresent(Authenticate.class)) {
       accessType = endpointMethod.getAnnotation(Authenticate.class).value();
     } else {
