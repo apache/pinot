@@ -35,6 +35,7 @@ import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.mailbox.StringMailboxIdentifier;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.service.QueryConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +47,6 @@ import org.slf4j.LoggerFactory;
 public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_RECEIVE";
-  private static final long DEFAULT_TIMEOUT_NANO = 10_000_000_000L;
 
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
   private final RelDistribution.Type _exchangeType;
@@ -56,6 +56,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
   private final int _port;
   private final long _jobId;
   private final int _stageId;
+  private final long _timeout;
   private TransferableBlock _upstreamErrorBlock;
 
   public MailboxReceiveOperator(MailboxService<Mailbox.MailboxContent> mailboxService, DataSchema dataSchema,
@@ -69,6 +70,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     _port = port;
     _jobId = jobId;
     _stageId = stageId;
+    _timeout = QueryConfig.DEFAULT_TIMEOUT_NANO;
     _upstreamErrorBlock = null;
   }
 
@@ -91,7 +93,7 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     }
     // TODO: do a round robin check against all MailboxContentStreamObservers and find which one that has data.
     boolean hasOpenedMailbox = true;
-    long timeoutWatermark = System.nanoTime() + DEFAULT_TIMEOUT_NANO;
+    long timeoutWatermark = System.nanoTime() + _timeout;
     while (hasOpenedMailbox && System.nanoTime() < timeoutWatermark) {
       hasOpenedMailbox = false;
       for (ServerInstance sendingInstance : _sendingStageInstances) {
