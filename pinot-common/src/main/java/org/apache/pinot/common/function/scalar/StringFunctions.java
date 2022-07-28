@@ -21,6 +21,7 @@ package org.apache.pinot.common.function.scalar;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.Base64;
@@ -563,22 +564,40 @@ public class StringFunctions {
   }
 
   /**
-   * @param input utf-8 encoded String
+   * @param input binary data
+   * @return Base64 encoded String
+   */
+  @ScalarFunction
+  public static String binaryToBase64(byte[] input) {
+    return Base64.getEncoder().encodeToString(input);
+  }
+
+  /**
+   * @param input string to be encoded
    * @return Base64 encoded String
    */
   @ScalarFunction
   public static String toBase64(String input) {
-    byte[] inputBytes = input.getBytes(StandardCharsets.UTF_8);
+    return toBase64(input, "UTF-8");
+  }
+
+  /**
+   * @param input String encoded with user specified encodeScheme
+   * @return Base64 encoded String
+   */
+  @ScalarFunction
+  public static String toBase64(String input, String encodeScheme) {
+    byte[] inputBytes = input.getBytes(Charset.forName(encodeScheme));
     return Base64.getEncoder().encodeToString(inputBytes);
   }
 
   /**
    * @param input Base64 encoded String
-   * @return utf8 encoded String
+   * @return decoded string
    */
   @ScalarFunction
   public static String fromBase64(String input) {
     byte[] inputBytes = Base64.getDecoder().decode(input);
-    return new String(inputBytes, StandardCharsets.UTF_8);
+    return new String(inputBytes);
   }
 }

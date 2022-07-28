@@ -20,12 +20,14 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Collections;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -106,6 +108,10 @@ public class LiteralOnlyBrokerRequestTest {
             + "where bar = decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253')")));
     Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(
         CalciteSqlParser.compileToPinotQuery("SELECT toBase64('hello!')," + " fromBase64('aGVsbG8h') FROM myTable")));
+    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(
+        CalciteSqlParser.compileToPinotQuery("SELECT reverse(fromBase64(foo))," + " toBase64(fromBase64('aGVsbG8h')) FROM myTable")));
+    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(
+        CalciteSqlParser.compileToPinotQuery("SELECT toBase64(max(foo))," + " fromBase64(toBase64(max(foo))) FROM myTable")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(
         CalciteSqlParser.compileToPinotQuery("SELECT count(*) from foo " + "where bar = toBase64('hello!')")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(
@@ -224,17 +230,17 @@ public class LiteralOnlyBrokerRequestTest {
         "{\"sql\":\"SELECT toBase64('hello!') AS encoded, " + "fromBase64('aGVsbG8h') AS decoded\"}");
     requestStats = Tracing.getTracer().createRequestScope();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
-    System.out.println(brokerResponse.getResultTable());
-    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "encoded");
-    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
-        DataSchema.ColumnDataType.STRING);
-    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(1), "decoded");
-    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(1),
-        DataSchema.ColumnDataType.STRING);
-    Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
-    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0).length, 2);
-    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[0].toString(), "aGVsbG8h");
-    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[1].toString(), "hello!");
+    ResultTable resultTable = brokerResponse.getResultTable();
+    DataSchema dataSchema = resultTable.getDataSchema();
+    List<Object[]> rows = resultTable.getRows();
+    Assert.assertEquals(dataSchema.getColumnName(0), "encoded");
+    Assert.assertEquals(dataSchema.getColumnDataType(0), DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(dataSchema.getColumnName(1), "decoded");
+    Assert.assertEquals(dataSchema.getColumnDataType(1), DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(rows.size(), 1);
+    Assert.assertEquals(rows.get(0).length, 2);
+    Assert.assertEquals(rows.get(0)[0].toString(), "aGVsbG8h");
+    Assert.assertEquals(rows.get(0)[1].toString(), "hello!");
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
 
     request = JsonUtils.stringToJsonNode(
@@ -242,13 +248,14 @@ public class LiteralOnlyBrokerRequestTest {
             + " AS encoded\"}");
     requestStats = Tracing.getTracer().createRequestScope();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
-    System.out.println(brokerResponse.getResultTable());
-    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "encoded");
-    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
-        DataSchema.ColumnDataType.STRING);
-    Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
-    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0).length, 1);
-    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[0].toString(),
+    resultTable = brokerResponse.getResultTable();
+    dataSchema = resultTable.getDataSchema();
+    rows = resultTable.getRows();
+    Assert.assertEquals(dataSchema.getColumnName(0), "encoded");
+    Assert.assertEquals(dataSchema.getColumnDataType(0), DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(rows.size(), 1);
+    Assert.assertEquals(rows.get(0).length, 1);
+    Assert.assertEquals(rows.get(0)[0].toString(),
         "dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0");
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
 
@@ -257,13 +264,14 @@ public class LiteralOnlyBrokerRequestTest {
         + "') AS decoded\"}");
     requestStats = Tracing.getTracer().createRequestScope();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
-    System.out.println(brokerResponse.getResultTable());
-    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "decoded");
-    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
-        DataSchema.ColumnDataType.STRING);
-    Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);
-    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0).length, 1);
-    Assert.assertEquals(brokerResponse.getResultTable().getRows().get(0)[0].toString(),
+    resultTable = brokerResponse.getResultTable();
+    dataSchema = resultTable.getDataSchema();
+    rows = resultTable.getRows();
+    Assert.assertEquals(dataSchema.getColumnName(0), "decoded");
+    Assert.assertEquals(dataSchema.getColumnDataType(0), DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(rows.size(), 1);
+    Assert.assertEquals(rows.get(0).length, 1);
+    Assert.assertEquals(rows.get(0)[0].toString(),
         "this is a long string that will encode to more than 76 characters using base64");
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
 
