@@ -21,6 +21,7 @@ package org.apache.pinot.connector.presto.grpc;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
@@ -31,9 +32,9 @@ import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
  */
 public class PinotStreamingQueryClient {
   private final Map<String, GrpcQueryClient> _grpcQueryClientMap = new HashMap<>();
-  private final GrpcQueryClient.Config _config;
+  private final GrpcConfig _config;
 
-  public PinotStreamingQueryClient(GrpcQueryClient.Config config) {
+  public PinotStreamingQueryClient(GrpcConfig config) {
     _config = config;
   }
 
