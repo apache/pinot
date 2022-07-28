@@ -27,9 +27,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.server.starter.ServerInstance;
@@ -76,7 +74,7 @@ public class ControllerJobStatusResource {
     } else {
       SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
       if (segmentDataManager == null) {
-        throw new WebApplicationException("Segment: " + segmentName + " is not found", Response.Status.NOT_FOUND);
+        return JsonUtils.objectToString(new SegmentReloadStatusValue(0, 0));
       }
       try {
         int successCount = 0;

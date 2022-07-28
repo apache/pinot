@@ -40,7 +40,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -614,17 +613,21 @@ public class PinotSegmentRestletResource {
     }
 
     String tableNameWithType =
-        controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONTROLLER_JOB_TABLE_NAME_WITH_TYPE);
-    Map<String, List<String>> serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+        controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
+    Map<String, List<String>> serverToSegments;
 
     String singleSegmentName = null;
-    if (controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONTROLLER_JOB_TYPE)
+    if (controllerJobZKMetadata.get(CommonConstants.ControllerJob.JOB_TYPE)
         .equals(ControllerJobType.RELOAD_SEGMENT.toString())) {
       // No need to query servers where this segment is not supposed to be hosted
-      serverToSegments = serverToSegments.entrySet().stream().filter(kv -> kv.getValue()
-              .contains(controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME)))
-          .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
       singleSegmentName = controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME);
+      serverToSegments = new HashMap<>();
+      List<String> segmentList = List.of(singleSegmentName);
+      _pinotHelixResourceManager.getServers(tableNameWithType, singleSegmentName).forEach(server -> {
+        serverToSegments.put(server, segmentList);
+      });
+    } else {
+      serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
     }
 
     BiMap<String, String> serverEndPoints =
@@ -637,7 +640,7 @@ public class PinotSegmentRestletResource {
     for (String endpoint : endpointsToServers.keySet()) {
       String reloadTaskStatusEndpoint =
           endpoint + "/controllerJob/reloadStatus/" + tableNameWithType + "?reloadJobTimestamp="
-              + controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONTROLLER_JOB_SUBMISSION_TIME);
+              + controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS);
       if (singleSegmentName != null) {
         reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + singleSegmentName;
       }
@@ -650,8 +653,9 @@ public class PinotSegmentRestletResource {
     ServerReloadControllerJobStatusResponse serverReloadControllerJobStatusResponse =
         new ServerReloadControllerJobStatusResponse();
     serverReloadControllerJobStatusResponse.setSuccessCount(0);
+
     serverReloadControllerJobStatusResponse.setTotalSegmentCount(
-        _pinotHelixResourceManager.getSegmentsCount(tableNameWithType));
+        (singleSegmentName == null) ? _pinotHelixResourceManager.getSegmentsCount(tableNameWithType) : 1);
     serverReloadControllerJobStatusResponse.setTotalServersQueried(serverUrls.size());
     serverReloadControllerJobStatusResponse.setTotalServerCallsFailed(serviceResponse._failedResponseCount);
 
@@ -674,7 +678,7 @@ public class PinotSegmentRestletResource {
 
     // Add derived fields
     long submissionTime =
-        Long.parseLong(controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONTROLLER_JOB_SUBMISSION_TIME));
+        Long.parseLong(controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS));
     double timeElapsedInMinutes = ((double) System.currentTimeMillis() - (double) submissionTime) / (1000.0 * 60.0);
     int remainingSegments = serverReloadControllerJobStatusResponse.getTotalSegmentCount()
         - serverReloadControllerJobStatusResponse.getSuccessCount();
@@ -720,8 +724,8 @@ public class PinotSegmentRestletResource {
     for (String tableNameWithType : tableNamesWithType) {
       Pair<Integer, String> msgInfo = _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload);
       Map<String, String> tableReloadMeta = new HashMap<>();
-      tableReloadMeta.put("numberOfMessagesSent", String.valueOf(msgInfo.getLeft()));
-      tableReloadMeta.put("reloadMessageId", msgInfo.getRight());
+      tableReloadMeta.put("numMessagesSent", String.valueOf(msgInfo.getLeft()));
+      tableReloadMeta.put("reloadJobId", msgInfo.getRight());
       perTableMsgData.put(tableNameWithType, tableReloadMeta);
       // Store in ZK
       try {

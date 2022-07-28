@@ -561,11 +561,11 @@ public class CommonConstants {
     /**
      * Controller job ZK props
      */
-    public static final String CONTROLLER_JOB_TYPE = "jobType";
-    public static final String CONTROLLER_JOB_TABLE_NAME_WITH_TYPE = "tableName";
-    public static final String CONTROLLER_JOB_ID = "jobId";
-    public static final String CONTROLLER_JOB_SUBMISSION_TIME = "submissionTime";
-    public static final String CONTROLLER_JOB_MESSAGES_COUNT = "messageCount";
+    public static final String JOB_TYPE = "jobType";
+    public static final String TABLE_NAME_WITH_TYPE = "tableName";
+    public static final String JOB_ID = "jobId";
+    public static final String SUBMISSION_TIME_MS = "submissionTimeMs";
+    public static final String MESSAGE_COUNT = "messageCount";
 
     public static final Integer MAXIMUM_CONTROLLER_JOBS_IN_ZK = 100;
     /**

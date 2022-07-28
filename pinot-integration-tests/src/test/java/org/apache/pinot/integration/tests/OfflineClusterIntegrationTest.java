@@ -428,6 +428,21 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     cleanupTestTableDataManager(offlineTableName);
   }
 
+  @Test
+  public void testReloadStatusApi() {
+    String reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
+    if (reloadJobId != null) {
+      // Spin until validated
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          return validateReloadJobSuccess(reloadJobId);
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }, 600_000L, "Failed to cleanup obsolete index in table");
+    }
+  }
+
   private void waitForNumOfSegmentsBecomeOnline(String tableNameWithType, int numSegments)
       throws InterruptedException, TimeoutException {
     long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
@@ -2382,7 +2397,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     return pinotDriver.connect("jdbc:pinot://localhost:" + controllerPort, jdbcProps);
   }
 
-  private void reloadOfflineTableAndValidateResponse(String tableName, boolean forceDownload) {
+  private String reloadOfflineTableAndValidateResponse(String tableName, boolean forceDownload) {
+    String jobId = null;
     try {
       String response =
           sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.OFFLINE, forceDownload),
@@ -2394,7 +2410,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
       if (isZKWriteSuccess.equals("SUCCESS")) {
         // We can validate reload status API now
-        String jobId = tableLevelDetails.get("reloadMessageId").asText();
+        jobId = tableLevelDetails.get("reloadJobId").asText();
         String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forControllerJobStatus(jobId));
         JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
 
@@ -2404,7 +2420,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         assertEquals(jobStatus.get("metadata").get("tableName").asText(), tableNameWithType);
       }
     } catch (Exception e) {
-      Assert.fail("Reload failed :" + e.getMessage());
+      Assert.fail("Reload failed: " + e.getMessage());
     }
+    return jobId;
+  }
+
+  private boolean validateReloadJobSuccess(String reloadJobId)
+      throws IOException {
+    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forControllerJobStatus(reloadJobId));
+    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
+
+    assertEquals(jobStatus.get("metadata").get("jobId").asText(), reloadJobId);
+    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
+    return jobStatus.get("totalSegmentCount").asInt() == jobStatus.get("successCount").asInt();
   }
 }
