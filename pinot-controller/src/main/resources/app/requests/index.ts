@@ -132,6 +132,9 @@ export const getTaskDebug = (taskName: string): Promise<AxiosResponse<OperationR
 export const getTaskTypeDebug = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
 
+export const getTables = (params): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tables`, { params, headers: { ...headers, Accept: 'application/json' } });
+
 export const getClusterConfig = (): Promise<AxiosResponse<ClusterConfig>> =>
   baseApi.get('/cluster/configs');
 
