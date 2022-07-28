@@ -1267,8 +1267,6 @@ public class SegmentPreProcessorTest {
     // In fact, the validation logic when updating index configs already blocks this to happen.
     testCases.put("addInvertedIndexOnNonDictColumn", (IndexLoadingConfig config) -> config.setInvertedIndexColumns(
         new HashSet<>(Collections.singletonList("column4"))));
-    testCases.put("addBloomFilterOnNonDictColumn", (IndexLoadingConfig config) -> config.setBloomFilterConfigs(
-        ImmutableMap.of("column4", new BloomFilterConfig(0.1, 1024, true))));
     // No index is added on non-existing columns.
     // The validation logic when updating index configs already blocks this to happen.
     testCases.put("addInvertedIndexOnAbsentColumn", (IndexLoadingConfig config) -> config.setInvertedIndexColumns(
