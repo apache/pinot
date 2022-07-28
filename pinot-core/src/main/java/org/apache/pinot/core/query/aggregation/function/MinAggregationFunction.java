@@ -37,7 +37,7 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
   private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
   private final boolean _nullHandlingEnabled;
 
-  private Set<Integer> _groupKeysWithNonNullValue;
+  private final Set<Integer> _groupKeysWithNonNullValue;
 
   public MinAggregationFunction(ExpressionContext expression) {
     this(expression, false);
@@ -46,6 +46,7 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
   public MinAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     _nullHandlingEnabled = nullHandlingEnabled;
+    _groupKeysWithNonNullValue = new HashSet<>();
   }
 
   @Override
@@ -213,7 +214,6 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
     if (_nullHandlingEnabled) {
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        _groupKeysWithNonNullValue = new HashSet<>();
         if (nullBitmap.getCardinality() < length) {
           for (int i = 0; i < length; i++) {
             double value = valueArray[i];

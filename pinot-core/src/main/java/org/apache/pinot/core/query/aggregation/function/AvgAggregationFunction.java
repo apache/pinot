@@ -39,7 +39,7 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
   private final boolean _nullHandlingEnabled;
 
-  private Set<Integer> _groupKeysWithNonNullValue;
+  private final Set<Integer> _groupKeysWithNonNullValue;
 
   public AvgAggregationFunction(ExpressionContext expression) {
     this(expression, false);
@@ -48,6 +48,7 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   public AvgAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     _nullHandlingEnabled = nullHandlingEnabled;
+    _groupKeysWithNonNullValue = new HashSet<>();
   }
 
   @Override
@@ -163,7 +164,6 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
 
   private void aggregateGroupBySVNullHandlingEnabled(int length, int[] groupKeyArray,
       GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    _groupKeysWithNonNullValue = new HashSet<>();
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
       if (nullBitmap.getCardinality() < length) {

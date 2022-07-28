@@ -37,7 +37,7 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
   private static final double DEFAULT_VALUE = 0.0;
   private final boolean _nullHandlingEnabled;
 
-  private Set<Integer> _groupKeysWithNonNullValue;
+  private final Set<Integer> _groupKeysWithNonNullValue;
 
   public SumAggregationFunction(ExpressionContext expression) {
     this(expression, false);
@@ -46,6 +46,7 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
   public SumAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     _nullHandlingEnabled = nullHandlingEnabled;
+    _groupKeysWithNonNullValue = new HashSet<>();
   }
 
   @Override
@@ -198,7 +199,6 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
     if (_nullHandlingEnabled) {
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        _groupKeysWithNonNullValue = new HashSet<>();
         if (nullBitmap.getCardinality() < length) {
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
@@ -246,8 +246,12 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
   @Override
   public Double extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     if (_nullHandlingEnabled && !_groupKeysWithNonNullValue.contains(groupKey)) {
+      System.out.println("groupKey = " + groupKey);
+      System.out.println("groupByResultHolder.getDoubleResult(groupKey) = null");
       return null;
     }
+    System.out.println("groupKey = " + groupKey);
+    System.out.println("groupByResultHolder.getDoubleResult(groupKey) = " + groupByResultHolder.getDoubleResult(groupKey));
     return groupByResultHolder.getDoubleResult(groupKey);
   }
 
