@@ -90,6 +90,9 @@ public class RequestContextUtils {
       for (Expression operand : operands) {
         arguments.add(getExpression(operand));
       }
+      if (arguments.size() == 0 && functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+        arguments.add(ExpressionContext.forIdentifier("*"));
+      }
       return new FunctionContext(functionType, functionName, arguments);
     } else {
       return new FunctionContext(functionType, functionName, Collections.emptyList());
