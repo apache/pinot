@@ -2652,17 +2652,6 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Return the number of segments for the given table
-   */
-  public int getSegmentsCount(String tableNameWithType) {
-    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
-    if (idealState == null) {
-      throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
-    }
-    return idealState.getPartitionSet().size();
-  }
-
-  /**
    * Utility function to return set of servers corresponding to a given segment.
    */
   public Set<String> getServersForSegment(String tableNameWithType, String segmentName) {

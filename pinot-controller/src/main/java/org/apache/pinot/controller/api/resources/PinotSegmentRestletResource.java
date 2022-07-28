@@ -34,6 +34,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -622,7 +623,7 @@ public class PinotSegmentRestletResource {
       // No need to query servers where this segment is not supposed to be hosted
       singleSegmentName = controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME);
       serverToSegments = new HashMap<>();
-      List<String> segmentList = List.of(singleSegmentName);
+      List<String> segmentList = Arrays.asList(singleSegmentName);
       _pinotHelixResourceManager.getServers(tableNameWithType, singleSegmentName).forEach(server -> {
         serverToSegments.put(server, segmentList);
       });
@@ -654,8 +655,11 @@ public class PinotSegmentRestletResource {
         new ServerReloadControllerJobStatusResponse();
     serverReloadControllerJobStatusResponse.setSuccessCount(0);
 
-    serverReloadControllerJobStatusResponse.setTotalSegmentCount(
-        (singleSegmentName == null) ? _pinotHelixResourceManager.getSegmentsCount(tableNameWithType) : 1);
+    int totalSegments = 0;
+    for (Map.Entry<String, List<String>> entry: serverToSegments.entrySet()) {
+      totalSegments += entry.getValue().size();
+    }
+    serverReloadControllerJobStatusResponse.setTotalSegmentCount(totalSegments);
     serverReloadControllerJobStatusResponse.setTotalServersQueried(serverUrls.size());
     serverReloadControllerJobStatusResponse.setTotalServerCallsFailed(serviceResponse._failedResponseCount);
 

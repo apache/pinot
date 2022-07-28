@@ -439,7 +439,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         } catch (Exception e) {
           throw new RuntimeException(e);
         }
-      }, 600_000L, "Failed to cleanup obsolete index in table");
+      }, 600_000L, "Failed to validate segment reload");
     }
   }
 
