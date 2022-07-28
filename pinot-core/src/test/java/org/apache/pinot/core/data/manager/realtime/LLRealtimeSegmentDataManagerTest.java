@@ -757,9 +757,8 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testShouldNotSkipUnfilteredMessagesIfNotIndexed()
+  public void testShouldNotSkipUnfilteredMessagesIfNotIndexedAndTimeThresholdIsReached()
       throws Exception {
-    // TODO DDC: change assertions wtih the fix
     final int segmentTimeThresholdMins = 10;
     TimeSupplier timeSupplier = new TimeSupplier() {
       @Override
@@ -790,15 +789,58 @@ public class LLRealtimeSegmentDataManagerTest {
 
     consumer.run();
 
-    // Note the segment indexes only 500 records instead of 1000 but increases _currentOffset by
-    // 1000
-    Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
-        START_OFFSET_VALUE + 2 * FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
-    Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
-        FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
-    Assert.assertEquals(segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs(),
-        FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
-    segmentDataManager.destroy();
+    try {
+      // millis() is called first in run before consumption, then once for each batch and once for each message in
+      // the batch, then once more when metrics are updated after each batch is processed and then 4 more times in
+      // run() after consume loop
+      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 8);
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
+          FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      Assert.assertEquals(segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs(),
+          FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    } finally {
+      segmentDataManager.destroy();
+    }
+  }
+
+  @Test
+  public void testShouldNotSkipUnfilteredMessagesIfNotIndexedAndRowCountThresholdIsReached()
+      throws Exception {
+    final int segmentTimeThresholdMins = 10;
+    TimeSupplier timeSupplier = new TimeSupplier();
+    FakeLLRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(true, timeSupplier, String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS),
+            segmentTimeThresholdMins + "m");
+    segmentDataManager._stubConsumeLoop = false;
+    segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+
+    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    final LongMsgOffset endOffset =
+        new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    segmentDataManager._consumeOffsets.add(endOffset);
+    final SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
+        new SegmentCompletionProtocol.Response.Params().withStatus(
+                SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+            .withStreamPartitionMsgOffset(endOffset.toString()));
+    segmentDataManager._responses.add(response);
+
+    consumer.run();
+
+    try {
+      // millis() is called first in run before consumption, then once for each batch and once for each message in
+      // the batch, then once for metrics updates and then 4 more times in run() after consume loop
+      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 6);
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
+          FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      Assert.assertEquals(segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs(),
+          FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    } finally {
+      segmentDataManager.destroy();
+    }
   }
 
   private static class TimeSupplier implements Supplier<Long> {

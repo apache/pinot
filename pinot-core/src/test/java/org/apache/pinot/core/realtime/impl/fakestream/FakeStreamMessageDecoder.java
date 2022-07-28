@@ -36,7 +36,7 @@ public class FakeStreamMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
-    GenericRow row = Fixtures.createSingleRow(((Long) System.currentTimeMillis()).intValue());
+    GenericRow row = Fixtures.createSingleRow(System.currentTimeMillis());
     destination.init(row);
     return destination;
   }
