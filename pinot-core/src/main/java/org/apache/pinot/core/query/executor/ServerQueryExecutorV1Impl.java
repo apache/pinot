@@ -312,8 +312,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       metadata.put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), "0");
       metadata.put(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), "0");
       metadata.put(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), "0");
-      metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), "0");
-      metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName(), "0");
       metadata.put(MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName(), String.valueOf(totalSegments));
       addPrunerStats(metadata, prunerStats);
       return dataTable;
