@@ -251,23 +251,20 @@ public abstract class QueryScheduler {
     // Please keep the format as name=value comma-separated with no spaces
     // Please add new entries at the end
     if (_queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned, numSegmentsPrunedInvalid)) {
-      String queryStatsMessage = "Processed requestId={},table={},"
-          + "segments(queried/processed/matched/consuming/invalid/limit/value)={}/{}/{}/{}/{}/{}/{},"
-          + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},minConsumingFreshnessMs={},"
-          + "broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},"
-          + "threadCpuTimeNs(total/thread/sysActivity/resSer)={}/{}/{}/{}";
-      if (queryHasMVSelectionOrderBy) {
-        queryStatsMessage = queryStatsMessage + ",queryHasMVSelectionOrderBy=true";
-      }
-      LOGGER.info(queryStatsMessage, requestId, tableNameWithType,
-          numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming,
+      LOGGER.info("Processed requestId={},table={},"
+              + "segments(queried/processed/matched/consuming/invalid/limit/value)={}/{}/{}/{}/{}/{}/{},"
+              + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},minConsumingFreshnessMs={},"
+              + "broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},"
+              + "threadCpuTimeNs(total/thread/sysActivity/resSer)={}/{}/{}/{},hasMVSelOrderBy={}", requestId,
+          tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming,
           numSegmentsPrunedInvalid, numSegmentsPrunedByLimit, numSegmentsPrunedByValue, schedulerWaitMs,
           timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
           timerContext.getPhaseDurationMs(ServerQueryPhase.RESPONSE_SERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), minConsumingFreshnessMs,
           queryRequest.getBrokerId(), numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name(),
-          totalCpuTimeNs, threadCpuTimeNs, systemActivitiesCpuTimeNs, responseSerializationCpuTimeNs);
+          totalCpuTimeNs, threadCpuTimeNs, systemActivitiesCpuTimeNs, responseSerializationCpuTimeNs,
+          queryHasMVSelectionOrderBy);
 
       // Limit the dropping log message at most once per second.
       if (_numDroppedLogRateLimiter.tryAcquire()) {
