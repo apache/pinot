@@ -22,8 +22,10 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -51,7 +53,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   private final Integer _scale;
   private final boolean _nullHandlingEnabled;
 
-  private Integer _groupKeyForNullValue = null;
+  private final Set<Integer> _groupKeysWithNonNullValue;
 
   public SumPrecisionAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(arguments.get(0));
@@ -70,6 +72,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
       _scale = null;
     }
     _nullHandlingEnabled = nullHandlingEnabled;
+    _groupKeysWithNonNullValue = new HashSet<>();
   }
 
   @Override
@@ -313,18 +316,13 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         if (nullBitmap.getCardinality() < length) {
           for (int i = 0; i < length; i++) {
             int groupKey = groupKeyArray[i];
-            if (nullBitmap.contains(i)) {
-              // There should be only one groupKey for the null value.
-              assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKey;
-              _groupKeyForNullValue = groupKey;
-            } else {
+            if (!nullBitmap.contains(i)) {
               BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
               sum = sum.add(BigDecimal.valueOf(intValues[i]));
               groupByResultHolder.setValueForKey(groupKey, sum);
+              _groupKeysWithNonNullValue.add(groupKey);
             }
           }
-        } else {
-          _groupKeyForNullValue = groupKeyArray[0];
         }
         break;
       case LONG:
@@ -332,17 +330,13 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         if (nullBitmap.getCardinality() < length) {
           for (int i = 0; i < length; i++) {
             int groupKey = groupKeyArray[i];
-            if (nullBitmap.contains(i)) {
-              assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKey;
-              _groupKeyForNullValue = groupKey;
-            } else {
+            if (!nullBitmap.contains(i)) {
               BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
               sum = sum.add(BigDecimal.valueOf(longValues[i]));
               groupByResultHolder.setValueForKey(groupKey, sum);
+              _groupKeysWithNonNullValue.add(groupKey);
             }
           }
-        } else {
-          _groupKeyForNullValue = groupKeyArray[0];
         }
         break;
       case FLOAT:
@@ -352,17 +346,13 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         if (nullBitmap.getCardinality() < length) {
           for (int i = 0; i < length; i++) {
             int groupKey = groupKeyArray[i];
-            if (nullBitmap.contains(i)) {
-              assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKey;
-              _groupKeyForNullValue = groupKey;
-            } else {
+            if (!nullBitmap.contains(i)) {
               BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
               sum = sum.add(new BigDecimal(stringValues[i]));
               groupByResultHolder.setValueForKey(groupKey, sum);
+              _groupKeysWithNonNullValue.add(groupKey);
             }
           }
-        } else {
-          _groupKeyForNullValue = groupKeyArray[0];
         }
         break;
       case BIG_DECIMAL:
@@ -370,17 +360,13 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         if (nullBitmap.getCardinality() < length) {
           for (int i = 0; i < length; i++) {
             int groupKey = groupKeyArray[i];
-            if (nullBitmap.contains(i)) {
-              assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKey;
-              _groupKeyForNullValue = groupKey;
-            } else {
+            if (!nullBitmap.contains(i)) {
               BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
               sum = sum.add(bigDecimalValues[i]);
               groupByResultHolder.setValueForKey(groupKey, sum);
+              _groupKeysWithNonNullValue.add(groupKey);
             }
           }
-        } else {
-          _groupKeyForNullValue = groupKeyArray[0];
         }
         break;
       case BYTES:
@@ -388,17 +374,13 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         if (nullBitmap.getCardinality() < length) {
           for (int i = 0; i < length; i++) {
             int groupKey = groupKeyArray[i];
-            if (nullBitmap.contains(i)) {
-              assert _groupKeyForNullValue == null || _groupKeyForNullValue == groupKey;
-              _groupKeyForNullValue = groupKey;
-            } else {
+            if (!nullBitmap.contains(i)) {
               BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
               sum = sum.add(BigDecimalUtils.deserialize(bytesValues[i]));
               groupByResultHolder.setValueForKey(groupKey, sum);
+              _groupKeysWithNonNullValue.add(groupKey);
             }
           }
-        } else {
-          _groupKeyForNullValue = groupKeyArray[0];
         }
         break;
       default:
@@ -480,7 +462,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
 
   @Override
   public BigDecimal extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    if (_groupKeyForNullValue != null && _groupKeyForNullValue == groupKey) {
+    if (_nullHandlingEnabled && !_groupKeysWithNonNullValue.contains(groupKey)) {
       return null;
     }
     return getDefaultResult(groupByResultHolder, groupKey);
