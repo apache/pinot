@@ -648,7 +648,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
           zkMetadata.getCrc());
       return true;
     } catch (Exception e) {
-      LOGGER.error("Failed to load existing segment: {} of table: {} with crc: {}", segmentName, _tableNameWithType, e);
+      LOGGER.error("Failed to load existing segment: {} of table: {} with crc: {}", segmentName, _tableNameWithType,
+          zkMetadata.getCrc(), e);
       closeSegmentDirectoryQuietly(segmentDirectory);
       return false;
     }
