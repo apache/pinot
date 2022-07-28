@@ -246,12 +246,8 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
   @Override
   public Double extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     if (_nullHandlingEnabled && !_groupKeysWithNonNullValue.contains(groupKey)) {
-      System.out.println("groupKey = " + groupKey);
-      System.out.println("groupByResultHolder.getDoubleResult(groupKey) = null");
       return null;
     }
-    System.out.println("groupKey = " + groupKey);
-    System.out.println("groupByResultHolder.getDoubleResult(groupKey) = " + groupByResultHolder.getDoubleResult(groupKey));
     return groupByResultHolder.getDoubleResult(groupKey);
   }
 

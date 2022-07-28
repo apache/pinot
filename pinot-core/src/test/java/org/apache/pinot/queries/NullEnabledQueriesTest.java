@@ -66,8 +66,6 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
   private static final int NUM_RECORDS = 1000;
   private static List<GenericRow> _records;
   private static BigDecimal _sumPrecision;
-  private static BigDecimal _sumKey1Precision;
-  private static BigDecimal _sumKey2Precision;
   private static double _sum;
   private static double _sumKey1;
   private static double _sumKey2;
@@ -98,8 +96,6 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
     FileUtils.deleteDirectory(INDEX_DIR);
 
     _sumPrecision = BigDecimal.ZERO;
-    _sumKey1Precision = BigDecimal.ZERO;
-    _sumKey2Precision = BigDecimal.ZERO;
     _sum = 0;
     _sumKey1 = 0;
     _sumKey2 = 0;
@@ -113,11 +109,9 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         _sum += value;
         if (i < NUM_RECORDS / 2) {
           record.putValue(KEY_COLUMN, 1);
-          _sumKey1Precision = _sumKey1Precision.add(BigDecimal.valueOf(value));
           _sumKey1 += value;
         } else {
           record.putValue(KEY_COLUMN, 2);
-          _sumKey2Precision = _sumKey2Precision.add(BigDecimal.valueOf(value));
           _sumKey2 += value;
         }
       } else {
@@ -254,21 +248,17 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
           //(3 rows)
           assertEquals(row[3], 0L);
         } else if ((int) row[keyColumnIdx] == 1) {
-          System.out.println("For Key = 1, row[0] = " + row[0]);
-          System.out.println("For Key = 1, _sumKey1 = " + 4 * _sumKey1);
           assertTrue(Math.abs(((Double) row[0]) - 4 * _sumKey1) < 1e-1);
           assertTrue(Math.abs(((Double) row[1]) - baseValue.doubleValue()) < 1e-1);
           assertTrue(Math.abs(((Double) row[2]) - (baseValue.doubleValue() + Math.ceil(NUM_RECORDS / 2.0) - 2))
               < 1e-1);
-          assertEquals(row[3], (long)(4 * (Math.ceil(NUM_RECORDS / 2.0) / 2)));
+          assertEquals(row[3], (long) (4 * (Math.ceil(NUM_RECORDS / 2.0) / 2)));
         } else {
-          System.out.println("For Key = 1, row[0] = " + row[0]);
-          System.out.println("For Key = 1, _sumKey1 = " + 4 * _sumKey2);
           assertEquals(row[keyColumnIdx], 2);
           assertTrue(Math.abs(((Double) row[0]) - 4 * _sumKey2) < 1e-1);
           assertTrue(Math.abs(((Double) row[1]) - (baseValue.doubleValue() + Math.ceil(NUM_RECORDS / 2.0))) < 1e-1);
           assertTrue(Math.abs(((Double) row[2]) - (baseValue.doubleValue() + NUM_RECORDS - 2)) < 1e-1);
-          assertEquals(row[3], (long)(4 * (Math.ceil(NUM_RECORDS / 2.0) / 2)));
+          assertEquals(row[3], (long) (4 * (Math.ceil(NUM_RECORDS / 2.0) / 2)));
         }
       }
     }
@@ -656,11 +646,6 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         }
         Object[] row = rows.get(index);
         assertEquals(row.length, 2);
-        if (!(Math.abs((Double) row[0] - (baseValue.doubleValue() + i)) < 1e-1)) {
-          System.out.println("Last test row[0] = " + row[0]);
-          System.out.println("Last test val = " + (baseValue.doubleValue() + i));
-        }
-
         assertTrue(Math.abs((Double) row[0] - (baseValue.doubleValue() + i)) < 1e-1);
         assertTrue(Math.abs(((Number) row[1]).doubleValue() - (baseValue.doubleValue() + i)) < 1e-1);
         i++;
