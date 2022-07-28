@@ -33,7 +33,7 @@ public class SegmentAssignmentFactory {
 
   public static SegmentAssignment getSegmentAssignment(HelixManager helixManager, TableConfig tableConfig) {
     SegmentAssignment segmentAssignment;
-    boolean isTableInGroup = TableConfigUtils.isTableInGroup(tableConfig);
+    boolean isTableInGroup = TableConfigUtils.doesTableHaveServerAssignment(tableConfig);
     if (tableConfig.getTableType() == TableType.OFFLINE) {
       if (isTableInGroup) {
         segmentAssignment = new ColocatedOfflineSegmentAssignment();

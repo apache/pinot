@@ -211,9 +211,9 @@ public class PinotInstanceAssignmentRestletResource {
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, TableConfig tableConfig,
       List<InstanceConfig> instanceConfigs, InstancePartitionsType instancePartitionsType) {
     String tableNameWithType = tableConfig.getTableName();
-    if (TableConfigUtils.isTableInGroup(tableConfig)) {
-      instancePartitionsMap.put(instancePartitionsType, InstancePartitionsUtils.fetchGroupInstancePartitions(
-          _resourceManager.getPropertyStore(), tableConfig.getTableGroupName(), instancePartitionsType));
+    if (TableConfigUtils.doesTableHaveServerAssignment(tableConfig, instancePartitionsType)) {
+      instancePartitionsMap.put(instancePartitionsType, InstancePartitionsUtils.fetchInstancePartitions(
+          _resourceManager.getPropertyStore(), tableConfig.getServerAssignment().get(instancePartitionsType)));
       return;
     }
     InstancePartitions existingInstancePartitions =

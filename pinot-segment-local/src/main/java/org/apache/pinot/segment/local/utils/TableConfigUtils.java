@@ -44,12 +44,10 @@ import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
-import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
-import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -57,8 +55,6 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
-import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
-import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -566,22 +562,6 @@ public final class TableConfigUtils {
 
   @VisibleForTesting
   static void validateTableGroupConfig(TableConfig tableConfig) {
-    if (StringUtils.isBlank(tableConfig.getTableGroupName())) {
-      return;
-    }
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    Preconditions.checkState(indexingConfig != null, "Provide partitioning columns via segmentPartitionConfig in "
-        + "indexingConfig");
-    SegmentPartitionConfig segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
-    Preconditions.checkState(segmentPartitionConfig != null, "Provide partitioning columns via column partition map "
-        + "in segmentPartitionConfig");
-    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = segmentPartitionConfig.getColumnPartitionMap();
-    Preconditions.checkState(columnPartitionConfigMap != null && columnPartitionConfigMap.size() > 0,
-        "Must provide at least 1 partitioning column. Set columnPartitionMap.");
-    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig
-        .getInstanceAssignmentConfigMap();
-    Preconditions.checkState(instanceAssignmentConfigMap == null || instanceAssignmentConfigMap.isEmpty(),
-        "Cannot set instance assignment config when table-group is enabled");
   }
 
   /**

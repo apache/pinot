@@ -1690,15 +1690,23 @@ public class PinotHelixResourceManager {
       }
     }
 
-    boolean isTableInGroup = TableConfigUtils.isTableInGroup(tableConfig);
     if (!instancePartitionsTypesToAssign.isEmpty()) {
       LOGGER.info("Assigning {} instances to table: {}", instancePartitionsTypesToAssign, tableNameWithType);
       InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
       List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
       for (InstancePartitionsType instancePartitionsType : instancePartitionsTypesToAssign) {
+        boolean tableHasServerAssignment = TableConfigUtils.doesTableHaveServerAssignment(tableConfig,
+            instancePartitionsType);
         InstancePartitions instancePartitions;
-        if (!isTableInGroup) {
+        if (!tableHasServerAssignment) {
           instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType, instanceConfigs, null);
+          LOGGER.info("Persisting instance partitions: {}", instancePartitions);
+          InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
+        } else {
+          instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
+              tableConfig.getServerAssignment().get(instancePartitionsType));
+          instancePartitions =
+              instancePartitions.withName(instancePartitionsType.getInstancePartitionsName(rawTableName));
           LOGGER.info("Persisting instance partitions: {}", instancePartitions);
           InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
         }

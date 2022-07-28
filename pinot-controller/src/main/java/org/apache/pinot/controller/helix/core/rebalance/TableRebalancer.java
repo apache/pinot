@@ -64,6 +64,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -417,12 +418,16 @@ public class TableRebalancer {
   private InstancePartitions getInstancePartitions(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType, boolean reassignInstances, boolean dryRun) {
     String tableNameWithType = tableConfig.getTableName();
-    boolean isTableInGroup = TableConfigUtils.isTableInGroup(tableConfig);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    boolean tableHasServerAssignment = TableConfigUtils.doesTableHaveServerAssignment(tableConfig,
+        instancePartitionsType);
     if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
-      if (isTableInGroup) {
-        InstancePartitions groupInstancePartitions = InstancePartitionsUtils.fetchGroupInstancePartitions(
-            _helixManager.getHelixPropertyStore(), tableConfig.getTableGroupName(), instancePartitionsType);
-        return groupInstancePartitions;
+      if (tableHasServerAssignment) {
+        InstancePartitions groupInstancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
+            _helixManager.getHelixPropertyStore(), tableConfig.getServerAssignment().get(instancePartitionsType));
+        Preconditions.checkState(groupInstancePartitions != null, "Server assignment config may be incorrect. "
+            + "Couldn't find instance partitions for the given name");
+        return groupInstancePartitions.withName(instancePartitionsType.getInstancePartitionsName(rawTableName));
       } else if (reassignInstances) {
         InstancePartitions existingInstancePartitions =
             InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),

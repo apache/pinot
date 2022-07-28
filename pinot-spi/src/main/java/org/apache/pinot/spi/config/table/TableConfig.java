@@ -53,7 +53,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String INGESTION_CONFIG_KEY = "ingestionConfig";
   public static final String TIER_CONFIGS_LIST_KEY = "tierConfigs";
   public static final String TUNER_CONFIG_LIST_KEY = "tunerConfigs";
-  public static final String TABLE_GROUP_CONFIG_KEY = "tableGroup";
+  public static final String SERVER_ASSIGNMENT_CONFIG_KEY = "serverAssignment";
 
   // Double underscore is reserved for real-time segment name delimiter
   private static final String TABLE_NAME_FORBIDDEN_SUBSTRING = "__";
@@ -102,8 +102,8 @@ public class TableConfig extends BaseJsonConfig {
   @JsonPropertyDescription(value = "Configs for Table config tuner")
   private List<TunerConfig> _tunerConfigList;
 
-  @JsonPropertyDescription(value = "Name of the table-group")
-  private String _tableGroupName;
+  @JsonPropertyDescription(value = "Point to an existing instance partitions")
+  private Map<InstancePartitionsType, String> _serverAssignment;
 
   @JsonCreator
   public TableConfig(@JsonProperty(value = TABLE_NAME_KEY, required = true) String tableName,
@@ -126,7 +126,7 @@ public class TableConfig extends BaseJsonConfig {
       @JsonProperty(TIER_CONFIGS_LIST_KEY) @Nullable List<TierConfig> tierConfigsList,
       @JsonProperty(IS_DIM_TABLE_KEY) boolean dimTable,
       @JsonProperty(TUNER_CONFIG_LIST_KEY) @Nullable List<TunerConfig> tunerConfigList,
-      @JsonProperty(TABLE_GROUP_CONFIG_KEY) @Nullable String tableGroupName) {
+      @JsonProperty(SERVER_ASSIGNMENT_CONFIG_KEY) @Nullable Map<InstancePartitionsType, String> serverAssignment) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
     Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
         "'tableName' cannot contain double underscore ('__')");
@@ -155,7 +155,7 @@ public class TableConfig extends BaseJsonConfig {
     _tierConfigsList = tierConfigsList;
     _dimTable = dimTable;
     _tunerConfigList = tunerConfigList;
-    _tableGroupName = tableGroupName;
+    _serverAssignment = serverAssignment;
   }
 
   @JsonProperty(TABLE_NAME_KEY)
@@ -328,12 +328,12 @@ public class TableConfig extends BaseJsonConfig {
     _tunerConfigList = tunerConfigList;
   }
 
-  @JsonProperty(TABLE_GROUP_CONFIG_KEY)
-  public String getTableGroupName() {
-    return _tableGroupName;
+  @JsonProperty(SERVER_ASSIGNMENT_CONFIG_KEY)
+  public Map<InstancePartitionsType, String> getServerAssignment() {
+    return _serverAssignment;
   }
 
-  public void setTableGroupName(String tableGroupName) {
-    _tableGroupName = tableGroupName;
+  public void setServerAssignment(Map<InstancePartitionsType, String> serverAssignment) {
+    _serverAssignment = serverAssignment;
   }
 }

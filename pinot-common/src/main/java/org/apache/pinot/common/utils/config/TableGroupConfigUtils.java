@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.config;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.HashMap;
@@ -26,6 +27,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.spi.config.table.TableGroupConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -38,23 +40,28 @@ public class TableGroupConfigUtils {
     Preconditions.checkArgument(tableGroupConfig != null, "Table group config cannot be null");
     Preconditions.checkArgument(StringUtils.isNotBlank(tableGroupConfig.getGroupName()), "Table group name cannot be "
         + "blank");
-    Preconditions.checkArgument(tableGroupConfig.getInstanceAssignmentConfig() != null, "Instance assignment config "
-        + "cannot be null for a table-group");
+    Preconditions.checkArgument(tableGroupConfig.getInstanceAssignmentConfigMap() != null,
+        "Instance assignment config map cannot be null for a table-group");
+    Preconditions.checkArgument(tableGroupConfig.getInstanceAssignmentConfigMap().size() > 0,
+        "Instance assignment config map cannot be empty");
     String groupName = tableGroupConfig.getGroupName();
     ZNRecord znRecord = new ZNRecord(groupName);
     Map<String, String> mapFields = new HashMap<>();
     mapFields.put(TableGroupConfig.ASSIGNMENT_CONFIG_KEY,
-        JsonUtils.objectToString(tableGroupConfig.getInstanceAssignmentConfig()));
+        JsonUtils.objectToString(tableGroupConfig.getInstanceAssignmentConfigMap()));
     znRecord.setMapField("config", mapFields);
+    znRecord.setBooleanField(TableGroupConfig.IN_SYNC_CONFIG_KEY, tableGroupConfig.getKeepInstancePartitionsInSync());
     return znRecord;
   }
 
   public static TableGroupConfig fromZNRecord(ZNRecord znRecord)
       throws IOException {
     String groupName = znRecord.getId();
+    boolean keepInSync = znRecord.getBooleanField(TableGroupConfig.IN_SYNC_CONFIG_KEY, true);
     Map<String, String> configMap = znRecord.getMapFields().get("config");
-    InstanceAssignmentConfig instanceAssignmentConfig = JsonUtils.stringToObject(configMap.get(
-        TableGroupConfig.ASSIGNMENT_CONFIG_KEY), InstanceAssignmentConfig.class);
-    return new TableGroupConfig(groupName, instanceAssignmentConfig);
+    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
+        JsonUtils.stringToObject(configMap.get(TableGroupConfig.ASSIGNMENT_CONFIG_KEY),
+            new TypeReference<Map<InstancePartitionsType, InstanceAssignmentConfig>>() { });
+    return new TableGroupConfig(groupName, keepInSync, instanceAssignmentConfigMap);
   }
 }

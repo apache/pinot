@@ -19,20 +19,12 @@
 package org.apache.pinot.common.assignment;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.Map;
-import org.apache.commons.lang.StringUtils;
-import org.apache.helix.AccessOption;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
-import org.apache.pinot.common.utils.config.TableGroupConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableGroupConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -68,7 +60,7 @@ public class InstanceAssignmentConfigUtils {
    */
   public static boolean allowInstanceAssignment(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
-    if (TableConfigUtils.isTableInGroup(tableConfig)) {
+    if (TableConfigUtils.doesTableHaveServerAssignment(tableConfig, instancePartitionsType)) {
       return allowInstanceAssignmentForGroup(tableConfig, instancePartitionsType);
     }
     TableType tableType = tableConfig.getTableType();
@@ -140,37 +132,6 @@ public class InstanceAssignmentConfigUtils {
   }
 
   /**
-   * Retrieves instance assignment config for the given group. A group should always have
-   * an instance assignment config, and hence this method will throw an exception if it
-   * can't find it in Zookeeper.
-   */
-  public static InstanceAssignmentConfig getGroupInstanceAssignmentConfig(
-      ZkHelixPropertyStore<ZNRecord> propertyStore, String groupName) throws IOException {
-    Preconditions.checkArgument(StringUtils.isNotBlank(groupName));
-    String path = ZKMetadataProvider.constructPropertyStorePathForTableGroup(groupName);
-    if (!propertyStore.exists(path, AccessOption.PERSISTENT)) {
-      throw new RuntimeException(String.format("Path=%s does not exist in ZK (for group=%s)", path, groupName));
-    }
-    ZNRecord znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
-    TableGroupConfig tableGroupConfig = TableGroupConfigUtils.fromZNRecord(znRecord);
-    return tableGroupConfig.getInstanceAssignmentConfig();
-  }
-
-  public static void setGroupInstanceAssignmentConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String groupName, InstanceAssignmentConfig instanceAssignmentConfig) throws IOException {
-    Preconditions.checkArgument(StringUtils.isNotBlank(groupName));
-    String path = ZKMetadataProvider.constructPropertyStorePathForTableGroup(groupName);
-    ZNRecord znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
-    if (znRecord == null) {
-      throw new RuntimeException(String.format("Group=%s does not exist", groupName));
-    }
-    TableGroupConfig tableGroupConfig = TableGroupConfigUtils.fromZNRecord(znRecord);
-    tableGroupConfig.setInstanceAssignmentConfig(instanceAssignmentConfig);
-    ZNRecord newZnRecord = TableGroupConfigUtils.toZNRecord(tableGroupConfig);
-    propertyStore.set(path, newZnRecord, AccessOption.PERSISTENT);
-  }
-
-  /**
    * For a table in a table-group, allow instance assignment for OFFLINE instance-partitions for offline tables
    * and CONSUMING instance-partitions for realtime tables. This will return false for COMPLETED
    * instance-partitions since we don't want/need separate COMPLETED instance partitions. In case COMPLETED
@@ -178,7 +139,6 @@ public class InstanceAssignmentConfigUtils {
    */
   private static boolean allowInstanceAssignmentForGroup(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
-    Preconditions.checkState(StringUtils.isNotBlank(tableConfig.getTableGroupName()));
     TableType tableType = tableConfig.getTableType();
     return (tableType == TableType.OFFLINE && instancePartitionsType == InstancePartitionsType.OFFLINE)
         || (tableType == TableType.REALTIME && instancePartitionsType == InstancePartitionsType.CONSUMING);

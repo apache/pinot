@@ -115,7 +115,7 @@ public class TableConfigBuilder {
   private IngestionConfig _ingestionConfig;
   private List<TierConfig> _tierConfigList;
   private List<TunerConfig> _tunerConfigList;
-  private String _tableGroupName;
+  private Map<InstancePartitionsType, String> _segmentAssignment;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -375,8 +375,8 @@ public class TableConfigBuilder {
     return this;
   }
 
-  public TableConfigBuilder setTableGroupName(String groupName) {
-    _tableGroupName = groupName;
+  public TableConfigBuilder setSegmentAssignment(Map<InstancePartitionsType, String> segmentAssignment) {
+    _segmentAssignment = segmentAssignment;
     return this;
   }
 
@@ -432,6 +432,6 @@ public class TableConfigBuilder {
     return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
         _fieldConfigList, _upsertConfig, _dedupConfig, _ingestionConfig, _tierConfigList, _isDimTable,
-        _tunerConfigList, _tableGroupName);
+        _tunerConfigList, _segmentAssignment);
   }
 }

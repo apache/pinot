@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.common.utils.config;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Map;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.spi.config.table.TableGroupConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.testng.Assert;
@@ -46,7 +49,10 @@ public class TableGroupConfigUtilsTest {
   @Test
   public void testConsistentZNRecordConversion()
       throws IOException {
-    TableGroupConfig tableGroupConfig = new TableGroupConfig("test-group", ASSIGNMENT_CONFIG);
+    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap = ImmutableMap.of(
+        InstancePartitionsType.OFFLINE, ASSIGNMENT_CONFIG,
+        InstancePartitionsType.CONSUMING, ASSIGNMENT_CONFIG);
+    TableGroupConfig tableGroupConfig = new TableGroupConfig("test-group", true, instanceAssignmentConfigMap);
     ZNRecord znRecord = TableGroupConfigUtils.toZNRecord(tableGroupConfig);
     TableGroupConfig tableGroupConfigAfterConversion = TableGroupConfigUtils.fromZNRecord(znRecord);
     Assert.assertEquals(tableGroupConfigAfterConversion, tableGroupConfig);

@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.StringUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -77,8 +76,6 @@ public class TableConfigUtils {
     String tenantConfigString = simpleFields.get(TableConfig.TENANT_CONFIG_KEY);
     Preconditions.checkState(tenantConfigString != null, FIELD_MISSING_MESSAGE_TEMPLATE, TableConfig.TENANT_CONFIG_KEY);
     TenantConfig tenantConfig = JsonUtils.stringToObject(tenantConfigString, TenantConfig.class);
-
-    String tableGroupName = simpleFields.get(TableConfig.TABLE_GROUP_CONFIG_KEY);
 
     String indexingConfigString = simpleFields.get(TableConfig.INDEXING_CONFIG_KEY);
     Preconditions
@@ -161,9 +158,16 @@ public class TableConfigUtils {
       });
     }
 
+    Map<InstancePartitionsType, String> serverAssignment = null;
+    String serverAssignmentString = simpleFields.get(TableConfig.SERVER_ASSIGNMENT_CONFIG_KEY);
+    if (serverAssignmentString != null) {
+      serverAssignment = JsonUtils.stringToObject(serverAssignmentString,
+          new TypeReference<Map<InstancePartitionsType, String>>() { });
+    }
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
-        dedupConfig, ingestionConfig, tierConfigList, isDimTable, tunerConfigList, tableGroupName);
+        dedupConfig, ingestionConfig, tierConfigList, isDimTable, tunerConfigList, serverAssignment);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -226,8 +230,9 @@ public class TableConfigUtils {
     if (tunerConfigList != null) {
       simpleFields.put(TableConfig.TUNER_CONFIG_LIST_KEY, JsonUtils.objectToString(tunerConfigList));
     }
-    if (tableConfig.getTableGroupName() != null) {
-      simpleFields.put(TableConfig.TABLE_GROUP_CONFIG_KEY, tableConfig.getTableGroupName());
+    if (tableConfig.getServerAssignment() != null) {
+      simpleFields.put(TableConfig.SERVER_ASSIGNMENT_CONFIG_KEY,
+          JsonUtils.objectToString(tableConfig.getServerAssignment()));
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());
@@ -301,7 +306,13 @@ public class TableConfigUtils {
     validationConfig.setSegmentPushType(null);
   }
 
-  public static boolean isTableInGroup(TableConfig tableConfig) {
-    return StringUtils.isNotBlank(tableConfig.getTableGroupName());
+  public static boolean doesTableHaveServerAssignment(TableConfig tableConfig) {
+    return tableConfig.getServerAssignment() != null && tableConfig.getServerAssignment().size() > 0;
+  }
+
+  public static boolean doesTableHaveServerAssignment(TableConfig tableConfig,
+      InstancePartitionsType instancePartitionsType) {
+    return doesTableHaveServerAssignment(tableConfig)
+        && tableConfig.getServerAssignment().containsKey(instancePartitionsType);
   }
 }
