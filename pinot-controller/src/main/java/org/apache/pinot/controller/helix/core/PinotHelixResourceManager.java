@@ -414,10 +414,8 @@ public class PinotHelixResourceManager {
   }
 
   public List<InstanceConfig> getAllControllerInstanceConfigs() {
-    return HelixHelper.getInstanceConfigs(_helixZkManager)
-        .stream()
-        .filter(instance -> InstanceTypeUtils.isController(instance.getId()))
-        .collect(Collectors.toList());
+    return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
+        .filter(instance -> InstanceTypeUtils.isController(instance.getId())).collect(Collectors.toList());
   }
 
   /**
@@ -2504,13 +2502,12 @@ public class PinotHelixResourceManager {
     if (idealState == null) {
       throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
     }
-
-    for (String segment : idealState.getPartitionSet()) {
-      for (String server : idealState.getInstanceStateMap(segment).keySet()) {
-        serverToSegmentsMap.computeIfAbsent(server, key -> new ArrayList<>()).add(segment);
+    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+      String segmentName = entry.getKey();
+      for (String server : entry.getValue().keySet()) {
+        serverToSegmentsMap.computeIfAbsent(server, key -> new ArrayList<>()).add(segmentName);
       }
     }
-
     return serverToSegmentsMap;
   }
 
@@ -2522,11 +2519,10 @@ public class PinotHelixResourceManager {
     if (idealState == null) {
       throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
     }
-
-    return idealState.getPartitionSet().stream()
-        .filter(segmentName::equals)
-        .flatMap(s -> idealState.getInstanceStateMap(s).keySet().stream())
-        .collect(Collectors.toSet());
+    Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
+    Preconditions.checkState(instanceStateMap != null, "Segment: {} does not exist in the ideal state of table: {}",
+        segmentName, tableNameWithType);
+    return instanceStateMap.keySet();
   }
 
   /**
@@ -3030,7 +3026,7 @@ public class PinotHelixResourceManager {
 
     if (tableNamesWithType.isEmpty()) {
       throw new TableNotFoundException(
-          "Table '" + tableName + (tableType != null ? "_" + tableType.toString() : "") + "' not found.");
+          "Table '" + tableName + (tableType != null ? "_" + tableType : "") + "' not found.");
     }
 
     return tableNamesWithType;
@@ -3217,8 +3213,9 @@ public class PinotHelixResourceManager {
         Thread.sleep(SEGMENT_CLEANUP_CHECK_INTERVAL_MS);
       }
     } while (System.currentTimeMillis() < endTimeMs);
-    throw new RuntimeException("Timeout while waiting for segments to be deleted for table: " + tableNameWithType
-        + ", timeout: " + timeOutInMillis + "ms");
+    throw new RuntimeException(
+        "Timeout while waiting for segments to be deleted for table: " + tableNameWithType + ", timeout: "
+            + timeOutInMillis + "ms");
   }
 
   /**
@@ -3318,7 +3315,7 @@ public class PinotHelixResourceManager {
    * @param tableNameWithType
    */
   public SegmentLineage listSegmentLineage(String tableNameWithType) {
-      return SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
+    return SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
   }
 
   /**
@@ -3620,8 +3617,7 @@ public class PinotHelixResourceManager {
       Map<String, String> taskProperties) {
     String periodicTaskRequestId = API_REQUEST_ID_PREFIX + UUID.randomUUID().toString().substring(0, 8);
 
-    LOGGER.info(
-        "[TaskRequestId: {}] Sending periodic task message to all controllers for running task {} against {},"
+    LOGGER.info("[TaskRequestId: {}] Sending periodic task message to all controllers for running task {} against {},"
             + " with properties {}.\"", periodicTaskRequestId, periodicTaskName,
         tableName != null ? " table '" + tableName + "'" : "all tables", taskProperties);
 
