@@ -598,6 +598,6 @@ public class StringFunctions {
   @ScalarFunction
   public static String fromBase64(String input) {
     byte[] inputBytes = Base64.getDecoder().decode(input);
-    return new String(inputBytes);
+    return new String(inputBytes, StandardCharsets.UTF_8);
   }
 }
