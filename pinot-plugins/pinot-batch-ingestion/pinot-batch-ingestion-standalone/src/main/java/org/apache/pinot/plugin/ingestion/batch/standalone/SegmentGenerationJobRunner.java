@@ -304,8 +304,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         } else {
           _outputDirFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
         }
-      } catch (Exception e) {
-        String msg = "Failed to generate Pinot segment for file - " + inputFileURI.toString();
+      } catch (Throwable e) {
+        String msg = "Failed to generate Pinot segment for file - " + inputFileURI;
         _failure.compareAndSet(null, new RuntimeException(msg, e));
 
         // We have to decrement the latch by the number of pending tasks.
