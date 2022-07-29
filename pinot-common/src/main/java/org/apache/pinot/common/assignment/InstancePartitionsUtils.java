@@ -71,9 +71,9 @@ public class InstancePartitionsUtils {
     String tableNameWithType = tableConfig.getTableName();
 
     // If table is in a group, use pre-computed instance partitions
-    if (TableConfigUtils.doesTableHaveServerAssignment(tableConfig, instancePartitionsType)) {
+    if (TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
       return fetchInstancePartitions(helixManager.getHelixPropertyStore(),
-          tableConfig.getServerAssignment().get(instancePartitionsType));
+          tableConfig.getInstancePartitionsMap().get(instancePartitionsType));
     }
 
     // Fetch the instance partitions from property store if it exists

@@ -159,7 +159,7 @@ public class TableConfigUtils {
     }
 
     Map<InstancePartitionsType, String> serverAssignment = null;
-    String serverAssignmentString = simpleFields.get(TableConfig.SERVER_ASSIGNMENT_CONFIG_KEY);
+    String serverAssignmentString = simpleFields.get(TableConfig.INSTANCE_PARTITIONS_MAP_CONFIG_KEY);
     if (serverAssignmentString != null) {
       serverAssignment = JsonUtils.stringToObject(serverAssignmentString,
           new TypeReference<Map<InstancePartitionsType, String>>() { });
@@ -230,9 +230,9 @@ public class TableConfigUtils {
     if (tunerConfigList != null) {
       simpleFields.put(TableConfig.TUNER_CONFIG_LIST_KEY, JsonUtils.objectToString(tunerConfigList));
     }
-    if (tableConfig.getServerAssignment() != null) {
-      simpleFields.put(TableConfig.SERVER_ASSIGNMENT_CONFIG_KEY,
-          JsonUtils.objectToString(tableConfig.getServerAssignment()));
+    if (tableConfig.getInstancePartitionsMap() != null) {
+      simpleFields.put(TableConfig.INSTANCE_PARTITIONS_MAP_CONFIG_KEY,
+          JsonUtils.objectToString(tableConfig.getInstancePartitionsMap()));
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());
@@ -306,13 +306,13 @@ public class TableConfigUtils {
     validationConfig.setSegmentPushType(null);
   }
 
-  public static boolean doesTableHaveServerAssignment(TableConfig tableConfig) {
-    return tableConfig.getServerAssignment() != null && tableConfig.getServerAssignment().size() > 0;
+  public static boolean hasPreConfiguredInstancePartitions(TableConfig tableConfig) {
+    return tableConfig.getInstancePartitionsMap() != null && tableConfig.getInstancePartitionsMap().size() > 0;
   }
 
-  public static boolean doesTableHaveServerAssignment(TableConfig tableConfig,
+  public static boolean hasPreConfiguredInstancePartitions(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
-    return doesTableHaveServerAssignment(tableConfig)
-        && tableConfig.getServerAssignment().containsKey(instancePartitionsType);
+    return hasPreConfiguredInstancePartitions(tableConfig)
+        && tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType);
   }
 }

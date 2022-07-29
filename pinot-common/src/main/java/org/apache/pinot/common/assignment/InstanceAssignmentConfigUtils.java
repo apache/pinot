@@ -60,7 +60,7 @@ public class InstanceAssignmentConfigUtils {
    */
   public static boolean allowInstanceAssignment(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
-    if (TableConfigUtils.doesTableHaveServerAssignment(tableConfig, instancePartitionsType)) {
+    if (TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
       return allowInstanceAssignmentForGroup(tableConfig, instancePartitionsType);
     }
     TableType tableType = tableConfig.getTableType();

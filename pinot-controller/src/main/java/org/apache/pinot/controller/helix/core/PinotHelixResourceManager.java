@@ -1695,7 +1695,7 @@ public class PinotHelixResourceManager {
       InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
       List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
       for (InstancePartitionsType instancePartitionsType : instancePartitionsTypesToAssign) {
-        boolean tableHasServerAssignment = TableConfigUtils.doesTableHaveServerAssignment(tableConfig,
+        boolean tableHasServerAssignment = TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig,
             instancePartitionsType);
         InstancePartitions instancePartitions;
         if (!tableHasServerAssignment) {
@@ -1704,7 +1704,7 @@ public class PinotHelixResourceManager {
           InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
         } else {
           instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
-              tableConfig.getServerAssignment().get(instancePartitionsType));
+              tableConfig.getInstancePartitionsMap().get(instancePartitionsType));
           instancePartitions =
               instancePartitions.withName(instancePartitionsType.getInstancePartitionsName(rawTableName));
           LOGGER.info("Persisting instance partitions: {}", instancePartitions);
