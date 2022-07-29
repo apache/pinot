@@ -427,7 +427,13 @@ public class TableRebalancer {
             _helixManager.getHelixPropertyStore(), tableConfig.getServerAssignment().get(instancePartitionsType));
         Preconditions.checkState(groupInstancePartitions != null, "Server assignment config may be incorrect. "
             + "Couldn't find instance partitions for the given name");
-        return groupInstancePartitions.withName(instancePartitionsType.getInstancePartitionsName(rawTableName));
+        InstancePartitions instancePartitions = groupInstancePartitions.withName(
+            instancePartitionsType.getInstancePartitionsName(rawTableName));
+        if (!dryRun) {
+          LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
+          InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);
+        }
+        return instancePartitions;
       } else if (reassignInstances) {
         InstancePartitions existingInstancePartitions =
             InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),

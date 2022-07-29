@@ -22,10 +22,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
-import java.util.Map;
 import java.util.Objects;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
-import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 
 
 /**
@@ -36,46 +34,33 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
  */
 public class TableGroupConfig {
   private static final String GROUP_NAME_CONFIG_KEY = "groupName";
-  public static final String IN_SYNC_CONFIG_KEY = "keepInstancePartitionsInSync";
-  public static final String ASSIGNMENT_CONFIG_KEY = "instanceAssignmentConfigMap";
+  public static final String ASSIGNMENT_CONFIG_KEY = "instanceAssignmentConfig";
 
   @JsonPropertyDescription("Name of the table-group")
   private final String _groupName;
 
-  @JsonPropertyDescription("If set to true, will ensure instance partitions are same for all instance-partitions type")
-  private final boolean _keepInstancePartitionsInSync;
-
   @JsonPropertyDescription("Instance assignment config for the table-group")
-  private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
+  private InstanceAssignmentConfig _instanceAssignmentConfig;
 
   @JsonCreator
   public TableGroupConfig(
       @JsonProperty(value = GROUP_NAME_CONFIG_KEY, required = true) String groupName,
-      @JsonProperty(value = IN_SYNC_CONFIG_KEY, required = true) boolean keepInstancePartitionsInSync,
-      @JsonProperty(value = ASSIGNMENT_CONFIG_KEY, required = true) Map<InstancePartitionsType,
-      InstanceAssignmentConfig> instanceAssignmentConfigMap) {
-    Preconditions.checkArgument(_instanceAssignmentConfigMap.size() > 0, "instance assignment config map should "
-        + "contain config for at-least 1 instance-partitions type (OFFLINE/CONSUMING/COMPLETED)");
+      @JsonProperty(value = ASSIGNMENT_CONFIG_KEY, required = true) InstanceAssignmentConfig instanceAssignmentConfig) {
+    Preconditions.checkArgument(instanceAssignmentConfig != null, "instanceAssignmentConfig should not be null");
     _groupName = groupName;
-    _keepInstancePartitionsInSync = keepInstancePartitionsInSync;
-    _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
+    _instanceAssignmentConfig = instanceAssignmentConfig;
   }
 
-  public Map<InstancePartitionsType, InstanceAssignmentConfig> getInstanceAssignmentConfigMap() {
-    return _instanceAssignmentConfigMap;
-  }
-
-  public boolean getKeepInstancePartitionsInSync() {
-    return _keepInstancePartitionsInSync;
+  public InstanceAssignmentConfig getInstanceAssignmentConfig() {
+    return _instanceAssignmentConfig;
   }
 
   public String getGroupName() {
     return _groupName;
   }
 
-  public void setInstanceAssignmentConfigMap(
-      Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
-    _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
+  public void setInstanceAssignmentConfig(InstanceAssignmentConfig instanceAssignmentConfig) {
+    _instanceAssignmentConfig = instanceAssignmentConfig;
   }
 
   @Override
@@ -87,12 +72,11 @@ public class TableGroupConfig {
       return false;
     }
     TableGroupConfig that = (TableGroupConfig) o;
-    return _keepInstancePartitionsInSync == that._keepInstancePartitionsInSync && _groupName.equals(that._groupName)
-        && _instanceAssignmentConfigMap.equals(that._instanceAssignmentConfigMap);
+    return _groupName.equals(that._groupName) && _instanceAssignmentConfig.equals(that._instanceAssignmentConfig);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_groupName, _keepInstancePartitionsInSync, _instanceAssignmentConfigMap);
+    return Objects.hash(_groupName, _instanceAssignmentConfig);
   }
 }

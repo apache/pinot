@@ -110,17 +110,6 @@ public class InstancePartitionsUtils {
     return InstancePartitions.fromZNRecord(znRecord);
   }
 
-  public static InstancePartitions fetchGroupInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
-      String groupName, InstancePartitionsType instancePartitionsType) {
-    String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
-        instancePartitionsType.getInstancePartitionsName(groupName));
-    ZNRecord znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
-    if (znRecord == null) {
-      throw new RuntimeException("No instance partitions for group found");
-    }
-    return InstancePartitions.fromZNRecord(znRecord);
-  }
-
   /**
    * Computes the default instance partitions. Sort all qualified instances and rotate the list based on the table name
    * to prevent creating hotspot servers.
@@ -189,15 +178,11 @@ public class InstancePartitionsUtils {
   public static void persistGroupInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
       String groupName, InstancePartitions instancePartitions) {
     Preconditions.checkState(instancePartitions.getInstancePartitionsName().contains("_GROUP"));
-    InstancePartitions offlineInstancePartitions =
-        instancePartitions.withName(InstancePartitionsType.OFFLINE.getInstancePartitionsName(groupName));
-    InstancePartitions consumingInstancePartitions =
-        instancePartitions.withName(InstancePartitionsType.CONSUMING.getInstancePartitionsName(groupName));
-    InstancePartitions completedInstancePartitions =
-        instancePartitions.withName(InstancePartitionsType.COMPLETED.getInstancePartitionsName(groupName));
-    persistInstancePartitions(propertyStore, offlineInstancePartitions);
-    persistInstancePartitions(propertyStore, consumingInstancePartitions);
-    persistInstancePartitions(propertyStore, completedInstancePartitions);
+    String path = ZKMetadataProvider
+        .constructPropertyStorePathForInstancePartitions(getGroupInstancePartitionsName(groupName));
+    if (!propertyStore.set(path, instancePartitions.toZNRecord(), AccessOption.PERSISTENT)) {
+      throw new ZkException("Failed to persist instance partitions: " + instancePartitions);
+    }
   }
 
   /**
