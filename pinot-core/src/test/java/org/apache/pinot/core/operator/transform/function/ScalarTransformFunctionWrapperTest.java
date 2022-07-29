@@ -32,6 +32,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.function.scalar.StringFunctions.binaryToBase64;
 import static org.apache.pinot.common.function.scalar.StringFunctions.fromBase64;
 import static org.apache.pinot.common.function.scalar.StringFunctions.toBase64;
 import static org.testng.Assert.assertEquals;
@@ -843,6 +844,20 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = fromBase64(toBase64(_stringAlphaNumericSVValues[i]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testBytesBase64TransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("binaryToBase64(%s)", BYTES_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "binaryToBase64");
+    String[] expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = binaryToBase64(_bytesSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
   }
