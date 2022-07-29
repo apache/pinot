@@ -667,7 +667,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     boolean enableClientIpLogging = _config.getProperty(Broker.CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING,
         Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING);
-    String clientIp = "";
+    String clientIp = "unknown";
     // If reverse proxy is used X-Forwarded-For will be populated
     // If X-Forwarded-For is not present, check if x-real-ip is present
     // Since X-Forwarded-For can contain comma separated list of values, we convert it to ";" delimiter to avoid
