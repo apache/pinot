@@ -199,9 +199,6 @@ public abstract class QueryScheduler {
     long responseSerializationCpuTimeNs =
         Long.parseLong(dataTableMetadata.getOrDefault(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), "0"));
     long totalCpuTimeNs = threadCpuTimeNs + systemActivitiesCpuTimeNs + responseSerializationCpuTimeNs;
-    boolean queryHasMVSelectionOrderBy =
-        Boolean.parseBoolean(dataTableMetadata.getOrDefault(MetadataKey.QUERY_HAS_MV_SELECTION_ORDER_BY.getName(),
-            Boolean.FALSE.toString()));
 
     if (numDocsScanned > 0) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
@@ -236,13 +233,6 @@ public abstract class QueryScheduler {
       _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.TOTAL_CPU_TIME_NS, totalCpuTimeNs,
           TimeUnit.NANOSECONDS);
     }
-    if (queryHasMVSelectionOrderBy) {
-      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_HAS_MV_SELECTION_ORDER_BY, 1);
-    }
-
-    // Remove the 'QUERY_HAS_MV_SELECTION_ORDER_BY' metadata from the DataTable as the Broker does not need to know
-    // about this metadata or emit a metric related to it
-    dataTableMetadata.remove(MetadataKey.QUERY_HAS_MV_SELECTION_ORDER_BY.getName());
 
     TimerContext timerContext = queryRequest.getTimerContext();
     int numSegmentsQueried = queryRequest.getSegmentsToQuery().size();
@@ -255,16 +245,15 @@ public abstract class QueryScheduler {
               + "segments(queried/processed/matched/consuming/invalid/limit/value)={}/{}/{}/{}/{}/{}/{},"
               + "schedulerWaitMs={},reqDeserMs={},totalExecMs={},resSerMs={},totalTimeMs={},minConsumingFreshnessMs={},"
               + "broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={},"
-              + "threadCpuTimeNs(total/thread/sysActivity/resSer)={}/{}/{}/{},hasMVSelOrderBy={}", requestId,
-          tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming,
+              + "threadCpuTimeNs(total/thread/sysActivity/resSer)={}/{}/{}/{}", requestId, tableNameWithType,
+          numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, numSegmentsConsuming,
           numSegmentsPrunedInvalid, numSegmentsPrunedByLimit, numSegmentsPrunedByValue, schedulerWaitMs,
           timerContext.getPhaseDurationMs(ServerQueryPhase.REQUEST_DESERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
           timerContext.getPhaseDurationMs(ServerQueryPhase.RESPONSE_SERIALIZATION),
           timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), minConsumingFreshnessMs,
           queryRequest.getBrokerId(), numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name(),
-          totalCpuTimeNs, threadCpuTimeNs, systemActivitiesCpuTimeNs, responseSerializationCpuTimeNs,
-          queryHasMVSelectionOrderBy);
+          totalCpuTimeNs, threadCpuTimeNs, systemActivitiesCpuTimeNs, responseSerializationCpuTimeNs);
 
       // Limit the dropping log message at most once per second.
       if (_numDroppedLogRateLimiter.tryAcquire()) {

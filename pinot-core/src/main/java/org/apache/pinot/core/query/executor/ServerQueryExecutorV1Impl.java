@@ -319,7 +319,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
       Plan queryPlan =
           enableStreaming ? _planMaker.makeStreamingInstancePlan(selectedSegments, queryContext, executorService,
-              responseObserver) : _planMaker.makeInstancePlan(selectedSegments, queryContext, executorService);
+              responseObserver, _serverMetrics) : _planMaker.makeInstancePlan(selectedSegments, queryContext,
+              executorService, _serverMetrics);
       planBuildTimer.stopAndRecord();
 
       TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);

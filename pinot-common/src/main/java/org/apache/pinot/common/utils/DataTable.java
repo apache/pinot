@@ -123,12 +123,7 @@ public interface DataTable {
     NUM_SEGMENTS_PRUNED_BY_LIMIT("numSegmentsPrunedByLimit", MetadataValueType.INT),
     NUM_SEGMENTS_PRUNED_BY_VALUE("numSegmentsPrunedByValue", MetadataValueType.INT),
     EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS("explainPlanNumEmptyFilterSegments", MetadataValueType.INT),
-    EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS("explainPlanNumMatchAllFilterSegments", MetadataValueType.INT),
-    // TODO: Add a mechanism to pass generic metadata without adding them to the DataTable's metadata
-    // This metadata field is only required for emitting a metric to identify whether queries using MV columns (as
-    // identifiers or via transform) are present in the Selection Order-By queries. This was the only place where
-    // such a metadata could be added in the existing interfaces even though we don't need this on the Broker side.
-    QUERY_HAS_MV_SELECTION_ORDER_BY("queryHasMVSelectionOrderBy", MetadataValueType.STRING);
+    EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS("explainPlanNumMatchAllFilterSegments", MetadataValueType.INT);
 
     private static final MetadataKey[] VALUES;
     private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();
