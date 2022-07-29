@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -364,14 +365,19 @@ public class PartitionUpsertMetadataManager {
       return record;
     }
 
-    RecordLocation currentRecordLocation =
-        _primaryKeyToRecordLocationMap.get(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction));
+    AtomicReference<GenericRow> previousRecordReference = new AtomicReference<>();
+    RecordLocation currentRecordLocation = _primaryKeyToRecordLocationMap.computeIfPresent(
+        HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), (pk, recordLocation) -> {
+          if (recordInfo.getComparisonValue().compareTo(recordLocation.getComparisonValue()) >= 0) {
+            _reuse.clear();
+            previousRecordReference.set(recordLocation.getSegment().getRecord(recordLocation.getDocId(), _reuse));
+          }
+          return recordLocation;
+        });
     if (currentRecordLocation != null) {
       // Existing primary key
-      if (recordInfo.getComparisonValue().compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
-        _reuse.clear();
-        GenericRow previousRecord =
-            currentRecordLocation.getSegment().getRecord(currentRecordLocation.getDocId(), _reuse);
+      GenericRow previousRecord = previousRecordReference.get();
+      if (previousRecord != null) {
         return _partialUpsertHandler.merge(previousRecord, record);
       } else {
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_OUT_OF_ORDER, 1L);
