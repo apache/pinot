@@ -55,10 +55,19 @@ public class InstancePartitionsUtils {
     return TableNameBuilder.extractRawTableName(tableName) + TYPE_SUFFIX_SEPARATOR + instancePartitionsType;
   }
 
+  /**
+   * Group instance partitions are stored with a _GROUP suffix. This is different from
+   * the naming convention for a table's instance partitions, which end with the
+   * instance-partitions type. A group's instance partitions are agnostic to the
+   * instance-partitions type, and the name is indicative of the same.
+   */
   public static String getGroupInstancePartitionsName(String groupName) {
     return String.format("%s_GROUP", groupName);
   }
 
+  /**
+   * See docs for getGroupInstancePartitionsName above.
+   */
   public static String getGroupInstancePartitionsName(String groupName, String instancePartitionsType) {
     return String.format("%s_%s", groupName, instancePartitionsType);
   }
@@ -69,11 +78,15 @@ public class InstancePartitionsUtils {
   public static InstancePartitions fetchOrComputeInstancePartitions(HelixManager helixManager, TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
     String tableNameWithType = tableConfig.getTableName();
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
-    // If table is in a group, use pre-computed instance partitions
+    // If table has pre-configured instance partitions.
     if (TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
-      return fetchInstancePartitions(helixManager.getHelixPropertyStore(),
+      InstancePartitions instancePartitions = fetchInstancePartitions(helixManager.getHelixPropertyStore(),
           tableConfig.getInstancePartitionsMap().get(instancePartitionsType));
+      Preconditions.checkState(instancePartitions != null, "Unable to find pre-configured"
+          + "instance partitions. Your table may be pointing to instance partitions which may not exist.");
+      return instancePartitions.withName(instancePartitionsType.getInstancePartitionsName(rawTableName));
     }
 
     // Fetch the instance partitions from property store if it exists
@@ -99,6 +112,13 @@ public class InstancePartitionsUtils {
     return znRecord != null ? InstancePartitions.fromZNRecord(znRecord) : null;
   }
 
+  /**
+   * Fetches instance partitions for the given group from ZK. A key difference between this method
+   * and fetchInstancePartitions is that this method would throw an exception if the instance
+   * partitions for the given group are not found, whereas fetchInstancePartitions returns null.
+   * The reason is that InstancePartitions for a group are created even before the group is
+   * registered, and are expected to exist throughout the lifecycle of the group.
+   */
   public static InstancePartitions fetchGroupInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
       String groupName) {
     String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
@@ -171,9 +191,7 @@ public class InstancePartitionsUtils {
   }
 
   /**
-   * Persists instance partitions for the group to Zookeeper. The instance partitions received are
-   * "group instance partitions", which essentially means their name has a "_GROUP" suffix. When
-   * persisting the instance-partitions however, we persist 3-copies: 1 for each instance partitions type.
+   * Persists instance partitions for the group to Zookeeper.
    */
   public static void persistGroupInstancePartitions(HelixPropertyStore<ZNRecord> propertyStore,
       String groupName, InstancePartitions instancePartitions) {

@@ -43,6 +43,11 @@ public class TableGroupConfigUtilsTest {
       2,
       false));
 
+  /**
+   * Converts a TableGroupConfig object to a ZNRecord, and then reconverts the ZNRecord back to a
+   * TableGroupConfig instance. Ensures that the final TableGroupConfig instance is equal to the
+   * original instance.
+   */
   @Test
   public void testConsistentZNRecordConversion()
       throws IOException {

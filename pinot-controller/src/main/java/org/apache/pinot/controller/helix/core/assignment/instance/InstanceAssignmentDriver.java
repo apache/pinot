@@ -58,7 +58,8 @@ public class InstanceAssignmentDriver {
   public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
       List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions) {
     String tableNameWithType = _tableConfig.getTableName();
-    Preconditions.checkState(!TableConfigUtils.hasPreConfiguredInstancePartitions(_tableConfig, instancePartitionsType));
+    Preconditions.checkState(!TableConfigUtils.hasPreConfiguredInstancePartitions(
+        _tableConfig, instancePartitionsType));
 
     InstanceAssignmentConfig assignmentConfig =
         InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(_tableConfig, instancePartitionsType);

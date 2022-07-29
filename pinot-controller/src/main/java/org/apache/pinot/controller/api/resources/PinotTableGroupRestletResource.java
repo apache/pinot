@@ -50,6 +50,7 @@ import org.slf4j.LoggerFactory;
 @Api(tags = Constants.TABLE_GROUP_TAG)
 @Path("/")
 public class PinotTableGroupRestletResource {
+  // TODO: Add a delete API.
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotTableGroupRestletResource.class);
 
   @Inject
@@ -76,9 +77,9 @@ public class PinotTableGroupRestletResource {
       InstancePartitions instancePartitions = InstanceAssignmentDriver.assignInstancesToGroup(groupName,
           helixDataAccessor.getChildValues(helixDataAccessor.keyBuilder().instanceConfigs(), true),
           tableGroupConfig.getInstanceAssignmentConfig());
-      _pinotHelixResourceManager.addTableGroup(groupName, tableGroupConfig);
       InstancePartitionsUtils.persistGroupInstancePartitions(_pinotHelixResourceManager.getPropertyStore(),
           groupName, instancePartitions);
+      _pinotHelixResourceManager.addTableGroup(groupName, tableGroupConfig);
       return new SuccessResponse(String.format("Group %s successfully created", groupName));
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);

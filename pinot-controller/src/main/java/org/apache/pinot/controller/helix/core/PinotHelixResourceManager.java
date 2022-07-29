@@ -1695,10 +1695,10 @@ public class PinotHelixResourceManager {
       InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
       List<InstanceConfig> instanceConfigs = getAllHelixInstanceConfigs();
       for (InstancePartitionsType instancePartitionsType : instancePartitionsTypesToAssign) {
-        boolean tableHasServerAssignment = TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig,
+        boolean hasPreConfiguredInstancePartitions = TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig,
             instancePartitionsType);
         InstancePartitions instancePartitions;
-        if (!tableHasServerAssignment) {
+        if (!hasPreConfiguredInstancePartitions) {
           instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType, instanceConfigs, null);
           LOGGER.info("Persisting instance partitions: {}", instancePartitions);
           InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
@@ -3629,6 +3629,10 @@ public class PinotHelixResourceManager {
     return Pair.of(periodicTaskRequestId, messageCount);
   }
 
+  /**
+   * Stores configuration for the given group to Zookeeper. Throws an exception if the
+   * group already exists (i.e. the ZK Node for the table-group config already exists).
+   */
   public void addTableGroup(String groupName, TableGroupConfig tableGroupConfig)
       throws IOException {
     String groupPath = ZKMetadataProvider.constructPropertyStorePathForTableGroup(groupName);

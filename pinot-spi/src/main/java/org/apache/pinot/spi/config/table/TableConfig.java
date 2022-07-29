@@ -126,7 +126,8 @@ public class TableConfig extends BaseJsonConfig {
       @JsonProperty(TIER_CONFIGS_LIST_KEY) @Nullable List<TierConfig> tierConfigsList,
       @JsonProperty(IS_DIM_TABLE_KEY) boolean dimTable,
       @JsonProperty(TUNER_CONFIG_LIST_KEY) @Nullable List<TunerConfig> tunerConfigList,
-      @JsonProperty(INSTANCE_PARTITIONS_MAP_CONFIG_KEY) @Nullable Map<InstancePartitionsType, String> instancePartitionsMap) {
+      @JsonProperty(INSTANCE_PARTITIONS_MAP_CONFIG_KEY) @Nullable
+          Map<InstancePartitionsType, String> instancePartitionsMap) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
     Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
         "'tableName' cannot contain double underscore ('__')");

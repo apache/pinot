@@ -55,6 +55,7 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -131,7 +132,7 @@ public final class TableConfigUtils {
       validateTierConfigList(tableConfig.getTierConfigsList());
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
       validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
-      validateTableGroupConfig(tableConfig);
+      validateInstancePartitionsTypeMapConfig(tableConfig);
       if (!skipTypes.contains(ValidationType.UPSERT)) {
         validateUpsertAndDedupConfig(tableConfig, schema);
         validatePartialUpsertStrategies(tableConfig, schema);
@@ -560,8 +561,24 @@ public final class TableConfigUtils {
     validateAggregateMetricsForUpsertConfig(tableConfig);
   }
 
+  /**
+   * Detects whether both InstanceAssignmentConfig and InstancePartitionsMap are set for a given
+   * instance partitions type. Validation fails because the table would ignore InstanceAssignmentConfig
+   * when the partitions are already set.
+   */
   @VisibleForTesting
-  static void validateTableGroupConfig(TableConfig tableConfig) {
+  static void validateInstancePartitionsTypeMapConfig(TableConfig tableConfig) {
+    if (!org.apache.pinot.common.utils.config.TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig)) {
+      return;
+    }
+    for (InstancePartitionsType instancePartitionsType : tableConfig.getInstancePartitionsMap().keySet()) {
+      if (tableConfig.getInstanceAssignmentConfigMap() == null) {
+        break;
+      }
+      Preconditions.checkState(!tableConfig.getInstanceAssignmentConfigMap().containsKey(instancePartitionsType),
+          String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap set for %s",
+              instancePartitionsType));
+    }
   }
 
   /**

@@ -419,10 +419,10 @@ public class TableRebalancer {
       InstancePartitionsType instancePartitionsType, boolean reassignInstances, boolean dryRun) {
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    boolean tableHasServerAssignment = TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig,
+    boolean hasPreConfiguredInstancePartitions = TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig,
         instancePartitionsType);
     if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
-      if (tableHasServerAssignment) {
+      if (hasPreConfiguredInstancePartitions) {
         InstancePartitions groupInstancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
             _helixManager.getHelixPropertyStore(), tableConfig.getInstancePartitionsMap().get(instancePartitionsType));
         Preconditions.checkState(groupInstancePartitions != null, "Server assignment config may be incorrect. "

@@ -158,16 +158,16 @@ public class TableConfigUtils {
       });
     }
 
-    Map<InstancePartitionsType, String> serverAssignment = null;
-    String serverAssignmentString = simpleFields.get(TableConfig.INSTANCE_PARTITIONS_MAP_CONFIG_KEY);
-    if (serverAssignmentString != null) {
-      serverAssignment = JsonUtils.stringToObject(serverAssignmentString,
+    Map<InstancePartitionsType, String> instancePartitionsMap = null;
+    String instancePartitionsMapString = simpleFields.get(TableConfig.INSTANCE_PARTITIONS_MAP_CONFIG_KEY);
+    if (instancePartitionsMapString != null) {
+      instancePartitionsMap = JsonUtils.stringToObject(instancePartitionsMapString,
           new TypeReference<Map<InstancePartitionsType, String>>() { });
     }
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
-        dedupConfig, ingestionConfig, tierConfigList, isDimTable, tunerConfigList, serverAssignment);
+        dedupConfig, ingestionConfig, tierConfigList, isDimTable, tunerConfigList, instancePartitionsMap);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -306,10 +306,16 @@ public class TableConfigUtils {
     validationConfig.setSegmentPushType(null);
   }
 
+  /**
+   * Returns true if the table has pre-configured instance partitions for any type (OFFLINE/CONSUMING/COMPLETED).
+   */
   public static boolean hasPreConfiguredInstancePartitions(TableConfig tableConfig) {
     return tableConfig.getInstancePartitionsMap() != null && tableConfig.getInstancePartitionsMap().size() > 0;
   }
 
+  /**
+   * Returns true if the table has pre-configured instance partitions for the given type.
+   */
   public static boolean hasPreConfiguredInstancePartitions(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
     return hasPreConfiguredInstancePartitions(tableConfig)

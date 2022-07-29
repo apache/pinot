@@ -40,6 +40,8 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -55,6 +57,7 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -1559,30 +1562,34 @@ public class TableConfigUtilsTest {
 
   @Test
   public void testValidateTableGroupConfig() {
-    TableConfig tableConfigWithoutTableGroup =
+    InstanceAssignmentConfig instanceAssignmentConfig = Mockito.mock(InstanceAssignmentConfig.class);
+
+    TableConfig tableConfigWithoutInstancePartitionsMap =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
             .build();
-    TableConfigUtils.validateTableGroupConfig(tableConfigWithoutTableGroup);
 
-    TableConfig tableConfigWithTableGroupOnly =
+    // Call validate with a table-config without any instance partitions or instance assignment config
+    TableConfigUtils.validateInstancePartitionsTypeMapConfig(tableConfigWithoutInstancePartitionsMap);
+
+    TableConfig tableConfigWithInstancePartitionsMap =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-            .setTableGroupName("test-table-group")
+            .setInstancePartitionsMap(ImmutableMap.of(InstancePartitionsType.OFFLINE, "test_GROUP"))
+            .build();
+
+    // Call validate with a table-config with instance partitions set but not instance assignment config
+    TableConfigUtils.validateInstancePartitionsTypeMapConfig(tableConfigWithInstancePartitionsMap);
+
+    TableConfig invalidTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+            .setInstancePartitionsMap(ImmutableMap.of(InstancePartitionsType.OFFLINE, "test_GROUP"))
+            .setInstanceAssignmentConfigMap(ImmutableMap.of(InstancePartitionsType.OFFLINE, instanceAssignmentConfig))
             .build();
     try {
-      TableConfigUtils.validateTableGroupConfig(tableConfigWithTableGroupOnly);
-      Assert.fail("Validation should have failed since segment partition config not set");
+      // Call validate with instance partitions and config set for the same type
+      TableConfigUtils.validateInstancePartitionsTypeMapConfig(invalidTableConfig);
+      Assert.fail("Validation should have failed since both instancePartitionsMap and config are set");
     } catch (IllegalStateException ignored) {
     }
-
-    Map<String, ColumnPartitionConfig> columnPartitionMap = new HashMap<>();
-    columnPartitionMap.put("partitioningColumn", new ColumnPartitionConfig("Murmur", 4));
-    TableConfig tableConfigWithSegmentPartitionConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-            .setTableGroupName("test-table-group")
-            .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionMap))
-            .build();
-
-    TableConfigUtils.validateTableGroupConfig(tableConfigWithSegmentPartitionConfig);
   }
 
   private Map<String, String> getStreamConfigs() {
