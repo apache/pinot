@@ -108,10 +108,10 @@ public class LiteralOnlyBrokerRequestTest {
             + "where bar = decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253')")));
     Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(
         CalciteSqlParser.compileToPinotQuery("SELECT toBase64('hello!')," + " fromBase64('aGVsbG8h') FROM myTable")));
-    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(
-        CalciteSqlParser.compileToPinotQuery("SELECT reverse(fromBase64(foo))," + " toBase64(fromBase64('aGVsbG8h')) FROM myTable")));
-    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(
-        CalciteSqlParser.compileToPinotQuery("SELECT toBase64(max(foo))," + " fromBase64(toBase64(max(foo))) FROM myTable")));
+    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
+        "SELECT reverse(fromBase64(foo))," + " toBase64(fromBase64('aGVsbG8h')) FROM myTable")));
+    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
+        "SELECT toBase64(max(foo))," + " fromBase64(toBase64(max(foo))) FROM myTable")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(
         CalciteSqlParser.compileToPinotQuery("SELECT count(*) from foo " + "where bar = toBase64('hello!')")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(

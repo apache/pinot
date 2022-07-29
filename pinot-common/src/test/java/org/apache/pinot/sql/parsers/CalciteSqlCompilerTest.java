@@ -1912,10 +1912,13 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(encodedBase64, "SEVMTE8h");
     Assert.assertEquals(decodedBase64, "HELLO!");
 
-    query = "select reverse(fromBase64(toBase64(upper('hello!')))) from mytable where fromBase64(toBase64(upper('hello!'))) = bar";
+    query =
+        "select reverse(fromBase64(toBase64(upper('hello!')))) from mytable where fromBase64(toBase64(upper('hello!')"
+            + ")) = bar";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     String arg1 = pinotQuery.getSelectList().get(0).getLiteral().getStringValue();
-    String leftOp = pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral().getStringValue();
+    String leftOp =
+        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral().getStringValue();
     Assert.assertEquals(arg1, "!OLLEH");
     Assert.assertEquals(leftOp, "HELLO!");
 
