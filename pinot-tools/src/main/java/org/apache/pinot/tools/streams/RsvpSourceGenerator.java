@@ -29,6 +29,7 @@ import java.util.Properties;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.joda.time.DateTime;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -59,7 +60,7 @@ public class RsvpSourceGenerator implements PinotSourceDataGenerator {
     json.put("group_name", "group_name" + ThreadLocalRandom.current().nextInt());
     json.put("group_lat", ThreadLocalRandom.current().nextDouble(-90.0, 90.0));
     json.put("group_lon", ThreadLocalRandom.current().nextDouble(180.0));
-    json.put("mtime", DATE_TIME_FORMATTER.format(LocalDateTime.now()));
+    json.put("mtime", DateTime.now().getMillis());
     json.put("rsvp_count", 1);
     return new RSVP(eventId, eventId, json);
   }

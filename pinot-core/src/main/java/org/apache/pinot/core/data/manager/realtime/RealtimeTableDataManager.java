@@ -73,6 +73,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 
+import static org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig;
+import static org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig.updateSchemaWithTimestampIndexes;
 import static org.apache.pinot.spi.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
 
 
@@ -364,6 +366,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           }
         }
       }
+
+      schema = updateSchemaWithTimestampIndexes(schema, extractTimestampIndexConfigsFromTableConfig(tableConfig));;
 
       segmentDataManager =
           new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
