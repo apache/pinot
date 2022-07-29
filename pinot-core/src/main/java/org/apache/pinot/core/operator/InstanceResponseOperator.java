@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
@@ -135,8 +136,9 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     if (_serverMetrics != null) {
       _serverMetrics.addMeteredTableValue(tableName, ServerMeter.QUERY_HAS_MV_SELECTION_ORDER_BY, 1);
     }
+    List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     LOGGER.warn("Table {} has MV column in ORDER BY. Expressions: {}", tableName,
-        _queryContext.getOrderByExpressions());
+        orderByExpressions == null ? "" : orderByExpressions);
   }
 
   private IntermediateResultsBlock getCombinedResults() {
