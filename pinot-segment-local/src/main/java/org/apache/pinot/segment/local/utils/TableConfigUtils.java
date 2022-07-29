@@ -696,10 +696,6 @@ public final class TableConfigUtils {
       bloomFilterColumns.addAll(indexingConfig.getBloomFilterConfigs().keySet());
     }
     for (String bloomFilterColumn : bloomFilterColumns) {
-      if (noDictionaryColumnsSet.contains(bloomFilterColumn)) {
-        throw new IllegalStateException("Cannot create a Bloom Filter on column " + bloomFilterColumn
-            + " specified in the noDictionaryColumns config");
-      }
       columnNameToConfigMap.put(bloomFilterColumn, "Bloom Filter Config");
     }
     if (indexingConfig.getInvertedIndexColumns() != null) {

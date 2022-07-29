@@ -44,6 +44,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTInd
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.text.NativeTextIndexCreator;
 import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexCreator;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
@@ -257,8 +258,16 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
   @Override
   public BloomFilterCreator newBloomFilterCreator(IndexCreationContext.BloomFilter context)
       throws IOException {
-    return new OnHeapGuavaBloomFilterCreator(context.getIndexDir(), context.getFieldSpec().getName(),
-        context.getCardinality(), Objects.requireNonNull(context.getBloomFilterConfig()));
+    int cardinality = context.getCardinality();
+    if (cardinality == Constants.UNKNOWN_CARDINALITY) {
+      // This is when we're creating bloom filters for non dictionary encoded cols where exact cardinality is not
+      // known beforehand.
+      // Since this field is only used for the estimate cardinality, using total # of entries instead
+      // TODO (saurabh) Check if we can do a better estimate
+      cardinality = context.getTotalNumberOfEntries();
+    }
+    return new OnHeapGuavaBloomFilterCreator(context.getIndexDir(), context.getFieldSpec().getName(), cardinality,
+        Objects.requireNonNull(context.getBloomFilterConfig()));
   }
 
   @Override
