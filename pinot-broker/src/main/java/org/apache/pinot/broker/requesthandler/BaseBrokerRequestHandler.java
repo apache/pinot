@@ -636,7 +636,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             && timeExpression.getIdentifier() != null) {
           String timeColumn = timeExpression.getIdentifier().getName();
           String timeColumnWithGranularity = TimestampIndexGranularity.getColumnNameWithGranularity(timeColumn,
-              TimestampIndexGranularity.valueOf(granularString));
+              TimestampIndexGranularity.valueOf(granularString.toUpperCase()));
           if (timestampIndexColumns.contains(timeColumnWithGranularity)) {
             pinotQuery.putToExpressionOverrideHints(expression,
                 RequestUtils.getIdentifierExpression(timeColumnWithGranularity));
