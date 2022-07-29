@@ -19,7 +19,9 @@
 package org.apache.pinot.core.plan;
 
 import java.util.List;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.operator.InstanceResponseOperator;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
@@ -28,16 +30,21 @@ public class InstanceResponsePlanNode implements PlanNode {
   protected final CombinePlanNode _combinePlanNode;
   protected final List<IndexSegment> _indexSegments;
   protected final List<FetchContext> _fetchContexts;
+  protected final QueryContext _queryContext;
+  protected final ServerMetrics _serverMetrics;
 
   public InstanceResponsePlanNode(CombinePlanNode combinePlanNode, List<IndexSegment> indexSegments,
-      List<FetchContext> fetchContexts) {
+      List<FetchContext> fetchContexts, QueryContext queryContext, ServerMetrics serverMetrics) {
     _combinePlanNode = combinePlanNode;
     _indexSegments = indexSegments;
     _fetchContexts = fetchContexts;
+    _queryContext = queryContext;
+    _serverMetrics = serverMetrics;
   }
 
   @Override
   public InstanceResponseOperator run() {
-    return new InstanceResponseOperator(_combinePlanNode.run(), _indexSegments, _fetchContexts);
+    return new InstanceResponseOperator(_combinePlanNode.run(), _indexSegments, _fetchContexts, _queryContext,
+        _serverMetrics);
   }
 }
