@@ -61,7 +61,7 @@ public class InstanceAssignmentConfigUtils {
   public static boolean allowInstanceAssignment(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
     if (TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
-      return allowInstanceAssignmentForGroup(tableConfig, instancePartitionsType);
+      return true;
     }
     TableType tableType = tableConfig.getTableType();
     Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
@@ -129,18 +129,5 @@ public class InstanceAssignmentConfigUtils {
     }
 
     return new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig);
-  }
-
-  /**
-   * For a table in a table-group, allow instance assignment for OFFLINE instance-partitions for offline tables
-   * and CONSUMING instance-partitions for realtime tables. This will return false for COMPLETED
-   * instance-partitions since we don't want/need separate COMPLETED instance partitions. In case COMPLETED
-   * Instance Partitions are omitted, realtime segment assignment will use the same instance partitions as CONSUMING.
-   */
-  private static boolean allowInstanceAssignmentForGroup(TableConfig tableConfig,
-      InstancePartitionsType instancePartitionsType) {
-    TableType tableType = tableConfig.getTableType();
-    return (tableType == TableType.OFFLINE && instancePartitionsType == InstancePartitionsType.OFFLINE)
-        || (tableType == TableType.REALTIME && instancePartitionsType == InstancePartitionsType.CONSUMING);
   }
 }
