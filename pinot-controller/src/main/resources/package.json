@@ -79,6 +79,7 @@
     "jsonlint": "1.6.3",
     "lodash": "4.17.21",
     "moment": "2.29.3",
+    "moment-timezone": "^0.5.34",
     "prop-types": "15.8.1",
     "re-resizable": "6.9.9",
     "react": "16.13.1",

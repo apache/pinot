@@ -17,9 +17,9 @@
  * under the License.
  */
 
-import { get, map, each, isEqual, isArray, keys, union } from 'lodash';
+import { get, map, each, isEqual, isArray, keys, union, last } from 'lodash';
 import { DataTable, SQLResult } from 'Models';
-import moment from 'moment';
+import moment from 'moment-timezone';
 import {
   getTenants,
   getInstances,
@@ -788,8 +788,8 @@ const getMinionMetaData = (tableName, taskType) => {
   });
 };
 
-const getElapsedTime = (startTime) => {
-  const currentTime = moment();
+const getElapsedTime = (startTime, timeZone) => {
+  const currentTime = moment.tz(moment().format('YYYY-MM-DD HH:mm:ss'), 'YYYY-MM-DD HH:mm:ss', timeZone);
   const diff = currentTime.diff(startTime);
   const elapsedTime = diff > (1000 * 60 * 60) ? `${currentTime.diff(startTime, 'hour')} hours` : `${currentTime.diff(startTime, 'minute')} minutes`;
   return elapsedTime;
@@ -805,12 +805,14 @@ const getTasksList = async (tableName, taskType) => {
       const promiseArr = [];
       const fetchInfo = async (taskID, status) => {
         const debugData = await getTaskDebugData(taskID);
-        const startTime = moment(get(debugData, 'data.subtaskInfos.0.startTime'), 'YYYY-MM-DD hh:mm:ss');
+        const startTimeStr = get(debugData, 'data.subtaskInfos.0.startTime');
+        const timeZone = last(startTimeStr.split(' '));
+        const startTime = moment.tz(startTimeStr, 'YYYY-MM-DD HH:mm:ss', timeZone);
         finalResponse.records.push([
           taskID,
           status,
           get(debugData, 'data.subtaskInfos.0.startTime'),
-          startTime ? getElapsedTime(startTime) : '',
+          startTime ? getElapsedTime(startTime, timeZone) : '',
           get(debugData, 'data.subtaskInfos.0.finishTime', ''),
           get(debugData, 'data.subtaskCount.total', 0)
         ]);
