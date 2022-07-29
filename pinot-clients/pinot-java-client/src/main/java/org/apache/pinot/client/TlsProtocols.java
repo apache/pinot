@@ -21,7 +21,6 @@ package org.apache.pinot.client;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * TLS Protocols enabled for AsyncHttpClient
@@ -34,7 +33,10 @@ public class TlsProtocols {
     }
 
     public List<String> getEnabledProtocols() {
-        return Objects.requireNonNullElse(_enabledProtocols, Collections.emptyList());
+        if (_enabledProtocols != null) {
+            return _enabledProtocols;
+        }
+        return Collections.emptyList();
     }
 
     public static TlsProtocols defaultProtocols(boolean tlsV10Enabled) {

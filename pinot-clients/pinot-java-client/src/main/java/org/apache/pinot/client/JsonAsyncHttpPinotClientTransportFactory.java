@@ -30,22 +30,23 @@ import org.apache.pinot.spi.utils.CommonConstants;
  */
 public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTransportFactory {
 
-  private static final String DEFAULT_BROKER_READ_TIMEOUT = "60000";
-  private static final String DEFAULT_BROKER_CONNECT_TIMEOUT = "2000";
-  private static final String DEFAULT_BROKER_HANDSHAKE_TIMEOUT = "2000";
+  private static final String DEFAULT_BROKER_READ_TIMEOUT_MS = "60000";
+  private static final String DEFAULT_BROKER_CONNECT_TIMEOUT_MS = "2000";
+  private static final String DEFAULT_BROKER_HANDSHAKE_TIMEOUT_MS = "2000";
   private static final String DEFAULT_BROKER_TLS_V10_ENABLED = "false";
 
   private Map<String, String> _headers = new HashMap<>();
   private String _scheme = CommonConstants.HTTP_PROTOCOL;
   private SSLContext _sslContext = null;
   private boolean _tlsV10Enabled = false;
-  private int _readTimeout = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT);
-  private int _connectTimeout = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT);
-  private int _handshakeTimeout = Integer.parseInt(DEFAULT_BROKER_HANDSHAKE_TIMEOUT);
+  private int _readTimeoutMs = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT_MS);
+  private int _connectTimeoutMs = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT_MS);
+  private int _handshakeTimeoutMs = Integer.parseInt(DEFAULT_BROKER_HANDSHAKE_TIMEOUT_MS);
 
   @Override
   public PinotClientTransport buildTransport() {
-    ConnectionTimeouts connectionTimeouts = ConnectionTimeouts.create(_readTimeout, _connectTimeout, _handshakeTimeout);
+    ConnectionTimeouts connectionTimeouts = ConnectionTimeouts.create(_readTimeoutMs, _connectTimeoutMs,
+            _handshakeTimeoutMs);
     TlsProtocols tlsProtocols = TlsProtocols.defaultProtocols(_tlsV10Enabled);
     return new JsonAsyncHttpPinotClientTransport(_headers, _scheme, _sslContext, connectionTimeouts, tlsProtocols);
   }
@@ -74,12 +75,12 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
   }
 
   public JsonAsyncHttpPinotClientTransportFactory withConnectionProperties(Properties properties) {
-    _readTimeout = Integer.parseInt(properties.getProperty("brokerReadTimeout",
-            DEFAULT_BROKER_READ_TIMEOUT));
-    _connectTimeout = Integer.parseInt(properties.getProperty("brokerConnectTimeout",
-            DEFAULT_BROKER_CONNECT_TIMEOUT));
-    _handshakeTimeout = Integer.parseInt(properties.getProperty("brokerHandshakeTimeout",
-            DEFAULT_BROKER_HANDSHAKE_TIMEOUT));
+    _readTimeoutMs = Integer.parseInt(properties.getProperty("brokerReadTimeoutMs",
+            DEFAULT_BROKER_READ_TIMEOUT_MS));
+    _connectTimeoutMs = Integer.parseInt(properties.getProperty("brokerConnectTimeoutMs",
+            DEFAULT_BROKER_CONNECT_TIMEOUT_MS));
+    _handshakeTimeoutMs = Integer.parseInt(properties.getProperty("brokerHandshakeTimeoutMs",
+            DEFAULT_BROKER_HANDSHAKE_TIMEOUT_MS));
     _tlsV10Enabled = Boolean.parseBoolean(properties.getProperty("brokerTlsV10Enabled",
             DEFAULT_BROKER_TLS_V10_ENABLED))
             || Boolean.parseBoolean(System.getProperties().getProperty("broker.tlsV10Enabled",

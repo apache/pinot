@@ -22,32 +22,32 @@ package org.apache.pinot.client;
  * Connections time out for AsyncHttpClient
  */
 public class ConnectionTimeouts {
-    private final int _readTimeout;
-    private final int _connectTimeout;
-    private final int _handshakeTimeout;
+    private final int _readTimeoutMs;
+    private final int _connectTimeoutMs;
+    private final int _handshakeTimeoutMs;
 
-    private ConnectionTimeouts(int readTimeout, int connectTimeout, int handshakeTimeout) {
-        _readTimeout = readTimeout;
-        _connectTimeout = connectTimeout;
-        _handshakeTimeout = handshakeTimeout;
+    private ConnectionTimeouts(int readTimeoutMs, int connectTimeoutMs, int handshakeTimeoutMs) {
+        _readTimeoutMs = readTimeoutMs;
+        _connectTimeoutMs = connectTimeoutMs;
+        _handshakeTimeoutMs = handshakeTimeoutMs;
     }
 
-    public static ConnectionTimeouts create(int readTimeout, int connectTimeout, int handshakeTimeout) {
-        if (readTimeout < 1 || connectTimeout < 1 || handshakeTimeout < 1) {
+    public static ConnectionTimeouts create(int readTimeoutMs, int connectTimeoutMs, int handshakeTimeoutMs) {
+        if (readTimeoutMs < 1 || connectTimeoutMs < 1 || handshakeTimeoutMs < 1) {
             throw new IllegalArgumentException("Timeouts must be > 0");
         }
-        return new ConnectionTimeouts(readTimeout, connectTimeout, handshakeTimeout);
+        return new ConnectionTimeouts(readTimeoutMs, connectTimeoutMs, handshakeTimeoutMs);
     }
 
-    public int getReadTimeout() {
-        return _readTimeout;
+    public int getReadTimeoutMs() {
+        return _readTimeoutMs;
     }
 
-    public int getConnectTimeout() {
-        return _connectTimeout;
+    public int getConnectTimeoutMs() {
+        return _connectTimeoutMs;
     }
 
-    public int getHandshakeTimeout() {
-        return _handshakeTimeout;
+    public int getHandshakeTimeoutMs() {
+        return _handshakeTimeoutMs;
     }
 }

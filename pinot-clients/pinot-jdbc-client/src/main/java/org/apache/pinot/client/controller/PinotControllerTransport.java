@@ -28,7 +28,6 @@ import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.pinot.client.ConnectionTimeouts;
-import org.apache.pinot.client.JsonAsyncHttpPinotClientTransport;
 import org.apache.pinot.client.PinotClientException;
 import org.apache.pinot.client.TlsProtocols;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
@@ -62,9 +61,9 @@ public class PinotControllerTransport {
       builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
     }
 
-    builder.setReadTimeout(connectionTimeouts.getReadTimeout())
-            .setConnectTimeout(connectionTimeouts.getConnectTimeout())
-            .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeout())
+    builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
+            .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
+            .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
             .setUserAgent(getUserAgentVersionFromClassPath())
             .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
 
@@ -74,10 +73,10 @@ public class PinotControllerTransport {
   private String getUserAgentVersionFromClassPath() {
     Properties userAgentProperties = new Properties();
     try {
-      userAgentProperties.load(JsonAsyncHttpPinotClientTransport.class.getClassLoader()
+      userAgentProperties.load(PinotControllerTransport.class.getClassLoader()
               .getResourceAsStream("version.properties"));
     } catch (IOException e) {
-      LOGGER.info("Unable to set user agent version");
+      LOGGER.warn("Unable to set user agent version");
     }
     return userAgentProperties.getProperty("ua", "unknown");
   }
