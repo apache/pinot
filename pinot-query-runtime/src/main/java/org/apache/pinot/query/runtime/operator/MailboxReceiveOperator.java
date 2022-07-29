@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
@@ -127,10 +128,10 @@ public class MailboxReceiveOperator extends BaseOperator<TransferableBlock> {
     }
     if (System.nanoTime() >= timeoutWatermark) {
       LOGGER.error("Timed out after polling mailboxes: {}", _sendingStageInstances);
+      return TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
+    } else {
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_dataSchema);
     }
-    // TODO: we need to at least return one data table with schema if there's no error.
-    // we need to condition this on whether there's already things being returned or not.
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock(_dataSchema);
   }
 
   public RelDistribution.Type getExchangeType() {
