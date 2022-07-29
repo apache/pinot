@@ -45,8 +45,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
 public class PartitionUpsertMetadataManagerTest {
@@ -54,13 +54,13 @@ public class PartitionUpsertMetadataManagerTest {
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
 
   @Test
-  public void testAddSegment() {
-    verifyAddSegment(HashFunction.NONE);
-    verifyAddSegment(HashFunction.MD5);
-    verifyAddSegment(HashFunction.MURMUR3);
+  public void testAddReplaceRemoveSegment() {
+    verifyAddReplaceRemoveSegment(HashFunction.NONE);
+    verifyAddReplaceRemoveSegment(HashFunction.MD5);
+    verifyAddReplaceRemoveSegment(HashFunction.MURMUR3);
   }
 
-  private void verifyAddSegment(HashFunction hashFunction) {
+  private void verifyAddReplaceRemoveSegment(HashFunction hashFunction) {
     PartitionUpsertMetadataManager upsertMetadataManager =
         new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"), "timeCol",
             hashFunction, null, mock(ServerMetrics.class));
@@ -76,6 +76,7 @@ public class PartitionUpsertMetadataManagerTest {
     List<RecordInfo> recordInfoList1 = getRecordInfoList(numRecords, primaryKeys, timestamps);
     upsertMetadataManager.addSegment(segment1, validDocIds1, recordInfoList1.iterator());
     // segment1: 0 -> {5, 100}, 1 -> {4, 120}, 2 -> {2, 100}
+    assertEquals(recordLocationMap.size(), 3);
     checkRecordLocation(recordLocationMap, 0, segment1, 5, 100, hashFunction);
     checkRecordLocation(recordLocationMap, 1, segment1, 4, 120, hashFunction);
     checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, hashFunction);
@@ -91,6 +92,7 @@ public class PartitionUpsertMetadataManagerTest {
         getRecordInfoList(numRecords, primaryKeys, timestamps).iterator());
     // segment1: 1 -> {4, 120}
     // segment2: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
+    assertEquals(recordLocationMap.size(), 4);
     checkRecordLocation(recordLocationMap, 0, segment2, 0, 100, hashFunction);
     checkRecordLocation(recordLocationMap, 1, segment1, 4, 120, hashFunction);
     checkRecordLocation(recordLocationMap, 2, segment2, 2, 120, hashFunction);
@@ -99,9 +101,11 @@ public class PartitionUpsertMetadataManagerTest {
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
 
     // Add an empty segment
-    upsertMetadataManager.addSegment(new EmptyIndexSegment(mock(SegmentMetadataImpl.class)));
+    EmptyIndexSegment emptySegment = mockEmptySegment(3);
+    upsertMetadataManager.addSegment(emptySegment);
     // segment1: 1 -> {4, 120}
     // segment2: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
+    assertEquals(recordLocationMap.size(), 4);
     checkRecordLocation(recordLocationMap, 0, segment2, 0, 100, hashFunction);
     checkRecordLocation(recordLocationMap, 1, segment1, 4, 120, hashFunction);
     checkRecordLocation(recordLocationMap, 2, segment2, 2, 120, hashFunction);
@@ -112,10 +116,11 @@ public class PartitionUpsertMetadataManagerTest {
     // Replace (reload) the first segment
     ThreadSafeMutableRoaringBitmap newValidDocIds1 = new ThreadSafeMutableRoaringBitmap();
     ImmutableSegmentImpl newSegment1 = mockImmutableSegment(1, newValidDocIds1, primaryKeys1);
-    upsertMetadataManager.addSegment(newSegment1, newValidDocIds1, recordInfoList1.iterator());
-    // original segment1: 1 -> {4, 120}
+    upsertMetadataManager.replaceSegment(newSegment1, newValidDocIds1, recordInfoList1.iterator(), segment1);
+    // original segment1: 1 -> {4, 120} (not in the map)
     // segment2: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
     // new segment1: 1 -> {4, 120}
+    assertEquals(recordLocationMap.size(), 4);
     checkRecordLocation(recordLocationMap, 0, segment2, 0, 100, hashFunction);
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
     checkRecordLocation(recordLocationMap, 2, segment2, 2, 120, hashFunction);
@@ -123,34 +128,42 @@ public class PartitionUpsertMetadataManagerTest {
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertSame(recordLocationMap.get(HashUtils.hashPrimaryKey(makePrimaryKey(1), hashFunction)).getSegment(),
-        newSegment1);
+    assertEquals(upsertMetadataManager._replacedSegments, Collections.singleton(segment1));
 
     // Remove the original segment1
     upsertMetadataManager.removeSegment(segment1);
     // segment2: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
     // new segment1: 1 -> {4, 120}
+    assertEquals(recordLocationMap.size(), 4);
     checkRecordLocation(recordLocationMap, 0, segment2, 0, 100, hashFunction);
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
     checkRecordLocation(recordLocationMap, 2, segment2, 2, 120, hashFunction);
     checkRecordLocation(recordLocationMap, 3, segment2, 3, 80, hashFunction);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertSame(recordLocationMap.get(HashUtils.hashPrimaryKey(makePrimaryKey(1), hashFunction)).getSegment(),
-        newSegment1);
+    assertTrue(upsertMetadataManager._replacedSegments.isEmpty());
 
-    // Remove an empty segment
-    upsertMetadataManager.removeSegment(new EmptyIndexSegment(mock(SegmentMetadataImpl.class)));
+    // Remove the empty segment
+    upsertMetadataManager.removeSegment(emptySegment);
     // segment2: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
     // new segment1: 1 -> {4, 120}
+    assertEquals(recordLocationMap.size(), 4);
     checkRecordLocation(recordLocationMap, 0, segment2, 0, 100, hashFunction);
     checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
     checkRecordLocation(recordLocationMap, 2, segment2, 2, 120, hashFunction);
     checkRecordLocation(recordLocationMap, 3, segment2, 3, 80, hashFunction);
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
     assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
-    assertSame(recordLocationMap.get(HashUtils.hashPrimaryKey(makePrimaryKey(1), hashFunction)).getSegment(),
-        newSegment1);
+
+    // Remove segment2
+    upsertMetadataManager.removeSegment(segment2);
+    // segment2: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80} (not in the map)
+    // new segment1: 1 -> {4, 120}
+    assertEquals(recordLocationMap.size(), 1);
+    checkRecordLocation(recordLocationMap, 1, newSegment1, 4, 120, hashFunction);
+    assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 2, 3});
+    assertEquals(newValidDocIds1.getMutableRoaringBitmap().toArray(), new int[]{4});
   }
 
   private List<RecordInfo> getRecordInfoList(int numRecords, int[] primaryKeys, int[] timestamps) {
@@ -177,6 +190,12 @@ public class PartitionUpsertMetadataManagerTest {
     when(segment.getValue(anyInt(), anyString())).thenAnswer(
         invocation -> primaryKeys.get(invocation.getArgument(0)).getValues()[0]);
     return segment;
+  }
+
+  private static EmptyIndexSegment mockEmptySegment(int sequenceNumber) {
+    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
+    when(segmentMetadata.getName()).thenReturn(getSegmentName(sequenceNumber));
+    return new EmptyIndexSegment(segmentMetadata);
   }
 
   private static MutableSegment mockMutableSegment(int sequenceNumber, ThreadSafeMutableRoaringBitmap validDocIds) {
@@ -270,46 +289,6 @@ public class PartitionUpsertMetadataManagerTest {
     checkRecordLocation(recordLocationMap, 3, segment2, 0, 100, hashFunction);
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{1});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 3});
-  }
-
-  @Test
-  public void testRemoveSegment() {
-    verifyRemoveSegment(HashFunction.NONE);
-    verifyRemoveSegment(HashFunction.MD5);
-    verifyRemoveSegment(HashFunction.MURMUR3);
-  }
-
-  private void verifyRemoveSegment(HashFunction hashFunction) {
-    PartitionUpsertMetadataManager upsertMetadataManager =
-        new PartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"), "timeCol",
-            hashFunction, null, mock(ServerMetrics.class));
-    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
-
-    // Add 2 segments
-    // segment1: 0 -> {0, 100}, 1 -> {1, 100}
-    // segment2: 2 -> {0, 100}, 3 -> {0, 100}
-    int numRecords = 2;
-    int[] primaryKeys = new int[]{0, 1};
-    int[] timestamps = new int[]{100, 100};
-    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
-    ImmutableSegmentImpl segment1 = mockImmutableSegment(1, validDocIds1, getPrimaryKeyList(numRecords, primaryKeys));
-    upsertMetadataManager.addSegment(segment1, validDocIds1,
-        getRecordInfoList(numRecords, primaryKeys, timestamps).iterator());
-
-    primaryKeys = new int[]{2, 3};
-    ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
-    ImmutableSegmentImpl segment2 = mockImmutableSegment(2, validDocIds2, getPrimaryKeyList(numRecords, primaryKeys));
-    upsertMetadataManager.addSegment(segment2, validDocIds2,
-        getRecordInfoList(numRecords, primaryKeys, timestamps).iterator());
-
-    // Remove the first segment
-    upsertMetadataManager.removeSegment(segment1);
-    // segment2: 2 -> {0, 100}, 3 -> {0, 100}
-    assertNull(recordLocationMap.get(makePrimaryKey(0)));
-    assertNull(recordLocationMap.get(makePrimaryKey(1)));
-    checkRecordLocation(recordLocationMap, 2, segment2, 0, 100, hashFunction);
-    checkRecordLocation(recordLocationMap, 3, segment2, 1, 100, hashFunction);
-    assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
   }
 
   @Test

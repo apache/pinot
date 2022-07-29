@@ -430,12 +430,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _logger.info("Added new immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
     } else {
       IndexSegment oldSegment = oldSegmentManager.getSegment();
-      partitionUpsertMetadataManager.addSegment(immutableSegment);
-      // TODO: Fix the following issue about replacing segment in upsert metadata
-      //   - We cannot directly invalidate the docs in the replaced segment because query might still running against it
-      //   - We should track the valid docs in the replaced segment separately. Currently the docs won't be invalidate
-      //     in the replaced segment due to the reason above, and will cause wrong logs/metrics emitted.
-      // partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+      partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
       _logger.info("Replaced {} segment: {} of upsert-enabled table: {}",
           oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, _tableNameWithType);
       releaseSegment(oldSegmentManager);
