@@ -804,6 +804,57 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   }
 
   @Test
+  public void testArrayConcatLongTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("array_concat_long(%s, %s)", LONG_MV_COLUMN, LONG_MV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "arrayConcatLong");
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.LONG);
+    assertFalse(transformFunction.getResultMetadata().isSingleValue());
+    long[][] expectedValues = new long[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = _longMVValues[i].clone();
+      expectedValues[i] = ArrayUtils.addAll(expectedValues[i], expectedValues[i]);
+    }
+    testTransformFunctionMV(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testArrayConcatFloatTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("array_concat_float(%s, %s)", FLOAT_MV_COLUMN, FLOAT_MV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "arrayConcatFloat");
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.FLOAT);
+    assertFalse(transformFunction.getResultMetadata().isSingleValue());
+    float[][] expectedValues = new float[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = _floatMVValues[i].clone();
+      expectedValues[i] = ArrayUtils.addAll(expectedValues[i], expectedValues[i]);
+    }
+    testTransformFunctionMV(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testArrayConcatDoubleTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("array_concat_double(%s, %s)", DOUBLE_MV_COLUMN, DOUBLE_MV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "arrayConcatDouble");
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.DOUBLE);
+    assertFalse(transformFunction.getResultMetadata().isSingleValue());
+    double[][] expectedValues = new double[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = _doubleMVValues[i].clone();
+      expectedValues[i] = ArrayUtils.addAll(expectedValues[i], expectedValues[i]);
+    }
+    testTransformFunctionMV(transformFunction, expectedValues);
+  }
+
+  @Test
   public void testConcatStringTransformFunction() {
     ExpressionContext expression = RequestContextUtils.getExpression(
         String.format("array_concat_string(%s, %s)", STRING_MV_COLUMN, STRING_MV_COLUMN));

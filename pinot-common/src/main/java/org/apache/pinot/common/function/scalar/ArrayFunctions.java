@@ -133,6 +133,21 @@ public class ArrayFunctions {
   }
 
   @ScalarFunction
+  public static long[] arrayConcatLong(long[] values1, long[] values2) {
+    return ArrayUtils.addAll(values1, values2);
+  }
+
+  @ScalarFunction
+  public static float[] arrayConcatFloat(float[] values1, float[] values2) {
+    return ArrayUtils.addAll(values1, values2);
+  }
+
+  @ScalarFunction
+  public static double[] arrayConcatDouble(double[] values1, double[] values2) {
+    return ArrayUtils.addAll(values1, values2);
+  }
+
+  @ScalarFunction
   public static String[] arrayConcatString(String[] values1, String[] values2) {
     return ArrayUtils.addAll(values1, values2);
   }
