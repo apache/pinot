@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
@@ -86,12 +85,15 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
   @Override
   protected InstanceResponseBlock getNextBlock() {
+    IntermediateResultsBlock intermediateResultsBlock;
+    InstanceResponseBlock instanceResponseBlock;
+
     if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
       long startWallClockTimeNs = System.nanoTime();
 
       ThreadTimer mainThreadTimer = new ThreadTimer();
-      IntermediateResultsBlock intermediateResultsBlock = getCombinedResults();
-      InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(intermediateResultsBlock);
+      intermediateResultsBlock = getCombinedResults();
+      instanceResponseBlock = new InstanceResponseBlock(intermediateResultsBlock);
       long mainThreadCpuTimeNs = mainThreadTimer.getThreadTimeNs();
 
       long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
@@ -111,20 +113,15 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
       responseMetaData.put(MetadataKey.THREAD_CPU_TIME_NS.getName(), String.valueOf(threadCpuTimeNs));
       responseMetaData
           .put(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(), String.valueOf(systemActivitiesCpuTimeNs));
-
-      // TODO: Remove this once the SelectionOrderByOperator is modified to throw an exception to catch cases where
-      //       an MV column (identifier or via transform) is present on the order-by list
-      logAndEmitMetricForQueryHasMVSelectionOrderBy(intermediateResultsBlock);
-
-      return instanceResponseBlock;
     } else {
-      // TODO: Remove this once the SelectionOrderByOperator is modified to throw an exception to catch cases where
-      //       an MV column (identifier or via transform) is present on the order-by list
-      IntermediateResultsBlock intermediateResultsBlock = getCombinedResults();
-      logAndEmitMetricForQueryHasMVSelectionOrderBy(intermediateResultsBlock);
-
-      return new InstanceResponseBlock(intermediateResultsBlock);
+      intermediateResultsBlock = getCombinedResults();
+      instanceResponseBlock = new InstanceResponseBlock(intermediateResultsBlock);
     }
+
+    // TODO: Remove this once the SelectionOrderByOperator is modified to throw an exception to catch cases where
+    //       an MV column (identifier or via transform) is present on the order-by list
+    logAndEmitMetricForQueryHasMVSelectionOrderBy(intermediateResultsBlock);
+    return instanceResponseBlock;
   }
 
   private void logAndEmitMetricForQueryHasMVSelectionOrderBy(IntermediateResultsBlock intermediateResultsBlock) {
@@ -136,9 +133,8 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     if (_serverMetrics != null) {
       _serverMetrics.addMeteredTableValue(tableName, ServerMeter.QUERY_HAS_MV_SELECTION_ORDER_BY, 1);
     }
-    List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     LOGGER.warn("Table {} has MV column in ORDER BY. Expressions: {}", tableName,
-        orderByExpressions == null ? "" : orderByExpressions);
+        _queryContext.getOrderByExpressions());
   }
 
   private IntermediateResultsBlock getCombinedResults() {
