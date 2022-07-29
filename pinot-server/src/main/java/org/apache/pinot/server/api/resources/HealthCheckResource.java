@@ -58,10 +58,10 @@ public class HealthCheckResource {
   })
   public String checkHealth(
       @ApiParam(value = "health check type: liveness or readiness") @QueryParam("checkType") String checkType) {
-    if (checkType == null || checkType.equalsIgnoreCase("readiness")) {
-      return getReadinessStatus(_instanceId);
-    } else {
+    if ("liveness".equalsIgnoreCase(checkType)) {
       return "OK";
+    } else {
+      return getReadinessStatus(_instanceId);
     }
   }
 
