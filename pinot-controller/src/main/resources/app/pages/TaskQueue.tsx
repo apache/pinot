@@ -18,12 +18,11 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { get, map, uniqBy, first } from 'lodash';
+import { get, map } from 'lodash';
 import { TableData } from 'Models';
 import { Grid, makeStyles } from '@material-ui/core';
 import SimpleAccordion from '../components/SimpleAccordion';
 import CustomButton from '../components/CustomButton';
-// import TableToolbar from '../components/TableToolbar';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import { useConfirm } from '../components/Confirm';
 import CustomizedTables from '../components/Table';
@@ -66,11 +65,11 @@ const TaskQueue = (props) => {
   const fetchData = async () => {
     setFetching(true);
     const taskInfoRes = await PinotMethodUtils.getTaskInfo(taskType);
-    const tablesResponse:any = await PinotMethodUtils.getTaskTypeDebugData(taskType);
+    const tablesResponse:any = await PinotMethodUtils.getTableData({ taskType });
     setTaskInfo(taskInfoRes);
     setTables((prevState): TableData => {
-      const _records = map(tablesResponse, table => [get(table, 'subtaskInfos.0.taskConfig.configs.tableName', '')]);
-      return { ...prevState, records: uniqBy(_records, (rec) => first(rec)) };
+      const _records = map(get(tablesResponse, 'tables', []), table => [[table]]);
+      return { ...prevState, records: _records };
     });
     setFetching(false);
   };

@@ -31,6 +31,7 @@ import {
   getPeriodicTaskNames,
   getTaskTypes,
   getTaskTypeDebug,
+  getTables,
   getTaskTypeTasks,
   getTaskTypeState,
   stopTasks,
@@ -1005,6 +1006,12 @@ const getTaskTypeDebugData = (taskType)=>{
   })
 };
 
+const getTableData = (params)=>{
+  return getTables(params).then(response=>{
+    return response.data;
+  })
+};
+
 const scheduleTaskAction = (tableName, taskType)=>{
   return sheduleTask(tableName, taskType).then(response=>{
     return response.data;
@@ -1082,6 +1089,7 @@ export default {
   getAllPeriodicTaskNames,
   getAllTaskTypes,
   getTaskTypeDebugData,
+  getTableData,
   getTaskInfo,
   stopAllTasks,
   resumeAllTasks,

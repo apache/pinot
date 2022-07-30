@@ -43,11 +43,14 @@ import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,8 +112,137 @@ public class BloomFilterHandler implements IndexHandler {
   }
 
   private boolean shouldCreateBloomFilter(ColumnMetadata columnMetadata) {
-    // TODO: Support raw index
-    return columnMetadata != null && columnMetadata.hasDictionary();
+    return columnMetadata != null;
+  }
+
+  private void createAndSealBloomFilterForDictionaryColumn(BloomFilterCreatorProvider indexCreatorProvider,
+      File indexDir, ColumnMetadata columnMetadata, BloomFilterConfig bloomFilterConfig,
+      SegmentDirectory.Writer segmentWriter)
+      throws Exception {
+    try (BloomFilterCreator bloomFilterCreator = indexCreatorProvider.newBloomFilterCreator(
+        IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata).build()
+            .forBloomFilter(bloomFilterConfig));
+        Dictionary dictionary = getDictionaryReader(columnMetadata, segmentWriter)) {
+      int length = dictionary.length();
+      for (int i = 0; i < length; i++) {
+        bloomFilterCreator.add(dictionary.getStringValue(i));
+      }
+      bloomFilterCreator.seal();
+    }
+  }
+
+  private void createAndSealBloomFilterForNonDictionaryColumn(BloomFilterCreatorProvider indexCreatorProvider,
+      File indexDir, ColumnMetadata columnMetadata, BloomFilterConfig bloomFilterConfig,
+      SegmentDirectory.Writer segmentWriter)
+      throws Exception {
+    int numDocs = columnMetadata.getTotalDocs();
+    try (BloomFilterCreator bloomFilterCreator = indexCreatorProvider.newBloomFilterCreator(
+        IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata).build()
+            .forBloomFilter(bloomFilterConfig));
+        ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
+        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
+      if (columnMetadata.isSingleValue()) {
+        // SV
+        switch (columnMetadata.getDataType()) {
+          case INT:
+            for (int i = 0; i < numDocs; i++) {
+              bloomFilterCreator.add(Integer.toString(forwardIndexReader.getInt(i, readerContext)));
+            }
+            break;
+          case LONG:
+            for (int i = 0; i < numDocs; i++) {
+              bloomFilterCreator.add(Long.toString(forwardIndexReader.getLong(i, readerContext)));
+            }
+            break;
+          case FLOAT:
+            for (int i = 0; i < numDocs; i++) {
+              bloomFilterCreator.add(Float.toString(forwardIndexReader.getFloat(i, readerContext)));
+            }
+            break;
+          case DOUBLE:
+            for (int i = 0; i < numDocs; i++) {
+              bloomFilterCreator.add(Double.toString(forwardIndexReader.getDouble(i, readerContext)));
+            }
+            break;
+          case STRING:
+            for (int i = 0; i < numDocs; i++) {
+              bloomFilterCreator.add(forwardIndexReader.getString(i, readerContext));
+            }
+            break;
+          case BYTES:
+            for (int i = 0; i < numDocs; i++) {
+              bloomFilterCreator.add(BytesUtils.toHexString(forwardIndexReader.getBytes(i, readerContext)));
+            }
+            break;
+          default:
+            throw new IllegalStateException("Unsupported data type: " + columnMetadata.getDataType() + " for column: "
+                + columnMetadata.getColumnName());
+        }
+        bloomFilterCreator.seal();
+      } else {
+        // MV
+        switch (columnMetadata.getDataType()) {
+          case INT:
+            for (int i = 0; i < numDocs; i++) {
+              int[] buffer = new int[columnMetadata.getMaxNumberOfMultiValues()];
+              int length = forwardIndexReader.getIntMV(i, buffer, readerContext);
+              for (int j = 0; j < length; j++) {
+                bloomFilterCreator.add(Integer.toString(buffer[j]));
+              }
+            }
+            break;
+          case LONG:
+            for (int i = 0; i < numDocs; i++) {
+              long[] buffer = new long[columnMetadata.getMaxNumberOfMultiValues()];
+              int length = forwardIndexReader.getLongMV(i, buffer, readerContext);
+              for (int j = 0; j < length; j++) {
+                bloomFilterCreator.add(Long.toString(buffer[j]));
+              }
+            }
+            break;
+          case FLOAT:
+            for (int i = 0; i < numDocs; i++) {
+              float[] buffer = new float[columnMetadata.getMaxNumberOfMultiValues()];
+              int length = forwardIndexReader.getFloatMV(i, buffer, readerContext);
+              for (int j = 0; j < length; j++) {
+                bloomFilterCreator.add(Float.toString(buffer[j]));
+              }
+            }
+            break;
+          case DOUBLE:
+            for (int i = 0; i < numDocs; i++) {
+              double[] buffer = new double[columnMetadata.getMaxNumberOfMultiValues()];
+              int length = forwardIndexReader.getDoubleMV(i, buffer, readerContext);
+              for (int j = 0; j < length; j++) {
+                bloomFilterCreator.add(Double.toString(buffer[j]));
+              }
+            }
+            break;
+          case STRING:
+            for (int i = 0; i < numDocs; i++) {
+              String[] buffer = new String[columnMetadata.getMaxNumberOfMultiValues()];
+              int length = forwardIndexReader.getStringMV(i, buffer, readerContext);
+              for (int j = 0; j < length; j++) {
+                bloomFilterCreator.add(buffer[j]);
+              }
+            }
+            break;
+          case BYTES:
+            for (int i = 0; i < numDocs; i++) {
+              byte[][] buffer = new byte[columnMetadata.getMaxNumberOfMultiValues()][];
+              int length = forwardIndexReader.getBytesMV(i, buffer, readerContext);
+              for (int j = 0; j < length; j++) {
+                bloomFilterCreator.add(BytesUtils.toHexString(buffer[j]));
+              }
+            }
+            break;
+          default:
+            throw new IllegalStateException("Unsupported data type: " + columnMetadata.getDataType() + " for column: "
+                + columnMetadata.getColumnName());
+        }
+        bloomFilterCreator.seal();
+      }
+    }
   }
 
   private void createBloomFilterForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
@@ -136,15 +268,12 @@ public class BloomFilterHandler implements IndexHandler {
     BloomFilterConfig bloomFilterConfig = _bloomFilterConfigs.get(columnName);
     LOGGER.info("Creating new bloom filter for segment: {}, column: {} with config: {}", segmentName, columnName,
         bloomFilterConfig);
-    try (BloomFilterCreator bloomFilterCreator = indexCreatorProvider.newBloomFilterCreator(
-        IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata)
-            .build().forBloomFilter(bloomFilterConfig));
-        Dictionary dictionary = getDictionaryReader(columnMetadata, segmentWriter)) {
-      int length = dictionary.length();
-      for (int i = 0; i < length; i++) {
-        bloomFilterCreator.add(dictionary.getStringValue(i));
-      }
-      bloomFilterCreator.seal();
+    if (columnMetadata.hasDictionary()) {
+      createAndSealBloomFilterForDictionaryColumn(indexCreatorProvider, indexDir, columnMetadata, bloomFilterConfig,
+          segmentWriter);
+    } else {
+      createAndSealBloomFilterForNonDictionaryColumn(indexCreatorProvider, indexDir, columnMetadata, bloomFilterConfig,
+          segmentWriter);
     }
 
     // For v3, write the generated bloom filter file into the single file and remove it.

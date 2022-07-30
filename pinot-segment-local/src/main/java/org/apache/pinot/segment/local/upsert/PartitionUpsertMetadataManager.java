@@ -23,8 +23,12 @@ import com.google.common.base.Preconditions;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -35,6 +39,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.local.utils.RecordInfo;
+import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -91,6 +96,9 @@ public class PartitionUpsertMetadataManager {
   @VisibleForTesting
   final ConcurrentHashMap<Object, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
 
+  @VisibleForTesting
+  final Set<IndexSegment> _replacedSegments = ConcurrentHashMap.newKeySet();
+
   // Reused for reading previous record during partial upsert
   private final GenericRow _reuse = new GenericRow();
 
@@ -121,6 +129,12 @@ public class PartitionUpsertMetadataManager {
    * Initializes the upsert metadata for the given immutable segment.
    */
   public void addSegment(ImmutableSegment segment) {
+    addSegment(segment, null, null);
+  }
+
+  @VisibleForTesting
+  void addSegment(ImmutableSegment segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable Iterator<RecordInfo> recordInfoIterator) {
     String segmentName = segment.getSegmentName();
     _logger.info("Adding segment: {}, current primary key count: {}", segmentName,
         _primaryKeyToRecordLocationMap.size());
@@ -130,10 +144,22 @@ public class PartitionUpsertMetadataManager {
       return;
     }
 
-    Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
-        "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(), segmentName,
-        _tableNameWithType);
-    addSegment((ImmutableSegmentImpl) segment, new ThreadSafeMutableRoaringBitmap(), getRecordInfoIterator(segment));
+    Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
+    segmentLock.lock();
+    try {
+      Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
+          "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(), segmentName,
+          _tableNameWithType);
+      if (validDocIds == null) {
+        validDocIds = new ThreadSafeMutableRoaringBitmap();
+      }
+      if (recordInfoIterator == null) {
+        recordInfoIterator = getRecordInfoIterator(segment);
+      }
+      addOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, recordInfoIterator, null, null);
+    } finally {
+      segmentLock.unlock();
+    }
 
     // Update metrics
     int numPrimaryKeys = _primaryKeyToRecordLocationMap.size();
@@ -179,11 +205,13 @@ public class PartitionUpsertMetadataManager {
     }
   }
 
-  @VisibleForTesting
-  void addSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
-      Iterator<RecordInfo> recordInfoIterator) {
+  private void addOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
+      Iterator<RecordInfo> recordInfoIterator, @Nullable IndexSegment oldSegment,
+      @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
     String segmentName = segment.getSegmentName();
     segment.enableUpsert(this, validDocIds);
+
+    AtomicInteger numKeysInWrongSegment = new AtomicInteger();
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
       _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
@@ -197,7 +225,7 @@ public class PartitionUpsertMetadataManager {
               // The current record is in the same segment
               // Update the record location when there is a tie to keep the newer record. Note that the record info
               // iterator will return records with incremental doc ids.
-              if (segment == currentSegment) {
+              if (currentSegment == segment) {
                 if (comparisonResult >= 0) {
                   validDocIds.replace(currentRecordLocation.getDocId(), recordInfo.getDocId());
                   return new RecordLocation(segment, recordInfo.getDocId(), recordInfo.getComparisonValue());
@@ -210,9 +238,25 @@ public class PartitionUpsertMetadataManager {
               // This could happen when committing a consuming segment, or reloading a completed segment. In this
               // case, we want to update the record location when there is a tie because the record locations should
               // point to the new added segment instead of the old segment being replaced. Also, do not update the valid
-              // doc ids for the old segment because it has not been replaced yet.
+              // doc ids for the old segment because it has not been replaced yet. We pass in an optional valid doc ids
+              // snapshot for the old segment, which can be updated and used to track the docs not replaced yet.
+              if (currentSegment == oldSegment) {
+                if (comparisonResult >= 0) {
+                  validDocIds.add(recordInfo.getDocId());
+                  if (validDocIdsForOldSegment != null) {
+                    validDocIdsForOldSegment.remove(currentRecordLocation.getDocId());
+                  }
+                  return new RecordLocation(segment, recordInfo.getDocId(), recordInfo.getComparisonValue());
+                } else {
+                  return currentRecordLocation;
+                }
+              }
+
+              // This should not happen because the previously replaced segment should have all keys removed. We still
+              // handle it here, and also track the number of keys not properly replaced previously.
               String currentSegmentName = currentSegment.getSegmentName();
-              if (segmentName.equals(currentSegmentName)) {
+              if (currentSegmentName.equals(segmentName)) {
+                numKeysInWrongSegment.getAndIncrement();
                 if (comparisonResult >= 0) {
                   validDocIds.add(recordInfo.getDocId());
                   return new RecordLocation(segment, recordInfo.getDocId(), recordInfo.getComparisonValue());
@@ -241,6 +285,11 @@ public class PartitionUpsertMetadataManager {
               return new RecordLocation(segment, recordInfo.getDocId(), recordInfo.getComparisonValue());
             }
           });
+    }
+    int numKeys = numKeysInWrongSegment.get();
+    if (numKeys > 0) {
+      _logger.warn("Found {} primary keys in the wrong segment when adding segment: {}", numKeys, segmentName);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_KEYS_IN_WRONG_SEGMENT, numKeys);
     }
   }
 
@@ -284,36 +333,73 @@ public class PartitionUpsertMetadataManager {
   /**
    * Replaces the upsert metadata for the old segment with the new immutable segment.
    */
-  public void replaceSegment(ImmutableSegment newSegment, IndexSegment oldSegment) {
-    String segmentName = newSegment.getSegmentName();
+  public void replaceSegment(ImmutableSegment segment, IndexSegment oldSegment) {
+    replaceSegment(segment, null, null, oldSegment);
+  }
+
+  @VisibleForTesting
+  void replaceSegment(ImmutableSegment segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable Iterator<RecordInfo> recordInfoIterator, IndexSegment oldSegment) {
+    String segmentName = segment.getSegmentName();
     Preconditions.checkArgument(segmentName.equals(oldSegment.getSegmentName()),
         "Cannot replace segment with different name for table: {}, old segment: {}, new segment: {}",
         _tableNameWithType, oldSegment.getSegmentName(), segmentName);
-    _logger.info("Replacing {} segment: {}", oldSegment instanceof ImmutableSegment ? "immutable" : "mutable",
-        segmentName);
+    _logger.info("Replacing {} segment: {}, current primary key count: {}",
+        oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName,
+        _primaryKeyToRecordLocationMap.size());
 
-    addSegment(newSegment);
-
-    MutableRoaringBitmap validDocIds =
-        oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
-    if (validDocIds != null && !validDocIds.isEmpty()) {
-      int numDocsNotReplaced = validDocIds.getCardinality();
-      if (_partialUpsertHandler != null) {
-        // For partial-upsert table, because we do not restore the original record location when removing the primary
-        // keys not replaced, it can potentially cause inconsistency between replicas. This can happen when a consuming
-        // segment is replaced by a committed segment that is consumed from a different server with different records
-        // (some stream consumer cannot guarantee consuming the messages in the same order).
-        _logger.error("{} primary keys not replaced when replacing segment: {} for partial-upsert table. This can "
-            + "potentially cause inconsistency between replicas", numDocsNotReplaced, segmentName);
-        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_ROWS_NOT_REPLACED,
-            numDocsNotReplaced);
+    Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
+    segmentLock.lock();
+    try {
+      MutableRoaringBitmap validDocIdsForOldSegment =
+          oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
+      if (segment instanceof EmptyIndexSegment) {
+        _logger.info("Skip adding empty segment: {}", segmentName);
       } else {
-        _logger.info("{} primary keys not replaced when replacing segment: {}", numDocsNotReplaced, segmentName);
+        Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
+            "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(), segmentName,
+            _tableNameWithType);
+        if (validDocIds == null) {
+          validDocIds = new ThreadSafeMutableRoaringBitmap();
+        }
+        if (recordInfoIterator == null) {
+          recordInfoIterator = getRecordInfoIterator(segment);
+        }
+        addOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, recordInfoIterator, oldSegment,
+            validDocIdsForOldSegment);
       }
-      removeSegment(oldSegment);
+
+      if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
+        int numKeysNotReplaced = validDocIdsForOldSegment.getCardinality();
+        if (_partialUpsertHandler != null) {
+          // For partial-upsert table, because we do not restore the original record location when removing the primary
+          // keys not replaced, it can potentially cause inconsistency between replicas. This can happen when a
+          // consuming segment is replaced by a committed segment that is consumed from a different server with
+          // different records (some stream consumer cannot guarantee consuming the messages in the same order).
+          _logger.warn("Found {} primary keys not replaced when replacing segment: {} for partial-upsert table. This "
+              + "can potentially cause inconsistency between replicas", numKeysNotReplaced, segmentName);
+          _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED,
+              numKeysNotReplaced);
+        } else {
+          _logger.info("Found {} primary keys not replaced when replacing segment: {}", numKeysNotReplaced,
+              segmentName);
+        }
+        removeSegment(oldSegment, validDocIdsForOldSegment);
+      }
+    } finally {
+      segmentLock.unlock();
     }
 
-    _logger.info("Finished replacing segment: {}", segmentName);
+    if (!(oldSegment instanceof EmptyIndexSegment)) {
+      _replacedSegments.add(oldSegment);
+    }
+
+    // Update metrics
+    int numPrimaryKeys = _primaryKeyToRecordLocationMap.size();
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+        numPrimaryKeys);
+
+    _logger.info("Finished replacing segment: {}, current primary key count: {}", segmentName, numPrimaryKeys);
   }
 
   /**
@@ -325,14 +411,37 @@ public class PartitionUpsertMetadataManager {
         segment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName,
         _primaryKeyToRecordLocationMap.size());
 
-    MutableRoaringBitmap validDocIds =
-        segment.getValidDocIds() != null ? segment.getValidDocIds().getMutableRoaringBitmap() : null;
-    if (validDocIds == null || validDocIds.isEmpty()) {
-      _logger.info("Skip removing segment without valid docs: {}", segmentName);
+    if (_replacedSegments.remove(segment)) {
+      _logger.info("Skip removing replaced segment: {}", segmentName);
       return;
     }
 
-    _logger.info("Removing {} primary keys for segment: {}", validDocIds.getCardinality(), segmentName);
+    Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
+    segmentLock.lock();
+    try {
+      MutableRoaringBitmap validDocIds =
+          segment.getValidDocIds() != null ? segment.getValidDocIds().getMutableRoaringBitmap() : null;
+      if (validDocIds == null || validDocIds.isEmpty()) {
+        _logger.info("Skip removing segment without valid docs: {}", segmentName);
+        return;
+      }
+
+      _logger.info("Removing {} primary keys for segment: {}", validDocIds.getCardinality(), segmentName);
+      removeSegment(segment, validDocIds);
+    } finally {
+      segmentLock.unlock();
+    }
+
+    // Update metrics
+    int numPrimaryKeys = _primaryKeyToRecordLocationMap.size();
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+        numPrimaryKeys);
+
+    _logger.info("Finished removing segment: {}, current primary key count: {}", segmentName, numPrimaryKeys);
+  }
+
+  private void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
+    assert !validDocIds.isEmpty();
     PrimaryKey primaryKey = new PrimaryKey(new Object[_primaryKeyColumns.size()]);
     PeekableIntIterator iterator = validDocIds.getIntIterator();
     while (iterator.hasNext()) {
@@ -346,13 +455,6 @@ public class PartitionUpsertMetadataManager {
             return recordLocation;
           });
     }
-
-    // Update metrics
-    int numPrimaryKeys = _primaryKeyToRecordLocationMap.size();
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
-        numPrimaryKeys);
-
-    _logger.info("Finished removing segment: {}, current primary key count: {}", segmentName, numPrimaryKeys);
   }
 
   /**
@@ -364,14 +466,19 @@ public class PartitionUpsertMetadataManager {
       return record;
     }
 
-    RecordLocation currentRecordLocation =
-        _primaryKeyToRecordLocationMap.get(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction));
+    AtomicReference<GenericRow> previousRecordReference = new AtomicReference<>();
+    RecordLocation currentRecordLocation = _primaryKeyToRecordLocationMap.computeIfPresent(
+        HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), (pk, recordLocation) -> {
+          if (recordInfo.getComparisonValue().compareTo(recordLocation.getComparisonValue()) >= 0) {
+            _reuse.clear();
+            previousRecordReference.set(recordLocation.getSegment().getRecord(recordLocation.getDocId(), _reuse));
+          }
+          return recordLocation;
+        });
     if (currentRecordLocation != null) {
       // Existing primary key
-      if (recordInfo.getComparisonValue().compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
-        _reuse.clear();
-        GenericRow previousRecord =
-            currentRecordLocation.getSegment().getRecord(currentRecordLocation.getDocId(), _reuse);
+      GenericRow previousRecord = previousRecordReference.get();
+      if (previousRecord != null) {
         return _partialUpsertHandler.merge(previousRecord, record);
       } else {
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_OUT_OF_ORDER, 1L);

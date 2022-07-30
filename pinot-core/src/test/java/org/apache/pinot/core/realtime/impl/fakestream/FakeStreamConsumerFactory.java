@@ -47,7 +47,7 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
 
   @Override
   public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-    return new FakePartitionLevelConsumer(partition, _streamConfig);
+    return new FakePartitionLevelConsumer(partition, _streamConfig, FakeStreamConfigUtils.MESSAGE_BATCH_SIZE);
   }
 
   @Override

@@ -53,9 +53,10 @@ public class FakePartitionLevelConsumer implements PartitionLevelConsumer {
 
   private List<Integer> _messageOffsets = new ArrayList<>();
   private List<byte[]> _messageBytes = new ArrayList<>();
+  private final int _defaultBatchSize;
 
-  FakePartitionLevelConsumer(int partition, StreamConfig streamConfig) {
-
+  FakePartitionLevelConsumer(int partition, StreamConfig streamConfig, int defaultBatchSize) {
+    _defaultBatchSize = defaultBatchSize;
     // TODO: this logic can move to a FakeStreamProducer instead of being inside the Consumer
     File tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
     File outputDir = new File(tempDir, String.valueOf(partition));
@@ -114,6 +115,10 @@ public class FakePartitionLevelConsumer implements PartitionLevelConsumer {
     }
     int startOffsetInt = (int) ((LongMsgOffset) startOffset).getOffset();
     int endOffsetInt = (int) ((LongMsgOffset) endOffset).getOffset();
+    if (endOffsetInt > _messageOffsets.size() && _defaultBatchSize > 0) {
+      // Hack to get multiple batches
+      endOffsetInt = startOffsetInt + _defaultBatchSize;
+    }
     return new FakeStreamMessageBatch(_messageOffsets.subList(startOffsetInt, endOffsetInt),
         _messageBytes.subList(startOffsetInt, endOffsetInt));
   }

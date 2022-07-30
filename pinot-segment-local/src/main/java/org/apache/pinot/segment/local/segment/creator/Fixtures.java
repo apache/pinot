@@ -109,7 +109,7 @@ public class Fixtures {
     return Schema.fromString(SCHEMA_JSON);
   }
 
-  public static GenericRow createSingleRow(int randomSeed) {
+  public static GenericRow createSingleRow(long randomSeed) {
     Random rand = new Random(randomSeed);
     int colValue = rand.nextInt(Integer.MAX_VALUE);
     GenericRow retVal = new GenericRow();
@@ -120,7 +120,7 @@ public class Fixtures {
     return retVal;
   }
 
-  public static GenericRow createInvalidSingleRow(int randomSeed) {
+  public static GenericRow createInvalidSingleRow(long randomSeed) {
     Random rand = new Random(randomSeed);
     int colValue = rand.nextInt(Integer.MAX_VALUE);
     GenericRow retVal = new GenericRow();
@@ -131,7 +131,7 @@ public class Fixtures {
     return retVal;
   }
 
-  public static GenericRow createMultipleRow(int randomSeed) {
+  public static GenericRow createMultipleRow(long randomSeed) {
     Random rand = new Random(randomSeed);
     GenericRow firstRow = createSingleRow(randomSeed);
     GenericRow secondRow = createSingleRow(rand.nextInt(Integer.MAX_VALUE));
@@ -141,7 +141,7 @@ public class Fixtures {
     return retVal;
   }
 
-  public static GenericRow createMultipleRowPartialFailure(int randomSeed) {
+  public static GenericRow createMultipleRowPartialFailure(long randomSeed) {
     Random rand = new Random(randomSeed);
     GenericRow firstRow = createSingleRow(randomSeed);
     GenericRow secondRow = createInvalidSingleRow(rand.nextInt(Integer.MAX_VALUE));

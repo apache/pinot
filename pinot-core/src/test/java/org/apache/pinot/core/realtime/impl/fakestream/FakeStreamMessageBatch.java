@@ -36,26 +36,32 @@ public class FakeStreamMessageBatch implements MessageBatch<byte[]> {
     _messageBytes = messageBytes;
   }
 
+  @Override
   public int getMessageCount() {
     return _messageOffsets.size();
   }
 
+  @Override
   public byte[] getMessageAtIndex(int index) {
     return _messageBytes.get(index);
   }
 
+  @Override
   public int getMessageOffsetAtIndex(int index) {
     return _messageOffsets.get(index);
   }
 
+  @Override
   public int getMessageLengthAtIndex(int index) {
     return _messageBytes.get(index).length;
   }
 
+  @Override
   public long getNextStreamMessageOffsetAtIndex(int index) {
     throw new UnsupportedOperationException("This method is deprecated");
   }
 
+  @Override
   public StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
     return new LongMsgOffset(_messageOffsets.get(index) + 1);
   }

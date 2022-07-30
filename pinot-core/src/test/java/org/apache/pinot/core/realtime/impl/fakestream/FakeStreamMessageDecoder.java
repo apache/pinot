@@ -20,6 +20,7 @@ package org.apache.pinot.core.realtime.impl.fakestream;
 
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 
@@ -35,11 +36,13 @@ public class FakeStreamMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
-    return null;
+    GenericRow row = Fixtures.createSingleRow(System.currentTimeMillis());
+    destination.init(row);
+    return destination;
   }
 
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-    return null;
+    return decode(payload, destination);
   }
 }

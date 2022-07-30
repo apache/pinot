@@ -1080,15 +1080,6 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNoDictionaryColumns(columnList)
-        .setBloomFilterColumns(columnList).build();
-    try {
-      TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail for valid column name in both no dictionary and bloom filter column config");
-    } catch (Exception e) {
-      // expected
-    }
-
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setJsonIndexColumns(Arrays.asList("non-existent-column")).build();
     try {
