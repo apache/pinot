@@ -20,6 +20,7 @@ package org.apache.pinot.server.api.resources;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import javax.inject.Inject;
@@ -27,6 +28,7 @@ import javax.inject.Named;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -54,8 +56,13 @@ public class HealthCheckResource {
       @ApiResponse(code = 200, message = "Server is healthy"),
       @ApiResponse(code = 503, message = "Server is not healthy")
   })
-  public String checkHealth() {
-    return getReadinessStatus(_instanceId);
+  public String checkHealth(
+      @ApiParam(value = "health check type: liveness or readiness") @QueryParam("checkType") String checkType) {
+    if ("liveness".equalsIgnoreCase(checkType)) {
+      return "OK";
+    } else {
+      return getReadinessStatus(_instanceId);
+    }
   }
 
   @GET
