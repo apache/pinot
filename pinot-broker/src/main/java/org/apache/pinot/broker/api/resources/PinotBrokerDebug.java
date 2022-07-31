@@ -18,28 +18,14 @@
  */
 package org.apache.pinot.broker.api.resources;
 
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiKeyAuthDefinition;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
-import io.swagger.annotations.ApiResponse;
-import io.swagger.annotations.ApiResponses;
-import io.swagger.annotations.Authorization;
-import io.swagger.annotations.SecurityDefinition;
-import io.swagger.annotations.SwaggerDefinition;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import javax.inject.Inject;
-import javax.ws.rs.GET;
 import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.broker.api.services.PinotBrokerDebugService;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.routing.RoutingTable;
@@ -48,30 +34,15 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
-import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
-
-@Api(tags = "Debug", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
-@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
 @Path("/")
-// TODO: Add APIs to return the RoutingTable (with unavailable segments)
-public class PinotBrokerDebug {
+public class PinotBrokerDebug implements PinotBrokerDebugService {
 
   @Inject
   private BrokerRoutingManager _routingManager;
 
-  @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/debug/timeBoundary/{tableName}")
-  @ApiOperation(value = "Get the time boundary information for a table")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Time boundary information for a table"),
-      @ApiResponse(code = 404, message = "Time boundary not found"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  public TimeBoundaryInfo getTimeBoundary(
-      @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName) {
+  @Override
+  public TimeBoundaryInfo getTimeBoundary(String tableName) {
     String offlineTableName =
         TableNameBuilder.OFFLINE.tableNameWithType(TableNameBuilder.extractRawTableName(tableName));
     TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);
@@ -82,17 +53,8 @@ public class PinotBrokerDebug {
     }
   }
 
-  @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/debug/routingTable/{tableName}")
-  @ApiOperation(value = "Get the routing table for a table")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Routing table"),
-      @ApiResponse(code = 404, message = "Routing not found"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  public Map<String, Map<ServerInstance, List<String>>> getRoutingTable(
-      @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName) {
+  @Override
+  public Map<String, Map<ServerInstance, List<String>>> getRoutingTable(String tableName) {
     Map<String, Map<ServerInstance, List<String>>> result = new TreeMap<>();
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType != TableType.REALTIME) {
@@ -118,17 +80,8 @@ public class PinotBrokerDebug {
     }
   }
 
-  @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/debug/routingTable/sql")
-  @ApiOperation(value = "Get the routing table for a query")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Routing table"),
-      @ApiResponse(code = 404, message = "Routing not found"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  public Map<ServerInstance, List<String>> getRoutingTableForQuery(
-      @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query) {
+  @Override
+  public Map<ServerInstance, List<String>> getRoutingTableForQuery(String query) {
     RoutingTable routingTable = _routingManager.getRoutingTable(CalciteSqlCompiler.compileToBrokerRequest(query));
     if (routingTable != null) {
       return routingTable.getServerInstanceToSegmentsMap();

@@ -22,31 +22,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiKeyAuthDefinition;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
-import io.swagger.annotations.ApiResponse;
-import io.swagger.annotations.ApiResponses;
-import io.swagger.annotations.Authorization;
-import io.swagger.annotations.SecurityDefinition;
-import io.swagger.annotations.SwaggerDefinition;
 import java.util.HashMap;
 import java.util.Map;
 import javax.inject.Inject;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
 import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.AsyncResponse;
-import javax.ws.rs.container.Suspended;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
+import org.apache.pinot.broker.api.services.PinotClientRequestService;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -61,18 +45,12 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
-import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
-
-@Api(tags = "Query", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
-@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
 @Path("/")
-public class PinotClientRequest {
+public class PinotClientRequest implements PinotClientRequestService {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotClientRequest.class);
 
   @Inject
@@ -84,19 +62,9 @@ public class PinotClientRequest {
   @Inject
   private BrokerMetrics _brokerMetrics;
 
-  @GET
-  @ManagedAsync
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("query/sql")
-  @ApiOperation(value = "Querying pinot")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Query response"),
-      @ApiResponse(code = 500, message = "Internal Server Error")
-  })
-  public void processSqlQueryGet(@ApiParam(value = "Query", required = true) @QueryParam("sql") String query,
-      @ApiParam(value = "Trace enabled") @QueryParam(Request.TRACE) String traceEnabled,
-      @ApiParam(value = "Debug options") @QueryParam(Request.DEBUG_OPTIONS) String debugOptions,
-      @Suspended AsyncResponse asyncResponse, @Context org.glassfish.grizzly.http.server.Request requestContext) {
+  @Override
+  public void processSqlQueryGet(String query, String traceEnabled, String debugOptions, AsyncResponse asyncResponse,
+      org.glassfish.grizzly.http.server.Request requestContext) {
     try {
       ObjectNode requestJson = JsonUtils.newObjectNode();
       requestJson.put(Request.SQL, query);
@@ -115,17 +83,9 @@ public class PinotClientRequest {
     }
   }
 
-  @POST
-  @ManagedAsync
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("query/sql")
-  @ApiOperation(value = "Querying pinot")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Query response"),
-      @ApiResponse(code = 500, message = "Internal Server Error")
-  })
-  public void processSqlQueryPost(String query, @Suspended AsyncResponse asyncResponse,
-      @Context org.glassfish.grizzly.http.server.Request requestContext) {
+  @Override
+  public void processSqlQueryPost(String query, AsyncResponse asyncResponse,
+      org.glassfish.grizzly.http.server.Request requestContext) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(query);
       if (!requestJson.has(Request.SQL)) {
