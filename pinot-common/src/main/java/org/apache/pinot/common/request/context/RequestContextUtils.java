@@ -90,7 +90,9 @@ public class RequestContextUtils {
       for (Expression operand : operands) {
         arguments.add(getExpression(operand));
       }
-      if (arguments.size() == 0 && functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+      // TODO(walterddr): a work-around for multi-stage query engine which might pass COUNT without argument, and
+      //  should be removed once that issue is fixed.
+      if (arguments.isEmpty() && functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
         arguments.add(ExpressionContext.forIdentifier("*"));
       }
       return new FunctionContext(functionType, functionName, arguments);

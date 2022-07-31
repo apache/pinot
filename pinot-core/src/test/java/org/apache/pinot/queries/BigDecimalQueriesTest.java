@@ -285,7 +285,8 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       assertEquals(dataSchema, new DataSchema(new String[]{"count"}, new ColumnDataType[]{ColumnDataType.LONG}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 1);
-      assertEquals((long) rows.get(0)[0], 4 * NUM_RECORDS);
+      // A quarter of the data is null and hence the count is 3 * NUM_RECORDS, not 4 * NUM_RECORDS.
+      assertEquals((long) rows.get(0)[0], 3 * NUM_RECORDS);
     }
     {
       String query = String.format("SELECT %s FROM testTable GROUP BY %s ORDER BY %s DESC",

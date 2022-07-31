@@ -19,16 +19,16 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.math.BigDecimal;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -37,8 +37,6 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
   private static final double DEFAULT_INITIAL_VALUE = Double.NEGATIVE_INFINITY;
   private final boolean _nullHandlingEnabled;
 
-  private final Set<Integer> _groupKeysWithNonNullValue;
-
   public MaxAggregationFunction(ExpressionContext expression) {
     this(expression, false);
   }
@@ -46,7 +44,6 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
   public MaxAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     _nullHandlingEnabled = nullHandlingEnabled;
-    _groupKeysWithNonNullValue = new HashSet<>();
   }
 
   @Override
@@ -56,11 +53,17 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
+    if (_nullHandlingEnabled) {
+      return new ObjectAggregationResultHolder();
+    }
     return new DoubleAggregationResultHolder(DEFAULT_INITIAL_VALUE);
   }
 
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
+    if (_nullHandlingEnabled) {
+      return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
+    }
     return new DoubleGroupByResultHolder(initialCapacity, maxCapacity, DEFAULT_INITIAL_VALUE);
   }
 
@@ -133,72 +136,77 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
         int[] values = blockValSet.getIntValuesSV();
-        // First value can be null.
-        int max = Integer.MIN_VALUE;
         if (nullBitmap.getCardinality() < values.length) {
+          int max = Integer.MIN_VALUE;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               max = Math.max(values[i], max);
             }
           }
+          Double otherMax = aggregationResultHolder.getResult();
+          aggregationResultHolder.setValue(otherMax == null ? max : Math.max(max, otherMax));
         }
-        // TODO: When all input values are null (nullBitmap.getCardinality() == values.length), Pinot returns
-        //  Integer.MIN_VALUE while Presto returns null. Same for other stored types.
-        aggregationResultHolder.setValue(Math.max(max, aggregationResultHolder.getDoubleResult()));
+        // Note: when all input values re null (nullBitmap.getCardinality() == values.length), max is null. As a result,
+        // we don't update the value of aggregationResultHolder.
         break;
       }
       case LONG: {
         long[] values = blockValSet.getLongValuesSV();
-        long max = Long.MIN_VALUE;
         if (nullBitmap.getCardinality() < values.length) {
+          long max = Long.MIN_VALUE;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               max = Math.max(values[i], max);
             }
           }
+          Double otherMax = aggregationResultHolder.getResult();
+          aggregationResultHolder.setValue(otherMax == null ? max : Math.max(max, otherMax));
         }
-        aggregationResultHolder.setValue(Math.max(max, aggregationResultHolder.getDoubleResult()));
         break;
       }
       case FLOAT: {
         float[] values = blockValSet.getFloatValuesSV();
-        float max = Float.NEGATIVE_INFINITY;
         if (nullBitmap.getCardinality() < values.length) {
+          float max = Float.NEGATIVE_INFINITY;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               max = Math.max(values[i], max);
             }
           }
+          Double otherMax = aggregationResultHolder.getResult();
+          aggregationResultHolder.setValue(otherMax == null ? max : Math.max(max, otherMax));
         }
-        aggregationResultHolder.setValue(Math.max(max, aggregationResultHolder.getDoubleResult()));
         break;
       }
       case DOUBLE: {
         double[] values = blockValSet.getDoubleValuesSV();
-        double max = Double.NEGATIVE_INFINITY;
         if (nullBitmap.getCardinality() < values.length) {
+          double max = Double.NEGATIVE_INFINITY;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               max = Math.max(values[i], max);
             }
           }
+          Double otherMax = aggregationResultHolder.getResult();
+          aggregationResultHolder.setValue(otherMax == null ? max : Math.max(max, otherMax));
         }
-        aggregationResultHolder.setValue(Math.max(max, aggregationResultHolder.getDoubleResult()));
         break;
       }
       case BIG_DECIMAL: {
         BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
-        BigDecimal max = null;
         if (nullBitmap.getCardinality() < values.length) {
+          BigDecimal max = null;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               max = max == null ? values[i] : values[i].max(max);
             }
           }
+          // TODO: even though the source data has BIG_DECIMAL type, we still only support double precision.
+          assert max != null;
+          Double otherMax = aggregationResultHolder.getResult();
+          aggregationResultHolder.setValue(
+              otherMax == null ? max.doubleValue() : Math.max(max.doubleValue(), otherMax));
         }
-        // TODO: even though the source data has BIG_DECIMAL type, we still only support double precision.
-        aggregationResultHolder.setValue(Math.max(max == null ? Double.NEGATIVE_INFINITY : max.doubleValue(),
-            aggregationResultHolder.getDoubleResult()));
         break;
       }
       default:
@@ -218,10 +226,9 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
           for (int i = 0; i < length; i++) {
             double value = valueArray[i];
             int groupKey = groupKeyArray[i];
-            double result = groupByResultHolder.getDoubleResult(groupKey);
-            if (!nullBitmap.contains(i) && value > result) {
+            Double result = groupByResultHolder.getResult(groupKey);
+            if (!nullBitmap.contains(i) && (result == null || value > result)) {
               groupByResultHolder.setValueForKey(groupKey, value);
-              _groupKeysWithNonNullValue.add(groupKey);
             }
           }
         }
@@ -254,13 +261,16 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public Double extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+    if (_nullHandlingEnabled) {
+      return aggregationResultHolder.getResult();
+    }
     return aggregationResultHolder.getDoubleResult();
   }
 
   @Override
   public Double extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    if (_nullHandlingEnabled && !_groupKeysWithNonNullValue.contains(groupKey)) {
-      return null;
+    if (_nullHandlingEnabled) {
+      return groupByResultHolder.getResult(groupKey);
     }
     return groupByResultHolder.getDoubleResult(groupKey);
   }

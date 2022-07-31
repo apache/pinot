@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -39,8 +37,6 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
   private final boolean _nullHandlingEnabled;
 
-  private final Set<Integer> _groupKeysWithNonNullValue;
-
   public AvgAggregationFunction(ExpressionContext expression) {
     this(expression, false);
   }
@@ -48,7 +44,6 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   public AvgAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     _nullHandlingEnabled = nullHandlingEnabled;
-    _groupKeysWithNonNullValue = new HashSet<>();
   }
 
   @Override
@@ -171,7 +166,6 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
           if (!nullBitmap.contains(i)) {
             int groupKey = groupKeyArray[i];
             setGroupByResult(groupKey, groupByResultHolder, doubleValues[i], 1L);
-            _groupKeysWithNonNullValue.add(groupKey);
           }
         }
       }
@@ -184,7 +178,6 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
             int groupKey = groupKeyArray[i];
             AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
             setGroupByResult(groupKey, groupByResultHolder, avgPair.getSum(), avgPair.getCount());
-            _groupKeysWithNonNullValue.add(groupKey);
           }
         }
       }
@@ -231,6 +224,9 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   public AvgPair extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     AvgPair avgPair = aggregationResultHolder.getResult();
     if (avgPair == null) {
+      if (_nullHandlingEnabled) {
+        return null;
+      }
       return new AvgPair(0.0, 0L);
     } else {
       return avgPair;
@@ -239,11 +235,11 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
 
   @Override
   public AvgPair extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    if (_nullHandlingEnabled && !_groupKeysWithNonNullValue.contains(groupKey)) {
-      return null;
-    }
     AvgPair avgPair = groupByResultHolder.getResult(groupKey);
     if (avgPair == null) {
+      if (_nullHandlingEnabled) {
+        return null;
+      }
       return new AvgPair(0.0, 0L);
     } else {
       return avgPair;

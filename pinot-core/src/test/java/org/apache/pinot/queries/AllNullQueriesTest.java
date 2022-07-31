@@ -312,18 +312,8 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         assertEquals((long) row[0], 1000 * 4);
         // count(col) returns the count of non-nullable docs.
         assertEquals((long) row[1], 0);
-        // TODO: this should return null similar to Presto.
-        if (dataType == DataType.FLOAT) {
-          assertEquals(((Double) row[2]).floatValue(), Float.POSITIVE_INFINITY);
-        } else if (dataType == DataType.LONG) {
-          assertEquals(((Double) row[2]).longValue(), Long.MAX_VALUE);
-        }
-        // TODO: this should return null similar to Presto.
-        if (dataType == DataType.FLOAT) {
-          assertEquals(((Double) row[3]).floatValue(), Float.NEGATIVE_INFINITY);
-        } else if (dataType == DataType.LONG) {
-          assertEquals(((Double) row[3]).longValue(), Long.MIN_VALUE);
-        }
+        assertNull(row[2]);
+        assertNull(row[3]);
       }
     }
     {
@@ -418,18 +408,8 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         List<Object[]> rows = resultTable.getRows();
         assertEquals(rows.size(), 1);
         assertEquals((long) rows.get(0)[0], 0);
-        // TODO: this should return null similar to Presto.
-        if (dataType == DataType.INT) {
-          assertEquals(((Double) rows.get(0)[1]).longValue(), Integer.MAX_VALUE);
-        } else {
-          assertEquals(((Double) rows.get(0)[1]).longValue(), Long.MAX_VALUE);
-        }
-        // TODO: this should return null similar to Presto.
-        if (dataType == DataType.INT) {
-          assertEquals(((Double) rows.get(0)[2]).longValue(), Integer.MIN_VALUE);
-        } else {
-          assertEquals(((Double) rows.get(0)[2]).longValue(), Long.MIN_VALUE);
-        }
+        assertNull(rows.get(0)[1]);
+        assertNull(rows.get(0)[2]);
         double avg = _sum / (double) _records.size();
         assertEquals(rows.get(0)[3], avg);
         assertEquals(rows.get(0)[4], 4 * _sum);
