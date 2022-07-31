@@ -68,6 +68,7 @@ public class CombineOperatorUtils {
       if (executionStatistics.getNumDocsScanned() > 0) {
         numSegmentsMatched++;
       }
+      // TODO: Check all operators and properly implement the getIndexSegment and remove this exception handling
       try {
         if (operator.getIndexSegment() instanceof MutableSegment) {
           numConsumingSegmentsProcessed += 1;
@@ -75,7 +76,8 @@ public class CombineOperatorUtils {
             numConsumingSegmentsMatched++;
           }
         }
-      } catch (UnsupportedOperationException ignored) { }
+      } catch (UnsupportedOperationException ignored) {
+      }
 
       numDocsScanned += executionStatistics.getNumDocsScanned();
       numEntriesScannedInFilter += executionStatistics.getNumEntriesScannedInFilter();
