@@ -30,31 +30,28 @@ public class GrpcConfig {
   public static final String CONFIG_MAX_INBOUND_MESSAGE_BYTES_SIZE = "maxInboundMessageSizeBytes";
   // Default max message size to 128MB
   public static final int DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE = 128 * 1024 * 1024;
+  // Default use plain text for transport
+  private static final String DEFAULT_IS_USE_PLAIN_TEXT = "true";
 
-  private final int _maxInboundMessageSizeBytes;
-  private final boolean _usePlainText;
   private final TlsConfig _tlsConfig;
   private final PinotConfiguration _pinotConfig;
 
   public static GrpcConfig buildGrpcQueryConfig(PinotConfiguration pinotConfig) {
-    return new GrpcConfig();
+    return new GrpcConfig(pinotConfig);
   }
 
-  public GrpcConfig() {
-    this(DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE, true);
+  public GrpcConfig(PinotConfiguration pinotConfig) {
+    _pinotConfig = pinotConfig;
+    _tlsConfig = TlsUtils.extractTlsConfig(_pinotConfig, GRPC_TLS_PREFIX);
+  }
+
+  public GrpcConfig(Map<String, Object> configMap) {
+    this(new PinotConfiguration(configMap));
   }
 
   public GrpcConfig(int maxInboundMessageSizeBytes, boolean usePlainText) {
     this(ImmutableMap.of(CONFIG_MAX_INBOUND_MESSAGE_BYTES_SIZE, maxInboundMessageSizeBytes, CONFIG_USE_PLAIN_TEXT,
         usePlainText));
-  }
-
-  public GrpcConfig(Map<String, Object> configMap) {
-    _pinotConfig = new PinotConfiguration(configMap);
-    _maxInboundMessageSizeBytes =
-        _pinotConfig.getProperty(CONFIG_MAX_INBOUND_MESSAGE_BYTES_SIZE, DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE);
-    _usePlainText = Boolean.valueOf(configMap.get(CONFIG_USE_PLAIN_TEXT).toString());
-    _tlsConfig = TlsUtils.extractTlsConfig(_pinotConfig, GRPC_TLS_PREFIX);
   }
 
   // Allow get customized configs.
@@ -63,11 +60,11 @@ public class GrpcConfig {
   }
 
   public int getMaxInboundMessageSizeBytes() {
-    return _maxInboundMessageSizeBytes;
+    return _pinotConfig.getProperty(CONFIG_MAX_INBOUND_MESSAGE_BYTES_SIZE, DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE);
   }
 
   public boolean isUsePlainText() {
-    return _usePlainText;
+    return Boolean.parseBoolean(_pinotConfig.getProperty(CONFIG_USE_PLAIN_TEXT, DEFAULT_IS_USE_PLAIN_TEXT));
   }
 
   public TlsConfig getTlsConfig() {

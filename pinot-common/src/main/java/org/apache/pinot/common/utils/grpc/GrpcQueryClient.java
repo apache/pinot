@@ -24,6 +24,7 @@ import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslProvider;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.KeyManagerFactory;
@@ -45,7 +46,7 @@ public class GrpcQueryClient {
   private final PinotQueryServerGrpc.PinotQueryServerBlockingStub _blockingStub;
 
   public GrpcQueryClient(String host, int port) {
-    this(host, port, new GrpcConfig());
+    this(host, port, new GrpcConfig(Collections.emptyMap()));
   }
 
   public GrpcQueryClient(String host, int port, GrpcConfig config) {
