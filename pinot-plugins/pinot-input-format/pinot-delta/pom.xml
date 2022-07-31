@@ -19,55 +19,54 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>pinot-plugins</artifactId>
+    <artifactId>pinot-input-format</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>0.11.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
 
-  <artifactId>pinot-input-format</artifactId>
-  <packaging>pom</packaging>
-  <name>Pinot Input Format</name>
+
+  <artifactId>pinot-delta</artifactId>
+  <name>Pinot Delta Lake</name>
   <url>https://pinot.apache.org/</url>
   <properties>
-    <pinot.root>${basedir}/../..</pinot.root>
-    <plugin.type>pinot-input-format</plugin.type>
+    <pinot.root>${basedir}/../../..</pinot.root>
+    <delta.version>0.5.0</delta.version>
+    <phase.prop>package</phase.prop>
   </properties>
-
-  <modules>
-    <module>pinot-avro</module>
-    <module>pinot-avro-base</module>
-    <module>pinot-confluent-avro</module>
-    <module>pinot-delta</module>
-    <module>pinot-orc</module>
-    <module>pinot-json</module>
-    <module>pinot-parquet</module>
-    <module>pinot-csv</module>
-    <module>pinot-thrift</module>
-    <module>pinot-protobuf</module>
-  </modules>
-
   <dependencies>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
+     <dependency>
+      <groupId>io.delta</groupId>
+      <artifactId>delta-standalone_2.12</artifactId>
+      <version>${delta.version}</version>
+       <exclusions>
+         <exclusion>
+           <groupId>org.scala-lang</groupId>
+           <artifactId>scala-library</artifactId>
+         </exclusion>
+       </exclusions>
     </dependency>
-    <!-- test -->
     <dependency>
-      <groupId>commons-io</groupId>
-      <artifactId>commons-io</artifactId>
+      <groupId>commons-lang</groupId>
+      <artifactId>commons-lang</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.parquet</groupId>
+      <artifactId>parquet-avro</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spi</artifactId>
+      <artifactId>pinot-avro-base</artifactId>
       <version>${project.version}</version>
-      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
   </dependencies>
