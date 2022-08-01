@@ -74,6 +74,7 @@ public class PinotServiceManagerAdminApiApplication extends ResourceConfig {
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
     beanConfig.setExpandSuperTypes(false);
+
     HttpHandler httpHandler =
         new CLStaticHttpHandler(PinotServiceManagerAdminApiApplication.class.getClassLoader(), "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
