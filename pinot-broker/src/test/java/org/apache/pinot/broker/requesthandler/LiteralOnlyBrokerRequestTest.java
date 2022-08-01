@@ -106,16 +106,22 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser
         .compileToPinotQuery("SELECT count(*) from foo "
             + "where bar = decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253')")));
-    Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(
-        CalciteSqlParser.compileToPinotQuery("SELECT toBase64('hello!')," + " fromBase64('aGVsbG8h') FROM myTable")));
+    Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
+        "SELECT toUtf8('hello!')," + " fromUtf8(toUtf8('hello!')) FROM myTable")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
-        "SELECT reverse(fromBase64(foo))," + " toBase64(fromBase64('aGVsbG8h')) FROM myTable")));
+        "SELECT reverse(fromUtf8(foo))," + " toUtf8('hello!') FROM myTable")));
+    Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
+        "SELECT toBase64(toUtf8('hello!'))," + " fromBase64('aGVsbG8h') FROM myTable")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
-        "SELECT toBase64(max(foo))," + " fromBase64(toBase64(max(foo))) FROM myTable")));
+        "SELECT reverse(toBase64(foo))," + " toBase64(fromBase64('aGVsbG8h')) FROM myTable")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(
-        CalciteSqlParser.compileToPinotQuery("SELECT count(*) from foo " + "where bar = toBase64('hello!')")));
+        CalciteSqlParser.compileToPinotQuery("SELECT fromBase64(toBase64(to_utf8(foo))) FROM myTable")));
+    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(
+        CalciteSqlParser.compileToPinotQuery("SELECT count(*) from foo " + "where bar = toBase64(toASCII('hello!'))")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(
         CalciteSqlParser.compileToPinotQuery("SELECT count(*) from foo " + "where bar = fromBase64('aGVsbG8h')")));
+    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(
+        CalciteSqlParser.compileToPinotQuery("SELECT count(*) from foo " + "where bar = fromUtf8(fromBase64('aGVsbG8h'))")));
   }
 
   @Test
@@ -128,7 +134,9 @@ public class LiteralOnlyBrokerRequestTest {
         "SELECT encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') AS encoded, "
             + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') AS decoded")));
     Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
-        "SELECT toBase64('hello!') AS encoded, " + "fromBase64('aGVsbG8h') AS decoded")));
+        "SELECT toUtf8('hello!') AS encoded, " + "fromUtf8(toUtf8('hello!')) AS decoded")));
+    Assert.assertTrue(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
+        "SELECT toBase64(toUtf8('hello!')) AS encoded, " + "fromBase64('aGVsbG8h') AS decoded")));
   }
 
   @Test
@@ -227,7 +235,7 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
 
     request = JsonUtils.stringToJsonNode(
-        "{\"sql\":\"SELECT toBase64('hello!') AS encoded, " + "fromBase64('aGVsbG8h') AS decoded\"}");
+        "{\"sql\":\"SELECT toBase64(toUtf8('hello!')) AS encoded, " + "fromUtf8(fromBase64('aGVsbG8h')) AS decoded\"}");
     requestStats = Tracing.getTracer().createRequestScope();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
     ResultTable resultTable = brokerResponse.getResultTable();
@@ -244,7 +252,22 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
 
     request = JsonUtils.stringToJsonNode(
-        "{\"sql\":\"SELECT toBase64('this is a long string that will encode to more than 76 characters using base64')"
+        "{\"sql\":\"SELECT fromUtf8(fromBase64(toBase64(toUtf8('nested')))) AS output\"}");
+    requestStats = Tracing.getTracer().createRequestScope();
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    resultTable = brokerResponse.getResultTable();
+    dataSchema = resultTable.getDataSchema();
+    rows = resultTable.getRows();
+    Assert.assertEquals(dataSchema.getColumnName(0), "output");
+    Assert.assertEquals(dataSchema.getColumnDataType(0), DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(rows.size(), 1);
+    Assert.assertEquals(rows.get(0).length, 1);
+    Assert.assertEquals(rows.get(0)[0].toString(), "nested");
+    Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
+
+    request = JsonUtils.stringToJsonNode(
+        "{\"sql\":\"SELECT toBase64(toUtf8('this is a long string that will encode to more than 76 characters using "
+            + "base64'))"
             + " AS encoded\"}");
     requestStats = Tracing.getTracer().createRequestScope();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
@@ -259,9 +282,9 @@ public class LiteralOnlyBrokerRequestTest {
         "dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0");
     Assert.assertEquals(brokerResponse.getTotalDocs(), 0);
 
-    request = JsonUtils.stringToJsonNode("{\"sql\":\"SELECT fromBase64"
+    request = JsonUtils.stringToJsonNode("{\"sql\":\"SELECT fromUtf8(fromBase64"
         + "('dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0"
-        + "') AS decoded\"}");
+        + "')) AS decoded\"}");
     requestStats = Tracing.getTracer().createRequestScope();
     brokerResponse = requestHandler.handleRequest(request, null, requestStats);
     resultTable = brokerResponse.getResultTable();

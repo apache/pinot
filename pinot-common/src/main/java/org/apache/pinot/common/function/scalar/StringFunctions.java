@@ -396,6 +396,15 @@ public class StringFunctions {
   }
 
   /**
+   * @param input
+   * @return string
+   */
+  @ScalarFunction
+  public static String fromUtf8(byte[] input) {
+    return new String(input, StandardCharsets.UTF_8);
+  }
+
+  /**
    * @see StandardCharsets#US_ASCII#encode(String)
    * @param input
    * @return bytes
@@ -568,36 +577,16 @@ public class StringFunctions {
    * @return Base64 encoded String
    */
   @ScalarFunction
-  public static String binaryToBase64(byte[] input) {
+  public static String toBase64(byte[] input) {
     return Base64.getEncoder().encodeToString(input);
   }
 
   /**
-   * @param input string to be encoded
-   * @return Base64 encoded String
-   */
-  @ScalarFunction
-  public static String toBase64(String input) {
-    return toBase64(input, "UTF-8");
-  }
-
-  /**
-   * @param input String encoded with user specified encodeScheme
-   * @return Base64 encoded String
-   */
-  @ScalarFunction
-  public static String toBase64(String input, String encodeScheme) {
-    byte[] inputBytes = input.getBytes(Charset.forName(encodeScheme));
-    return Base64.getEncoder().encodeToString(inputBytes);
-  }
-
-  /**
    * @param input Base64 encoded String
-   * @return decoded string
+   * @return decoded binary data
    */
   @ScalarFunction
-  public static String fromBase64(String input) {
-    byte[] inputBytes = Base64.getDecoder().decode(input);
-    return new String(inputBytes, StandardCharsets.UTF_8);
+  public static byte[] fromBase64(String input) {
+    return Base64.getDecoder().decode(input);
   }
 }

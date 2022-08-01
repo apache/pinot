@@ -83,10 +83,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.function.scalar.StringFunctions.decodeUrl;
-import static org.apache.pinot.common.function.scalar.StringFunctions.encodeUrl;
-import static org.apache.pinot.common.function.scalar.StringFunctions.fromBase64;
-import static org.apache.pinot.common.function.scalar.StringFunctions.toBase64;
+import static org.apache.pinot.common.function.scalar.StringFunctions.*;
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.EXTERNAL_VIEW_CHECK_INTERVAL_MS;
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
 import static org.testng.Assert.*;
@@ -607,7 +604,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
 
     // string literal
-    String sqlQuery = "SELECT toBase64('hello!'), " + "fromBase64('aGVsbG8h') FROM myTable";
+    String sqlQuery = "SELECT toBase64(toUtf8('hello!')), " + "fromUtf8(fromBase64('aGVsbG8h')) FROM myTable";
     JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
     JsonNode resultTable = response.get("resultTable");
     JsonNode dataSchema = resultTable.get("dataSchema");
@@ -615,37 +612,37 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode rows = response.get("resultTable").get("rows");
 
     String encodedString = rows.get(0).get(0).asText();
-    String expectedEncodedStr = toBase64("hello!");
+    String expectedEncodedStr = toBase64(toUtf8("hello!"));
     assertEquals(encodedString, expectedEncodedStr);
     String decodedString = rows.get(0).get(1).asText();
-    String expectedDecodedStr = fromBase64("aGVsbG8h");
+    String expectedDecodedStr = fromUtf8(fromBase64("aGVsbG8h"));
     assertEquals(decodedString, expectedDecodedStr);
 
     // long string literal encode
     sqlQuery =
-        "SELECT toBase64('this is a long string that will encode to more than 76 characters using base64') FROM "
+        "SELECT toBase64(toUtf8('this is a long string that will encode to more than 76 characters using base64')) "
+            + "FROM "
             + "myTable";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
     rows = resultTable.get("rows");
     encodedString = rows.get(0).get(0).asText();
     assertEquals(encodedString,
-        toBase64("this is a long string that will encode to more than 76 characters using base64"));
+        toBase64(toUtf8("this is a long string that will encode to more than 76 characters using base64")));
 
     // long string literal decode
-    sqlQuery =
-        "SELECT fromBase64"
+    sqlQuery = "SELECT fromUtf8(fromBase64"
         + "('dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0"
-        + "')FROM myTable";
+        + "')) FROM myTable";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
     rows = resultTable.get("rows");
     decodedString = rows.get(0).get(0).asText();
-    assertEquals(decodedString, fromBase64(
-        "dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0"));
+    assertEquals(decodedString, fromUtf8(fromBase64(
+        "dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0")));
 
     // non-string literal
-    sqlQuery = "SELECT toBase64(123), fromBase64(toBase64(123)), 123 FROM myTable";
+    sqlQuery = "SELECT toBase64(toUtf8(123)), fromUtf8(fromBase64(toBase64(toUtf8(123)))), 123 FROM myTable";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
     rows = resultTable.get("rows");
@@ -653,14 +650,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     decodedString = rows.get(0).get(1).asText();
     String originalCol = rows.get(0).get(2).asText();
     assertEquals(decodedString, originalCol);
-    assertEquals(encodedString, toBase64("123"));
+    assertEquals(encodedString, toBase64(toUtf8("123")));
 
     // identifier
-    sqlQuery = "SELECT Carrier, toBase64(Carrier), fromBase64(toBase64(Carrier)) FROM myTable LIMIT 100";
+    sqlQuery =
+        "SELECT Carrier, toBase64(toUtf8(Carrier)), fromUtf8(fromBase64(toBase64(toUtf8(Carrier)))), fromBase64"
+            + "(toBase64(toUtf8(Carrier))) FROM myTable LIMIT 100";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"STRING\",\"STRING\"]");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"STRING\",\"STRING\",\"BYTES\"]");
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 100);
     for (int i = 0; i < 100; i++) {
@@ -668,8 +667,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       String encoded = rows.get(1).asText();
       String decoded = rows.get(2).asText();
       assertEquals(original, decoded);
-      assertEquals(encoded, toBase64(original));
-      assertEquals(decoded, fromBase64(toBase64(original)));
+      assertEquals(encoded, toBase64(toUtf8(original)));
+      assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
     }
 
     // invalid argument
@@ -689,21 +688,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // string literal used in a filter
     sqlQuery =
-        "SELECT * FROM myTable WHERE fromBase64('aGVsbG8h') != Carrier AND toBase64('hello!') != Carrier LIMIT 10";
+        "SELECT * FROM myTable WHERE fromUtf8(fromBase64('aGVsbG8h')) != Carrier AND toBase64(toUtf8('hello!')) != "
+        + "Carrier LIMIT 10";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
 
     // non-string literal used in a filter
-    sqlQuery = "SELECT * FROM myTable WHERE fromBase64(toBase64(AirlineID)) != Carrier LIMIT 10";
+    sqlQuery = "SELECT * FROM myTable WHERE fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) != Carrier LIMIT 10";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
 
     // string identifier used in a filter
-    sqlQuery = "SELECT * FROM myTable WHERE fromBase64(toBase64(Carrier)) = Carrier LIMIT 10";
+    sqlQuery = "SELECT * FROM myTable WHERE fromUtf8(fromBase64(toBase64(toUtf8(Carrier)))) = Carrier LIMIT 10";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
     rows = resultTable.get("rows");
@@ -711,7 +711,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // non-string identifier used in a filter
     sqlQuery =
-        "SELECT fromBase64(toBase64(AirlineID)), AirlineID FROM myTable WHERE fromBase64(toBase64(AirlineID)) = "
+        "SELECT fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))), AirlineID FROM myTable WHERE fromUtf8(fromBase64"
+        + "(toBase64(toUtf8(AirlineID)))) = "
             + "AirlineID LIMIT 10";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
@@ -721,9 +722,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(rows.size(), 10);
 
     // string identifier used in group by order by
-    sqlQuery = "SELECT Carrier as originalCol, toBase64(Carrier) as encoded, fromBase64(toBase64(Carrier)) as decoded "
-        + "FROM myTable GROUP BY Carrier, toBase64(Carrier), fromBase64(toBase64(Carrier)) ORDER BY toBase64(Carrier)"
-        + " LIMIT 10";
+    sqlQuery =
+        "SELECT Carrier as originalCol, toBase64(toUtf8(Carrier)) as encoded, fromUtf8(fromBase64(toBase64(toUtf8"
+        + "(Carrier)))) as decoded "
+            + "FROM myTable GROUP BY Carrier, toBase64(toUtf8(Carrier)), fromUtf8(fromBase64(toBase64(toUtf8(Carrier)"
+            + "))) ORDER BY toBase64(toUtf8(Carrier))"
+            + " LIMIT 10";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
@@ -735,15 +739,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       String encoded = rows.get(1).asText();
       String decoded = rows.get(2).asText();
       assertEquals(original, decoded);
-      assertEquals(encoded, toBase64(original));
-      assertEquals(decoded, fromBase64(toBase64(original)));
+      assertEquals(encoded, toBase64(toUtf8(original)));
+      assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
     }
 
     // non-string identifier used in group by order by
     sqlQuery =
-        "SELECT AirlineID as originalCol, toBase64(AirlineID) as encoded, fromBase64(toBase64(AirlineID)) as decoded "
-            + "FROM myTable GROUP BY AirlineID, toBase64(AirlineID), fromBase64(toBase64(AirlineID)) ORDER BY "
-            + "toBase64(AirlineID) LIMIT 10";
+        "SELECT AirlineID as originalCol, toBase64(toUtf8(AirlineID)) as encoded, fromUtf8(fromBase64(toBase64(toUtf8"
+        + "(AirlineID)))) as decoded "
+            + "FROM myTable GROUP BY AirlineID, toBase64(toUtf8(AirlineID)), fromUtf8(fromBase64(toBase64(toUtf8"
+            + "(AirlineID)))) ORDER BY "
+            + "fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) LIMIT 10";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
@@ -755,8 +761,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       String encoded = rows.get(1).asText();
       String decoded = rows.get(2).asText();
       assertEquals(original, decoded);
-      assertEquals(encoded, toBase64(original));
-      assertEquals(decoded, fromBase64(toBase64(original)));
+      assertEquals(encoded, toBase64(toUtf8(original)));
+      assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
     }
   }
 
@@ -769,7 +775,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "SELECT 1, now() as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as "
             + "today, now(), ago('PT1H'), encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') as encodedUrl, "
             + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') as decodedUrl, toBase64"
-            + "('hello!') as toBase64, fromBase64('aGVsbG8h') as fromBase64";
+            + "(toUtf8('hello!')) as toBase64, fromUtf8(fromBase64('aGVsbG8h')) as fromBase64";
     JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
     long currentTsMax = System.currentTimeMillis();
     long oneHourAgoTsMax = currentTsMax - ONE_HOUR_IN_MS;

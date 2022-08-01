@@ -41,6 +41,8 @@ import org.apache.pinot.sql.parsers.rewriter.CompileTimeFunctionsInvoker;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.function.scalar.StringFunctions.toUtf8;
+
 
 /**
  * Some tests for the SQL compiler.
@@ -1891,21 +1893,23 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(encoded, "key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
     Assert.assertEquals(decoded, "key1=value 1&key2=value@!$2&key3=value%3");
 
-    query = "select toBase64('hello!'), fromBase64('aGVsbG8h') from mytable";
+    query = "select toBase64(toUtf8('hello!')), fromUtf8(fromBase64('aGVsbG8h')) from mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     String encodedBase64 = pinotQuery.getSelectList().get(0).getLiteral().getStringValue();
     String decodedBase64 = pinotQuery.getSelectList().get(1).getLiteral().getStringValue();
     Assert.assertEquals(encodedBase64, "aGVsbG8h");
     Assert.assertEquals(decodedBase64, "hello!");
 
-    query = "select toBase64(fromBase64('aGVsbG8h')), fromBase64(toBase64('hello!')) from mytable";
+    query = "select toBase64(fromBase64('aGVsbG8h')), fromUtf8(fromBase64(toBase64(toUtf8('hello!')))) from mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     encodedBase64 = pinotQuery.getSelectList().get(0).getLiteral().getStringValue();
     decodedBase64 = pinotQuery.getSelectList().get(1).getLiteral().getStringValue();
     Assert.assertEquals(encodedBase64, "aGVsbG8h");
     Assert.assertEquals(decodedBase64, "hello!");
 
-    query = "select toBase64(upper('hello!')), fromBase64(toBase64(upper('hello!'))) from mytable";
+    query =
+        "select toBase64(toUtf8(upper('hello!'))), fromUtf8(fromBase64(toBase64(toUtf8(upper('hello!'))))) from "
+            + "mytable";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     encodedBase64 = pinotQuery.getSelectList().get(0).getLiteral().getStringValue();
     decodedBase64 = pinotQuery.getSelectList().get(1).getLiteral().getStringValue();
@@ -1913,8 +1917,9 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(decodedBase64, "HELLO!");
 
     query =
-        "select reverse(fromBase64(toBase64(upper('hello!')))) from mytable where fromBase64(toBase64(upper('hello!')"
-            + ")) = bar";
+        "select reverse(fromUtf8(fromBase64(toBase64(toUtf8(upper('hello!')))))) from mytable where fromUtf8"
+            + "(fromBase64(toBase64(toUtf8(upper('hello!')))))"
+            + " = bar";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     String arg1 = pinotQuery.getSelectList().get(0).getLiteral().getStringValue();
     String leftOp =
@@ -1922,17 +1927,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(arg1, "!OLLEH");
     Assert.assertEquals(leftOp, "HELLO!");
 
-    query = "select a from mytable where foo = toBase64('hello!') and bar = fromBase64('aGVsbG8h')";
-    pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    and = pinotQuery.getFilterExpression().getFunctionCall();
-    encoded = and.getOperands().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue();
-    decoded = and.getOperands().get(1).getFunctionCall().getOperands().get(1).getLiteral().getStringValue();
-    Assert.assertEquals(encoded, "aGVsbG8h");
-    Assert.assertEquals(decoded, "hello!");
-
-    query =
-        "select toBase64('hello!'), fromBase64('aGVsbG8h') from mytable where foo = toBase64('hello!') and bar = "
-            + "fromBase64('aGVsbG8h')";
+    query = "select a from mytable where foo = toBase64(toUtf8('hello!')) and bar = fromUtf8(fromBase64('aGVsbG8h'))";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     and = pinotQuery.getFilterExpression().getFunctionCall();
     encoded = and.getOperands().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue();
@@ -2072,7 +2067,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(expression.getFunctionCall().getOperator(), "count");
     Assert.assertEquals(expression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "*");
 
-    expression = CalciteSqlParser.compileToExpression("toBase64('hello!')");
+    expression = CalciteSqlParser.compileToExpression("toBase64(toUtf8('hello!'))");
     Assert.assertNotNull(expression.getFunctionCall());
     pinotQuery.setFilterExpression(expression);
     pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
@@ -2080,7 +2075,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertNotNull(expression.getLiteral());
     Assert.assertEquals(expression.getLiteral().getFieldValue(), "aGVsbG8h");
 
-    expression = CalciteSqlParser.compileToExpression("fromBase64('aGVsbG8h')");
+    expression = CalciteSqlParser.compileToExpression("fromUtf8(fromBase64('aGVsbG8h'))");
     Assert.assertNotNull(expression.getFunctionCall());
     pinotQuery.setFilterExpression(expression);
     pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
