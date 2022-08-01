@@ -21,16 +21,19 @@ package org.apache.pinot.query.service;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
+import org.apache.pinot.core.common.datablock.DataBlockUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
@@ -67,7 +70,7 @@ public class QueryDispatcher {
         queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
         requestId, reduceNode.getSenderStageId(), reduceNode.getDataSchema(), mailboxService.getHostname(),
         mailboxService.getMailboxPort());
-    return reduceMailboxReceive(mailboxReceiveOperator);
+    return reduceMailboxReceive(mailboxReceiveOperator, timeoutNano);
   }
 
   public int submit(long requestId, QueryPlan queryPlan)
@@ -114,9 +117,14 @@ public class QueryDispatcher {
   }
 
   public static List<DataTable> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator) {
+    return reduceMailboxReceive(mailboxReceiveOperator, QueryConfig.DEFAULT_TIMEOUT_NANO);
+  }
+
+  public static List<DataTable> reduceMailboxReceive(MailboxReceiveOperator mailboxReceiveOperator, long timeoutNano) {
     List<DataTable> resultDataBlocks = new ArrayList<>();
     TransferableBlock transferableBlock;
-    while (true) {
+    long timeoutWatermark = System.nanoTime() + timeoutNano;
+    while (System.nanoTime() < timeoutWatermark) {
       transferableBlock = mailboxReceiveOperator.nextBlock();
       if (TransferableBlockUtils.isEndOfStream(transferableBlock)) {
         // TODO: we only received bubble up error from the execution stage tree.
@@ -131,6 +139,10 @@ public class QueryDispatcher {
         BaseDataBlock dataTable = transferableBlock.getDataBlock();
         resultDataBlocks.add(dataTable);
       }
+    }
+    if (System.nanoTime() >= timeoutWatermark) {
+      resultDataBlocks = Collections.singletonList(
+          DataBlockUtils.getErrorDataBlock(QueryException.EXECUTION_TIMEOUT_ERROR));
     }
     return resultDataBlocks;
   }
