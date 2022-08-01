@@ -353,10 +353,10 @@ public final class TlsUtils {
     SslContextBuilder sslContextBuilder =
         SslContextBuilder.forClient().sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
     if (tlsConfig.getKeyStorePath() != null) {
-      sslContextBuilder.keyManager(TlsUtils.createKeyManagerFactory(tlsConfig));
+      sslContextBuilder.keyManager(createKeyManagerFactory(tlsConfig));
     }
     if (tlsConfig.getTrustStorePath() != null) {
-      sslContextBuilder.trustManager(TlsUtils.createTrustManagerFactory(tlsConfig));
+      sslContextBuilder.trustManager(createTrustManagerFactory(tlsConfig));
     }
     try {
       return sslContextBuilder.build();
@@ -374,10 +374,10 @@ public final class TlsUtils {
     if (tlsConfig.getKeyStorePath() == null) {
       throw new IllegalArgumentException("Must provide key store path for secured server");
     }
-    SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(TlsUtils.createKeyManagerFactory(tlsConfig))
+    SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(createKeyManagerFactory(tlsConfig))
         .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
     if (tlsConfig.getTrustStorePath() != null) {
-      sslContextBuilder.trustManager(TlsUtils.createTrustManagerFactory(tlsConfig));
+      sslContextBuilder.trustManager(createTrustManagerFactory(tlsConfig));
     }
     if (tlsConfig.isClientAuthEnabled()) {
       sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
