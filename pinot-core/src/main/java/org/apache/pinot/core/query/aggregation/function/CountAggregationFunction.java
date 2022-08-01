@@ -92,7 +92,7 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    if (blockValSetMap.isEmpty()) {
+    if (blockValSetMap.isEmpty() || !blockValSetMap.containsKey(STAR_TREE_COUNT_STAR_EXPRESSION)) {
       aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
     } else if (_nullHandlingEnabled) {
       assert blockValSetMap.size() == 1;
