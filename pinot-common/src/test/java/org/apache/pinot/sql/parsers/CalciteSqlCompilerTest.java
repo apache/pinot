@@ -41,7 +41,6 @@ import org.apache.pinot.sql.parsers.rewriter.CompileTimeFunctionsInvoker;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.function.scalar.StringFunctions.toUtf8;
 
 
 /**

@@ -120,8 +120,8 @@ public class LiteralOnlyBrokerRequestTest {
         CalciteSqlParser.compileToPinotQuery("SELECT count(*) from foo " + "where bar = toBase64(toASCII('hello!'))")));
     Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(
         CalciteSqlParser.compileToPinotQuery("SELECT count(*) from foo " + "where bar = fromBase64('aGVsbG8h')")));
-    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(
-        CalciteSqlParser.compileToPinotQuery("SELECT count(*) from foo " + "where bar = fromUtf8(fromBase64('aGVsbG8h'))")));
+    Assert.assertFalse(BaseBrokerRequestHandler.isLiteralOnlyQuery(CalciteSqlParser.compileToPinotQuery(
+        "SELECT count(*) from foo " + "where bar = fromUtf8(fromBase64('aGVsbG8h'))")));
   }
 
   @Test
