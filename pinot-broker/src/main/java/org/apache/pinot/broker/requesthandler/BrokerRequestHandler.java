@@ -36,4 +36,6 @@ public interface BrokerRequestHandler {
   BrokerResponse handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
       RequestContext requestContext)
       throws Exception;
+
+  String cancelRequest(long requestId);
 }

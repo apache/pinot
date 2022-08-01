@@ -40,7 +40,6 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   private final boolean _isMultiStageQueryEngineEnabled;
 
-
   public BrokerRequestHandlerDelegate(
       BrokerRequestHandler singleStageBrokerRequestHandler,
       @Nullable MultiStageBrokerRequestHandler multiStageWorkerRequestHandler
@@ -84,5 +83,10 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       }
     }
     return _singleStageBrokerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
+  }
+
+  @Override
+  public String cancelRequest(long requestId) {
+    return _singleStageBrokerRequestHandler.cancelRequest(requestId);
   }
 }

@@ -22,13 +22,17 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -45,7 +49,26 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * request from tracing to prevent resource leak.
  */
 public final class TraceContext {
+
+  static Map<Long, Pair<QueryContext, Future[]>> requestId2FuturesMap = new ConcurrentHashMap<>();
+
   private TraceContext() {
+  }
+
+  public static void register(long requestId, QueryContext queryContext, Future[] futures) {
+    requestId2FuturesMap.put(requestId, Pair.of(queryContext, futures));
+  }
+
+  public static void cancel(long requestId) {
+    Pair<QueryContext, Future[]> queryContextFuturesPair = requestId2FuturesMap.get(requestId);
+    if (queryContextFuturesPair.getRight() != null) {
+      // Cancel all ongoing jobs
+      for (Future future : queryContextFuturesPair.getRight()) {
+        if (!future.isDone()) {
+          future.cancel(true);
+        }
+      }
+    }
   }
 
   /**

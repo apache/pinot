@@ -35,6 +35,7 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.core.util.trace.TraceContext;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.Tracing;
@@ -73,6 +74,13 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     //       The parallelism is bounded by the task count.
     _numTasks = CombineOperatorUtils.getNumTasksForQuery(operators.size(), queryContext.getMaxExecutionThreads());
     _futures = new Future[_numTasks];
+
+    try {
+      long requestId = Long.parseLong(queryContext.getQueryOptions().get("requestId"));
+      TraceContext.register(requestId, queryContext, _futures);
+    } catch (Exception e) {
+      //ignore.. this will only mean that we cannot cancel the query.. this can happen if requestId is null or not a long etc
+    }
   }
 
   @Override

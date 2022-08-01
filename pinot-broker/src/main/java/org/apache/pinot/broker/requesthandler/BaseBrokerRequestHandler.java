@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -125,6 +126,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final boolean _enableQueryLimitOverride;
   private final boolean _enableDistinctCountBitmapOverride;
 
+
   public BaseBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       BrokerMetrics brokerMetrics) {
@@ -189,7 +191,23 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (sql == null) {
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
     }
-    return handleRequest(requestId, sql.asText(), request, requesterIdentity, requestContext);
+    BrokerResponseNative brokerResponseNative =
+        handleRequest(requestId, sql.asText(), request, requesterIdentity, requestContext);
+    return brokerResponseNative;
+  }
+
+  @Override
+  public String cancelRequest(long requestId) {
+    try {
+
+      //we will send the cancel request to all servers.. we can probably optimize by asking the user to provide the query again or the list of tables
+      //Assuming this wont be frequently called.. invoking this on all servers it not a big overhead
+
+      return "";
+
+    } catch (Exception e) {
+      return "Exception while trying to cancel request: " + requestId + ". " + e.getMessage();
+    }
   }
 
   private BrokerResponseNative handleRequest(long requestId, String query, JsonNode request,
@@ -1472,6 +1490,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (enableTrace) {
       queryOptions.put(Broker.Request.TRACE, "true");
     }
+
+    queryOptions.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, String.valueOf(requestId));
+
     // NOTE: Always set query options because we will put 'timeoutMs' later
     pinotQuery.setQueryOptions(queryOptions);
     if (!queryOptions.isEmpty()) {

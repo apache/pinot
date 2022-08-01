@@ -115,6 +115,22 @@ public class PinotClientRequest {
     }
   }
 
+  @GET
+  @ManagedAsync
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("query/cancel")
+  @ApiOperation(value = "Querying pinot")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Query response"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
+  public void cancelSqlQuery(@ApiParam(value = "RequestId", required = true) @QueryParam("RequestId") long requestId,
+      @Suspended AsyncResponse asyncResponse, @Context org.glassfish.grizzly.http.server.Request requestContext) {
+    //todo: should we get the query as well.. probably not needed if the broker maintains requestId <> RequestContext for the running queries
+    String response =  _requestHandler.cancelRequest(requestId);
+    asyncResponse.resume(response);
+
+  }
   @POST
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
