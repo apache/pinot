@@ -21,6 +21,7 @@ package org.apache.pinot.integration.tests;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
@@ -56,7 +57,9 @@ public class OfflineSecureGRPCServerIntegrationTest extends OfflineGRPCServerInt
     configMap.put("tls.truststore.password", PASSWORD);
     configMap.put("tls.truststore.type", JKS);
     configMap.put("tls.ssl.provider", JDK);
-    GrpcQueryClient.Config config = new GrpcQueryClient.Config(configMap);
+    PinotConfiguration brokerConfig = new PinotConfiguration(configMap);
+    // This mimics how pinot broker instantiates GRPCQueryClient.
+    GrpcConfig config = GrpcConfig.buildGrpcQueryConfig(brokerConfig);
     return new GrpcQueryClient("localhost", Server.DEFAULT_GRPC_PORT, config);
   }
 }
