@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.Arrays;
+import java.util.Base64;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -31,8 +32,6 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.testng.annotations.Test;
-import static org.apache.pinot.common.function.scalar.StringFunctions.fromBase64;
-import static org.apache.pinot.common.function.scalar.StringFunctions.toBase64;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -829,7 +828,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertEquals(transformFunction.getName(), "toBase64");
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = toBase64(_bytesSVValues[i]);
+      expectedValues[i] = Base64.getEncoder().encodeToString(_bytesSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
 
@@ -839,7 +838,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertEquals(transformFunction.getName(), "fromBase64");
     byte[][] expectedBinaryValues = new byte[NUM_ROWS][];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedBinaryValues[i] = fromBase64(toBase64(_bytesSVValues[i]));
+      expectedBinaryValues[i] = Base64.getDecoder().decode(Base64.getEncoder().encodeToString(_bytesSVValues[i]));
     }
     testTransformFunction(transformFunction, expectedBinaryValues);
   }
