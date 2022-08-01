@@ -87,6 +87,8 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   private int _numDocsScanned = 0;
   private long _numEntriesScannedPostFilter = 0;
 
+  private boolean _queryHasMVSelectionOrderBy = false;
+
   public SelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, TransformOperator transformOperator, boolean allOrderByColsPreSorted) {
     _indexSegment = indexSegment;
@@ -128,6 +130,8 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     for (int i = 0; i < numOrderByExpressions; i++) {
       if (_orderByExpressionMetadata[i].isSingleValue()) {
         valueIndexList.add(i);
+      } else {
+        _queryHasMVSelectionOrderBy = true;
       }
     }
 
@@ -236,13 +240,16 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
+    IntermediateResultsBlock resultsBlock;
     if (_allOrderByColsPreSorted) {
-      return computeAllPreSorted();
+      resultsBlock = computeAllPreSorted();
     } else if (_expressions.size() == _orderByExpressions.size()) {
-      return computeAllOrdered();
+      resultsBlock = computeAllOrdered();
     } else {
-      return computePartiallyOrdered();
+      resultsBlock = computePartiallyOrdered();
     }
+    resultsBlock.setQueryHasMVSelectionOrderBy(_queryHasMVSelectionOrderBy);
+    return resultsBlock;
   }
 
   private IntermediateResultsBlock computeAllPreSorted() {

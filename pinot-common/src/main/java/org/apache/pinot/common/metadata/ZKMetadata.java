@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.common.metadata;
 
-import org.apache.helix.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
 public interface ZKMetadata {

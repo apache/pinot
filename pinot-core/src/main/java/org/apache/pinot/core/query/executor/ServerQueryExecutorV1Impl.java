@@ -276,6 +276,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     return dataTable;
   }
 
+  // NOTE: This method might change indexSegments. Do not use it after calling this method.
   private DataTable processQuery(List<IndexSegment> indexSegments, QueryContext queryContext, TimerContext timerContext,
       ExecutorService executorService, @Nullable StreamObserver<Server.ServerResponse> responseObserver,
       boolean enableStreaming)
@@ -318,7 +319,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
       Plan queryPlan =
           enableStreaming ? _planMaker.makeStreamingInstancePlan(selectedSegments, queryContext, executorService,
-              responseObserver) : _planMaker.makeInstancePlan(selectedSegments, queryContext, executorService);
+              responseObserver, _serverMetrics) : _planMaker.makeInstancePlan(selectedSegments, queryContext,
+              executorService, _serverMetrics);
       planBuildTimer.stopAndRecord();
 
       TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
@@ -568,7 +570,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           subqueryExpression.getLiteral());
       // Execute the subquery
       subquery.setEndTimeMs(endTimeMs);
-      DataTable dataTable = processQuery(indexSegments, subquery, timerContext, executorService, null, false);
+      // Make a clone of indexSegments because the method might modify the list
+      DataTable dataTable =
+          processQuery(new ArrayList<>(indexSegments), subquery, timerContext, executorService, null, false);
       IdSet idSet = dataTable.getObject(0, 0);
       String serializedIdSet = idSet.toBase64String();
       // Rewrite the expression

@@ -1420,7 +1420,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     throw new BadQueryRequestException("Unknown columnName '" + columnName + "' found in the query");
   }
 
-  private static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
+  public static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
     return Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=')
         .split(request.get(optionsKey).asText());
   }
@@ -1477,6 +1477,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (!queryOptions.isEmpty()) {
       LOGGER.debug("Query options are set to: {} for request {}: {}", queryOptions, requestId, query);
     }
+    // TODO: Remove the SQL query options after releasing 0.11.0
+    // The query engine will break if these 2 options are missing during version upgrade.
+    queryOptions.put(Broker.Request.QueryOptionKey.GROUP_BY_MODE, Broker.Request.SQL);
+    queryOptions.put(Broker.Request.QueryOptionKey.RESPONSE_FORMAT, Broker.Request.SQL);
   }
 
   /**

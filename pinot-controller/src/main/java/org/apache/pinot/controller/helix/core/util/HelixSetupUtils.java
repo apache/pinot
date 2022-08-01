@@ -30,10 +30,7 @@ import org.apache.helix.controller.HelixControllerMain;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZKHelixDataAccessor;
 import org.apache.helix.manager.zk.ZKHelixManager;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
-import org.apache.helix.manager.zk.client.HelixZkClient;
-import org.apache.helix.manager.zk.client.SharedZkClientFactory;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
@@ -43,6 +40,8 @@ import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.helix.model.builder.FullAutoModeISBuilder;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
+import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -68,7 +67,7 @@ public class HelixSetupUtils {
   private static void setupHelixClusterIfNeeded(String helixClusterName, String zkPath) {
     HelixAdmin admin = null;
     try {
-      admin = new ZKHelixAdmin(zkPath);
+      admin = new ZKHelixAdmin.Builder().setZkAddress(zkPath).build();
       if (admin.getClusters().contains(helixClusterName)) {
         LOGGER.info("Helix cluster: {} already exists", helixClusterName);
       } else {
@@ -94,12 +93,10 @@ public class HelixSetupUtils {
 
   public static void setupPinotCluster(String helixClusterName, String zkPath, boolean isUpdateStateModel,
       boolean enableBatchMessageMode, String leadControllerResourceRebalanceStrategy) {
-    HelixZkClient zkClient = null;
+    ZkClient zkClient = null;
     try {
-      zkClient = SharedZkClientFactory.getInstance().buildZkClient(new HelixZkClient.ZkConnectionConfig(zkPath),
-          new HelixZkClient.ZkClientConfig().setZkSerializer(new ZNRecordSerializer())
-              .setConnectInitTimeout(TimeUnit.SECONDS.toMillis(ZkClient.DEFAULT_CONNECT_TIMEOUT_SEC)));
-      zkClient.waitUntilConnected(ZkClient.DEFAULT_CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS);
+      zkClient = new ZkClient.Builder().setZkServer(zkPath).setZkSerializer(new ZNRecordSerializer()).build();
+      zkClient.waitUntilConnected(ZkClient.DEFAULT_CONNECTION_TIMEOUT, TimeUnit.MILLISECONDS);
       HelixAdmin helixAdmin = new ZKHelixAdmin(zkClient);
       HelixDataAccessor helixDataAccessor =
           new ZKHelixDataAccessor(helixClusterName, new ZkBaseDataAccessor<>(zkClient));

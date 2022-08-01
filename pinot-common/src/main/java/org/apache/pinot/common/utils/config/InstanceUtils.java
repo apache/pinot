@@ -23,8 +23,8 @@ import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 

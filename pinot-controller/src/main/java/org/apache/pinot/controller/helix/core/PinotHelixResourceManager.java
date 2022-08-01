@@ -56,7 +56,6 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -67,7 +66,6 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
@@ -77,6 +75,7 @@ import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ParticipantHistory;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -115,6 +114,7 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.api.exception.UserAlreadyExistsException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
+import org.apache.pinot.controller.api.resources.PeriodicTaskInvocationResponse;
 import org.apache.pinot.controller.api.resources.StateType;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -411,6 +411,11 @@ public class PinotHelixResourceManager {
     }
     return HelixHelper.getInstancesConfigsWithTag(HelixHelper.getInstanceConfigs(_helixZkManager),
         TagNameUtils.getBrokerTagForTenant(brokerTenantName));
+  }
+
+  public List<InstanceConfig> getAllControllerInstanceConfigs() {
+    return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
+        .filter(instance -> InstanceTypeUtils.isController(instance.getId())).collect(Collectors.toList());
   }
 
   /**
@@ -2497,13 +2502,12 @@ public class PinotHelixResourceManager {
     if (idealState == null) {
       throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
     }
-
-    for (String segment : idealState.getPartitionSet()) {
-      for (String server : idealState.getInstanceStateMap(segment).keySet()) {
-        serverToSegmentsMap.computeIfAbsent(server, key -> new ArrayList<>()).add(segment);
+    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+      String segmentName = entry.getKey();
+      for (String server : entry.getValue().keySet()) {
+        serverToSegmentsMap.computeIfAbsent(server, key -> new ArrayList<>()).add(segmentName);
       }
     }
-
     return serverToSegmentsMap;
   }
 
@@ -2515,11 +2519,10 @@ public class PinotHelixResourceManager {
     if (idealState == null) {
       throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
     }
-
-    return idealState.getPartitionSet().stream()
-        .filter(segmentName::equals)
-        .flatMap(s -> idealState.getInstanceStateMap(s).keySet().stream())
-        .collect(Collectors.toSet());
+    Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
+    Preconditions.checkState(instanceStateMap != null, "Segment: {} does not exist in the ideal state of table: {}",
+        segmentName, tableNameWithType);
+    return instanceStateMap.keySet();
   }
 
   /**
@@ -2869,9 +2872,18 @@ public class PinotHelixResourceManager {
               //  realtime segment consumption,
               //  and realtime segment will mark itself as OFFLINE in ideal state.
               //  Issue: https://github.com/apache/pinot/issues/4653
-              if ((enableInstance && !offlineState.equals(state)) || (!enableInstance && offlineState.equals(state))) {
-                toggleSucceeded = false;
-                break;
+              if (enableInstance) {
+                // Instance enabled, every partition should not eventually be offline.
+                if (offlineState.equals(state)) {
+                  toggleSucceeded = false;
+                  break;
+                }
+              } else {
+                // Instance disabled, every partition should eventually be offline.
+                if (!offlineState.equals(state)) {
+                  toggleSucceeded = false;
+                  break;
+                }
               }
             }
             if (!toggleSucceeded) {
@@ -2891,11 +2903,12 @@ public class PinotHelixResourceManager {
         LOGGER.warn("Got interrupted when sleeping for {}ms to wait until the current state matched for instance: {}",
             intervalWaitTimeMs, instanceName);
         return PinotResourceManagerResponse.failure(
-            "Got interrupted when waiting for instance to be " + (enableInstance ? "enabled" : "disabled"));
+            "Got interrupted when waiting for instance: " + instanceName + " to be " + (enableInstance ? "enabled"
+                : "disabled"));
       }
     }
     return PinotResourceManagerResponse.failure(
-        "Instance " + (enableInstance ? "enable" : "disable") + " failed, timeout");
+        "Instance: " + instanceName + (enableInstance ? " enable" : " disable") + " failed, timeout");
   }
 
   public RebalanceResult rebalanceTable(String tableNameWithType, Configuration rebalanceConfig)
@@ -3013,7 +3026,7 @@ public class PinotHelixResourceManager {
 
     if (tableNamesWithType.isEmpty()) {
       throw new TableNotFoundException(
-          "Table '" + tableName + (tableType != null ? "_" + tableType.toString() : "") + "' not found.");
+          "Table '" + tableName + (tableType != null ? "_" + tableType : "") + "' not found.");
     }
 
     return tableNamesWithType;
@@ -3200,8 +3213,9 @@ public class PinotHelixResourceManager {
         Thread.sleep(SEGMENT_CLEANUP_CHECK_INTERVAL_MS);
       }
     } while (System.currentTimeMillis() < endTimeMs);
-    throw new RuntimeException("Timeout while waiting for segments to be deleted for table: " + tableNameWithType
-        + ", timeout: " + timeOutInMillis + "ms");
+    throw new RuntimeException(
+        "Timeout while waiting for segments to be deleted for table: " + tableNameWithType + ", timeout: "
+            + timeOutInMillis + "ms");
   }
 
   /**
@@ -3301,7 +3315,7 @@ public class PinotHelixResourceManager {
    * @param tableNameWithType
    */
   public SegmentLineage listSegmentLineage(String tableNameWithType) {
-      return SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
+    return SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
   }
 
   /**
@@ -3457,6 +3471,7 @@ public class PinotHelixResourceManager {
   public Set<String> getOnlineSegmentsFromExternalView(String tableNameWithType) {
     ExternalView externalView = getTableExternalView(tableNameWithType);
     if (externalView == null) {
+      LOGGER.warn(String.format("External view is null for table (%s)", tableNameWithType));
       return Collections.emptySet();
     }
     Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
@@ -3596,14 +3611,13 @@ public class PinotHelixResourceManager {
    * @param tableName Name of table against which task is to be run
    * @param periodicTaskName Task name
    * @param taskProperties Extra properties to be passed along
-   * @return Task id for filtering logs, along with the number of successfully sent messages
+   * @return Task id for filtering logs, along with success status (whether helix messeages were sent)
    */
-  public Pair<String, Integer> invokeControllerPeriodicTask(String tableName, String periodicTaskName,
+  public PeriodicTaskInvocationResponse invokeControllerPeriodicTask(String tableName, String periodicTaskName,
       Map<String, String> taskProperties) {
     String periodicTaskRequestId = API_REQUEST_ID_PREFIX + UUID.randomUUID().toString().substring(0, 8);
 
-    LOGGER.info(
-        "[TaskRequestId: {}] Sending periodic task message to all controllers for running task {} against {},"
+    LOGGER.info("[TaskRequestId: {}] Sending periodic task message to all controllers for running task {} against {},"
             + " with properties {}.\"", periodicTaskRequestId, periodicTaskName,
         tableName != null ? " table '" + tableName + "'" : "all tables", taskProperties);
 
@@ -3622,7 +3636,7 @@ public class PinotHelixResourceManager {
 
     LOGGER.info("[TaskRequestId: {}] Periodic task execution message sent to {} controllers.", periodicTaskRequestId,
         messageCount);
-    return Pair.of(periodicTaskRequestId, messageCount);
+    return new PeriodicTaskInvocationResponse(periodicTaskRequestId, messageCount > 0);
   }
 
   /*

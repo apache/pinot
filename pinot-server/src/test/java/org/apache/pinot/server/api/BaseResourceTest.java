@@ -87,6 +87,7 @@ public abstract class BaseResourceTest {
   private File _avroFile;
   private AdminApiApplication _adminApiApplication;
   protected WebTarget _webTarget;
+  protected String _instanceId;
 
   @SuppressWarnings("SuspiciousMethodCalls")
   @BeforeClass
@@ -133,8 +134,8 @@ public abstract class BaseResourceTest {
             ? NetUtils.getHostnameOrAddress() : NetUtils.getHostAddress());
     int port = serverConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
         CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID,
-        CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port);
+    _instanceId = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port;
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _instanceId);
     _adminApiApplication = new AdminApiApplication(serverInstance, new AllowAllAccessFactory(), serverConf);
     _adminApiApplication.start(Collections.singletonList(
         new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", CommonConstants.Server.DEFAULT_ADMIN_API_PORT,

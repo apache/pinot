@@ -75,10 +75,9 @@ public class ADLSGen2PinotFS extends BasePinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(ADLSGen2PinotFS.class);
 
   private enum AuthenticationType {
-    ACCESS_KEY,
-    AZURE_AD,
-    AZURE_AD_WITH_PROXY
+    ACCESS_KEY, AZURE_AD, AZURE_AD_WITH_PROXY
   }
+
   private static final String AUTHENTICATION_TYPE = "authenticationType";
   private static final String ACCOUNT_NAME = "accountName";
   private static final String ACCESS_KEY = "accessKey";
@@ -139,7 +138,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     String proxyHost = config.getProperty(PROXY_HOST);
     String proxyUsername = config.getProperty(PROXY_USERNAME);
     String proxyPassword = config.getProperty(PROXY_PASSWORD);
-    Integer proxyPort = Integer.parseInt(config.getProperty(PROXY_PORT));
+    String proxyPort = config.getProperty(PROXY_PORT);
 
     String dfsServiceEndpointUrl = HTTPS_URL_PREFIX + accountName + AZURE_STORAGE_DNS_SUFFIX;
     String blobServiceEndpointUrl = HTTPS_URL_PREFIX + accountName + AZURE_BLOB_DNS_SUFFIX;
@@ -183,9 +182,9 @@ public class ADLSGen2PinotFS extends BasePinotFS {
         Preconditions.checkNotNull(proxyPassword, "Proxy Password cannot be null");
 
         NettyAsyncHttpClientBuilder builder = new NettyAsyncHttpClientBuilder();
-        builder.proxy(
-            new ProxyOptions(ProxyOptions.Type.HTTP, new InetSocketAddress(proxyHost, proxyPort)).setCredentials(
-                proxyUsername, proxyPassword));
+        builder.proxy(new ProxyOptions(ProxyOptions.Type.HTTP,
+            new InetSocketAddress(proxyHost, Integer.parseInt(proxyPort))).setCredentials(proxyUsername,
+            proxyPassword));
         ClientSecretCredentialBuilder clientSecretCredentialBuilder =
             new ClientSecretCredentialBuilder().clientId(clientId).clientSecret(clientSecret).tenantId(tenantId);
         clientSecretCredentialBuilder.httpClient(builder.build());
@@ -246,9 +245,8 @@ public class ADLSGen2PinotFS extends BasePinotFS {
       // By default, create directory call will overwrite if the path already exists. Setting IfNoneMatch = "*" to
       // prevent overwrite. https://docs.microsoft.com/en-us/rest/api/storageservices/datalakestoragegen2/path/create
       DataLakeRequestConditions requestConditions = new DataLakeRequestConditions().setIfNoneMatch("*");
-      _fileSystemClient
-          .createDirectoryWithResponse(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(uri), null, null, null,
-              null, requestConditions, null, null);
+      _fileSystemClient.createDirectoryWithResponse(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(uri), null,
+          null, null, null, requestConditions, null, null);
       return true;
     } catch (DataLakeStorageException e) {
       // If the path already exists, doing nothing and return true

@@ -125,8 +125,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     ServerMetrics serverMetrics = Mockito.mock(ServerMetrics.class);
     _upsertIndexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     ((ImmutableSegmentImpl) _upsertIndexSegment).enableUpsert(
-        new PartitionUpsertMetadataManager("testTable_REALTIME", 0, serverMetrics, null,
-            HashFunction.NONE, Collections.emptyList()), new ThreadSafeMutableRoaringBitmap());
+        new PartitionUpsertMetadataManager("testTable_REALTIME", 0, Collections.singletonList("column6"),
+            "daysSinceEpoch", HashFunction.NONE, null, serverMetrics), new ThreadSafeMutableRoaringBitmap());
   }
 
   @AfterClass

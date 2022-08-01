@@ -194,6 +194,7 @@ const QueryPage = () => {
 
   const [checked, setChecked] = React.useState({
     tracing: queryParam.get('tracing') === 'true',
+    useMSE: queryParam.get('useMSE') === 'true',
     showResultJSON: false,
   });
 
@@ -270,19 +271,24 @@ const QueryPage = () => {
     setQueryLoader(true);
     queryExecuted.current = true;
     let params;
-    let timeoutStr = '';
+    let queryOptions = '';
     if(queryTimeout){
-      timeoutStr = ` option(timeoutMs=${queryTimeout})`
+      queryOptions += `timeoutMs=${queryTimeout}`;
+    }
+    if(checked.useMSE){
+      queryOptions += `useMultistageEngine=true`;
     }
     const finalQuery = `${query || inputQuery.trim()}`;
     params = JSON.stringify({
-      sql: `${finalQuery}${timeoutStr}`,
+      sql: `${finalQuery}`,
       trace: checked.tracing,
+      queryOptions: `${queryOptions}`,
     });
 
     if(finalQuery !== ''){
       queryParam.set('query', finalQuery);
       queryParam.set('tracing', checked.tracing.toString());
+      queryParam.set('useMSE', checked.useMSE.toString());
       if(queryTimeout !== undefined && queryTimeout !== ''){
         queryParam.set('timeout', queryTimeout.toString());
       }
@@ -292,7 +298,7 @@ const QueryPage = () => {
       })
     }
 
-    const results = await PinotMethodUtils.getQueryResults(params, checked);
+    const results = await PinotMethodUtils.getQueryResults(params);
     setResultError(results.error || '');
     setResultData(results.result || { columns: [], records: [] });
     setQueryStats(results.queryStats || { columns: responseStatCols, records: [] });
@@ -309,6 +315,10 @@ const QueryPage = () => {
       warnings.push(`There are ${numSegmentsPrunedInvalid} invalid segment/s. This usually means that they were `
          + `created with an older schema. `
          + `Please reload the table in order to refresh these segments to the new schema.`);
+    }
+    if (checked.useMSE) {
+      warnings.push(`Using V2 Multi-Stage Query Engine. This is an experimental feature. Please report any bugs to `
+          + `Apache Pinot Slack channel.`);
     }
     return warnings;
   }
@@ -377,6 +387,7 @@ const QueryPage = () => {
       setInputQuery(query);
       setChecked({
         tracing: queryParam.get('tracing') === 'true',
+        useMSE: queryParam.get('useMse') === 'true',
         showResultJSON: checked.showResultJSON,
       });
       setQueryTimeout(Number(queryParam.get('timeout') || '') || '');
@@ -492,6 +503,16 @@ const QueryPage = () => {
                 Tracing
               </Grid>
 
+              <Grid item xs={2}>
+                <Checkbox
+                    name="useMSE"
+                    color="primary"
+                    onChange={handleChange}
+                    checked={checked.useMSE}
+                />
+                Use V2 Engine
+              </Grid>
+
               <Grid item xs={3}>
                 <FormControl fullWidth={true} className={classes.timeoutControl}>
                   <InputLabel htmlFor="my-input">Timeout (in Milliseconds)</InputLabel>
@@ -525,19 +546,20 @@ const QueryPage = () => {
                     </Grid>
                 ) : null}
 
+                {
+                  warnings.map(warn =>
+                                   <Alert severity="warning" className={classes.sqlError}>
+                                     {warn}
+                                   </Alert>
+                  )
+                }
+
                 {resultError ? (
                   <Alert severity="error" className={classes.sqlError}>
                     {resultError}
                   </Alert>
                 ) : (
                   <>
-                    {
-                    warnings.map(warn =>
-                        <Alert severity="warning" className={classes.sqlError}>
-                          {warn}
-                        </Alert>
-                      )
-                    }
                     <Grid item xs style={{ backgroundColor: 'white' }}>
                       {resultData.columns.length ? (
                         <>

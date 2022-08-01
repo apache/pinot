@@ -102,7 +102,7 @@ public class ADLSGen2PinotFSTest {
         _mockFileClient, _mockBlobContainerClient, _mockBlobClient, _mockBlobServiceClient, _mockBlobInputStream);
   }
 
-  @Test(expectedExceptions = IllegalArgumentException.class)
+  @Test(expectedExceptions = NullPointerException.class)
   public void testInitNoAuth() {
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
     _adlsGen2PinotFsUnderTest.init(pinotConfiguration);

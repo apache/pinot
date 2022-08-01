@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
+import org.apache.pinot.query.service.QueryConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +46,8 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
 
   public GrpcMailboxServer(GrpcMailboxService mailboxService, int port) {
     _mailboxService = mailboxService;
-    _server = ServerBuilder.forPort(port).addService(this).build();
+    _server = ServerBuilder.forPort(port).addService(this)
+        .maxInboundMessageSize(QueryConfig.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_BYTES_SIZE).build();
     LOGGER.info("Initialized GrpcMailboxServer on port: {}", port);
   }
 

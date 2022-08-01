@@ -20,6 +20,7 @@ package org.apache.pinot.server.api.resources;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import javax.inject.Inject;
@@ -27,6 +28,7 @@ import javax.inject.Named;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -54,8 +56,42 @@ public class HealthCheckResource {
       @ApiResponse(code = 200, message = "Server is healthy"),
       @ApiResponse(code = 503, message = "Server is not healthy")
   })
-  public String checkHealth() {
-    Status status = ServiceStatus.getServiceStatus(_instanceId);
+  public String checkHealth(
+      @ApiParam(value = "health check type: liveness or readiness") @QueryParam("checkType") String checkType) {
+    if ("liveness".equalsIgnoreCase(checkType)) {
+      return "OK";
+    } else {
+      return getReadinessStatus(_instanceId);
+    }
+  }
+
+  @GET
+  @Path("/health/liveness")
+  @Produces(MediaType.TEXT_PLAIN)
+  @ApiOperation(value = "Checking server liveness status.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Server is live"),
+      @ApiResponse(code = 503, message = "Server is not live")
+  })
+  public String checkLiveness() {
+    // Returns OK since if we reached here, the admin application is running.
+    return "OK";
+  }
+
+  @GET
+  @Path("/health/readiness")
+  @Produces(MediaType.TEXT_PLAIN)
+  @ApiOperation(value = "Checking server readiness status")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Server is ready to serve queries"),
+      @ApiResponse(code = 503, message = "Server is not ready to serve queries")
+  })
+  public String checkReadiness() {
+    return getReadinessStatus(_instanceId);
+  }
+
+  private static String getReadinessStatus(String instanceId) throws WebApplicationException {
+    Status status = ServiceStatus.getServiceStatus(instanceId);
     if (status == Status.GOOD) {
       return "OK";
     }

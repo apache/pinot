@@ -44,7 +44,6 @@ import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,8 +137,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   public DataSource getDataSource(String column) {
     DataSource result = _dataSources.get(column);
     Preconditions.checkNotNull(result,
-        "DataSource for %s should not be null. Potentially invalid column name specified.",
-        column);
+        "DataSource for %s should not be null. Potentially invalid column name specified.", column);
     return result;
   }
 
@@ -236,15 +234,15 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
-  public void getPrimaryKey(int docId, PrimaryKey reuse) {
+  public Object getValue(int docId, String column) {
     try {
       if (_pinotSegmentRecordReader == null) {
         _pinotSegmentRecordReader = new PinotSegmentRecordReader();
         _pinotSegmentRecordReader.init(this);
       }
-      _pinotSegmentRecordReader.getPrimaryKey(docId, _partitionUpsertMetadataManager.getPrimaryKeyColumns(), reuse);
+      return _pinotSegmentRecordReader.getValue(docId, column);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to use PinotSegmentRecordReader to read primary key from immutable segment");
+      throw new RuntimeException("Failed to use PinotSegmentRecordReader to read value from immutable segment");
     }
   }
 }

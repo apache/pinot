@@ -27,16 +27,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.I0Itec.zkclient.IZkChildListener;
-import org.I0Itec.zkclient.IZkDataListener;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.helix.PropertyPathConfig;
-import org.apache.helix.PropertyType;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.helix.manager.zk.ZkClient;
+import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.HelixPropertyListener;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
+import org.apache.helix.zookeeper.impl.client.ZkClient;
+import org.apache.helix.zookeeper.zkclient.IZkChildListener;
+import org.apache.helix.zookeeper.zkclient.IZkDataListener;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -88,7 +87,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
     _pinotHelixResourceManager = pinotManager;
     _leadControllerManager = leadControllerManager;
     String clusterName = _pinotHelixResourceManager.getHelixClusterName();
-    _propertyStorePath = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, clusterName);
+    _propertyStorePath = PropertyPathBuilder.propertyStore(clusterName);
     _tableConfigPath = _propertyStorePath + TABLE_CONFIG;
   }
 

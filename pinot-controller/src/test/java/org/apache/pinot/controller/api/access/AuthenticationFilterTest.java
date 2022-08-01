@@ -19,7 +19,12 @@
 
 package org.apache.pinot.controller.api.access;
 
+import java.lang.reflect.Method;
 import java.util.Optional;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import org.testng.annotations.Test;
@@ -105,5 +110,43 @@ public class AuthenticationFilterTest {
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     Optional<String> actual = _authFilter.extractTableName(pathParams, queryParams);
     assertEquals(actual, Optional.empty());
+  }
+
+  @Test
+  public void testExtractAccessTypeWithAuthAnnotation() throws Exception {
+    Method method = AuthenticationFilterTest.class.getMethod("methodWithAuthAnnotation");
+    assertEquals(AccessType.UPDATE, _authFilter.extractAccessType(method));
+  }
+
+  @Test
+  public void testExtractAccessTypeWithMissingAuthAnnotation() throws Exception {
+    Method method = AuthenticationFilterTest.class.getMethod("methodWithGet");
+    assertEquals(AccessType.READ, _authFilter.extractAccessType(method));
+    method = AuthenticationFilterTest.class.getMethod("methodWithPost");
+    assertEquals(AccessType.CREATE, _authFilter.extractAccessType(method));
+    method = AuthenticationFilterTest.class.getMethod("methodWithPut");
+    assertEquals(AccessType.UPDATE, _authFilter.extractAccessType(method));
+    method = AuthenticationFilterTest.class.getMethod("methodWithDelete");
+    assertEquals(AccessType.DELETE, _authFilter.extractAccessType(method));
+  }
+
+  @Authenticate(AccessType.UPDATE)
+  public void methodWithAuthAnnotation() {
+  }
+
+  @GET
+  public void methodWithGet() {
+  }
+
+  @PUT
+  public void methodWithPut() {
+  }
+
+  @POST
+  public void methodWithPost() {
+  }
+
+  @DELETE
+  public void methodWithDelete() {
   }
 }

@@ -20,7 +20,10 @@ package org.apache.pinot.core.util;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
@@ -74,7 +77,10 @@ public final class SegmentProcessorAvroUtils {
   public static Schema convertPinotSchemaToAvroSchema(org.apache.pinot.spi.data.Schema pinotSchema) {
     SchemaBuilder.FieldAssembler<org.apache.avro.Schema> fieldAssembler = SchemaBuilder.record("record").fields();
 
-    for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
+    List<FieldSpec> orderedFieldSpecs = pinotSchema.getAllFieldSpecs().stream()
+        .sorted(Comparator.comparing(FieldSpec::getName))
+        .collect(Collectors.toList());
+    for (FieldSpec fieldSpec : orderedFieldSpecs) {
       String name = fieldSpec.getName();
       DataType storedType = fieldSpec.getDataType().getStoredType();
       if (fieldSpec.isSingleValueField()) {

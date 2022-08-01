@@ -22,6 +22,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
+import org.apache.pinot.query.service.QueryConfig;
 
 
 /**
@@ -33,7 +34,6 @@ import org.apache.pinot.query.mailbox.GrpcMailboxService;
  * <p>the channelId should be in the format of: <code>"senderHost:senderPort:receiverHost:receiverPort"</code>
  */
 public class ChannelManager {
-  private static final int DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE = 128 * 1024 * 1024;
 
   private final GrpcMailboxService _mailboxService;
   private final GrpcMailboxServer _grpcMailboxServer;
@@ -54,9 +54,15 @@ public class ChannelManager {
   }
 
   public ManagedChannel getChannel(String channelId) {
-    String[] channelParts = channelId.split(":");
     return _channelMap.computeIfAbsent(channelId,
-        (id) -> ManagedChannelBuilder.forAddress(channelParts[0], Integer.parseInt(channelParts[1]))
-            .maxInboundMessageSize(DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE).usePlaintext().build());
+        (id) -> constructChannel(id.split(":")));
+  }
+
+  private static ManagedChannel constructChannel(String[] channelParts) {
+    ManagedChannelBuilder<?> managedChannelBuilder = ManagedChannelBuilder
+        .forAddress(channelParts[0], Integer.parseInt(channelParts[1]))
+        .maxInboundMessageSize(QueryConfig.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_BYTES_SIZE)
+        .usePlaintext();
+    return managedChannelBuilder.build();
   }
 }

@@ -56,6 +56,9 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
+import org.apache.pinot.common.minion.InMemoryTaskManagerStatusCache;
+import org.apache.pinot.common.minion.TaskGeneratorMostRecentRunInfo;
+import org.apache.pinot.common.minion.TaskManagerStatusCache;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TlsUtils;
@@ -148,6 +151,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected RetentionManager _retentionManager;
   protected SegmentStatusChecker _segmentStatusChecker;
   protected PinotTaskManager _taskManager;
+  protected TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> _taskManagerStatusCache;
   protected PeriodicTaskScheduler _periodicTaskScheduler;
   protected PinotHelixTaskResourceManager _helixTaskResourceManager;
   protected PinotRealtimeSegmentManager _realtimeSegmentsManager;
@@ -457,6 +461,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_helixTaskResourceManager).to(PinotHelixTaskResourceManager.class);
         bind(_segmentCompletionManager).to(SegmentCompletionManager.class);
         bind(_taskManager).to(PinotTaskManager.class);
+        bind(_taskManagerStatusCache).to(TaskManagerStatusCache.class);
         bind(connectionManager).to(HttpConnectionManager.class);
         bind(_executorService).to(Executor.class);
         bind(_controllerMetrics).to(ControllerMetrics.class);
@@ -465,6 +470,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_leadControllerManager).to(LeadControllerManager.class);
         bind(_periodicTaskScheduler).to(PeriodicTaskScheduler.class);
         bind(_sqlQueryExecutor).to(SqlQueryExecutor.class);
+        bind(_pinotLLCRealtimeSegmentManager).to(PinotLLCRealtimeSegmentManager.class);
       }
     });
 
@@ -629,13 +635,18 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     return _controllerMode;
   }
 
+  protected TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> getTaskManagerStatusCache() {
+    return new InMemoryTaskManagerStatusCache();
+  }
+
   @VisibleForTesting
   protected List<PeriodicTask> setupControllerPeriodicTasks() {
     LOGGER.info("Setting up periodic tasks");
     List<PeriodicTask> periodicTasks = new ArrayList<>();
+    _taskManagerStatusCache = getTaskManagerStatusCache();
     _taskManager =
         new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _leadControllerManager, _config,
-            _controllerMetrics);
+            _controllerMetrics, _taskManagerStatusCache);
     periodicTasks.add(_taskManager);
     _retentionManager =
         new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);

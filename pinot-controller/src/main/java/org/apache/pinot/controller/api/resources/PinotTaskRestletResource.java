@@ -19,6 +19,8 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.HashBiMap;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -26,12 +28,16 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
@@ -50,10 +56,15 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.minion.BaseTaskGeneratorInfo;
+import org.apache.pinot.common.minion.TaskManagerStatusCache;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -61,10 +72,13 @@ import org.apache.pinot.controller.api.exception.NoTaskMetadataException;
 import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
 import org.apache.pinot.controller.api.exception.TaskAlreadyExistsException;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.server.ManagedAsync;
 import org.quartz.CronTrigger;
@@ -117,6 +131,21 @@ public class PinotTaskRestletResource {
 
   @Inject
   PinotTaskManager _pinotTaskManager;
+
+  @Inject
+  TaskManagerStatusCache _taskManagerStatusCache;
+
+  @Inject
+  PinotHelixResourceManager _pinotHelixResourceManager;
+
+  @Inject
+  Executor _executor;
+
+  @Inject
+  HttpConnectionManager _connectionManager;
+
+  @Context
+  private UriInfo _uriInfo;
 
   @GET
   @Path("/tasks/tasktypes")
@@ -229,6 +258,55 @@ public class PinotTaskRestletResource {
           + "Value of > 0 prints subtask details for all tasks)")
       @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
     return _pinotHelixTaskResourceManager.getTasksDebugInfoByTable(taskType, tableNameWithType, verbosity);
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tasks/generator/{tableNameWithType}/{taskType}/debug")
+  @ApiOperation("Fetch task generation information for the recent runs of the given task for the given table")
+  public String getTaskGenerationDebugInto(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
+          String tableNameWithType,
+      @ApiParam(value = "Whether to only lookup local cache for logs", defaultValue = "false") @QueryParam("localOnly")
+          boolean localOnly)
+      throws JsonProcessingException {
+    if (localOnly) {
+      BaseTaskGeneratorInfo taskGeneratorMostRecentRunInfo =
+          _taskManagerStatusCache.fetchTaskGeneratorInfo(tableNameWithType, taskType);
+      if (taskGeneratorMostRecentRunInfo == null) {
+        throw new ControllerApplicationException(LOGGER, "Task generation information not found",
+            Response.Status.NOT_FOUND);
+      }
+
+      return JsonUtils.objectToString(taskGeneratorMostRecentRunInfo);
+    }
+
+    // Call all controllers
+    List<InstanceConfig> controllers = _pinotHelixResourceManager.getAllControllerInstanceConfigs();
+    // Relying on original schema that was used to query the controller
+    URI uri = _uriInfo.getRequestUri();
+    String scheme = uri.getScheme();
+    List<String> controllerUrls = controllers.stream().map(controller -> {
+      return String.format("%s://%s:%d/tasks/generator/%s/%s/debug?localOnly=true", scheme, controller.getHostName(),
+          Integer.parseInt(controller.getPort()), tableNameWithType, taskType);
+    }).collect(Collectors.toList());
+
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, HashBiMap.create(0));
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(controllerUrls, null, true, 10000);
+
+    List<JsonNode> result = new ArrayList<>();
+    serviceResponse._httpResponses.values().forEach(resp -> {
+      try {
+        result.add(JsonUtils.stringToJsonNode(resp));
+      } catch (IOException e) {
+        LOGGER.error("Failed to parse controller response {}", resp, e);
+      }
+    });
+
+    return JsonUtils.objectToString(result);
   }
 
   @GET

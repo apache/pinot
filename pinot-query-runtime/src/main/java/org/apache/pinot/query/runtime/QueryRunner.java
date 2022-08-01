@@ -18,17 +18,21 @@
  */
 package org.apache.pinot.query.runtime;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Mailbox;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.common.datablock.DataBlockUtils;
+import org.apache.pinot.core.common.datablock.MetadataBlock;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -36,6 +40,7 @@ import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.executor.WorkerQueryExecutor;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -101,22 +106,81 @@ public class QueryRunner {
       BaseDataBlock dataBlock;
       try {
         DataTable dataTable = _serverExecutor.processQuery(serverQueryRequest, executorService, null);
-        // this works because default DataTableImplV3 will have a version number at beginning,
-        // which maps to ROW type of version 3.
-        dataBlock = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTable.toBytes()));
-      } catch (IOException e) {
-        throw new RuntimeException("Unable to convert byte buffer", e);
+        if (!dataTable.getExceptions().isEmpty()) {
+          // if contains exception, directly return a metadata block with the exceptions.
+          dataBlock = DataBlockUtils.getErrorDataBlock(dataTable.getExceptions());
+        } else {
+          // this works because default DataTableImplV3 will have a version number at beginning:
+          // the new DataBlock encodes lower 16 bits as version and upper 16 bits as type (ROW, COLUMNAR, METADATA)
+          dataBlock = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTable.toBytes()));
+        }
+      } catch (Exception e) {
+        dataBlock = DataBlockUtils.getErrorDataBlock(e);
       }
 
       MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
       StageMetadata receivingStageMetadata = distributedStagePlan.getMetadataMap().get(sendNode.getReceiverStageId());
       MailboxSendOperator mailboxSendOperator =
-          new MailboxSendOperator(_mailboxService, dataBlock, receivingStageMetadata.getServerInstances(),
-              sendNode.getExchangeType(), sendNode.getPartitionKeySelector(), _hostname, _port,
-              serverQueryRequest.getRequestId(), sendNode.getStageId());
+          new MailboxSendOperator(_mailboxService, sendNode.getDataSchema(),
+              new LeafStageTransferableBlockOperator(dataBlock, sendNode.getDataSchema()),
+              receivingStageMetadata.getServerInstances(), sendNode.getExchangeType(),
+              sendNode.getPartitionKeySelector(), _hostname, _port, serverQueryRequest.getRequestId(),
+              sendNode.getStageId());
       mailboxSendOperator.nextBlock();
+      if (dataBlock.getExceptions().isEmpty()) {
+        mailboxSendOperator.nextBlock();
+      }
     } else {
       _workerExecutor.processQuery(distributedStagePlan, requestMetadataMap, executorService);
+    }
+  }
+
+  /**
+   * Leaf-stage transfer block opreator is used to wrap around the leaf stage process results. They are passed to the
+   * Pinot server to execute query thus only one {@link DataTable} were returned. However, to conform with the
+   * intermediate stage operators. an additional {@link MetadataBlock} needs to be transfer after the data block.
+   *
+   * <p>In order to achieve this:
+   * <ul>
+   *   <li>The leaf-stage result is split into data payload block and metadata payload block.</li>
+   *   <li>In case the leaf-stage result contains error or only metadata, we skip the data payload block.</li>
+   * </ul>
+   */
+  private static class LeafStageTransferableBlockOperator extends BaseOperator<TransferableBlock> {
+    private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
+
+    private final MetadataBlock _endOfStreamBlock;
+    private final BaseDataBlock _baseDataBlock;
+    private final DataSchema _dataSchema;
+    private boolean _hasTransferred;
+
+    private LeafStageTransferableBlockOperator(BaseDataBlock baseDataBlock, DataSchema dataSchema) {
+      _baseDataBlock = baseDataBlock;
+      _dataSchema = dataSchema;
+      _endOfStreamBlock = baseDataBlock.getExceptions().isEmpty()
+          ? DataBlockUtils.getEndOfStreamDataBlock(dataSchema) : null;
+      _hasTransferred = false;
+    }
+
+    @Override
+    public List<Operator> getChildOperators() {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public String toExplainString() {
+      return EXPLAIN_NAME;
+    }
+
+    @Override
+    protected TransferableBlock getNextBlock() {
+      if (!_hasTransferred) {
+        _hasTransferred = true;
+        return new TransferableBlock(_baseDataBlock);
+      } else {
+        return new TransferableBlock(_endOfStreamBlock);
+      }
     }
   }
 

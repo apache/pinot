@@ -24,7 +24,9 @@ import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.common.proto.Mailbox;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockUtils;
+import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -66,8 +68,11 @@ public class GrpcMailboxServiceTest extends GrpcMailboxServiceTestBase {
   private Mailbox.MailboxContent getTestMailboxContent(String mailboxId)
       throws IOException {
     return Mailbox.MailboxContent.newBuilder().setMailboxId(mailboxId)
-        .putAllMetadata(ImmutableMap.of("key", "value", "finished", "true"))
-        .setPayload(ByteString.copyFrom(new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock()).toBytes()))
+        .putAllMetadata(ImmutableMap.of("key", "value", ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true"))
+        .setPayload(ByteString.copyFrom(new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(new DataSchema(
+            new String[]{"foo", "bar"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING}))
+        ).toBytes()))
         .build();
   }
 }

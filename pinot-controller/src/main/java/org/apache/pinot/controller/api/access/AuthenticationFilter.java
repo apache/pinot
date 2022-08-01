@@ -87,13 +87,17 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     //     - "schemaName"
     // If table name is not available, it means the endpoint is not a table-level endpoint.
     Optional<String> tableName = extractTableName(uriInfo.getPathParameters(), uriInfo.getQueryParameters());
+    AccessType accessType = extractAccessType(endpointMethod);
+    new AccessControlUtils().validatePermission(tableName, accessType, _httpHeaders, endpointUrl, accessControl);
+  }
 
+  @VisibleForTesting
+  AccessType extractAccessType(Method endpointMethod) {
     // default access type
     AccessType accessType = AccessType.READ;
-
     if (endpointMethod.isAnnotationPresent(Authenticate.class)) {
       accessType = endpointMethod.getAnnotation(Authenticate.class).value();
-    } else if (accessControl.protectAnnotatedOnly()) {
+    } else {
       // heuristically infer access type via javax.ws.rs annotations
       if (endpointMethod.getAnnotation(POST.class) != null) {
         accessType = AccessType.CREATE;
@@ -103,8 +107,7 @@ public class AuthenticationFilter implements ContainerRequestFilter {
         accessType = AccessType.DELETE;
       }
     }
-
-    new AccessControlUtils().validatePermission(tableName, accessType, _httpHeaders, endpointUrl, accessControl);
+    return accessType;
   }
 
   @VisibleForTesting

@@ -40,15 +40,16 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
@@ -58,12 +59,14 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -249,6 +252,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       SegmentRefreshSemaphore segmentRefreshSemaphore)
       throws Exception {
     LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
+    long startTime = System.currentTimeMillis();
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkNotNull(tableConfig);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
@@ -280,7 +284,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
           String.format("Failed to reload %d/%d segments: %s in table: %s", failedSegments.size(),
               segmentsMetadata.size(), failedSegments, tableNameWithType), sampleException.get());
     }
-    LOGGER.info("Reloaded all segments in table: {}", tableNameWithType);
+    LOGGER.info("Reloaded all segments in table: {}. Duration: {}", tableNameWithType,
+        (System.currentTimeMillis() - startTime));
   }
 
   private void reloadSegment(String tableNameWithType, SegmentMetadata segmentMetadata, TableConfig tableConfig,
@@ -461,5 +466,28 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public SegmentUploader getSegmentUploader() {
     return _segmentUploader;
+  }
+
+  @Override
+  public void forceCommit(String tableNameWithType, Set<String> segmentNames) {
+    Preconditions.checkArgument(TableNameBuilder.isRealtimeTableResource(tableNameWithType), String
+        .format("Force commit is only supported for segments of realtime tables - table name: %s segment names: %s",
+            tableNameWithType, segmentNames));
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager != null) {
+      segmentNames.forEach(segName -> {
+        SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segName);
+        if (segmentDataManager != null) {
+          try {
+            if (segmentDataManager instanceof LLRealtimeSegmentDataManager) {
+              LLRealtimeSegmentDataManager llSegmentDataManager = (LLRealtimeSegmentDataManager) segmentDataManager;
+              llSegmentDataManager.forceCommit();
+            }
+          } finally {
+            tableDataManager.releaseSegment(segmentDataManager);
+          }
+        }
+      });
+    }
   }
 }

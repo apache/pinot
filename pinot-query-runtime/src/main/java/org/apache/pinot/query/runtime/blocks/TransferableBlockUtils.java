@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
+import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.common.datablock.DataBlockUtils;
 
 
@@ -28,24 +27,20 @@ public final class TransferableBlockUtils {
   private TransferableBlockUtils() {
     // do not instantiate.
   }
-  private static final TransferableBlock EOS_TRANSFERABLE_BLOCK =
-      new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
 
-  public static TransferableBlock getEndOfStreamTransferableBlock() {
-    return EOS_TRANSFERABLE_BLOCK;
+  public static TransferableBlock getEndOfStreamTransferableBlock(DataSchema dataSchema) {
+    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(dataSchema));
   }
 
   public static TransferableBlock getErrorTransferableBlock(Exception e) {
     return new TransferableBlock(DataBlockUtils.getErrorDataBlock(e));
   }
 
-  public static TransferableBlock getEmptyTransferableBlock(DataSchema dataSchema) {
-    return new TransferableBlock(DataBlockUtils.getEmptyDataBlock(dataSchema));
+  public static TransferableBlock getErrorTransferableBlock(Map<Integer, String> exceptions) {
+    return new TransferableBlock(DataBlockUtils.getErrorDataBlock(exceptions));
   }
 
   public static boolean isEndOfStream(TransferableBlock transferableBlock) {
-    return transferableBlock.getType().equals(BaseDataBlock.Type.METADATA)
-        && "END_OF_STREAM".equals(transferableBlock.getDataBlock().getMetadata()
-        .get(DataTable.MetadataKey.TABLE.getName()));
+    return transferableBlock.isEndOfStreamBlock();
   }
 }

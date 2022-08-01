@@ -16,26 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.starter.helix;
+package org.apache.pinot.query.mailbox.channel;
 
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+public class ChannelUtils {
 
+  public static final String MAILBOX_METADATA_BUFFER_SIZE_KEY = "buffer.size";
+  public static final String MAILBOX_METADATA_END_OF_STREAM_KEY = "end.of.stream";
 
-public class SegmentLocks {
-  private SegmentLocks() {
-  }
-
-  private static final int NUM_LOCKS = 10000;
-  private static final Lock[] LOCKS = new Lock[NUM_LOCKS];
-
-  static {
-    for (int i = 0; i < NUM_LOCKS; i++) {
-      LOCKS[i] = new ReentrantLock();
-    }
-  }
-
-  public static Lock getSegmentLock(String tableNameWithType, String segmentName) {
-    return LOCKS[Math.abs((31 * tableNameWithType.hashCode() + segmentName.hashCode()) % NUM_LOCKS)];
+  private ChannelUtils() {
+    // do not instantiate.
   }
 }

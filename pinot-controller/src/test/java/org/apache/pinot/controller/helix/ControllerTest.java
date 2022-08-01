@@ -40,7 +40,6 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.Message;
@@ -51,6 +50,7 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.http.client.entity.EntityBuilder;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -297,7 +297,7 @@ public class ControllerTest {
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeBrokerResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
-            FakeBrokerResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
+            new FakeBrokerResourceOnlineOfflineStateModelFactory());
     helixManager.connect();
     HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
     if (isSingleTenant) {
@@ -324,17 +324,13 @@ public class ControllerTest {
 
   public static class FakeBrokerResourceOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
     private static final String STATE_MODEL_DEF = "BrokerResourceOnlineOfflineStateModel";
-    private static final FakeBrokerResourceOnlineOfflineStateModelFactory FACTORY_INSTANCE =
-        new FakeBrokerResourceOnlineOfflineStateModelFactory();
-    private static final FakeBrokerResourceOnlineOfflineStateModel STATE_MODEL_INSTANCE =
-        new FakeBrokerResourceOnlineOfflineStateModel();
 
     private FakeBrokerResourceOnlineOfflineStateModelFactory() {
     }
 
     @Override
     public StateModel createNewStateModel(String resourceName, String partitionName) {
-      return STATE_MODEL_INSTANCE;
+      return new FakeBrokerResourceOnlineOfflineStateModel();
     }
 
     @SuppressWarnings("unused")
@@ -400,7 +396,7 @@ public class ControllerTest {
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeSegmentOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
-            FakeSegmentOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
+            new FakeSegmentOnlineOfflineStateModelFactory());
     helixManager.connect();
     HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
     if (isSingleTenant) {
@@ -439,17 +435,13 @@ public class ControllerTest {
 
   public static class FakeSegmentOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
     private static final String STATE_MODEL_DEF = "SegmentOnlineOfflineStateModel";
-    private static final FakeSegmentOnlineOfflineStateModelFactory FACTORY_INSTANCE =
-        new FakeSegmentOnlineOfflineStateModelFactory();
-    private static final FakeSegmentOnlineOfflineStateModel STATE_MODEL_INSTANCE =
-        new FakeSegmentOnlineOfflineStateModel();
 
     private FakeSegmentOnlineOfflineStateModelFactory() {
     }
 
     @Override
     public StateModel createNewStateModel(String resourceName, String partitionName) {
-      return STATE_MODEL_INSTANCE;
+      return new FakeSegmentOnlineOfflineStateModel();
     }
 
     @SuppressWarnings("unused")
@@ -520,7 +512,7 @@ public class ControllerTest {
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, getZkUrl());
     helixManager.getStateMachineEngine()
         .registerStateModelFactory(FakeMinionResourceOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
-            FakeMinionResourceOnlineOfflineStateModelFactory.FACTORY_INSTANCE);
+            new FakeMinionResourceOnlineOfflineStateModelFactory());
     helixManager.connect();
     HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
     helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, Helix.UNTAGGED_MINION_INSTANCE);
@@ -529,17 +521,13 @@ public class ControllerTest {
 
   public static class FakeMinionResourceOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
     private static final String STATE_MODEL_DEF = "MinionResourceOnlineOfflineStateModel";
-    private static final FakeMinionResourceOnlineOfflineStateModelFactory FACTORY_INSTANCE =
-        new FakeMinionResourceOnlineOfflineStateModelFactory();
-    private static final FakeMinionResourceOnlineOfflineStateModel STATE_MODEL_INSTANCE =
-        new FakeMinionResourceOnlineOfflineStateModel();
 
     private FakeMinionResourceOnlineOfflineStateModelFactory() {
     }
 
     @Override
     public StateModel createNewStateModel(String resourceName, String partitionName) {
-      return STATE_MODEL_INSTANCE;
+      return new FakeMinionResourceOnlineOfflineStateModel();
     }
 
     @SuppressWarnings("unused")

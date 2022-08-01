@@ -102,11 +102,11 @@ public abstract class BaseDataBlock implements DataTable {
    * @param fixedSizeDataBytes byte[] for fix-sized columns.
    * @param variableSizeDataBytes byte[] for variable length columns (arrays).
    */
-  public BaseDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
+  public BaseDataBlock(int numRows, @Nullable DataSchema dataSchema, String[] stringDictionary,
       byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
     _numRows = numRows;
-    _numColumns = dataSchema.size();
     _dataSchema = dataSchema;
+    _numColumns = dataSchema == null ? 0 : dataSchema.size();
     _stringDictionary = stringDictionary;
     _fixedSizeDataBytes = fixedSizeDataBytes;
     _fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);

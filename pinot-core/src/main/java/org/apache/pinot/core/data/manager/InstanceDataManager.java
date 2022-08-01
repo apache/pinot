@@ -25,8 +25,8 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.HelixManager;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.core.util.SegmentRefreshSemaphore;
@@ -163,4 +163,9 @@ public interface InstanceDataManager {
    * uploaded segment file. Servers utilize segment uploader to upload llc segment to segment store.
    */
   SegmentUploader getSegmentUploader();
+
+  /**
+   * Immediately stop consumption and start committing the consuming segments.
+   */
+  void forceCommit(String tableNameWithType, Set<String> segmentNames);
 }

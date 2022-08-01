@@ -63,7 +63,8 @@ public class FakeStreamConfigUtils {
   private static final String CONSUMER_FACTORY_CLASS = FakeStreamConsumerFactory.class.getName();
   private static final String OFFSET_CRITERIA = "smallest";
   private static final String DECODER_CLASS = FakeStreamMessageDecoder.class.getName();
-  private static final int SEGMENT_FLUSH_THRESHOLD_ROWS = 500;
+  public static final int SEGMENT_FLUSH_THRESHOLD_ROWS = 500;
+  public static final int MESSAGE_BATCH_SIZE = SEGMENT_FLUSH_THRESHOLD_ROWS;
 
   /**
    * Gets default num partitions
