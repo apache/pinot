@@ -73,6 +73,7 @@ public class PinotServiceManagerAdminApiApplication extends ResourceConfig {
     beanConfig.setBasePath(_baseUri.getPath());
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
+    beanConfig.setExpandSuperTypes(false);
 
     HttpHandler httpHandler =
         new CLStaticHttpHandler(PinotServiceManagerAdminApiApplication.class.getClassLoader(), "/api/");
