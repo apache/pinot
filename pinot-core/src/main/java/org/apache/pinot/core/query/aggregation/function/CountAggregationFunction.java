@@ -92,9 +92,13 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    if (blockValSetMap.isEmpty() || !blockValSetMap.containsKey(STAR_TREE_COUNT_STAR_EXPRESSION)) {
+    if (blockValSetMap.isEmpty()) {
       aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
-    } else if (_nullHandlingEnabled) {
+    } else if (!blockValSetMap.containsKey(STAR_TREE_COUNT_STAR_EXPRESSION)) {
+      if (!_nullHandlingEnabled) {
+        aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
+        return;
+      }
       assert blockValSetMap.size() == 1;
       BlockValSet blockValSet = blockValSetMap.values().iterator().next();
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
