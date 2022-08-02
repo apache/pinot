@@ -84,8 +84,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.function.scalar.StringFunctions.decodeUrl;
-import static org.apache.pinot.common.function.scalar.StringFunctions.encodeUrl;
+import static org.apache.pinot.common.function.scalar.StringFunctions.*;
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.EXTERNAL_VIEW_CHECK_INTERVAL_MS;
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
 import static org.testng.Assert.*;
@@ -607,6 +606,178 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  public void testBase64Func()
+      throws Exception {
+
+    // string literal
+    String sqlQuery = "SELECT toBase64(toUtf8('hello!')), " + "fromUtf8(fromBase64('aGVsbG8h')) FROM myTable";
+    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"STRING\"]");
+    JsonNode rows = response.get("resultTable").get("rows");
+
+    String encodedString = rows.get(0).get(0).asText();
+    String expectedEncodedStr = toBase64(toUtf8("hello!"));
+    assertEquals(encodedString, expectedEncodedStr);
+    String decodedString = rows.get(0).get(1).asText();
+    String expectedDecodedStr = fromUtf8(fromBase64("aGVsbG8h"));
+    assertEquals(decodedString, expectedDecodedStr);
+
+    // long string literal encode
+    sqlQuery =
+        "SELECT toBase64(toUtf8('this is a long string that will encode to more than 76 characters using base64')) "
+            + "FROM "
+            + "myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    encodedString = rows.get(0).get(0).asText();
+    assertEquals(encodedString,
+        toBase64(toUtf8("this is a long string that will encode to more than 76 characters using base64")));
+
+    // long string literal decode
+    sqlQuery = "SELECT fromUtf8(fromBase64"
+        + "('dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0"
+        + "')) FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    decodedString = rows.get(0).get(0).asText();
+    assertEquals(decodedString, fromUtf8(fromBase64(
+        "dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0")));
+
+    // non-string literal
+    sqlQuery = "SELECT toBase64(toUtf8(123)), fromUtf8(fromBase64(toBase64(toUtf8(123)))), 123 FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    encodedString = rows.get(0).get(0).asText();
+    decodedString = rows.get(0).get(1).asText();
+    String originalCol = rows.get(0).get(2).asText();
+    assertEquals(decodedString, originalCol);
+    assertEquals(encodedString, toBase64(toUtf8("123")));
+
+    // identifier
+    sqlQuery =
+        "SELECT Carrier, toBase64(toUtf8(Carrier)), fromUtf8(fromBase64(toBase64(toUtf8(Carrier)))), fromBase64"
+            + "(toBase64(toUtf8(Carrier))) FROM myTable LIMIT 100";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"STRING\",\"STRING\",\"BYTES\"]");
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 100);
+    for (int i = 0; i < 100; i++) {
+      String original = rows.get(0).asText();
+      String encoded = rows.get(1).asText();
+      String decoded = rows.get(2).asText();
+      assertEquals(original, decoded);
+      assertEquals(encoded, toBase64(toUtf8(original)));
+      assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
+    }
+
+    // invalid argument
+    sqlQuery = "SELECT toBase64() FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
+
+    // invalid argument
+    sqlQuery = "SELECT fromBase64() FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
+
+    // invalid argument
+    sqlQuery = "SELECT toBase64('hello!') FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("SqlCompilationException"));
+
+    // invalid argument
+    sqlQuery = "SELECT fromBase64('hello!') FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
+
+    // string literal used in a filter
+    sqlQuery =
+        "SELECT * FROM myTable WHERE fromUtf8(fromBase64('aGVsbG8h')) != Carrier AND toBase64(toUtf8('hello!')) != "
+        + "Carrier LIMIT 10";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+
+    // non-string literal used in a filter
+    sqlQuery = "SELECT * FROM myTable WHERE fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) != Carrier LIMIT 10";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+
+    // string identifier used in a filter
+    sqlQuery = "SELECT * FROM myTable WHERE fromUtf8(fromBase64(toBase64(toUtf8(Carrier)))) = Carrier LIMIT 10";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+
+    // non-string identifier used in a filter
+    sqlQuery =
+        "SELECT fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))), AirlineID FROM myTable WHERE fromUtf8(fromBase64"
+        + "(toBase64(toUtf8(AirlineID)))) = "
+            + "AirlineID LIMIT 10";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"LONG\"]");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+
+    // string identifier used in group by order by
+    sqlQuery =
+        "SELECT Carrier as originalCol, toBase64(toUtf8(Carrier)) as encoded, fromUtf8(fromBase64(toBase64(toUtf8"
+        + "(Carrier)))) as decoded "
+            + "FROM myTable GROUP BY Carrier, toBase64(toUtf8(Carrier)), fromUtf8(fromBase64(toBase64(toUtf8(Carrier)"
+            + "))) ORDER BY toBase64(toUtf8(Carrier))"
+            + " LIMIT 10";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"STRING\",\"STRING\"]");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      String original = rows.get(0).asText();
+      String encoded = rows.get(1).asText();
+      String decoded = rows.get(2).asText();
+      assertEquals(original, decoded);
+      assertEquals(encoded, toBase64(toUtf8(original)));
+      assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
+    }
+
+    // non-string identifier used in group by order by
+    sqlQuery =
+        "SELECT AirlineID as originalCol, toBase64(toUtf8(AirlineID)) as encoded, fromUtf8(fromBase64(toBase64(toUtf8"
+        + "(AirlineID)))) as decoded "
+            + "FROM myTable GROUP BY AirlineID, toBase64(toUtf8(AirlineID)), fromUtf8(fromBase64(toBase64(toUtf8"
+            + "(AirlineID)))) ORDER BY "
+            + "fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) LIMIT 10";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"LONG\",\"STRING\",\"STRING\"]");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      String original = rows.get(0).asText();
+      String encoded = rows.get(1).asText();
+      String decoded = rows.get(2).asText();
+      assertEquals(original, decoded);
+      assertEquals(encoded, toBase64(toUtf8(original)));
+      assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
+    }
+  }
+
+  @Test
   public void testLiteralOnlyFunc()
       throws Exception {
     long currentTsMin = System.currentTimeMillis();
@@ -614,7 +785,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String sqlQuery =
         "SELECT 1, now() as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as "
             + "today, now(), ago('PT1H'), encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') as encodedUrl, "
-            + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') as decodedUrl";
+            + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') as decodedUrl, toBase64"
+            + "(toUtf8('hello!')) as toBase64, fromUtf8(fromBase64('aGVsbG8h')) as fromBase64";
     JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
     long currentTsMax = System.currentTimeMillis();
     long oneHourAgoTsMax = currentTsMax - ONE_HOUR_IN_MS;
@@ -628,6 +800,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String oneHourAgoColumnName = response.get("resultTable").get("dataSchema").get("columnNames").get(6).asText();
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(7).asText(), "encodedUrl");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(8).asText(), "decodedUrl");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(9).asText(), "toBase64");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(10).asText(), "fromBase64");
     assertTrue(Long.parseLong(nowColumnName) > currentTsMin);
     assertTrue(Long.parseLong(nowColumnName) < currentTsMax);
     assertTrue(Long.parseLong(oneHourAgoColumnName) > oneHourAgoTsMin);
@@ -642,6 +816,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(6).asText(), "LONG");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(7).asText(), "STRING");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(8).asText(), "STRING");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(9).asText(), "STRING");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(10).asText(), "STRING");
 
     int first = response.get("resultTable").get("rows").get(0).get(0).asInt();
     long second = response.get("resultTable").get("rows").get(0).get(1).asLong();
@@ -665,6 +841,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
     assertEquals(response.get("resultTable").get("rows").get(0).get(8).asText(),
         "key1=value 1&key2=value@!$2&key3=value%3");
+    assertEquals(response.get("resultTable").get("rows").get(0).get(9).asText(),
+        "aGVsbG8h");
+    assertEquals(response.get("resultTable").get("rows").get(0).get(10).asText(),
+        "hello!");
   }
 
   @Test(dependsOnMethods = "testBloomFilterTriggering")

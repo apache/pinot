@@ -23,6 +23,7 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
+import java.util.Base64;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
@@ -394,6 +395,15 @@ public class StringFunctions {
   }
 
   /**
+   * @param input bytes
+   * @return UTF8 encoded string
+   */
+  @ScalarFunction
+  public static String fromUtf8(byte[] input) {
+    return new String(input, StandardCharsets.UTF_8);
+  }
+
+  /**
    * @see StandardCharsets#US_ASCII#encode(String)
    * @param input
    * @return bytes
@@ -559,5 +569,23 @@ public class StringFunctions {
   public static String decodeUrl(String input)
       throws UnsupportedEncodingException {
     return URLDecoder.decode(input, StandardCharsets.UTF_8.toString());
+  }
+
+  /**
+   * @param input binary data
+   * @return Base64 encoded String
+   */
+  @ScalarFunction
+  public static String toBase64(byte[] input) {
+    return Base64.getEncoder().encodeToString(input);
+  }
+
+  /**
+   * @param input Base64 encoded String
+   * @return decoded binary data
+   */
+  @ScalarFunction
+  public static byte[] fromBase64(String input) {
+    return Base64.getDecoder().decode(input);
   }
 }
