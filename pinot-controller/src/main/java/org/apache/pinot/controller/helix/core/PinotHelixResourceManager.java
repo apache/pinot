@@ -1814,6 +1814,10 @@ public class PinotHelixResourceManager {
   }
 
   public void deleteOfflineTable(String tableName) {
+    deleteOfflineTable(tableName, null);
+  }
+
+  public void deleteOfflineTable(String tableName, @Nullable String retentionPeriod) {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     LOGGER.info("Deleting table {}: Start", offlineTableName);
 
@@ -1839,7 +1843,9 @@ public class PinotHelixResourceManager {
     }
 
     // Remove all stored segments for the table
-    _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, getSegmentsFor(offlineTableName, false));
+    Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod) : null;
+    _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, getSegmentsFor(offlineTableName, false),
+        retentionPeriodMs);
     LOGGER.info("Deleting table {}: Removed stored segments", offlineTableName);
 
     // Remove segment metadata
@@ -1868,6 +1874,10 @@ public class PinotHelixResourceManager {
   }
 
   public void deleteRealtimeTable(String tableName) {
+    deleteRealtimeTable(tableName, null);
+  }
+
+  public void deleteRealtimeTable(String tableName, @Nullable String retentionPeriod) {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     LOGGER.info("Deleting table {}: Start", realtimeTableName);
 
@@ -1889,7 +1899,12 @@ public class PinotHelixResourceManager {
     }
 
     // Remove all stored segments for the table
-    _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFor(realtimeTableName, false));
+
+
+    // Remove all stored segments for the table
+    Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod) : null;
+    _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFor(realtimeTableName, false),
+        retentionPeriodMs);
     LOGGER.info("Deleting table {}: Removed stored segments", realtimeTableName);
 
     // Remove segment metadata
