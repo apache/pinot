@@ -588,4 +588,111 @@ public class StringFunctions {
   public static byte[] fromBase64(String input) {
     return Base64.getDecoder().decode(input);
   }
+
+  /**
+   * Replace a regular expression pattern. If matchStr is not found, inputStr will be returned. By default, all
+   * occurences of match pattern in the input string will be replaced. Default matching pattern is case sensitive.
+   *
+   * @param inputStr Input string to apply the regexpReplace
+   * @param matchStr Regexp or string to match against inputStr
+   * @param replaceStr Regexp or string to replace if matchStr is found
+   * @param matchStartPos Index of inputStr from where matching should start. Default is 0.
+   * @param occurence Controls which occurence of the matched pattern must be replaced. Counting starts at 0. Default
+   *                  is -1
+   * @param flag Single character flag that controls how the regex finds matches in inputStr. If an incorrect flag is
+   *            specified, the function applies default case sensitive match. Only one flag can be specified. Supported
+   *             flags:
+   *             i -> Case insensitive
+   * @return replaced input string
+   */
+  @ScalarFunction
+  public static String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos,
+      int occurence, String flag) {
+    Integer patternFlag;
+
+    // TODO: Support more flags like MULTILINE, COMMENTS, etc.
+    switch (flag) {
+      case "i":
+        patternFlag = Pattern.CASE_INSENSITIVE;
+        break;
+      default:
+        patternFlag = null;
+        break;
+    }
+
+    Pattern p;
+    if (patternFlag != null) {
+      p = Pattern.compile(matchStr, patternFlag);
+    } else {
+      p = Pattern.compile(matchStr);
+    }
+
+    Matcher matcher = p.matcher(inputStr).region(matchStartPos, inputStr.length());
+    StringBuffer sb;
+
+    if (occurence >= 0) {
+      sb = new StringBuffer(inputStr);
+      while (occurence >= 0 && matcher.find()) {
+        if (occurence == 0) {
+          sb.replace(matcher.start(), matcher.end(), replaceStr);
+          break;
+        }
+        occurence--;
+      }
+    } else {
+      sb = new StringBuffer();
+      while (matcher.find()) {
+        matcher.appendReplacement(sb, replaceStr);
+      }
+      matcher.appendTail(sb);
+    }
+
+    return sb.toString();
+  }
+
+  /**
+   * See #regexpReplace(String, String, String, int, int, String). Matches against entire inputStr and replaces all
+   * occurences. Match is performed in case-sensitive mode.
+   *
+   * @param inputStr Input string to apply the regexpReplace
+   * @param matchStr Regexp or string to match against inputStr
+   * @param replaceStr Regexp or string to replace if matchStr is found
+   * @return replaced input string
+   */
+  @ScalarFunction
+  public static String regexpReplace(String inputStr, String matchStr, String replaceStr) {
+    return regexpReplace(inputStr, matchStr, replaceStr, 0, -1, "");
+  }
+
+  /**
+   * See #regexpReplace(String, String, String, int, int, String). Matches against entire inputStr and replaces all
+   * occurences. Match is performed in case-sensitive mode.
+   *
+   * @param inputStr Input string to apply the regexpReplace
+   * @param matchStr Regexp or string to match against inputStr
+   * @param replaceStr Regexp or string to replace if matchStr is found
+   * @param matchStartPos Index of inputStr from where matching should start. Default is 0.
+   * @return replaced input string
+   */
+  @ScalarFunction
+  public static String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos) {
+    return regexpReplace(inputStr, matchStr, replaceStr, matchStartPos, -1, "");
+  }
+
+  /**
+   * See #regexpReplace(String, String, String, int, int, String). Match is performed in case-sensitive mode.
+   *
+   * @param inputStr Input string to apply the regexpReplace
+   * @param matchStr Regexp or string to match against inputStr
+   * @param replaceStr Regexp or string to replace if matchStr is found
+   * @param matchStartPos Index of inputStr from where matching should start. Default is 0.
+   * @param occurence Controls which occurence of the matched pattern must be replaced. Counting starts
+   *                    at 0. Default is -1
+   * @return replaced input string
+   */
+  @ScalarFunction
+  public static String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos,
+      int occurence) {
+    return regexpReplace(inputStr, matchStr, replaceStr, matchStartPos, occurence, "");
+  }
 }
