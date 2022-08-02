@@ -48,6 +48,8 @@ public class ComplexTypeTransformerTest {
     Map<String, Object> innerMap1 = new HashMap<>();
     innerMap1.put("aa", 2);
     innerMap1.put("bb", "u");
+    innerMap1.put("cc", new byte[]{1, 1});
+
     map1.put("im1", innerMap1);
     Map<String, Object> map2 = new HashMap<>();
     map2.put("c", 3);
@@ -58,6 +60,8 @@ public class ComplexTypeTransformerTest {
     Assert.assertEquals(genericRow.getValue("map1.b"), "v");
     Assert.assertEquals(genericRow.getValue("map1.im1.aa"), 2);
     Assert.assertEquals(genericRow.getValue("map1.im1.bb"), "u");
+    Assert.assertEquals(genericRow.getValue("map1.im1.cc"), new byte[]{1, 1});
+
     Assert.assertEquals(genericRow.getValue("map2.c"), 3);
 
     // test flattening the tuple inside the collection
@@ -347,7 +351,7 @@ public class ComplexTypeTransformerTest {
     transformer = new ComplexTypeTransformer(Arrays.asList(), ".",
             ComplexTypeConfig.CollectionNotUnnestedToJson.NONE, new HashMap<>());
     transformer.transform(genericRow);
-    Assert.assertTrue(ComplexTypeTransformer.isArray(genericRow.getValue("t.array1")));
+    Assert.assertTrue(ComplexTypeTransformer.isNonPrimitiveArray(genericRow.getValue("t.array1")));
   }
 
   @Test
