@@ -223,6 +223,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
   }
 
+  public String forControllerJobStatus(String jobId) {
+    return StringUtil.join("/", _baseUrl, "segments", "segmentReloadStatus", jobId);
+  }
+
   public String forTableSize(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "size");
   }
