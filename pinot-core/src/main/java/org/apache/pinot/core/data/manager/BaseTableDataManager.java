@@ -132,7 +132,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     FileUtils.deleteQuietly(_resourceTmpDir);
     if (!_resourceTmpDir.exists()) {
       Preconditions.checkState(_resourceTmpDir.mkdirs(),
-          "Unable to create temp resources directory at %s."
+          "Unable to create temp resources directory at %s. "
               + "Please check for available space and write-permissions for this directory.",
           _resourceTmpDir);
     }
