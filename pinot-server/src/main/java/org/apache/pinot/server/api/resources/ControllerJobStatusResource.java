@@ -45,8 +45,8 @@ public class ControllerJobStatusResource {
   @GET
   @Path("/controllerJob/reloadStatus/{tableNameWithType}")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Task status", notes = "Return status of the given task")
-  public String taskStatus(@PathParam("tableNameWithType") String tableNameWithType,
+  @ApiOperation(value = "Task status", notes = "Return the status of a given reload job")
+  public String reloadJobStatus(@PathParam("tableNameWithType") String tableNameWithType,
       @QueryParam("reloadJobTimestamp") long reloadJobSubmissionTimestamp,
       @QueryParam("segmentName") String segmentName)
       throws Exception {
