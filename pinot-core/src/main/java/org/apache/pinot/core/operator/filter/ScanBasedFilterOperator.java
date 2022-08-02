@@ -35,18 +35,21 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
   private final PredicateEvaluator _predicateEvaluator;
   private final DataSource _dataSource;
   private final int _numDocs;
+  private final boolean _nullHandlingEnabled;
 
-  ScanBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+  ScanBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
+      boolean nullHandlingEnabled) {
     _predicateEvaluator = predicateEvaluator;
     _dataSource = dataSource;
     _numDocs = numDocs;
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   @Override
   protected FilterBlock getNextBlock() {
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
     if (dataSourceMetadata.isSingleValue()) {
-      return new FilterBlock(new SVScanDocIdSet(_predicateEvaluator, _dataSource.getForwardIndex(), _numDocs));
+      return new FilterBlock(new SVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, _nullHandlingEnabled));
     } else {
       return new FilterBlock(new MVScanDocIdSet(_predicateEvaluator, _dataSource.getForwardIndex(), _numDocs,
           dataSourceMetadata.getMaxNumValuesPerMVEntry()));

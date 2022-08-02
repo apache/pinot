@@ -48,7 +48,7 @@ public class GapfillFilterHandler implements ValueExtractorFactory {
       // TODO: Please refer to {@link PostAggregationHandler} on how to handle the index for aggregation queries.
       _indexes.put(_dataSchema.getColumnName(i), i);
     }
-    _rowMatcher = RowMatcherFactory.getRowMatcher(filter, this);
+    _rowMatcher = RowMatcherFactory.getRowMatcher(filter, this, false);
   }
 
   /**

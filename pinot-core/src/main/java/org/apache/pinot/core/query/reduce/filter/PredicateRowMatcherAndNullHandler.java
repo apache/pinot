@@ -18,33 +18,24 @@
  */
 package org.apache.pinot.core.query.reduce.filter;
 
-import java.util.List;
-import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 
 
 /**
- * OR filter matcher.
+ * Predicate matcher and null handler.
  */
-public class OrRowMatcher implements RowMatcher {
-  private final RowMatcher[] _childMatchers;
+public class PredicateRowMatcherAndNullHandler extends PredicateRowMatcher {
 
-  public OrRowMatcher(List<FilterContext> childFilters, ValueExtractorFactory valueExtractorFactory,
-      boolean nullHandlingEnabled) {
-    int numChildren = childFilters.size();
-    _childMatchers = new RowMatcher[numChildren];
-    for (int i = 0; i < numChildren; i++) {
-      _childMatchers[i] = RowMatcherFactory.getRowMatcher(childFilters.get(i), valueExtractorFactory,
-          nullHandlingEnabled);
-    }
+  public PredicateRowMatcherAndNullHandler(Predicate predicate, ValueExtractor valueExtractor) {
+    super(predicate, valueExtractor);
   }
 
   @Override
   public boolean isMatch(Object[] row) {
-    for (RowMatcher childMatcher : _childMatchers) {
-      if (childMatcher.isMatch(row)) {
-        return true;
-      }
+    Object value = _valueExtractor.extract(row);
+    if (value == null) {
+      return false;
     }
-    return false;
+    return isMatch(value);
   }
 }
