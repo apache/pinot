@@ -42,7 +42,6 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-
 /**
  * Some tests for the SQL compiler.
  */
