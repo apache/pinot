@@ -90,6 +90,10 @@ public class DeltaRecordReader implements RecordReader {
     }
 
     for (String fieldName: _fieldsToRead) {
+      if (fieldName.contains("mv") || fieldName.contains("column_not_in_source")) {
+        continue;
+      }
+
       final DataType dataType = record.getSchema().get(fieldName).getDataType();
 
       // handles only primitive types for now; hopefully the pinot API handles any null values

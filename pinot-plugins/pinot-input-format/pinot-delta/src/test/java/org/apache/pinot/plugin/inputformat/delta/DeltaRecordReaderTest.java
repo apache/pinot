@@ -3,12 +3,25 @@ package org.apache.pinot.plugin.inputformat.delta;
 import io.delta.standalone.DeltaLog;
 import io.delta.standalone.OptimisticTransaction;
 import io.delta.standalone.actions.Action;
+import io.delta.standalone.actions.Format;
+import io.delta.standalone.actions.Metadata;
+import io.delta.standalone.types.BooleanType;
+import io.delta.standalone.types.DataType;
+import io.delta.standalone.types.DoubleType;
+import io.delta.standalone.types.FloatType;
+import io.delta.standalone.types.IntegerType;
+import io.delta.standalone.types.LongType;
+import io.delta.standalone.types.StringType;
+import io.delta.standalone.types.StructField;
+import io.delta.standalone.types.StructType;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
@@ -57,13 +70,49 @@ public class DeltaRecordReaderTest extends AbstractRecordReaderTest {
       }
     }
 
-    AddFile file = new AddFile(_dataFilePq.getPath(), new HashMap<>(), _dataFilePq.length(),
+    DeltaLog log = DeltaLog.forTable(new Configuration(), _dataFile.getPath());
+    OptimisticTransaction txn = log.startTransaction();
+
+    StructType deltaSchema = new StructType();
+
+    String partitionColumn = null;
+    for (FieldSpec fieldSpec : getPinotSchema().getAllFieldSpecs()) {
+      final String name = fieldSpec.getName();
+
+      // ignore multi-value fields
+      if (name.contains("mv")) {
+        continue;
+      }
+
+      partitionColumn = name;
+      final FieldSpec.DataType dataType = fieldSpec.getDataType();
+
+      DataType deltaDataType = null;
+      if (dataType.equals(FieldSpec.DataType.INT)) {
+        deltaDataType = new IntegerType();
+      } else if (dataType.equals(FieldSpec.DataType.FLOAT)) {
+        deltaDataType = new FloatType();
+      } else if (dataType.equals(FieldSpec.DataType.STRING)) {
+        deltaDataType = new StringType();
+      } else if (dataType.equals(FieldSpec.DataType.DOUBLE)) {
+        deltaDataType = new DoubleType();
+      } else if (dataType.equals(FieldSpec.DataType.BOOLEAN)) {
+        deltaDataType = new BooleanType();
+      } else if (dataType.equals(FieldSpec.DataType.LONG)) {
+        deltaDataType = new LongType();
+      } else {
+        throw new IOException("unknown type " + dataType);
+      }
+
+      deltaSchema = deltaSchema.add(name, deltaDataType, true);
+    }
+
+    AddFile file = new AddFile(_dataFilePq.getPath(), Map.of(partitionColumn, "1"), _dataFilePq.length(),
         System.currentTimeMillis(), true, null, null);
     List<Action> totalCommitFiles = new ArrayList<>();
     totalCommitFiles.add(file);
 
-    DeltaLog log = DeltaLog.forTable(new Configuration(), _dataFile.getPath());
-    OptimisticTransaction txn = log.startTransaction();
+    txn.updateMetadata(new Metadata("foo", "bar", "baz", new Format(), Arrays.asList(partitionColumn), new HashMap<>(), Optional.of(System.currentTimeMillis()), deltaSchema));
     txn.commit(totalCommitFiles, new Operation(Operation.Name.UPDATE), "Test");
   }
 
@@ -78,6 +127,10 @@ public class DeltaRecordReaderTest extends AbstractRecordReaderTest {
 
       for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
+
+        if (fieldSpecName.contains("mv")) {
+          continue;
+        }
 
         if (fieldSpec.getDataType().getStoredType().equals(FieldSpec.DataType.INT)) {
           Assert.assertEquals(expectedRecord.get(fieldSpecName), actualRecord.getValue(fieldSpecName));
