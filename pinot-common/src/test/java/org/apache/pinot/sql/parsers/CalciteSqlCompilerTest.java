@@ -1942,6 +1942,16 @@ public class CalciteSqlCompilerTest {
     }
     Assert.assertNotNull(expectedError);
     Assert.assertTrue(expectedError instanceof SqlCompilationException);
+
+    query = "select toBase64('hello!') from mytable";
+    expectedError = null;
+    try {
+      CalciteSqlParser.compileToPinotQuery(query);
+    } catch (Exception e) {
+      expectedError = e;
+    }
+    Assert.assertNotNull(expectedError);
+    Assert.assertTrue(expectedError instanceof SqlCompilationException);
   }
 
   @Test

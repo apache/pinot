@@ -395,8 +395,8 @@ public class StringFunctions {
   }
 
   /**
-   * @param input
-   * @return string
+   * @param input bytes
+   * @return UTF8 encoded string
    */
   @ScalarFunction
   public static String fromUtf8(byte[] input) {

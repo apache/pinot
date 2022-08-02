@@ -682,6 +682,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
 
     // invalid argument
+    sqlQuery = "SELECT toBase64('hello!') FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("SqlCompilationException"));
+
+    // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM myTable";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
