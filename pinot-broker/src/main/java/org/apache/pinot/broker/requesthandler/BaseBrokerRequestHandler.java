@@ -628,7 +628,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Function function = expression.getFunctionCall();
     switch (function.getOperator()) {
       case "datetrunc":
-        String granularString = function.getOperands().get(0).getLiteral().getStringValue();
+        String granularString = function.getOperands().get(0).getLiteral().getStringValue().toUpperCase();
         Expression timeExpression = function.getOperands().get(1);
         if (((function.getOperandsSize() == 2) || (function.getOperandsSize() == 3 && "MILLISECONDS".equalsIgnoreCase(
             function.getOperands().get(2).getLiteral().getStringValue())))
@@ -636,7 +636,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             && timeExpression.getIdentifier() != null) {
           String timeColumn = timeExpression.getIdentifier().getName();
           String timeColumnWithGranularity = TimestampIndexGranularity.getColumnNameWithGranularity(timeColumn,
-              TimestampIndexGranularity.valueOf(granularString.toUpperCase()));
+              TimestampIndexGranularity.valueOf(granularString));
           if (timestampIndexColumns.contains(timeColumnWithGranularity)) {
             pinotQuery.putToExpressionOverrideHints(expression,
                 RequestUtils.getIdentifierExpression(timeColumnWithGranularity));
