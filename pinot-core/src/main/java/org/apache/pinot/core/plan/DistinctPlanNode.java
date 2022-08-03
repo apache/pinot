@@ -70,7 +70,7 @@ public class DistinctPlanNode implements PlanNode {
           //  DictionaryBasedDistinctOperator can be reused since it is more efficient than DistinctOperator for
           //  dictionary-encoded columns.
           NullValueVectorReader nullValueReader = dataSource.getNullValueVector();
-          if (nullValueReader == null || nullValueReader.getNullBitmap().getCardinality() == 0) {
+          if (nullValueReader == null || nullValueReader.getNullBitmap().isEmpty()) {
             return new DictionaryBasedDistinctOperator(dataSourceMetadata.getDataType(), distinctAggregationFunction,
                 dictionary, dataSourceMetadata.getNumDocs(), _queryContext.isNullHandlingEnabled());
           }

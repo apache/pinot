@@ -65,7 +65,7 @@ public class FastFilteredCountOperator extends BaseOperator<IntermediateResultsB
     List<Object> aggregates = new ArrayList<>(1);
     aggregates.add(count);
     _docsCounted += count;
-    return new IntermediateResultsBlock(_aggregationFunctions, aggregates);
+    return new IntermediateResultsBlock(_aggregationFunctions, aggregates, false);
   }
 
   @Override

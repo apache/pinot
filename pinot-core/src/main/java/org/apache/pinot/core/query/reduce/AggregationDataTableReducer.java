@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -65,18 +66,36 @@ public class AggregationDataTableReducer implements DataTableReducer {
       for (int i = 0; i < numAggregationFunctions; i++) {
         Object intermediateResultToMerge;
         ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
-        switch (columnDataType) {
-          case LONG:
-            intermediateResultToMerge = dataTable.getLong(0, i);
-            break;
-          case DOUBLE:
-            intermediateResultToMerge = dataTable.getDouble(0, i);
-            break;
-          case OBJECT:
-            intermediateResultToMerge = dataTable.getObject(0, i);
-            break;
-          default:
-            throw new IllegalStateException("Illegal column data type in aggregation results: " + columnDataType);
+        if (_queryContext.isNullHandlingEnabled()) {
+          RoaringBitmap nullBitmap = dataTable.getNullRowIds(i);
+          boolean isNull = nullBitmap != null && nullBitmap.contains(0);
+          switch (columnDataType) {
+            case LONG:
+              intermediateResultToMerge = isNull ? null : dataTable.getLong(0, i);
+              break;
+            case DOUBLE:
+              intermediateResultToMerge = isNull ? null : dataTable.getDouble(0, i);
+              break;
+            case OBJECT:
+              intermediateResultToMerge = isNull ? null : dataTable.getObject(0, i);
+              break;
+            default:
+              throw new IllegalStateException("Illegal column data type in aggregation results: " + columnDataType);
+          }
+        } else {
+          switch (columnDataType) {
+            case LONG:
+              intermediateResultToMerge = dataTable.getLong(0, i);
+              break;
+            case DOUBLE:
+              intermediateResultToMerge = dataTable.getDouble(0, i);
+              break;
+            case OBJECT:
+              intermediateResultToMerge = dataTable.getObject(0, i);
+              break;
+            default:
+              throw new IllegalStateException("Illegal column data type in aggregation results: " + columnDataType);
+          }
         }
         Object mergedIntermediateResult = intermediateResults[i];
         if (mergedIntermediateResult == null) {
@@ -89,8 +108,8 @@ public class AggregationDataTableReducer implements DataTableReducer {
     Object[] finalResults = new Object[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
-      finalResults[i] = aggregationFunction.getFinalResultColumnType()
-          .convert(aggregationFunction.extractFinalResult(intermediateResults[i]));
+      Comparable result = aggregationFunction.extractFinalResult(intermediateResults[i]);
+      finalResults[i] = result == null ? null : aggregationFunction.getFinalResultColumnType().convert(result);
     }
     brokerResponseNative.setResultTable(reduceToResultTable(finalResults));
   }

@@ -285,7 +285,8 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       assertEquals(dataSchema, new DataSchema(new String[]{"count"}, new ColumnDataType[]{ColumnDataType.LONG}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 1);
-      assertEquals((long) rows.get(0)[0], 4 * NUM_RECORDS);
+      // A quarter of the data is null and hence the count is 3 * NUM_RECORDS, not 4 * NUM_RECORDS.
+      assertEquals((long) rows.get(0)[0], 3 * NUM_RECORDS);
     }
     {
       String query = String.format("SELECT %s FROM testTable GROUP BY %s ORDER BY %s DESC",
@@ -385,54 +386,6 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
         Object[] row = rows.get(i);
         assertEquals(row.length, 1);
         assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69)));
-      }
-    }
-    {
-      String query = String.format(
-          "SELECT MAX(%s) AS maxValue FROM testTable GROUP BY %s HAVING maxValue < %s ORDER BY maxValue",
-          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(5)));
-      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
-      assertEquals(dataSchema,
-          new DataSchema(new String[]{"maxValue"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
-      List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 5);
-      assertEquals(rows.get(0)[0], 0.0);
-      int i = 0;
-      for (int index = 1; index < 5; index++) {
-        Object[] row = rows.get(index);
-        assertEquals(row.length, 1);
-        if (i % 4 == 3) {
-          // Null values are inserted at: index % 4 == 3.
-          i++;
-        }
-        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)).doubleValue());
-        i++;
-      }
-    }
-    {
-      int lowerLimit = 991;
-      String query = String.format(
-          "SELECT MAX(%s) AS maxValue FROM testTable GROUP BY %s HAVING maxValue > %s ORDER BY maxValue",
-          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(lowerLimit)));
-      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
-      assertEquals(dataSchema,
-          new DataSchema(new String[]{"maxValue"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
-      List<Object[]> rows = resultTable.getRows();
-      assertEquals(rows.size(), 6);
-      int i = lowerLimit;
-      for (int index = 0; index < 6; index++) {
-        if (i % 4 == 3) {
-          // Null values are inserted at: index % 4 == 3.
-          i++;
-        }
-        Object[] row = rows.get(index);
-        assertEquals(row.length, 1);
-        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)).doubleValue());
-        i++;
       }
     }
     {

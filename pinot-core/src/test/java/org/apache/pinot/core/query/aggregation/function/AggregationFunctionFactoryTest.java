@@ -31,13 +31,14 @@ import static org.testng.Assert.assertTrue;
 
 @SuppressWarnings("rawtypes")
 public class AggregationFunctionFactoryTest {
-  private static final String ARGUMENT = "(column)";
+  private static final String ARGUMENT_COLUMN = "(column)";
+  private static final String ARGUMENT_STAR = "(*)";
   private static final QueryContext DUMMY_QUERY_CONTEXT =
       QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
 
   @Test
   public void testGetAggregationFunction() {
-    FunctionContext function = getFunction("CoUnT");
+    FunctionContext function = getFunction("CoUnT", ARGUMENT_STAR);
     AggregationFunction aggregationFunction =
         AggregationFunctionFactory.getAggregationFunction(function, DUMMY_QUERY_CONTEXT);
     assertTrue(aggregationFunction instanceof CountAggregationFunction);
@@ -446,7 +447,7 @@ public class AggregationFunctionFactoryTest {
   }
 
   private FunctionContext getFunction(String functionName) {
-    return getFunction(functionName, ARGUMENT);
+    return getFunction(functionName, ARGUMENT_COLUMN);
   }
 
   private FunctionContext getFunction(String functionName, String args) {

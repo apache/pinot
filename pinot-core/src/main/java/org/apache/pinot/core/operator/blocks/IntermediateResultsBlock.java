@@ -98,19 +98,23 @@ public class IntermediateResultsBlock implements Block {
    * <p>For aggregation only, the result is a list of values.
    * <p>For aggregation group-by, the result is a list of maps from group keys to aggregation values.
    */
-  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> aggregationResult) {
+  public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> aggregationResult,
+      boolean nullHandlingEnabled) {
     _aggregationFunctions = aggregationFunctions;
     _aggregationResult = aggregationResult;
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   /**
    * Constructor for aggregation group-by order-by result with {@link AggregationGroupByResult}.
    */
   public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
-      @Nullable AggregationGroupByResult aggregationGroupByResults, DataSchema dataSchema) {
+      @Nullable AggregationGroupByResult aggregationGroupByResults, DataSchema dataSchema,
+      boolean nullHandlingEnabled) {
     _aggregationFunctions = aggregationFunctions;
     _aggregationGroupByResult = aggregationGroupByResults;
     _dataSchema = dataSchema;
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   /**
@@ -118,10 +122,11 @@ public class IntermediateResultsBlock implements Block {
    * with a collection of intermediate records.
    */
   public IntermediateResultsBlock(AggregationFunction[] aggregationFunctions,
-      Collection<IntermediateRecord> intermediateRecords, DataSchema dataSchema) {
+      Collection<IntermediateRecord> intermediateRecords, DataSchema dataSchema, boolean nullHandlingEnabled) {
     _aggregationFunctions = aggregationFunctions;
     _dataSchema = dataSchema;
     _intermediateRecords = intermediateRecords;
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   public IntermediateResultsBlock(Table table, boolean nullHandlingEnabled) {
@@ -458,28 +463,75 @@ public class IntermediateResultsBlock implements Block {
       columnNames[i] = aggregationFunction.getColumnName();
       columnDataTypes[i] = aggregationFunction.getIntermediateResultColumnType();
     }
+    RoaringBitmap[] nullBitmaps = null;
+    Object[] colDefaultNullValues = null;
+    if (_nullHandlingEnabled) {
+      colDefaultNullValues = new Object[numAggregationFunctions];
+      nullBitmaps = new RoaringBitmap[numAggregationFunctions];
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        if (columnDataTypes[i] != ColumnDataType.OBJECT) {
+          colDefaultNullValues[i] = NullValueUtils.getDefaultNullValue(columnDataTypes[i].toDataType());
+        }
+        nullBitmaps[i] = new RoaringBitmap();
+      }
+    }
 
     // Build the data table.
     DataTableBuilder dataTableBuilder =
         DataTableFactory.getDataTableBuilder(new DataSchema(columnNames, columnDataTypes));
     dataTableBuilder.startRow();
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      switch (columnDataTypes[i]) {
-        case LONG:
-          dataTableBuilder.setColumn(i, ((Number) _aggregationResult.get(i)).longValue());
-          break;
-        case DOUBLE:
-          dataTableBuilder.setColumn(i, ((Double) _aggregationResult.get(i)).doubleValue());
-          break;
-        case OBJECT:
-          dataTableBuilder.setColumn(i, _aggregationResult.get(i));
-          break;
-        default:
-          throw new UnsupportedOperationException(
-              "Unsupported aggregation column data type: " + columnDataTypes[i] + " for column: " + columnNames[i]);
+    if (_nullHandlingEnabled) {
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        Object value = _aggregationResult.get(i);
+        // OBJECT (e.g. DistinctTable) calls toBytes() (e.g. DistinctTable.toBytes()) which takes care of replacing
+        // nulls with default values, and building presence vector and serializing both.
+        if (columnDataTypes[i] != ColumnDataType.OBJECT) {
+          if (value == null) {
+            value = colDefaultNullValues[i];
+            nullBitmaps[i].add(0);
+          }
+        }
+
+        switch (columnDataTypes[i]) {
+          case LONG:
+            dataTableBuilder.setColumn(i, ((Number) value).longValue());
+            break;
+          case DOUBLE:
+            dataTableBuilder.setColumn(i, ((Double) value).doubleValue());
+            break;
+          case OBJECT:
+            dataTableBuilder.setColumn(i, value);
+            break;
+          default:
+            throw new UnsupportedOperationException(
+                "Unsupported aggregation column data type: " + columnDataTypes[i] + " for column: " + columnNames[i]);
+        }
+      }
+    } else {
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        switch (columnDataTypes[i]) {
+          case LONG:
+            dataTableBuilder.setColumn(i, ((Number) _aggregationResult.get(i)).longValue());
+            break;
+          case DOUBLE:
+            dataTableBuilder.setColumn(i, ((Double) _aggregationResult.get(i)).doubleValue());
+            break;
+          case OBJECT:
+            dataTableBuilder.setColumn(i, _aggregationResult.get(i));
+            break;
+          default:
+            throw new UnsupportedOperationException(
+                "Unsupported aggregation column data type: " + columnDataTypes[i] + " for column: " + columnNames[i]);
+        }
       }
     }
+
     dataTableBuilder.finishRow();
+    if (_nullHandlingEnabled) {
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        dataTableBuilder.setNullRowIds(nullBitmaps[i]);
+      }
+    }
     DataTable dataTable = dataTableBuilder.build();
 
     return attachMetadataToDataTable(dataTable);

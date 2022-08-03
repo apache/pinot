@@ -81,11 +81,6 @@ public class RequestContextUtils {
    */
   public static FunctionContext getFunction(Function thriftFunction) {
     String functionName = thriftFunction.getOperator();
-    if (functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-      // NOTE: COUNT always take one single argument "*"
-      return new FunctionContext(FunctionContext.Type.AGGREGATION, AggregationFunctionType.COUNT.getName(),
-          new ArrayList<>(Collections.singletonList(ExpressionContext.forIdentifier("*"))));
-    }
     FunctionContext.Type functionType =
         AggregationFunctionType.isAggregationFunction(functionName) ? FunctionContext.Type.AGGREGATION
             : FunctionContext.Type.TRANSFORM;
@@ -94,6 +89,11 @@ public class RequestContextUtils {
       List<ExpressionContext> arguments = new ArrayList<>(operands.size());
       for (Expression operand : operands) {
         arguments.add(getExpression(operand));
+      }
+      // TODO(walterddr): a work-around for multi-stage query engine which might pass COUNT without argument, and
+      //  should be removed once that issue is fixed.
+      if (arguments.isEmpty() && functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+        arguments.add(ExpressionContext.forIdentifier("*"));
       }
       return new FunctionContext(functionType, functionName, arguments);
     } else {
