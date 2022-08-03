@@ -418,8 +418,9 @@ public class PinotTableRestletResource {
   public SuccessResponse deleteTable(
       @ApiParam(value = "Name of the table to delete", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); Using 0d or -1d will instantly "
-          + "delete segments without retention") @QueryParam("retention") String retentionPeriod) {
+      @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
+          + "will default to the first config that's not null: the cluster setting, then '7d'. Using 0d or -1d will "
+          + "instantly delete segments without retention") @QueryParam("retention") String retentionPeriod) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
 
     List<String> tablesDeleted = new LinkedList<>();

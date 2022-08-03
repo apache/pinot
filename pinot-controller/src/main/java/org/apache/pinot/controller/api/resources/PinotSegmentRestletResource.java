@@ -648,8 +648,10 @@ public class PinotSegmentRestletResource {
   public SuccessResponse deleteSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "Retention period for the deleted segments (e.g. 12h, 3d); Using 0d or -1d will instantly "
-          + "delete segments without retention") @QueryParam("retention") String retentionPeriod) {
+      @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
+          + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
+          + "Using 0d or -1d will instantly delete segments without retention")
+      @QueryParam("retention") String retentionPeriod) {
     segmentName = URIUtils.decode(segmentName);
     TableType tableType = SegmentName.isRealtimeSegmentName(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
     String tableNameWithType =
@@ -666,8 +668,10 @@ public class PinotSegmentRestletResource {
   public SuccessResponse deleteAllSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Retention period for the deleted segments (e.g. 12h, 3d); Using 0d or -1d will instantly "
-          + "delete segments without retention") @QueryParam("retention") String retentionPeriod) {
+      @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
+          + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
+          + "Using 0d or -1d will instantly delete segments without retention")
+      @QueryParam("retention") String retentionPeriod) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type must not be null", Status.BAD_REQUEST);
@@ -688,9 +692,10 @@ public class PinotSegmentRestletResource {
       notes = "Delete the segments in the JSON array payload")
   public SuccessResponse deleteSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Retention period for the deleted segments (e.g. 12h, 3d); Using 0d or -1d will instantly "
-          + "delete segments without retention") @QueryParam("retention") String retentionPeriod,
-      List<String> segments) {
+      @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
+          + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
+          + "Using 0d or -1d will instantly delete segments without retention")
+      @QueryParam("retention") String retentionPeriod, List<String> segments) {
     int numSegments = segments.size();
     if (numSegments == 0) {
       throw new ControllerApplicationException(LOGGER, "Segments must be provided", Status.BAD_REQUEST);
