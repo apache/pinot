@@ -57,7 +57,6 @@ public class MutableSegmentImplUpsertTest {
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
     UpsertConfig upsertConfigWithHash = new UpsertConfig();
-    upsertConfigWithHash.setMode(UpsertConfig.Mode.FULL);
     upsertConfigWithHash.setHashFunction(hashFunction);
     _tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setUpsertConfig(upsertConfigWithHash)

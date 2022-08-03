@@ -1225,7 +1225,6 @@ public class TableConfigUtilsTest {
 
     // Dedup and upsert can't be enabled simultaneously
     UpsertConfig upsertConfig = new UpsertConfig();
-    upsertConfig.setMode(UpsertConfig.Mode.FULL);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setDedupConfig(new DedupConfig(true, HashFunction.NONE))
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
@@ -1244,7 +1243,6 @@ public class TableConfigUtilsTest {
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .build();
     UpsertConfig upsertConfig = new UpsertConfig();
-    upsertConfig.setMode(UpsertConfig.Mode.FULL);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setUpsertConfig(upsertConfig).build();
     try {
@@ -1483,7 +1481,6 @@ public class TableConfigUtilsTest {
 
     // invalid Upsert config with RealtimeToOfflineTask
     UpsertConfig upsertConfig = new UpsertConfig();
-    upsertConfig.setMode(UpsertConfig.Mode.FULL);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
         .setUpsertConfig(upsertConfig).setTaskConfig(new TableTaskConfig(
             ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,

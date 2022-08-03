@@ -59,7 +59,6 @@ public class MutableSegmentImplUpsertComparisonColTest {
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
     UpsertConfig offsetUpsertConfig = new UpsertConfig();
-    offsetUpsertConfig.setMode(UpsertConfig.Mode.FULL);
     offsetUpsertConfig.setComparisonColumn("offset");
     _tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setUpsertConfig(offsetUpsertConfig)

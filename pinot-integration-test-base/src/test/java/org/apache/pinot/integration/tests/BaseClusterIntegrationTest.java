@@ -389,7 +389,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
     UpsertConfig upsertConfig = new UpsertConfig();
-    upsertConfig.setMode(UpsertConfig.Mode.FULL);
 
     return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())

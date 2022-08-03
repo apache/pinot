@@ -30,7 +30,6 @@ public class UpsertConfigTest {
   @Test
   public void testUpsertConfig() {
     UpsertConfig upsertConfig1 = new UpsertConfig();
-    upsertConfig1.setMode(UpsertConfig.Mode.FULL);
     assertEquals(upsertConfig1.getMode(), UpsertConfig.Mode.FULL);
 
     upsertConfig1.setComparisonColumn("comparison");
