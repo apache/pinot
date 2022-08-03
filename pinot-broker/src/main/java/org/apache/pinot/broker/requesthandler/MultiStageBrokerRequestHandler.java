@@ -90,7 +90,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
         new WorkerManager(_reducerHostname, _reducerPort, routingManager));
     _queryDispatcher = new QueryDispatcher();
-    _mailboxService = new GrpcMailboxService(_reducerHostname, _reducerPort);
+    _mailboxService = new GrpcMailboxService(_reducerHostname, _reducerPort, config);
 
     // TODO: move this to a startUp() function.
     _mailboxService.start();
