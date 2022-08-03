@@ -43,7 +43,7 @@ public class UpsertConfig extends BaseJsonConfig {
   private Mode _mode;
 
   @JsonPropertyDescription("Function to hash the primary key.")
-  private HashFunction _hashFunction;
+  private HashFunction _hashFunction = HashFunction.NONE;
 
   @JsonPropertyDescription("Partial update strategies.")
   private Map<String, Strategy> _partialUpsertStrategies;
@@ -76,9 +76,12 @@ public class UpsertConfig extends BaseJsonConfig {
     _hashFunction = hashFunction == null ? HashFunction.NONE : hashFunction;
   }
 
+  public UpsertConfig(Mode mode) {
+    _mode = mode;
+  }
+
+  // Do not use this constructor. This is needed for JSON deserialization.
   public UpsertConfig() {
-    _mode = Mode.FULL;
-    _hashFunction = HashFunction.NONE;
   }
 
   public Mode getMode() {
@@ -100,10 +103,6 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public String getComparisonColumn() {
     return _comparisonColumn;
-  }
-
-  public void setMode(Mode mode) {
-    _mode = mode;
   }
 
   public void setHashFunction(HashFunction hashFunction) {

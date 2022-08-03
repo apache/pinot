@@ -1224,11 +1224,10 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
 
     // Dedup and upsert can't be enabled simultaneously
-    UpsertConfig upsertConfig = new UpsertConfig();
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setDedupConfig(new DedupConfig(true, HashFunction.NONE))
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
-        .setUpsertConfig(upsertConfig).setStreamConfigs(streamConfigs).build();
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setStreamConfigs(streamConfigs).build();
     try {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail();
@@ -1242,7 +1241,7 @@ public class TableConfigUtilsTest {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .build();
-    UpsertConfig upsertConfig = new UpsertConfig();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setUpsertConfig(upsertConfig).build();
     try {
@@ -1360,8 +1359,7 @@ public class TableConfigUtilsTest {
     streamConfigs.put("stream.kafka.consumer.type", "simple");
     Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
     partialUpsertStratgies.put("myCol2", UpsertConfig.Strategy.IGNORE);
-    UpsertConfig partialUpsertConfig = new UpsertConfig();
-    partialUpsertConfig.setMode(UpsertConfig.Mode.PARTIAL);
+    UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     partialUpsertConfig.setPartialUpsertStrategies(partialUpsertStratgies);
     partialUpsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
     partialUpsertConfig.setComparisonColumn("myCol2");
@@ -1377,8 +1375,7 @@ public class TableConfigUtilsTest {
       Assert.assertEquals(e.getMessage(), "Merger cannot be applied to comparison column");
     }
 
-    partialUpsertConfig = new UpsertConfig();
-    partialUpsertConfig.setMode(UpsertConfig.Mode.PARTIAL);
+    partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     partialUpsertConfig.setPartialUpsertStrategies(partialUpsertStratgies);
     partialUpsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName("myCol2")
@@ -1480,9 +1477,8 @@ public class TableConfigUtilsTest {
     }
 
     // invalid Upsert config with RealtimeToOfflineTask
-    UpsertConfig upsertConfig = new UpsertConfig();
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
-        .setUpsertConfig(upsertConfig).setTaskConfig(new TableTaskConfig(
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setTaskConfig(new TableTaskConfig(
             ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
                 "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig))).build();
     try {

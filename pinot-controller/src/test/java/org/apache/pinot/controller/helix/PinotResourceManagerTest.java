@@ -68,8 +68,7 @@ public class PinotResourceManagerTest {
     realtimeTableConfig.getValidationConfig().setReplicasPerPartition(NUM_REPLICAS_STRING);
     realtimeTableConfig.getValidationConfig()
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1));
-    UpsertConfig upsertConfig = new UpsertConfig();
-    realtimeTableConfig.setUpsertConfig(upsertConfig);
+    realtimeTableConfig.setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL));
     TEST_INSTANCE.getHelixResourceManager().addTable(realtimeTableConfig);
   }
 
