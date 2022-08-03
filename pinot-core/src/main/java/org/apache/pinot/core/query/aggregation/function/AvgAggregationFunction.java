@@ -98,26 +98,34 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
       BlockValSet blockValSet, RoaringBitmap nullBitmap) {
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
-      double sum = 0.0;
-      for (int i = 0; i < length; i++) {
-        if (!nullBitmap.contains(i)) {
-          sum += doubleValues[i];
+      if (nullBitmap.getCardinality() < length) {
+        double sum = 0.0;
+        // TODO: need to update the for-loop terminating condition to: i < length & i < doubleValues.length?
+        for (int i = 0; i < length; i++) {
+          if (!nullBitmap.contains(i)) {
+            sum += doubleValues[i];
+          }
         }
+        setAggregationResult(aggregationResultHolder, sum, length);
       }
-      setAggregationResult(aggregationResultHolder, sum, length);
+      // Note: when all input values re null (nullBitmap.getCardinality() == values.length), avg is null. As a result,
+      // we don't call setAggregationResult.
     } else {
       // Serialized AvgPair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      double sum = 0.0;
-      long count = 0L;
-      for (int i = 0; i < length; i++) {
-        if (!nullBitmap.contains(i)) {
-          AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-          sum += value.getSum();
-          count += value.getCount();
+      if (nullBitmap.getCardinality() < length) {
+        double sum = 0.0;
+        long count = 0L;
+        // TODO: need to update the for-loop terminating condition to: i < length & i < bytesValues.length?
+        for (int i = 0; i < length; i++) {
+          if (!nullBitmap.contains(i)) {
+            AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+            sum += value.getSum();
+            count += value.getCount();
+          }
         }
+        setAggregationResult(aggregationResultHolder, sum, count);
       }
-      setAggregationResult(aggregationResultHolder, sum, count);
     }
   }
 
@@ -161,6 +169,7 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
       GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
+      // TODO: need to update the for-loop terminating condition to: i < length & i < valueArray.length?
       if (nullBitmap.getCardinality() < length) {
         for (int i = 0; i < length; i++) {
           if (!nullBitmap.contains(i)) {
@@ -172,6 +181,7 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
     } else {
       // Serialized AvgPair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      // TODO: need to update the for-loop terminating condition to: i < length & i < valueArray.length?
       if (nullBitmap.getCardinality() < length) {
         for (int i = 0; i < length; i++) {
           if (!nullBitmap.contains(i)) {
@@ -224,26 +234,18 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   public AvgPair extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     AvgPair avgPair = aggregationResultHolder.getResult();
     if (avgPair == null) {
-      if (_nullHandlingEnabled) {
-        return null;
-      }
-      return new AvgPair(0.0, 0L);
-    } else {
-      return avgPair;
+      return _nullHandlingEnabled ? null : new AvgPair(0.0, 0L);
     }
+    return avgPair;
   }
 
   @Override
   public AvgPair extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     AvgPair avgPair = groupByResultHolder.getResult(groupKey);
     if (avgPair == null) {
-      if (_nullHandlingEnabled) {
-        return null;
-      }
-      return new AvgPair(0.0, 0L);
-    } else {
-      return avgPair;
+      return _nullHandlingEnabled ? null : new AvgPair(0.0, 0L);
     }
+    return avgPair;
   }
 
   @Override

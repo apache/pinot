@@ -20,7 +20,6 @@ package org.apache.pinot.queries;
 
 import java.io.File;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -62,8 +61,6 @@ public class AllNullQueriesTest extends BaseQueriesTest {
 
   private static final int NUM_RECORDS = 1000;
   private static List<GenericRow> _records;
-  private static BigDecimal _sumPrecision;
-  private static double _sum;
 
   private static final String COLUMN_NAME = "column";
 
@@ -95,8 +92,6 @@ public class AllNullQueriesTest extends BaseQueriesTest {
       record.putValue(COLUMN_NAME, null);
       _records.add(record);
     }
-    _sumPrecision = BigDecimal.ZERO;
-    _sum = 0;
   }
 
   private void setUp(TableConfig tableConfig, DataType dataType, File indexDir)
@@ -410,9 +405,8 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         assertEquals((long) rows.get(0)[0], 0);
         assertNull(rows.get(0)[1]);
         assertNull(rows.get(0)[2]);
-        double avg = _sum / (double) _records.size();
-        assertEquals(rows.get(0)[3], avg);
-        assertEquals(rows.get(0)[4], 4 * _sum);
+        assertNull(rows.get(0)[3]);
+        assertNull(rows.get(0)[4]);
       }
     }
     {
@@ -450,7 +444,7 @@ public class AllNullQueriesTest extends BaseQueriesTest {
       assertEquals(dataSchema, new DataSchema(new String[]{"sum"}, new ColumnDataType[]{ColumnDataType.STRING}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 1);
-      assertEquals(new BigDecimal((String) rows.get(0)[0]), _sumPrecision.multiply(BigDecimal.valueOf(4)));
+      assertNull(rows.get(0)[0]);
     }
     if (columnDataType != ColumnDataType.STRING) {
       {

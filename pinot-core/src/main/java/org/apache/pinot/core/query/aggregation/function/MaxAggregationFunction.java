@@ -136,15 +136,14 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
         int[] values = blockValSet.getIntValuesSV();
-        if (nullBitmap.getCardinality() < values.length) {
+        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
           int max = Integer.MIN_VALUE;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               max = Math.max(values[i], max);
             }
           }
-          Double otherMax = aggregationResultHolder.getResult();
-          aggregationResultHolder.setValue(otherMax == null ? max : Math.max(max, otherMax));
+          updateAggregationResultHolder(aggregationResultHolder, max);
         }
         // Note: when all input values re null (nullBitmap.getCardinality() == values.length), max is null. As a result,
         // we don't update the value of aggregationResultHolder.
@@ -152,49 +151,46 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
       }
       case LONG: {
         long[] values = blockValSet.getLongValuesSV();
-        if (nullBitmap.getCardinality() < values.length) {
+        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
           long max = Long.MIN_VALUE;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               max = Math.max(values[i], max);
             }
           }
-          Double otherMax = aggregationResultHolder.getResult();
-          aggregationResultHolder.setValue(otherMax == null ? max : Math.max(max, otherMax));
+          updateAggregationResultHolder(aggregationResultHolder, max);
         }
         break;
       }
       case FLOAT: {
         float[] values = blockValSet.getFloatValuesSV();
-        if (nullBitmap.getCardinality() < values.length) {
+        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
           float max = Float.NEGATIVE_INFINITY;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               max = Math.max(values[i], max);
             }
           }
-          Double otherMax = aggregationResultHolder.getResult();
-          aggregationResultHolder.setValue(otherMax == null ? max : Math.max(max, otherMax));
+          updateAggregationResultHolder(aggregationResultHolder, max);
         }
         break;
       }
       case DOUBLE: {
         double[] values = blockValSet.getDoubleValuesSV();
-        if (nullBitmap.getCardinality() < values.length) {
+        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
           double max = Double.NEGATIVE_INFINITY;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               max = Math.max(values[i], max);
             }
           }
-          Double otherMax = aggregationResultHolder.getResult();
-          aggregationResultHolder.setValue(otherMax == null ? max : Math.max(max, otherMax));
+          updateAggregationResultHolder(aggregationResultHolder, max);
         }
         break;
       }
       case BIG_DECIMAL: {
         BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
-        if (nullBitmap.getCardinality() < values.length) {
+        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
           BigDecimal max = null;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
@@ -203,15 +199,18 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
           }
           // TODO: even though the source data has BIG_DECIMAL type, we still only support double precision.
           assert max != null;
-          Double otherMax = aggregationResultHolder.getResult();
-          aggregationResultHolder.setValue(
-              otherMax == null ? max.doubleValue() : Math.max(max.doubleValue(), otherMax));
+          updateAggregationResultHolder(aggregationResultHolder, max.doubleValue());
         }
         break;
       }
       default:
         throw new IllegalStateException("Cannot compute max for non-numeric type: " + blockValSet.getValueType());
     }
+  }
+
+  private void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, double max) {
+    Double otherMax = aggregationResultHolder.getResult();
+    aggregationResultHolder.setValue(otherMax == null ? max : Math.max(max, otherMax));
   }
 
   @Override
@@ -223,6 +222,7 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
         if (nullBitmap.getCardinality() < length) {
+          // TODO: need to update the for-loop terminating condition to: i < length & i < valueArray.length?
           for (int i = 0; i < length; i++) {
             double value = valueArray[i];
             int groupKey = groupKeyArray[i];

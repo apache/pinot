@@ -22,10 +22,8 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -53,8 +51,6 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   private final Integer _scale;
   private final boolean _nullHandlingEnabled;
 
-  private final Set<Integer> _groupKeysWithNonNullValue;
-
   public SumPrecisionAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(arguments.get(0));
 
@@ -72,7 +68,6 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
       _scale = null;
     }
     _nullHandlingEnabled = nullHandlingEnabled;
-    _groupKeysWithNonNullValue = new HashSet<>();
   }
 
   @Override
@@ -93,7 +88,6 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BigDecimal sum = getDefaultResult(aggregationResultHolder);
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (_nullHandlingEnabled) {
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
@@ -103,6 +97,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
       }
     }
 
+    BigDecimal sum = getDefaultResult(aggregationResultHolder);
     switch (blockValSet.getValueType().getStoredType()) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
@@ -154,17 +149,18 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
 
   private void aggregateNullHandlingEnabled(int length, AggregationResultHolder aggregationResultHolder,
       BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    BigDecimal sum = getDefaultResult(aggregationResultHolder);
-
+    BigDecimal sum = BigDecimal.ZERO;
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
         int[] intValues = blockValSet.getIntValuesSV();
         if (nullBitmap.getCardinality() < length) {
+          // TODO: need to update the for-loop terminating condition to: i < length & i < intValues.length?
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
               sum = sum.add(BigDecimal.valueOf(intValues[i]));
             }
           }
+          setAggregationResult(aggregationResultHolder, sum);
         }
         break;
       }
@@ -176,6 +172,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
               sum = sum.add(BigDecimal.valueOf(longValues[i]));
             }
           }
+          setAggregationResult(aggregationResultHolder, sum);
         }
         break;
       }
@@ -189,6 +186,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
               }
             }
           }
+          setAggregationResult(aggregationResultHolder, sum);
         }
         break;
       }
@@ -203,6 +201,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
               }
             }
           }
+          setAggregationResult(aggregationResultHolder, sum);
         }
         break;
       }
@@ -214,6 +213,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
               sum = sum.add(new BigDecimal(stringValues[i]));
             }
           }
+          setAggregationResult(aggregationResultHolder, sum);
         }
         break;
       case BIG_DECIMAL: {
@@ -224,6 +224,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
               sum = sum.add(bigDecimalValues[i]);
             }
           }
+          setAggregationResult(aggregationResultHolder, sum);
         }
         break;
       }
@@ -235,12 +236,17 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
               sum = sum.add(BigDecimalUtils.deserialize(bytesValues[i]));
             }
           }
+          setAggregationResult(aggregationResultHolder, sum);
         }
         break;
       default:
         throw new IllegalStateException();
     }
-    aggregationResultHolder.setValue(sum);
+  }
+
+  protected void setAggregationResult(AggregationResultHolder aggregationResultHolder, BigDecimal sum) {
+    BigDecimal otherSum = aggregationResultHolder.getResult();
+    aggregationResultHolder.setValue(otherSum == null ? sum : sum.add(otherSum));
   }
 
   @Override
@@ -314,13 +320,10 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         if (nullBitmap.getCardinality() < length) {
+          // TODO: need to update the for-loop terminating condition to: i < length & i < intValues.length?
           for (int i = 0; i < length; i++) {
-            int groupKey = groupKeyArray[i];
             if (!nullBitmap.contains(i)) {
-              BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-              sum = sum.add(BigDecimal.valueOf(intValues[i]));
-              groupByResultHolder.setValueForKey(groupKey, sum);
-              _groupKeysWithNonNullValue.add(groupKey);
+              setGroupByResult(groupKeyArray[i], groupByResultHolder, BigDecimal.valueOf(intValues[i]));
             }
           }
         }
@@ -329,12 +332,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         long[] longValues = blockValSet.getLongValuesSV();
         if (nullBitmap.getCardinality() < length) {
           for (int i = 0; i < length; i++) {
-            int groupKey = groupKeyArray[i];
             if (!nullBitmap.contains(i)) {
-              BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-              sum = sum.add(BigDecimal.valueOf(longValues[i]));
-              groupByResultHolder.setValueForKey(groupKey, sum);
-              _groupKeysWithNonNullValue.add(groupKey);
+              setGroupByResult(groupKeyArray[i], groupByResultHolder, BigDecimal.valueOf(longValues[i]));
             }
           }
         }
@@ -345,12 +344,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         String[] stringValues = blockValSet.getStringValuesSV();
         if (nullBitmap.getCardinality() < length) {
           for (int i = 0; i < length; i++) {
-            int groupKey = groupKeyArray[i];
             if (!nullBitmap.contains(i)) {
-              BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-              sum = sum.add(new BigDecimal(stringValues[i]));
-              groupByResultHolder.setValueForKey(groupKey, sum);
-              _groupKeysWithNonNullValue.add(groupKey);
+              setGroupByResult(groupKeyArray[i], groupByResultHolder, new BigDecimal(stringValues[i]));
             }
           }
         }
@@ -359,12 +354,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
         if (nullBitmap.getCardinality() < length) {
           for (int i = 0; i < length; i++) {
-            int groupKey = groupKeyArray[i];
             if (!nullBitmap.contains(i)) {
-              BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-              sum = sum.add(bigDecimalValues[i]);
-              groupByResultHolder.setValueForKey(groupKey, sum);
-              _groupKeysWithNonNullValue.add(groupKey);
+              setGroupByResult(groupKeyArray[i], groupByResultHolder, bigDecimalValues[i]);
             }
           }
         }
@@ -373,12 +364,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (nullBitmap.getCardinality() < length) {
           for (int i = 0; i < length; i++) {
-            int groupKey = groupKeyArray[i];
             if (!nullBitmap.contains(i)) {
-              BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-              sum = sum.add(BigDecimalUtils.deserialize(bytesValues[i]));
-              groupByResultHolder.setValueForKey(groupKey, sum);
-              _groupKeysWithNonNullValue.add(groupKey);
+              setGroupByResult(groupKeyArray[i], groupByResultHolder, BigDecimalUtils.deserialize(bytesValues[i]));
             }
           }
         }
@@ -386,6 +373,12 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
       default:
         throw new IllegalStateException();
     }
+  }
+
+  private void setGroupByResult(int groupKey, GroupByResultHolder groupByResultHolder, BigDecimal value) {
+    BigDecimal sum = groupByResultHolder.getResult(groupKey);
+    sum = sum == null ? value : sum.add(value);
+    groupByResultHolder.setValueForKey(groupKey, sum);
   }
 
   @Override
@@ -457,15 +450,20 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
 
   @Override
   public BigDecimal extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    return getDefaultResult(aggregationResultHolder);
+    BigDecimal result = aggregationResultHolder.getResult();
+    if (result == null) {
+      return _nullHandlingEnabled ? null : BigDecimal.ZERO;
+    }
+    return result;
   }
 
   @Override
   public BigDecimal extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    if (_nullHandlingEnabled && !_groupKeysWithNonNullValue.contains(groupKey)) {
-      return null;
+    BigDecimal result = groupByResultHolder.getResult(groupKey);
+    if (result == null) {
+      return _nullHandlingEnabled ? null : BigDecimal.ZERO;
     }
-    return getDefaultResult(groupByResultHolder, groupKey);
+    return result;
   }
 
   @Override

@@ -136,15 +136,14 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
         int[] values = blockValSet.getIntValuesSV();
-        if (nullBitmap.getCardinality() < values.length) {
+        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
           int min = Integer.MAX_VALUE;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               min = Math.min(values[i], min);
             }
           }
-          Double otherMin = aggregationResultHolder.getResult();
-          aggregationResultHolder.setValue(otherMin == null ? min : Math.min(min, otherMin));
+          updateAggregationResultHolder(aggregationResultHolder, min);
         }
         // Note: when all input values re null (nullBitmap.getCardinality() == values.length), min is null. As a result,
         // we don't update the value of aggregationResultHolder.
@@ -152,49 +151,46 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
       }
       case LONG: {
         long[] values = blockValSet.getLongValuesSV();
-        if (nullBitmap.getCardinality() < values.length) {
+        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
           long min = Long.MAX_VALUE;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               min = Math.min(values[i], min);
             }
           }
-          Double otherMin = aggregationResultHolder.getResult();
-          aggregationResultHolder.setValue(otherMin == null ? min : Math.min(min, otherMin));
+          updateAggregationResultHolder(aggregationResultHolder, min);
         }
         break;
       }
       case FLOAT: {
         float[] values = blockValSet.getFloatValuesSV();
-        if (nullBitmap.getCardinality() < values.length) {
+        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
           float min = Float.POSITIVE_INFINITY;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               min = Math.min(values[i], min);
             }
           }
-          Double otherMin = aggregationResultHolder.getResult();
-          aggregationResultHolder.setValue(otherMin == null ? min : Math.min(min, otherMin));
+          updateAggregationResultHolder(aggregationResultHolder, min);
         }
         break;
       }
       case DOUBLE: {
         double[] values = blockValSet.getDoubleValuesSV();
-        if (nullBitmap.getCardinality() < values.length) {
+        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
           double min = Double.POSITIVE_INFINITY;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               min = Math.min(values[i], min);
             }
           }
-          Double otherMin = aggregationResultHolder.getResult();
-          aggregationResultHolder.setValue(otherMin == null ? min : Math.min(min, otherMin));
+          updateAggregationResultHolder(aggregationResultHolder, min);
         }
         break;
       }
       case BIG_DECIMAL: {
         BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
-        if (nullBitmap.getCardinality() < values.length) {
+        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
           BigDecimal min = null;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
@@ -204,14 +200,18 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
           assert min != null;
           Double otherMin = aggregationResultHolder.getResult();
           // TODO: even though the source data has BIG_DECIMAL type, we still only support double precision.
-          aggregationResultHolder.setValue(
-              otherMin == null ? min.doubleValue() : Math.min(min.doubleValue(), otherMin));
+          updateAggregationResultHolder(aggregationResultHolder, min.doubleValue());
         }
         break;
       }
       default:
         throw new IllegalStateException("Cannot compute min for non-numeric type: " + blockValSet.getValueType());
     }
+  }
+
+  private void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, double min) {
+    Double otherMin = aggregationResultHolder.getResult();
+    aggregationResultHolder.setValue(otherMin == null ? min : Math.min(min, otherMin));
   }
 
   @Override
@@ -223,6 +223,7 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
         if (nullBitmap.getCardinality() < length) {
+          // TODO: need to update the for-loop terminating condition to: i < length & i < valueArray.length?
           for (int i = 0; i < length; i++) {
             double value = valueArray[i];
             int groupKey = groupKeyArray[i];

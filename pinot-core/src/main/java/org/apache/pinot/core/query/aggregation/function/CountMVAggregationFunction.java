@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -51,6 +53,11 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
   @Override
   public String getResultColumnName() {
     return AggregationFunctionType.COUNTMV.getName().toLowerCase() + "(" + _expression + ")";
+  }
+
+  @Override
+  public List<ExpressionContext> getInputExpressions() {
+    return Collections.singletonList(_expression);
   }
 
   @Override
