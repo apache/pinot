@@ -42,7 +42,7 @@ public class TimestampIndexGranularityTest {
     Assert.assertFalse(TimestampIndexGranularity.isValidTimeColumnWithGranularityName(timeColumn));
     Assert.assertFalse(TimestampIndexGranularity.isValidTimeColumnWithGranularityName("$docId"));
     Assert.assertFalse(TimestampIndexGranularity.isValidTimeColumnWithGranularityName("$ts$"));
-    Assert.assertTrue(TimestampIndexGranularity.isValidTimeGranularity("day"));
+    Assert.assertFalse(TimestampIndexGranularity.isValidTimeGranularity("day"));
     Assert.assertTrue(TimestampIndexGranularity.isValidTimeGranularity("DAY"));
   }
 

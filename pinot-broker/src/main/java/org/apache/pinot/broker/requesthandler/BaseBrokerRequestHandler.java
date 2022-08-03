@@ -628,7 +628,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Function function = expression.getFunctionCall();
     switch (function.getOperator()) {
       case "datetrunc":
-        String granularString = function.getOperands().get(0).getLiteral().getStringValue();
+        String granularString = function.getOperands().get(0).getLiteral().getStringValue().toUpperCase();
         Expression timeExpression = function.getOperands().get(1);
         if (((function.getOperandsSize() == 2) || (function.getOperandsSize() == 3 && "MILLISECONDS".equalsIgnoreCase(
             function.getOperands().get(2).getLiteral().getStringValue())))
