@@ -108,14 +108,30 @@ public class UpsertConfig extends BaseJsonConfig {
     _hashFunction = hashFunction;
   }
 
+  /**
+   * PartialUpsertStrategies maintains the mapping of merge strategies per columns.
+   * Each key in the map is a columnName, value is a partial upsert merging strategy.
+   * Supported strategies are {OVERWRITE|INCREMENT|APPEND|UNION|IGNORE}.
+   */
   public void setPartialUpsertStrategies(Map<String, Strategy> partialUpsertStrategies) {
     _partialUpsertStrategies = partialUpsertStrategies;
   }
 
+  /**
+   * If strategy is not specified for a column, the merger on that column will use "defaultPartialUpsertStrategy".
+   * The default value of defaultPartialUpsertStrategy is OVERWRITE.
+   */
   public void setDefaultPartialUpsertStrategy(Strategy defaultPartialUpsertStrategy) {
     _defaultPartialUpsertStrategy = defaultPartialUpsertStrategy;
   }
 
+  /**
+   * By default, Pinot uses the value in the time column to determine the latest record. For two records with the
+   * same primary key, the record with the larger value of the time column is picked as the
+   * latest update.
+   * However, there are cases when users need to use another column to determine the order.
+   * In such case, you can use option comparisonColumn to override the column used for comparison.
+   */
   public void setComparisonColumn(String comparisonColumn) {
     _comparisonColumn = comparisonColumn;
   }
