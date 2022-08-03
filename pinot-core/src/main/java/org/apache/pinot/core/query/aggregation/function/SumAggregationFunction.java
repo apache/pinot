@@ -19,9 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.math.BigDecimal;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -39,8 +37,6 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
   private static final double DEFAULT_VALUE = 0.0;
   private final boolean _nullHandlingEnabled;
 
-  private final Set<Integer> _groupKeysWithNonNullValue;
-
   public SumAggregationFunction(ExpressionContext expression) {
     this(expression, false);
   }
@@ -48,7 +44,6 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
   public SumAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     _nullHandlingEnabled = nullHandlingEnabled;
-    _groupKeysWithNonNullValue = new HashSet<>();
   }
 
   @Override
@@ -135,8 +130,8 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
     double sum = 0;
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
-        int[] values = blockValSet.getIntValuesSV();
-        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
+        if (nullBitmap.getCardinality() < length) {
+          int[] values = blockValSet.getIntValuesSV();
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               sum += values[i];
@@ -147,8 +142,8 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
         break;
       }
       case LONG: {
-        long[] values = blockValSet.getLongValuesSV();
-        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
+        if (nullBitmap.getCardinality() < length) {
+          long[] values = blockValSet.getLongValuesSV();
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               sum += values[i];
@@ -159,8 +154,8 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
         break;
       }
       case FLOAT: {
-        float[] values = blockValSet.getFloatValuesSV();
-        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
+        if (nullBitmap.getCardinality() < length) {
+          float[] values = blockValSet.getFloatValuesSV();
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               sum += values[i];
@@ -171,8 +166,8 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
         break;
       }
       case DOUBLE: {
-        double[] values = blockValSet.getDoubleValuesSV();
-        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
+        if (nullBitmap.getCardinality() < length) {
+          double[] values = blockValSet.getDoubleValuesSV();
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
               sum += values[i];
@@ -183,8 +178,8 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
         break;
       }
       case BIG_DECIMAL: {
-        BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
-        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
+        if (nullBitmap.getCardinality() < length) {
+          BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
           BigDecimal decimalSum = BigDecimal.valueOf(sum);
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
@@ -210,12 +205,11 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    double[] valueArray = blockValSet.getDoubleValuesSV();
     if (_nullHandlingEnabled) {
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        // TODO: need to update the for-loop terminating condition to: i < length & i < valueArray.length?
         if (nullBitmap.getCardinality() < length) {
+          double[] valueArray = blockValSet.getDoubleValuesSV();
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
               int groupKey = groupKeyArray[i];
@@ -228,7 +222,6 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
               //------+------+------+-----
               // NULL | NULL | NULL |   2
               // NULL | NULL | NULL |   1
-              _groupKeysWithNonNullValue.add(groupKey);
             }
           }
         }
@@ -236,6 +229,7 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
       }
     }
 
+    double[] valueArray = blockValSet.getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
       groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);

@@ -112,17 +112,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         }
         break;
       case FLOAT:
-        float[] floatValues = blockValSet.getFloatValuesSV();
-        for (int i = 0; i < length; i++) {
-          sum = sum.add(BigDecimal.valueOf(floatValues[i]));
-        }
-        break;
       case DOUBLE:
-        double[] doubleValues = blockValSet.getDoubleValuesSV();
-        for (int i = 0; i < length; i++) {
-          sum = sum.add(BigDecimal.valueOf(doubleValues[i]));
-        }
-        break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
@@ -152,9 +142,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
     BigDecimal sum = BigDecimal.ZERO;
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
-        int[] intValues = blockValSet.getIntValuesSV();
         if (nullBitmap.getCardinality() < length) {
-          // TODO: need to update the for-loop terminating condition to: i < length & i < intValues.length?
+          int[] intValues = blockValSet.getIntValuesSV();
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
               sum = sum.add(BigDecimal.valueOf(intValues[i]));
@@ -165,8 +154,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         break;
       }
       case LONG: {
-        long[] longValues = blockValSet.getLongValuesSV();
         if (nullBitmap.getCardinality() < length) {
+          long[] longValues = blockValSet.getLongValuesSV();
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
               sum = sum.add(BigDecimal.valueOf(longValues[i]));
@@ -177,8 +166,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         break;
       }
       case FLOAT: {
-        float[] floatValues = blockValSet.getFloatValuesSV();
         if (nullBitmap.getCardinality() < length) {
+          float[] floatValues = blockValSet.getFloatValuesSV();
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
               if (Float.isFinite(floatValues[i])) {
@@ -191,8 +180,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         break;
       }
       case DOUBLE: {
-        double[] doubleValues = blockValSet.getDoubleValuesSV();
         if (nullBitmap.getCardinality() < length) {
+          double[] doubleValues = blockValSet.getDoubleValuesSV();
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
               // TODO(nhejazi): throw an exception here instead of ignoring infinite values?
@@ -206,8 +195,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         break;
       }
       case STRING:
-        String[] stringValues = blockValSet.getStringValuesSV();
         if (nullBitmap.getCardinality() < length) {
+          String[] stringValues = blockValSet.getStringValuesSV();
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
               sum = sum.add(new BigDecimal(stringValues[i]));
@@ -217,8 +206,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         }
         break;
       case BIG_DECIMAL: {
-        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
         if (nullBitmap.getCardinality() < length) {
+          BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
               sum = sum.add(bigDecimalValues[i]);
@@ -229,8 +218,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         break;
       }
       case BYTES:
-        byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (nullBitmap.getCardinality() < length) {
+          byte[][] bytesValues = blockValSet.getBytesValuesSV();
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
               sum = sum.add(BigDecimalUtils.deserialize(bytesValues[i]));
@@ -318,9 +307,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
       GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
     switch (blockValSet.getValueType().getStoredType()) {
       case INT:
-        int[] intValues = blockValSet.getIntValuesSV();
         if (nullBitmap.getCardinality() < length) {
-          // TODO: need to update the for-loop terminating condition to: i < length & i < intValues.length?
+          int[] intValues = blockValSet.getIntValuesSV();
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
               setGroupByResult(groupKeyArray[i], groupByResultHolder, BigDecimal.valueOf(intValues[i]));
@@ -329,8 +317,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         }
         break;
       case LONG:
-        long[] longValues = blockValSet.getLongValuesSV();
         if (nullBitmap.getCardinality() < length) {
+          long[] longValues = blockValSet.getLongValuesSV();
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
               setGroupByResult(groupKeyArray[i], groupByResultHolder, BigDecimal.valueOf(longValues[i]));
@@ -341,8 +329,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
       case FLOAT:
       case DOUBLE:
       case STRING:
-        String[] stringValues = blockValSet.getStringValuesSV();
         if (nullBitmap.getCardinality() < length) {
+          String[] stringValues = blockValSet.getStringValuesSV();
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
               setGroupByResult(groupKeyArray[i], groupByResultHolder, new BigDecimal(stringValues[i]));
@@ -351,8 +339,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         }
         break;
       case BIG_DECIMAL:
-        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
         if (nullBitmap.getCardinality() < length) {
+          BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
               setGroupByResult(groupKeyArray[i], groupByResultHolder, bigDecimalValues[i]);
@@ -361,8 +349,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
         }
         break;
       case BYTES:
-        byte[][] bytesValues = blockValSet.getBytesValuesSV();
         if (nullBitmap.getCardinality() < length) {
+          byte[][] bytesValues = blockValSet.getBytesValuesSV();
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
               setGroupByResult(groupKeyArray[i], groupByResultHolder, BigDecimalUtils.deserialize(bytesValues[i]));

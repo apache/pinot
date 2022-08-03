@@ -135,8 +135,8 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
       BlockValSet blockValSet, RoaringBitmap nullBitmap) {
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
-        int[] values = blockValSet.getIntValuesSV();
-        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
+        if (nullBitmap.getCardinality() < length) {
+          int[] values = blockValSet.getIntValuesSV();
           int min = Integer.MAX_VALUE;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
@@ -150,8 +150,8 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
         break;
       }
       case LONG: {
-        long[] values = blockValSet.getLongValuesSV();
-        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
+        if (nullBitmap.getCardinality() < length) {
+          long[] values = blockValSet.getLongValuesSV();
           long min = Long.MAX_VALUE;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
@@ -163,8 +163,8 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
         break;
       }
       case FLOAT: {
-        float[] values = blockValSet.getFloatValuesSV();
-        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
+        if (nullBitmap.getCardinality() < length) {
+          float[] values = blockValSet.getFloatValuesSV();
           float min = Float.POSITIVE_INFINITY;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
@@ -176,8 +176,8 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
         break;
       }
       case DOUBLE: {
-        double[] values = blockValSet.getDoubleValuesSV();
-        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
+        if (nullBitmap.getCardinality() < length) {
+          double[] values = blockValSet.getDoubleValuesSV();
           double min = Double.POSITIVE_INFINITY;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
@@ -189,8 +189,8 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
         break;
       }
       case BIG_DECIMAL: {
-        BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
-        if (nullBitmap.getCardinality() < Math.min(length, values.length)) {
+        if (nullBitmap.getCardinality() < length) {
+          BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
           BigDecimal min = null;
           for (int i = 0; i < length & i < values.length; i++) {
             if (!nullBitmap.contains(i)) {
@@ -198,7 +198,6 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
             }
           }
           assert min != null;
-          Double otherMin = aggregationResultHolder.getResult();
           // TODO: even though the source data has BIG_DECIMAL type, we still only support double precision.
           updateAggregationResultHolder(aggregationResultHolder, min.doubleValue());
         }
@@ -218,12 +217,11 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    double[] valueArray = blockValSet.getDoubleValuesSV();
     if (_nullHandlingEnabled) {
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
         if (nullBitmap.getCardinality() < length) {
-          // TODO: need to update the for-loop terminating condition to: i < length & i < valueArray.length?
+          double[] valueArray = blockValSet.getDoubleValuesSV();
           for (int i = 0; i < length; i++) {
             double value = valueArray[i];
             int groupKey = groupKeyArray[i];
@@ -237,6 +235,7 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
       }
     }
 
+    double[] valueArray = blockValSet.getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
       int groupKey = groupKeyArray[i];
