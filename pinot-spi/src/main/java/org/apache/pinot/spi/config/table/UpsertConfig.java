@@ -41,21 +41,21 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   @JsonPropertyDescription("Upsert mode.")
-  private final Mode _mode;
+  private Mode _mode;
 
   @JsonPropertyDescription("Function to hash the primary key.")
-  private final HashFunction _hashFunction;
+  private HashFunction _hashFunction;
 
   @JsonPropertyDescription("Partial update strategies.")
-  private final Map<String, Strategy> _partialUpsertStrategies;
+  private Map<String, Strategy> _partialUpsertStrategies;
 
   @JsonPropertyDescription("default upsert strategy for partial mode")
-  private final Strategy _defaultPartialUpsertStrategy;
+  private Strategy _defaultPartialUpsertStrategy;
 
   @JsonPropertyDescription("Column for upsert comparison, default to time column")
-  private final String _comparisonColumn;
+  private String _comparisonColumn;
 
-  @JsonCreator
+  @Deprecated
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
       @JsonProperty("partialUpsertStrategies") @Nullable Map<String, Strategy> partialUpsertStrategies,
       @JsonProperty("defaultPartialUpsertStrategy") @Nullable Strategy defaultPartialUpsertStrategy,
@@ -77,6 +77,9 @@ public class UpsertConfig extends BaseJsonConfig {
     _hashFunction = hashFunction == null ? HashFunction.NONE : hashFunction;
   }
 
+  public UpsertConfig() {
+  }
+
   public Mode getMode() {
     return _mode;
   }
@@ -96,5 +99,25 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public String getComparisonColumn() {
     return _comparisonColumn;
+  }
+
+  public void setMode(Mode mode) {
+    _mode = mode;
+  }
+
+  public void setHashFunction(HashFunction hashFunction) {
+    _hashFunction = hashFunction;
+  }
+
+  public void setPartialUpsertStrategies(Map<String, Strategy> partialUpsertStrategies) {
+    _partialUpsertStrategies = partialUpsertStrategies;
+  }
+
+  public void setDefaultPartialUpsertStrategy(Strategy defaultPartialUpsertStrategy) {
+    _defaultPartialUpsertStrategy = defaultPartialUpsertStrategy;
+  }
+
+  public void setComparisonColumn(String comparisonColumn) {
+    _comparisonColumn = comparisonColumn;
   }
 }
