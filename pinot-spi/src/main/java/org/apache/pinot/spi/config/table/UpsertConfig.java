@@ -77,6 +77,8 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   public UpsertConfig() {
+    _mode = Mode.FULL;
+    _hashFunction = HashFunction.NONE;
   }
 
   public Mode getMode() {
