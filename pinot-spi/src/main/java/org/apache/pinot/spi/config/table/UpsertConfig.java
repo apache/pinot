@@ -111,7 +111,7 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   /**
-   * PartialUpsertStrategies maintains the mapping of merge strategies per columns.
+   * PartialUpsertStrategies maintains the mapping of merge strategies per column.
    * Each key in the map is a columnName, value is a partial upsert merging strategy.
    * Supported strategies are {OVERWRITE|INCREMENT|APPEND|UNION|IGNORE}.
    */
@@ -120,7 +120,7 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   /**
-   * If strategy is not specified for a column, the merger on that column will use "defaultPartialUpsertStrategy".
+   * If strategy is not specified for a column, the merger on that column will be "defaultPartialUpsertStrategy".
    * The default value of defaultPartialUpsertStrategy is OVERWRITE.
    */
   public void setDefaultPartialUpsertStrategy(Strategy defaultPartialUpsertStrategy) {
