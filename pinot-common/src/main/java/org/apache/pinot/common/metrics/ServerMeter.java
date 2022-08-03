@@ -75,6 +75,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   INDEXING_FAILURES("attributeValues", true),
   QUERY_HAS_MV_SELECTION_ORDER_BY("queryHasMVSelectionOrderBy", false),
 
+  HEALTHCHECK_OK_CALLS("healthcheck", true),
+  HEALTHCHECK_BAD_CALLS("healthcheck", true),
+
   // Netty connection metrics
   NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
   NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),

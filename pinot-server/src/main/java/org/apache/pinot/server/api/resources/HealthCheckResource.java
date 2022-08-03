@@ -32,6 +32,8 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.server.starter.helix.AdminApiApplication;
@@ -47,6 +49,9 @@ public class HealthCheckResource {
   @Inject
   @Named(AdminApiApplication.SERVER_INSTANCE_ID)
   private String _instanceId;
+
+  @Inject
+  private ServerMetrics _serverMetrics;
 
   @GET
   @Path("/health")
@@ -90,11 +95,13 @@ public class HealthCheckResource {
     return getReadinessStatus(_instanceId);
   }
 
-  private static String getReadinessStatus(String instanceId) throws WebApplicationException {
+  private String getReadinessStatus(String instanceId) throws WebApplicationException {
     Status status = ServiceStatus.getServiceStatus(instanceId);
     if (status == Status.GOOD) {
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.HEALTHCHECK_OK_CALLS, 1);
       return "OK";
     }
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.HEALTHCHECK_BAD_CALLS, 1);
     String errMessage = String.format("Pinot server status is %s", status);
     Response response =
         Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
