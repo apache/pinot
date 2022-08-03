@@ -16,23 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.common.metadata.controllerjob;
 
-import java.sql.Statement;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
-
-public class PinotConnectionTest {
-  private DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
-  private DummyPinotControllerTransport _dummyPinotControllerTransport = DummyPinotControllerTransport.create();
-
-  @Test
-  public void createStatementTest()
-      throws Exception {
-    PinotConnection pinotConnection =
-        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
-    Statement statement = pinotConnection.createStatement();
-    Assert.assertNotNull(statement);
-  }
+public enum ControllerJobType {
+  RELOAD_SEGMENT,
+  RELOAD_ALL_SEGMENTS
 }

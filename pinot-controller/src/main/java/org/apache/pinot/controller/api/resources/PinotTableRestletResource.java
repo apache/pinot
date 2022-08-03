@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -795,6 +796,28 @@ public class PinotTableRestletResource {
           Response.Status.INTERNAL_SERVER_ERROR, ioe);
     }
     return segmentsMetadata;
+  }
+
+  @GET
+  @Path("table/{tableName}/jobs")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get list of controller jobs for this table",
+      notes = "Get list of controller jobs for this table")
+  public Map<String, Map<String, String>> getControllerJobs(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr
+  ) {
+    TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
+    List<String> tableNamesWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
+            LOGGER);
+
+    Map<String, Map<String, String>> result = new HashMap<>();
+    for (String tableNameWithType : tableNamesWithType) {
+      result.putAll(_pinotHelixResourceManager.getAllJobsForTable(tableNameWithType));
+    }
+
+    return result;
   }
 
   /**

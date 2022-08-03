@@ -31,6 +31,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -56,6 +57,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -76,6 +78,7 @@ import org.apache.helix.model.ParticipantHistory;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.zkclient.exception.ZkNoNodeException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -97,6 +100,7 @@ import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
@@ -1982,6 +1986,110 @@ public class PinotHelixResourceManager {
     return instanceSet;
   }
 
+  /**
+   * Returns the ZK metdata for the given jobId
+   * @param jobId the id of the job
+   * @return Map representing the job's ZK properties
+   */
+  @Nullable
+  public Map<String, String> getControllerJobZKMetadata(String jobId) {
+    String controllerJobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob();
+    ZNRecord taskResourceZnRecord = _propertyStore.get(controllerJobResourcePath, null, AccessOption.PERSISTENT);
+    if (taskResourceZnRecord != null) {
+      return taskResourceZnRecord.getMapFields().get(jobId);
+    }
+    return null;
+  }
+
+  /**
+   * Returns a Map of jobId to job's ZK metadata for the given table
+   * @param tableNameWithType the table for which jobs are to be fetched
+   * @return A Map of jobId to job properties
+   */
+  public Map<String, Map<String, String>> getAllJobsForTable(String tableNameWithType) {
+    String jobsResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob();
+    try {
+      ZNRecord tableJobsRecord = _propertyStore.get(jobsResourcePath, null, -1);
+      Map<String, Map<String, String>> controllerJobs = tableJobsRecord.getMapFields();
+      return controllerJobs.entrySet().stream().filter(
+          job -> job.getValue().get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)
+              .equals(tableNameWithType)).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    } catch (ZkNoNodeException e) {
+      LOGGER.warn("Could not find controller job node for table : {}", tableNameWithType, e);
+    }
+
+    return Collections.emptyMap();
+  }
+
+  /**
+   * Adds a new reload segment job metadata into ZK
+   * @param tableNameWithType Table for which job is to be added
+   * @param segmentName Name of the segment being reloaded
+   * @param jobId job's UUID
+   * @param numMessagesSent number of messages that were sent to servers. Saved as metadata
+   * @return boolean representing success / failure of the ZK write step
+   */
+  public boolean addNewReloadSegmentJob(String tableNameWithType, String segmentName, String jobId,
+      int numMessagesSent) {
+    Map<String, String> jobMetadata = new HashMap<>();
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_SEGMENT.toString());
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS,
+        Long.toString(System.currentTimeMillis()));
+    jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT,
+        Integer.toString(numMessagesSent));
+    jobMetadata.put(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME, segmentName);
+    return addReloadJobToZK(jobId, jobMetadata);
+  }
+
+  /**
+   * Adds a new reload segment job metadata into ZK
+   * @param tableNameWithType Table for which job is to be added
+   * @param jobId job's UUID
+   * @param numberOfMessagesSent number of messages that were sent to servers. Saved as metadata
+   * @return boolean representing success / failure of the ZK write step
+   */
+  public boolean addNewReloadAllSegmentsJob(String tableNameWithType, String jobId, int numberOfMessagesSent) {
+    Map<String, String> jobMetadata = new HashMap<>();
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE,
+        ControllerJobType.RELOAD_ALL_SEGMENTS.toString());
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS,
+        Long.toString(System.currentTimeMillis()));
+    jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT,
+        Integer.toString(numberOfMessagesSent));
+    return addReloadJobToZK(jobId, jobMetadata);
+  }
+
+  private boolean addReloadJobToZK(String jobId, Map<String, String> jobMetadata) {
+    String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob();
+    Stat stat = new Stat();
+    ZNRecord tableJobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
+    if (tableJobsZnRecord != null) {
+      Map<String, Map<String, String>> tasks = tableJobsZnRecord.getMapFields();
+      tasks.put(jobId, jobMetadata);
+      if (tasks.size() > CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK) {
+        tasks = tasks.entrySet().stream().sorted(new Comparator<Map.Entry<String, Map<String, String>>>() {
+              @Override
+              public int compare(Map.Entry<String, Map<String, String>> v1, Map.Entry<String, Map<String, String>> v2) {
+                return Long.compare(
+                    Long.parseLong(v2.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS)),
+                    Long.parseLong(v1.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS)));
+              }
+            }).collect(Collectors.toList()).subList(0, CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK)
+            .stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+      }
+      tableJobsZnRecord.setMapFields(tasks);
+      return _propertyStore.set(jobResourcePath, tableJobsZnRecord, stat.getVersion(), AccessOption.PERSISTENT);
+    } else {
+      tableJobsZnRecord = new ZNRecord(jobResourcePath);
+      tableJobsZnRecord.setMapField(jobId, jobMetadata);
+      return _propertyStore.set(jobResourcePath, tableJobsZnRecord, AccessOption.PERSISTENT);
+    }
+  }
+
   @VisibleForTesting
   public void addNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata, String downloadUrl) {
     // NOTE: must first set the segment ZK metadata before assigning segment to instances because segment assignment
@@ -2166,7 +2274,7 @@ public class PinotHelixResourceManager {
     sendSegmentRefreshMessage(tableNameWithType, segmentName, true, true);
   }
 
-  public int reloadAllSegments(String tableNameWithType, boolean forceDownload) {
+  public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload) {
     LOGGER.info("Sending reload message for table: {} with forceDownload: {}", tableNameWithType, forceDownload);
 
     if (forceDownload) {
@@ -2193,10 +2301,10 @@ public class PinotHelixResourceManager {
       LOGGER.warn("No reload message sent for table: {}", tableNameWithType);
     }
 
-    return numMessagesSent;
+    return Pair.of(numMessagesSent, segmentReloadMessage.getMsgId());
   }
 
-  public int reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload) {
+  public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload) {
     LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}", segmentName,
         tableNameWithType, forceDownload);
 
@@ -2226,7 +2334,7 @@ public class PinotHelixResourceManager {
     } else {
       LOGGER.warn("No reload message sent for segment: {} in table: {}", segmentName, tableNameWithType);
     }
-    return numMessagesSent;
+    return Pair.of(numMessagesSent, segmentReloadMessage.getMsgId());
   }
 
   /**

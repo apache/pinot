@@ -19,6 +19,10 @@
 package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
+import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslProvider;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
@@ -337,6 +341,51 @@ public final class TlsUtils {
     public Socket createSocket(String host, int port)
         throws IOException {
       return _sslSocketFactory.createSocket(host, port);
+    }
+  }
+
+  /**
+   * Builds client side SslContext based on a given TlsConfig.
+   *
+   * @param tlsConfig TLS config
+   */
+  public static SslContext buildClientContext(TlsConfig tlsConfig) {
+    SslContextBuilder sslContextBuilder =
+        SslContextBuilder.forClient().sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
+    if (tlsConfig.getKeyStorePath() != null) {
+      sslContextBuilder.keyManager(createKeyManagerFactory(tlsConfig));
+    }
+    if (tlsConfig.getTrustStorePath() != null) {
+      sslContextBuilder.trustManager(createTrustManagerFactory(tlsConfig));
+    }
+    try {
+      return sslContextBuilder.build();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Builds server side SslContext based on a given TlsConfig.
+   *
+   * @param tlsConfig TLS config
+   */
+  public static SslContext buildServerContext(TlsConfig tlsConfig) {
+    if (tlsConfig.getKeyStorePath() == null) {
+      throw new IllegalArgumentException("Must provide key store path for secured server");
+    }
+    SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(createKeyManagerFactory(tlsConfig))
+        .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
+    if (tlsConfig.getTrustStorePath() != null) {
+      sslContextBuilder.trustManager(createTrustManagerFactory(tlsConfig));
+    }
+    if (tlsConfig.isClientAuthEnabled()) {
+      sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
+    }
+    try {
+      return sslContextBuilder.build();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 }

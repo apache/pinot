@@ -16,23 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
 
-import java.sql.Statement;
-import org.testng.Assert;
-import org.testng.annotations.Test;
+package org.apache.pinot.server.starter.helix;
 
+public class SegmentReloadStatusValue {
+  private final long _totalSegmentCount;
+  private final long _successCount;
 
-public class PinotConnectionTest {
-  private DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
-  private DummyPinotControllerTransport _dummyPinotControllerTransport = DummyPinotControllerTransport.create();
+  public SegmentReloadStatusValue(long totalSegmentCount, long successCount) {
+    _totalSegmentCount = totalSegmentCount;
+    _successCount = successCount;
+  }
 
-  @Test
-  public void createStatementTest()
-      throws Exception {
-    PinotConnection pinotConnection =
-        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
-    Statement statement = pinotConnection.createStatement();
-    Assert.assertNotNull(statement);
+  public long getTotalSegmentCount() {
+    return _totalSegmentCount;
+  }
+
+  public long getSuccessCount() {
+    return _successCount;
   }
 }
