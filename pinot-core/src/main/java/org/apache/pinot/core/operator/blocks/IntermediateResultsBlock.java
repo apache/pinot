@@ -69,6 +69,8 @@ public class IntermediateResultsBlock implements Block {
   private long _numTotalDocs;
   private int _numSegmentsProcessed;
   private int _numSegmentsMatched;
+  private int _numConsumingSegmentsProcessed;
+  private int _numConsumingSegmentsMatched;
   private boolean _numGroupsLimitReached;
   private int _numResizes;
   private long _resizeTimeMs;
@@ -268,6 +270,24 @@ public class IntermediateResultsBlock implements Block {
 
   public void setNumSegmentsMatched(int numSegmentsMatched) {
     _numSegmentsMatched = numSegmentsMatched;
+  }
+
+  @VisibleForTesting
+  public int getNumConsumingSegmentsProcessed() {
+    return _numConsumingSegmentsProcessed;
+  }
+
+  public void setNumConsumingSegmentsProcessed(int numConsumingSegmentsProcessed) {
+    _numConsumingSegmentsProcessed = numConsumingSegmentsProcessed;
+  }
+
+  @VisibleForTesting
+  public int getNumConsumingSegmentsMatched() {
+    return _numConsumingSegmentsMatched;
+  }
+
+  public void setNumConsumingSegmentsMatched(int numConsumingSegmentsMatched) {
+    _numConsumingSegmentsMatched = numConsumingSegmentsMatched;
   }
 
   @VisibleForTesting
@@ -477,6 +497,10 @@ public class IntermediateResultsBlock implements Block {
         .put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), String.valueOf(_numEntriesScannedPostFilter));
     dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), String.valueOf(_numSegmentsProcessed));
     dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), String.valueOf(_numSegmentsMatched));
+    dataTable.getMetadata().put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(),
+        String.valueOf(_numConsumingSegmentsProcessed));
+    dataTable.getMetadata().put(MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName(),
+        String.valueOf(_numConsumingSegmentsMatched));
     dataTable.getMetadata().put(MetadataKey.NUM_RESIZES.getName(), String.valueOf(_numResizes));
     dataTable.getMetadata().put(MetadataKey.RESIZE_TIME_MS.getName(), String.valueOf(_resizeTimeMs));
 
