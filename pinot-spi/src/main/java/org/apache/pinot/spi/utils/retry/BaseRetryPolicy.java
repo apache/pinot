@@ -55,7 +55,7 @@ public abstract class BaseRetryPolicy implements RetryPolicy {
           Thread.sleep(getDelayMs(attempt++));
         }
       }
-      if (_maxNumAttempts>0 && Boolean.TRUE.equals(operation.call())) {
+      if (_maxNumAttempts > 0 && Boolean.TRUE.equals(operation.call())) {
         // Succeeded
         return;
       }
