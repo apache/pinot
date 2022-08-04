@@ -138,7 +138,9 @@
     <quartz.version>2.3.2</quartz.version>
     <calcite.version>1.29.0</calcite.version>
     <lucene.version>8.2.0</lucene.version>
-    <reflections.version>0.9.11</reflections.version>
+    <!-- reflections version is pinned to 0.9.9 due to multi-threading issues. Do not upgrade -->
+    <!-- see: https://github.com/ronmamo/reflections/issues/81 -->
+    <reflections.version>0.9.9</reflections.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
     <commons-lang.version>2.6</commons-lang.version>
     <!-- pinot-common, commons-configuration, hadoop-common, hadoop-client use commons-logging -->
