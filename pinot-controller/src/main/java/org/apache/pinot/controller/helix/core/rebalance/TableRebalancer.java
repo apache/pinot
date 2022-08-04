@@ -429,7 +429,8 @@ public class TableRebalancer {
               instancePartitionsType.getInstancePartitionsName(rawTableName));
           if (!dryRun) {
             LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
-            InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);
+            InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(),
+                instancePartitions);
           }
           return instancePartitions;
         }
