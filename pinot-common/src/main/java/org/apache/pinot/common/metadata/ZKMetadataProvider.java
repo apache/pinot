@@ -59,7 +59,6 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_SCHEMAS_PREFIX = "/SCHEMAS";
   private static final String PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX = "/INSTANCE_PARTITIONS";
   private static final String PROPERTYSTORE_TABLE_CONFIGS_PREFIX = "/CONFIGS/TABLE";
-  private static final String PROPERTYSTORE_TABLE_GROUP_PREFIX = "/CONFIGS/TABLE_GROUP";
   private static final String PROPERTYSTORE_USER_CONFIGS_PREFIX = "/CONFIGS/USER";
   private static final String PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX = "/CONFIGS/INSTANCE";
   private static final String PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX = "/CONFIGS/CLUSTER";
@@ -109,10 +108,6 @@ public class ZKMetadataProvider {
 
   public static String constructPropertyStorePathForInstancePartitions(String instancePartitionsName) {
     return StringUtil.join("/", PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX, instancePartitionsName);
-  }
-
-  public static String constructPropertyStorePathForTableGroup(String groupName) {
-    return StringUtil.join("/", PROPERTYSTORE_TABLE_GROUP_PREFIX, groupName);
   }
 
   public static String constructPropertyStorePathForResource(String resourceName) {
@@ -321,19 +316,6 @@ public class ZKMetadataProvider {
     } catch (Exception e) {
       LOGGER.error("Caught exception while creating table config from ZNRecord: {}", znRecord.getId(), e);
       return null;
-    }
-  }
-
-  public static List<String> getAllGroups(ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    List<ZNRecord> znRecords = propertyStore.getChildren(PROPERTYSTORE_TABLE_GROUP_PREFIX, null,
-        AccessOption.PERSISTENT, CommonConstants.Helix.ZkClient.RETRY_COUNT,
-        CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
-    if (znRecords != null) {
-      return znRecords.stream()
-          .map(ZNRecord::getId)
-          .collect(Collectors.toList());
-    } else {
-      return Collections.emptyList();
     }
   }
 

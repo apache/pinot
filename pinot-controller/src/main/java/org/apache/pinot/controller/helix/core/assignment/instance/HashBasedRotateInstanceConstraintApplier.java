@@ -35,17 +35,17 @@ public class HashBasedRotateInstanceConstraintApplier implements InstanceConstra
   private static final Logger LOGGER = LoggerFactory.getLogger(HashBasedRotateInstanceConstraintApplier.class);
 
   // Entity could be either a table or table-group
-  private final String _entityName;
+  private final String _tableNameWithType;
 
-  public HashBasedRotateInstanceConstraintApplier(String entityName) {
-    _entityName = entityName;
+  public HashBasedRotateInstanceConstraintApplier(String tableNameWithType) {
+    _tableNameWithType = tableNameWithType;
   }
 
   @Override
   public Map<Integer, List<InstanceConfig>> applyConstraint(
       Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap) {
-    int tableNameHash = Math.abs(_entityName.hashCode());
-    LOGGER.info("Rotating instances for entity: {} with hash: {}", _entityName, tableNameHash);
+    int tableNameHash = Math.abs(_tableNameWithType.hashCode());
+    LOGGER.info("Rotating instances for table: {} with hash: {}", _tableNameWithType, tableNameHash);
 
     for (Map.Entry<Integer, List<InstanceConfig>> entry : poolToInstanceConfigsMap.entrySet()) {
       List<InstanceConfig> instanceConfigs = entry.getValue();

@@ -106,7 +106,6 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
-import org.apache.pinot.common.utils.config.TableGroupConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
@@ -135,7 +134,6 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
-import org.apache.pinot.spi.config.table.TableGroupConfig;
 import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
@@ -1703,10 +1701,9 @@ public class PinotHelixResourceManager {
           LOGGER.info("Persisting instance partitions: {}", instancePartitions);
           InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
         } else {
-          instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
-              tableConfig.getInstancePartitionsMap().get(instancePartitionsType));
-          instancePartitions =
-              instancePartitions.withName(instancePartitionsType.getInstancePartitionsName(rawTableName));
+          instancePartitions = InstancePartitionsUtils.fetchInstancePartitionsWithRename(_propertyStore,
+              tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
+              instancePartitionsType.getInstancePartitionsName(rawTableName));
           LOGGER.info("Persisting instance partitions: {}", instancePartitions);
           InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
         }
@@ -3627,20 +3624,6 @@ public class PinotHelixResourceManager {
     LOGGER.info("[TaskRequestId: {}] Periodic task execution message sent to {} controllers.", periodicTaskRequestId,
         messageCount);
     return Pair.of(periodicTaskRequestId, messageCount);
-  }
-
-  /**
-   * Stores configuration for the given group to Zookeeper. Throws an exception if the
-   * group already exists (i.e. the ZK Node for the table-group config already exists).
-   */
-  public void addTableGroup(String groupName, TableGroupConfig tableGroupConfig)
-      throws IOException {
-    String groupPath = ZKMetadataProvider.constructPropertyStorePathForTableGroup(groupName);
-    if (_propertyStore.exists(groupPath, AccessOption.PERSISTENT)) {
-      throw new IllegalArgumentException(String.format("Group=%s already exists", groupName));
-    }
-    ZNRecord znRecord = TableGroupConfigUtils.toZNRecord(tableGroupConfig);
-    _propertyStore.create(groupPath, znRecord, AccessOption.PERSISTENT);
   }
 
   /*

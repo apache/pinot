@@ -22,7 +22,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
-import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
@@ -80,29 +79,6 @@ public class InstanceAssignmentConfig extends BaseJsonConfig {
 
   public InstanceReplicaGroupPartitionConfig getReplicaGroupPartitionConfig() {
     return _replicaGroupPartitionConfig;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (o == null || getClass() != o.getClass()) {
-      return false;
-    }
-    if (!super.equals(o)) {
-      return false;
-    }
-    InstanceAssignmentConfig that = (InstanceAssignmentConfig) o;
-    return _partitionSelector == that._partitionSelector && _tagPoolConfig.equals(that._tagPoolConfig) && Objects
-        .equals(_constraintConfig, that._constraintConfig) && _replicaGroupPartitionConfig
-        .equals(that._replicaGroupPartitionConfig);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects
-        .hash(super.hashCode(), _partitionSelector, _tagPoolConfig, _constraintConfig, _replicaGroupPartitionConfig);
   }
 
   public enum PartitionSelector {

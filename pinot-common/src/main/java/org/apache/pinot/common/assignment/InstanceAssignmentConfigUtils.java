@@ -31,12 +31,9 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class InstanceAssignmentConfigUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(InstanceAssignmentConfigUtils.class);
 
   private InstanceAssignmentConfigUtils() {
   }
