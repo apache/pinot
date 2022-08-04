@@ -58,6 +58,8 @@ public class StreamConfig {
   public static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
   public static final int DEFAULT_IDLE_TIMEOUT_MILLIS = 3 * 60 * 1000;
 
+  public static final String DEFAULT_STREAM_DECODER_ERRORS_IGNORE = "false";
+
   private static final String SIMPLE_CONSUMER_TYPE_STRING = "simple";
 
   private static final double CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED = -1;
@@ -68,6 +70,7 @@ public class StreamConfig {
   private final List<ConsumerType> _consumerTypes = new ArrayList<>();
   private final String _consumerFactoryClassName;
   private final String _decoderClass;
+  private final boolean _decoderErrorsIgnore;
   private final Map<String, String> _decoderProperties = new HashMap<>();
 
   private final long _connectionTimeoutMillis;
@@ -136,6 +139,8 @@ public class StreamConfig {
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_DECODER_CLASS);
     _decoderClass = streamConfigMap.get(decoderClassKey);
     Preconditions.checkNotNull(_decoderClass, "Must specify decoder class name " + decoderClassKey);
+
+    _decoderErrorsIgnore = extractDecoderErrorsIgnore(streamConfigMap);
 
     String streamDecoderPropPrefix =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.DECODER_PROPS_PREFIX);
@@ -283,6 +288,12 @@ public class StreamConfig {
     }
   }
 
+  protected boolean extractDecoderErrorsIgnore(Map<String, String> streamConfigMap) {
+    String key = StreamConfigProperties.STREAM_DECODER_ERRORS_IGNORE;
+    String decoderErrorsIgnore = streamConfigMap.getOrDefault(key, DEFAULT_STREAM_DECODER_ERRORS_IGNORE);
+    return Boolean.valueOf(decoderErrorsIgnore);
+  }
+
   public String getType() {
     return _type;
   }
@@ -317,6 +328,10 @@ public class StreamConfig {
 
   public String getDecoderClass() {
     return _decoderClass;
+  }
+
+  public boolean getDecoderErrorsIgnore() {
+    return _decoderErrorsIgnore;
   }
 
   public Map<String, String> getDecoderProperties() {
@@ -376,9 +391,10 @@ public class StreamConfig {
         + _fetchTimeoutMillis + ", _idleTimeoutMillis=" + _idleTimeoutMillis + ", _flushThresholdRows="
         + _flushThresholdRows + ", _flushThresholdTimeMillis=" + _flushThresholdTimeMillis
         + ", _flushSegmentDesiredSizeBytes=" + _flushThresholdSegmentSizeBytes + ", _flushAutotuneInitialRows="
-        + _flushAutotuneInitialRows + ", _decoderClass='" + _decoderClass + '\'' + ", _decoderProperties="
-        + _decoderProperties + ", _groupId='" + _groupId + "', _topicConsumptionRateLimit=" + _topicConsumptionRateLimit
-        + ", _tableNameWithType='" + _tableNameWithType + '}';
+        + _flushAutotuneInitialRows + ", _decoderClass='" + _decoderClass + '\'' + ", _decoderErrorsIgnore='"
+        + _decoderErrorsIgnore + '\'' + ", _decoderProperties=" + _decoderProperties + ", _groupId='" + _groupId
+        + "', _topicConsumptionRateLimit=" + _topicConsumptionRateLimit + ", _tableNameWithType='" + _tableNameWithType
+        + '}';
   }
 
   @Override
@@ -402,10 +418,11 @@ public class StreamConfig {
         && EqualityUtils.isEqual(_topicName, that._topicName) && EqualityUtils.isEqual(_consumerTypes,
         that._consumerTypes) && EqualityUtils.isEqual(_consumerFactoryClassName, that._consumerFactoryClassName)
         && EqualityUtils.isEqual(_offsetCriteria, that._offsetCriteria) && EqualityUtils.isEqual(_decoderClass,
-        that._decoderClass) && EqualityUtils.isEqual(_decoderProperties, that._decoderProperties)
-        && EqualityUtils.isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_tableNameWithType,
-        that._tableNameWithType) && EqualityUtils.isEqual(_topicConsumptionRateLimit, that._topicConsumptionRateLimit)
-        && EqualityUtils.isEqual(_streamConfigMap, that._streamConfigMap);
+        that._decoderClass) && EqualityUtils.isEqual(_decoderErrorsIgnore, that._decoderErrorsIgnore)
+        && EqualityUtils.isEqual(_decoderProperties, that._decoderProperties) && EqualityUtils.isEqual(_groupId,
+        that._groupId) && EqualityUtils.isEqual(_tableNameWithType, that._tableNameWithType) && EqualityUtils.isEqual(
+        _topicConsumptionRateLimit, that._topicConsumptionRateLimit) && EqualityUtils.isEqual(_streamConfigMap,
+        that._streamConfigMap);
   }
 
   @Override
@@ -423,6 +440,7 @@ public class StreamConfig {
     result = EqualityUtils.hashCodeOf(result, _flushThresholdSegmentSizeBytes);
     result = EqualityUtils.hashCodeOf(result, _flushAutotuneInitialRows);
     result = EqualityUtils.hashCodeOf(result, _decoderClass);
+    result = EqualityUtils.hashCodeOf(result, _decoderErrorsIgnore);
     result = EqualityUtils.hashCodeOf(result, _decoderProperties);
     result = EqualityUtils.hashCodeOf(result, _groupId);
     result = EqualityUtils.hashCodeOf(result, _topicConsumptionRateLimit);
