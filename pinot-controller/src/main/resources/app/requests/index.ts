@@ -129,6 +129,9 @@ export const getTasks = (tableName: string, taskType: string): Promise<AxiosResp
 export const getTaskDebug = (taskName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/task/${taskName}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
 
+export const getTaskGeneratorDebug = (taskName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/generator/${taskName}/${taskType}/debug`, { headers: { ...headers, Accept: 'application/json' } });
+
 export const getTaskTypeDebug = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
 
