@@ -46,7 +46,6 @@ import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.pinot.query.context.PlannerContext;
-import org.apache.pinot.query.parser.CalciteSqlParser;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.planner.logical.StagePlanner;
@@ -54,6 +53,8 @@ import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.rules.PinotQueryRuleSets;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.Validator;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 
 
 /**
@@ -144,7 +145,9 @@ public class QueryEnvironment {
   protected SqlNode parse(String query, PlannerContext plannerContext)
       throws Exception {
     // 1. invoke CalciteSqlParser to parse out SqlNode;
-    return CalciteSqlParser.compile(query, plannerContext);
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
+    plannerContext.setOptions(sqlNodeAndOptions.getOptions());
+    return sqlNodeAndOptions.getSqlNode();
   }
 
   protected SqlNode validate(SqlNode parsed)
