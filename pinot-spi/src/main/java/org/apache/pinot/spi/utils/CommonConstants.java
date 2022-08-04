@@ -557,6 +557,23 @@ public class CommonConstants {
     public static final String CONFIG_OF_MINION_QUERY_REWRITER_CLASS_NAMES = "pinot.minion.query.rewriter.class.names";
   }
 
+  public static class ControllerJob {
+    /**
+     * Controller job ZK props
+     */
+    public static final String JOB_TYPE = "jobType";
+    public static final String TABLE_NAME_WITH_TYPE = "tableName";
+    public static final String JOB_ID = "jobId";
+    public static final String SUBMISSION_TIME_MS = "submissionTimeMs";
+    public static final String MESSAGE_COUNT = "messageCount";
+
+    public static final Integer MAXIMUM_CONTROLLER_JOBS_IN_ZK = 100;
+    /**
+     * Segment reload job ZK props
+     */
+    public static final String SEGMENT_RELOAD_JOB_SEGMENT_NAME = "segmentName";
+  }
+
   public static class Segment {
     public static class Realtime {
       public enum Status {

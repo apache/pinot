@@ -128,7 +128,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<IntermediateRe
     }
 
     // Build intermediate result block based on aggregation result from the executor.
-    return new IntermediateResultsBlock(_aggregationFunctions, aggregationResults);
+    return new IntermediateResultsBlock(_aggregationFunctions, aggregationResults, false);
   }
 
   private static Double getMinValue(DataSource dataSource) {

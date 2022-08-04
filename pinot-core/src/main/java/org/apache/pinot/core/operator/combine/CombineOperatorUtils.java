@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.segment.spi.MutableSegment;
 
 
 @SuppressWarnings("rawtypes")
@@ -56,6 +57,8 @@ public class CombineOperatorUtils {
       long threadCpuTimeNs, int numServerThreads) {
     int numSegmentsProcessed = operators.size();
     int numSegmentsMatched = 0;
+    int numConsumingSegmentsProcessed = 0;
+    int numConsumingSegmentsMatched = 0;
     long numDocsScanned = 0;
     long numEntriesScannedInFilter = 0;
     long numEntriesScannedPostFilter = 0;
@@ -65,6 +68,17 @@ public class CombineOperatorUtils {
       if (executionStatistics.getNumDocsScanned() > 0) {
         numSegmentsMatched++;
       }
+      // TODO: Check all operators and properly implement the getIndexSegment and remove this exception handling
+      try {
+        if (operator.getIndexSegment() instanceof MutableSegment) {
+          numConsumingSegmentsProcessed += 1;
+          if (executionStatistics.getNumDocsScanned() > 0) {
+            numConsumingSegmentsMatched++;
+          }
+        }
+      } catch (UnsupportedOperationException ignored) {
+      }
+
       numDocsScanned += executionStatistics.getNumDocsScanned();
       numEntriesScannedInFilter += executionStatistics.getNumEntriesScannedInFilter();
       numEntriesScannedPostFilter += executionStatistics.getNumEntriesScannedPostFilter();
@@ -72,6 +86,8 @@ public class CombineOperatorUtils {
     }
     resultsBlock.setNumSegmentsProcessed(numSegmentsProcessed);
     resultsBlock.setNumSegmentsMatched(numSegmentsMatched);
+    resultsBlock.setNumConsumingSegmentsProcessed(numConsumingSegmentsProcessed);
+    resultsBlock.setNumConsumingSegmentsMatched(numConsumingSegmentsMatched);
     resultsBlock.setNumDocsScanned(numDocsScanned);
     resultsBlock.setNumEntriesScannedInFilter(numEntriesScannedInFilter);
     resultsBlock.setNumEntriesScannedPostFilter(numEntriesScannedPostFilter);

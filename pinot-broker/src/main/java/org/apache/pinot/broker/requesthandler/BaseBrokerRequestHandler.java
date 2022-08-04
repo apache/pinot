@@ -628,7 +628,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Function function = expression.getFunctionCall();
     switch (function.getOperator()) {
       case "datetrunc":
-        String granularString = function.getOperands().get(0).getLiteral().getStringValue();
+        String granularString = function.getOperands().get(0).getLiteral().getStringValue().toUpperCase();
         Expression timeExpression = function.getOperands().get(1);
         if (((function.getOperandsSize() == 2) || (function.getOperandsSize() == 3 && "MILLISECONDS".equalsIgnoreCase(
             function.getOperands().get(2).getLiteral().getStringValue())))
@@ -670,7 +670,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (_queryLogRateLimiter.tryAcquire() || forceLog(brokerResponse, totalTimeMs)) {
       // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
       LOGGER.info("requestId={},table={},timeMs={},docs={}/{},entries={}/{},"
-              + "segments(queried/processed/matched/consuming/unavailable):{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
+              + "segments(queried/processed/matched/consumingQueried/consumingProcessed/consumingMatched/unavailable):"
+              + "{}/{}/{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
               + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},"
               + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},"
               + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},query={}", requestId, tableName,
@@ -678,6 +679,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           brokerResponse.getNumEntriesScannedInFilter(), brokerResponse.getNumEntriesScannedPostFilter(),
           brokerResponse.getNumSegmentsQueried(), brokerResponse.getNumSegmentsProcessed(),
           brokerResponse.getNumSegmentsMatched(), brokerResponse.getNumConsumingSegmentsQueried(),
+          brokerResponse.getNumConsumingSegmentsProcessed(), brokerResponse.getNumConsumingSegmentsMatched(),
           numUnavailableSegments, brokerResponse.getMinConsumingFreshnessTimeMs(),
           brokerResponse.getNumServersResponded(), brokerResponse.getNumServersQueried(),
           brokerResponse.isNumGroupsLimitReached(), requestContext.getReduceTimeMillis(),

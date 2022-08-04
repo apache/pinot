@@ -25,7 +25,7 @@ import org.testng.annotations.Test;
 
 public class PinotConnectionTest {
   private DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
-  private DummyPinotControllerTransport _dummyPinotControllerTransport = new DummyPinotControllerTransport();
+  private DummyPinotControllerTransport _dummyPinotControllerTransport = DummyPinotControllerTransport.create();
 
   @Test
   public void createStatementTest()

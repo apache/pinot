@@ -29,21 +29,20 @@ public class UpsertConfigTest {
 
   @Test
   public void testUpsertConfig() {
-    UpsertConfig upsertConfig1 = new UpsertConfig(UpsertConfig.Mode.FULL, null, null, null, null);
+    UpsertConfig upsertConfig1 = new UpsertConfig(UpsertConfig.Mode.FULL);
     assertEquals(upsertConfig1.getMode(), UpsertConfig.Mode.FULL);
 
-    upsertConfig1 = new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "comparison", null);
+    upsertConfig1.setComparisonColumn("comparison");
     assertEquals(upsertConfig1.getComparisonColumn(), "comparison");
 
-    upsertConfig1 =
-        new UpsertConfig(UpsertConfig.Mode.FULL, null, null, "comparison", HashFunction.MURMUR3);
+    upsertConfig1.setHashFunction(HashFunction.MURMUR3);
     assertEquals(upsertConfig1.getHashFunction(), HashFunction.MURMUR3);
 
+    UpsertConfig upsertConfig2 = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
     partialUpsertStratgies.put("myCol", UpsertConfig.Strategy.INCREMENT);
-    UpsertConfig upsertConfig2 =
-        new UpsertConfig(UpsertConfig.Mode.PARTIAL, partialUpsertStratgies, UpsertConfig.Strategy.OVERWRITE, null,
-            null);
+    upsertConfig2.setPartialUpsertStrategies(partialUpsertStratgies);
+    upsertConfig2.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
     assertEquals(upsertConfig2.getPartialUpsertStrategies(), partialUpsertStratgies);
   }
 }

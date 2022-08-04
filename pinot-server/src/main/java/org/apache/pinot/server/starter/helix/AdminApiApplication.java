@@ -115,6 +115,7 @@ public class AdminApiApplication extends ResourceConfig {
     beanConfig.setDescription("APIs for accessing Pinot server information");
     beanConfig.setContact("https://github.com/apache/pinot");
     beanConfig.setVersion("1.0");
+    beanConfig.setExpandSuperTypes(false);
     if (Boolean.parseBoolean(pinotConfiguration.getProperty(CommonConstants.Server.CONFIG_OF_SWAGGER_USE_HTTPS))) {
       beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL});
     } else {

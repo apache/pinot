@@ -21,6 +21,7 @@ package org.apache.pinot.query.mailbox.channel;
 public class ChannelUtils {
 
   public static final String MAILBOX_METADATA_BUFFER_SIZE_KEY = "buffer.size";
+  public static final String MAILBOX_METADATA_BEGIN_OF_STREAM_KEY = "begin.of.stream";
   public static final String MAILBOX_METADATA_END_OF_STREAM_KEY = "end.of.stream";
 
   private ChannelUtils() {

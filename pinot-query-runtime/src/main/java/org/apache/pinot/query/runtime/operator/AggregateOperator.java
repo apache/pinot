@@ -174,6 +174,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
 
   private AggregationFunction toAggregationFunction(RexExpression aggCall, int aggregationFunctionInputRef) {
     Preconditions.checkState(aggCall instanceof RexExpression.FunctionCall);
+    // TODO(Rong Rong): query options are not supported by the new engine at this moment.
     switch (((RexExpression.FunctionCall) aggCall).getFunctionName()) {
       case "$SUM":
       case "$SUM0":
@@ -182,7 +183,8 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
             ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
       case "$COUNT":
       case "COUNT":
-        return new CountAggregationFunction();
+        return new CountAggregationFunction(
+            ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
       case "$MIN":
       case "$MIN0":
       case "MIN":

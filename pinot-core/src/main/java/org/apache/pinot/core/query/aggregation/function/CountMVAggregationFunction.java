@@ -29,7 +29,6 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class CountMVAggregationFunction extends CountAggregationFunction {
-  private final ExpressionContext _expression;
 
   /**
    * Constructor for the class.
@@ -37,7 +36,8 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
    * @param expression Expression to aggregate on.
    */
   public CountMVAggregationFunction(ExpressionContext expression) {
-    _expression = expression;
+    // TODO(nhejazi): support proper null handling for aggregation functions on MV columns.
+    super(expression);
   }
 
   @Override

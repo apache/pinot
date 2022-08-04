@@ -118,10 +118,10 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
       long longValue = RANDOM.nextLong();
       _longSum = _longSum.add(BigDecimal.valueOf(longValue));
       float floatValue = RANDOM.nextFloat();
-      _floatSum = _floatSum.add(new BigDecimal(Float.toString(floatValue)));
+      _floatSum = _floatSum.add(new BigDecimal(String.valueOf(floatValue)));
       double doubleValue = RANDOM.nextDouble();
       String stringValue = Double.toString(doubleValue);
-      BigDecimal bigDecimalValue = new BigDecimal(stringValue);
+      BigDecimal bigDecimalValue = BigDecimal.valueOf(doubleValue);
       _doubleSum = _doubleSum.add(bigDecimalValue);
       byte[] bytesValue = BigDecimalUtils.serialize(bigDecimalValue);
 

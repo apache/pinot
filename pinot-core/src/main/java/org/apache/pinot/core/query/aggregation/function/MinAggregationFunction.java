@@ -25,16 +25,25 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class MinAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
   private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
+  private final boolean _nullHandlingEnabled;
 
   public MinAggregationFunction(ExpressionContext expression) {
+    this(expression, false);
+  }
+
+  public MinAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   @Override
@@ -44,11 +53,17 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
+    if (_nullHandlingEnabled) {
+      return new ObjectAggregationResultHolder();
+    }
     return new DoubleAggregationResultHolder(DEFAULT_VALUE);
   }
 
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
+    if (_nullHandlingEnabled) {
+      return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
+    }
     return new DoubleGroupByResultHolder(initialCapacity, maxCapacity, DEFAULT_VALUE);
   }
 
@@ -56,6 +71,14 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (_nullHandlingEnabled) {
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+      if (nullBitmap != null && !nullBitmap.isEmpty()) {
+        aggregateNullHandlingEnabled(length, aggregationResultHolder, blockValSet, nullBitmap);
+        return;
+      }
+    }
+
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
         int[] values = blockValSet.getIntValuesSV();
@@ -108,10 +131,111 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
     }
   }
 
+  private void aggregateNullHandlingEnabled(int length, AggregationResultHolder aggregationResultHolder,
+      BlockValSet blockValSet, RoaringBitmap nullBitmap) {
+    switch (blockValSet.getValueType().getStoredType()) {
+      case INT: {
+        if (nullBitmap.getCardinality() < length) {
+          int[] values = blockValSet.getIntValuesSV();
+          int min = Integer.MAX_VALUE;
+          for (int i = 0; i < length & i < values.length; i++) {
+            if (!nullBitmap.contains(i)) {
+              min = Math.min(values[i], min);
+            }
+          }
+          updateAggregationResultHolder(aggregationResultHolder, min);
+        }
+        // Note: when all input values re null (nullBitmap.getCardinality() == values.length), min is null. As a result,
+        // we don't update the value of aggregationResultHolder.
+        break;
+      }
+      case LONG: {
+        if (nullBitmap.getCardinality() < length) {
+          long[] values = blockValSet.getLongValuesSV();
+          long min = Long.MAX_VALUE;
+          for (int i = 0; i < length & i < values.length; i++) {
+            if (!nullBitmap.contains(i)) {
+              min = Math.min(values[i], min);
+            }
+          }
+          updateAggregationResultHolder(aggregationResultHolder, min);
+        }
+        break;
+      }
+      case FLOAT: {
+        if (nullBitmap.getCardinality() < length) {
+          float[] values = blockValSet.getFloatValuesSV();
+          float min = Float.POSITIVE_INFINITY;
+          for (int i = 0; i < length & i < values.length; i++) {
+            if (!nullBitmap.contains(i)) {
+              min = Math.min(values[i], min);
+            }
+          }
+          updateAggregationResultHolder(aggregationResultHolder, min);
+        }
+        break;
+      }
+      case DOUBLE: {
+        if (nullBitmap.getCardinality() < length) {
+          double[] values = blockValSet.getDoubleValuesSV();
+          double min = Double.POSITIVE_INFINITY;
+          for (int i = 0; i < length & i < values.length; i++) {
+            if (!nullBitmap.contains(i)) {
+              min = Math.min(values[i], min);
+            }
+          }
+          updateAggregationResultHolder(aggregationResultHolder, min);
+        }
+        break;
+      }
+      case BIG_DECIMAL: {
+        if (nullBitmap.getCardinality() < length) {
+          BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
+          BigDecimal min = null;
+          for (int i = 0; i < length & i < values.length; i++) {
+            if (!nullBitmap.contains(i)) {
+              min = min == null ? values[i] : values[i].min(min);
+            }
+          }
+          assert min != null;
+          // TODO: even though the source data has BIG_DECIMAL type, we still only support double precision.
+          updateAggregationResultHolder(aggregationResultHolder, min.doubleValue());
+        }
+        break;
+      }
+      default:
+        throw new IllegalStateException("Cannot compute min for non-numeric type: " + blockValSet.getValueType());
+    }
+  }
+
+  private void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, double min) {
+    Double otherMin = aggregationResultHolder.getResult();
+    aggregationResultHolder.setValue(otherMin == null ? min : Math.min(min, otherMin));
+  }
+
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (_nullHandlingEnabled) {
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+      if (nullBitmap != null && !nullBitmap.isEmpty()) {
+        if (nullBitmap.getCardinality() < length) {
+          double[] valueArray = blockValSet.getDoubleValuesSV();
+          for (int i = 0; i < length; i++) {
+            double value = valueArray[i];
+            int groupKey = groupKeyArray[i];
+            Double result = groupByResultHolder.getResult(groupKey);
+            if (!nullBitmap.contains(i) && (result == null || value < result)) {
+              groupByResultHolder.setValueForKey(groupKey, value);
+            }
+          }
+        }
+        return;
+      }
+    }
+
+    double[] valueArray = blockValSet.getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
       int groupKey = groupKeyArray[i];
@@ -137,21 +261,35 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public Double extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+    if (_nullHandlingEnabled) {
+      return aggregationResultHolder.getResult();
+    }
     return aggregationResultHolder.getDoubleResult();
   }
 
   @Override
   public Double extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+    if (_nullHandlingEnabled) {
+      return groupByResultHolder.getResult(groupKey);
+    }
     return groupByResultHolder.getDoubleResult(groupKey);
   }
 
   @Override
-  public Double merge(Double intermediateResult1, Double intermediateResult2) {
-    if (intermediateResult1 < intermediateResult2) {
-      return intermediateResult1;
-    } else {
-      return intermediateResult2;
+  public Double merge(Double intermediateMinResult1, Double intermediateMinResult2) {
+    if (_nullHandlingEnabled) {
+      if (intermediateMinResult1 == null) {
+        return intermediateMinResult2;
+      }
+      if (intermediateMinResult2 == null) {
+        return intermediateMinResult1;
+      }
     }
+
+    if (intermediateMinResult1 < intermediateMinResult2) {
+      return intermediateMinResult1;
+    }
+    return intermediateMinResult2;
   }
 
   @Override

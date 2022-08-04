@@ -28,6 +28,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -53,7 +54,7 @@ import org.slf4j.LoggerFactory;
 public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcBrokerRequestHandler.class);
 
-  private final GrpcQueryClient.Config _grpcConfig;
+  private final GrpcConfig _grpcConfig;
   private final StreamingReduceService _streamingReduceService;
   private final PinotStreamingQueryClient _streamingQueryClient;
 
@@ -63,7 +64,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
       BrokerMetrics brokerMetrics, TlsConfig tlsConfig) {
     super(config, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
     LOGGER.info("Using Grpc BrokerRequestHandler.");
-    _grpcConfig = buildGrpcQueryClientConfig(config);
+    _grpcConfig = GrpcConfig.buildGrpcQueryConfig(config);
 
     // create streaming query client
     _streamingQueryClient = new PinotStreamingQueryClient(_grpcConfig);
@@ -125,16 +126,11 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  // return empty config for now
-  private GrpcQueryClient.Config buildGrpcQueryClientConfig(PinotConfiguration config) {
-    return new GrpcQueryClient.Config();
-  }
-
   public static class PinotStreamingQueryClient {
     private final Map<String, GrpcQueryClient> _grpcQueryClientMap = new ConcurrentHashMap<>();
-    private final GrpcQueryClient.Config _config;
+    private final GrpcConfig _config;
 
-    public PinotStreamingQueryClient(GrpcQueryClient.Config config) {
+    public PinotStreamingQueryClient(GrpcConfig config) {
       _config = config;
     }
 

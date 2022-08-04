@@ -41,6 +41,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.http.Header;
 import org.apache.http.HttpStatus;
@@ -83,11 +84,11 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.function.scalar.StringFunctions.decodeUrl;
-import static org.apache.pinot.common.function.scalar.StringFunctions.encodeUrl;
+import static org.apache.pinot.common.function.scalar.StringFunctions.*;
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.EXTERNAL_VIEW_CHECK_INTERVAL_MS;
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
 import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 /**
@@ -457,7 +458,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(getInvertedIndexColumns());
     updateTableConfig(tableConfig);
-    reloadOfflineTable(getTableName());
+    String reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
@@ -469,6 +470,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to cleanup obsolete index");
+    validateReloadJobSuccess(reloadJobId);
+
     assertEquals(getTableSize(getTableName()), _tableSizeAfterRemovingIndex);
 
     // Add the inverted index back to test index removal via force download.
@@ -525,7 +528,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(getInvertedIndexColumns());
     updateTableConfig(tableConfig);
-    reloadOfflineTable(getTableName(), true);
+    String reloadId = reloadOfflineTableAndValidateResponse(getTableName(), true);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
@@ -539,6 +542,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to cleanup obsolete index in table");
+    validateReloadJobSuccess(reloadJobId);
     // With force download, the table size gets back to the initial value.
     assertEquals(getTableSize(getTableName()), DISK_SIZE_IN_BYTES);
   }
@@ -550,7 +554,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setInvertedIndexColumns(UPDATED_INVERTED_INDEX_COLUMNS);
     updateTableConfig(tableConfig);
-    reloadOfflineTable(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()));
+    String reloadJobId = reloadOfflineTableAndValidateResponse(
+        TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), false);
 
     // It takes a while to reload multiple segments, thus we retry the query for some time.
     // After all segments are reloaded, the inverted index is added on DivActualElapsedTime.
@@ -567,6 +572,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate inverted index");
+    validateReloadJobSuccess(reloadJobId);
   }
 
   @Test
@@ -586,6 +592,124 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  public void testRegexpReplace() throws Exception {
+    // Correctness tests of regexpReplace.
+
+    // Test replace all.
+    String sqlQuery = "SELECT regexpReplace('CA', 'C', 'TEST')";
+    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    String result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "TESTA");
+
+    sqlQuery = "SELECT regexpReplace('foobarbaz', 'b', 'X')";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "fooXarXaz");
+
+    sqlQuery = "SELECT regexpReplace('foobarbaz', 'b', 'XY')";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "fooXYarXYaz");
+
+    sqlQuery = "SELECT regexpReplace('Argentina', '(.)', '$1 ')";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "A r g e n t i n a ");
+
+    sqlQuery = "SELECT regexpReplace('Pinot is  blazing  fast', '( ){2,}', ' ')";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "Pinot is blazing fast");
+
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, and wise','\\w+thy', 'something')";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "something, something, and wise");
+
+    sqlQuery = "SELECT regexpReplace('11234567898','(\\d)(\\d{3})(\\d{3})(\\d{4})', '$1-($2) $3-$4')";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "1-(123) 456-7898");
+
+    // Test replace starting at index.
+
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 4)";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "healthy, something, something and wise");
+
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 1)";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "hsomething, something, something and wise");
+
+
+    // Test occurence
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 2)";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "healthy, wealthy, something and wise");
+
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 0)";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "something, wealthy, stealthy and wise");
+
+    // Test flags
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+tHy', 'something', 0, 0, 'i')";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "something, wealthy, stealthy and wise");
+
+    // Negative test. Pattern match not found.
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+tHy', 'something')";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "healthy, wealthy, stealthy and wise");
+
+    // Negative test. Pattern match not found.
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+tHy', 'something', 3, 21, 'i')";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "healthy, wealthy, stealthy and wise");
+
+    // Negative test - incorrect flag
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+tHy', 'something', 3, 12, 'xyz')";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "healthy, wealthy, stealthy and wise");
+
+    // Test in select clause with column values
+    sqlQuery = "SELECT regexpReplace(DestCityName, ' ', '', 0, -1, 'i') from myTable where OriginState = 'CA'";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      boolean containsSpace = row.get(0).asText().contains(" ");
+      assertEquals(containsSpace, false);
+    }
+
+    // Test in where clause
+    sqlQuery = "SELECT count(*) from myTable where regexpReplace(originState, '[VC]A', 'TEST') = 'TEST'";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    int count1 = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    sqlQuery = "SELECT count(*) from myTable where originState='CA' or originState='VA'";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    int count2 = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertEquals(count1, count2);
+
+    // Test nested transform
+    sqlQuery = "SELECT count(*) from myTable where contains(regexpReplace(originState, '(C)(A)', '$1TEST$2'), "
+        + "'CTESTA')";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    count1 = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    sqlQuery = "SELECT count(*) from myTable where originState='CA'";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    count2 = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertEquals(count1, count2);
+  }
+
+  @Test
   public void testUrlFunc()
       throws Exception {
     String sqlQuery = "SELECT encodeUrl('key1=value 1&key2=value@!$2&key3=value%3'), "
@@ -601,6 +725,178 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  public void testBase64Func()
+      throws Exception {
+
+    // string literal
+    String sqlQuery = "SELECT toBase64(toUtf8('hello!')), " + "fromUtf8(fromBase64('aGVsbG8h')) FROM myTable";
+    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"STRING\"]");
+    JsonNode rows = response.get("resultTable").get("rows");
+
+    String encodedString = rows.get(0).get(0).asText();
+    String expectedEncodedStr = toBase64(toUtf8("hello!"));
+    assertEquals(encodedString, expectedEncodedStr);
+    String decodedString = rows.get(0).get(1).asText();
+    String expectedDecodedStr = fromUtf8(fromBase64("aGVsbG8h"));
+    assertEquals(decodedString, expectedDecodedStr);
+
+    // long string literal encode
+    sqlQuery =
+        "SELECT toBase64(toUtf8('this is a long string that will encode to more than 76 characters using base64')) "
+            + "FROM "
+            + "myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    encodedString = rows.get(0).get(0).asText();
+    assertEquals(encodedString,
+        toBase64(toUtf8("this is a long string that will encode to more than 76 characters using base64")));
+
+    // long string literal decode
+    sqlQuery = "SELECT fromUtf8(fromBase64"
+        + "('dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0"
+        + "')) FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    decodedString = rows.get(0).get(0).asText();
+    assertEquals(decodedString, fromUtf8(fromBase64(
+        "dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0")));
+
+    // non-string literal
+    sqlQuery = "SELECT toBase64(toUtf8(123)), fromUtf8(fromBase64(toBase64(toUtf8(123)))), 123 FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    encodedString = rows.get(0).get(0).asText();
+    decodedString = rows.get(0).get(1).asText();
+    String originalCol = rows.get(0).get(2).asText();
+    assertEquals(decodedString, originalCol);
+    assertEquals(encodedString, toBase64(toUtf8("123")));
+
+    // identifier
+    sqlQuery =
+        "SELECT Carrier, toBase64(toUtf8(Carrier)), fromUtf8(fromBase64(toBase64(toUtf8(Carrier)))), fromBase64"
+            + "(toBase64(toUtf8(Carrier))) FROM myTable LIMIT 100";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"STRING\",\"STRING\",\"BYTES\"]");
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 100);
+    for (int i = 0; i < 100; i++) {
+      String original = rows.get(0).asText();
+      String encoded = rows.get(1).asText();
+      String decoded = rows.get(2).asText();
+      assertEquals(original, decoded);
+      assertEquals(encoded, toBase64(toUtf8(original)));
+      assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
+    }
+
+    // invalid argument
+    sqlQuery = "SELECT toBase64() FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
+
+    // invalid argument
+    sqlQuery = "SELECT fromBase64() FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
+
+    // invalid argument
+    sqlQuery = "SELECT toBase64('hello!') FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("SqlCompilationException"));
+
+    // invalid argument
+    sqlQuery = "SELECT fromBase64('hello!') FROM myTable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
+
+    // string literal used in a filter
+    sqlQuery =
+        "SELECT * FROM myTable WHERE fromUtf8(fromBase64('aGVsbG8h')) != Carrier AND toBase64(toUtf8('hello!')) != "
+        + "Carrier LIMIT 10";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+
+    // non-string literal used in a filter
+    sqlQuery = "SELECT * FROM myTable WHERE fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) != Carrier LIMIT 10";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+
+    // string identifier used in a filter
+    sqlQuery = "SELECT * FROM myTable WHERE fromUtf8(fromBase64(toBase64(toUtf8(Carrier)))) = Carrier LIMIT 10";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+
+    // non-string identifier used in a filter
+    sqlQuery =
+        "SELECT fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))), AirlineID FROM myTable WHERE fromUtf8(fromBase64"
+        + "(toBase64(toUtf8(AirlineID)))) = "
+            + "AirlineID LIMIT 10";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"LONG\"]");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+
+    // string identifier used in group by order by
+    sqlQuery =
+        "SELECT Carrier as originalCol, toBase64(toUtf8(Carrier)) as encoded, fromUtf8(fromBase64(toBase64(toUtf8"
+        + "(Carrier)))) as decoded "
+            + "FROM myTable GROUP BY Carrier, toBase64(toUtf8(Carrier)), fromUtf8(fromBase64(toBase64(toUtf8(Carrier)"
+            + "))) ORDER BY toBase64(toUtf8(Carrier))"
+            + " LIMIT 10";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"STRING\",\"STRING\"]");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      String original = rows.get(0).asText();
+      String encoded = rows.get(1).asText();
+      String decoded = rows.get(2).asText();
+      assertEquals(original, decoded);
+      assertEquals(encoded, toBase64(toUtf8(original)));
+      assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
+    }
+
+    // non-string identifier used in group by order by
+    sqlQuery =
+        "SELECT AirlineID as originalCol, toBase64(toUtf8(AirlineID)) as encoded, fromUtf8(fromBase64(toBase64(toUtf8"
+        + "(AirlineID)))) as decoded "
+            + "FROM myTable GROUP BY AirlineID, toBase64(toUtf8(AirlineID)), fromUtf8(fromBase64(toBase64(toUtf8"
+            + "(AirlineID)))) ORDER BY "
+            + "fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) LIMIT 10";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"LONG\",\"STRING\",\"STRING\"]");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      String original = rows.get(0).asText();
+      String encoded = rows.get(1).asText();
+      String decoded = rows.get(2).asText();
+      assertEquals(original, decoded);
+      assertEquals(encoded, toBase64(toUtf8(original)));
+      assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
+    }
+  }
+
+  @Test
   public void testLiteralOnlyFunc()
       throws Exception {
     long currentTsMin = System.currentTimeMillis();
@@ -608,7 +904,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String sqlQuery =
         "SELECT 1, now() as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as "
             + "today, now(), ago('PT1H'), encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') as encodedUrl, "
-            + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') as decodedUrl";
+            + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') as decodedUrl, toBase64"
+            + "(toUtf8('hello!')) as toBase64, fromUtf8(fromBase64('aGVsbG8h')) as fromBase64";
     JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
     long currentTsMax = System.currentTimeMillis();
     long oneHourAgoTsMax = currentTsMax - ONE_HOUR_IN_MS;
@@ -622,6 +919,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String oneHourAgoColumnName = response.get("resultTable").get("dataSchema").get("columnNames").get(6).asText();
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(7).asText(), "encodedUrl");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(8).asText(), "decodedUrl");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(9).asText(), "toBase64");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(10).asText(), "fromBase64");
     assertTrue(Long.parseLong(nowColumnName) > currentTsMin);
     assertTrue(Long.parseLong(nowColumnName) < currentTsMax);
     assertTrue(Long.parseLong(oneHourAgoColumnName) > oneHourAgoTsMin);
@@ -636,6 +935,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(6).asText(), "LONG");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(7).asText(), "STRING");
     assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(8).asText(), "STRING");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(9).asText(), "STRING");
+    assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(10).asText(), "STRING");
 
     int first = response.get("resultTable").get("rows").get(0).get(0).asInt();
     long second = response.get("resultTable").get("rows").get(0).get(1).asLong();
@@ -659,6 +960,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
     assertEquals(response.get("resultTable").get("rows").get(0).get(8).asText(),
         "key1=value 1&key2=value@!$2&key3=value%3");
+    assertEquals(response.get("resultTable").get("rows").get(0).get(9).asText(),
+        "aGVsbG8h");
+    assertEquals(response.get("resultTable").get("rows").get(0).get(10).asText(),
+        "hello!");
   }
 
   @Test(dependsOnMethods = "testBloomFilterTriggering")
@@ -671,7 +976,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setRangeIndexColumns(UPDATED_RANGE_INDEX_COLUMNS);
     updateTableConfig(tableConfig);
-    reloadOfflineTable(getTableName());
+    String reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse = postQuery(TEST_UPDATED_RANGE_INDEX_QUERY);
@@ -682,13 +987,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate range index");
+    validateReloadJobSuccess(reloadJobId);
 
     // Update table config to remove the new range index, and
     // reload table to clean the new range index physically.
     tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setRangeIndexColumns(getRangeIndexColumns());
     updateTableConfig(tableConfig);
-    reloadOfflineTable(getTableName());
+    reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse = postQuery(TEST_UPDATED_RANGE_INDEX_QUERY);
@@ -700,6 +1006,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to cleanup obsolete index");
+    validateReloadJobSuccess(reloadJobId);
 
     assertEquals(getTableSize(getTableName()), _tableSizeAfterRemovingIndex);
   }
@@ -714,7 +1021,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setBloomFilterColumns(UPDATED_BLOOM_FILTER_COLUMNS);
     updateTableConfig(tableConfig);
-    reloadOfflineTable(getTableName());
+    String reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse = postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY);
@@ -725,13 +1032,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate bloom filter");
+    validateReloadJobSuccess(reloadJobId);
 
     // Update table config to remove the new bloom filter, and
     // reload table to clean the new bloom filter physically.
     tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setBloomFilterColumns(getBloomFilterColumns());
     updateTableConfig(tableConfig);
-    reloadOfflineTable(getTableName());
+    reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
     TestUtils.waitForCondition(aVoid -> {
       try {
         JsonNode queryResponse = postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY);
@@ -743,6 +1051,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to cleanup obsolete index");
+    validateReloadJobSuccess(reloadJobId);
     assertEquals(getTableSize(getTableName()), _tableSizeAfterRemovingIndex);
   }
 
@@ -779,7 +1088,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     indexingConfig.setStarTreeIndexConfigs(Collections.singletonList(STAR_TREE_INDEX_CONFIG_1));
     indexingConfig.setEnableDynamicStarTreeCreation(true);
     updateTableConfig(tableConfig);
-    reloadOfflineTable(getTableName());
+    String reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
 
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -794,9 +1103,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to add first star-tree index");
+    validateReloadJobSuccess(reloadJobId);
 
     // Reload again should have no effect
-    reloadOfflineTable(getTableName());
+    reloadOfflineTableAndValidateResponse(getTableName(), false);
     firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
     assertEquals(firstQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), firstQueryResult);
     assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
@@ -824,7 +1134,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Update table config with a different star-tree index config and trigger reload
     indexingConfig.setStarTreeIndexConfigs(Collections.singletonList(STAR_TREE_INDEX_CONFIG_2));
     updateTableConfig(tableConfig);
-    reloadOfflineTable(getTableName());
+    String reloadId = reloadOfflineTableAndValidateResponse(getTableName(), false);
 
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -839,13 +1149,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to change to second star-tree index");
+    validateReloadJobSuccess(reloadJobId);
 
     // First query should not be able to use the star-tree
     firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
     assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), firstQueryResult);
 
     // Reload again should have no effect
-    reloadOfflineTable(getTableName());
+    reloadOfflineTableAndValidateResponse(getTableName(), false);
     firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
     assertEquals(firstQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), firstQueryResult);
     assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
@@ -870,7 +1181,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Remove the star-tree index config and trigger reload
     indexingConfig.setStarTreeIndexConfigs(null);
     updateTableConfig(tableConfig);
-    reloadOfflineTable(getTableName());
+    reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
 
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -885,6 +1196,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to remove star-tree index");
+    validateReloadJobSuccess(reloadJobId);
     assertEquals(getTableSize(getTableName()), tableSizeWithDefaultIndex);
 
     // First query should not be able to use the star-tree
@@ -892,7 +1204,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), firstQueryResult);
 
     // Reload again should have no effect
-    reloadOfflineTable(getTableName());
+    reloadOfflineTableAndValidateResponse(getTableName(), false);
     firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
     assertEquals(firstQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), firstQueryResult);
     assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
@@ -1029,7 +1341,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     updateTableConfig(tableConfig);
 
     // Trigger reload
-    reloadOfflineTable(getTableName());
+    String reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
 
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -1046,6 +1358,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to add default columns");
+    validateReloadJobSuccess(reloadJobId);
   }
 
   private void reloadWithMissingColumns()
@@ -1067,7 +1380,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     addSchema(schema);
 
     // Trigger reload
-    reloadOfflineTable(getTableName());
+    String reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
 
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -1087,6 +1400,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to skip missing columns");
+    validateReloadJobSuccess(reloadJobId);
   }
 
   private void reloadWithRegularColumns()
@@ -1097,7 +1411,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     addSchema(createSchema());
 
     // Trigger reload
-    reloadOfflineTable(getTableName());
+    String reloadJobId = reloadOfflineTableAndValidateResponse(getTableName(), false);
 
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -1114,6 +1428,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to reload regular columns");
+    validateReloadJobSuccess(reloadJobId);
   }
 
   private void testNewAddedColumns()
@@ -2366,16 +2681,50 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     Assert.assertTrue(resultSet.getLong(1) > 0);
   }
 
-  private java.sql.Connection getJDBCConnectionFromController(int controllerPort) throws Exception {
+  private java.sql.Connection getJDBCConnectionFromController(int controllerPort)
+      throws Exception {
     PinotDriver pinotDriver = new PinotDriver();
     Properties jdbcProps = new Properties();
     return pinotDriver.connect("jdbc:pinot://localhost:" + controllerPort, jdbcProps);
   }
 
-  private java.sql.Connection getJDBCConnectionFromBrokers(int controllerPort, int brokerPort) throws Exception {
+  private java.sql.Connection getJDBCConnectionFromBrokers(int controllerPort, int brokerPort)
+      throws Exception {
     PinotDriver pinotDriver = new PinotDriver();
     Properties jdbcProps = new Properties();
     jdbcProps.put(PinotConnection.BROKER_LIST, "localhost:" + brokerPort);
     return pinotDriver.connect("jdbc:pinot://localhost:" + controllerPort, jdbcProps);
+  }
+
+  private String reloadOfflineTableAndValidateResponse(String tableName, boolean forceDownload)
+      throws IOException {
+    String jobId = null;
+    String response =
+        sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, TableType.OFFLINE, forceDownload),
+            null);
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    JsonNode tableLevelDetails =
+        JsonUtils.stringToJsonNode(StringEscapeUtils.unescapeJava(response.split(": ")[1])).get(tableNameWithType);
+    String isZKWriteSuccess = tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText();
+    assertEquals("SUCCESS", isZKWriteSuccess);
+    jobId = tableLevelDetails.get("reloadJobId").asText();
+    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forControllerJobStatus(jobId));
+    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
+
+    // Validate all fields are present
+    assertEquals(jobStatus.get("metadata").get("jobId").asText(), jobId);
+    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
+    assertEquals(jobStatus.get("metadata").get("tableName").asText(), tableNameWithType);
+    return jobId;
+  }
+
+  private boolean validateReloadJobSuccess(String reloadJobId)
+      throws IOException {
+    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forControllerJobStatus(reloadJobId));
+    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
+
+    assertEquals(jobStatus.get("metadata").get("jobId").asText(), reloadJobId);
+    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
+    return jobStatus.get("totalSegmentCount").asInt() == jobStatus.get("successCount").asInt();
   }
 }
