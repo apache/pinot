@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.executor;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -106,8 +105,9 @@ public class WorkerQueryExecutor {
     if (stageNode instanceof MailboxReceiveNode) {
       MailboxReceiveNode receiveNode = (MailboxReceiveNode) stageNode;
       List<ServerInstance> sendingInstances = metadataMap.get(receiveNode.getSenderStageId()).getServerInstances();
-      return new MailboxReceiveOperator(_mailboxService, receiveNode.getDataSchema(), RelDistribution.Type.ANY,
-          sendingInstances, _hostName, _port, requestId, receiveNode.getSenderStageId());
+      return new MailboxReceiveOperator(_mailboxService, receiveNode.getDataSchema(), sendingInstances,
+          receiveNode.getExchangeType(), receiveNode.getPartitionKeySelector(), _hostName, _port, requestId,
+          receiveNode.getSenderStageId());
     } else if (stageNode instanceof MailboxSendNode) {
       MailboxSendNode sendNode = (MailboxSendNode) stageNode;
       BaseOperator<TransferableBlock> nextOperator = getOperator(requestId, sendNode.getInputs().get(0), metadataMap);
