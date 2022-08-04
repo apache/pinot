@@ -113,12 +113,17 @@ public class StagePlanner {
       RelDistribution.Type exchangeType = distribution.getType();
 
       // 2. make an exchange sender and receiver node pair
+      // only HASH_DISTRIBUTED requires a partition key selector; so all other types (SINGLETON and BROADCAST)
+      // of exchange will not carry a partition key selector.
       KeySelector<Object[], Object[]> keySelector = exchangeType == RelDistribution.Type.HASH_DISTRIBUTED
           ? new FieldSelectionKeySelector(distributionKeys) : null;
 
       StageNode mailboxReceiver;
       StageNode mailboxSender;
       if (canSkipShuffle(nextStageRoot, keySelector)) {
+        // Use SINGLETON exchange type indicates a LOCAL-to-LOCAL data transfer between execution threads.
+        // TODO: actually implement the SINGLETON exchange without going through the over-the-wire GRPC mailbox
+        // sender and receiver.
         mailboxReceiver = new MailboxReceiveNode(currentStageId, nextStageRoot.getDataSchema(),
             nextStageRoot.getStageId(), RelDistribution.Type.SINGLETON, keySelector);
         mailboxSender = new MailboxSendNode(nextStageRoot.getStageId(), nextStageRoot.getDataSchema(),
