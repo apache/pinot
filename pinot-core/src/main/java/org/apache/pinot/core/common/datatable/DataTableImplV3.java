@@ -322,7 +322,7 @@ public class DataTableImplV3 extends BaseDataTable {
         continue;
       }
       String value = entry.getValue();
-      dataOutputStream.writeInt(key.ordinal());
+      dataOutputStream.writeInt(key.getId());
       if (key.getValueType() == MetadataValueType.INT) {
         dataOutputStream.write(Ints.toByteArray(Integer.parseInt(value)));
       } else if (key.getValueType() == MetadataValueType.LONG) {
@@ -353,7 +353,7 @@ public class DataTableImplV3 extends BaseDataTable {
     Map<String, String> metadata = new HashMap<>();
     for (int i = 0; i < numEntries; i++) {
       int keyId = buffer.getInt();
-      MetadataKey key = MetadataKey.getByOrdinal(keyId);
+      MetadataKey key = MetadataKey.getById(keyId);
       // Ignore unknown keys.
       if (key == null) {
         continue;
