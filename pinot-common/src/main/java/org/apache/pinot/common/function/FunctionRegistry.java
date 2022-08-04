@@ -56,7 +56,7 @@ public class FunctionRegistry {
     long startTimeMs = System.currentTimeMillis();
     Reflections reflections = new Reflections(
         new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot"))
-            .filterInputsBy(new FilterBuilder.Include(".*\\.function\\..*"))
+            .filterInputsBy(new FilterBuilder().includePattern(".*\\.function\\..*"))
             .setScanners(new MethodAnnotationsScanner()));
     Set<Method> methodSet = reflections.getMethodsAnnotatedWith(ScalarFunction.class);
     for (Method method : methodSet) {
