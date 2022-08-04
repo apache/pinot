@@ -93,6 +93,11 @@ public class InstancePartitionsUtils {
     return znRecord != null ? InstancePartitions.fromZNRecord(znRecord) : null;
   }
 
+  /**
+   * Gets the instance partitions with the given name, and returns a re-named copy of the same.
+   * This method is useful when we use a table with instancePartitionsMap since in that case
+   * the value of a table's instance partitions are copied over from an existing instancePartitions.
+   */
   public static InstancePartitions fetchInstancePartitionsWithRename(HelixPropertyStore<ZNRecord> propertyStore,
       String instancePartitionsName, String newName) {
     InstancePartitions instancePartitions = fetchInstancePartitions(propertyStore, instancePartitionsName);

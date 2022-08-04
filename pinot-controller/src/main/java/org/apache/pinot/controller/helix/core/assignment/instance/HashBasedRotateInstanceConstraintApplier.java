@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
 public class HashBasedRotateInstanceConstraintApplier implements InstanceConstraintApplier {
   private static final Logger LOGGER = LoggerFactory.getLogger(HashBasedRotateInstanceConstraintApplier.class);
 
-  // Entity could be either a table or table-group
   private final String _tableNameWithType;
 
   public HashBasedRotateInstanceConstraintApplier(String tableNameWithType) {

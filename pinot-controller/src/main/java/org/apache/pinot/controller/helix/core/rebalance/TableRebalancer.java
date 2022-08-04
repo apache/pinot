@@ -422,16 +422,17 @@ public class TableRebalancer {
     boolean hasPreConfiguredInstancePartitions = TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig,
         instancePartitionsType);
     if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
-      if (hasPreConfiguredInstancePartitions) {
-        InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitionsWithRename(
-            _helixManager.getHelixPropertyStore(), tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
-            instancePartitionsType.getInstancePartitionsName(rawTableName));
-        if (!dryRun) {
-          LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
-          InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);
+      if (reassignInstances) {
+        if (hasPreConfiguredInstancePartitions) {
+          InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitionsWithRename(
+              _helixManager.getHelixPropertyStore(), tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
+              instancePartitionsType.getInstancePartitionsName(rawTableName));
+          if (!dryRun) {
+            LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
+            InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);
+          }
+          return instancePartitions;
         }
-        return instancePartitions;
-      } else if (reassignInstances) {
         InstancePartitions existingInstancePartitions =
             InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
                 InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,

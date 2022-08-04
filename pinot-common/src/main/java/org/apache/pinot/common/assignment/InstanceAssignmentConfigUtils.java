@@ -34,7 +34,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 
 
 public class InstanceAssignmentConfigUtils {
-
   private InstanceAssignmentConfigUtils() {
   }
 

@@ -64,8 +64,7 @@ public class InstanceTagPoolSelector {
     candidateInstanceConfigs.sort(Comparator.comparing(InstanceConfig::getInstanceName));
     int numCandidateInstances = candidateInstanceConfigs.size();
     Preconditions.checkState(numCandidateInstances > 0, "No enabled instance has the tag: %s", tag);
-    LOGGER.info("{} enabled instances have the tag: {} for table: {}", numCandidateInstances, tag,
-        _tableNameWithType);
+    LOGGER.info("{} enabled instances have the tag: {} for table: {}", numCandidateInstances, tag, _tableNameWithType);
 
     Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = new TreeMap<>();
     if (_tagPoolConfig.isPoolBased()) {
