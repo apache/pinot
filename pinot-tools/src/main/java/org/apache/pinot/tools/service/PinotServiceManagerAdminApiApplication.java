@@ -58,9 +58,7 @@ public class PinotServiceManagerAdminApiApplication extends ResourceConfig {
     Preconditions.checkArgument(httpPort > 0);
     _baseUri = URI.create("http://0.0.0.0:" + httpPort + "/");
     _httpServer = GrizzlyHttpServerFactory.createHttpServer(_baseUri, this);
-    synchronized (PinotReflectionUtils.getReflectionLock()) {
-      setupSwagger();
-    }
+    PinotReflectionUtils.runWithLock(this::setupSwagger);
   }
 
   private void setupSwagger() {
