@@ -101,15 +101,13 @@ public class AdminApiApplication extends ResourceConfig {
     if (pinotConfiguration.getProperty(CommonConstants.Server.CONFIG_OF_SWAGGER_SERVER_ENABLED,
         CommonConstants.Server.DEFAULT_SWAGGER_SERVER_ENABLED)) {
       LOGGER.info("Starting swagger for the Pinot server.");
-      synchronized (PinotReflectionUtils.getReflectionLock()) {
-        setupSwagger(_httpServer, pinotConfiguration);
-      }
+      PinotReflectionUtils.runWithLock(() -> setupSwagger(pinotConfiguration));
     }
     _started = true;
     return true;
   }
 
-  private void setupSwagger(HttpServer httpServer, PinotConfiguration pinotConfiguration) {
+  private void setupSwagger(PinotConfiguration pinotConfiguration) {
     BeanConfig beanConfig = new BeanConfig();
     beanConfig.setTitle("Pinot Server API");
     beanConfig.setDescription("APIs for accessing Pinot server information");
@@ -132,13 +130,13 @@ public class AdminApiApplication extends ResourceConfig {
     CLStaticHttpHandler staticHttpHandler =
         new CLStaticHttpHandler(AdminApiApplication.class.getClassLoader(), "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/api/");
-    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/help/");
+    _httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/api/");
+    _httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/help/");
 
     URL swaggerDistLocation =
         AdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/3.23.11/");
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
-    httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
+    _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
 
   public void stop() {
