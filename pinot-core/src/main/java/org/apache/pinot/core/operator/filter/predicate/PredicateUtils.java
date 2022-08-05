@@ -76,7 +76,7 @@ public class PredicateUtils {
     IntSet dictIdSet = new IntOpenHashSet(hashSetSize);
     switch (dataType.getStoredType()) {
       case INT:
-        int[] intValues = inPredicate.getIntValues();
+        int[] intValues = dataType == DataType.BOOLEAN ? inPredicate.getBooleanValues() : inPredicate.getIntValues();
         for (int value : intValues) {
           int dictId = dictionary.indexOf(value);
           if (dictId >= 0) {
