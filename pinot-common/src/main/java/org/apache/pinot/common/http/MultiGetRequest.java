@@ -97,7 +97,8 @@ public class MultiGetRequest {
    * @return instance of CompletionService. Completion service will provide
    *   results as they arrive. The order is NOT same as the order of URLs
    */
-  public CompletionService<GetMethod> execute(List<String> urls, @Nullable Map<String, String> requestHeaders, int timeoutMs) {
+  public CompletionService<GetMethod> execute(List<String> urls, @Nullable Map<String, String> requestHeaders,
+      int timeoutMs) {
     HttpClientParams clientParams = new HttpClientParams();
     clientParams.setConnectionManagerTimeout(timeoutMs);
     HttpClient client = new HttpClient(clientParams, _connectionManager);
