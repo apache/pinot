@@ -393,7 +393,7 @@ public class TableDebugResource {
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, null, timeoutMs);
+        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
 
     // Map from InstanceName -> <Segment -> DebugInfo>
     Map<String, Map<String, SegmentServerDebugInfo>> serverToSegmentDebugInfoMap = new HashMap<>();

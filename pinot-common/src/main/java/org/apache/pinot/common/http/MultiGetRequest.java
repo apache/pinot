@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorCompletionService;
+import javax.annotation.Nullable;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.methods.GetMethod;
@@ -91,11 +92,12 @@ public class MultiGetRequest {
   /**
    * GET urls in parallel using the executor service.
    * @param urls absolute URLs to GET
+   * @param requestHeaders headers to set when making the request
    * @param timeoutMs timeout in milliseconds for each GET request
    * @return instance of CompletionService. Completion service will provide
    *   results as they arrive. The order is NOT same as the order of URLs
    */
-  public CompletionService<GetMethod> execute(List<String> urls, Map<String, String> requestHeaders, int timeoutMs) {
+  public CompletionService<GetMethod> execute(List<String> urls, @Nullable Map<String, String> requestHeaders, int timeoutMs) {
     HttpClientParams clientParams = new HttpClientParams();
     clientParams.setConnectionManagerTimeout(timeoutMs);
     HttpClient client = new HttpClient(clientParams, _connectionManager);
