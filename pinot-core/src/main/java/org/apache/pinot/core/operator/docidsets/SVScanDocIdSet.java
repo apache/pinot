@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.docidsets;
 import org.apache.pinot.core.operator.dociditerators.SVScanDocIdIterator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 
 public final class SVScanDocIdSet implements FilterBlockDocIdSet {
@@ -28,12 +29,9 @@ public final class SVScanDocIdSet implements FilterBlockDocIdSet {
 
   public SVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
       boolean nullHandlingEnabled) {
-    if (nullHandlingEnabled) {
-      _docIdIterator = new SVScanDocIdIterator(predicateEvaluator, dataSource.getForwardIndex(), numDocs,
-          dataSource.getNullValueVector());
-    } else {
-      _docIdIterator = new SVScanDocIdIterator(predicateEvaluator, dataSource.getForwardIndex(), numDocs, null);
-    }
+    NullValueVectorReader nullValueVector = nullHandlingEnabled ? dataSource.getNullValueVector() : null;
+    _docIdIterator = new SVScanDocIdIterator(
+        predicateEvaluator, dataSource.getForwardIndex(), numDocs, nullValueVector);
   }
 
   @Override
