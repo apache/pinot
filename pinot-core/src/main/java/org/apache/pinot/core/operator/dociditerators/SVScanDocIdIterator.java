@@ -180,12 +180,50 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   private static class MatcherUtils {
-    public static int removeNullDocs(int[] docIds, int limit, ImmutableRoaringBitmap nullBitmap) {
+    public static int removeNullDocs(int[] docIds, int[] values, int limit, ImmutableRoaringBitmap nullBitmap) {
       assert !nullBitmap.isEmpty();
       int copyToIdx = 0;
       for (int i = 0; i < limit; i++) {
         if (!nullBitmap.contains(docIds[i])) {
-          docIds[copyToIdx++] = docIds[i];
+          // Compact non-null entries into the prefix of the docIds and values arrays.
+          docIds[copyToIdx] = docIds[i];
+          values[copyToIdx++] = values[i];
+        }
+      }
+      return copyToIdx;
+    }
+
+    public static int removeNullDocs(int[] docIds, long[] values, int limit, ImmutableRoaringBitmap nullBitmap) {
+      assert !nullBitmap.isEmpty();
+      int copyToIdx = 0;
+      for (int i = 0; i < limit; i++) {
+        if (!nullBitmap.contains(docIds[i])) {
+          docIds[copyToIdx] = docIds[i];
+          values[copyToIdx++] = values[i];
+        }
+      }
+      return copyToIdx;
+    }
+
+    public static int removeNullDocs(int[] docIds, float[] values, int limit, ImmutableRoaringBitmap nullBitmap) {
+      assert !nullBitmap.isEmpty();
+      int copyToIdx = 0;
+      for (int i = 0; i < limit; i++) {
+        if (!nullBitmap.contains(docIds[i])) {
+          docIds[copyToIdx] = docIds[i];
+          values[copyToIdx++] = values[i];
+        }
+      }
+      return copyToIdx;
+    }
+
+    public static int removeNullDocs(int[] docIds, double[] values, int limit, ImmutableRoaringBitmap nullBitmap) {
+      assert !nullBitmap.isEmpty();
+      int copyToIdx = 0;
+      for (int i = 0; i < limit; i++) {
+        if (!nullBitmap.contains(docIds[i])) {
+          docIds[copyToIdx] = docIds[i];
+          values[copyToIdx++] = values[i];
         }
       }
       return copyToIdx;
@@ -228,9 +266,9 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     @Override
     public int matchValues(int limit, int[] docIds) {
       _reader.readDictIds(docIds, limit, _buffer, _readerContext);
-      int newLimit = MatcherUtils.removeNullDocs(docIds, limit, _nullBitmap);
+      int newLimit = MatcherUtils.removeNullDocs(docIds, _buffer, limit, _nullBitmap);
       assert newLimit < limit;
-      return _predicateEvaluator.applySV(limit, docIds, _buffer);
+      return _predicateEvaluator.applySV(newLimit, docIds, _buffer);
     }
   }
 
@@ -272,7 +310,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     @Override
     public int matchValues(int limit, int[] docIds) {
       _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
-      int newLimit = MatcherUtils.removeNullDocs(docIds, limit, _nullBitmap);
+      int newLimit = MatcherUtils.removeNullDocs(docIds, _buffer, limit, _nullBitmap);
       assert newLimit < limit;
       return _predicateEvaluator.applySV(newLimit, docIds, _buffer);
     }
@@ -314,9 +352,9 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     @Override
     public int matchValues(int limit, int[] docIds) {
       _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
-      int newLimit = MatcherUtils.removeNullDocs(docIds, limit, _nullBitmap);
+      int newLimit = MatcherUtils.removeNullDocs(docIds, _buffer, limit, _nullBitmap);
       assert newLimit < limit;
-      return _predicateEvaluator.applySV(limit, docIds, _buffer);
+      return _predicateEvaluator.applySV(newLimit, docIds, _buffer);
     }
   }
 
@@ -356,9 +394,9 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     @Override
     public int matchValues(int limit, int[] docIds) {
       _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
-      int newLimit = MatcherUtils.removeNullDocs(docIds, limit, _nullBitmap);
+      int newLimit = MatcherUtils.removeNullDocs(docIds, _buffer, limit, _nullBitmap);
       assert newLimit < limit;
-      return _predicateEvaluator.applySV(limit, docIds, _buffer);
+      return _predicateEvaluator.applySV(newLimit, docIds, _buffer);
     }
   }
 
@@ -398,9 +436,9 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     @Override
     public int matchValues(int limit, int[] docIds) {
       _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
-      int newLimit = MatcherUtils.removeNullDocs(docIds, limit, _nullBitmap);
+      int newLimit = MatcherUtils.removeNullDocs(docIds, _buffer, limit, _nullBitmap);
       assert newLimit < limit;
-      return _predicateEvaluator.applySV(limit, docIds, _buffer);
+      return _predicateEvaluator.applySV(newLimit, docIds, _buffer);
     }
   }
 

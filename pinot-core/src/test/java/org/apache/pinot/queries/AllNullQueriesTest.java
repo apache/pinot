@@ -288,6 +288,19 @@ public class AllNullQueriesTest extends BaseQueriesTest {
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put("enableNullHandling", "true");
     DataType dataType = columnDataType.toDataType();
+    {
+      String query = String.format("SELECT %s FROM testTable WHERE %s is null limit 5000", COLUMN_NAME, COLUMN_NAME);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{columnDataType}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 4000);
+      for (Object[] row : rows) {
+        assertNull(row[0]);
+      }
+    }
     if (columnDataType != ColumnDataType.STRING) {
       {
         String query = String.format(
@@ -482,6 +495,26 @@ public class AllNullQueriesTest extends BaseQueriesTest {
       assertEquals(rows.size(), 0);
     }
     if (columnDataType != ColumnDataType.STRING) {
+      {
+        String query = String.format("SELECT COUNT(%s) AS count, MIN(%s) AS min, MAX(%s) AS max, SUM(%s) AS sum" + " "
+                + "FROM testTable GROUP BY %s ORDER BY max", COLUMN_NAME, COLUMN_NAME, COLUMN_NAME, COLUMN_NAME,
+            COLUMN_NAME);
+        BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+        ResultTable resultTable = brokerResponse.getResultTable();
+        DataSchema dataSchema = resultTable.getDataSchema();
+        assertEquals(dataSchema, new DataSchema(new String[]{"count", "min", "max", "sum"}, new ColumnDataType[]{
+            ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
+        }));
+        List<Object[]> rows = resultTable.getRows();
+        assertEquals(rows.size(), 1);
+        Object[] row = rows.get(0);
+        assertEquals(row.length, 4);
+        // Count(column) return 0 if all values are nulls.
+        assertEquals(row[0], 0L);
+        assertNull(row[1]);
+        assertNull(row[2]);
+        assertNull(row[3]);
+      }
       {
         String query = String.format(
             "SELECT AVG(%s) AS avg FROM testTable GROUP BY %s ORDER BY avg LIMIT 20", COLUMN_NAME, COLUMN_NAME);

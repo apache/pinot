@@ -195,6 +195,21 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       }
     }
     {
+        String query = "SELECT booleanColumn FROM testTable WHERE booleanColumn";
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{"booleanColumn"}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 10);
+      for (int i = 0; i < 10; i++) {
+        Object[] row = rows.get(i);
+        assertEquals(row.length, 1);
+        assertEquals(row[0], true);
+      }
+    }
+    {
       String query = "SELECT * FROM testTable ORDER BY booleanColumn DESC LIMIT 4000";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();

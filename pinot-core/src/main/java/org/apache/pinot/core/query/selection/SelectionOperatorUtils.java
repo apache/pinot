@@ -431,30 +431,31 @@ public class SelectionOperatorUtils {
     List<Object[]> rows = new ArrayList<>(Math.min(limit, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
     for (DataTable dataTable : dataTables) {
       int numColumns = dataTable.getDataSchema().size();
-      RoaringBitmap[] nullBitmaps = null;
+      int numRows = dataTable.getNumberOfRows();
       if (nullHandlingEnabled) {
-        nullBitmaps = new RoaringBitmap[numColumns];;
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];;
         for (int coldId = 0; coldId < numColumns; coldId++) {
           nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
         }
-      }
-
-      int numRows = dataTable.getNumberOfRows();
-      for (int rowId = 0; rowId < numRows; rowId++) {
-        if (rows.size() < limit) {
-          rows.add(extractRowFromDataTable(dataTable, rowId));
-        } else {
-          break;
-        }
-      }
-
-      if (nullHandlingEnabled) {
         for (int rowId = 0; rowId < numRows; rowId++) {
-          Object[] row = rows.get(rowId);
-          for (int colId = 0; colId < numColumns; colId++) {
-            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
-              row[colId] = null;
+          if (rows.size() < limit) {
+            Object[] row = extractRowFromDataTable(dataTable, rowId);
+            for (int colId = 0; colId < numColumns; colId++) {
+              if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+                row[colId] = null;
+              }
             }
+            rows.add(row);
+          } else {
+            break;
+          }
+        }
+      } else {
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          if (rows.size() < limit) {
+            rows.add(extractRowFromDataTable(dataTable, rowId));
+          } else {
+            break;
           }
         }
       }
