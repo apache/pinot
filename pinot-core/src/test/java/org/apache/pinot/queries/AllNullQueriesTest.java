@@ -301,6 +301,17 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         assertNull(row[0]);
       }
     }
+    {
+      String query = String.format("SELECT %s FROM testTable WHERE %s is not null limit 5000",
+          COLUMN_NAME, COLUMN_NAME);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{columnDataType}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 0);
+    }
     if (columnDataType != ColumnDataType.STRING) {
       {
         String query = String.format(
