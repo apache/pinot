@@ -79,7 +79,7 @@ public class ServerSegmentMetadataReader {
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
+        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, null, timeoutMs);
 
     long totalDiskSizeInBytes = 0;
     int totalNumSegments = 0;
@@ -148,7 +148,7 @@ public class ServerSegmentMetadataReader {
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, true, timeoutMs);
+        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, true, null, timeoutMs);
     List<String> segmentsMetadata = new ArrayList<>();
 
     int failedParses = 0;

@@ -649,7 +649,7 @@ public class PinotSegmentRestletResource {
     }
 
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
+        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, null, 10000);
 
     ServerReloadControllerJobStatusResponse serverReloadControllerJobStatusResponse =
         new ServerReloadControllerJobStatusResponse();

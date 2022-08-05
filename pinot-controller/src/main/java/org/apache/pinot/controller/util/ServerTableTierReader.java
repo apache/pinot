@@ -67,7 +67,7 @@ public class ServerTableTierReader {
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
+        completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, null, timeoutMs);
     Map<String, TableTierInfo> serverToTableTierInfoMap = new HashMap<>();
     int failedParses = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {

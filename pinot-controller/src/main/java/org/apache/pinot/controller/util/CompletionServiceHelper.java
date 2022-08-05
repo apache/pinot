@@ -67,12 +67,12 @@ public class CompletionServiceHelper {
    * multiRequestPerServer is true) to the response from that endpoint.
    */
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
-      boolean multiRequestPerServer, int timeoutMs) {
+      boolean multiRequestPerServer, Map<String, String> requestHeaders, int timeoutMs) {
     CompletionServiceResponse completionServiceResponse = new CompletionServiceResponse();
 
     // TODO: use some service other than completion service so that we know which server encounters the error
     CompletionService<GetMethod> completionService =
-        new MultiGetRequest(_executor, _httpConnectionManager).execute(serverURLs, timeoutMs);
+        new MultiGetRequest(_executor, _httpConnectionManager).execute(serverURLs, requestHeaders, timeoutMs);
     for (int i = 0; i < serverURLs.size(); i++) {
       GetMethod getMethod = null;
       try {
