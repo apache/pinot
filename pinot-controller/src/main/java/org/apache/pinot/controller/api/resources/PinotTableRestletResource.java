@@ -418,7 +418,10 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Deletes a table", notes = "Deletes a table")
   public SuccessResponse deleteTable(
       @ApiParam(value = "Name of the table to delete", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
+          + "will default to the first config that's not null: the cluster setting, then '7d'. Using 0d or -1d will "
+          + "instantly delete segments without retention") @QueryParam("retention") String retentionPeriod) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
 
     List<String> tablesDeleted = new LinkedList<>();
@@ -428,7 +431,7 @@ public class PinotTableRestletResource {
         tableExist = _pinotHelixResourceManager.hasOfflineTable(tableName);
         // Even the table name does not exist, still go on to delete remaining table metadata in case a previous delete
         // did not complete.
-        _pinotHelixResourceManager.deleteOfflineTable(tableName);
+        _pinotHelixResourceManager.deleteOfflineTable(tableName, retentionPeriod);
         if (tableExist) {
           tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
         }
@@ -437,7 +440,7 @@ public class PinotTableRestletResource {
         tableExist = _pinotHelixResourceManager.hasRealtimeTable(tableName);
         // Even the table name does not exist, still go on to delete remaining table metadata in case a previous delete
         // did not complete.
-        _pinotHelixResourceManager.deleteRealtimeTable(tableName);
+        _pinotHelixResourceManager.deleteRealtimeTable(tableName, retentionPeriod);
         if (tableExist) {
           tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
         }
