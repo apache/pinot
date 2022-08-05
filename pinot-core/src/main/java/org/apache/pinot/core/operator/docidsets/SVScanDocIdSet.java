@@ -32,7 +32,7 @@ public final class SVScanDocIdSet implements FilterBlockDocIdSet {
       _docIdIterator = new SVScanDocIdIterator(predicateEvaluator, dataSource.getForwardIndex(), numDocs,
           dataSource.getNullValueVector());
     } else {
-      _docIdIterator = new SVScanDocIdIterator(predicateEvaluator, dataSource.getForwardIndex(), numDocs);
+      _docIdIterator = new SVScanDocIdIterator(predicateEvaluator, dataSource.getForwardIndex(), numDocs, null);
     }
   }
 
