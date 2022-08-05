@@ -93,9 +93,9 @@ const TaskQueueTable = (props) => {
     const detail = await PinotMethodUtils.getScheduleJobDetail(tableName, taskType);
     const tableDetailRes = await PinotMethodUtils.getTableDetails(tableName);
     const taskGeneratorDebugData = await PinotMethodUtils.getTaskGeneratorDebugData(tableName, taskType);
-    const mostRecentSuccessRunTS = get(taskGeneratorDebugData, 'data.0.mostRecentErrorRunMessage', {});
-    const mostRecentSuccessRunTSLastTime = last(keys(mostRecentSuccessRunTS).sort());
-    setMostRecentErrorRunMessage(get(mostRecentSuccessRunTS, mostRecentSuccessRunTSLastTime, ''));
+    const mostRecentErrorRunMessagesTS = get(taskGeneratorDebugData, 'data.0.mostRecentErrorRunMessages', {});
+    const mostRecentErrorRunMessagesTSLastTime = last(keys(mostRecentErrorRunMessagesTS).sort());
+    setMostRecentErrorRunMessage(get(mostRecentErrorRunMessagesTS, mostRecentErrorRunMessagesTSLastTime, ''));
     setTableDetail(tableDetailRes);
     setJobDetail(detail);
     setFetching(false);
