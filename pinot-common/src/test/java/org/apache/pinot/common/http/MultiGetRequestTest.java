@@ -116,7 +116,7 @@ public class MultiGetRequestTest {
     // timeout value needs to be less than 5000ms set above for
     // third server
     final int requestTimeoutMs = 1000;
-    CompletionService<GetMethod> completionService = mget.execute(urls, requestTimeoutMs);
+    CompletionService<GetMethod> completionService = mget.execute(urls, null, requestTimeoutMs);
     int success = 0;
     int errors = 0;
     int timeouts = 0;
