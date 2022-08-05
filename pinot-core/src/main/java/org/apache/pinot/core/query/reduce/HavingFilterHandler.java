@@ -29,10 +29,6 @@ import org.apache.pinot.core.query.reduce.filter.RowMatcherFactory;
 public class HavingFilterHandler {
   private final RowMatcher _rowMatcher;
 
-  public HavingFilterHandler(FilterContext havingFilter, PostAggregationHandler postAggregationHandler) {
-    _rowMatcher = RowMatcherFactory.getRowMatcher(havingFilter, postAggregationHandler, false);
-  }
-
   public HavingFilterHandler(FilterContext havingFilter, PostAggregationHandler postAggregationHandler,
       boolean nullHandlingEnabled) {
     _rowMatcher = RowMatcherFactory.getRowMatcher(havingFilter, postAggregationHandler, nullHandlingEnabled);
