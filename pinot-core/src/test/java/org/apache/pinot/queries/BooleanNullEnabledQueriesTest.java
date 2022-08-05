@@ -255,6 +255,48 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       }
     }
     {
+      String query = String.format("SELECT %s FROM testTable WHERE %s not in (true) LIMIT 5000",
+          BOOLEAN_COLUMN, BOOLEAN_COLUMN);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), _falseValuesCount * 4);
+      for (Object[] row : rows) {
+        assertFalse((boolean) row[0]);
+      }
+    }
+    {
+      String query = String.format("SELECT %s FROM testTable WHERE %s in (1) LIMIT 5000",
+          BOOLEAN_COLUMN, BOOLEAN_COLUMN);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), _trueValuesCount * 4);
+      for (Object[] row : rows) {
+        assertTrue((boolean) row[0]);
+      }
+    }
+    {
+      String query = String.format("SELECT %s FROM testTable WHERE %s in (false) LIMIT 5000",
+          BOOLEAN_COLUMN, BOOLEAN_COLUMN);
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), _falseValuesCount * 4);
+      for (Object[] row : rows) {
+        assertFalse((boolean) row[0]);
+      }
+    }
+    {
       String query = String.format("SELECT %s FROM testTable WHERE %s != true LIMIT 5000",
           BOOLEAN_COLUMN, BOOLEAN_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);

@@ -42,12 +42,8 @@ public class RowMatcherFactory {
         assert filter.getChildren().size() == 1;
         return new NotRowMatcher(filter.getChildren().get(0), valueExtractorFactory, nullHandlingEnabled);
       case PREDICATE:
-        if (nullHandlingEnabled) {
-          return new PredicateRowMatcherAndNullHandler(filter.getPredicate(),
-              valueExtractorFactory.getValueExtractor(filter.getPredicate().getLhs()));
-        }
         return new PredicateRowMatcher(filter.getPredicate(),
-            valueExtractorFactory.getValueExtractor(filter.getPredicate().getLhs()));
+            valueExtractorFactory.getValueExtractor(filter.getPredicate().getLhs()), nullHandlingEnabled);
       default:
         throw new IllegalStateException();
     }

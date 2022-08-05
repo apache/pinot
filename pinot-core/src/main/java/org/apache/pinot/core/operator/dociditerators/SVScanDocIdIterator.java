@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -49,14 +50,21 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
-  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs,
-      NullValueVectorReader nullValueReader, boolean nullHandlingEnabled) {
+  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs) {
     _predicateEvaluator = predicateEvaluator;
     _reader = reader;
     _readerContext = reader.createContext();
     _numDocs = numDocs;
-    ImmutableRoaringBitmap nullBitmap = nullHandlingEnabled && nullValueReader != null
-        ? nullValueReader.getNullBitmap() : null;
+    _valueMatcher = getValueMatcher(null);
+  }
+
+  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs,
+      @Nullable NullValueVectorReader nullValueReader) {
+    _predicateEvaluator = predicateEvaluator;
+    _reader = reader;
+    _readerContext = reader.createContext();
+    _numDocs = numDocs;
+    ImmutableRoaringBitmap nullBitmap = nullValueReader != null ? nullValueReader.getNullBitmap() : null;
     if (nullBitmap != null && nullBitmap.isEmpty()) {
       nullBitmap = null;
     }
@@ -129,7 +137,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     return _numEntriesScanned;
   }
 
-  private ValueMatcher getValueMatcher(ImmutableRoaringBitmap nullBitmap) {
+  private ValueMatcher getValueMatcher(@Nullable ImmutableRoaringBitmap nullBitmap) {
     if (_reader.isDictionaryEncoded()) {
       return nullBitmap == null ? new DictIdMatcher() : new DictIdMatcherAndNullHandler(nullBitmap);
     } else {
@@ -257,6 +265,9 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesValueMatch(int docId) {
+      // Any comparison (equality, inequality, or membership) with null results in false (similar to Presto) even if
+      // the compared with value is null, and comparison is equality.
+      // To consider nulls, use: IS NULL, or IS NOT NULL operators.
       if (_nullBitmap.contains(docId)) {
         return false;
       }
@@ -300,8 +311,6 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     @Override
     public boolean doesValueMatch(int docId) {
       if (_nullBitmap.contains(docId)) {
-        // Any comparison (equality, inequality, or membership) with null results in false (similar to Presto) even if
-        // the compared with value is null, and comparison is equality.
         return false;
       }
       return _predicateEvaluator.applySV(_reader.getInt(docId, _readerContext));
