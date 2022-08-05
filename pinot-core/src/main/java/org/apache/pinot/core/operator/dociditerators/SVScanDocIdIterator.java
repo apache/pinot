@@ -270,8 +270,6 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     public int matchValues(int limit, int[] docIds) {
       _reader.readDictIds(docIds, limit, _buffer, _readerContext);
       int newLimit = MatcherUtils.removeNullDocs(docIds, _buffer, limit, _nullBitmap);
-      // docIds might not be all documents, so there is no guarantee there are null docs in the docIds.
-      assert newLimit <= limit;
       return _predicateEvaluator.applySV(newLimit, docIds, _buffer);
     }
   }
@@ -313,7 +311,6 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     public int matchValues(int limit, int[] docIds) {
       _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
       int newLimit = MatcherUtils.removeNullDocs(docIds, _buffer, limit, _nullBitmap);
-      assert newLimit <= limit;
       return _predicateEvaluator.applySV(newLimit, docIds, _buffer);
     }
   }
@@ -355,7 +352,6 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     public int matchValues(int limit, int[] docIds) {
       _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
       int newLimit = MatcherUtils.removeNullDocs(docIds, _buffer, limit, _nullBitmap);
-      assert newLimit <= limit;
       return _predicateEvaluator.applySV(newLimit, docIds, _buffer);
     }
   }
@@ -397,7 +393,6 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     public int matchValues(int limit, int[] docIds) {
       _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
       int newLimit = MatcherUtils.removeNullDocs(docIds, _buffer, limit, _nullBitmap);
-      assert newLimit <= limit;
       return _predicateEvaluator.applySV(newLimit, docIds, _buffer);
     }
   }
@@ -439,7 +434,6 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     public int matchValues(int limit, int[] docIds) {
       _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
       int newLimit = MatcherUtils.removeNullDocs(docIds, _buffer, limit, _nullBitmap);
-      assert newLimit <= limit;
       return _predicateEvaluator.applySV(newLimit, docIds, _buffer);
     }
   }
