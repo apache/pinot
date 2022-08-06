@@ -1704,7 +1704,8 @@ public class PinotHelixResourceManager {
           instancePartitions = InstancePartitionsUtils.fetchInstancePartitionsWithRename(_propertyStore,
               tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
               instancePartitionsType.getInstancePartitionsName(rawTableName));
-          LOGGER.info("Persisting instance partitions: {}", instancePartitions);
+          LOGGER.info("Persisting instance partitions: {} (referencing {})", instancePartitions,
+              tableConfig.getInstancePartitionsMap().get(instancePartitionsType));
           InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
         }
       }

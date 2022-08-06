@@ -568,13 +568,11 @@ public final class TableConfigUtils {
    */
   @VisibleForTesting
   static void validateInstancePartitionsTypeMapConfig(TableConfig tableConfig) {
-    if (!org.apache.pinot.common.utils.config.TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig)) {
+    if (MapUtils.isEmpty(tableConfig.getInstancePartitionsMap())
+        || MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
       return;
     }
     for (InstancePartitionsType instancePartitionsType : tableConfig.getInstancePartitionsMap().keySet()) {
-      if (tableConfig.getInstanceAssignmentConfigMap() == null) {
-        break;
-      }
       Preconditions.checkState(!tableConfig.getInstanceAssignmentConfigMap().containsKey(instancePartitionsType),
           String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap set for %s",
               instancePartitionsType));

@@ -310,7 +310,7 @@ public class TableConfigUtils {
    * Returns true if the table has pre-configured instance partitions for any type (OFFLINE/CONSUMING/COMPLETED).
    */
   public static boolean hasPreConfiguredInstancePartitions(TableConfig tableConfig) {
-    return tableConfig.getInstancePartitionsMap() != null && tableConfig.getInstancePartitionsMap().size() > 0;
+    return MapUtils.isNotEmpty(tableConfig.getInstancePartitionsMap());
   }
 
   /**

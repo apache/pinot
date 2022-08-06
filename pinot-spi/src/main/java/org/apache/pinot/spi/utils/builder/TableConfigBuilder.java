@@ -108,6 +108,7 @@ public class TableConfigBuilder {
   private RoutingConfig _routingConfig;
   private QueryConfig _queryConfig;
   private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
+  private Map<InstancePartitionsType, String> _instancePartitionsMap;
   private List<FieldConfig> _fieldConfigList;
 
   private UpsertConfig _upsertConfig;
@@ -115,7 +116,6 @@ public class TableConfigBuilder {
   private IngestionConfig _ingestionConfig;
   private List<TierConfig> _tierConfigList;
   private List<TunerConfig> _tunerConfigList;
-  private Map<InstancePartitionsType, String> _instancePartitionsMap;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
