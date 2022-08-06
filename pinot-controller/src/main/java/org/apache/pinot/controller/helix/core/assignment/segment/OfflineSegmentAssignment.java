@@ -102,10 +102,7 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
         _offlineTableName);
     LOGGER.info("Assigning segment: {} with instance partitions: {} for table: {}", segmentName, instancePartitions,
         _offlineTableName);
-    checkReplication(instancePartitions);
-
     List<String> instancesAssigned = assignSegment(segmentName, currentAssignment, instancePartitions);
-
     LOGGER.info("Assigned segment: {} to instances: {} for table: {}", segmentName, instancesAssigned,
         _offlineTableName);
     return instancesAssigned;
@@ -119,7 +116,7 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
    */
   private void checkReplication(InstancePartitions instancePartitions) {
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
-    if (numReplicaGroups != 1 && numReplicaGroups != _replication) {
+    if (numReplicaGroups != _replication) {
       LOGGER.warn(
           "Number of replica-groups in instance partitions {}: {} does not match replication in table config: {} for "
               + "table: {}, use: {}", instancePartitions.getInstancePartitionsName(), numReplicaGroups, _replication,
@@ -132,14 +129,16 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
    */
   private List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
       InstancePartitions instancePartitions) {
-    int numReplicaGroups = instancePartitions.getNumReplicaGroups();
-    if (numReplicaGroups == 1) {
+    // NOTE: When partition column is configured, use replica-group based assignment
+    if (_partitionColumn == null && instancePartitions.getNumReplicaGroups() == 1) {
       // Non-replica-group based assignment
 
       return SegmentAssignmentUtils.assignSegmentWithoutReplicaGroup(currentAssignment, instancePartitions,
           _replication);
     } else {
       // Replica-group based assignment
+
+      checkReplication(instancePartitions);
 
       // Fetch partition id from segment ZK metadata if partition column is configured
       int partitionId;
@@ -195,7 +194,6 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
         InstancePartitions tierInstancePartitions = tierInstancePartitionsMap.get(tierName);
         Preconditions.checkNotNull(tierInstancePartitions,
             "Failed to find instance partitions for tier: %s of table: %s", tierName, _offlineTableName);
-        checkReplication(tierInstancePartitions);
 
         LOGGER.info("Rebalancing tier: {} for table: {} with bootstrap: {}, instance partitions: {}", tierName,
             _offlineTableName, bootstrap, tierInstancePartitions);
@@ -208,7 +206,6 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
 
     LOGGER.info("Rebalancing table: {} with instance partitions: {}, bootstrap: {}", _offlineTableName,
         offlineInstancePartitions, bootstrap);
-    checkReplication(offlineInstancePartitions);
     Map<String, Map<String, String>> newAssignment =
         reassignSegments(InstancePartitionsType.OFFLINE.toString(), nonTierAssignment, offlineInstancePartitions,
             bootstrap);
@@ -241,8 +238,8 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
             SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
       }
     } else {
-      int numReplicaGroups = instancePartitions.getNumReplicaGroups();
-      if (numReplicaGroups == 1) {
+      // NOTE: When partition column is configured, use replica-group based assignment
+      if (_partitionColumn == null && instancePartitions.getNumReplicaGroups() == 1) {
         // Non-replica-group based assignment
 
         List<String> instances =
@@ -252,6 +249,8 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
                 _replication);
       } else {
         // Replica-group based assignment
+
+        checkReplication(instancePartitions);
 
         if (_partitionColumn == null) {
           // NOTE: Shuffle the segments within the current assignment to avoid moving only new segments to the new added

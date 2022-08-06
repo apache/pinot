@@ -56,6 +56,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
+@SuppressWarnings("unchecked")
 public class OfflineReplicaGroupSegmentAssignmentTest {
   private static final int NUM_REPLICAS = 3;
   private static final String SEGMENT_NAME_PREFIX = "segment_";
@@ -110,8 +111,7 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     _instancePartitionsMapWithoutPartition =
         Collections.singletonMap(InstancePartitionsType.OFFLINE, instancePartitionsWithoutPartition);
 
-    // Mock HelixManager
-    @SuppressWarnings("unchecked")
+    // Mock HelixManager]
     ZkHelixPropertyStore<ZNRecord> propertyStoreWithPartitions = mock(ZkHelixPropertyStore.class);
     List<ZNRecord> segmentZKMetadataZNRecords = new ArrayList<>(NUM_SEGMENTS);
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
@@ -372,5 +372,113 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     int[] expectedNumSegmentsAssignedPerInstance = new int[NUM_INSTANCES];
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, NUM_SEGMENTS * NUM_REPLICAS / NUM_INSTANCES);
     assertEquals(actualNumSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
+  }
+
+  @Test
+  public void testOneReplicaWithPartition() {
+    // Mock HelixManager
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    List<ZNRecord> segmentZKMetadataZNRecords = new ArrayList<>(NUM_SEGMENTS);
+    for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
+      String segmentName = SEGMENTS.get(segmentId);
+      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+      int partitionId = segmentId % NUM_PARTITIONS;
+      segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(PARTITION_COLUMN,
+          new ColumnPartitionMetadata(null, NUM_PARTITIONS, Collections.singleton(partitionId), null))));
+      ZNRecord segmentZKMetadataZNRecord = segmentZKMetadata.toZNRecord();
+      when(propertyStore.get(
+          eq(ZKMetadataProvider.constructPropertyStorePathForSegment(OFFLINE_TABLE_NAME_WITH_PARTITION, segmentName)),
+          any(), anyInt())).thenReturn(segmentZKMetadataZNRecord);
+      segmentZKMetadataZNRecords.add(segmentZKMetadataZNRecord);
+    }
+    when(propertyStore.getChildren(
+        eq(ZKMetadataProvider.constructPropertyStorePathForResource(OFFLINE_TABLE_NAME_WITH_PARTITION)), any(),
+        anyInt(), anyInt(), anyInt())).thenReturn(segmentZKMetadataZNRecords);
+    HelixManager helixManager = mock(HelixManager.class);
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+
+    int numInstancesPerPartition = NUM_INSTANCES / NUM_PARTITIONS;
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
+        new ReplicaGroupStrategyConfig(PARTITION_COLUMN, numInstancesPerPartition);
+    TableConfig tableConfigWithPartitions =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITH_PARTITION).setNumReplicas(1)
+            .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY).build();
+    tableConfigWithPartitions.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(helixManager, tableConfigWithPartitions);
+
+    // {
+    //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5],
+    //   1_0=[instance_6, instance_7, instance_8, instance_9, instance_10, instance_11],
+    //   2_0=[instance_12, instance_13, instance_14, instance_15, instance_16, instance_17],
+    // }
+    InstancePartitions instancePartitions = new InstancePartitions(INSTANCE_PARTITIONS_NAME_WITH_PARTITION);
+    int instanceIdToAdd = 0;
+    for (int partitionId = 0; partitionId < NUM_PARTITIONS; partitionId++) {
+      List<String> instancesForPartition = new ArrayList<>(numInstancesPerPartition);
+      for (int i = 0; i < numInstancesPerPartition; i++) {
+        instancesForPartition.add(INSTANCES.get(instanceIdToAdd++));
+      }
+      instancePartitions.setInstances(partitionId, 0, instancesForPartition);
+    }
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+        Collections.singletonMap(InstancePartitionsType.OFFLINE, instancePartitions);
+
+    // Test assignment
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
+      String segmentName = SEGMENTS.get(segmentId);
+      List<String> instancesAssigned =
+          segmentAssignment.assignSegment(segmentName, currentAssignment, instancePartitionsMap);
+      assertEquals(instancesAssigned.size(), 1);
+
+      // Segment 0 (partition 0) should be assigned to instance 0
+      // Segment 1 (partition 1) should be assigned to instance 6
+      // Segment 2 (partition 2) should be assigned to instance 12
+      // Segment 3 (partition 0) should be assigned to instance 1
+      // Segment 4 (partition 1) should be assigned to instance 7
+      // Segment 5 (partition 2) should be assigned to instance 13
+      // Segment 6 (partition 0) should be assigned to instance 2
+      // Segment 7 (partition 1) should be assigned to instance 8
+      // ...
+      int partitionId = segmentId % NUM_PARTITIONS;
+      int expectedAssignedInstanceId =
+          (segmentId % NUM_INSTANCES) / NUM_PARTITIONS + partitionId * numInstancesPerPartition;
+      assertEquals(instancesAssigned.get(0), INSTANCES.get(expectedAssignedInstanceId));
+
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+    }
+
+    // Current assignment should already be balanced
+    assertEquals(
+        segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, null, null, new BaseConfiguration()),
+        currentAssignment);
+
+    // Test bootstrap
+    // Bootstrap table should reassign all segments based on their alphabetical order within the partition
+    Configuration rebalanceConfig = new BaseConfiguration();
+    rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
+    Map<String, Map<String, String>> newAssignment =
+        segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, null, null, rebalanceConfig);
+    assertEquals(newAssignment.size(), NUM_SEGMENTS);
+    int numSegmentsPerPartition = NUM_SEGMENTS / NUM_PARTITIONS;
+    String[][] partitionIdToSegmentsMap = new String[NUM_PARTITIONS][numSegmentsPerPartition];
+    for (int i = 0; i < NUM_SEGMENTS; i++) {
+      partitionIdToSegmentsMap[i % NUM_PARTITIONS][i / NUM_PARTITIONS] = SEGMENTS.get(i);
+    }
+    String[][] partitionIdToSortedSegmentsMap = new String[NUM_PARTITIONS][numSegmentsPerPartition];
+    for (int i = 0; i < NUM_PARTITIONS; i++) {
+      String[] sortedSegments = new String[numSegmentsPerPartition];
+      System.arraycopy(partitionIdToSegmentsMap[i], 0, sortedSegments, 0, numSegmentsPerPartition);
+      Arrays.sort(sortedSegments);
+      partitionIdToSortedSegmentsMap[i] = sortedSegments;
+    }
+    for (int i = 0; i < NUM_PARTITIONS; i++) {
+      for (int j = 0; j < numSegmentsPerPartition; j++) {
+        assertEquals(newAssignment.get(partitionIdToSortedSegmentsMap[i][j]),
+            currentAssignment.get(partitionIdToSegmentsMap[i][j]));
+      }
+    }
   }
 }
