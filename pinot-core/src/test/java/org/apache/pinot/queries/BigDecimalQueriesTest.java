@@ -401,6 +401,54 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
 //      List<Object[]> rows = resultTable.getRows();
 //      assertEquals(rows.size(), 1);
     }
+    {
+      String query = String.format(
+          "SELECT MAX(%s) AS maxValue FROM testTable GROUP BY %s HAVING maxValue < %s ORDER BY maxValue",
+          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(5)));
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{"maxValue"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
+      List<Object[]> rows = resultTable.getRows();
+      // The default null ordering is: 'NULLS LAST'. This is why the number of returned value is 4 and not 5.
+      assertEquals(rows.size(), 4);
+      int i = 0;
+      for (int index = 0; index < 4; index++) {
+        if (i % 4 == 3) {
+          // Null values are inserted at: index % 4 == 3.
+          i++;
+        }
+        Object[] row = rows.get(index);
+        assertEquals(row.length, 1);
+        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)).doubleValue());
+        i++;
+      }
+    }
+    {
+      int lowerLimit = 991;
+      String query = String.format(
+          "SELECT MAX(%s) AS maxValue FROM testTable GROUP BY %s HAVING maxValue > %s ORDER BY maxValue",
+          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(lowerLimit)));
+      BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
+      ResultTable resultTable = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTable.getDataSchema();
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{"maxValue"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
+      List<Object[]> rows = resultTable.getRows();
+      assertEquals(rows.size(), 6);
+      int i = lowerLimit;
+      for (int index = 0; index < 6; index++) {
+        if (i % 4 == 3) {
+          // Null values are inserted at: index % 4 == 3.
+          i++;
+        }
+        Object[] row = rows.get(index);
+        assertEquals(row.length, 1);
+        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)).doubleValue());
+        i++;
+      }
+    }
     DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_3);
   }
 

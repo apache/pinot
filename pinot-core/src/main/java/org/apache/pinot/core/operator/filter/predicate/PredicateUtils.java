@@ -74,7 +74,7 @@ public class PredicateUtils {
     List<String> values = inPredicate.getValues();
     int hashSetSize = Integer.min(HashUtil.getMinHashSetSize(values.size()), MAX_INITIAL_DICT_ID_SET_SIZE);
     IntSet dictIdSet = new IntOpenHashSet(hashSetSize);
-    switch (dataType.getStoredType()) {
+    switch (dataType) {
       case INT:
         int[] intValues = inPredicate.getIntValues();
         for (int value : intValues) {
@@ -114,6 +114,24 @@ public class PredicateUtils {
       case BIG_DECIMAL:
         BigDecimal[] bigDecimalValues = inPredicate.getBigDecimalValues();
         for (BigDecimal value : bigDecimalValues) {
+          int dictId = dictionary.indexOf(value);
+          if (dictId >= 0) {
+            dictIdSet.add(dictId);
+          }
+        }
+        break;
+      case BOOLEAN:
+        int[] booleanValues = inPredicate.getBooleanValues();
+        for (int value : booleanValues) {
+          int dictId = dictionary.indexOf(value);
+          if (dictId >= 0) {
+            dictIdSet.add(dictId);
+          }
+        }
+        break;
+      case TIMESTAMP:
+        long[] timestampValues = inPredicate.getTimestampValues();
+        for (long value : timestampValues) {
           int dictId = dictionary.indexOf(value);
           if (dictId >= 0) {
             dictIdSet.add(dictId);
