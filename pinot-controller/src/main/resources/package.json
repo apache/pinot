@@ -6,6 +6,7 @@
     "dev": "webpack-dev-server --config ./webpack.config.js --mode development",
     "start": "npm-run-all --parallel lint dev",
     "build": "webpack --mode production",
+    "build-dev": "webpack --mode development",
     "build-analyze": "webpack --mode production --analyze",
     "lint": "eslint 'app/**/*.{js,ts,tsx,jsx}' --quiet --fix",
     "test": "echo \"Error: no test specified\" && exit 1"

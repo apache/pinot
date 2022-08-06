@@ -175,6 +175,8 @@
 
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
+
+    <npm.script>build</npm.script>
   </properties>
 
   <profiles>
