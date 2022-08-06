@@ -33,7 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <npm.script>${npm.script}</npm.script>
+    <npm.script>build</npm.script>
   </properties>
   <dependencies>
     <dependency>
