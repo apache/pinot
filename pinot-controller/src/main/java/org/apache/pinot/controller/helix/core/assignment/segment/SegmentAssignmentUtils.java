@@ -74,10 +74,10 @@ public class SegmentAssignmentUtils {
    */
   public static List<String> getInstancesForNonReplicaGroupBasedAssignment(InstancePartitions instancePartitions,
       int replication) {
-    Preconditions
-        .checkState(instancePartitions.getNumReplicaGroups() == 1 && instancePartitions.getNumPartitions() == 1,
-            "Instance partitions: %s should contain 1 replica and 1 partition for non-replica-group based assignment",
-            instancePartitions.getInstancePartitionsName());
+    Preconditions.checkState(
+        instancePartitions.getNumReplicaGroups() == 1 && instancePartitions.getNumPartitions() == 1,
+        "Instance partitions: %s should contain 1 replica and 1 partition for non-replica-group based assignment",
+        instancePartitions.getInstancePartitionsName());
     List<String> instances = instancePartitions.getInstances(0, 0);
     int numInstances = instances.size();
     Preconditions.checkState(numInstances >= replication,
@@ -129,8 +129,8 @@ public class SegmentAssignmentUtils {
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     List<String> instancesAssigned = new ArrayList<>(numReplicaGroups);
     for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
-      instancesAssigned
-          .add(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceIdWithLeastSegmentsAssigned));
+      instancesAssigned.add(
+          instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceIdWithLeastSegmentsAssigned));
     }
     return instancesAssigned;
   }
@@ -168,9 +168,8 @@ public class SegmentAssignmentUtils {
       // Uniformly spray the segment partitions over the instance partitions
       int instancePartitionId = entry.getKey();
       List<String> segments = entry.getValue();
-      SegmentAssignmentUtils
-          .rebalanceReplicaGroupBasedPartition(currentAssignment, instancePartitions, instancePartitionId, segments,
-              newAssignment);
+      SegmentAssignmentUtils.rebalanceReplicaGroupBasedPartition(currentAssignment, instancePartitions,
+          instancePartitionId, segments, newAssignment);
     }
     return newAssignment;
   }
@@ -215,8 +214,8 @@ public class SegmentAssignmentUtils {
       for (String instanceName : currentAssignment.get(segmentName).keySet()) {
         Integer instanceId = instanceNameToIdMap.get(instanceName);
         if (instanceId != null && numSegmentsAssignedPerInstance[instanceId] < targetNumSegmentsPerInstance) {
-          newAssignment
-              .put(segmentName, getReplicaGroupBasedInstanceStateMap(instancePartitions, partitionId, instanceId));
+          newAssignment.put(segmentName,
+              getReplicaGroupBasedInstanceStateMap(instancePartitions, partitionId, instanceId));
           numSegmentsAssignedPerInstance[instanceId]++;
           segmentAssigned = true;
           break;
@@ -251,8 +250,8 @@ public class SegmentAssignmentUtils {
     Map<String, String> instanceStateMap = new TreeMap<>();
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
-      instanceStateMap
-          .put(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceId), SegmentStateModel.ONLINE);
+      instanceStateMap.put(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceId),
+          SegmentStateModel.ONLINE);
     }
     return instanceStateMap;
   }

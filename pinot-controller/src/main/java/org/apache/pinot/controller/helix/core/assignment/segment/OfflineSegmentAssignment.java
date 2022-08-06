@@ -106,8 +106,8 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
 
     List<String> instancesAssigned = assignSegment(segmentName, currentAssignment, instancePartitions);
 
-    LOGGER
-        .info("Assigned segment: {} to instances: {} for table: {}", segmentName, instancesAssigned, _offlineTableName);
+    LOGGER.info("Assigned segment: {} to instances: {} for table: {}", segmentName, instancesAssigned,
+        _offlineTableName);
     return instancesAssigned;
   }
 
@@ -136,8 +136,8 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
     if (numReplicaGroups == 1) {
       // Non-replica-group based assignment
 
-      return SegmentAssignmentUtils
-          .assignSegmentWithoutReplicaGroup(currentAssignment, instancePartitions, _replication);
+      return SegmentAssignmentUtils.assignSegmentWithoutReplicaGroup(currentAssignment, instancePartitions,
+          _replication);
     } else {
       // Replica-group based assignment
 
@@ -146,11 +146,11 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
       if (_partitionColumn == null) {
         partitionId = 0;
       } else {
-        SegmentZKMetadata segmentZKMetadata = ZKMetadataProvider
-            .getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), _offlineTableName, segmentName);
-        Preconditions
-            .checkState(segmentZKMetadata != null, "Failed to find segment ZK metadata for segment: %s of table: %s",
-                segmentName, _offlineTableName);
+        SegmentZKMetadata segmentZKMetadata =
+            ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), _offlineTableName,
+                segmentName);
+        Preconditions.checkState(segmentZKMetadata != null,
+            "Failed to find segment ZK metadata for segment: %s of table: %s", segmentName, _offlineTableName);
         int segmentPartitionId = getPartitionId(segmentZKMetadata);
 
         // Uniformly spray the segment partitions over the instance partitions
@@ -167,9 +167,8 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
       @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, Configuration config) {
     InstancePartitions offlineInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.OFFLINE);
-    Preconditions
-        .checkState(offlineInstancePartitions != null, "Failed to find OFFLINE instance partitions for table: %s",
-            _offlineTableName);
+    Preconditions.checkState(offlineInstancePartitions != null,
+        "Failed to find OFFLINE instance partitions for table: %s", _offlineTableName);
     boolean bootstrap =
         config.getBoolean(RebalanceConfigConstants.BOOTSTRAP, RebalanceConfigConstants.DEFAULT_BOOTSTRAP);
 
@@ -194,9 +193,8 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
         Map<String, Map<String, String>> tierCurrentAssignment = entry.getValue();
 
         InstancePartitions tierInstancePartitions = tierInstancePartitionsMap.get(tierName);
-        Preconditions
-            .checkNotNull(tierInstancePartitions, "Failed to find instance partitions for tier: %s of table: %s",
-                tierName, _offlineTableName);
+        Preconditions.checkNotNull(tierInstancePartitions,
+            "Failed to find instance partitions for tier: %s of table: %s", tierName, _offlineTableName);
         checkReplication(tierInstancePartitions);
 
         LOGGER.info("Rebalancing tier: {} for table: {} with bootstrap: {}, instance partitions: {}", tierName,
@@ -239,8 +237,8 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
       newAssignment = new TreeMap<>();
       for (String segment : currentAssignment.keySet()) {
         List<String> assignedInstances = assignSegment(segment, newAssignment, instancePartitions);
-        newAssignment
-            .put(segment, SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
+        newAssignment.put(segment,
+            SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
       }
     } else {
       int numReplicaGroups = instancePartitions.getNumReplicaGroups();
@@ -249,8 +247,9 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
 
         List<String> instances =
             SegmentAssignmentUtils.getInstancesForNonReplicaGroupBasedAssignment(instancePartitions, _replication);
-        newAssignment = SegmentAssignmentUtils
-            .rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, instances, _replication);
+        newAssignment =
+            SegmentAssignmentUtils.rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, instances,
+                _replication);
       } else {
         // Replica-group based assignment
 
@@ -262,8 +261,8 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
           Collections.shuffle(segments, new Random(_offlineTableName.hashCode()));
 
           newAssignment = new TreeMap<>();
-          SegmentAssignmentUtils
-              .rebalanceReplicaGroupBasedPartition(currentAssignment, instancePartitions, 0, segments, newAssignment);
+          SegmentAssignmentUtils.rebalanceReplicaGroupBasedPartition(currentAssignment, instancePartitions, 0, segments,
+              newAssignment);
         } else {
           newAssignment = rebalanceTableWithPartition(currentAssignment, instancePartitions);
         }
@@ -297,8 +296,8 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
       Collections.shuffle(segments, random);
     }
 
-    return SegmentAssignmentUtils
-        .rebalanceReplicaGroupBasedTable(currentAssignment, instancePartitions, instancePartitionIdToSegmentsMap);
+    return SegmentAssignmentUtils.rebalanceReplicaGroupBasedTable(currentAssignment, instancePartitions,
+        instancePartitionIdToSegmentsMap);
   }
 
   private int getPartitionId(SegmentZKMetadata segmentZKMetadata) {
