@@ -513,7 +513,7 @@ public class DataTableSerDeTest {
       Assert.assertEquals(numEntries, EXPECTED_METADATA.size());
       for (int i = 0; i < numEntries; i++) {
         int keyOrdinal = dataInputStream.readInt();
-        DataTable.MetadataKey key = MetadataKey.getByOrdinal(keyOrdinal);
+        DataTable.MetadataKey key = MetadataKey.getById(keyOrdinal);
         Assert.assertNotEquals(key, null);
         if (key.getValueType() == DataTable.MetadataValueType.INT) {
           byte[] actualBytes = new byte[Integer.BYTES];
