@@ -39,6 +39,7 @@ import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationJobUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
+import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -172,6 +173,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     // Get list of files to process.
     List<String> filteredFiles = SegmentGenerationUtils.listMatchedFilesWithRecursiveOption(_inputDirFS, _inputDirURI,
         _spec.getIncludeFileNamePattern(), _spec.getExcludeFileNamePattern(), _spec.isSearchRecursively());
+
+    ConsistentDataPushUtils.configureSegmentPostfix(_spec);
 
     File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());
     try {

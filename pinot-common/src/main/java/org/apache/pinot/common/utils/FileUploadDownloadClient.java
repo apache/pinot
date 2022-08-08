@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,6 +27,8 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -57,6 +60,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -745,6 +749,54 @@ public class FileUploadDownloadClient implements AutoCloseable {
     NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, rawTableName);
     List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
     return uploadSegment(uri, segmentName, inputStream, null, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  /**
+   * Returns a map from a given tableType to a list of segments for that given tableType (OFFLINE or REALTIME)
+   * If tableType is left unspecified, both OFFLINE and REALTIME segments will be returned in the map.
+   */
+  public Map<String, List<String>> getSegments(URI uri, String rawTableName, @Nullable String tableType,
+      boolean excludeReplacedSegments)
+      throws URISyntaxException, IOException {
+    List<String> tableTypes;
+    if (tableType == null || tableType.isEmpty()) {
+      tableTypes = Arrays.asList(TableType.OFFLINE.toString(), TableType.REALTIME.toString());
+    } else {
+      tableTypes = Arrays.asList(tableType);
+    }
+    ControllerRequestURLBuilder controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(uri.toString());
+    Map<String, List<String>> tableTypeToSegments = new HashMap<>();
+    for (String tableTypeToFilter : tableTypes) {
+      List<String> segments = new ArrayList<>();
+      RequestBuilder requestBuilder = RequestBuilder.get(
+          controllerRequestURLBuilder.forSegmentListAPIWithTableTypeAndExcludeReplacedSegments(rawTableName,
+              tableTypeToFilter, excludeReplacedSegments)).setVersion(HttpVersion.HTTP_1_1);
+      HttpClient.setTimeout(requestBuilder, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+      SimpleHttpResponse response;
+      try {
+        response = HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(requestBuilder.build()));
+      } catch (HttpErrorStatusException e) {
+        tableTypeToSegments.put(tableTypeToFilter, segments);
+        continue;
+      }
+      String responseString = response.getResponse();
+      JsonNode responseJsonNode = JsonUtils.stringToJsonNode(responseString);
+      Iterator<JsonNode> responseElements = responseJsonNode.elements();
+      while (responseElements.hasNext()) {
+        JsonNode responseElementJsonNode = responseElements.next();
+        if (!responseElementJsonNode.has(tableTypeToFilter)) {
+          continue;
+        }
+        JsonNode jsonArray = responseElementJsonNode.get(tableTypeToFilter);
+        Iterator<JsonNode> elements = jsonArray.elements();
+        while (elements.hasNext()) {
+          JsonNode segmentJsonNode = elements.next();
+          segments.add(segmentJsonNode.asText());
+        }
+      }
+      tableTypeToSegments.put(tableTypeToFilter, segments);
+    }
+    return tableTypeToSegments;
   }
 
   /**

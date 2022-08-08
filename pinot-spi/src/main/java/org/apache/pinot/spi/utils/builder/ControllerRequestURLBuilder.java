@@ -370,6 +370,12 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName + "?type=" + tableType);
   }
 
+  public String forSegmentListAPIWithTableTypeAndExcludeReplacedSegments(String tableName, String tableType,
+      boolean excludeReplacedSegments) {
+    return StringUtil.join("/", _baseUrl, "segments",
+        tableName + "?type=" + tableType + "&excludeReplacedSegments=" + excludeReplacedSegments);
+  }
+
   public String forSegmentListAPIWithTableType(String tableName, String tableType) {
     return StringUtil.join("/", _baseUrl, "segments", tableName + "?type=" + tableType);
   }
