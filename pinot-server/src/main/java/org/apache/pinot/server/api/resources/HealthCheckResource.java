@@ -66,7 +66,7 @@ public class HealthCheckResource {
     if ("liveness".equalsIgnoreCase(checkType)) {
       return "OK";
     } else {
-      return getReadinessStatus(_instanceId);
+      return getReadinessStatus();
     }
   }
 
@@ -92,16 +92,16 @@ public class HealthCheckResource {
       @ApiResponse(code = 503, message = "Server is not ready to serve queries")
   })
   public String checkReadiness() {
-    return getReadinessStatus(_instanceId);
+    return getReadinessStatus();
   }
 
-  private String getReadinessStatus(String instanceId) throws WebApplicationException {
-    Status status = ServiceStatus.getServiceStatus(instanceId);
+  private String getReadinessStatus() throws WebApplicationException {
+    Status status = ServiceStatus.getServiceStatus(_instanceId);
     if (status == Status.GOOD) {
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.HEALTHCHECK_OK_CALLS, 1);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_OK_CALLS, 1);
       return "OK";
     }
-    _serverMetrics.addMeteredGlobalValue(ServerMeter.HEALTHCHECK_BAD_CALLS, 1);
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_BAD_CALLS, 1);
     String errMessage = String.format("Pinot server status is %s", status);
     Response response =
         Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
