@@ -111,7 +111,7 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     _instancePartitionsMapWithoutPartition =
         Collections.singletonMap(InstancePartitionsType.OFFLINE, instancePartitionsWithoutPartition);
 
-    // Mock HelixManager]
+    // Mock HelixManager
     ZkHelixPropertyStore<ZNRecord> propertyStoreWithPartitions = mock(ZkHelixPropertyStore.class);
     List<ZNRecord> segmentZKMetadataZNRecords = new ArrayList<>(NUM_SEGMENTS);
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
