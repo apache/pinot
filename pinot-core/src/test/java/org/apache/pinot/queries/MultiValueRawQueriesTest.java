@@ -64,6 +64,7 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
   private static final int NUM_UNIQUE_RECORDS_PER_SEGMENT = 10;
   private static final int NUM_DUPLICATES_PER_RECORDS = 2;
   private static final int MV_OFFSET = 100;
+  private static final int MV_LENGTH = 2; // Entries in each multivalue array
   private static final int BASE_VALUE_1 = 0;
   private static final int BASE_VALUE_2 = 1000;
 
@@ -2043,6 +2044,304 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       assertEquals(resultTable.getRows().size(), 1);
       Object[] value = resultTable.getRows().get(0);
       assertEquals(value[0], 8L);
+    }
+  }
+
+  private boolean validateMvArrayLength(String query, int expectedLength, int expectedRecords) {
+    ResultTable resultTable = getBrokerResponse(query).getResultTable();
+    assertNotNull(resultTable);
+    List<Object[]> recordRows = resultTable.getRows();
+    assertNotNull(recordRows);
+    assertEquals(recordRows.size(), expectedRecords);
+    for (int i = 0; i < recordRows.size(); i++) {
+      Object[] values = recordRows.get(i);
+      assertNotNull(values);
+      int len = (int) values[0];
+      if (len != expectedLength) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private boolean validateQueryOutputSize(String query, int expectedRecords) {
+    ResultTable resultTable = getBrokerResponse(query).getResultTable();
+    assertNotNull(resultTable);
+    List<Object[]> recordRows = resultTable.getRows();
+    assertNotNull(recordRows);
+    assertEquals(recordRows.size(), expectedRecords);
+    return true;
+  }
+
+  private String getConcatQueryString(String concatFunction, String col1, String col2, String concatCol, String table,
+      int limit) {
+    return String.format("SELECT %s(%s, %s) AS %s FROM %s LIMIT %d", concatFunction, col1, col2, concatCol, table,
+        limit);
+  }
+
+  private String getConcatNestingQueryString(String concatFunction, String col1, String col2, String concatCol,
+      String table, int limit) {
+    return String.format("SELECT arraylength(%s(%s, %s)) AS %s FROM %s LIMIT %d", concatFunction, col1, col2, concatCol,
+        table, limit);
+  }
+
+  private String getConcatUseInWhereQueryString(String concatFunction, String col1, String col2, String concatCol,
+      String table, String compareOperator, int mvPerArray, int limit) {
+    return String.format("SELECT %s(%s, %s) AS %s FROM %s WHERE arraylength(%s) %s %d LIMIT %d", concatFunction, col1,
+        col2, concatCol, table, concatCol, compareOperator, mvPerArray, limit);
+  }
+
+  private String getConcatGroupByQueryString(String concatFunction, String col1, String col2, String concatCol,
+      String table, String compareOperator, int mvPerArray, int limit) {
+    return String.format(
+        "SELECT %s(%s, %s) AS %s, sum(svIntCol) FROM %s WHERE arraylength(%s) %s %d GROUP BY %s LIMIT %d",
+        concatFunction, col1, col2, concatCol, table, concatCol, compareOperator, mvPerArray, concatCol, limit);
+  }
+
+  @Test
+  public void testArrayConcatInt() {
+    {
+      // Test basic arrayConcatInt() functionality
+      String query = getConcatQueryString("arrayConcatInt", "mvIntCol", "mvRawIntCol", "concatInts", "testTable",
+          NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      ResultTable resultTable = getBrokerResponse(query).getResultTable();
+      assertNotNull(resultTable);
+      List<Object[]> recordRows = resultTable.getRows();
+      assertNotNull(recordRows);
+      assertEquals(recordRows.size(), NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      for (int i = 0; i < recordRows.size(); i++) {
+        Object[] values = recordRows.get(i);
+        assertNotNull(values);
+        assertTrue(values.length >= 1);
+        int[] intValues = (int[]) values[0];
+        int baseValue = intValues[0];
+        int[] expectedConcatInt = new int[]{baseValue, baseValue + MV_OFFSET, baseValue, baseValue + MV_OFFSET};
+        assertTrue(Arrays.equals(intValues, expectedConcatInt));
+      }
+    }
+    {
+      // Test nesting arrayConcatInt()
+      String query =
+          getConcatNestingQueryString("arrayConcatInt", "mvIntCol", "mvRawIntCol", "concatIntsLen", "testTable",
+              NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      // After concatenation, make sure each multivalue entry has double the entries
+      assertTrue(validateMvArrayLength(query, 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT));
+    }
+    {
+      // Test use of the output in WHERE expression
+      String query =
+          getConcatUseInWhereQueryString("arrayConcatInt", "mvIntCol", "mvRawIntCol", "concatInts", "testTable", "<=",
+              2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      assertTrue(validateQueryOutputSize(query, NUM_UNIQUE_RECORDS_PER_SEGMENT));
+      query =
+          getConcatUseInWhereQueryString("arrayConcatInt", "mvIntCol", "mvRawIntCol", "concatInts", "testTable", ">",
+              2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      assertTrue(validateQueryOutputSize(query, 0));
+    }
+    {
+      // Test use of output in GROUP BY
+      String query =
+          getConcatGroupByQueryString("arrayConcatInt", "mvIntCol", "mvRawIntCol", "concatInts", "testTable", "<=",
+              2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      assertTrue(validateQueryOutputSize(query, NUM_UNIQUE_RECORDS_PER_SEGMENT));
+    }
+  }
+
+  @Test
+  public void testArrayConcatLong() {
+    {
+      // Test basic arrayConcatLong() functionality
+      String query = getConcatQueryString("arrayConcatLong", "mvLongCol", "mvRawLongCol", "concatLongs", "testTable",
+          NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      ResultTable resultTable = getBrokerResponse(query).getResultTable();
+      assertNotNull(resultTable);
+      List<Object[]> recordRows = resultTable.getRows();
+      assertNotNull(recordRows);
+      assertEquals(recordRows.size(), NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      for (int i = 0; i < recordRows.size(); i++) {
+        Object[] values = recordRows.get(i);
+        assertNotNull(values);
+        assertTrue(values.length >= 1);
+        long[] intValues = (long[]) values[0];
+        long baseValue = intValues[0];
+        long[] expectedConcatInt = new long[]{baseValue, baseValue + MV_OFFSET, baseValue, baseValue + MV_OFFSET};
+        assertTrue(Arrays.equals(intValues, expectedConcatInt));
+      }
+    }
+    {
+      // Test nesting arrayConcatLong()
+      String query =
+          getConcatNestingQueryString("arrayConcatLong", "mvLongCol", "mvRawLongCol", "concatLongsLen", "testTable",
+              NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      // After concatenation, make sure each multivalue entry has double the entries
+      assertTrue(validateMvArrayLength(query, 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT));
+    }
+    {
+      // Test use of the output in WHERE expression
+      String query =
+          getConcatUseInWhereQueryString("arrayConcatLong", "mvLongCol", "mvRawLongCol", "concatLongs", "testTable",
+              "<=", 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      assertTrue(validateQueryOutputSize(query, NUM_UNIQUE_RECORDS_PER_SEGMENT));
+      query = getConcatUseInWhereQueryString("arrayConcatLong", "mvLongCol", "mvRawLongCol", "concatLongs", "testTable",
+          ">", 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      assertTrue(validateQueryOutputSize(query, 0));
+    }
+    {
+      // Test use of output in GROUP BY
+      String query =
+          getConcatGroupByQueryString("arrayConcatLong", "mvLongCol", "mvRawLongCol", "concatLongs", "testTable", "<=",
+              2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      assertTrue(validateQueryOutputSize(query, NUM_UNIQUE_RECORDS_PER_SEGMENT));
+    }
+  }
+
+  @Test
+  public void testArrayConcatFloat() {
+    {
+      // Test basic arrayConcatFloat() functionality
+      String query =
+          getConcatQueryString("arrayConcatFloat", "mvFloatCol", "mvRawFloatCol", "concatFloats", "testTable",
+              NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      ResultTable resultTable = getBrokerResponse(query).getResultTable();
+      assertNotNull(resultTable);
+      List<Object[]> recordRows = resultTable.getRows();
+      assertNotNull(recordRows);
+      assertEquals(recordRows.size(), NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      for (int i = 0; i < recordRows.size(); i++) {
+        Object[] values = recordRows.get(i);
+        assertNotNull(values);
+        assertTrue(values.length >= 1);
+        float[] intValues = (float[]) values[0];
+        float baseValue = intValues[0];
+        float[] expectedConcatInt = new float[]{baseValue, baseValue + MV_OFFSET, baseValue, baseValue + MV_OFFSET};
+        assertTrue(Arrays.equals(intValues, expectedConcatInt));
+      }
+    }
+    {
+      // Test nesting arrayConcatFloat()
+      String query =
+          getConcatNestingQueryString("arrayConcatFloat", "mvFloatCol", "mvRawFloatCol", "concatFloatsLen", "testTable",
+              NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      // After concatenation, make sure each multivalue entry has double the entries
+      assertTrue(validateMvArrayLength(query, 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT));
+    }
+    {
+      // Test use of the output in WHERE expression
+      String query =
+          getConcatUseInWhereQueryString("arrayConcatFloat", "mvFloatCol", "mvRawFloatCol", "concatFloats", "testTable",
+              "<=", 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      assertTrue(validateQueryOutputSize(query, NUM_UNIQUE_RECORDS_PER_SEGMENT));
+      query =
+          getConcatUseInWhereQueryString("arrayConcatFloat", "mvFloatCol", "mvRawFloatCol", "concatFloats", "testTable",
+              ">", 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      assertTrue(validateQueryOutputSize(query, 0));
+    }
+    {
+      // Test use of output in GROUP BY
+      String query =
+          getConcatGroupByQueryString("arrayConcatFloat", "mvFloatCol", "mvRawFloatCol", "concatFloats", "testTable",
+              "<=", 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      assertTrue(validateQueryOutputSize(query, NUM_UNIQUE_RECORDS_PER_SEGMENT));
+    }
+  }
+
+  @Test
+  public void testArrayConcatDouble() {
+    {
+      // Test basic arrayConcatDouble() functionality
+      String query =
+          getConcatQueryString("arrayConcatDouble", "mvDoubleCol", "mvRawDoubleCol", "concatDoubles", "testTable",
+              NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      ResultTable resultTable = getBrokerResponse(query).getResultTable();
+      assertNotNull(resultTable);
+      List<Object[]> recordRows = resultTable.getRows();
+      assertNotNull(recordRows);
+      assertEquals(recordRows.size(), NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      for (int i = 0; i < recordRows.size(); i++) {
+        Object[] values = recordRows.get(i);
+        assertNotNull(values);
+        assertTrue(values.length >= 1);
+        double[] intValues = (double[]) values[0];
+        double baseValue = intValues[0];
+        double[] expectedConcatInt = new double[]{baseValue, baseValue + MV_OFFSET, baseValue, baseValue + MV_OFFSET};
+        assertTrue(Arrays.equals(intValues, expectedConcatInt));
+      }
+    }
+    {
+      // Test nesting arrayConcatDouble()
+      String query =
+          getConcatNestingQueryString("arrayConcatDouble", "mvDoubleCol", "mvRawDoubleCol", "concatDoublesLen",
+              "testTable", NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      // After concatenation, make sure each multivalue entry has double the entries
+      assertTrue(validateMvArrayLength(query, 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT));
+    }
+    {
+      // Test use of the output in WHERE expression
+      String query =
+          getConcatUseInWhereQueryString("arrayConcatDouble", "mvDoubleCol", "mvRawDoubleCol", "concatDoubles",
+              "testTable", "<=", 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      assertTrue(validateQueryOutputSize(query, NUM_UNIQUE_RECORDS_PER_SEGMENT));
+      query = getConcatUseInWhereQueryString("arrayConcatDouble", "mvDoubleCol", "mvRawDoubleCol", "concatDoubles",
+          "testTable", ">", 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      assertTrue(validateQueryOutputSize(query, 0));
+    }
+    {
+      // Test use of output in GROUP BY
+      String query = getConcatGroupByQueryString("arrayConcatDouble", "mvDoubleCol", "mvRawDoubleCol", "concatDoubles",
+          "testTable", "<=", 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      assertTrue(validateQueryOutputSize(query, NUM_UNIQUE_RECORDS_PER_SEGMENT));
+    }
+  }
+
+  @Test
+  public void testArrayConcatString() {
+    {
+      // Test basic arrayConcatDouble() functionality
+      String query =
+          getConcatQueryString("arrayConcatString", "mvStringCol", "mvRawStringCol", "concatStrings", "testTable",
+              NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      ResultTable resultTable = getBrokerResponse(query).getResultTable();
+      assertNotNull(resultTable);
+      List<Object[]> recordRows = resultTable.getRows();
+      assertNotNull(recordRows);
+      assertEquals(recordRows.size(), NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      for (int i = 0; i < recordRows.size(); i++) {
+        Object[] values = recordRows.get(i);
+        assertNotNull(values);
+        assertTrue(values.length >= 1);
+        String[] stringValues = (String[]) values[0];
+        assertTrue(stringValues.length == 2 * MV_LENGTH);
+        String[] expectedConcatStrings = new String[2 * MV_LENGTH];
+        for (int j = 0, k = MV_LENGTH; j < MV_LENGTH; j++) {
+          expectedConcatStrings[j] = stringValues[j];
+          expectedConcatStrings[k++] = stringValues[j];
+        }
+        assertTrue(Arrays.equals(stringValues, expectedConcatStrings));
+      }
+    }
+    {
+      // Test nesting arrayConcatString()
+      String query =
+          getConcatNestingQueryString("arrayConcatString", "mvStringCol", "mvRawStringCol", "concatStringLen",
+              "testTable", NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      // After concatenation, make sure each multivalue entry has double the entries
+      assertTrue(validateMvArrayLength(query, 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT));
+    }
+    {
+      // Test use of the output in WHERE expression
+      String query =
+          getConcatUseInWhereQueryString("arrayConcatString", "mvStringCol", "mvRawStringCol", "concatStrings",
+              "testTable", "<=", 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      assertTrue(validateQueryOutputSize(query, NUM_UNIQUE_RECORDS_PER_SEGMENT));
+      query = getConcatUseInWhereQueryString("arrayConcatString", "mvStringCol", "mvRawStringCol", "concatStrings",
+          "testTable", ">", 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      assertTrue(validateQueryOutputSize(query, 0));
+    }
+    {
+      // Test use of output in GROUP BY
+      String query = getConcatGroupByQueryString("arrayConcatString", "mvStringCol", "mvRawStringCol", "concatStrings",
+          "testTable", "<=", 2 * MV_LENGTH, NUM_UNIQUE_RECORDS_PER_SEGMENT);
+      assertTrue(validateQueryOutputSize(query, NUM_UNIQUE_RECORDS_PER_SEGMENT));
     }
   }
 }
