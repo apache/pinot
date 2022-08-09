@@ -152,7 +152,7 @@ const getAllInstances = () => {
 };
 
 // This method is used to display instance data on cluster manager home page
-// API: /instances/:instaneName
+// API: /instances/:instanceName
 // Expected Output: {columns: [], records: []}
 const getInstanceData = (instances, liveInstanceArr) => {
   const promiseArr = [...instances.map((inst) => getInstance(inst))];
