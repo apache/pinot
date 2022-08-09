@@ -16,12 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.utils;
+package org.apache.pinot.segment.local.upsert;
 
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
-public final class RecordInfo {
+@SuppressWarnings("rawtypes")
+public class RecordInfo {
   private final PrimaryKey _primaryKey;
   private final int _docId;
   private final Comparable _comparisonValue;

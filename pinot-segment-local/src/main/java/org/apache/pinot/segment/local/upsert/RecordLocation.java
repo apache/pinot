@@ -24,6 +24,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 /**
  * Indicate a record's location on the local host.
  */
+@SuppressWarnings("rawtypes")
 public class RecordLocation {
   private final IndexSegment _segment;
   private final int _docId;

@@ -18,22 +18,23 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.UpsertConfig;
-import org.apache.pinot.spi.data.Schema;
 
 
 /**
- * The manager of the upsert metadata of a table.
+ * Implementation of {@link TableUpsertMetadataManager} that is backed by a {@link ConcurrentHashMap}.
  */
 @ThreadSafe
-public interface TableUpsertMetadataManager {
+public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMetadataManager {
+  private final Map<Integer, ConcurrentMapPartitionUpsertMetadataManager> _partitionMetadataManagerMap =
+      new ConcurrentHashMap<>();
 
-  void init(TableConfig tableConfig, Schema schema, ServerMetrics serverMetrics);
-
-  ConcurrentMapPartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
-
-  UpsertConfig.Mode getUpsertMode();
+  @Override
+  public ConcurrentMapPartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
+    return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
+        k -> new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _primaryKeyColumns,
+            _comparisonColumn, _hashFunction, _partialUpsertHandler, _serverMetrics));
+  }
 }

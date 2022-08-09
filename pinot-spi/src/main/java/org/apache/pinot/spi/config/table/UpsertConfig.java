@@ -54,6 +54,12 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Column for upsert comparison, default to time column")
   private String _comparisonColumn;
 
+  @JsonPropertyDescription("Custom class for upsert metadata manager")
+  private String _metadataManagerClass;
+
+  @JsonPropertyDescription("Custom properties")
+  private Map<String, String> _properties;
+
   @Deprecated
   public UpsertConfig(@JsonProperty(value = "mode", required = true) Mode mode,
       @JsonProperty("partialUpsertStrategies") @Nullable Map<String, Strategy> partialUpsertStrategies,
@@ -105,6 +111,16 @@ public class UpsertConfig extends BaseJsonConfig {
     return _comparisonColumn;
   }
 
+  @Nullable
+  public String getMetadataManagerClass() {
+    return _metadataManagerClass;
+  }
+
+  @Nullable
+  public Map<String, String> getProperties() {
+    return _properties;
+  }
+
   public void setHashFunction(HashFunction hashFunction) {
     _hashFunction = hashFunction;
   }
@@ -135,5 +151,13 @@ public class UpsertConfig extends BaseJsonConfig {
    */
   public void setComparisonColumn(String comparisonColumn) {
     _comparisonColumn = comparisonColumn;
+  }
+
+  public void setMetadataManagerClass(String metadataManagerClass) {
+    _metadataManagerClass = metadataManagerClass;
+  }
+
+  public void setProperties(Map<String, String> properties) {
+    _properties = properties;
   }
 }
