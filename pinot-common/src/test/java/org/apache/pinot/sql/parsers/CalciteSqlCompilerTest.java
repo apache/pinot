@@ -185,6 +185,36 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testExtract() {
+    try {
+      //@formatter:off
+      {
+        PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT EXTRACT(WEEK FROM \"2017-06-15\")");
+        Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
+        Assert.assertEquals(function.getOperands().get(0).getIntervalQualifier().getName(), "WEEK");
+        Assert.assertEquals(function.getOperands().get(1).getIdentifier().getName(), "2017-06-15");
+      }
+
+      {
+        PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT EXTRACT(MINUTE FROM \"2017-06-15 09:34:21\")");
+        Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
+        Assert.assertEquals(function.getOperands().get(0).getIntervalQualifier().getName(), "MINUTE");
+        Assert.assertEquals(function.getOperands().get(1).getIdentifier().getName(), "2017-06-15 09:34:21");
+      }
+
+      {
+        PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT EXTRACT(YEAR FROM \"2017-06-15 09:34:21\")");
+        Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
+        Assert.assertEquals(function.getOperands().get(0).getIntervalQualifier().getName(), "YEAR");
+        Assert.assertEquals(function.getOperands().get(1).getIdentifier().getName(), "2017-06-15 09:34:21");
+      }
+      //@formatter:on
+    } catch (SqlCompilationException e) {
+      throw e;
+    }
+  }
+
+  @Test
   public void testFilterClauses() {
     {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where a > 1.5");
@@ -2152,6 +2182,17 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testFlattenAndOr() {
+    {
+      String query = "SELECT * FROM foo WHERE col1 > 0 AND 1";
+      PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+      Function functionCall = pinotQuery.getFilterExpression().getFunctionCall();
+      Assert.assertEquals(functionCall.getOperator(), FilterKind.AND.name());
+      List<Expression> operands = functionCall.getOperands();
+      Assert.assertEquals(operands.size(), 4);
+      for (Expression operand : operands) {
+        Assert.assertEquals(operand.getFunctionCall().getOperator(), FilterKind.GREATER_THAN.name());
+      }
+    }
     {
       String query = "SELECT * FROM foo WHERE col1 > 0 AND (col2 > 0 AND col3 > 0) AND col4 > 0";
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);

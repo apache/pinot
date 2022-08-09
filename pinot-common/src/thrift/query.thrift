@@ -42,7 +42,8 @@ struct PinotQuery {
 enum ExpressionType {
   LITERAL,
   IDENTIFIER,
-  FUNCTION
+  FUNCTION,
+  INTERVAL_QUALIFIER
 }
 
 struct Expression {
@@ -50,6 +51,11 @@ struct Expression {
   2: optional Function functionCall;
   3: optional Literal literal;
   4: optional Identifier identifier;
+  5: optional IntervalQualifier intervalQualifier;
+}
+
+struct IntervalQualifier {
+  1: required string name;
 }
 
 struct Identifier {

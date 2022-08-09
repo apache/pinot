@@ -23,6 +23,7 @@ public enum FilterKind {
   OR,
   NOT,
   EQUALS,
+  EXTRACT,
   NOT_EQUALS,
   GREATER_THAN,
   GREATER_THAN_OR_EQUAL,
