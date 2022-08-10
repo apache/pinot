@@ -2183,17 +2183,6 @@ public class CalciteSqlCompilerTest {
   @Test
   public void testFlattenAndOr() {
     {
-      String query = "SELECT * FROM foo WHERE col1 > 0 AND 1";
-      PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      Function functionCall = pinotQuery.getFilterExpression().getFunctionCall();
-      Assert.assertEquals(functionCall.getOperator(), FilterKind.AND.name());
-      List<Expression> operands = functionCall.getOperands();
-      Assert.assertEquals(operands.size(), 4);
-      for (Expression operand : operands) {
-        Assert.assertEquals(operand.getFunctionCall().getOperator(), FilterKind.GREATER_THAN.name());
-      }
-    }
-    {
       String query = "SELECT * FROM foo WHERE col1 > 0 AND (col2 > 0 AND col3 > 0) AND col4 > 0";
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
       Function functionCall = pinotQuery.getFilterExpression().getFunctionCall();
