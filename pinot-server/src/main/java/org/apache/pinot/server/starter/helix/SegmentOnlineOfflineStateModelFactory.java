@@ -129,12 +129,23 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     public void onBecomeOfflineFromConsuming(Message message, NotificationContext context) {
       _logger.info("SegmentOnlineOfflineStateModel.onBecomeOfflineFromConsuming() : " + message);
       String realtimeTableName = message.getResourceName();
-      String segmentName = message.getPartitionName();
+      String segmentNameStr = message.getPartitionName();
       try {
-        _instanceDataManager.removeSegment(realtimeTableName, segmentName);
+        // Acquire the segment and release it first.
+        LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+
+        TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(realtimeTableName);
+        Preconditions.checkNotNull(tableDataManager);
+        SegmentDataManager acquiredSegment = tableDataManager.acquireSegment(segmentNameStr);
+        if (acquiredSegment == null) {
+          throw new RuntimeException("Segment " + segmentNameStr + " + not present ");
+        }
+        tableDataManager.releaseSegment(acquiredSegment);
+        // Remove the segment from instance data manager
+        _instanceDataManager.removeSegment(realtimeTableName, segmentNameStr);
       } catch (Exception e) {
         _logger.error("Caught exception in state transition from CONSUMING -> OFFLINE for resource: {}, partition: {}",
-            realtimeTableName, segmentName, e);
+            realtimeTableName, segmentNameStr, e);
         Utils.rethrowException(e);
       }
     }

@@ -2377,7 +2377,7 @@ public class PinotHelixResourceManager {
 
     // First, disable or reset the segment
     for (String instance : instanceSet) {
-      if (externalViewStateMap == null || SegmentStateModel.CONSUMING.equals(externalViewStateMap.get(instance))) {
+      if (externalViewStateMap == null) {
         LOGGER.info("Disabling segment: {} of table: {}", segmentName, tableNameWithType);
         // enablePartition(false, ...) takes a segment to OFFLINE state by setting the ideal state.
         // TODO: If the controller fails to re-enable the partition, it will be left in disabled state
@@ -2442,7 +2442,7 @@ public class PinotHelixResourceManager {
       Set<String> instanceSet = idealState.getInstanceSet(segmentName);
       Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
       for (String instance : instanceSet) {
-        if (externalViewStateMap == null || SegmentStateModel.CONSUMING.equals(externalViewStateMap.get(instance))) {
+        if (externalViewStateMap == null) {
           instanceToDisableSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
         } else {
           instanceToResetSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
