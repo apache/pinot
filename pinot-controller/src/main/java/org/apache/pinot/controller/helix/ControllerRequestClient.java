@@ -140,21 +140,21 @@ public class ControllerRequestClient {
     }
   }
 
-  public void resetTable(String tableNameWithType)
+  public void resetTable(String tableNameWithType, long maxWaitTimeMs)
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-          _controllerRequestURLBuilder.forTableReset(tableNameWithType)).toURI(), null));
+          _controllerRequestURLBuilder.forTableReset(tableNameWithType, maxWaitTimeMs)).toURI(), null));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
   }
 
-  public void resetSegment(String tableNameWithType, String segmentName, boolean forceReload)
+  public void resetSegment(String tableNameWithType, String segmentName, long maxWaitTimeMs)
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-          _controllerRequestURLBuilder.forSegmentReset(tableNameWithType, segmentName)).toURI(), null));
+          _controllerRequestURLBuilder.forSegmentReset(tableNameWithType, segmentName, maxWaitTimeMs)).toURI(), null));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

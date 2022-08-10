@@ -223,8 +223,9 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
   }
 
-  public String forTableReset(String tableNameWithType) {
-    return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, "reset");
+  public String forTableReset(String tableNameWithType, long maxWaitTimeMs) {
+    String query = String.format("reset?maxWaitTimeMs=%d", maxWaitTimeMs);
+    return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, query);
   }
 
   public String forControllerJobStatus(String jobId) {
@@ -320,8 +321,9 @@ public class ControllerRequestURLBuilder {
         "reload?forceDownload=" + forceDownload);
   }
 
-  public String forSegmentReset(String tableNameWithType, String segmentName) {
-    return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, encode(segmentName), "reset");
+  public String forSegmentReset(String tableNameWithType, String segmentName, long maxWaitTimeMs) {
+    String query = String.format("reset?maxWaitTimeMs=%d", maxWaitTimeMs);
+    return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, encode(segmentName), query);
   }
 
   public String forSegmentDownload(String tableName, String segmentName) {

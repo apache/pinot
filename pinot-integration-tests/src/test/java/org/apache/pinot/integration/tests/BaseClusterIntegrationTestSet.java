@@ -559,7 +559,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }, 600_000L, "Failed to generate default values for new columns");
 
     // reset the table.
-    resetTable(rawTableName, tableType);
+    resetTable(rawTableName, tableType, 60000);
 
     // Check table reset should return original table count results.
     TestUtils.waitForCondition(aVoid -> {

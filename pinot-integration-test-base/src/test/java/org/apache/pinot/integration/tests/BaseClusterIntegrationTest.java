@@ -598,9 +598,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Reset table utils.
    */
-  protected void resetTable(String tableName, TableType tableType)
+  protected void resetTable(String tableName, TableType tableType, long maxWaitTimeMs)
       throws IOException {
-    getControllerRequestClient().resetTable(TableNameBuilder.forType(tableType).tableNameWithType(tableName));
+    getControllerRequestClient().resetTable(TableNameBuilder.forType(tableType).tableNameWithType(tableName),
+        maxWaitTimeMs);
   }
 
   /**
