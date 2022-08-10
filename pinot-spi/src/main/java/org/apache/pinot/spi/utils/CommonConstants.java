@@ -256,7 +256,9 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING =
         "pinot.broker.request.client.ip.logging";
-    public static final boolean DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING = true;
+
+    // TODO: Support populating clientIp for GrpcRequestIdentity.
+    public static final boolean DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING = false;
 
     public static class Request {
       public static final String SQL = "sql";
