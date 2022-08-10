@@ -31,6 +31,7 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -529,6 +530,50 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         return null;
       }
     }, 60_000L, errorMessage);
+  }
+
+  public void testReset(TableType tableType)
+      throws Exception {
+    String rawTableName = getTableName();
+    Schema schema = getSchema();
+
+    String selectStarQuery = "SELECT * FROM " + rawTableName;
+    JsonNode queryResponse = postQuery(selectStarQuery);
+    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), schema.size());
+    long numTotalDocs = queryResponse.get("totalDocs").asLong();
+
+    // Ensure table is fully loaded.
+    String testCountQuery = "SELECT COUNT(*) FROM " + rawTableName;
+    long countStarResult = getCountStarResult();
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode testQueryResponse = postQuery(testCountQuery);
+        // Should not throw exception during reload
+        assertEquals(testQueryResponse.get("exceptions").size(), 0);
+        // Total docs should not change during reload
+        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return testQueryResponse.get("resultTable").get("rows").get(0).get(0).asLong() == countStarResult;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to generate default values for new columns");
+
+    // reset the table.
+    resetTable(rawTableName, tableType);
+
+    // Check table reset should return original table count results.
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode testQueryResponse = postQuery(testCountQuery);
+        // Should not throw exception during reload
+        assertEquals(testQueryResponse.get("exceptions").size(), 0);
+        // Total docs should not change during reload
+        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+        return testQueryResponse.get("resultTable").get("rows").get(0).get(0).asLong() == countStarResult;
+      } catch (Throwable e) {
+        return false;
+      }
+    }, 600_000L, "Failed to generate default values for new columns");
   }
 
   /**

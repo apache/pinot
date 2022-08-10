@@ -223,6 +223,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
   }
 
+  public String forTableReset(String tableNameWithType) {
+    return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, "reset");
+  }
+
   public String forControllerJobStatus(String jobId) {
     return StringUtil.join("/", _baseUrl, "segments", "segmentReloadStatus", jobId);
   }
@@ -314,6 +318,10 @@ public class ControllerRequestURLBuilder {
   public String forSegmentReload(String tableName, String segmentName, boolean forceDownload) {
     return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName),
         "reload?forceDownload=" + forceDownload);
+  }
+
+  public String forSegmentReset(String tableNameWithType, String segmentName) {
+    return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, encode(segmentName), "reset");
   }
 
   public String forSegmentDownload(String tableName, String segmentName) {
