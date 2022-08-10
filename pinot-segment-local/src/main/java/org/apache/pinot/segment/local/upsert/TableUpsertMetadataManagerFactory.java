@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.upsert;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -34,7 +35,8 @@ public class TableUpsertMetadataManagerFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableUpsertMetadataManagerFactory.class);
 
-  public static TableUpsertMetadataManager create(TableConfig tableConfig, Schema schema, ServerMetrics serverMetrics) {
+  public static TableUpsertMetadataManager create(TableConfig tableConfig, Schema schema,
+      TableDataManager tableDataManager, ServerMetrics serverMetrics) {
     String tableNameWithType = tableConfig.getTableName();
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     Preconditions.checkArgument(upsertConfig != null, "Must provide upsert config for table: %s", tableNameWithType);
@@ -57,7 +59,7 @@ public class TableUpsertMetadataManagerFactory {
       metadataManager = new ConcurrentMapTableUpsertMetadataManager();
     }
 
-    metadataManager.init(tableConfig, schema, serverMetrics);
+    metadataManager.init(tableConfig, schema, tableDataManager, serverMetrics);
     return metadataManager;
   }
 }

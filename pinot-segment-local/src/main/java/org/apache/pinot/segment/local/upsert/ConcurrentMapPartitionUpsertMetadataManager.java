@@ -55,7 +55,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Implementation of {@link PartitionUpsertMetadataManager} that is backed by a {@link ConcurrentHashMap}.
  */
-@SuppressWarnings("unchecked")
+@SuppressWarnings({"rawtypes", "unchecked"})
 @ThreadSafe
 public class ConcurrentMapPartitionUpsertMetadataManager implements PartitionUpsertMetadataManager {
   private static final long OUT_OF_ORDER_EVENT_MIN_REPORT_INTERVAL_NS = TimeUnit.MINUTES.toNanos(1);
@@ -425,6 +425,31 @@ public class ConcurrentMapPartitionUpsertMetadataManager implements PartitionUps
     } else {
       // New primary key
       return record;
+    }
+  }
+
+  @VisibleForTesting
+  static class RecordLocation {
+    private final IndexSegment _segment;
+    private final int _docId;
+    private final Comparable _comparisonValue;
+
+    public RecordLocation(IndexSegment indexSegment, int docId, Comparable comparisonValue) {
+      _segment = indexSegment;
+      _docId = docId;
+      _comparisonValue = comparisonValue;
+    }
+
+    public IndexSegment getSegment() {
+      return _segment;
+    }
+
+    public int getDocId() {
+      return _docId;
+    }
+
+    public Comparable getComparisonValue() {
+      return _comparisonValue;
     }
   }
 }

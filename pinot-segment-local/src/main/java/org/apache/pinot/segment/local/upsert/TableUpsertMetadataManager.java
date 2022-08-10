@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -31,7 +32,7 @@ import org.apache.pinot.spi.data.Schema;
 @ThreadSafe
 public interface TableUpsertMetadataManager {
 
-  void init(TableConfig tableConfig, Schema schema, ServerMetrics serverMetrics);
+  void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, ServerMetrics serverMetrics);
 
   ConcurrentMapPartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 
