@@ -2654,7 +2654,7 @@ public class CalciteSqlCompilerTest {
       SqlParserImpl sqlParser = CalciteSqlParser.newSqlParser(inStream);
       SqlNodeList sqlNodeList = sqlParser.SqlStmtsEof();
       // Extract OPTION statements from sql.
-      return CalciteSqlParser.extractSqlNodeAndOptions(sqlNodeList);
+      return CalciteSqlParser.extractSqlNodeAndOptions(sqlString, sqlNodeList);
     } catch (Exception e) {
       Assert.fail("test custom sql parser failed", e);
       return null;

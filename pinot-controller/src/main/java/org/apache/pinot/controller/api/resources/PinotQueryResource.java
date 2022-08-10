@@ -121,9 +121,17 @@ public class PinotQueryResource {
   }
 
   private String executeSqlQuery(@Context HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
-      String queryOptions)
+      @Nullable String queryOptions)
       throws Exception {
-    if (queryOptions != null && queryOptions.contains(QueryOptionKey.USE_MULTISTAGE_ENGINE)) {
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
+    Map<String, String> options = sqlNodeAndOptions.getQueryOptions();
+    if (queryOptions != null) {
+      Map<String, String> optionsFromString = RequestUtils.getOptionsFromString(queryOptions);
+      sqlNodeAndOptions.putExtraQueryOptions(optionsFromString);
+    }
+
+    // Determine which engine to used based on query options.
+    if (Boolean.parseBoolean(options.get(QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
       if (_controllerConf.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED,
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
         return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders);
@@ -132,7 +140,6 @@ public class PinotQueryResource {
             + "Please see https://docs.pinot.apache.org/ for instruction to enable V2 engine.");
       }
     } else {
-      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
       PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
       switch (sqlType) {
         case DQL:
