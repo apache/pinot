@@ -2490,10 +2490,9 @@ public class PinotHelixResourceManager {
       Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
     }
     if (!segmentInstancesToCheck.isEmpty()) {
-      throw new TimeoutException(String.format(
-          "Timed out waiting for external view to stabilize after call to disable/reset segments. "
-              + "Disable/reset might complete in the background, but skipping enable of segments of table: %s",
-          tableNameWithType));
+      throw new TimeoutException(String.format("Timed out waiting for external view to stabilize after call to "
+          + "disable/reset segments. Disable/reset might complete in the background, but skipping enable of segments: "
+          + "(%s) on table: %s", segmentInstancesToCheck, tableNameWithType));
     }
 
     // Lastly, enable segments
