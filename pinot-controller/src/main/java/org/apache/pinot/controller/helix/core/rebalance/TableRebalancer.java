@@ -424,12 +424,13 @@ public class TableRebalancer {
         boolean hasPreConfiguredInstancePartitions = TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig,
             instancePartitionsType);
         if (hasPreConfiguredInstancePartitions) {
+          String referenceInstancePartitionsName = tableConfig.getInstancePartitionsMap().get(instancePartitionsType);
           InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitionsWithRename(
-              _helixManager.getHelixPropertyStore(), tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
+              _helixManager.getHelixPropertyStore(), referenceInstancePartitionsName,
               instancePartitionsType.getInstancePartitionsName(rawTableName));
           if (!dryRun) {
             LOGGER.info("Persisting instance partitions: {} (referencing {})", instancePartitions,
-                tableConfig.getInstancePartitionsMap().get(instancePartitionsType));
+                referenceInstancePartitionsName);
             InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(),
                 instancePartitions);
           }

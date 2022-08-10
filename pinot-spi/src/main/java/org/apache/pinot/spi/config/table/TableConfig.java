@@ -85,6 +85,10 @@ public class TableConfig extends BaseJsonConfig {
   private RoutingConfig _routingConfig;
   private QueryConfig _queryConfig;
   private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
+
+  @JsonPropertyDescription(value = "Point to an existing instance partitions")
+  private Map<InstancePartitionsType, String> _instancePartitionsMap;
+
   private List<FieldConfig> _fieldConfigList;
 
   @JsonPropertyDescription(value = "upsert related config")
@@ -101,9 +105,6 @@ public class TableConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription(value = "Configs for Table config tuner")
   private List<TunerConfig> _tunerConfigList;
-
-  @JsonPropertyDescription(value = "Point to an existing instance partitions")
-  private Map<InstancePartitionsType, String> _instancePartitionsMap;
 
   @JsonCreator
   public TableConfig(@JsonProperty(value = TABLE_NAME_KEY, required = true) String tableName,
@@ -261,6 +262,15 @@ public class TableConfig extends BaseJsonConfig {
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
   }
 
+  @JsonProperty(INSTANCE_PARTITIONS_MAP_CONFIG_KEY)
+  public Map<InstancePartitionsType, String> getInstancePartitionsMap() {
+    return _instancePartitionsMap;
+  }
+
+  public void setInstancePartitionsMap(Map<InstancePartitionsType, String> instancePartitionsMap) {
+    _instancePartitionsMap = instancePartitionsMap;
+  }
+
   @JsonProperty(FIELD_CONFIG_LIST_KEY)
   @Nullable
   public List<FieldConfig> getFieldConfigList() {
@@ -327,14 +337,5 @@ public class TableConfig extends BaseJsonConfig {
 
   public void setTunerConfigsList(List<TunerConfig> tunerConfigList) {
     _tunerConfigList = tunerConfigList;
-  }
-
-  @JsonProperty(INSTANCE_PARTITIONS_MAP_CONFIG_KEY)
-  public Map<InstancePartitionsType, String> getInstancePartitionsMap() {
-    return _instancePartitionsMap;
-  }
-
-  public void setInstancePartitionsMap(Map<InstancePartitionsType, String> instancePartitionsMap) {
-    _instancePartitionsMap = instancePartitionsMap;
   }
 }
