@@ -27,6 +27,8 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -68,15 +70,19 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
+import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
+import org.apache.helix.model.Message;
 import org.apache.helix.model.ParticipantHistory;
+import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.util.HelixUtil;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkNoNodeException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
@@ -2354,7 +2360,7 @@ public class PinotHelixResourceManager {
 
   /**
    * Resets a segment. The steps involved are
-   *  1. If segment is in ERROR state in the External View, invoke resetPartition, else invoke disablePartition
+   *  1. invoke resetPartition (if segment is CONSUMING, invoke disablePartition)
    *  2. Wait for the external view to stabilize. Step 1 should turn the segment to OFFLINE state
    *  3. Invoke enablePartition on the segment
    */
@@ -2371,16 +2377,16 @@ public class PinotHelixResourceManager {
 
     // First, disable or reset the segment
     for (String instance : instanceSet) {
-      if (externalViewStateMap == null || !SegmentStateModel.ERROR.equals(externalViewStateMap.get(instance))) {
+      if (externalViewStateMap == null || SegmentStateModel.CONSUMING.equals(externalViewStateMap.get(instance))) {
         LOGGER.info("Disabling segment: {} of table: {}", segmentName, tableNameWithType);
-        // enablePartition takes a segment which is NOT in ERROR state, to OFFLINE state
+        // enablePartition(false, ...) takes a segment to OFFLINE state by setting the ideal state.
         // TODO: If the controller fails to re-enable the partition, it will be left in disabled state
         _helixAdmin.enablePartition(false, _helixClusterName, instance, tableNameWithType,
             Lists.newArrayList(segmentName));
       } else {
         LOGGER.info("Resetting segment: {} of table: {}", segmentName, tableNameWithType);
-        // resetPartition takes a segment which is in ERROR state, to OFFLINE state
-        _helixAdmin.resetPartition(_helixClusterName, instance, tableNameWithType, Lists.newArrayList(segmentName));
+        // resetPartitionAllState takes a segment to OFFLINE state by sending state transition message.
+        resetPartitionAllState(_helixClusterName, instance, tableNameWithType, Lists.newArrayList(segmentName));
       }
     }
 
@@ -2417,7 +2423,7 @@ public class PinotHelixResourceManager {
 
   /**
    * Resets all segments of a table. The steps involved are
-   * 1. If segment is in ERROR state in the External View, invoke resetPartition, else invoke disablePartition
+   * 1. invoke resetPartition (if segment is CONSUMING, invoke disablePartition)
    * 2. Wait for the external view to stabilize. Step 1 should turn all segments to OFFLINE state
    * 3. Invoke enablePartition on the segments
    */
@@ -2436,7 +2442,7 @@ public class PinotHelixResourceManager {
       Set<String> instanceSet = idealState.getInstanceSet(segmentName);
       Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
       for (String instance : instanceSet) {
-        if (externalViewStateMap == null || !SegmentStateModel.ERROR.equals(externalViewStateMap.get(instance))) {
+        if (externalViewStateMap == null || SegmentStateModel.CONSUMING.equals(externalViewStateMap.get(instance))) {
           instanceToDisableSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
         } else {
           instanceToResetSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
@@ -2448,12 +2454,12 @@ public class PinotHelixResourceManager {
     // First, disable/reset the segments
     LOGGER.info("Disabling/resetting segments of table: {}", tableNameWithType);
     for (Map.Entry<String, Set<String>> entry : instanceToResetSegmentsMap.entrySet()) {
-      // resetPartition takes a segment which is in ERROR state, to OFFLINE state
-      _helixAdmin.resetPartition(_helixClusterName, entry.getKey(), tableNameWithType,
+      // resetPartitionAllState takes a segment to OFFLINE state by sending state transition message.
+      resetPartitionAllState(_helixClusterName, entry.getKey(), tableNameWithType,
           Lists.newArrayList(entry.getValue()));
     }
     for (Map.Entry<String, Set<String>> entry : instanceToDisableSegmentsMap.entrySet()) {
-      // enablePartition takes a segment which is NOT in ERROR state, to OFFLINE state
+      // enablePartition(false, ...) takes a segment to OFFLINE state by setting the ideal state.
       // TODO: If the controller fails to re-enable the partition, it will be left in disabled state
       _helixAdmin.enablePartition(false, _helixClusterName, entry.getKey(), tableNameWithType,
           Lists.newArrayList(entry.getValue()));
@@ -2505,6 +2511,107 @@ public class PinotHelixResourceManager {
       _helixAdmin.enablePartition(true, _helixClusterName, entry.getKey(), tableNameWithType,
           Lists.newArrayList(entry.getValue()));
     }
+  }
+
+  /**
+   * This util is similar to {@link HelixAdmin#resetPartition(String, String, String, List)}.
+   * However instead of resetting only the ERROR state to its initial state. we reset all state regardless.
+   */
+  private void resetPartitionAllState(String clusterName, String instanceName, String resourceName,
+      List<String> partitionNames) {
+    LOGGER.info("Reset partitions {} for resource {} on instance {} in cluster {}.",
+        partitionNames == null ? "NULL" : HelixUtil.serializeByComma(partitionNames), resourceName,
+        instanceName, clusterName);
+    HelixDataAccessor accessor = _helixZkManager.getHelixDataAccessor();
+    PropertyKey.Builder keyBuilder = accessor.keyBuilder();
+
+    // check the instance is alive
+    LiveInstance liveInstance = accessor.getProperty(keyBuilder.liveInstance(instanceName));
+    if (liveInstance == null) {
+      // check if the instance exists in the cluster
+      String instanceConfigPath = PropertyPathBuilder.instanceConfig(clusterName, instanceName);
+      throw new RuntimeException(String.format("Can't find instance: %s on %s", instanceName, instanceConfigPath));
+    }
+
+    // check resource group exists
+    IdealState idealState = accessor.getProperty(keyBuilder.idealStates(resourceName));
+    if (idealState == null) {
+      throw new RuntimeException("RESOURCE_NON_EXISTENT");
+    }
+
+    // check partition exists in resource group
+    Set<String> resetPartitionNames = new HashSet<String>(partitionNames);
+    Set<String> partitions =
+        (idealState.getRebalanceMode() == IdealState.RebalanceMode.CUSTOMIZED) ? idealState.getRecord()
+            .getMapFields().keySet() : idealState.getRecord().getListFields().keySet();
+    if (!partitions.containsAll(resetPartitionNames)) {
+      throw new RuntimeException("PARTITION_NON_EXISTENT");
+    }
+
+    // check current partition state for the transition message.
+    String sessionId = liveInstance.getEphemeralOwner();
+    CurrentState curState =
+        accessor.getProperty(keyBuilder.currentState(instanceName, sessionId, resourceName));
+
+    // check stateModelDef exists and get initial state
+    String stateModelDef = idealState.getStateModelDefRef();
+    StateModelDefinition stateModel = accessor.getProperty(keyBuilder.stateModelDef(stateModelDef));
+    if (stateModel == null) {
+      throw new RuntimeException("STATE_MODEL_NON_EXISTENT");
+    }
+
+    // check there is no pending messages for the partitions exist
+    List<Message> messages = accessor.getChildValues(keyBuilder.messages(instanceName), true);
+    for (Message message : messages) {
+      if (!Message.MessageType.STATE_TRANSITION.name().equalsIgnoreCase(message.getMsgType()) || !sessionId
+          .equals(message.getTgtSessionId()) || !resourceName.equals(message.getResourceName())
+          || !resetPartitionNames.contains(message.getPartitionName())) {
+        continue;
+      }
+
+      throw new RuntimeException(String.format("Can't reset state for %s.%s on %s, "
+              + "because a pending message %s exists for resource %s", resourceName, partitionNames, instanceName,
+          message.toString(), message.getResourceName()));
+    }
+
+    String adminName = null;
+    try {
+      adminName = InetAddress.getLocalHost().getCanonicalHostName() + "-ADMIN";
+    } catch (UnknownHostException e) {
+      // can ignore it
+      LOGGER.info("Unable to get host name. Will set it to UNKNOWN, mostly ignorable", e);
+      adminName = "UNKNOWN";
+    }
+
+    List<Message> resetMessages = new ArrayList<Message>();
+    List<PropertyKey> messageKeys = new ArrayList<PropertyKey>();
+    for (String partitionName : resetPartitionNames) {
+      // send currentState to initialState message
+      String msgId = UUID.randomUUID().toString();
+      Message message = new Message(Message.MessageType.STATE_TRANSITION, msgId);
+      message.setSrcName(adminName);
+      message.setTgtName(instanceName);
+      message.setMsgState(Message.MessageState.NEW);
+      message.setPartitionName(partitionName);
+      message.setResourceName(resourceName);
+      message.setTgtSessionId(sessionId);
+      message.setStateModelDef(stateModelDef);
+      message.setFromState(curState.getState(partitionName));
+      message.setToState(stateModel.getInitialState());
+      message.setStateModelFactoryName(idealState.getStateModelFactoryName());
+
+      if (idealState.getResourceGroupName() != null) {
+        message.setResourceGroupName(idealState.getResourceGroupName());
+      }
+      if (idealState.getInstanceGroupTag() != null) {
+        message.setResourceTag(idealState.getInstanceGroupTag());
+      }
+
+      resetMessages.add(message);
+      messageKeys.add(keyBuilder.message(instanceName, message.getId()));
+    }
+
+    accessor.setChildren(messageKeys, resetMessages);
   }
 
   /**
