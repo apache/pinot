@@ -1421,6 +1421,15 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
+   * Reset consumption on a table by sending force commit messages to servers
+   */
+  public void resetConsumption(String tableNameWithType) {
+    IdealState idealState = getIdealState(tableNameWithType);
+    Set<String> consumingSegments = findConsumingSegments(idealState);
+    sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
+  }
+
+  /**
    * Pause consumption on a table by
    *   1) setting "isTablePaused" in ideal states to true and
    *   2) sending force commit messages to servers

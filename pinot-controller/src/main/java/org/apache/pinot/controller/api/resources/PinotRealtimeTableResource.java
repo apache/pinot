@@ -90,6 +90,23 @@ public class PinotRealtimeTableResource {
     }
   }
 
+  @POST
+  @Path("/tables/{tableName}/resetConsumption")
+  @ApiOperation(value = "Reset consumption of a realtime table",
+      notes = "Reset the consumption for a realtime table using force commit")
+  public Response resetConsumption(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    validate(tableNameWithType);
+    try {
+      _pinotLLCRealtimeSegmentManager.resetConsumption(tableNameWithType);
+      return Response.ok().build();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+
   @GET
   @Path("/tables/{tableName}/pauseStatus")
   @Produces(MediaType.APPLICATION_JSON)
