@@ -310,6 +310,8 @@ public abstract class BaseReduceService {
       brokerResponseNative.setExplainPlanNumMatchAllFilterSegments(_explainPlanNumMatchAllFilterSegments);
       if (_numConsumingSegmentsQueried > 0) {
         brokerResponseNative.setNumConsumingSegmentsQueried(_numConsumingSegmentsQueried);
+      }
+      if (_minConsumingFreshnessTimeMs != Long.MAX_VALUE) {
         brokerResponseNative.setMinConsumingFreshnessTimeMs(_minConsumingFreshnessTimeMs);
       }
       brokerResponseNative.setNumConsumingSegmentsProcessed(_numConsumingSegmentsProcessed);
@@ -340,7 +342,7 @@ public abstract class BaseReduceService {
         brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.REALTIME_TOTAL_CPU_TIME_NS, _realtimeTotalCpuTimeNs,
             TimeUnit.NANOSECONDS);
 
-        if (_numConsumingSegmentsQueried > 0 && _minConsumingFreshnessTimeMs > 0) {
+        if (_minConsumingFreshnessTimeMs != Long.MAX_VALUE) {
           brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
               System.currentTimeMillis() - _minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
         }
