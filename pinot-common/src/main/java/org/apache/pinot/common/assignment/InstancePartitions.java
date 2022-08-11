@@ -127,6 +127,13 @@ public class InstancePartitions {
     return znRecord;
   }
 
+  /**
+   * Returns a new instance of InstancePartitions with the given name
+   */
+  public InstancePartitions withName(String newName) {
+    return new InstancePartitions(newName, getPartitionToInstancesMap());
+  }
+
   public String toJsonString() {
     try {
       return JsonUtils.objectToString(this);
