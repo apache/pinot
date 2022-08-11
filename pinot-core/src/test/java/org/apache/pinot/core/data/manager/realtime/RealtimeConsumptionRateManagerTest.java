@@ -19,8 +19,12 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import com.google.common.cache.LoadingCache;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.Test;
@@ -61,15 +65,16 @@ public class RealtimeConsumptionRateManagerTest {
   @Test
   public void testCreateRateLimiter() {
     // topic A
-    ConsumptionRateLimiter rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_A, TABLE_NAME);
+    ConsumptionRateLimiter rateLimiter =
+        _consumptionRateManager.createRateLimiter(STREAM_CONFIG_A, TABLE_NAME, null, null);
     assertEquals(5.0, ((RateLimiterImpl) rateLimiter).getRate(), DELTA);
 
     // topic B
-    rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_B, TABLE_NAME);
+    rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_B, TABLE_NAME, null, null);
     assertEquals(2.5, ((RateLimiterImpl) rateLimiter).getRate(), DELTA);
 
     // topic C
-    rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_C, TABLE_NAME);
+    rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_C, TABLE_NAME, null, null);
     assertEquals(rateLimiter, NOOP_RATE_LIMITER);
   }
 
@@ -115,5 +120,41 @@ public class RealtimeConsumptionRateManagerTest {
     assertEquals((int) cache.get(STREAM_CONFIG_C), 1); // use cache
     assertEquals((int) cache.get(STREAM_CONFIG_C), 1); // use cache
     verify(partitionCountFetcher, times(1)).fetch(STREAM_CONFIG_C);
+  }
+
+  @Test
+  public void testMetricEmitter() {
+    // setup metric emitter
+    double rateLimit = 2; // 2 msgs/sec = 120 msgs/min
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    MetricEmitter metricEmitter = new MetricEmitter(serverMetrics, "tableA-topicB-partition5");
+
+    // 1st minute: no metrics should be emitted in the first minute
+    Instant now = Clock.fixed(Instant.parse("2022-08-10T12:00:02Z"), ZoneOffset.UTC).instant();
+    assertEquals(metricEmitter.emitMetric(10, rateLimit, now), 0);
+    now = Clock.fixed(Instant.parse("2022-08-10T12:00:10Z"), ZoneOffset.UTC).instant();
+    assertEquals(metricEmitter.emitMetric(20, rateLimit, now), 0);
+    now = Clock.fixed(Instant.parse("2022-08-10T12:00:30Z"), ZoneOffset.UTC).instant();
+    assertEquals(metricEmitter.emitMetric(5, rateLimit, now), 0);
+    now = Clock.fixed(Instant.parse("2022-08-10T12:00:55Z"), ZoneOffset.UTC).instant();
+    assertEquals(metricEmitter.emitMetric(25, rateLimit, now), 0);
+
+    // 2nd minute: metric should be emitted
+    now = Clock.fixed(Instant.parse("2022-08-10T12:01:05Z"), ZoneOffset.UTC).instant();
+    assertEquals(metricEmitter.emitMetric(35, rateLimit, now), (int) Math.round((10 + 20 + 5 + 25) / 120.0 * 100));
+
+    // 3rd minute
+    now = Clock.fixed(Instant.parse("2022-08-10T12:02:25Z"), ZoneOffset.UTC).instant();
+    assertEquals(metricEmitter.emitMetric(0, rateLimit, now), (int) Math.round(35 / 120.0 * 100));
+
+    // 4th minute
+    now = Clock.fixed(Instant.parse("2022-08-10T12:03:15Z"), ZoneOffset.UTC).instant();
+    assertEquals(metricEmitter.emitMetric(10, rateLimit, now), 0);
+    now = Clock.fixed(Instant.parse("2022-08-10T12:03:20Z"), ZoneOffset.UTC).instant();
+    assertEquals(metricEmitter.emitMetric(20, rateLimit, now), 0);
+
+    // 5th minute
+    now = Clock.fixed(Instant.parse("2022-08-10T12:04:30Z"), ZoneOffset.UTC).instant();
+    assertEquals(metricEmitter.emitMetric(5, rateLimit, now), (int) Math.round((10 + 20) / 120.0 * 100));
   }
 }
