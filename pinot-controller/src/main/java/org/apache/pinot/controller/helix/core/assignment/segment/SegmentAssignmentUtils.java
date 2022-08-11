@@ -136,6 +136,31 @@ public class SegmentAssignmentUtils {
   }
 
   /**
+   * Assigns a segment for a table that's part of a table-group. Within each replica-group, the segment
+   * is assigned to the partition (segmentPartitionId / numInstancesPerPartition) and the instance
+   * (segmentPartitionId % numInstancesPerPartition).
+   */
+  public static List<String> assignSegmentDeterministically(InstancePartitions instancePartitions,
+      int segmentPartitionId) {
+    int numReplicaGroups = instancePartitions.getNumReplicaGroups();
+    int numPartitions = instancePartitions.getNumPartitions();
+    int numInstancesPerPartition = instancePartitions.getInstances(0, 0).size();
+    int numInstances = numInstancesPerPartition * numPartitions;
+
+    // To handle the case when number of instances < number of segment partitions, we take
+    // the modulus of segmentPartitionId with numInstances.
+    int effectiveSegmentPartitionId = segmentPartitionId % numInstances;
+    int partitionNumForSegment = effectiveSegmentPartitionId / numInstancesPerPartition;
+    int instanceIdInPartition = effectiveSegmentPartitionId % numInstancesPerPartition;
+    List<String> instancesAssigned = new ArrayList<>(numReplicaGroups);
+    for (int replicaGroupid = 0; replicaGroupid < numReplicaGroups; replicaGroupid++) {
+      instancesAssigned.add(instancePartitions.getInstances(partitionNumForSegment, replicaGroupid)
+          .get(instanceIdInPartition));
+    }
+    return instancesAssigned;
+  }
+
+  /**
    * Rebalances the table with Helix AutoRebalanceStrategy.
    */
   public static Map<String, Map<String, String>> rebalanceTableWithHelixAutoRebalanceStrategy(

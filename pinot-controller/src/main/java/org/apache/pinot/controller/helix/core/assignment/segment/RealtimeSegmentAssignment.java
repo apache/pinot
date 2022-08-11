@@ -87,6 +87,7 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
   private String _realtimeTableName;
   private int _replication;
   private String _partitionColumn;
+  private boolean _useDeterministicSegmentAssignment = false;
 
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig) {
@@ -96,6 +97,9 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
         tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
     _partitionColumn = replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
+    if (tableConfig.getValidationConfig().getSegmentAssignmentStrategy().equals("DeterministicSegmentAssignment")) {
+      _useDeterministicSegmentAssignment = true;
+    }
 
     LOGGER.info("Initialized RealtimeSegmentAssignment with replication: {}, partitionColumn: {} for table: {}",
         _replication, _partitionColumn, _realtimeTableName);
@@ -144,6 +148,9 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
    */
   private List<String> assignConsumingSegment(String segmentName, InstancePartitions instancePartitions) {
     int partitionGroupId = getPartitionGroupId(segmentName);
+    if (_useDeterministicSegmentAssignment) {
+      return SegmentAssignmentUtils.assignSegmentDeterministically(instancePartitions, partitionGroupId);
+    }
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     if (numReplicaGroups == 1) {
       // Non-replica-group based assignment:
@@ -308,11 +315,12 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
   private Map<String, Map<String, String>> reassignSegments(String instancePartitionType,
       Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions, boolean bootstrap) {
     Map<String, Map<String, String>> newAssignment;
-    if (bootstrap) {
-      LOGGER.info("Bootstrapping segment assignment for {} segments of table: {}", instancePartitionType,
-          _realtimeTableName);
+    boolean reassignAllSegments = bootstrap || _useDeterministicSegmentAssignment;
+    if (reassignAllSegments) {
+      LOGGER.info("Reassigning all segments for {} segments of table: {} (reason: {})", instancePartitionType,
+          _realtimeTableName, bootstrap ? "Bootstrap" : "DeterministicSegmentAssignment");
 
-      // When bootstrap is enabled, start with an empty assignment and reassign all segments
+      // Start with an empty assignment and reassign all segments
       newAssignment = new TreeMap<>();
       for (String segment : currentAssignment.keySet()) {
         List<String> assignedInstances = assignCompletedSegment(segment, newAssignment, instancePartitions);
@@ -359,6 +367,10 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
    */
   private List<String> assignCompletedSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
       InstancePartitions instancePartitions) {
+    if (_useDeterministicSegmentAssignment) {
+      return SegmentAssignmentUtils.assignSegmentDeterministically(instancePartitions,
+          getPartitionGroupId(segmentName));
+    }
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     if (numReplicaGroups == 1) {
       // Non-replica-group based assignment

@@ -75,7 +75,7 @@ public class MultistageEngineQuickStart extends QuickStartBase {
     File tempDir = new File(quickstartTmpDir, "tmp");
     FileUtils.forceMkdir(tempDir);
     QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1, tempDir, getConfigOverrides());
+        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 4, 1, tempDir, getConfigOverrides());
 
     printStatus(Quickstart.Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();

@@ -75,6 +75,7 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
   private String _offlineTableName;
   private int _replication;
   private String _partitionColumn;
+  private boolean _useDeterministicSegmentAssignment;
 
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig) {
@@ -88,7 +89,12 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
     if (_partitionColumn == null) {
       LOGGER.info("Initialized OfflineSegmentAssignment with replication: {} without partition column for table: {} ",
           _replication, _offlineTableName);
+      _useDeterministicSegmentAssignment = false;
     } else {
+      // TODO: Where do I keep the segment assignment strategy
+      if (tableConfig.getValidationConfig().getSegmentAssignmentStrategy().equals("DeterministicSegmentAssignment")) {
+        _useDeterministicSegmentAssignment = true;
+      }
       LOGGER.info("Initialized OfflineSegmentAssignment with replication: {} and partition column: {} for table: {}",
           _replication, _partitionColumn, _offlineTableName);
     }
@@ -151,6 +157,9 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
         Preconditions.checkState(segmentZKMetadata != null,
             "Failed to find segment ZK metadata for segment: %s of table: %s", segmentName, _offlineTableName);
         int segmentPartitionId = getPartitionId(segmentZKMetadata);
+        if (_useDeterministicSegmentAssignment) {
+          return SegmentAssignmentUtils.assignSegmentDeterministically(instancePartitions, segmentPartitionId);
+        }
 
         // Uniformly spray the segment partitions over the instance partitions
         int numPartitions = instancePartitions.getNumPartitions();
@@ -226,11 +235,12 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
   private Map<String, Map<String, String>> reassignSegments(String instancePartitionType,
       Map<String, Map<String, String>> currentAssignment, InstancePartitions instancePartitions, boolean bootstrap) {
     Map<String, Map<String, String>> newAssignment;
-    if (bootstrap) {
-      LOGGER.info("Bootstrapping segment assignment for {} segments of table: {}", instancePartitionType,
-          _offlineTableName);
+    boolean reassignAllSegments = bootstrap || _useDeterministicSegmentAssignment;
+    if (reassignAllSegments) {
+      LOGGER.info("Reassigning all segments for {} segments of table: {} (reason: {})", instancePartitionType,
+          _offlineTableName, bootstrap ? "Bootstrap" : "DeterministicSegmentAssignment");
 
-      // When bootstrap is enabled, start with an empty assignment and reassign all segments
+      // Start with an empty assignment and reassign all segments
       newAssignment = new TreeMap<>();
       for (String segment : currentAssignment.keySet()) {
         List<String> assignedInstances = assignSegment(segment, newAssignment, instancePartitions);

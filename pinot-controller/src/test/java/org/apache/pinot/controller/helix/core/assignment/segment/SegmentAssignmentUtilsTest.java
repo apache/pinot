@@ -436,4 +436,28 @@ public class SegmentAssignmentUtilsTest {
       assertEquals((int) numSegmentsToBeMovedPerInstance.get(instanceName), numSegmentsPerInstance);
     }
   }
+
+  @Test
+  public void testAssignSegmentDeterministically() {
+    final int numPartitions = 3;
+    final int numInstancesPerPartition = 2;
+    final int numInstances = numInstancesPerPartition * numPartitions;
+    final int numReplicaGroups = 1;
+    List<List<String>> instances = Arrays.asList(
+        Arrays.asList("instance-0", "instance-1"),
+        Arrays.asList("instance-2", "instance-3"),
+        Arrays.asList("instance-4", "instance-5")
+    );
+    InstancePartitions instancePartitions = new InstancePartitions("testTableName_OFFLINE");
+    for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
+      for (int partitionId = 0; partitionId < instances.size(); partitionId++) {
+        instancePartitions.setInstances(partitionId, replicaGroupId, instances.get(partitionId));
+      }
+    }
+    for (int segmentPartitionId = 0; segmentPartitionId < numInstances * 2; segmentPartitionId++) {
+      int effectiveSegmentPartitionId = segmentPartitionId % numInstances;
+      assertEquals(Collections.singletonList(String.format("instance-%d", effectiveSegmentPartitionId)),
+          SegmentAssignmentUtils.assignSegmentDeterministically(instancePartitions, segmentPartitionId));
+    }
+  }
 }
