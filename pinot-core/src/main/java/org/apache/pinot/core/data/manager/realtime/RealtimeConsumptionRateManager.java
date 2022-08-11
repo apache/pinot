@@ -184,8 +184,8 @@ public class RealtimeConsumptionRateManager {
     private final String _metricKeyName;
 
     // state variables
-    private long previousMinute = -1;
-    private int aggregateNumMessages = 0;
+    private long _previousMinute = -1;
+    private int _aggregateNumMessages = 0;
 
     public MetricEmitter(ServerMetrics serverMetrics, String metricKeyName) {
       _serverMetrics = serverMetrics;
@@ -195,17 +195,17 @@ public class RealtimeConsumptionRateManager {
     int emitMetric(int numMsgsConsumed, double rateLimit, Instant now) {
       int ratioPercentage = 0;
       long nowInMinutes = now.getEpochSecond() / 60;
-      if (nowInMinutes == previousMinute) {
-        aggregateNumMessages += numMsgsConsumed;
+      if (nowInMinutes == _previousMinute) {
+        _aggregateNumMessages += numMsgsConsumed;
       } else {
-        if (previousMinute != -1) { // not first time
-          double actualRate = aggregateNumMessages / ((nowInMinutes - previousMinute) * 60.0); // messages per second
+        if (_previousMinute != -1) { // not first time
+          double actualRate = _aggregateNumMessages / ((nowInMinutes - _previousMinute) * 60.0); // messages per second
           ratioPercentage = (int) Math.round(actualRate / rateLimit * 100);
           _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.CONSUMPTION_RATE_TO_LIMIT_RATIO_PERCENT,
               ratioPercentage);
         }
-        aggregateNumMessages = numMsgsConsumed;
-        previousMinute = nowInMinutes;
+        _aggregateNumMessages = numMsgsConsumed;
+        _previousMinute = nowInMinutes;
       }
       return ratioPercentage;
     }
