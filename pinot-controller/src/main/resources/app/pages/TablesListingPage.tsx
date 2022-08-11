@@ -67,13 +67,39 @@ const TablesListingPage = () => {
   const [showAddOfflineTableModal, setShowAddOfflineTableModal] = useState(false);
   const [showAddRealtimeTableModal, setShowAddRealtimeTableModal] = useState(false);
 
+  const loading = 'Loading...';
+
   const fetchData = async () => {
     !fetching && setFetching(true);
     const tablesResponse = await PinotMethodUtils.getQueryTablesList({bothType: true});
     const tablesList = [];
+    const tableData = []
+    const columnHeaders = [
+      'Table Name',
+      'Reported Size',
+      'Estimated Size',
+      'Number of Segments',
+      'Status',
+    ];
     tablesResponse.records.map((record)=>{
       tablesList.push(...record);
     });
+    tablesList.map((table)=>{
+      tableData.push([
+        table,
+        loading,
+        loading,
+        loading,
+        loading,
+      ]);
+    });
+    // Set the table data to "Loading..." at first as tableSize can take minutes to fetch
+    // for larger tables.
+    setTableData({
+      columns: columnHeaders,
+      records: tableData
+    });
+
     const tableDetails = await PinotMethodUtils.getAllTableDetails(tablesList);
     const schemaDetailsData = await PinotMethodUtils.getAllSchemaDetails();
     setTableData(tableDetails);
@@ -85,9 +111,7 @@ const TablesListingPage = () => {
     fetchData();
   }, []);
 
-  return fetching ? (
-    <AppLoader />
-  ) : (
+  return (
     <Grid item xs className={classes.gridContainer}>
       <div className={classes.operationDiv}>
         <SimpleAccordion
