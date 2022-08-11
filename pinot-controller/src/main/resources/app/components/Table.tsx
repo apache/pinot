@@ -270,7 +270,15 @@ export default function CustomizedTables({
   accordionToggleObject,
   tooltipData
 }: Props) {
+  // Separate the initial and final data into two separte state variables.
+  // This way we can filter and sort the data without affecting the original data.
+  // If the component receives new data, we can simply set the new data to the initial data,
+  // and the filters and sorts will be applied to the new data.
+  const [initialData, setInitialData] = React.useState(data);
   const [finalData, setFinalData] = React.useState(Utils.tableFormat(data));
+  React.useEffect( () => {
+    setInitialData(data);
+  }, [data]);
 
   const [order, setOrder] = React.useState(false);
   const [columnClicked, setColumnClicked] = React.useState('');
@@ -296,9 +304,9 @@ export default function CustomizedTables({
 
   const filterSearchResults = React.useCallback((str: string) => {
     if (str === '') {
-      setFinalData(finalData);
+      setFinalData(Utils.tableFormat(data));
     } else {
-      const filteredRescords = data.records.filter((record) => {
+      const filteredRescords = initialData.records.filter((record) => {
         const searchFound = record.find(
           (cell) => cell.toString().toLowerCase().indexOf(str) > -1
         );
@@ -309,7 +317,7 @@ export default function CustomizedTables({
       });
       setFinalData(filteredRescords);
     }
-  }, [data, setFinalData]);
+  }, [initialData, setFinalData]);
 
   React.useEffect(() => {
     clearTimeout(timeoutId.current);
@@ -322,9 +330,9 @@ export default function CustomizedTables({
     };
   }, [search, timeoutId, filterSearchResults]);
 
-  React.useCallback(()=>{
-    setFinalData(Utils.tableFormat(data));
-  }, [data]);
+  // React.useCallback(()=>{
+    // setFinalData(Utils.tableFormat(data));
+  // }, [data]);
 
   const styleCell = (str: string) => {
     if (str === 'Good' || str.toLowerCase() === 'online' || str.toLowerCase() === 'alive' || str.toLowerCase() === 'true') {
@@ -454,7 +462,7 @@ export default function CustomizedTables({
                           const result = order ? (aSegmentInt > bSegmentInt) : (aSegmentInt < bSegmentInt);
                           return result ? 1 : -1;
                         });
-                        setFinalData(data);
+                        setFinalData(finalData);
                       } else {
                         setFinalData(orderBy(finalData, column+app_state.columnNameSeparator+index, order ? 'asc' : 'desc'));
                       }
