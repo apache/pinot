@@ -38,6 +38,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
@@ -68,8 +69,10 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
@@ -118,11 +121,17 @@ public class LLRealtimeSegmentDataManagerTest {
 
   private FakeLLRealtimeSegmentDataManager createFakeSegmentManager()
       throws Exception {
-    return createFakeSegmentManager(false, new TimeSupplier(), null, null);
+    return createFakeSegmentManager(false, new TimeSupplier(), null, null, false);
   }
 
   private FakeLLRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
-      @Nullable String maxRows, @Nullable String maxDuration)
+      @Nullable String maxRows, @Nullable String maxDuration, boolean injectErrors)
+      throws Exception {
+    return createFakeSegmentManager(noUpsert, timeSupplier, maxRows, maxDuration, injectErrors, null);
+  }
+
+  private FakeLLRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
+      @Nullable String maxRows, @Nullable String maxDuration, boolean injectErrors, Boolean ignoreErrors)
       throws Exception {
     SegmentZKMetadata segmentZKMetadata = createZkMetadata();
     TableConfig tableConfig = createTableConfig();
@@ -136,6 +145,12 @@ public class LLRealtimeSegmentDataManagerTest {
     if (maxDuration != null) {
       tableConfig.getIndexingConfig().getStreamConfigs()
           .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, maxDuration);
+    }
+    tableConfig.getIndexingConfig().getStreamConfigs()
+        .put("stream.fakeStream.decoder.prop.throwExceptions", Boolean.toString(injectErrors));
+    if (ignoreErrors != null) {
+      tableConfig.getIndexingConfig().getStreamConfigs()
+          .put(StreamConfigProperties.STREAM_DECODER_ERRORS_IGNORE, ignoreErrors.toString());
     }
     RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
     LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
@@ -773,7 +788,7 @@ public class LLRealtimeSegmentDataManagerTest {
       }
     };
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
-        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2), segmentTimeThresholdMins + "m");
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2), segmentTimeThresholdMins + "m", false);
     segmentDataManager._stubConsumeLoop = false;
     segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
 
@@ -812,7 +827,7 @@ public class LLRealtimeSegmentDataManagerTest {
     TimeSupplier timeSupplier = new TimeSupplier();
     FakeLLRealtimeSegmentDataManager segmentDataManager =
         createFakeSegmentManager(true, timeSupplier, String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS),
-            segmentTimeThresholdMins + "m");
+            segmentTimeThresholdMins + "m", false);
     segmentDataManager._stubConsumeLoop = false;
     segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
 
@@ -834,6 +849,74 @@ public class LLRealtimeSegmentDataManagerTest {
       Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 6);
       Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
           START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
+          FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      Assert.assertEquals(segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs(),
+          FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    } finally {
+      segmentDataManager.destroy();
+    }
+  }
+
+  @Test
+  public void testShouldStopConsumptionWhenNotBeAbleDecodeMessage()
+      throws Exception {
+    final int segmentTimeThresholdMins = 10;
+    TimeSupplier timeSupplier = new TimeSupplier();
+    FakeLLRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(true, timeSupplier, String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS),
+            segmentTimeThresholdMins + "m", true);
+    segmentDataManager._stubConsumeLoop = false;
+    segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+
+    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    final LongMsgOffset endOffset =
+        new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    segmentDataManager._consumeOffsets.add(endOffset);
+    final SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
+        new SegmentCompletionProtocol.Response.Params().withStatus(
+                SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+            .withStreamPartitionMsgOffset(endOffset.toString()));
+    segmentDataManager._responses.add(response);
+
+    consumer.run();
+
+    try {
+      Assert.assertEquals(segmentDataManager.getConsumerState(), CommonConstants.ConsumerState.NOT_CONSUMING);
+      verify(segmentDataManager.getRealtimeTableDataManager()).addSegmentError(eq(SEGMENT_NAME_STR),
+          any(SegmentErrorInfo.class));
+    } finally {
+      segmentDataManager.destroy();
+    }
+  }
+
+  @Test
+  public void testShouldIgnoreDecoderErrors()
+      throws Exception {
+    final int segmentTimeThresholdMins = 10;
+    TimeSupplier timeSupplier = new TimeSupplier();
+    FakeLLRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(true, timeSupplier, String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS),
+            segmentTimeThresholdMins + "m", true, true);
+    segmentDataManager._stubConsumeLoop = false;
+    segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+
+    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    final LongMsgOffset endOffset =
+        new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    segmentDataManager._consumeOffsets.add(endOffset);
+    final SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
+        new SegmentCompletionProtocol.Response.Params().withStatus(
+                SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+            .withStreamPartitionMsgOffset(endOffset.toString()));
+    segmentDataManager._responses.add(response);
+
+    consumer.run();
+
+    try {
+      // Half batch of every read fails so the consumer end ups ingesting 2 batches
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2);
       Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
           FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
       Assert.assertEquals(segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs(),
@@ -868,6 +951,7 @@ public class LLRealtimeSegmentDataManagerTest {
     public Field _shouldStop;
     public Field _stopReason;
     private Field _streamMsgOffsetFactory;
+    private Field _realtimeTableDataManager;
     public LinkedList<LongMsgOffset> _consumeOffsets = new LinkedList<>();
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
     public boolean _commitSegmentCalled = false;
@@ -907,6 +991,8 @@ public class LLRealtimeSegmentDataManagerTest {
       _shouldStop.setAccessible(true);
       _stopReason = LLRealtimeSegmentDataManager.class.getDeclaredField("_stopReason");
       _stopReason.setAccessible(true);
+      _realtimeTableDataManager = LLRealtimeSegmentDataManager.class.getDeclaredField("_realtimeTableDataManager");
+      _realtimeTableDataManager.setAccessible(true);
       _semaphoreMap = semaphoreMap;
       _streamMsgOffsetFactory = LLRealtimeSegmentDataManager.class.getDeclaredField("_streamPartitionMsgOffsetFactory");
       _streamMsgOffsetFactory.setAccessible(true);
@@ -921,6 +1007,14 @@ public class LLRealtimeSegmentDataManagerTest {
         Assert.fail();
       }
       return null;
+    }
+
+    private RealtimeTableDataManager getRealtimeTableDataManager() {
+      try {
+        return (RealtimeTableDataManager) _realtimeTableDataManager.get(this);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }
 
     public PartitionConsumer createPartitionConsumer() {

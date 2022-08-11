@@ -29,13 +29,21 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
  * StreamMessageDecoder implementation for fake stream
  */
 public class FakeStreamMessageDecoder implements StreamMessageDecoder<byte[]> {
+  public static final String THROW_EXCEPTIONS = "throwExceptions";
+  private long _counter = 0;
+  private boolean _throwException = false;
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) {
+    _throwException = Boolean.valueOf(props.get(THROW_EXCEPTIONS));
   }
 
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
+    _counter++;
+    if (_throwException && _counter % 2 != 0) {
+      throw new RuntimeException("there is a problem");
+    }
     GenericRow row = Fixtures.createSingleRow(System.currentTimeMillis());
     destination.init(row);
     return destination;

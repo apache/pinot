@@ -548,9 +548,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // this can be overridden by the decoder if there is a better indicator in the message payload
       RowMetadata msgMetadata = messagesAndOffsets.getMetadataAtIndex(index);
 
-      GenericRow decodedRow = _messageDecoder
-          .decode(messagesAndOffsets.getMessageAtIndex(index), messagesAndOffsets.getMessageOffsetAtIndex(index),
-              messagesAndOffsets.getMessageLengthAtIndex(index), reuse);
+      GenericRow decodedRow = null;
+      try {
+        decodedRow = _messageDecoder.decode(messagesAndOffsets.getMessageAtIndex(index),
+            messagesAndOffsets.getMessageOffsetAtIndex(index), messagesAndOffsets.getMessageLengthAtIndex(index),
+            reuse);
+      } catch (RuntimeException e) {
+        handleDecoderException(e);
+      }
       if (decodedRow != null) {
         try {
           _transformPipeline.processRow(decodedRow, reusedResult);
@@ -609,6 +614,19 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       Uninterruptibles.sleepUninterruptibly(idlePipeSleepTimeMillis, TimeUnit.MILLISECONDS);
     }
     return prematureExit;
+  }
+
+  /**
+   * This method decides whether decoder exceptions are to be ignored. If the decoder exception cannot be ignored then
+   * the exception is rethrown.
+   * @param e Exception thrown whilst decoding a message from the batch
+   */
+  private void handleDecoderException(RuntimeException e) {
+    if (_partitionLevelStreamConfig.getDecoderErrorsIgnore()) {
+      _segmentLogger.warn("Ignoring exception while decoding message.", e);
+      return;
+    }
+    throw e;
   }
 
   public class PartitionConsumer implements Runnable {
