@@ -20,6 +20,7 @@ package org.apache.pinot.query;
 
 import java.util.Collection;
 import java.util.Properties;
+import javax.annotation.Nullable;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.jdbc.CalciteSchema;
@@ -120,12 +121,19 @@ public class QueryEnvironment {
    * between reusing plannerImpl vs. create a new planner for each query.
    *
    * @param sqlQuery SQL query string.
+   * @param sqlNodeAndOptions parsed SQL query.
    * @return a dispatchable query plan
    */
-  public QueryPlan planQuery(String sqlQuery) {
+  public QueryPlan planQuery(String sqlQuery, @Nullable SqlNodeAndOptions sqlNodeAndOptions) {
     PlannerContext plannerContext = new PlannerContext();
     try {
-      SqlNode parsed = parse(sqlQuery, plannerContext);
+      SqlNode parsed;
+      if (sqlNodeAndOptions != null) {
+        parsed = sqlNodeAndOptions.getSqlNode();
+        plannerContext.setOptions(sqlNodeAndOptions.getOptions());
+      } else {
+        parsed = parse(sqlQuery, plannerContext);
+      }
       SqlNode validated = validate(parsed);
       RelRoot relation = toRelation(validated, plannerContext);
       RelNode optimized = optimize(relation, plannerContext);
@@ -136,6 +144,11 @@ public class QueryEnvironment {
       _planner.close();
       _planner.reset();
     }
+  }
+
+  @Deprecated
+  public QueryPlan planQuery(String sqlQuery) {
+    return planQuery(sqlQuery, null);
   }
 
   // --------------------------------------------------------------------------

@@ -56,6 +56,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,8 +68,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final int _reducerPort;
 
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
-  private QueryEnvironment _queryEnvironment;
-  private QueryDispatcher _queryDispatcher;
+  private final QueryEnvironment _queryEnvironment;
+  private final QueryDispatcher _queryDispatcher;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
@@ -97,8 +98,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   @Override
-  public BrokerResponseNative handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
-      RequestContext requestContext)
+  public BrokerResponseNative handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+      long compilationStartTimeNs, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
     requestContext.setBrokerId(_brokerId);
@@ -118,23 +119,26 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     JsonNode sql = request.get(CommonConstants.Broker.Request.SQL);
     if (sql == null) {
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
-    } else {
-      return handleSQLRequest(requestId, request.get(CommonConstants.Broker.Request.SQL).asText(), request,
-          requesterIdentity, requestContext);
     }
+    String query = sql.asText();
+    requestContext.setQuery(query);
+    return handleRequest(requestId, query, sqlNodeAndOptions, compilationStartTimeNs, request, requesterIdentity,
+        requestContext);
   }
 
-  private BrokerResponseNative handleSQLRequest(long requestId, String query, JsonNode request,
+  private BrokerResponseNative handleRequest(long requestId, String query,
+      @Nullable SqlNodeAndOptions sqlNodeAndOptions, long compilationStartTimeNs, JsonNode request,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
-    requestContext.setQuery(query);
 
     // Compile the request
-    long compilationStartTimeNs = System.nanoTime();
+    if (sqlNodeAndOptions == null) {
+      compilationStartTimeNs = System.nanoTime();
+    }
     QueryPlan queryPlan;
     try {
-      queryPlan = _queryEnvironment.planQuery(query);
+      queryPlan = _queryEnvironment.planQuery(query, sqlNodeAndOptions);
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);

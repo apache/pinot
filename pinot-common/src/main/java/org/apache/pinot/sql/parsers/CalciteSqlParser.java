@@ -171,8 +171,10 @@ public class CalciteSqlParser {
 
   public static PinotQuery compileToPinotQuery(String sql)
       throws SqlCompilationException {
-    SqlNodeAndOptions sqlNodeAndOptions = compileToSqlNodeAndOptions(sql);
+    return compileToPinotQuery(compileToSqlNodeAndOptions(sql));
+  }
 
+  public static PinotQuery compileToPinotQuery(SqlNodeAndOptions sqlNodeAndOptions) {
     // Compile Sql without OPTION statements.
     PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode());
 
