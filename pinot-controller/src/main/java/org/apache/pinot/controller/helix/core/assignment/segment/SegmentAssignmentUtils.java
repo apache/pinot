@@ -136,9 +136,17 @@ public class SegmentAssignmentUtils {
   }
 
   /**
-   * Assigns a segment for a table that's part of a table-group. Within each replica-group, the segment
-   * is assigned to the partition (segmentPartitionId / numInstancesPerPartition) and the instance
-   * (segmentPartitionId % numInstancesPerPartition).
+   * Assigns a segment deterministically which is useful when we want segments with the same segmentPartitionId to
+   * always be on the same server. For example, let's say that we have 6 servers, 3 partitions and 2 instances
+   * per-partition (assume 1 replica-group for simplicity):
+   *
+   *      partition-0 |instance-0, instance-1|
+   *      partition-1 |instance-2, instance-3|
+   *      partition-2 |instance-4, instance-5|
+   *
+   * This can be thought of as a matrix which is numbered from top-left to bottom-right. To assign a segment, we
+   * essentially compute the cell using (segmentPartitionId % numInstances) and assign to the corresponding instance.
+   * For example, if the segmentPartitionId is 32, in the case above we'll assign it to 32 % 6 = 2, i.e. instance-2.
    */
   public static List<String> assignSegmentDeterministically(InstancePartitions instancePartitions,
       int segmentPartitionId) {
@@ -147,8 +155,7 @@ public class SegmentAssignmentUtils {
     int numInstancesPerPartition = instancePartitions.getInstances(0, 0).size();
     int numInstances = numInstancesPerPartition * numPartitions;
 
-    // To handle the case when number of instances < number of segment partitions, we take
-    // the modulus of segmentPartitionId with numInstances.
+    // Segments with the same "effectiveSegmentPartitionId" will have the exact same assignment
     int effectiveSegmentPartitionId = segmentPartitionId % numInstances;
     int partitionNumForSegment = effectiveSegmentPartitionId / numInstancesPerPartition;
     int instanceIdInPartition = effectiveSegmentPartitionId % numInstancesPerPartition;
