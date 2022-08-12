@@ -19,11 +19,14 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
@@ -39,6 +42,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -535,45 +539,32 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   public void testReset(TableType tableType)
       throws Exception {
     String rawTableName = getTableName();
-    Schema schema = getSchema();
-
-    String selectStarQuery = "SELECT * FROM " + rawTableName;
-    JsonNode queryResponse = postQuery(selectStarQuery);
-    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), schema.size());
-    long numTotalDocs = queryResponse.get("totalDocs").asLong();
-
-    // Ensure table is fully loaded.
-    String testCountQuery = "SELECT COUNT(*) FROM " + rawTableName;
-    long countStarResult = getCountStarResult();
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        JsonNode testQueryResponse = postQuery(testCountQuery);
-        // Should not throw exception during reload
-        assertEquals(testQueryResponse.get("exceptions").size(), 0);
-        // Total docs should not change during reload
-        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs);
-        return testQueryResponse.get("resultTable").get("rows").get(0).get(0).asLong() == countStarResult;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, 600_000L, "Failed to generate default values for new columns");
 
     // reset the table.
     resetTable(rawTableName, tableType, null);
 
-    // Check table reset should return original table count results.
+    // Sleep 1 second to allow reset table async do its job.
+    Thread.sleep(1000L);
+
+    // Check that all states comes back to ONLINE.
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode testQueryResponse = postQuery(testCountQuery);
-        // Should not throw exception during reload
-        assertEquals(testQueryResponse.get("exceptions").size(), 0);
-        // Total docs should not change during reload
-        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs);
-        return testQueryResponse.get("resultTable").get("rows").get(0).get(0).asLong() == countStarResult;
-      } catch (Throwable e) {
+        // check external view and wait for everything to come back online
+        ExternalView externalView = _helixAdmin.getResourceExternalView(getHelixClusterName(),
+            TableNameBuilder.forType(tableType).tableNameWithType(rawTableName));
+        for (String segmentName : externalView.getPartitionSet()) {
+          Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
+          Preconditions.checkNotNull(externalViewStateMap);
+          for (String state : externalViewStateMap.values()) {
+            Preconditions.checkState(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(state)
+                || CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING.equals(state));
+          }
+        }
+        return true;
+      } catch (Throwable t) {
         return false;
       }
-    }, 600_000L, "Failed to generate default values for new columns");
+    }, 30_000L, "Failed to wait for all segments come back online");
   }
 
   /**
