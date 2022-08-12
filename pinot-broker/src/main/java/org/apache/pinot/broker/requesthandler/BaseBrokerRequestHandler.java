@@ -170,7 +170,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   @Override
   public BrokerResponseNative handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      long compilationStartTimeNs, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
     requestContext.setBrokerId(_brokerId);
@@ -193,32 +193,32 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     String query = sql.asText();
     requestContext.setQuery(query);
-    return handleRequest(requestId, query, sqlNodeAndOptions, compilationStartTimeNs, request, requesterIdentity,
-        requestContext);
+    return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
   }
 
   private BrokerResponseNative handleRequest(long requestId, String query,
-      @Nullable SqlNodeAndOptions sqlNodeAndOptions, long compilationStartTimeNs, JsonNode request,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
+      @Nullable SqlNodeAndOptions sqlNodeAndOptions, JsonNode request, @Nullable RequesterIdentity requesterIdentity,
+      RequestContext requestContext)
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
     // Compile the request
+    long compilationStartTimeNs = System.nanoTime();
     PinotQuery pinotQuery;
     try {
       if (sqlNodeAndOptions != null) {
-        pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
+        // Include parse time when the query is already parsed
+        compilationStartTimeNs -= sqlNodeAndOptions.getParseTimeNs();
       } else {
-        compilationStartTimeNs = System.nanoTime();
-        pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+        sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
       }
+      pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
     }
-
     setOptions(pinotQuery, requestId, query, request);
 
     if (isLiteralOnlyQuery(pinotQuery)) {
@@ -785,7 +785,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       Preconditions.checkState(subqueryLiteral != null, "Second argument of IN_SUBQUERY must be a literal (subquery)");
       String subquery = subqueryLiteral.getStringValue();
       BrokerResponseNative response =
-          handleRequest(requestId, subquery, null, -1, jsonRequest, requesterIdentity, requestContext);
+          handleRequest(requestId, subquery, null, jsonRequest, requesterIdentity, requestContext);
       if (response.getExceptionsSize() != 0) {
         throw new RuntimeException("Caught exception while executing subquery: " + subquery);
       }

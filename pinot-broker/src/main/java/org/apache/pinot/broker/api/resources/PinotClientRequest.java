@@ -144,7 +144,6 @@ public class PinotClientRequest {
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
       boolean onlyDql)
       throws Exception {
-    long compilationStartTimeNs = System.nanoTime();
     SqlNodeAndOptions sqlNodeAndOptions;
     try {
       sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlRequestJson.get(Request.SQL).asText());
@@ -159,8 +158,8 @@ public class PinotClientRequest {
     switch (sqlType) {
       case DQL:
         try (RequestScope requestStatistics = Tracing.getTracer().createRequestScope()) {
-          return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, compilationStartTimeNs,
-              httpRequesterIdentity, requestStatistics);
+          return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity,
+              requestStatistics);
         }
       case DML:
         Map<String, String> headers = new HashMap<>();

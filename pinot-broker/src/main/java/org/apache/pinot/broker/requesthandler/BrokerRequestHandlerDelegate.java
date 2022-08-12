@@ -78,14 +78,13 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public BrokerResponseNative handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      long compilationStartTimeNs, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     if (sqlNodeAndOptions == null) {
       JsonNode sql = request.get(Request.SQL);
       if (sql == null) {
         throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
       }
-      compilationStartTimeNs = System.nanoTime();
       try {
         sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql.asText());
       } catch (Exception e) {
@@ -97,11 +96,11 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     }
 
     if (_multiStageWorkerRequestHandler != null && useMultiStageEngine(request, sqlNodeAndOptions)) {
-      return _multiStageWorkerRequestHandler.handleRequest(request, sqlNodeAndOptions, compilationStartTimeNs,
-          requesterIdentity, requestContext);
+      return _multiStageWorkerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
+          requestContext);
     } else {
-      return _singleStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, compilationStartTimeNs,
-          requesterIdentity, requestContext);
+      return _singleStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
+          requestContext);
     }
   }
 

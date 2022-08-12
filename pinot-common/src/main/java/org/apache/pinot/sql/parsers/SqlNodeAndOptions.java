@@ -28,6 +28,8 @@ public class SqlNodeAndOptions {
   // TODO: support option literals other than STRING
   private final Map<String, String> _options;
 
+  private long _parseTimeNs;
+
   public SqlNodeAndOptions(SqlNode sqlNode, PinotSqlType sqlType, Map<String, String> options) {
     _sqlNode = sqlNode;
     _sqlType = sqlType;
@@ -38,12 +40,20 @@ public class SqlNodeAndOptions {
     return _sqlNode;
   }
 
+  public PinotSqlType getSqlType() {
+    return _sqlType;
+  }
+
   public Map<String, String> getOptions() {
     return _options;
   }
 
-  public PinotSqlType getSqlType() {
-    return _sqlType;
+  public long getParseTimeNs() {
+    return _parseTimeNs;
+  }
+
+  public void setParseTimeNs(long parseTimeNs) {
+    _parseTimeNs = parseTimeNs;
   }
 
   public void setExtraOptions(Map<String, String> extractOptionsMap) {

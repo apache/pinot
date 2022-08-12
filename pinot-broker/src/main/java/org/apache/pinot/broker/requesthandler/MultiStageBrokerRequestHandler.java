@@ -56,6 +56,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,7 +100,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   @Override
   public BrokerResponseNative handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      long compilationStartTimeNs, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
     requestContext.setBrokerId(_brokerId);
@@ -122,22 +123,25 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
     String query = sql.asText();
     requestContext.setQuery(query);
-    return handleRequest(requestId, query, sqlNodeAndOptions, compilationStartTimeNs, request, requesterIdentity,
-        requestContext);
+    return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
   }
 
   private BrokerResponseNative handleRequest(long requestId, String query,
-      @Nullable SqlNodeAndOptions sqlNodeAndOptions, long compilationStartTimeNs, JsonNode request,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
+      @Nullable SqlNodeAndOptions sqlNodeAndOptions, JsonNode request, @Nullable RequesterIdentity requesterIdentity,
+      RequestContext requestContext)
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
     // Compile the request
-    if (sqlNodeAndOptions == null) {
-      compilationStartTimeNs = System.nanoTime();
-    }
+    long compilationStartTimeNs = System.nanoTime();
     QueryPlan queryPlan;
     try {
+      if (sqlNodeAndOptions != null) {
+        // Include parse time when the query is already parsed
+        compilationStartTimeNs -= sqlNodeAndOptions.getParseTimeNs();
+      } else {
+        sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
+      }
       queryPlan = _queryEnvironment.planQuery(query, sqlNodeAndOptions);
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());

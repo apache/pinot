@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.query;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
 import java.util.Properties;
-import javax.annotation.Nullable;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.jdbc.CalciteSchema;
@@ -124,17 +124,11 @@ public class QueryEnvironment {
    * @param sqlNodeAndOptions parsed SQL query.
    * @return a dispatchable query plan
    */
-  public QueryPlan planQuery(String sqlQuery, @Nullable SqlNodeAndOptions sqlNodeAndOptions) {
+  public QueryPlan planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
     PlannerContext plannerContext = new PlannerContext();
     try {
-      SqlNode parsed;
-      if (sqlNodeAndOptions != null) {
-        parsed = sqlNodeAndOptions.getSqlNode();
-        plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      } else {
-        parsed = parse(sqlQuery, plannerContext);
-      }
-      SqlNode validated = validate(parsed);
+      plannerContext.setOptions(sqlNodeAndOptions.getOptions());
+      SqlNode validated = validate(sqlNodeAndOptions.getSqlNode());
       RelRoot relation = toRelation(validated, plannerContext);
       RelNode optimized = optimize(relation, plannerContext);
       return toDispatchablePlan(optimized, plannerContext);
@@ -146,15 +140,16 @@ public class QueryEnvironment {
     }
   }
 
-  @Deprecated
+  @VisibleForTesting
   public QueryPlan planQuery(String sqlQuery) {
-    return planQuery(sqlQuery, null);
+    return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery));
   }
 
   // --------------------------------------------------------------------------
   // steps
   // --------------------------------------------------------------------------
 
+  @VisibleForTesting
   protected SqlNode parse(String query, PlannerContext plannerContext)
       throws Exception {
     // 1. invoke CalciteSqlParser to parse out SqlNode;

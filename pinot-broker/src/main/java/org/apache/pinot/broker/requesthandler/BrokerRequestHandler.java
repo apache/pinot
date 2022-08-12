@@ -34,16 +34,13 @@ public interface BrokerRequestHandler {
 
   void shutDown();
 
-  default BrokerResponseNative handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      long compilationStartTimeNs, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
-      throws Exception {
-    return handleRequest(request, requesterIdentity, requestContext);
-  }
+  BrokerResponseNative handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
+      throws Exception;
 
-  @Deprecated
   default BrokerResponseNative handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
       RequestContext requestContext)
       throws Exception {
-    return handleRequest(request, null, -1, requesterIdentity, requestContext);
+    return handleRequest(request, null, requesterIdentity, requestContext);
   }
 }
