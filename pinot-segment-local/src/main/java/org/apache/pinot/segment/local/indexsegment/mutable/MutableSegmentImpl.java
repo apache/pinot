@@ -966,6 +966,7 @@ public class MutableSegmentImpl implements MutableSegment {
   public DataSource getDataSource(String column) {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
     if (fieldSpec == null || fieldSpec.isVirtualColumn()) {
+      VirtualColumnContext virtualColumnContext = null;
       // Column is either added during ingestion, or was initiated with a virtual column provider
       if (fieldSpec == null) {
         // If the column was added during ingestion, we will construct the column provider based on its fieldSpec to
@@ -973,9 +974,13 @@ public class MutableSegmentImpl implements MutableSegment {
         fieldSpec = _newlyAddedColumnsFieldMap.get(column);
         Preconditions.checkNotNull(fieldSpec,
             "FieldSpec for " + column + " should not be null. " + "Potentially invalid column name specified.");
+        // newly added column shouldn't have any doc count?
+        virtualColumnContext = new VirtualColumnContext(fieldSpec, 0);
       }
       // TODO: Refactor virtual column provider to directly generate data source
-      VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
+      if (virtualColumnContext == null) {
+        virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
+      }
       VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
       return new ImmutableDataSource(virtualColumnProvider.buildMetadata(virtualColumnContext),
           virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext));
