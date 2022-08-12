@@ -85,7 +85,11 @@ public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProv
 
   @Override
   public ColumnMetadataImpl buildMetadata(VirtualColumnContext context) {
-    return getColumnMetadataBuilder(context).setCardinality(1).setSorted(context.getFieldSpec().isSingleValueField())
-        .setHasDictionary(true).build();
+    if (context.getFieldSpec().isSingleValueField()) {
+      return getColumnMetadataBuilder(context).setCardinality(1).setSorted(true)
+          .setHasDictionary(true).build();
+    }
+    return getColumnMetadataBuilder(context).setSorted(false).setHasDictionary(true).setMaxNumberOfMultiValues(0)
+        .build();
   }
 }
