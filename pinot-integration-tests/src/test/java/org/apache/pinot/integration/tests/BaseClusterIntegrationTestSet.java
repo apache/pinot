@@ -543,8 +543,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     // reset the table.
     resetTable(rawTableName, tableType, null);
 
-    // Sleep 1 second to allow reset table async do its job.
-    Thread.sleep(1000L);
+    // Sleep 5 second to allow reset table async do its job.
+    Thread.sleep(5000L);
 
     // Check that all states comes back to ONLINE.
     TestUtils.waitForCondition(aVoid -> {
