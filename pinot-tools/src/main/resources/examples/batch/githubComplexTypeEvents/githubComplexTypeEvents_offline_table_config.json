@@ -1,5 +1,5 @@
 {
-  "tableName": "githubEvents",
+  "tableName": "githubComplexTypeEvents",
   "tableType": "OFFLINE",
   "tenants": {
   },
