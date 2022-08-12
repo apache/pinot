@@ -18,33 +18,23 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
-import org.apache.pinot.segment.spi.IndexSegment;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.concurrent.ThreadSafe;
 
 
 /**
- * Indicate a record's location on the local host.
+ * Implementation of {@link TableUpsertMetadataManager} that is backed by a {@link ConcurrentHashMap}.
  */
-public class RecordLocation {
-  private final IndexSegment _segment;
-  private final int _docId;
-  /** value used to denote the order */
-  private final Comparable _comparisonValue;
+@ThreadSafe
+public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMetadataManager {
+  private final Map<Integer, ConcurrentMapPartitionUpsertMetadataManager> _partitionMetadataManagerMap =
+      new ConcurrentHashMap<>();
 
-  public RecordLocation(IndexSegment indexSegment, int docId, Comparable comparisonValue) {
-    _segment = indexSegment;
-    _docId = docId;
-    _comparisonValue = comparisonValue;
-  }
-
-  public IndexSegment getSegment() {
-    return _segment;
-  }
-
-  public int getDocId() {
-    return _docId;
-  }
-
-  public Comparable getComparisonValue() {
-    return _comparisonValue;
+  @Override
+  public ConcurrentMapPartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
+    return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
+        k -> new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _primaryKeyColumns,
+            _comparisonColumn, _hashFunction, _partialUpsertHandler, _serverMetrics));
   }
 }
