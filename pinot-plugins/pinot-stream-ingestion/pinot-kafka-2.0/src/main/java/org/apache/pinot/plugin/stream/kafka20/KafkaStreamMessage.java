@@ -18,32 +18,34 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.common.header.Header;
-import org.apache.kafka.common.header.Headers;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
 
-@FunctionalInterface
-public interface RowMetadataExtractor {
-  static RowMetadataExtractor build(boolean populateMetadata) {
-    return record -> {
-      if (!populateMetadata) {
-        return null;
-      }
-      GenericRow headerGenericRow = new GenericRow();
-      Headers headers = record.headers();
-      if (headers != null) {
-        Header[] headersArray = headers.toArray();
-        for (Header header : headersArray) {
-          headerGenericRow.putValue(header.key(), header.value());
-        }
-      }
-      return new StreamMessageMetadata(record.timestamp(), headerGenericRow);
-    };
+public class KafkaStreamMessage extends StreamMessage {
+  private static final GenericRow EMPTY_ROW_REUSE = new GenericRow();
+
+  // should distinguish stream-specific record metadata in the table??
+  private final long _offset;
+
+  public KafkaStreamMessage(@Nullable byte[] key, byte[] value, long offset, @Nullable StreamMessageMetadata metadata) {
+    super(key, value, metadata);
+    _offset = offset;
   }
 
-  RowMetadata extract(ConsumerRecord<?, ?> consumerRecord);
+  public GenericRow getHeaders() {
+    EMPTY_ROW_REUSE.clear();
+    return getMetadata() != null ? getMetadata().getHeaders() : EMPTY_ROW_REUSE;
+  }
+
+  // for backward compatibility
+  public byte[] getMessage() {
+    return getValue();
+  }
+
+  public long getNextOffset() {
+    return _offset < 0 ? -1 : _offset + 1;
+  }
 }

@@ -64,7 +64,7 @@ public class IndexingFailureTest {
   @Test
   public void testIndexingFailures()
       throws IOException {
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
+    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
     GenericRow goodRow = new GenericRow();
     goodRow.putValue(INT_COL, 0);
     goodRow.putValue(STRING_COL, "a");

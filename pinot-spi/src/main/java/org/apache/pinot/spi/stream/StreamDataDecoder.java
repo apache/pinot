@@ -16,27 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka20;
+package org.apache.pinot.spi.stream;
 
-import java.nio.ByteBuffer;
-import org.apache.pinot.plugin.stream.kafka.MessageAndOffset;
-import org.apache.pinot.spi.stream.RowMetadata;
-
-
-public class MessageAndOffsetAndMetadata extends MessageAndOffset {
-  private final RowMetadata _rowMetadata;
-
-  public MessageAndOffsetAndMetadata(byte[] message, long offset, RowMetadata rowMetadata) {
-    super(message, offset);
-    _rowMetadata = rowMetadata;
-  }
-
-  public MessageAndOffsetAndMetadata(ByteBuffer message, long offset, RowMetadata rowMetadata) {
-    super(message, offset);
-    _rowMetadata = rowMetadata;
-  }
-
-  public RowMetadata getRowMetadata() {
-    return _rowMetadata;
-  }
+/**
+ * A decoder for {@link StreamMessage}
+ */
+public interface StreamDataDecoder {
+  /**
+   * Decodes a {@link StreamMessage}
+   *
+   * @param message {@link StreamMessage} that contains the data payload and optionally, a key and row metadata
+   * @return {@link StreamDataDecoderResult} that either contains the decoded row or the exception
+   */
+  StreamDataDecoderResult decode(StreamMessage message);
 }

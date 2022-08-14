@@ -20,6 +20,7 @@ package org.apache.pinot.spi.stream;
 
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
@@ -31,6 +32,8 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public interface RowMetadata {
+  GenericRow EMPTY_ROW = new GenericRow();
+
 
   /**
    * Return the timestamp associated with when the row was ingested upstream.
@@ -39,5 +42,15 @@ public interface RowMetadata {
    * @return timestamp (epoch in milliseconds) when the row was ingested upstream
    *         Long.MIN_VALUE if not available
    */
-  long getIngestionTimeMs();
+  long getRecordTimestampMs();
+
+  /**
+   * Returns the stream message headers
+   *
+   * @return A {@link GenericRow} that encapsulates the headers in the ingested row
+   */
+  default GenericRow getHeaders() {
+    EMPTY_ROW.clear();
+    return EMPTY_ROW;
+  }
 }

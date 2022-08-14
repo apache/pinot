@@ -18,16 +18,18 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
-public class KafkaMessageBatch implements MessageBatch<byte[]> {
+public class KafkaMessageBatch implements MessageBatch<KafkaStreamMessage> {
 
-  private final List<MessageAndOffsetAndMetadata> _messageList;
+  private final List<KafkaStreamMessage> _messageList;
   private final int _unfilteredMessageCount;
   private final long _lastOffset;
 
@@ -36,7 +38,7 @@ public class KafkaMessageBatch implements MessageBatch<byte[]> {
    * @param lastOffset the offset of the last message in the batch
    * @param batch the messages, which may be smaller than {@see unfilteredMessageCount}
    */
-  public KafkaMessageBatch(int unfilteredMessageCount, long lastOffset, List<MessageAndOffsetAndMetadata> batch) {
+  public KafkaMessageBatch(int unfilteredMessageCount, long lastOffset, List<KafkaStreamMessage> batch) {
     _messageList = batch;
     _lastOffset = lastOffset;
     _unfilteredMessageCount = unfilteredMessageCount;
@@ -53,18 +55,18 @@ public class KafkaMessageBatch implements MessageBatch<byte[]> {
   }
 
   @Override
-  public byte[] getMessageAtIndex(int index) {
-    return _messageList.get(index).getMessage().array();
+  public KafkaStreamMessage getMessageAtIndex(int index) {
+    return _messageList.get(index);
   }
 
   @Override
   public int getMessageOffsetAtIndex(int index) {
-    return _messageList.get(index).getMessage().arrayOffset();
+    return ByteBuffer.wrap(_messageList.get(index).getMessage()).arrayOffset();
   }
 
   @Override
   public int getMessageLengthAtIndex(int index) {
-    return _messageList.get(index).payloadSize();
+    return _messageList.get(index).getMessage().length;
   }
 
   @Override
@@ -84,6 +86,16 @@ public class KafkaMessageBatch implements MessageBatch<byte[]> {
 
   @Override
   public RowMetadata getMetadataAtIndex(int index) {
-    return _messageList.get(index).getRowMetadata();
+    return _messageList.get(index).getMetadata();
+  }
+
+  @Override
+  public byte[] getMessageBytesAtIndex(int index) {
+    return _messageList.get(index).getValue();
+  }
+
+  @Override
+  public StreamMessage getStreamMessage(int index) {
+    return _messageList.get(index);
   }
 }

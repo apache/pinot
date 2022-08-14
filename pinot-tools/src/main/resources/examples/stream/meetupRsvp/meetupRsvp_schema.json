@@ -8,6 +8,14 @@
   "dimensionFieldSpecs": [
     {
       "dataType": "STRING",
+      "name": "__key"
+    },
+    {
+      "dataType": "STRING",
+      "name": "header$producerTimestamp"
+    },
+    {
+      "dataType": "STRING",
       "name": "venue_name"
     },
     {

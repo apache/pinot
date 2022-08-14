@@ -76,6 +76,8 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+
+    Thread.currentThread().join();
   }
 
   protected void createSegmentsAndUpload(List<File> avroFile, Schema schema, TableConfig tableConfig)

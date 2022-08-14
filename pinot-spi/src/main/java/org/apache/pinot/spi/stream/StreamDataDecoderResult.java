@@ -16,38 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka;
+package org.apache.pinot.spi.stream;
 
-import java.nio.ByteBuffer;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-public class MessageAndOffset {
+/**
+ * A container class for holding the result of a decoder
+ * At any point in time, only one of Result or exception is set as null.
+ */
+public final class StreamDataDecoderResult {
+  private final GenericRow _result;
+  private final Exception _exception;
 
-  private ByteBuffer _message;
-  private long _offset;
-
-  public MessageAndOffset(byte[] message, long offset) {
-    this(ByteBuffer.wrap(message), offset);
+  public StreamDataDecoderResult(GenericRow result, Exception exception) {
+    _result = result;
+    _exception = exception;
   }
 
-  public MessageAndOffset(ByteBuffer message, long offset) {
-    _message = message;
-    _offset = offset;
+  public GenericRow getResult() {
+    return _result;
   }
 
-  public ByteBuffer getMessage() {
-    return _message;
-  }
-
-  public long getOffset() {
-    return _offset;
-  }
-
-  public long getNextOffset() {
-    return getOffset() + 1;
-  }
-
-  public int payloadSize() {
-    return getMessage().array().length;
+  public Exception getException() {
+    return _exception;
   }
 }

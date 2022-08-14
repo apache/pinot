@@ -202,7 +202,7 @@ public class MutableSegmentImplIngestionAggregationTest {
 
 
     Random random = new Random(seed);
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
+    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
 
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = getRow(random);

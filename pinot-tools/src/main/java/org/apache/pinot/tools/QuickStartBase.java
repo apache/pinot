@@ -399,7 +399,7 @@ public abstract class QuickStartBase {
         case "meetupRsvp":
           kafkaStarter.createTopic("meetupRSVPEvents", KafkaStarterUtils.getTopicCreationProps(10));
           printStatus(Quickstart.Color.CYAN, "***** Starting meetup data stream and publishing to Kafka *****");
-          MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream();
+          MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream(true);
           meetupRSVPProvider.run();
           Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
