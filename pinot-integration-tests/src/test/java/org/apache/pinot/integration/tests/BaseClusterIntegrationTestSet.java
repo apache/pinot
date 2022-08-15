@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -557,24 +556,20 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       return liveMessageCount == 0;
     }, 30_000L, "Failed to wait for all segment reset messages clear helix state transition!");
 
-    // Check that all states comes back to ONLINE.
+    // Check that all segment states come back to ONLINE.
     TestUtils.waitForCondition(aVoid -> {
-      try {
-        // check external view and wait for everything to come back online
-        ExternalView externalView = _helixAdmin.getResourceExternalView(getHelixClusterName(),
-            TableNameBuilder.forType(tableType).tableNameWithType(rawTableName));
-        for (String segmentName : externalView.getPartitionSet()) {
-          Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
-          Preconditions.checkNotNull(externalViewStateMap);
-          for (String state : externalViewStateMap.values()) {
-            Preconditions.checkState(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(state)
-                || CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING.equals(state));
+      // check external view and wait for everything to come back online
+      ExternalView externalView = _helixAdmin.getResourceExternalView(getHelixClusterName(),
+          TableNameBuilder.forType(tableType).tableNameWithType(rawTableName));
+      for (Map<String, String> externalViewStateMap : externalView.getRecord().getMapFields().values()) {
+        for (String state : externalViewStateMap.values()) {
+          if (!CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(state)
+              && !CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING.equals(state)) {
+            return false;
           }
         }
-        return true;
-      } catch (Throwable t) {
-        return false;
       }
+      return true;
     }, 30_000L, "Failed to wait for all segments come back online");
   }
 

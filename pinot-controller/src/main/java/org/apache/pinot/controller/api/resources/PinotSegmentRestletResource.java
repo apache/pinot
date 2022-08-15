@@ -542,7 +542,8 @@ public class PinotSegmentRestletResource {
   public SuccessResponse resetAllSegments(
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,
-      @ApiParam(value = "Name of the target instance to reset") @QueryParam("targetInstance") String targetInstance) {
+      @ApiParam(value = "Name of the target instance to reset") @QueryParam("targetInstance") @Nullable
+          String targetInstance) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     try {
       Preconditions.checkState(tableType != null, "Must provide table name with type: %s", tableNameWithType);

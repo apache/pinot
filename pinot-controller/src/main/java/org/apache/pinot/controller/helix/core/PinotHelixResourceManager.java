@@ -25,7 +25,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -82,7 +81,6 @@ import org.apache.helix.model.ParticipantHistory;
 import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.helix.util.HelixUtil;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkNoNodeException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
@@ -2379,7 +2377,7 @@ public class PinotHelixResourceManager {
               instance);
         } else {
           LOGGER.info("Resetting segment: {} of table: {} on instance: {}", segmentName, tableNameWithType, instance);
-          resetPartitionAllState(_helixClusterName, instance, tableNameWithType, Lists.newArrayList(segmentName));
+          resetPartitionAllState(instance, tableNameWithType, Collections.singleton(segmentName));
         }
       }
     }
@@ -2413,21 +2411,24 @@ public class PinotHelixResourceManager {
     LOGGER.info("Resetting segments of table: {}", tableNameWithType);
     for (Map.Entry<String, Set<String>> entry : instanceToResetSegmentsMap.entrySet()) {
       if (targetInstance == null || targetInstance.equals(entry.getKey())) {
-        resetPartitionAllState(_helixClusterName, entry.getKey(), tableNameWithType,
-            Lists.newArrayList(entry.getValue()));
+        resetPartitionAllState(entry.getKey(), tableNameWithType,
+            entry.getValue());
       }
     }
+
+    LOGGER.info("Reset segments for table {} finished. WIth the following segments skipped: {}", tableNameWithType,
+        instanceToSkippedSegmentsMap);
   }
 
   /**
    * This util is similar to {@link HelixAdmin#resetPartition(String, String, String, List)}.
    * However instead of resetting only the ERROR state to its initial state. we reset all state regardless.
    */
-  private void resetPartitionAllState(String clusterName, String instanceName, String resourceName,
-      List<String> partitionNames) {
+  private void resetPartitionAllState(String instanceName, String resourceName,
+      Set<String> resetPartitionNames) {
     LOGGER.info("Reset partitions {} for resource {} on instance {} in cluster {}.",
-        partitionNames == null ? "NULL" : HelixUtil.serializeByComma(partitionNames), resourceName,
-        instanceName, clusterName);
+        resetPartitionNames == null ? "NULL" : resetPartitionNames, resourceName,
+        instanceName, _helixClusterName);
     HelixDataAccessor accessor = _helixZkManager.getHelixDataAccessor();
     PropertyKey.Builder keyBuilder = accessor.keyBuilder();
 
@@ -2435,36 +2436,18 @@ public class PinotHelixResourceManager {
     LiveInstance liveInstance = accessor.getProperty(keyBuilder.liveInstance(instanceName));
     if (liveInstance == null) {
       // check if the instance exists in the cluster
-      String instanceConfigPath = PropertyPathBuilder.instanceConfig(clusterName, instanceName);
+      String instanceConfigPath = PropertyPathBuilder.instanceConfig(_helixClusterName, instanceName);
       throw new RuntimeException(String.format("Can't find instance: %s on %s", instanceName, instanceConfigPath));
     }
 
-    // check resource group exists
+    // gather metadata for sending state transition message.
+    // we skip through the sanity checks normally done on Helix because in Pinot these are guaranteed to be safe.
     IdealState idealState = accessor.getProperty(keyBuilder.idealStates(resourceName));
-    if (idealState == null) {
-      throw new RuntimeException("RESOURCE_NON_EXISTENT");
-    }
-
-    // check partition exists in resource group
-    Set<String> resetPartitionNames = new HashSet<String>(partitionNames);
-    Set<String> partitions =
-        (idealState.getRebalanceMode() == IdealState.RebalanceMode.CUSTOMIZED) ? idealState.getRecord()
-            .getMapFields().keySet() : idealState.getRecord().getListFields().keySet();
-    if (!partitions.containsAll(resetPartitionNames)) {
-      throw new RuntimeException("PARTITION_NON_EXISTENT");
-    }
-
-    // check current partition state for the transition message.
     String sessionId = liveInstance.getEphemeralOwner();
     CurrentState curState =
         accessor.getProperty(keyBuilder.currentState(instanceName, sessionId, resourceName));
-
-    // check stateModelDef exists and get initial state
     String stateModelDef = idealState.getStateModelDefRef();
     StateModelDefinition stateModel = accessor.getProperty(keyBuilder.stateModelDef(stateModelDef));
-    if (stateModel == null) {
-      throw new RuntimeException("STATE_MODEL_NON_EXISTENT");
-    }
 
     // check there is no pending messages for the partitions exist
     List<Message> messages = accessor.getChildValues(keyBuilder.messages(instanceName), true);
@@ -2476,7 +2459,7 @@ public class PinotHelixResourceManager {
       }
 
       throw new RuntimeException(String.format("Can't reset state for %s.%s on %s, "
-              + "because a pending message %s exists for resource %s", resourceName, partitionNames, instanceName,
+              + "because a pending message %s exists for resource %s", resourceName, resetPartitionNames, instanceName,
           message.toString(), message.getResourceName()));
     }
 
