@@ -63,10 +63,26 @@ public interface QueryResponse {
   String getServerStats();
 
   /**
+   * Returns the time taken for the server to respond to the query.
+   * @param serverRoutingInstance
+   */
+  int getServerResponseDelayMs(ServerRoutingInstance serverRoutingInstance);
+
+  /**
    * Returns the failed server if the query fails.
    */
   @Nullable
   ServerRoutingInstance getFailedServer();
+
+  /**
+   * Returns the query request Id.
+   */
+  long getRequestId();
+
+  /**
+   * Returns the query timeout in milliseconds.
+   */
+  long getTimeOutMs();
 
   /**
    * Returns the exception if the query fails.

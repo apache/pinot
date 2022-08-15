@@ -30,6 +30,7 @@ import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -62,7 +63,8 @@ public class QueryRoutingTest {
 
   @BeforeClass
   public void setUp() {
-    _queryRouter = new QueryRouter("testBroker", mock(BrokerMetrics.class));
+    // TODO(Vivek): Check if any testing can be done here.
+    _queryRouter = new QueryRouter("testBroker", mock(BrokerMetrics.class), mock(ServerRoutingStatsManager.class));
   }
 
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes) {

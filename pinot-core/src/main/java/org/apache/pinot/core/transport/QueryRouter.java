@@ -33,6 +33,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -53,15 +54,17 @@ public class QueryRouter {
   private final ServerChannels _serverChannels;
   private final ServerChannels _serverChannelsTls;
   private final ConcurrentHashMap<Long, AsyncQueryResponse> _asyncQueryResponseMap = new ConcurrentHashMap<>();
+  private final ServerRoutingStatsManager _serverRoutingStatsManager;
 
   /**
    * Creates an unsecured query router.
-   *
    * @param brokerId broker id
    * @param brokerMetrics broker metrics
+   * @param serverRoutingStatsManager
    */
-  public QueryRouter(String brokerId, BrokerMetrics brokerMetrics) {
-    this(brokerId, brokerMetrics, null, null);
+  public QueryRouter(String brokerId, BrokerMetrics brokerMetrics,
+      ServerRoutingStatsManager serverRoutingStatsManager) {
+    this(brokerId, brokerMetrics, null, null, serverRoutingStatsManager);
   }
 
   /**
@@ -73,11 +76,12 @@ public class QueryRouter {
    * @param tlsConfig TLS config
    */
   public QueryRouter(String brokerId, BrokerMetrics brokerMetrics, @Nullable NettyConfig nettyConfig,
-      @Nullable TlsConfig tlsConfig) {
+      @Nullable TlsConfig tlsConfig, ServerRoutingStatsManager serverRoutingStatsManager) {
     _brokerId = brokerId;
     _brokerMetrics = brokerMetrics;
     _serverChannels = new ServerChannels(this, brokerMetrics, nettyConfig, null);
     _serverChannelsTls = tlsConfig != null ? new ServerChannels(this, brokerMetrics, nettyConfig, tlsConfig) : null;
+    _serverRoutingStatsManager = serverRoutingStatsManager;
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
@@ -118,6 +122,7 @@ public class QueryRouter {
       ServerRoutingInstance serverRoutingInstance = entry.getKey();
       ServerChannels serverChannels = serverRoutingInstance.isTlsEnabled() ? _serverChannelsTls : _serverChannels;
       try {
+        _serverRoutingStatsManager.recordStatsAfterQuerySubmission(requestId, serverRoutingInstance.getInstanceId());
         serverChannels.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, entry.getValue(),
             timeoutMs);
         asyncQueryResponse.markRequestSubmitted(serverRoutingInstance);
@@ -141,6 +146,8 @@ public class QueryRouter {
       AsyncQueryResponse asyncQueryResponse, Exception e) {
     LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId,
         serverRoutingInstance, e);
+    _serverRoutingStatsManager.recordStatsUponResponseArrival(requestId, serverRoutingInstance.getInstanceId(),
+        (int) asyncQueryResponse.getTimeOutMs());
     asyncQueryResponse.markQueryFailed(serverRoutingInstance, e);
   }
 
@@ -173,12 +180,20 @@ public class QueryRouter {
     // Query future might be null if the query is already done (maybe due to failure)
     if (asyncQueryResponse != null) {
       asyncQueryResponse.receiveDataTable(serverRoutingInstance, dataTable, responseSize, deserializationTimeMs);
+
+      // Record query completion stats immediately after receiving the response from the server instead of waiting
+      // for the reduce phase.
+      int latencyMs = asyncQueryResponse.getServerResponseDelayMs(serverRoutingInstance);
+      _serverRoutingStatsManager.recordStatsUponResponseArrival(requestId, serverRoutingInstance.getInstanceId(),
+          latencyMs);
     }
   }
 
   void markServerDown(ServerRoutingInstance serverRoutingInstance, Exception exception) {
     for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
       asyncQueryResponse.markServerDown(serverRoutingInstance, exception);
+      _serverRoutingStatsManager.recordStatsUponResponseArrival(asyncQueryResponse.getRequestId(),
+          serverRoutingInstance.getInstanceId(), (int) asyncQueryResponse.getTimeOutMs());
     }
   }
 

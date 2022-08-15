@@ -815,7 +815,7 @@ public class PinotHelixResourceManager {
   public synchronized PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames,
       @Nullable String retentionPeriod) {
     try {
-      LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
+        LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
           "Table name: %s is not a valid table name with type suffix", tableNameWithType);
       HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
