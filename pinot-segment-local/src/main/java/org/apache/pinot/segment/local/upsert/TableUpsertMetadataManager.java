@@ -37,4 +37,6 @@ public interface TableUpsertMetadataManager {
   ConcurrentMapPartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 
   UpsertConfig.Mode getUpsertMode();
+
+  void close();
 }

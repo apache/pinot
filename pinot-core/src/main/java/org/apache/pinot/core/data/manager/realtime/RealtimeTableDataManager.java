@@ -199,6 +199,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   protected void doShutdown() {
     _segmentAsyncExecutorService.shutdown();
+    if (_tableUpsertMetadataManager != null) {
+      _tableUpsertMetadataManager.close();
+    }
+
     for (SegmentDataManager segmentDataManager : _segmentDataManagerMap.values()) {
       segmentDataManager.destroy();
     }

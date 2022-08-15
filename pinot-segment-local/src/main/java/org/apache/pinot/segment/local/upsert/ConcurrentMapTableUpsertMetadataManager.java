@@ -37,4 +37,12 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
         k -> new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _primaryKeyColumns,
             _comparisonColumn, _hashFunction, _partialUpsertHandler, _serverMetrics));
   }
+
+  @Override
+  public void close() {
+    for (ConcurrentMapPartitionUpsertMetadataManager partitionUpsertMetadataManager
+        : _partitionMetadataManagerMap.values()) {
+      partitionUpsertMetadataManager.close();
+    }
+  }
 }

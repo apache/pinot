@@ -82,4 +82,9 @@ public interface PartitionUpsertMetadataManager {
    * Returns the merged record when partial-upsert is enabled.
    */
   GenericRow updateRecord(GenericRow record, RecordInfo recordInfo);
+
+  /**
+   * Close the partition upsert data manager
+   */
+  void close();
 }
