@@ -221,11 +221,4 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
   public void testHardcodedServerPartitionedSqlQueries() {
     // Ignored
   }
-
-  // Disabled because the reset duration might be too long and will randomly timeout.
-  @Test(enabled = false)
-  @Override
-  public void testReset() {
-    // Ignore
-  }
 }
