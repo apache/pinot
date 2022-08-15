@@ -57,6 +57,7 @@ public enum AggregationFunctionType {
   PERCENTILESMARTTDIGEST("percentileSmartTDigest"),
   IDSET("idSet"),
   HISTOGRAM("histogram"),
+  COVPOP("covPop"),
 
   // Geo aggregation functions
   STUNION("STUnion"),
