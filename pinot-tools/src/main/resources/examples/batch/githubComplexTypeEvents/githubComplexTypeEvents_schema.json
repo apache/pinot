@@ -71,5 +71,5 @@
       "granularity": "1:SECONDS"
     }
   ],
-  "schemaName": "githubEvents"
+  "schemaName": "githubComplexTypeEvents"
 }

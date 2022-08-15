@@ -41,7 +41,7 @@ executionFrameworkSpec:
 jobType: SegmentCreationAndTarPush
 
 # inputDirURI: Root directory of input data, expected to have scheme configured in PinotFS.
-inputDirURI: 'examples/batch/githubEvents/rawdata_complexTypeHandling'
+inputDirURI: 'examples/batch/githubComplexTypeEvents/rawdata'
 
 # includeFileNamePattern: include file name pattern, supported glob pattern.
 # Sample usage:
@@ -56,7 +56,7 @@ includeFileNamePattern: 'glob:**/*.json'
 # _excludeFileNamePattern: ''
 
 # outputDirURI: Root directory of output segments, expected to have scheme configured in PinotFS.
-outputDirURI: 'examples/batch/githubEvents/segments'
+outputDirURI: 'examples/batch/githubComplexTypeEvents/segments'
 
 # overwriteOutput: Overwrite output segments if existed.
 overwriteOutput: true
@@ -106,13 +106,13 @@ recordReaderSpec:
 tableSpec:
 
   # tableName: Table name
-  tableName: 'githubEvents'
+  tableName: 'githubComplexTypeEvents'
 
   # schemaURI: defines where to read the table schema, supports PinotFS or HTTP.
   # E.g.
   #   hdfs://path/to/table_schema.json
   #   http://localhost:9000/tables/myTable/schema
-  schemaURI: 'http://localhost:9000/tables/githubEvents/schema'
+  schemaURI: 'http://localhost:9000/tables/githubComplexTypeEvents/schema'
 
   # tableConfigURI: defines where to reade the table config.
   # Supports using PinotFS or HTTP.
@@ -121,7 +121,7 @@ tableSpec:
   #   http://localhost:9000/tables/myTable
   # Note that the API to read Pinot table config directly from pinot controller contains a JSON wrapper.
   # The real table config is the object under the field 'OFFLINE'.
-  tableConfigURI: 'http://localhost:9000/tables/githubEvents'
+  tableConfigURI: 'http://localhost:9000/tables/githubComplexTypeEvents'
 
 # pinotClusterSpecs: defines the Pinot Cluster Access Point.
 pinotClusterSpecs:
