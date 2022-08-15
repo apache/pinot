@@ -44,6 +44,7 @@ import org.apache.pinot.spi.trace.Tracing;
 /**
  * Class for evaluating transform expressions.
  */
+// [tanmeshnm] transform operator used to transform raw data in segments
 public class TransformOperator extends BaseOperator<TransformBlock> {
   private static final String EXPLAIN_NAME = "TRANSFORM";
 
@@ -57,6 +58,7 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
    * @param projectionOperator Projection operator
    * @param expressions Collection of expressions to evaluate
    */
+  // todo:[tanmeshnm] where is expression context getting passed?
   public TransformOperator(@Nullable QueryContext queryContext, ProjectionOperator projectionOperator,
       Collection<ExpressionContext> expressions) {
     _projectionOperator = projectionOperator;

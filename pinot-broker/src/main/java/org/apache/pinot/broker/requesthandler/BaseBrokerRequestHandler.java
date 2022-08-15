@@ -202,6 +202,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     long compilationStartTimeNs = System.nanoTime();
     PinotQuery pinotQuery;
     try {
+      // [tanmeshnm] Query entry point
       pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());

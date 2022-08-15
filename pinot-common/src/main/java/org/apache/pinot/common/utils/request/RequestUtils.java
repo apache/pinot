@@ -21,9 +21,15 @@ package org.apache.pinot.common.utils.request;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.calcite.sql.SqlLiteral;
+import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.request.*;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
+import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Identifier;
+import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.sql.FilterKind;
 
@@ -35,12 +41,6 @@ public class RequestUtils {
   public static Expression getIdentifierExpression(String identifier) {
     Expression expression = new Expression(ExpressionType.IDENTIFIER);
     expression.setIdentifier(new Identifier(identifier));
-    return expression;
-  }
-
-  public static Expression getIntervalQualifierExpression(String intervalQualifier) {
-    Expression expression = new Expression(ExpressionType.INTERVAL_QUALIFIER);
-    expression.setIntervalQualifier(new IntervalQualifier(intervalQualifier));
     return expression;
   }
 
@@ -130,6 +130,11 @@ public class RequestUtils {
   }
 
   private static final Map<String, String> CANONICAL_NAME_TO_SPECIAL_KEY_MAP;
+
+  public static Expression getExtractExpression(SqlNode node) {
+
+    return null;
+  }
 
   static {
     CANONICAL_NAME_TO_SPECIAL_KEY_MAP = new HashMap<>();

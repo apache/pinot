@@ -189,25 +189,25 @@ public class CalciteSqlCompilerTest {
     try {
       //@formatter:off
       {
-        PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT EXTRACT(WEEK FROM \"2017-06-15\")");
+        PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT * EXTRACT(WEEK FROM \"2017-06-15\")");
         Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
         Assert.assertEquals(function.getOperands().get(0).getIntervalQualifier().getName(), "WEEK");
         Assert.assertEquals(function.getOperands().get(1).getIdentifier().getName(), "2017-06-15");
       }
 
-      {
-        PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT EXTRACT(MINUTE FROM \"2017-06-15 09:34:21\")");
-        Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
-        Assert.assertEquals(function.getOperands().get(0).getIntervalQualifier().getName(), "MINUTE");
-        Assert.assertEquals(function.getOperands().get(1).getIdentifier().getName(), "2017-06-15 09:34:21");
-      }
-
-      {
-        PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT EXTRACT(YEAR FROM \"2017-06-15 09:34:21\")");
-        Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
-        Assert.assertEquals(function.getOperands().get(0).getIntervalQualifier().getName(), "YEAR");
-        Assert.assertEquals(function.getOperands().get(1).getIdentifier().getName(), "2017-06-15 09:34:21");
-      }
+//      {
+//        PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT EXTRACT(MINUTE FROM \"2017-06-15 09:34:21\")");
+//        Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
+//        Assert.assertEquals(function.getOperands().get(0).getIntervalQualifier().getName(), "MINUTE");
+//        Assert.assertEquals(function.getOperands().get(1).getIdentifier().getName(), "2017-06-15 09:34:21");
+//      }
+//
+//      {
+//        PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT EXTRACT(YEAR FROM \"2017-06-15 09:34:21\")");
+//        Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
+//        Assert.assertEquals(function.getOperands().get(0).getIntervalQualifier().getName(), "YEAR");
+//        Assert.assertEquals(function.getOperands().get(1).getIdentifier().getName(), "2017-06-15 09:34:21");
+//      }
       //@formatter:on
     } catch (SqlCompilationException e) {
       throw e;

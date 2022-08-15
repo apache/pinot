@@ -737,6 +737,7 @@ public class CalciteSqlParser {
           // This is to handle expression like: CAST(col AS INT)
           return RequestUtils.getLiteralExpression(((SqlDataTypeSpec) node).getTypeName().getSimple());
         } else {
+          // [tanmeshnm] entry point for extract
           return compileFunctionExpression((SqlBasicCall) node);
         }
     }
@@ -752,6 +753,8 @@ public class CalciteSqlParser {
       case OR:
         return compileOrExpression(functionNode);
       // BETWEEN and LIKE might be negated (NOT BETWEEN, NOT LIKE)
+      case EXTRACT:
+        return compileExtractExpression(functionNode);
       case BETWEEN:
         negated = ((SqlBetweenOperator) functionNode.getOperator()).isNegated();
         canonicalName = SqlKind.BETWEEN.name();
@@ -811,6 +814,39 @@ public class CalciteSqlParser {
     } else {
       return functionExpression;
     }
+  }
+
+  /**
+   * EXTRACT(<field> FROM <exp>)
+   * field  -- Identifier??
+   * exp    -- Literal??
+   */
+  private static Expression compileExtractExpression(SqlBasicCall extractNode) {
+
+    // 1. convert field from INTERVAL_QUALIFIER to LITERAL
+    SqlNode literalField = SqlNode.clone(extractNode.getOperandList().get(0));
+
+
+    // 2. extract field from exp
+    SqlNode exp = extractNode.getOperandList().get(1);
+
+
+//    ExtractTransformFunction extractTransformFunction = new ExtractTransformFunction();
+
+
+
+// .......
+//    List<Expression> operands = new ArrayList<>();
+//    operands.add(toExpression(convertIntervalQualifierToLiteral(extractNode.getOperandList().get(0))));
+//    operands.add(toExpression(extractNode.getOperandList().get(0))); // INTERVAL_QUALIFIER // WEEK
+//    operands.add(toExpression(extractNode.getOperandList().get(1))); // IDENTIFIER // TIME
+
+//    Expression extractExpression = RequestUtils.getFunctionExpression(FilterKind.EXTRACT.name());
+//    extractExpression.getFunctionCall().setOperands(operands);
+//
+//    return extractExpression;
+
+    return null;
   }
 
   /**

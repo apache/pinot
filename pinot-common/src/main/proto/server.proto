@@ -39,6 +39,7 @@ syntax = "proto3";
 
 package org.apache.pinot.common.proto;
 
+// [tanmeshnm] proto for PinotQueryServer
 service PinotQueryServer {
   rpc Submit(ServerRequest) returns (stream ServerResponse);
 }

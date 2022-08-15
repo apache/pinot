@@ -52,6 +52,7 @@ public class QueryContextConverterUtils {
   /**
    * Converts the given {@link PinotQuery} into a {@link QueryContext}.
    */
+  // [tanmeshnm] converting PinotQuery to QueryContext
   public static QueryContext getQueryContext(PinotQuery pinotQuery) {
     // FROM
     String tableName;
