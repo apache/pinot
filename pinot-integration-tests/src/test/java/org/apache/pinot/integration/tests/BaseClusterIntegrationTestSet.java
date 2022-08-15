@@ -26,8 +26,10 @@ import java.io.InputStreamReader;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.Message;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.exception.QueryException;
@@ -543,8 +545,17 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     // reset the table.
     resetTable(rawTableName, tableType, null);
 
-    // Sleep 5 second to allow reset table async do its job.
-    Thread.sleep(5000L);
+    // wait for all live messages clear the queue.
+    List<String> instances = _helixResourceManager.getServerInstancesForTable(rawTableName, tableType);
+    PropertyKey.Builder keyBuilder = _helixDataAccessor.keyBuilder();
+    TestUtils.waitForCondition(aVoid -> {
+      int liveMessageCount = 0;
+      for (String instanceName : instances) {
+        List<Message> messages = _helixDataAccessor.getChildValues(keyBuilder.messages(instanceName), true);
+        liveMessageCount += messages.size();
+      }
+      return liveMessageCount == 0;
+    }, 30_000L, "Failed to wait for all segment reset messages clear helix state transition!");
 
     // Check that all states comes back to ONLINE.
     TestUtils.waitForCondition(aVoid -> {
