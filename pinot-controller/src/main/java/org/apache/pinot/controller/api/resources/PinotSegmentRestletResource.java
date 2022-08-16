@@ -507,7 +507,8 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "Name of the target instance to reset") @QueryParam("targetInstance") String targetInstance) {
+      @ApiParam(value = "Name of the target instance to reset") @QueryParam("targetInstance") @Nullable
+          String targetInstance) {
     segmentName = URIUtils.decode(segmentName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     try {

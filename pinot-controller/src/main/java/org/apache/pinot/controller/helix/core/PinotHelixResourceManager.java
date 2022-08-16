@@ -2365,20 +2365,16 @@ public class PinotHelixResourceManager {
     Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
     ExternalView externalView = getTableExternalView(tableNameWithType);
     Preconditions.checkState(externalView != null, "Could not find external view for table: %s", tableNameWithType);
-    Set<String> instanceSet = idealState.getInstanceSet(segmentName);
-    Preconditions.checkState(CollectionUtils.isNotEmpty(instanceSet),
-        "Could not find segment: %s in ideal state for table: %s", segmentName, tableNameWithType);
+    Set<String> instanceSet = parseInstanceSet(idealState, segmentName, targetInstance);
     Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
 
     for (String instance : instanceSet) {
-      if (targetInstance == null || targetInstance.equals(instance)) {
-        if (externalViewStateMap == null || SegmentStateModel.OFFLINE.equals(externalViewStateMap.get(instance))) {
-          LOGGER.info("Skipping reset for segment: {} of table: {} on instance: {}", segmentName, tableNameWithType,
-              instance);
-        } else {
-          LOGGER.info("Resetting segment: {} of table: {} on instance: {}", segmentName, tableNameWithType, instance);
-          resetPartitionAllState(instance, tableNameWithType, Collections.singleton(segmentName));
-        }
+      if (externalViewStateMap == null || SegmentStateModel.OFFLINE.equals(externalViewStateMap.get(instance))) {
+        LOGGER.info("Skipping reset for segment: {} of table: {} on instance: {}", segmentName, tableNameWithType,
+            instance);
+      } else {
+        LOGGER.info("Resetting segment: {} of table: {} on instance: {}", segmentName, tableNameWithType, instance);
+        resetPartitionAllState(instance, tableNameWithType, Collections.singleton(segmentName));
       }
     }
   }
@@ -2397,7 +2393,7 @@ public class PinotHelixResourceManager {
     Map<String, Set<String>> instanceToSkippedSegmentsMap = new HashMap<>();
 
     for (String segmentName : idealState.getPartitionSet()) {
-      Set<String> instanceSet = idealState.getInstanceSet(segmentName);
+      Set<String> instanceSet = parseInstanceSet(idealState, segmentName, targetInstance);
       Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
       for (String instance : instanceSet) {
         if (externalViewStateMap == null || SegmentStateModel.OFFLINE.equals(externalViewStateMap.get(instance))) {
@@ -2408,16 +2404,25 @@ public class PinotHelixResourceManager {
       }
     }
 
-    LOGGER.info("Resetting segments of table: {}", tableNameWithType);
+    LOGGER.info("Resetting all segments of table: {}", tableNameWithType);
     for (Map.Entry<String, Set<String>> entry : instanceToResetSegmentsMap.entrySet()) {
-      if (targetInstance == null || targetInstance.equals(entry.getKey())) {
-        resetPartitionAllState(entry.getKey(), tableNameWithType,
-            entry.getValue());
-      }
+      resetPartitionAllState(entry.getKey(), tableNameWithType, entry.getValue());
     }
 
-    LOGGER.info("Reset segments for table {} finished. WIth the following segments skipped: {}", tableNameWithType,
+    LOGGER.info("Reset segments for table {} finished. With the following segments skipped: {}", tableNameWithType,
         instanceToSkippedSegmentsMap);
+  }
+
+  private static Set<String> parseInstanceSet(IdealState idealState, String segmentName,
+      @Nullable String targetInstance) {
+    Set<String> instanceSet = idealState.getInstanceSet(segmentName);
+    Preconditions.checkState(CollectionUtils.isNotEmpty(instanceSet),
+        "Could not find segment: %s in ideal state", segmentName);
+    if (targetInstance != null) {
+      return instanceSet.contains(targetInstance) ? Collections.singleton(targetInstance) : Collections.emptySet();
+    } else {
+      return instanceSet;
+    }
   }
 
   /**
@@ -2442,12 +2447,15 @@ public class PinotHelixResourceManager {
 
     // gather metadata for sending state transition message.
     // we skip through the sanity checks normally done on Helix because in Pinot these are guaranteed to be safe.
+    // TODO: these are static in Pinot's resource reset (for each resource type).
     IdealState idealState = accessor.getProperty(keyBuilder.idealStates(resourceName));
+    String stateModelDef = idealState.getStateModelDefRef();
+    StateModelDefinition stateModel = accessor.getProperty(keyBuilder.stateModelDef(stateModelDef));
+
+    // get current state.
     String sessionId = liveInstance.getEphemeralOwner();
     CurrentState curState =
         accessor.getProperty(keyBuilder.currentState(instanceName, sessionId, resourceName));
-    String stateModelDef = idealState.getStateModelDefRef();
-    StateModelDefinition stateModel = accessor.getProperty(keyBuilder.stateModelDef(stateModelDef));
 
     // check there is no pending messages for the partitions exist
     List<Message> messages = accessor.getChildValues(keyBuilder.messages(instanceName), true);
@@ -2457,7 +2465,6 @@ public class PinotHelixResourceManager {
           || !resetPartitionNames.contains(message.getPartitionName())) {
         continue;
       }
-
       throw new RuntimeException(String.format("Can't reset state for %s.%s on %s, "
               + "because a pending message %s exists for resource %s", resourceName, resetPartitionNames, instanceName,
           message.toString(), message.getResourceName()));
