@@ -42,8 +42,8 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 
-public class MultiGetRequestTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MultiGetRequest.class);
+public class MultiHttpRequestTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MultiHttpRequest.class);
   private static final String SUCCESS_MSG = "success";
   private static final String ERROR_MSG = "error";
   private static final String TIMEOUT_MSG = "Timeout";
@@ -106,8 +106,8 @@ public class MultiGetRequestTest {
 
   @Test
   public void testMultiGet() {
-    MultiGetRequest mget =
-        new MultiGetRequest(Executors.newCachedThreadPool(), new MultiThreadedHttpConnectionManager());
+    MultiHttpRequest mget =
+        new MultiHttpRequest(Executors.newCachedThreadPool(), new MultiThreadedHttpConnectionManager());
     List<String> urls = Arrays.asList("http://localhost:" + String.valueOf(_portStart) + URI_PATH,
         "http://localhost:" + String.valueOf(_portStart + 1) + URI_PATH,
         "http://localhost:" + String.valueOf(_portStart + 2) + URI_PATH,

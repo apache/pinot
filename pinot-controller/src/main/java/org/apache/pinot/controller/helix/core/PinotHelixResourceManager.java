@@ -226,28 +226,7 @@ public class PinotHelixResourceManager {
               public String load(String instanceId) {
                 InstanceConfig instanceConfig = getHelixInstanceConfig(instanceId);
                 Preconditions.checkNotNull(instanceConfig, "Failed to find instance config for: %s", instanceId);
-                // Backward-compatible with legacy hostname of format 'Server_<hostname>'
-                String hostname = instanceConfig.getHostName();
-                if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
-                  hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
-                }
-
-                String protocol = CommonConstants.HTTP_PROTOCOL;
-                int port = Server.DEFAULT_ADMIN_API_PORT;
-
-                int adminPort = instanceConfig.getRecord().getIntField(Helix.Instance.ADMIN_PORT_KEY, -1);
-                int adminHttpsPort = instanceConfig.getRecord().getIntField(Helix.Instance.ADMIN_HTTPS_PORT_KEY, -1);
-
-                // NOTE: preference for insecure is sub-optimal, but required for incremental upgrade scenarios
-                if (adminPort > 0) {
-                  protocol = CommonConstants.HTTP_PROTOCOL;
-                  port = adminPort;
-                } else if (adminHttpsPort > 0) {
-                  protocol = CommonConstants.HTTPS_PROTOCOL;
-                  port = adminHttpsPort;
-                }
-
-                return String.format("%s://%s:%d", protocol, hostname, port);
+                return InstanceUtils.getInstanceAdminEndpoint(instanceConfig, Server.DEFAULT_ADMIN_API_PORT);
               }
             });
     _tableUpdaterLocks = new Object[DEFAULT_TABLE_UPDATER_LOCKERS_SIZE];

@@ -26,6 +26,7 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.instance.Instance;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 
 
@@ -57,6 +58,32 @@ public class InstanceUtils {
         throw new IllegalStateException();
     }
     return prefix + instance.getHost() + "_" + instance.getPort();
+  }
+
+  public static String getInstanceAdminEndpoint(InstanceConfig instanceConfig, int defaultPort) {
+    // Backward-compatible with legacy hostname of format 'Server_<hostname>'
+    String hostname = instanceConfig.getHostName();
+    if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+    }
+    return getInstanceAdminEndpoint(instanceConfig, CommonConstants.HTTP_PROTOCOL, hostname, defaultPort);
+  }
+
+  public static String getInstanceAdminEndpoint(InstanceConfig instanceConfig, String defaultProtocol, String hostname,
+      int defaultPort) {
+    String protocol = defaultProtocol;
+    int port = defaultPort;
+    int adminPort = instanceConfig.getRecord().getIntField(Helix.Instance.ADMIN_PORT_KEY, -1);
+    int adminHttpsPort = instanceConfig.getRecord().getIntField(Helix.Instance.ADMIN_HTTPS_PORT_KEY, -1);
+    // NOTE: preference for insecure is sub-optimal, but required for incremental upgrade scenarios
+    if (adminPort > 0) {
+      protocol = CommonConstants.HTTP_PROTOCOL;
+      port = adminPort;
+    } else if (adminHttpsPort > 0) {
+      protocol = CommonConstants.HTTPS_PROTOCOL;
+      port = adminHttpsPort;
+    }
+    return String.format("%s://%s:%d", protocol, hostname, port);
   }
 
   /**

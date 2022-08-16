@@ -258,4 +258,8 @@ public class ServerInstance {
   public long getLatestQueryTime() {
     return _latestQueryTime.get();
   }
+
+  public QueryScheduler getQueryScheduler() {
+    return _queryScheduler;
+  }
 }
