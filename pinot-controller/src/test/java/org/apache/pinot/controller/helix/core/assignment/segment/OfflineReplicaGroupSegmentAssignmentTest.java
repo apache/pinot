@@ -138,21 +138,15 @@ public class OfflineReplicaGroupSegmentAssignmentTest {
     TableConfig tableConfigWithPartitions =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITH_PARTITION)
             .setNumReplicas(NUM_REPLICAS)
-            .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY).build();
-    tableConfigWithPartitions.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
+            .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
+            .setReplicaGroupStrategyConfig(replicaGroupStrategyConfig).build();
     _segmentAssignmentWithPartition =
         SegmentAssignmentFactory.getSegmentAssignment(helixManagerWithPartitions, tableConfigWithPartitions);
 
     // {
-    //   0_0=[instance_0, instance_1],
-    //   0_1=[instance_6, instance_7],
-    //   0_2=[instance_12, instance_13],
-    //   1_0=[instance_2, instance_3],
-    //   1_1=[instance_8, instance_9],
-    //   1_2=[instance_14, instance_15],
-    //   2_0=[instance_4, instance_5],
-    //   2_1=[instance_10, instance_11],
-    //   2_2=[instance_16, instance_17]
+    //   0_0=[instance_0, instance_1], 1_0=[instance_2, instance_3], 2_0=[instance_4, instance_5],
+    //   0_1=[instance_6, instance_7], 1_1=[instance_8, instance_9], 2_1=[instance_10, instance_11],
+    //   0_2=[instance_12, instance_13], 1_2=[instance_14, instance_15], 2_2=[instance_16, instance_17]
     // }
     InstancePartitions instancePartitionsWithPartition =
         new InstancePartitions(INSTANCE_PARTITIONS_NAME_WITH_PARTITION);

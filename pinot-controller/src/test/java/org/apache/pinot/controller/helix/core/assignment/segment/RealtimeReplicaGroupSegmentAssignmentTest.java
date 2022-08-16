@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -30,6 +31,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -49,8 +51,10 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
+@SuppressWarnings("unchecked")
 public class RealtimeReplicaGroupSegmentAssignmentTest {
   private static final int NUM_REPLICAS = 3;
+  private static final String PARTITION_COLUMN = "partitionColumn";
   private static final int NUM_PARTITIONS = 4;
   private static final int NUM_SEGMENTS = 24;
   private static final String CONSUMING_INSTANCE_NAME_PREFIX = "consumingInstance_";
@@ -82,7 +86,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setLLC(true).setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
-            .build();
+            .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1)).build();
     _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(createHelixManager(), tableConfig);
 
     _instancePartitionsMap = new TreeMap<>();
@@ -315,6 +319,117 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
       currentAssignment.put(segmentName,
           SegmentAssignmentUtils.getInstanceStateMap(actualInstances, SegmentStateModel.ONLINE));
     });
+  }
+
+  @Test
+  public void testExplicitPartition() {
+    // CONSUMING instances:
+    // {
+    //   0_0=[instance_0], 1_0=[instance_1], 2_0=[instance_2],
+    //   0_1=[instance_3], 1_1=[instance_4], 2_1=[instance_5],
+    //   0_2=[instance_6], 1_2=[instance_7], 2_2=[instance_8]
+    // }
+    //        p0                p1                p2
+    //        p3
+    InstancePartitions consumingInstancePartitions = new InstancePartitions(CONSUMING_INSTANCE_PARTITIONS_NAME);
+    int numConsumingInstancesPerReplicaGroup = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
+    int consumingInstanceIdToAdd = 0;
+    for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+      for (int partitionId = 0; partitionId < numConsumingInstancesPerReplicaGroup; partitionId++) {
+        consumingInstancePartitions.setInstances(partitionId, replicaGroupId,
+            Collections.singletonList(CONSUMING_INSTANCES.get(consumingInstanceIdToAdd++)));
+      }
+    }
+
+    // COMPLETED instances:
+    // {
+    //   0_0=[instance_0], 1_0=[instance_1], 2_0=[instance_2], 3_0=[instance_3],
+    //   0_1=[instance_4], 1_1=[instance_5], 2_1=[instance_6], 3_1=[instance_7],
+    //   0_2=[instance_8], 1_2=[instance_9], 2_2=[instance_10], 3_2=[instance_11]
+    // }
+    InstancePartitions completedInstancePartitions = new InstancePartitions(COMPLETED_INSTANCE_PARTITIONS_NAME);
+    int numCompletedInstancesPerReplicaGroup = NUM_COMPLETED_INSTANCES / NUM_REPLICAS;
+    int completedInstanceIdToAdd = 0;
+    for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+      for (int partitionId = 0; partitionId < numCompletedInstancesPerReplicaGroup; partitionId++) {
+        completedInstancePartitions.setInstances(partitionId, replicaGroupId,
+            Collections.singletonList(COMPLETED_INSTANCES.get(completedInstanceIdToAdd++)));
+      }
+    }
+
+    // Test assigning CONSUMING segment
+    Map<InstancePartitionsType, InstancePartitions> onlyConsumingInstancePartitionMap =
+        ImmutableMap.of(InstancePartitionsType.CONSUMING, consumingInstancePartitions);
+    Map<String, Map<String, String>> consumingCurrentAssignment = new TreeMap<>();
+    for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
+      String segmentName = _segments.get(segmentId);
+      List<String> instancesAssigned =
+          _segmentAssignment.assignSegment(segmentName, consumingCurrentAssignment, onlyConsumingInstancePartitionMap);
+      assertEquals(instancesAssigned.size(), NUM_REPLICAS);
+
+      // Segment 0 (partition 0) should be assigned to instance 0, 3, 6
+      // Segment 1 (partition 1) should be assigned to instance 1, 4, 7
+      // Segment 2 (partition 2) should be assigned to instance 2, 5, 8
+      // Segment 3 (partition 3) should be assigned to instance 0, 3, 6
+      // Segment 4 (partition 0) should be assigned to instance 0, 3, 6
+      // Segment 5 (partition 1) should be assigned to instance 1, 4, 7
+      // ...
+      for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+        int partitionId = segmentId % NUM_PARTITIONS;
+        int expectedAssignedInstanceId =
+            partitionId % numConsumingInstancesPerReplicaGroup + replicaGroupId * numConsumingInstancesPerReplicaGroup;
+        assertEquals(instancesAssigned.get(replicaGroupId), CONSUMING_INSTANCES.get(expectedAssignedInstanceId));
+      }
+
+      addToAssignment(consumingCurrentAssignment, segmentId, instancesAssigned);
+    }
+
+    // Test assigning UPLOADED segment
+    Map<InstancePartitionsType, InstancePartitions> onlyCompletedInstancePartitionMap =
+        ImmutableMap.of(InstancePartitionsType.COMPLETED, completedInstancePartitions);
+    Map<String, Map<String, String>> uploadedCurrentAssignment = new TreeMap<>();
+    for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
+      String segmentName = _segments.get(segmentId);
+      List<String> instancesAssigned =
+          _segmentAssignment.assignSegment(segmentName, uploadedCurrentAssignment, onlyCompletedInstancePartitionMap);
+      assertEquals(instancesAssigned.size(), NUM_REPLICAS);
+
+      // Segment 0 (partition 0) should be assigned to instance 0, 4, 8
+      // Segment 1 (partition 1) should be assigned to instance 1, 5, 9
+      // Segment 2 (partition 2) should be assigned to instance 2, 6, 10
+      // Segment 3 (partition 3) should be assigned to instance 3, 7, 11
+      // Segment 4 (partition 0) should be assigned to instance 0, 4, 8
+      // Segment 5 (partition 1) should be assigned to instance 1, 5, 9
+      // ...
+      for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+        int partitionId = segmentId % NUM_PARTITIONS;
+        int expectedAssignedInstanceId = partitionId + replicaGroupId * numCompletedInstancesPerReplicaGroup;
+        assertEquals(instancesAssigned.get(replicaGroupId), COMPLETED_INSTANCES.get(expectedAssignedInstanceId));
+      }
+
+      addToAssignment(uploadedCurrentAssignment, segmentId, instancesAssigned);
+    }
+
+    // Test relocating COMPLETED segments
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+        ImmutableMap.of(InstancePartitionsType.CONSUMING, consumingInstancePartitions, InstancePartitionsType.COMPLETED,
+            completedInstancePartitions);
+    BaseConfiguration rebalanceConfig = new BaseConfiguration();
+    rebalanceConfig.setProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, true);
+    Map<String, Map<String, String>> newAssignment =
+        _segmentAssignment.rebalanceTable(uploadedCurrentAssignment, instancePartitionsMap, null, null,
+            rebalanceConfig);
+
+    // First 20 segments (COMPLETED) should have the same assignment as if they are uploaded
+    // Last 4 segments (CONSUMING) should not move
+    for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
+      String segmentName = _segments.get(segmentId);
+      if (segmentId < NUM_SEGMENTS - NUM_PARTITIONS) {
+        assertEquals(newAssignment.get(segmentName), uploadedCurrentAssignment.get(segmentName));
+      } else {
+        assertEquals(newAssignment.get(segmentName), consumingCurrentAssignment.get(segmentName));
+      }
+    }
   }
 
   private void addToAssignment(Map<String, Map<String, String>> currentAssignment, int segmentId,

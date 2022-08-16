@@ -129,8 +129,10 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
    */
   private List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
       InstancePartitions instancePartitions) {
-    // NOTE: When partition column is configured, use replica-group based assignment
-    if (_partitionColumn == null && instancePartitions.getNumReplicaGroups() == 1) {
+    int numReplicaGroups = instancePartitions.getNumReplicaGroups();
+    int numPartitions = instancePartitions.getNumPartitions();
+
+    if (numReplicaGroups == 1 && numPartitions == 1) {
       // Non-replica-group based assignment
 
       return SegmentAssignmentUtils.assignSegmentWithoutReplicaGroup(currentAssignment, instancePartitions,
@@ -142,7 +144,7 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
 
       // Fetch partition id from segment ZK metadata if partition column is configured
       int partitionId;
-      if (_partitionColumn == null) {
+      if (_partitionColumn == null || numPartitions == 1) {
         partitionId = 0;
       } else {
         SegmentZKMetadata segmentZKMetadata =
@@ -153,7 +155,6 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
         int segmentPartitionId = getPartitionId(segmentZKMetadata);
 
         // Uniformly spray the segment partitions over the instance partitions
-        int numPartitions = instancePartitions.getNumPartitions();
         partitionId = segmentPartitionId % numPartitions;
       }
 
@@ -238,8 +239,10 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
             SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
       }
     } else {
-      // NOTE: When partition column is configured, use replica-group based assignment
-      if (_partitionColumn == null && instancePartitions.getNumReplicaGroups() == 1) {
+      int numReplicaGroups = instancePartitions.getNumReplicaGroups();
+      int numPartitions = instancePartitions.getNumPartitions();
+
+      if (numReplicaGroups == 1 && numPartitions == 1) {
         // Non-replica-group based assignment
 
         List<String> instances =
@@ -252,7 +255,7 @@ public class OfflineSegmentAssignment implements SegmentAssignment {
 
         checkReplication(instancePartitions);
 
-        if (_partitionColumn == null) {
+        if (_partitionColumn == null || numPartitions == 1) {
           // NOTE: Shuffle the segments within the current assignment to avoid moving only new segments to the new added
           //       servers, which might cause hotspot servers because queries tend to hit the new segments. Use the
           //       table name hash as the random seed for the shuffle so that the result is deterministic.
