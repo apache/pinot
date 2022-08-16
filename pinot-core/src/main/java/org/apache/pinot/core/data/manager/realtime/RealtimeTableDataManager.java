@@ -200,9 +200,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   protected void doShutdown() {
     _segmentAsyncExecutorService.shutdown();
     if (_tableUpsertMetadataManager != null) {
-      _tableUpsertMetadataManager.close();
+      try {
+        _tableUpsertMetadataManager.close();
+      } catch (IOException e) {
+        _logger.warn("Cannot close upsert metadata manager properly for table: {}", _tableNameWithType, e);
+      }
     }
-
     for (SegmentDataManager segmentDataManager : _segmentDataManagerMap.values()) {
       segmentDataManager.destroy();
     }

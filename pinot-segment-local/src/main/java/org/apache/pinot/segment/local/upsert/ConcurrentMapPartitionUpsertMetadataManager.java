@@ -432,7 +432,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager implements PartitionUps
   public void close() {
     _logger.info("Closing metadata manager for table {} and partition {}, current primary key count: {}",
         _tableNameWithType, _partitionId, _primaryKeyToRecordLocationMap.size());
-    _primaryKeyToRecordLocationMap.clear();
   }
 
   @VisibleForTesting

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
+import java.io.Closeable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -30,13 +31,11 @@ import org.apache.pinot.spi.data.Schema;
  * The manager of the upsert metadata of a table.
  */
 @ThreadSafe
-public interface TableUpsertMetadataManager {
+public interface TableUpsertMetadataManager extends Closeable {
 
   void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, ServerMetrics serverMetrics);
 
   ConcurrentMapPartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 
   UpsertConfig.Mode getUpsertMode();
-
-  void close();
 }
