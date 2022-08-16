@@ -43,6 +43,7 @@ public class QueryEnvironmentTestBase {
   @DataProvider(name = "testQueryDataProvider")
   protected Object[][] provideQueries() {
     return new Object[][] {
+        new Object[]{"SELECT * FROM a LIMIT 10"},
         new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2"},
         new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0"},
         new Object[]{"SELECT * FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2"},
