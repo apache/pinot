@@ -20,8 +20,6 @@
 package org.apache.pinot.queries;
 
 import java.io.File;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,6 +27,7 @@ import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.math3.util.Precision;
 import org.apache.commons.math3.stat.correlation.Covariance;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
@@ -49,6 +48,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -170,15 +170,18 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     _sumLong = Arrays.stream(longCol).sum();
     _sumFloat = Arrays.stream(floatCol).sum();
 
-//    Covariance cov = new Covariance();
-//    _expectedCovIntXY = cov.covariance(intColX, intColY, false);
-//    _expectedCovDoubleXY = cov.covariance(doubleColX, doubleColY, false);
-//    _expectedCovIntDouble = cov.covariance(intColX, doubleColX, false);
-//    _expectedCovIntLong = cov.covariance(intColX, longCol, false);
-//    _expectedCovIntFloat = cov.covariance(intColX, floatCol, false);
-//    _expectedCovDoubleLong = cov.covariance(doubleColX, longCol, false);
-//    _expectedCovDoubleFloat = cov.covariance(doubleColX, floatCol, false);
-//    _expectedCovLongFloat = cov.covariance(longCol, floatCol, false);
+    Covariance cov = new Covariance();
+    double[] newIntColX = Arrays.stream(intColX).asDoubleStream().toArray();
+    double[] newIntColY = Arrays.stream(intColY).asDoubleStream().toArray();
+    double[] newLongCol = Arrays.stream(longCol).asDoubleStream().toArray();
+    _expectedCovIntXY = cov.covariance(newIntColX, newIntColY, false);
+    _expectedCovDoubleXY = cov.covariance(doubleColX, doubleColY, false);
+    _expectedCovIntDouble = cov.covariance(newIntColX, doubleColX, false);
+    _expectedCovIntLong = cov.covariance(newIntColX, newLongCol, false);
+    _expectedCovIntFloat = cov.covariance(newIntColX, floatCol, false);
+    _expectedCovDoubleLong = cov.covariance(doubleColX, newLongCol, false);
+    _expectedCovDoubleFloat = cov.covariance(doubleColX, floatCol, false);
+    _expectedCovLongFloat = cov.covariance(newLongCol, floatCol, false);
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
@@ -219,13 +222,22 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     checkWithPrecision((CovarianceTuple) aggregationResult.get(6), _sumDoubleX, _sumFloat, _sumDoubleFloat);
     checkWithPrecision((CovarianceTuple) aggregationResult.get(7), _sumLong, _sumFloat, _sumLongFloat);
 
-//    assertEquals(aggregationResult.get(1), _expectedCovDoubleXY);
-//    assertEquals(aggregationResult.get(2), _expectedCovIntDouble);
-//    assertEquals(aggregationResult.get(3), _expectedCovIntLong);
-//    assertEquals(aggregationResult.get(4), _expectedCovIntFloat);
-//    assertEquals(aggregationResult.get(5), _expectedCovDoubleLong);
-//    assertEquals(aggregationResult.get(6), _expectedCovDoubleFloat);
-//    assertEquals(aggregationResult.get(7), _expectedCovLongFloat);
+    // Inter segments (expect 4 * inner segment result)
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
+    assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
+    assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 6 * NUM_RECORDS);
+    assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
+    Object[] results = brokerResponse.getResultTable().getRows().get(0);
+    assertEquals(results.length, 8);
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[0], _expectedCovIntXY, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[1], _expectedCovDoubleXY, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[2], _expectedCovIntDouble, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[3], _expectedCovIntLong, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[4], _expectedCovIntFloat, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[5], _expectedCovDoubleLong, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[6], _expectedCovDoubleFloat, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[7], _expectedCovLongFloat, RELATIVE_EPSILON));
   }
 
   private void checkWithPrecision(CovarianceTuple tuple, double sumX, double sumY, double sumXY) {
