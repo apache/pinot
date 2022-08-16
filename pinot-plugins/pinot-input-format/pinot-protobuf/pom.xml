@@ -35,8 +35,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <proto.version>3.11.4</proto.version>
-    <confluent.version>5.5.3</confluent.version>
     <kafka.lib.version>2.8.1</kafka.lib.version>
     <testcontainers.version>1.17.3</testcontainers.version>
     <phase.prop>package</phase.prop>
