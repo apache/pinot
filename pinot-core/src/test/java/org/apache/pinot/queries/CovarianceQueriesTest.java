@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.math3.util.Precision;
 import org.apache.commons.math3.stat.correlation.Covariance;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -48,7 +49,6 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -62,8 +62,8 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   private static final String SEGMENT_NAME = "testSegment";
 
   private static final int NUM_RECORDS = 2000;
-  private static final int MAX_VALUE = 100;
-  private static final int PRECISION_SCALE = 4;
+  private static final int MAX_VALUE = 500;
+  private static final double RELATIVE_EPSILON = 0.00001;
 
   private static final String INT_COLUMN_X = "intColumnX";
   private static final String INT_COLUMN_Y = "intColumnY";
@@ -90,14 +90,14 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   private double _sumDoubleXY = 0;
 
   private long _sumLong = 0l;
-  private float _sumFloat = 0f;
+  private double _sumFloat = 0;
 
   private double _sumIntDouble = 0;
   private long _sumIntLong = 0l;
-  private float _sumIntFloat = 0f;
+  private double _sumIntFloat = 0;
   private double _sumDoubleLong = 0;
   private double _sumDoubleFloat = 0;
-  private float _sumLongFloat = 0f;
+  private double _sumLongFloat = 0;
 
   private double _expectedCovIntXY;
   private double _expectedCovDoubleXY;
@@ -135,6 +135,7 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     double[] doubleColX = rand.doubles(NUM_RECORDS, -MAX_VALUE, MAX_VALUE).toArray();
     double[] doubleColY = rand.doubles(NUM_RECORDS, -MAX_VALUE, MAX_VALUE).toArray();
     long[] longCol = rand.longs(NUM_RECORDS, -MAX_VALUE, MAX_VALUE).toArray();
+    double[] floatCol = new double[NUM_RECORDS];
 
     for (int i  = 0; i < NUM_RECORDS; i++) {
       GenericRow record = new GenericRow();
@@ -144,16 +145,15 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
       double doubleY = doubleColY[i];
       long longVal = longCol[i];
       float floatVal = -MAX_VALUE + rand.nextFloat() * 2 * MAX_VALUE;
-
+      floatCol[i] = floatVal;
       _sumIntXY += intX * intY;
       _sumDoubleXY += doubleX * doubleY;
       _sumIntDouble += intX * doubleX;
       _sumIntLong += intX * longVal;
-      _sumIntFloat += intX * floatVal;
+      _sumIntFloat += intX * floatCol[i];
       _sumDoubleLong += doubleX * longVal;
-      _sumDoubleFloat += doubleX * floatVal;
-      _sumLongFloat += longVal * floatVal;
-      _sumFloat += floatVal;
+      _sumDoubleFloat += doubleX * floatCol[i];
+      _sumLongFloat += longVal * floatCol[i];
 
       record.putValue(INT_COLUMN_X, intX);
       record.putValue(INT_COLUMN_Y, intY);
@@ -163,14 +163,12 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
       record.putValue(FLOAT_COLUMN, floatVal);
       records.add(record);
     }
-
     _sumIntX = Arrays.stream(intColX).sum();
     _sumIntY = Arrays.stream(intColY).sum();
     _sumDoubleX = Arrays.stream(doubleColX).sum();
     _sumDoubleY = Arrays.stream(doubleColY).sum();
     _sumLong = Arrays.stream(longCol).sum();
-
-
+    _sumFloat = Arrays.stream(floatCol).sum();
 
 //    Covariance cov = new Covariance();
 //    _expectedCovIntXY = cov.covariance(intColX, intColY, false);
@@ -212,48 +210,14 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
         NUM_RECORDS * 6, NUM_RECORDS);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
     assertNotNull(aggregationResult);
-    checkWithPrecision(PRECISION_SCALE, (CovarianceTuple) aggregationResult.get(0), _sumIntX, _sumIntY, _sumIntXY);
-    checkWithPrecision(PRECISION_SCALE, (CovarianceTuple) aggregationResult.get(1), _sumDoubleX, _sumDoubleY, _sumDoubleXY);
-    checkWithPrecision(PRECISION_SCALE, (CovarianceTuple) aggregationResult.get(2), _sumIntX, _sumDoubleX, _sumIntDouble);
-    checkWithPrecision(PRECISION_SCALE, (CovarianceTuple) aggregationResult.get(3), _sumIntX, _sumLong, _sumIntLong);
-    checkWithPrecision(2, (CovarianceTuple) aggregationResult.get(4), _sumIntX, _sumFloat, _sumIntFloat);
-    checkWithPrecision(PRECISION_SCALE, (CovarianceTuple) aggregationResult.get(5), _sumDoubleX, _sumLong, _sumDoubleLong);
-//    checkWithPrecision(2, (CovarianceTuple) aggregationResult.get(6), _sumDoubleX, _sumFloat, _sumDoubleFloat);
-//    checkWithPrecision(2, (CovarianceTuple) aggregationResult.get(7), _sumLong, _sumFloat, _sumLongFloat);
-
-
-
-//    assertEquals(((CovarianceTuple) aggregationResult.get(0)).getSumX(), (double) _sumIntX);
-//    assertEquals(((CovarianceTuple) aggregationResult.get(0)).getSumY(), (double) _sumIntY);
-//    assertEquals(((CovarianceTuple) aggregationResult.get(0)).getSumXY(), (double) _sumIntXY);
-//
-//    assertEquals(((CovarianceTuple)aggregationResult.get(1)).getSumX(), _sumDoubleX);
-//    assertEquals(((CovarianceTuple)aggregationResult.get(1)).getSumY(), _sumDoubleY);
-//    assertEquals(((CovarianceTuple)aggregationResult.get(1)).getSumXY(), _sumDoubleXY);
-//
-//    assertEquals(((CovarianceTuple)aggregationResult.get(2)).getSumX(), (double) _sumIntX);
-//    assertEquals(((CovarianceTuple)aggregationResult.get(2)).getSumY(), _sumDoubleX);
-//    assertEquals(((CovarianceTuple)aggregationResult.get(2)).getSumXY(), _sumIntDouble);
-
-//    assertEquals(((CovarianceTuple)aggregationResult.get(3)).getSumX(), (double) _sumIntX);
-//    assertEquals(((CovarianceTuple)aggregationResult.get(3)).getSumY(), _sumLong);
-//    assertEquals(((CovarianceTuple)aggregationResult.get(3)).getSumXY(), _sumIntLong);
-
-//    assertEquals(((CovarianceTuple)aggregationResult.get(4)).getSumX(), (double) _sumIntX);
-//    assertEquals(((CovarianceTuple)aggregationResult.get(4)).getSumY(), _sumFloat);
-//    assertEquals(((CovarianceTuple)aggregationResult.get(4)).getSumXY(), _sumIntFloat);
-//
-//    assertEquals(((CovarianceTuple)aggregationResult.get(5)).getSumX(), _sumDoubleX);
-//    assertEquals(((CovarianceTuple)aggregationResult.get(5)).getSumY(), _sumLong);
-//    assertEquals(((CovarianceTuple)aggregationResult.get(5)).getSumXY(), _sumDoubleLong);
-
-//    assertEquals(((CovarianceTuple)aggregationResult.get(6)).getSumX(), _sumDoubleX);
-//    assertEquals(((CovarianceTuple)aggregationResult.get(6)).getSumY(), _sumFloat);
-//    assertEquals(((CovarianceTuple)aggregationResult.get(6)).getSumXY(), _sumDoubleFloat);
-//
-//    assertEquals(((CovarianceTuple)aggregationResult.get(7)).getSumX(), _sumLong);
-//    assertEquals(((CovarianceTuple)aggregationResult.get(7)).getSumY(), _sumFloat);
-//    assertEquals(((CovarianceTuple)aggregationResult.get(7)).getSumXY(), _sumLongFloat);
+    checkWithPrecision((CovarianceTuple) aggregationResult.get(0), _sumIntX, _sumIntY, _sumIntXY);
+    checkWithPrecision((CovarianceTuple) aggregationResult.get(1), _sumDoubleX, _sumDoubleY, _sumDoubleXY);
+    checkWithPrecision((CovarianceTuple) aggregationResult.get(2), _sumIntX, _sumDoubleX, _sumIntDouble);
+    checkWithPrecision((CovarianceTuple) aggregationResult.get(3), _sumIntX, _sumLong, _sumIntLong);
+    checkWithPrecision((CovarianceTuple) aggregationResult.get(4), _sumIntX, _sumFloat, _sumIntFloat);
+    checkWithPrecision((CovarianceTuple) aggregationResult.get(5), _sumDoubleX, _sumLong, _sumDoubleLong);
+    checkWithPrecision((CovarianceTuple) aggregationResult.get(6), _sumDoubleX, _sumFloat, _sumDoubleFloat);
+    checkWithPrecision((CovarianceTuple) aggregationResult.get(7), _sumLong, _sumFloat, _sumLongFloat);
 
 //    assertEquals(aggregationResult.get(1), _expectedCovDoubleXY);
 //    assertEquals(aggregationResult.get(2), _expectedCovIntDouble);
@@ -264,9 +228,9 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
 //    assertEquals(aggregationResult.get(7), _expectedCovLongFloat);
   }
 
-  private void checkWithPrecision(int scale, CovarianceTuple tuple, double sumX, double sumY, double sumXY) {
-    assertEquals(BigDecimal.valueOf(tuple.getSumX()).setScale(scale, RoundingMode.HALF_UP), BigDecimal.valueOf(sumX).setScale(scale, RoundingMode.HALF_UP));
-    assertEquals(BigDecimal.valueOf(tuple.getSumY()).setScale(scale, RoundingMode.HALF_UP), BigDecimal.valueOf(sumY).setScale(scale, RoundingMode.HALF_UP));
-    assertEquals(BigDecimal.valueOf(tuple.getSumXY()).setScale(scale, RoundingMode.HALF_UP), BigDecimal.valueOf(sumXY).setScale(scale, RoundingMode.HALF_UP));
+  private void checkWithPrecision(CovarianceTuple tuple, double sumX, double sumY, double sumXY) {
+    assertTrue(Precision.equalsWithRelativeTolerance(tuple.getSumX(), sumX, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance(tuple.getSumY(), sumY, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance(tuple.getSumXY(), sumXY, RELATIVE_EPSILON));
   }
 }
