@@ -157,11 +157,13 @@ public abstract class QueryScheduler {
   /**
    * Cancel a query as identified by the queryId. This method is non-blocking and the query may still run for a while
    * after calling this method. This method can be called multiple times.
+   * TODO: refine the errmsg when query is cancelled, instead of bubbling up the executor's CancellationException.
    *
    * @param queryId a unique Id to find the query
    * @return true if a running query exists for the given queryId.
    */
   public boolean cancelQuery(String queryId) {
+    Preconditions.checkArgument(_enableQueryCancellation, "Query cancellation is not enabled on server");
     // Keep the future as it'll be cleaned up by the thread executing the query.
     Future<byte[]> future = _queryFuturesById.get(queryId);
     if (future == null) {
@@ -180,7 +182,8 @@ public abstract class QueryScheduler {
   /**
    * @return list of ids of the queries currently running on the server.
    */
-  public Set<String> getRunningQueries() {
+  public Set<String> getRunningQueryIds() {
+    Preconditions.checkArgument(_enableQueryCancellation, "Query cancellation is not enabled on server");
     return new HashSet<>(_queryFuturesById.keySet());
   }
 

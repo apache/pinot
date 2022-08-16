@@ -121,9 +121,9 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public Map<Long, String> getRunningQueries() {
-    if (_multiStageWorkerRequestHandler != null) {
-      return _multiStageWorkerRequestHandler.getRunningQueries();
-    }
+    // TODO: add support for multiStaged engine: track running queries for multiStaged engine and combine its
+    //       running queries with those from singleStaged engine. Both engines share the same request Id generator, so
+    //       the query will have unique ids across the two engines.
     return _singleStageBrokerRequestHandler.getRunningQueries();
   }
 
@@ -131,9 +131,8 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   public boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpConnectionManager connMgr,
       Map<String, Integer> serverResponses)
       throws Exception {
-    if (_multiStageWorkerRequestHandler != null) {
-      return _multiStageWorkerRequestHandler.cancelQuery(queryId, timeoutMs, executor, connMgr, serverResponses);
-    }
+    // TODO: add support for multiStaged engine, basically try to cancel the query on multiStaged engine firstly; if
+    //       not found, try on the singleStaged engine.
     return _singleStageBrokerRequestHandler.cancelQuery(queryId, timeoutMs, executor, connMgr, serverResponses);
   }
 }

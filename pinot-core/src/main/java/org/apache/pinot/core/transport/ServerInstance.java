@@ -78,8 +78,7 @@ public class ServerInstance {
         INVALID_PORT);
     _queryMailboxPort = instanceConfig.getRecord().getIntField(Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
         INVALID_PORT);
-    _adminEndpoint = InstanceUtils.getInstanceAdminEndpoint(instanceConfig, CommonConstants.HTTP_PROTOCOL, _hostname,
-        CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
+    _adminEndpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig, _hostname, CommonConstants.HTTP_PROTOCOL);
   }
 
   @VisibleForTesting

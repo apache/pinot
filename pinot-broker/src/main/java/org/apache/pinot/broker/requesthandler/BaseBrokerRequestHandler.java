@@ -185,13 +185,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   @Override
   public Map<Long, String> getRunningQueries() {
-    Preconditions.checkArgument(_enableQueryCancellation, "Query cancellation is not enabled");
+    Preconditions.checkArgument(_enableQueryCancellation, "Query cancellation is not enabled on broker");
     return _queriesById.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue()._query));
   }
 
   @VisibleForTesting
   Set<ServerInstance> getRunningServers(long requestId) {
-    Preconditions.checkArgument(_enableQueryCancellation, "Query cancellation is not enabled");
+    Preconditions.checkArgument(_enableQueryCancellation, "Query cancellation is not enabled on broker");
     QueryServers queryServers = _queriesById.get(requestId);
     return (queryServers == null) ? Collections.emptySet() : queryServers._servers;
   }
@@ -200,7 +200,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   public boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpConnectionManager connMgr,
       Map<String, Integer> serverResponses)
       throws Exception {
-    Preconditions.checkArgument(_enableQueryCancellation, "Query cancellation is not enabled");
+    Preconditions.checkArgument(_enableQueryCancellation, "Query cancellation is not enabled on broker");
     QueryServers queryServers = _queriesById.get(queryId);
     if (queryServers == null) {
       return false;
@@ -225,9 +225,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         // requests. The completion order is different from serverUrls, thus use uri in the response.
         deleteMethod = completionService.take().get();
         URI uri = deleteMethod.getURI();
-        LOGGER.debug("Got response: {} to cancel query: {} via uri: {}", deleteMethod.getStatusCode(), globalId, uri);
+        int status = deleteMethod.getStatusCode();
+        // Unexpected server responses are collected and returned as exception.
+        if (status != 200 && status != 404) {
+          throw new Exception(String.format("Unexpected status=%d and response='%s' from uri='%s'", status,
+              deleteMethod.getResponseBodyAsString(), uri));
+        }
         if (serverResponses != null) {
-          serverResponses.put(uri.getHost(), deleteMethod.getStatusCode());
+          serverResponses.put(uri.getHost() + ":" + uri.getPort(), status);
         }
       } catch (Exception e) {
         LOGGER.error("Failed to cancel query: {}", globalId, e);
@@ -241,7 +246,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
     }
     if (errMsgs.size() > 0) {
-      throw new Exception("Failed to cancel query on servers: " + StringUtils.join(errMsgs, ","));
+      throw new Exception("Unexpected responses from servers: " + StringUtils.join(errMsgs, ","));
     }
     return true;
   }

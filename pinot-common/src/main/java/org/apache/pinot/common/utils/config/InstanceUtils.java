@@ -60,19 +60,18 @@ public class InstanceUtils {
     return prefix + instance.getHost() + "_" + instance.getPort();
   }
 
-  public static String getInstanceAdminEndpoint(InstanceConfig instanceConfig, int defaultPort) {
+  public static String getServerAdminEndpoint(InstanceConfig instanceConfig) {
     // Backward-compatible with legacy hostname of format 'Server_<hostname>'
     String hostname = instanceConfig.getHostName();
     if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
       hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
     }
-    return getInstanceAdminEndpoint(instanceConfig, CommonConstants.HTTP_PROTOCOL, hostname, defaultPort);
+    return getServerAdminEndpoint(instanceConfig, hostname, CommonConstants.HTTP_PROTOCOL);
   }
 
-  public static String getInstanceAdminEndpoint(InstanceConfig instanceConfig, String defaultProtocol, String hostname,
-      int defaultPort) {
+  public static String getServerAdminEndpoint(InstanceConfig instanceConfig, String hostname, String defaultProtocol) {
     String protocol = defaultProtocol;
-    int port = defaultPort;
+    int port = CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
     int adminPort = instanceConfig.getRecord().getIntField(Helix.Instance.ADMIN_PORT_KEY, -1);
     int adminHttpsPort = instanceConfig.getRecord().getIntField(Helix.Instance.ADMIN_HTTPS_PORT_KEY, -1);
     // NOTE: preference for insecure is sub-optimal, but required for incremental upgrade scenarios

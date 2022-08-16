@@ -50,11 +50,11 @@ public class QuerySchedulerTest {
       when(query.getQueryId()).thenReturn(id);
       qs.submitQuery(query);
     }
-    Assert.assertEquals(qs.getRunningQueries(), queryIds);
+    Assert.assertEquals(qs.getRunningQueryIds(), queryIds);
     for (String id : queryIds) {
       qs.cancelQuery(id);
     }
-    Assert.assertTrue(qs.getRunningQueries().isEmpty());
+    Assert.assertTrue(qs.getRunningQueryIds().isEmpty());
     Assert.assertFalse(qs.cancelQuery("unknown"));
   }
 

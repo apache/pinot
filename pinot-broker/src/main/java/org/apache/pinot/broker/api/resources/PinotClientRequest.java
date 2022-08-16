@@ -170,19 +170,21 @@ public class PinotClientRequest {
           boolean verbose) {
     try {
       Map<String, Integer> serverResponses = verbose ? new HashMap<>() : null;
-      if (!_requestHandler.cancelQuery(queryId, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
-        throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
-            .entity(String.format("Query: %s not found on the broker", queryId)).build());
+      if (_requestHandler.cancelQuery(queryId, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
+        String resp = "Cancelled query: " + queryId;
+        if (verbose) {
+          resp += " with responses from servers: " + serverResponses;
+        }
+        return resp;
       }
-      String resp = "Cancelled query: " + queryId;
-      if (verbose) {
-        resp += " with responses from servers: " + serverResponses;
-      }
-      return resp;
     } catch (Exception e) {
       throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-          .entity(String.format("Failed to cancel query: %s due to error: %s", queryId, e.getMessage())).build());
+          .entity(String.format("Failed to cancel query: %s on the broker due to error: %s", queryId, e.getMessage()))
+          .build());
     }
+    throw new WebApplicationException(
+        Response.status(Response.Status.NOT_FOUND).entity(String.format("Query: %s not found on the broker", queryId))
+            .build());
   }
 
   @GET
@@ -198,7 +200,7 @@ public class PinotClientRequest {
       return _requestHandler.getRunningQueries();
     } catch (Exception e) {
       throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-          .entity("Failed to get running queries due to error: " + e.getMessage()).build());
+          .entity("Failed to get running queries on the broker due to error: " + e.getMessage()).build());
     }
   }
 

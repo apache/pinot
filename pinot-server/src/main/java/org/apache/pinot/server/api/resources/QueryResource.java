@@ -67,22 +67,34 @@ public class QueryResource {
   public String cancelQuery(
       @ApiParam(value = "QueryId as in the format of <brokerId>_<requestId>", required = true) @PathParam("queryId")
           String queryId) {
-    if (_serverInstance.getQueryScheduler().cancelQuery(queryId)) {
-      return "Cancelled query: " + queryId;
+    try {
+      if (_serverInstance.getQueryScheduler().cancelQuery(queryId)) {
+        return "Cancelled query: " + queryId;
+      }
+    } catch (Exception e) {
+      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity(String.format("Failed to cancel query: %s on the server due to error: %s", queryId, e.getMessage()))
+          .build());
     }
     throw new WebApplicationException(
-        Response.status(Response.Status.NOT_FOUND).entity("Query: " + queryId + " not found on the server").build());
+        Response.status(Response.Status.NOT_FOUND).entity(String.format("Query: %s not found on the server", queryId))
+            .build());
   }
 
   @GET
-  @Path("/query/id")
+  @Path("/queries/id")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get queryIds of running queries on the server", notes = "QueryIds are in the format of "
       + "<brokerId>_<requestId>")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Set<String> getRunningQueries() {
-    return _serverInstance.getQueryScheduler().getRunningQueries();
+  public Set<String> getRunningQueryIds() {
+    try {
+      return _serverInstance.getQueryScheduler().getRunningQueryIds();
+    } catch (Exception e) {
+      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("Failed to get queryIds of running queries on the server due to error: " + e.getMessage()).build());
+    }
   }
 }
