@@ -22,8 +22,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.api.RequesterIdentity;
-import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 
 
 @ThreadSafe
@@ -33,7 +34,13 @@ public interface BrokerRequestHandler {
 
   void shutDown();
 
-  BrokerResponse handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
-      RequestContext requestContext)
+  BrokerResponseNative handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception;
+
+  default BrokerResponseNative handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
+      RequestContext requestContext)
+      throws Exception {
+    return handleRequest(request, null, requesterIdentity, requestContext);
+  }
 }

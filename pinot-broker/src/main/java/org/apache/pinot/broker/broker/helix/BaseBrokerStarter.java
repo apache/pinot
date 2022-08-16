@@ -284,7 +284,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
 
     _brokerRequestHandler = new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler,
-        multiStageBrokerRequestHandler);
+        multiStageBrokerRequestHandler, _brokerMetrics);
     _brokerRequestHandler.start();
     String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
     if (controllerUrl != null) {

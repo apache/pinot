@@ -22,9 +22,18 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.broker.api.RequesterIdentity;
-import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -34,20 +43,17 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * {@see: @CommonConstant
  */
 public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestHandlerDelegate.class);
 
   private final BrokerRequestHandler _singleStageBrokerRequestHandler;
   private final MultiStageBrokerRequestHandler _multiStageWorkerRequestHandler;
+  private final BrokerMetrics _brokerMetrics;
 
-  private final boolean _isMultiStageQueryEngineEnabled;
-
-
-  public BrokerRequestHandlerDelegate(
-      BrokerRequestHandler singleStageBrokerRequestHandler,
-      @Nullable MultiStageBrokerRequestHandler multiStageWorkerRequestHandler
-  ) {
+  public BrokerRequestHandlerDelegate(BrokerRequestHandler singleStageBrokerRequestHandler,
+      @Nullable MultiStageBrokerRequestHandler multiStageWorkerRequestHandler, BrokerMetrics brokerMetrics) {
     _singleStageBrokerRequestHandler = singleStageBrokerRequestHandler;
     _multiStageWorkerRequestHandler = multiStageWorkerRequestHandler;
-    _isMultiStageQueryEngineEnabled = _multiStageWorkerRequestHandler != null;
+    _brokerMetrics = brokerMetrics;
   }
 
   @Override
@@ -71,18 +77,43 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   }
 
   @Override
-  public BrokerResponse handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
-      RequestContext requestContext)
+  public BrokerResponseNative handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
-    if (_isMultiStageQueryEngineEnabled && _multiStageWorkerRequestHandler != null) {
-      if (request.has("queryOptions")) {
-        Map<String, String> queryOptionMap = BaseBrokerRequestHandler.getOptionsFromJson(request, "queryOptions");
-        if (Boolean.parseBoolean(queryOptionMap.get(
-            CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
-          return _multiStageWorkerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
-        }
+    if (sqlNodeAndOptions == null) {
+      JsonNode sql = request.get(Request.SQL);
+      if (sql == null) {
+        throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
+      }
+      try {
+        sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql.asText());
+      } catch (Exception e) {
+        LOGGER.info("Caught exception while compiling SQL: {}, {}", sql.asText(), e.getMessage());
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
+        requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+        return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
       }
     }
-    return _singleStageBrokerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
+
+    if (_multiStageWorkerRequestHandler != null && useMultiStageEngine(request, sqlNodeAndOptions)) {
+      return _multiStageWorkerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
+          requestContext);
+    } else {
+      return _singleStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
+          requestContext);
+    }
+  }
+
+  private boolean useMultiStageEngine(JsonNode request, SqlNodeAndOptions sqlNodeAndOptions) {
+    Map<String, String> optionsFromSql = sqlNodeAndOptions.getOptions();
+    if (Boolean.parseBoolean(optionsFromSql.get(QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
+      return true;
+    }
+    if (request.has(Request.QUERY_OPTIONS)) {
+      Map<String, String> optionsFromRequest =
+          BaseBrokerRequestHandler.getOptionsFromJson(request, Request.QUERY_OPTIONS);
+      return Boolean.parseBoolean(optionsFromRequest.get(QueryOptionKey.USE_MULTISTAGE_ENGINE));
+    }
+    return false;
   }
 }

@@ -86,6 +86,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -168,8 +169,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   @Override
-  public BrokerResponseNative handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
-      RequestContext requestContext)
+  public BrokerResponseNative handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
     requestContext.setBrokerId(_brokerId);
@@ -190,20 +191,28 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (sql == null) {
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
     }
-    return handleRequest(requestId, sql.asText(), request, requesterIdentity, requestContext);
+    String query = sql.asText();
+    requestContext.setQuery(query);
+    return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
   }
 
-  private BrokerResponseNative handleRequest(long requestId, String query, JsonNode request,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
+  private BrokerResponseNative handleRequest(long requestId, String query,
+      @Nullable SqlNodeAndOptions sqlNodeAndOptions, JsonNode request, @Nullable RequesterIdentity requesterIdentity,
+      RequestContext requestContext)
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
-    requestContext.setQuery(query);
 
     // Compile the request
     long compilationStartTimeNs = System.nanoTime();
     PinotQuery pinotQuery;
     try {
-      pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+      if (sqlNodeAndOptions != null) {
+        // Include parse time when the query is already parsed
+        compilationStartTimeNs -= sqlNodeAndOptions.getParseTimeNs();
+      } else {
+        sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
+      }
+      pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
@@ -244,8 +253,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     }
 
-    String tableName =
-        getActualTableName(serverPinotQuery.getDataSource().getTableName(), _tableCache);
+    String tableName = getActualTableName(serverPinotQuery.getDataSource().getTableName(), _tableCache);
     serverPinotQuery.getDataSource().setTableName(tableName);
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     requestContext.setTableName(rawTableName);
@@ -691,7 +699,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
     }
 
-
     // Please keep the format as name=value comma-separated with no spaces
     // Please keep all the name value pairs together, then followed by the query. To add a new entry, please add it to
     // the end of existing pairs, but before the query.
@@ -702,9 +709,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
               + "{}/{}/{}/{}/{}/{}/{},consumingFreshnessTimeMs={},"
               + "servers={}/{},groupLimitReached={},brokerReduceTimeMs={},exceptions={},serverStats={},"
               + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},"
-              + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},clientIp={}"
-              + ",query={}", requestId, tableName,
-          totalTimeMs, brokerResponse.getNumDocsScanned(), brokerResponse.getTotalDocs(),
+              + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):{}/{}/{}/{},clientIp={},query={}", requestId,
+          tableName, totalTimeMs, brokerResponse.getNumDocsScanned(), brokerResponse.getTotalDocs(),
           brokerResponse.getNumEntriesScannedInFilter(), brokerResponse.getNumEntriesScannedPostFilter(),
           brokerResponse.getNumSegmentsQueried(), brokerResponse.getNumSegmentsProcessed(),
           brokerResponse.getNumSegmentsMatched(), brokerResponse.getNumConsumingSegmentsQueried(),
@@ -779,7 +785,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       Preconditions.checkState(subqueryLiteral != null, "Second argument of IN_SUBQUERY must be a literal (subquery)");
       String subquery = subqueryLiteral.getStringValue();
       BrokerResponseNative response =
-          handleRequest(requestId, subquery, jsonRequest, requesterIdentity, requestContext);
+          handleRequest(requestId, subquery, null, jsonRequest, requesterIdentity, requestContext);
       if (response.getExceptionsSize() != 0) {
         throw new RuntimeException("Caught exception while executing subquery: " + subquery);
       }

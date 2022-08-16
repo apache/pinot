@@ -107,6 +107,8 @@ public class CalciteSqlParser {
 
   public static SqlNodeAndOptions compileToSqlNodeAndOptions(String sql)
       throws SqlCompilationException {
+    long parseStartTimeNs = System.nanoTime();
+
     // Remove the comments from the query
     sql = removeComments(sql);
 
@@ -128,6 +130,7 @@ public class CalciteSqlParser {
       if (options.size() > 0) {
         sqlNodeAndOptions.setExtraOptions(extractOptionsMap(options));
       }
+      sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parseStartTimeNs);
       return sqlNodeAndOptions;
     } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
@@ -171,8 +174,10 @@ public class CalciteSqlParser {
 
   public static PinotQuery compileToPinotQuery(String sql)
       throws SqlCompilationException {
-    SqlNodeAndOptions sqlNodeAndOptions = compileToSqlNodeAndOptions(sql);
+    return compileToPinotQuery(compileToSqlNodeAndOptions(sql));
+  }
 
+  public static PinotQuery compileToPinotQuery(SqlNodeAndOptions sqlNodeAndOptions) {
     // Compile Sql without OPTION statements.
     PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode());
 
