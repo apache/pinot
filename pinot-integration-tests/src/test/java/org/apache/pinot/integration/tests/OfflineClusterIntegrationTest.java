@@ -2663,6 +2663,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response.get(MAX_NUM_MULTI_VALUES_MAP_KEY).size(), numMVColumn);
   }
 
+  @Test
+  public void testReset()
+      throws Exception {
+    super.testReset(TableType.OFFLINE);
+  }
 
   @Test
   public void testJDBCClient()

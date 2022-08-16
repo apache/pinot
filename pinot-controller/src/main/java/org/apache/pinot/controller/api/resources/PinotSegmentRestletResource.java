@@ -507,14 +507,13 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "Maximum time in milliseconds to wait for reset to be completed. By default, uses "
-          + "serverAdminRequestTimeout") @QueryParam("maxWaitTimeMs") long maxWaitTimeMs) {
+      @ApiParam(value = "Name of the target instance to reset") @QueryParam("targetInstance") @Nullable
+          String targetInstance) {
     segmentName = URIUtils.decode(segmentName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     try {
       Preconditions.checkState(tableType != null, "Must provide table name with type: %s", tableNameWithType);
-      _pinotHelixResourceManager.resetSegment(tableNameWithType, segmentName,
-          maxWaitTimeMs > 0 ? maxWaitTimeMs : _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      _pinotHelixResourceManager.resetSegment(tableNameWithType, segmentName, targetInstance);
       return new SuccessResponse(
           String.format("Successfully reset segment: %s of table: %s", segmentName, tableNameWithType));
     } catch (IllegalStateException e) {
@@ -543,14 +542,13 @@ public class PinotSegmentRestletResource {
           + " finally enabling the segments", notes = "Resets a segment by disabling and then enabling a segment")
   public SuccessResponse resetAllSegments(
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
-          String tableNameWithType, @ApiParam(
-      value = "Maximum time in milliseconds to wait for reset to be completed. By default, uses "
-          + "serverAdminRequestTimeout") @QueryParam("maxWaitTimeMs") long maxWaitTimeMs) {
+          String tableNameWithType,
+      @ApiParam(value = "Name of the target instance to reset") @QueryParam("targetInstance") @Nullable
+          String targetInstance) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     try {
       Preconditions.checkState(tableType != null, "Must provide table name with type: %s", tableNameWithType);
-      _pinotHelixResourceManager.resetAllSegments(tableNameWithType,
-          maxWaitTimeMs > 0 ? maxWaitTimeMs : _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      _pinotHelixResourceManager.resetAllSegments(tableNameWithType, targetInstance);
       return new SuccessResponse(String.format("Successfully reset all segments of table: %s", tableNameWithType));
     } catch (IllegalStateException e) {
       throw new ControllerApplicationException(LOGGER,
