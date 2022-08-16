@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.plugin.inputformat.protobuf;
 
 import com.google.common.base.Preconditions;
@@ -28,9 +46,13 @@ import static com.google.common.base.Preconditions.checkState;
 
 
 public class KafkaConfluentSchemaRegistryProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaConfluentSchemaRegistryProtoBufMessageDecoder.class);
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(KafkaConfluentSchemaRegistryProtoBufMessageDecoder.class);
   private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
   private static final String SCHEMA_REGISTRY_OPTS_PREFIX = "schema.registry.";
+  public static final String CACHED_SCHEMA_MAP_CAPACITY = "cached.schema.map.capacity";
+  public static final String DEFAULT_CACHED_SCHEMA_MAP_CAPACITY = "1000";
+
   private KafkaProtobufDeserializer<Message> _deserializer;
   private RecordExtractor<Message> _protoBufRecordExtractor;
   private String _topicName;
@@ -70,8 +92,12 @@ public class KafkaConfluentSchemaRegistryProtoBufMessageDecoder implements Strea
       throws Exception {
     checkState(props.containsKey(SCHEMA_REGISTRY_REST_URL), "Missing required property '%s'", SCHEMA_REGISTRY_REST_URL);
     String schemaRegistryUrl = props.get(SCHEMA_REGISTRY_REST_URL);
+    ProtobufSchemaProvider protobufSchemaProvider = new ProtobufSchemaProvider();
+    int identityMapCapacity = Integer.parseInt(
+        props.getOrDefault(CACHED_SCHEMA_MAP_CAPACITY, DEFAULT_CACHED_SCHEMA_MAP_CAPACITY));
     SchemaRegistryClient schemaRegistryClient =
-        new CachedSchemaRegistryClient(createRestService(schemaRegistryUrl, props), 1000, Collections.singletonList(new ProtobufSchemaProvider()), props, null);
+        new CachedSchemaRegistryClient(createRestService(schemaRegistryUrl, props),
+            identityMapCapacity, Collections.singletonList(protobufSchemaProvider), props, null);
     _deserializer = new KafkaProtobufDeserializer<>(schemaRegistryClient);
     Preconditions.checkNotNull(topicName, "Topic must be provided");
     _topicName = topicName;
@@ -103,7 +129,7 @@ public class KafkaConfluentSchemaRegistryProtoBufMessageDecoder implements Strea
    */
   private void ignoreOrRethrowException(RuntimeException e) {
     if (isUnknownMagicByte(e) || isUnknownMagicByte(e.getCause())) {
-      // Do nothing, the message is not an Avro message and can't be decoded
+      // Do nothing, the message is not an ProtoBuf message and can't be decoded
       LOGGER.error("Caught exception while decoding row in topic {}, discarding row", _topicName, e);
       return;
     }
