@@ -385,6 +385,13 @@ public class CommonConstants {
         "pinot.server.starter.enableRealtimeOffsetBasedConsumptionStatusChecker";
     public static final boolean DEFAULT_ENABLE_REALTIME_OFFSET_BASED_CONSUMPTION_STATUS_CHECKER = false;
 
+    public static final String CONFIG_OF_ENABLE_REALTIME_FRESHNESS_BASED_CONSUMPTION_STATUS_CHECKER =
+        "pinot.server.starter.enableRealtimeFreshnessBasedConsumptionStatusChecker";
+    public static final boolean DEFAULT_ENABLE_REALTIME_FRESHNESS_BASED_CONSUMPTION_STATUS_CHECKER = false;
+    public static final String CONFIG_OF_STARTUP_REALTIME_MIN_FRESHNESS_MS =
+        "pinot.server.starter.realtimeMinFreshnessMs";
+    public static final int DEFAULT_STARTUP_REALTIME_MIN_FRESHNESS_MS = 0;
+
     public static final String DEFAULT_READ_MODE = "mmap";
     // Whether to reload consuming segment on scheme update
     public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = true;

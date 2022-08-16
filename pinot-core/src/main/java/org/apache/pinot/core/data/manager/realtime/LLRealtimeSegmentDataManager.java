@@ -1440,6 +1440,17 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
+  public StreamPartitionMsgOffset fetchLatestStreamOffset(Long maxWaitTimeMs) {
+    try (StreamMetadataProvider metadataProvider = _streamConsumerFactory
+        .createPartitionMetadataProvider(_clientId, _partitionGroupId)) {
+      return metadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs);
+    } catch (Exception e) {
+      _segmentLogger.warn("Cannot fetch latest stream offset for clientId {} and partitionGroupId {}", _clientId,
+          _partitionGroupId);
+    }
+    return null;
+  }
+
   /*
    * set the following partition parameters in RT segment config builder:
    *  - partition column
