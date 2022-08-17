@@ -20,20 +20,39 @@
 package org.apache.pinot.client;
 
 import java.util.List;
+import java.util.Properties;
 
 
 /**
  * Maintains broker cache using controller APIs
  */
 public class ControllerBasedBrokerSelector implements BrokerSelector {
-  private final UpdatableBrokerCache _brokerCache;
+  private static final String SCHEME = "scheme";
 
-  public ControllerBasedBrokerSelector(String scheme, String controllerHost, int controllerPort,
-      long brokerUpdateFreqInMillis)
+  private final UpdatableBrokerCache _brokerCache;
+  private final Properties _properties;
+
+  public ControllerBasedBrokerSelector(String scheme, String controllerHost, int controllerPort)
       throws Exception {
-    _brokerCache = new BrokerCacheUpdaterPeriodic(scheme, controllerHost, controllerPort, brokerUpdateFreqInMillis);
+    this(scheme, controllerHost, controllerPort, new Properties());
+  }
+
+  public ControllerBasedBrokerSelector(String scheme, String controllerHost, int controllerPort, Properties properties)
+      throws Exception {
+    _properties = properties;
+    String controllerUrl = controllerHost + ":" + controllerPort;
+    _properties.setProperty(SCHEME, scheme);
+    _brokerCache = new BrokerCacheUpdaterPeriodic(_properties, controllerUrl);
     _brokerCache.init();
   }
+
+  public ControllerBasedBrokerSelector(Properties properties, String controllerUrl)
+      throws Exception {
+    _properties = properties;
+    _brokerCache = new BrokerCacheUpdaterPeriodic(properties, controllerUrl);
+    _brokerCache.init();
+  }
+
 
   @Override
   public String selectBroker(String table) {
