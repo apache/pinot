@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
+import java.io.Closeable;
 import java.util.List;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -51,7 +52,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  * </ul>
  */
 @ThreadSafe
-public interface PartitionUpsertMetadataManager {
+public interface PartitionUpsertMetadataManager extends Closeable {
 
   /**
    * Returns the primary key columns.
