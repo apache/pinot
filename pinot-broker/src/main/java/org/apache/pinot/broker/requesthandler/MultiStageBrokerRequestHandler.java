@@ -36,6 +36,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -99,7 +100,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   @Override
-  public BrokerResponseNative handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+  public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();

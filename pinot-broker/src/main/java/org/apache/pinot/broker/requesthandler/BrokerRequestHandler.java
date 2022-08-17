@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.broker.api.RequesterIdentity;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 
@@ -37,11 +37,11 @@ public interface BrokerRequestHandler {
 
   void shutDown();
 
-  BrokerResponseNative handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+  BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception;
 
-  default BrokerResponseNative handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
+  default BrokerResponse handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
       RequestContext requestContext)
       throws Exception {
     return handleRequest(request, null, requesterIdentity, requestContext);
