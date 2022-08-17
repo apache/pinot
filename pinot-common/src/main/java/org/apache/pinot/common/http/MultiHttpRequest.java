@@ -23,9 +23,11 @@ import java.util.Map;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorCompletionService;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.httpclient.HttpMethodBase;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.params.HttpClientParams;
 import org.slf4j.Logger;
@@ -33,23 +35,21 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Class to support multiple http GET operations in parallel by using
- * the executor that is passed in.
+ * Class to support multiple http operations in parallel by using the executor that is passed in. This is a wrapper
+ * around Apache common HTTP client.
  *
- * This is a wrapper around Apache common HTTP client.
+ * The execute method is re-usable but there is no real benefit to it. All the connection management is handled by
+ * the input HttpConnectionManager. Note that we cannot use SimpleHttpConnectionManager as it is not thread safe. Use
+ * MultiThreadedHttpConnectionManager as shown in the example below. As GET is commonly used, there is a dedicated
+ * execute method for it. Other http methods like DELETE can use the generic version of execute method.
  *
- * The execute method is re-usable but there is no real benefit to it. All
- * the connection management is handled by the input HttpConnectionManager.
- * Note that we cannot use SimpleHttpConnectionManager as it is not thread
- * safe. Use MultiThreadedHttpConnectionManager as shown in the example
- * below
  * Usage:
  * <pre>
  * {@code
  *    List<String> urls = Arrays.asList("http://www.linkedin.com", "http://www.google.com");
- *    MultiGetRequest mget = new MultiGetRequest(Executors.newCachedThreadPool(),
+ *    MultiHttpRequest mhr = new MultiHttpRequest(Executors.newCachedThreadPool(),
  *           new MultiThreadedHttpConnectionManager());
- *    CompletionService<GetMethod> completionService = mget.execute(urls);
+ *    CompletionService<GetMethod> completionService = mhr.execute(urls, headers, timeoutMs);
  *    for (int i = 0; i < urls.size(); i++) {
  *      GetMethod getMethod = null;
  *      try {
@@ -72,8 +72,8 @@ import org.slf4j.LoggerFactory;
  * }
  * </pre>
  */
-public class MultiGetRequest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MultiGetRequest.class);
+public class MultiHttpRequest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MultiHttpRequest.class);
 
   private final Executor _executor;
   // TODO: Verify that _connectionManager is an instaceOf MultithreadedHttpConnectionManager.
@@ -84,7 +84,7 @@ public class MultiGetRequest {
    * @param executor executor service to use for making parallel requests
    * @param connectionManager http connection manager to use.
    */
-  public MultiGetRequest(Executor executor, HttpConnectionManager connectionManager) {
+  public MultiHttpRequest(Executor executor, HttpConnectionManager connectionManager) {
     _executor = executor;
     _connectionManager = connectionManager;
   }
@@ -99,24 +99,42 @@ public class MultiGetRequest {
    */
   public CompletionService<GetMethod> execute(List<String> urls, @Nullable Map<String, String> requestHeaders,
       int timeoutMs) {
+    return execute(urls, requestHeaders, timeoutMs, "GET", GetMethod::new);
+  }
+
+  /**
+   * Execute certain http method on the urls in parallel using the executor service.
+   * @param urls absolute URLs to execute the http method
+   * @param requestHeaders headers to set when making the request
+   * @param timeoutMs timeout in milliseconds for each http request
+   * @param httpMethodName the name of the http method like GET, DELETE etc.
+   * @param httpMethodSupplier a function to create a new http method object.
+   * @return instance of CompletionService. Completion service will provide
+   *   results as they arrive. The order is NOT same as the order of URLs
+   */
+  public <T extends HttpMethodBase> CompletionService<T> execute(List<String> urls,
+      @Nullable Map<String, String> requestHeaders, int timeoutMs, String httpMethodName,
+      Function<String, T> httpMethodSupplier) {
     HttpClientParams clientParams = new HttpClientParams();
     clientParams.setConnectionManagerTimeout(timeoutMs);
     HttpClient client = new HttpClient(clientParams, _connectionManager);
 
-    CompletionService<GetMethod> completionService = new ExecutorCompletionService<>(_executor);
+    CompletionService<T> completionService = new ExecutorCompletionService<>(_executor);
     for (String url : urls) {
       completionService.submit(() -> {
         try {
-          GetMethod getMethod = new GetMethod(url);
+          T httpMethod = httpMethodSupplier.apply(url);
+          // Explicitly cast type downwards to workaround a bug in jdk8: https://bugs.openjdk.org/browse/JDK-8056984
+          HttpMethodBase httpMethodBase = httpMethod;
           if (requestHeaders != null) {
-            requestHeaders.forEach(getMethod::setRequestHeader);
+            requestHeaders.forEach((k, v) -> httpMethodBase.setRequestHeader(k, v));
           }
-          getMethod.getParams().setSoTimeout(timeoutMs);
-          client.executeMethod(getMethod);
-          return getMethod;
+          httpMethodBase.getParams().setSoTimeout(timeoutMs);
+          client.executeMethod(httpMethodBase);
+          return httpMethod;
         } catch (Exception e) {
           // Log only exception type and message instead of the whole stack trace
-          LOGGER.warn("Caught '{}' while executing GET on URL: {}", e.toString(), url);
+          LOGGER.warn("Caught '{}' while executing: {} on URL: {}", e, httpMethodName, url);
           throw e;
         }
       });

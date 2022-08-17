@@ -70,7 +70,7 @@ public class QueryRoutingTest {
 
   private QueryScheduler mockQueryScheduler(int responseDelayMs, byte[] responseBytes) {
     QueryScheduler queryScheduler = mock(QueryScheduler.class);
-    when(queryScheduler.submit(any())).thenAnswer(invocation -> {
+    when(queryScheduler.submitQuery(any())).thenAnswer(invocation -> {
       Thread.sleep(responseDelayMs);
       return Futures.immediateFuture(responseBytes);
     });

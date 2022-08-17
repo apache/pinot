@@ -87,6 +87,14 @@ public class ServerQueryRequest {
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
   }
 
+  /**
+   * As _requestId can be same across brokers, so use _brokerId and _requestId together to uniquely identify a query.
+   * @return unique query Id within a pinot cluster.
+   */
+  public String getQueryId() {
+    return _brokerId + "_" + _requestId;
+  }
+
   public long getRequestId() {
     return _requestId;
   }

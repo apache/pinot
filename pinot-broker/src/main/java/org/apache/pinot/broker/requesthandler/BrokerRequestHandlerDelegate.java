@@ -20,7 +20,9 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -115,5 +117,22 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       return Boolean.parseBoolean(optionsFromRequest.get(QueryOptionKey.USE_MULTISTAGE_ENGINE));
     }
     return false;
+  }
+
+  @Override
+  public Map<Long, String> getRunningQueries() {
+    // TODO: add support for multiStaged engine: track running queries for multiStaged engine and combine its
+    //       running queries with those from singleStaged engine. Both engines share the same request Id generator, so
+    //       the query will have unique ids across the two engines.
+    return _singleStageBrokerRequestHandler.getRunningQueries();
+  }
+
+  @Override
+  public boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpConnectionManager connMgr,
+      Map<String, Integer> serverResponses)
+      throws Exception {
+    // TODO: add support for multiStaged engine, basically try to cancel the query on multiStaged engine firstly; if
+    //       not found, try on the singleStaged engine.
+    return _singleStageBrokerRequestHandler.cancelQuery(queryId, timeoutMs, executor, connMgr, serverResponses);
   }
 }
