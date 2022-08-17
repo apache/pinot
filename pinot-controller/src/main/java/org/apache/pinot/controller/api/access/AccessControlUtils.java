@@ -19,6 +19,7 @@
 
 package org.apache.pinot.controller.api.access;
 
+import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
@@ -47,28 +48,28 @@ public final class AccessControlUtils {
    * @param endpointUrl the request url for which this access control is called
    * @param accessControl AccessControl object which does the actual validation
    */
-  public static void validatePermission(String tableName, AccessType accessType, HttpHeaders httpHeaders,
-      String endpointUrl, AccessControl accessControl) {
+  public static void validatePermission(@Nullable String tableName, AccessType accessType,
+      @Nullable HttpHeaders httpHeaders, @Nullable String endpointUrl, AccessControl accessControl) {
     String accessTypeToEndpointMsg =
         String.format("access type '%s' to the endpoint '%s' for table '%s'", accessType, endpointUrl, tableName);
     try {
       if (StringUtils.isBlank(tableName)) {
-        if (!accessControl.hasAccess(accessType, httpHeaders, endpointUrl)) {
-          accessDenied(accessTypeToEndpointMsg);
+        if (accessControl.hasAccess(accessType, httpHeaders, endpointUrl)) {
+          return;
         }
       } else {
         String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-        if (!accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl)) {
-          accessDenied(accessTypeToEndpointMsg);
+        if (accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl)) {
+          return;
         }
       }
     } catch (Exception e) {
-      if (!(e instanceof ControllerApplicationException)) {
-        throw new ControllerApplicationException(LOGGER,
-            "Caught exception while validating permission for " + accessTypeToEndpointMsg,
-            Response.Status.INTERNAL_SERVER_ERROR, e);
-      }
+      throw new ControllerApplicationException(LOGGER,
+          "Caught exception while validating permission for " + accessTypeToEndpointMsg,
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+
+    accessDenied(accessTypeToEndpointMsg);
   }
 
   /**
@@ -79,8 +80,8 @@ public final class AccessControlUtils {
    * @param endpointUrl the request url for which this access control is called
    * @param accessControl AccessControl object which does the actual validation
    */
-  public static void validatePermission(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl,
-      AccessControl accessControl) {
+  public static void validatePermission(AccessType accessType, @Nullable HttpHeaders httpHeaders,
+      @Nullable String endpointUrl, AccessControl accessControl) {
     validatePermission(null, accessType, httpHeaders, endpointUrl, accessControl);
   }
 
@@ -90,7 +91,8 @@ public final class AccessControlUtils {
    * @param httpHeaders HTTP headers containing requester identity required by access control object
    * @param endpointUrl the request url for which this access control is called
    */
-  public static void validatePermission(HttpHeaders httpHeaders, String endpointUrl, AccessControl accessControl) {
+  public static void validatePermission(@Nullable HttpHeaders httpHeaders, @Nullable String endpointUrl,
+      AccessControl accessControl) {
     if (!accessControl.hasAccess(httpHeaders)) {
       accessDenied(endpointUrl);
     }
