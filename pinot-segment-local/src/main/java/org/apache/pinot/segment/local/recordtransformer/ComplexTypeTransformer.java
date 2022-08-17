@@ -352,14 +352,14 @@ public class ComplexTypeTransformer implements RecordTransformer {
         List<String> innerMapFields = new ArrayList<>();
         for (Map.Entry<String, Object> innerEntry : new ArrayList<>(innerMap.entrySet())) {
           Object innerValue = innerEntry.getValue();
-          String innerCancatName = concat(field, innerEntry.getKey());
-          map.put(innerCancatName, innerEntry.getValue());
+          String innerConcatName = concat(field, innerEntry.getKey());
+          map.put(innerConcatName, innerEntry.getValue());
           if (innerValue instanceof Map || innerValue instanceof Collection || isNonPrimitiveArray(innerValue)) {
-            innerMapFields.add(innerCancatName);
+            innerMapFields.add(innerConcatName);
           }
         }
         if (!innerMapFields.isEmpty()) {
-          flattenMap(concatName, map, innerMapFields);
+          flattenMap(path, map, innerMapFields);
         }
       } else if (value instanceof Collection && _fieldsToUnnest.contains(concatName)) {
         Collection collection = (Collection) value;
