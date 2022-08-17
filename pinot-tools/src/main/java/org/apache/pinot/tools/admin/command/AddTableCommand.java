@@ -161,9 +161,9 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
 
   public boolean sendTableCreationRequest(JsonNode node)
       throws IOException {
-    String res = AbstractBaseAdminCommand
-        .sendRequest("POST", ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsCreate(), node.toString(),
-            makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)));
+    String res = AbstractBaseAdminCommand.sendRequest("POST",
+        ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsCreate(), node.toString(),
+        makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)));
     LOGGER.info(res);
     return res.contains("successfully added");
   }
@@ -191,7 +191,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
         "Failed reading schema " + _schemaFile);
 
     String tableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
-    TableConfigs tableConfigs =  new TableConfigs(tableName, schema, tableConfig, null);
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, tableConfig, null);
 
     return sendTableCreationRequest(JsonUtils.objectToJsonNode(tableConfigs));
   }
