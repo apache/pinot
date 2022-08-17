@@ -48,6 +48,9 @@ public class OffsetCriteria {
     // Consumes from the time as provided in the period string
     PERIOD,
 
+    // Consumes from the time format yyyy-MM-dd'T'HH:mm:ss.SSSZ
+    TIMESTAMP,
+
     // Consumes from the custom offset criteria */
     CUSTOM
   }
@@ -88,6 +91,14 @@ public class OffsetCriteria {
    */
   public boolean isPeriod() {
     return _offsetType != null && _offsetType.equals(OffsetType.PERIOD);
+  }
+
+  /**
+   * True if the offset criteria is defined as a timestamp string
+   * @return
+   */
+  public boolean isTimestamp() {
+    return _offsetType != null && _offsetType.equals(OffsetType.TIMESTAMP);
   }
 
   /**
@@ -149,6 +160,19 @@ public class OffsetCriteria {
     }
 
     /**
+     * Builds an {@link OffsetCriteria} with {@link OffsetType} TIMESTAMP
+     * @param timestamp
+     * @return
+     */
+    public OffsetCriteria withOffsetAsTimestamp(String timestamp) {
+      Preconditions.checkNotNull(timestamp, "Must provide timestamp string of format "
+          + "yyyy-MM-dd'T'HH:mm:ss.SSSZ eg. 2022-08-09T12:31:38.222Z");
+      _offsetCriteria.setOffsetType(OffsetType.TIMESTAMP);
+      _offsetCriteria.setOffsetString(timestamp);
+      return _offsetCriteria;
+    }
+
+    /**
      * Builds an {@link OffsetCriteria} with {@link OffsetType} CUSTOM
      * @param customString
      * @return
@@ -172,17 +196,17 @@ public class OffsetCriteria {
         _offsetCriteria.setOffsetType(OffsetType.SMALLEST);
       } else if (offsetString.equalsIgnoreCase(OffsetType.LARGEST.toString())) {
         _offsetCriteria.setOffsetType(OffsetType.LARGEST);
-      } else {
-        try {
-          Long periodToMillis = TimeUtils.convertPeriodToMillis(offsetString);
-          if (periodToMillis >= 0) {
-            _offsetCriteria.setOffsetType(OffsetType.PERIOD);
-          } else {
-            _offsetCriteria.setOffsetType(OffsetType.CUSTOM);
-          }
-        } catch (Exception e) {
+      } else if (TimeUtils.isPeriodValid(offsetString)) {
+        long periodToMillis = TimeUtils.convertPeriodToMillis(offsetString);
+        if (periodToMillis >= 0) {
+          _offsetCriteria.setOffsetType(OffsetType.PERIOD);
+        } else {
           _offsetCriteria.setOffsetType(OffsetType.CUSTOM);
         }
+      } else if (TimeUtils.isTimestampValid(offsetString)) {
+        _offsetCriteria.setOffsetType(OffsetType.TIMESTAMP);
+      } else {
+        _offsetCriteria.setOffsetType(OffsetType.CUSTOM);
       }
       _offsetCriteria.setOffsetString(offsetString);
       return _offsetCriteria;
