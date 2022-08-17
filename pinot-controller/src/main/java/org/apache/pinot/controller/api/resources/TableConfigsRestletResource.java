@@ -99,7 +99,6 @@ public class TableConfigsRestletResource {
 
   @Inject
   AccessControlFactory _accessControlFactory;
-  AccessControlUtils _accessControlUtils = new AccessControlUtils();
 
   /**
    * List all {@link TableConfigs}, where each is a group of the offline table config, realtime table config and
@@ -193,18 +192,18 @@ public class TableConfigsRestletResource {
     try {
       String endpointUrl = request.getRequestURL().toString();
       AccessControl accessControl = _accessControlFactory.create();
-      _accessControlUtils
+      AccessControlUtils
           .validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl, accessControl);
 
       if (offlineTableConfig != null) {
         tuneConfig(offlineTableConfig, schema);
-        _accessControlUtils
+        AccessControlUtils
             .validatePermission(offlineTableConfig.getTableName(), AccessType.CREATE, httpHeaders, endpointUrl,
                 accessControl);
       }
       if (realtimeTableConfig != null) {
         tuneConfig(realtimeTableConfig, schema);
-        _accessControlUtils
+        AccessControlUtils
             .validatePermission(realtimeTableConfig.getTableName(), AccessType.CREATE, httpHeaders, endpointUrl,
                 accessControl);
       }
