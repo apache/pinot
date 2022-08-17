@@ -20,11 +20,7 @@ package org.apache.pinot.tools;
 
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.spi.stream.StreamDataProvider;
-import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
-import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,22 +39,8 @@ import org.slf4j.LoggerFactory;
  */
 public class GenericQuickstart extends Quickstart {
   private static final Logger LOGGER = LoggerFactory.getLogger(GenericQuickstart.class);
-  private StreamDataServerStartable _kafkaStarter;
-  private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   public GenericQuickstart() {
-  }
-
-  private void startKafka() {
-    _zookeeperInstance = ZkStarter.startLocalZkServer();
-    try {
-      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
-          KafkaStarterUtils.getDefaultKafkaConfiguration(_zookeeperInstance));
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
-    }
-    _kafkaStarter.start();
-    _kafkaStarter.createTopic("pullRequestMergedEvents", KafkaStarterUtils.getTopicCreationProps(2));
   }
 
   @Override
@@ -92,18 +74,7 @@ public class GenericQuickstart extends Quickstart {
 
   public void execute()
       throws Exception {
-    printStatus(Color.CYAN, "***** Starting Kafka *****");
     startKafka();
-
-    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-      try {
-        printStatus(Color.GREEN, "***** Shutting down QuickStart cluster *****");
-        _kafkaStarter.stop();
-        ZkStarter.stopLocalZkServer(_zookeeperInstance);
-      } catch (Exception e) {
-        LOGGER.error("Caught exception in shutting down QuickStart cluster", e);
-      }
-    }));
     super.execute();
   }
 

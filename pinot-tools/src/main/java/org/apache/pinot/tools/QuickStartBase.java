@@ -24,15 +24,25 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.LineIterator;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.spi.stream.StreamDataProducer;
+import org.apache.pinot.spi.stream.StreamDataProvider;
+import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
+import org.apache.pinot.tools.streams.AirlineDataStream;
+import org.apache.pinot.tools.streams.MeetupRsvpStream;
 import org.apache.pinot.tools.utils.JarUtils;
+import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,10 +73,19 @@ public abstract class QuickStartBase {
       "examples/batch/githubComplexTypeEvents"
   };
 
+  protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = ImmutableMap.of(
+      "airlineStats", "examples/stream/airlineStats",
+      "githubEvents", "examples/minions/stream/githubEvents",
+      "meetupRsvp", "examples/stream/meetupRsvp",
+      "meetupRsvpJson", "examples/stream/meetupRsvpJson",
+      "meetupRsvpComplexType", "examples/stream/meetupRsvpComplexType");
+
   protected File _dataDir = FileUtils.getTempDirectory();
   protected String[] _bootstrapDataDirs;
   protected String _zkExternalAddress;
   protected String _configFilePath;
+  protected StreamDataServerStartable _kafkaStarter;
+  protected ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   public QuickStartBase setDataDir(String dataDir) {
     _dataDir = new File(dataDir);
@@ -185,6 +204,25 @@ public abstract class QuickStartBase {
     }
   }
 
+  protected List<QuickstartTableRequest> bootstrapStreamTableDirectories(File quickstartTmpDir)
+      throws IOException {
+    List<QuickstartTableRequest> quickstartTableRequests = new ArrayList<>();
+    for (Map.Entry<String, String> entry : getDefaultStreamTableDirectories().entrySet()) {
+      String tableName = entry.getKey();
+      String directory = entry.getValue();
+      File baseDir = new File(quickstartTmpDir, tableName);
+      File dataDir = new File(baseDir, "rawdata");
+      dataDir.mkdirs();
+      if (useDefaultBootstrapTableDir()) {
+        copyResourceTableToTmpDirectory(directory, tableName, baseDir, dataDir, true);
+      } else {
+        copyFilesystemTableToTmpDirectory(directory, tableName, baseDir);
+      }
+      quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath()));
+    }
+    return quickstartTableRequests;
+  }
+
   private static void copyFilesystemTableToTmpDirectory(String sourcePath, String tableName, File baseDir)
       throws IOException {
     File fileDb = new File(sourcePath);
@@ -245,5 +283,131 @@ public abstract class QuickStartBase {
       }
     }
     return responseBuilder.toString();
+  }
+
+  protected Map<String, String> getDefaultStreamTableDirectories() {
+    return DEFAULT_STREAM_TABLE_DIRECTORIES;
+  }
+
+  protected static void publishStreamDataToKafka(String tableName, File dataDir)
+      throws Exception {
+    switch (tableName) {
+      case "githubEvents":
+        publishGithubEventsToKafka("githubEvents", new File(dataDir, "/rawdata/2021-07-21-few-hours.json"));
+        break;
+      default:
+        break;
+    }
+  }
+
+  protected static void publishGithubEventsToKafka(String topicName, File dataFile)
+      throws Exception {
+    Properties properties = new Properties();
+    properties.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
+    properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
+    properties.put("request.required.acks", "1");
+    StreamDataProducer producer =
+        StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
+    try {
+      LineIterator dataStream = FileUtils.lineIterator(dataFile);
+
+      while (dataStream.hasNext()) {
+        producer.produce(topicName, dataStream.nextLine().getBytes(StandardCharsets.UTF_8));
+      }
+    } finally {
+      producer.close();
+    }
+  }
+
+  protected void startKafka() {
+    printStatus(Quickstart.Color.CYAN, "***** Starting Kafka *****");
+    _zookeeperInstance = ZkStarter.startLocalZkServer();
+    try {
+      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
+          KafkaStarterUtils.getDefaultKafkaConfiguration(_zookeeperInstance));
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
+    }
+    _kafkaStarter.start();
+
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      try {
+        printStatus(Quickstart.Color.GREEN, "***** Shutting down kafka and zookeeper *****");
+        _kafkaStarter.stop();
+        ZkStarter.stopLocalZkServer(_zookeeperInstance);
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+    }));
+
+    printStatus(Quickstart.Color.CYAN, "***** Kafka Started *****");
+  }
+
+  public void startAllDataStreams(StreamDataServerStartable kafkaStarter, File quickstartTmpDir)
+      throws Exception {
+    for (String streamName : getDefaultStreamTableDirectories().keySet()) {
+      switch (streamName) {
+        case "airlineStats":
+          kafkaStarter.createTopic("flights-realtime", KafkaStarterUtils.getTopicCreationProps(10));
+          printStatus(Quickstart.Color.CYAN, "***** Starting airlineStats data stream and publishing to Kafka *****");
+          AirlineDataStream airlineDataStream = new AirlineDataStream(new File(quickstartTmpDir, "airlineStats"));
+          airlineDataStream.run();
+          Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+              airlineDataStream.shutdown();
+            } catch (Exception e) {
+              e.printStackTrace();
+            }
+          }));
+          break;
+        case "meetupRsvp":
+          kafkaStarter.createTopic("meetupRSVPEvents", KafkaStarterUtils.getTopicCreationProps(10));
+          printStatus(Quickstart.Color.CYAN, "***** Starting meetup data stream and publishing to Kafka *****");
+          MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream();
+          meetupRSVPProvider.run();
+          Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+              meetupRSVPProvider.stopPublishing();
+            } catch (Exception e) {
+              e.printStackTrace();
+            }
+          }));
+          break;
+        case "meetupRsvpJson":
+          kafkaStarter.createTopic("meetupRSVPJsonEvents", KafkaStarterUtils.getTopicCreationProps(10));
+          printStatus(Quickstart.Color.CYAN, "***** Starting meetupRsvpJson data stream and publishing to Kafka *****");
+          MeetupRsvpStream meetupRSVPJsonProvider = new MeetupRsvpStream("meetupRSVPJsonEvents");
+          meetupRSVPJsonProvider.run();
+          Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+              meetupRSVPJsonProvider.stopPublishing();
+            } catch (Exception e) {
+              e.printStackTrace();
+            }
+          }));
+          break;
+        case "meetupRsvpComplexType":
+          kafkaStarter.createTopic("meetupRSVPComplexTypeEvents", KafkaStarterUtils.getTopicCreationProps(10));
+          printStatus(Quickstart.Color.CYAN,
+              "***** Starting meetupRSVPComplexType data stream and publishing to Kafka *****");
+          MeetupRsvpStream meetupRSVPComplexTypeProvider = new MeetupRsvpStream("meetupRSVPComplexTypeEvents");
+          meetupRSVPComplexTypeProvider.run();
+          Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+              meetupRSVPComplexTypeProvider.stopPublishing();
+            } catch (Exception e) {
+              e.printStackTrace();
+            }
+          }));
+          break;
+        case "githubEvents":
+          kafkaStarter.createTopic("githubEvents", KafkaStarterUtils.getTopicCreationProps(2));
+          printStatus(Quickstart.Color.CYAN, "***** Starting githubEvents data stream and publishing to Kafka *****");
+          publishStreamDataToKafka("githubEvents", new File(quickstartTmpDir, "githubEvents"));
+          break;
+        default:
+          throw new UnsupportedOperationException("Unknown stream name: " + streamName);
+      }
+    }
   }
 }
