@@ -57,7 +57,7 @@ public class KafkaConfluentSchemaRegistryProtoBufMessageDecoder implements Strea
   private RecordExtractor<Message> _protoBufRecordExtractor;
   private String _topicName;
 
-  public RestService createRestService(String schemaRegistryUrl, Map<String, String> configs) {
+  private RestService createRestService(String schemaRegistryUrl, Map<String, String> configs) {
     RestService restService = new RestService(schemaRegistryUrl);
 
     ConfigDef configDef = new ConfigDef();
