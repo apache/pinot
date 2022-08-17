@@ -56,7 +56,7 @@ public class ConnectionUtils {
   }
 
 
-  public static String getUserAgentVersionFromClassPath() {
+  public static String getUserAgentVersionFromClassPath(String userAgentKey) {
     Properties userAgentProperties = new Properties();
     try {
       userAgentProperties.load(ConnectionUtils.class.getClassLoader()
@@ -64,6 +64,6 @@ public class ConnectionUtils {
     } catch (IOException e) {
       LOGGER.warn("Unable to set user agent version");
     }
-    return userAgentProperties.getProperty("ua", "pinot-java");
+    return userAgentProperties.getProperty(userAgentKey, "pinot-java");
   }
 }

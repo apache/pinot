@@ -79,7 +79,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
             .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
             .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
-            .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath())
+            .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua"))
             .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }
@@ -98,7 +98,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
             .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
             .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
-            .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath())
+            .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua"))
             .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }

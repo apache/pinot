@@ -113,7 +113,7 @@ public class BrokerCache {
     builder.setReadTimeout(readTimeoutMs)
         .setConnectTimeout(connectTimeoutMs)
         .setHandshakeTimeout(handshakeTimeoutMs)
-        .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath())
+        .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua_broker_cache"))
         .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
 
     _client = Dsl.asyncHttpClient(builder.build());
