@@ -132,6 +132,9 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.INIDSET, InIdSetTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOOKUP, LookupTransformFunction.class);
 
+    // TODO: add more Function type related to Extract
+    typeToImplementation.put(TransformFunctionType.EXTRACT_YEAR, ExtractTransformFunction.Year.class);
+
     // Regexp functions
     typeToImplementation.put(TransformFunctionType.REGEXP_EXTRACT,
         RegexpExtractTransformFunction.class);

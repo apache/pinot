@@ -36,6 +36,7 @@ public interface PinotClientTransport {
   BrokerResponse executeQuery(String brokerAddress, Request request)
       throws PinotClientException;
 
+  @Deprecated
   Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
       throws PinotClientException;
 

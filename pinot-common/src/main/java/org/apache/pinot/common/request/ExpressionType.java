@@ -29,8 +29,7 @@ package org.apache.pinot.common.request;
 public enum ExpressionType implements org.apache.thrift.TEnum {
   LITERAL(0),
   IDENTIFIER(1),
-  FUNCTION(2),
-  INTERVAL_QUALIFIER(3);
+  FUNCTION(2);
 
   private final int value;
 
@@ -50,7 +49,7 @@ public enum ExpressionType implements org.apache.thrift.TEnum {
    * @return null if the value is not found.
    */
   @org.apache.thrift.annotation.Nullable
-  public static ExpressionType findByValue(int value) { 
+  public static ExpressionType findByValue(int value) {
     switch (value) {
       case 0:
         return LITERAL;
@@ -58,8 +57,6 @@ public enum ExpressionType implements org.apache.thrift.TEnum {
         return IDENTIFIER;
       case 2:
         return FUNCTION;
-      case 3:
-        return INTERVAL_QUALIFIER;
       default:
         return null;
     }
