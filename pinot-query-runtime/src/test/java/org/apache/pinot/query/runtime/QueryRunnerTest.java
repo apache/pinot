@@ -110,6 +110,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // Aggregation without GROUP BY
         new Object[]{"SELECT COUNT(*) FROM a WHERE a.col3 >= 0 AND a.col2 = 'alice'", 1},
 
+        // Aggregation with GROUP BY on a count star reference
+        new Object[]{"SELECT a.col1, COUNT(*) FROM a WHERE a.col3 >= 0 GROUP BY a.col1", 5},
+
         // project in intermediate stage
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
         // col1 on both are "foo", "bar", "alice", "bob", "charlie"
