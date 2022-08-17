@@ -89,7 +89,10 @@ public class DefaultNullValueVirtualColumnProvider extends BaseVirtualColumnProv
     if (context.getFieldSpec().isSingleValueField()) {
       builder.setSorted(true);
     } else {
-      builder.setMaxNumberOfMultiValues(0);
+      // When there is no value for a multi-value column, the maxNumberOfMultiValues and cardinality should be
+      // set as 1 because the MV column bitmap uses 1 to delimit the rows for a MV column. Each MV column will have a
+      // default null value based on column's data type
+      builder.setMaxNumberOfMultiValues(1);
     }
     return builder.build();
   }

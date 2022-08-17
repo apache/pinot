@@ -636,6 +636,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     assertEquals(resultTable.get("dataSchema").get("columnNames").size(), schema.size());
     assertEquals(resultTable.get("rows").size(), 10);
 
+    // Test aggregation query to include querying all segemnts (including realtime)
+    String aggregationQuery = "SELECT SUMMV(NewIntMVDimension) FROM " + rawTableName;
+    queryResponse = postQuery(aggregationQuery);
+    assertEquals(queryResponse.get("exceptions").size(), 0);
+
     // Test filter on all new added columns
     String countStarQuery = "SELECT COUNT(*) FROM " + rawTableName
         + " WHERE NewIntSVDimension < 0 AND NewLongSVDimension < 0 AND NewFloatSVDimension < 0 AND "
