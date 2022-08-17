@@ -19,6 +19,7 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -84,33 +85,8 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet1 = blockValSetMap.get(_expression1);
-    BlockValSet blockValSet2 = blockValSetMap.get(_expression2);
-    double[] values1;
-    double[] values2;
-    switch (blockValSet1.getValueType().getStoredType()) {
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE:
-        values1 = blockValSet1.getDoubleValuesSV();
-        break;
-      default:
-        throw new IllegalStateException(
-            "Cannot compute covariance for non-numeric type: " + blockValSet1.getValueType());
-    }
-
-    switch (blockValSet2.getValueType().getStoredType()) {
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE:
-        values2 = blockValSet2.getDoubleValuesSV();
-        break;
-      default:
-        throw new IllegalStateException(
-            "Cannot compute covariance for non-numeric type: " + blockValSet2.getValueType());
-    }
+    double[] values1 = getValSet(blockValSetMap, _expression1);
+    double[] values2 = getValSet(blockValSetMap, _expression2);
 
     double sumX = 0.0;
     double sumY = 0.0;
@@ -134,19 +110,53 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
     }
   }
 
-  protected void setGroupByResult() {}
+  protected void setGroupByResult(int groupKey, GroupByResultHolder groupByResultHolder, double sumX, double sumY,
+      double sumXY, long count) {
+    CovarianceTuple covarianceTuple = groupByResultHolder.getResult(groupKey);
+    if (covarianceTuple == null) {
+      groupByResultHolder.setValueForKey(groupKey, new CovarianceTuple(sumX, sumY, sumXY, count));
+    } else {
+      covarianceTuple.apply(sumX, sumY, sumXY, count);
+    }
+  }
 
+  private double[] getValSet(Map<ExpressionContext, BlockValSet> blockValSetMap, ExpressionContext expression) {
+    BlockValSet blockValSet = blockValSetMap.get(expression);
+    //TODO: Add MV support for covariance
+    Preconditions.checkState(blockValSet.isSingleValue(),
+        "Covariance function currently only supports single-valued column");
+    switch (blockValSet.getValueType().getStoredType()) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+        return blockValSet.getDoubleValuesSV();
+      default:
+        throw new IllegalStateException(
+            "Cannot compute covariance for non-numeric type: " + blockValSet.getValueType());
+    }
+  }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    // TODO
+    double[] values1 = getValSet(blockValSetMap, _expression1);
+    double[] values2 = getValSet(blockValSetMap, _expression2);
+    for (int i = 0; i < length; i++) {
+      setGroupByResult(groupKeyArray[i], groupByResultHolder, values1[i], values2[i], values1[i] * values2[i], 1L);
+    }
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    // TODO
+    double[] values1 = getValSet(blockValSetMap, _expression1);
+    double[] values2 = getValSet(blockValSetMap, _expression2);
+    for (int i = 0; i < length; i++) {
+      for (int groupKey : groupKeysArray[i]) {
+        setGroupByResult(groupKey, groupByResultHolder, values1[i], values2[i], values1[i] * values2[i], 1L);
+      }
+    }
   }
 
   @Override
@@ -161,7 +171,7 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
 
   @Override
   public CovarianceTuple extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    return null;
+    return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
@@ -195,7 +205,14 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
 
   @Override
   public String toExplainString() {
-    // TODO
-    return null;
+    StringBuilder stringBuilder = new StringBuilder(getType().getName()).append('(');
+    int numArguments = getInputExpressions().size();
+    if (numArguments > 0) {
+      stringBuilder.append(getInputExpressions().get(0).toString());
+      for (int i = 1; i < numArguments; i++) {
+        stringBuilder.append(", ").append(getInputExpressions().get(i).toString());
+      }
+    }
+    return stringBuilder.append(')').toString();
   }
 }
