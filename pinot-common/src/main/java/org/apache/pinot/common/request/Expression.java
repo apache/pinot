@@ -38,7 +38,7 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
   private static final org.apache.thrift.scheme.SchemeFactory TUPLE_SCHEME_FACTORY = new ExpressionTupleSchemeFactory();
 
   /**
-   *
+   * 
    * @see ExpressionType
    */
   public @org.apache.thrift.annotation.Nullable ExpressionType type; // required
@@ -49,7 +49,7 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
     /**
-     *
+     * 
      * @see ExpressionType
      */
     TYPE((short)1, "type"),
@@ -124,13 +124,13 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
   public static final java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new java.util.EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.TYPE, new org.apache.thrift.meta_data.FieldMetaData("type", org.apache.thrift.TFieldRequirementType.REQUIRED,
+    tmpMap.put(_Fields.TYPE, new org.apache.thrift.meta_data.FieldMetaData("type", org.apache.thrift.TFieldRequirementType.REQUIRED, 
         new org.apache.thrift.meta_data.EnumMetaData(org.apache.thrift.protocol.TType.ENUM, ExpressionType.class)));
-    tmpMap.put(_Fields.FUNCTION_CALL, new org.apache.thrift.meta_data.FieldMetaData("functionCall", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+    tmpMap.put(_Fields.FUNCTION_CALL, new org.apache.thrift.meta_data.FieldMetaData("functionCall", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT        , "Function")));
-    tmpMap.put(_Fields.LITERAL, new org.apache.thrift.meta_data.FieldMetaData("literal", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+    tmpMap.put(_Fields.LITERAL, new org.apache.thrift.meta_data.FieldMetaData("literal", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT        , "Literal")));
-    tmpMap.put(_Fields.IDENTIFIER, new org.apache.thrift.meta_data.FieldMetaData("identifier", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+    tmpMap.put(_Fields.IDENTIFIER, new org.apache.thrift.meta_data.FieldMetaData("identifier", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT        , "Identifier")));
     metaDataMap = java.util.Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(Expression.class, metaDataMap);
@@ -140,7 +140,7 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
   }
 
   public Expression(
-          ExpressionType type)
+    ExpressionType type)
   {
     this();
     this.type = type;
@@ -177,7 +177,7 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
   }
 
   /**
-   *
+   * 
    * @see ExpressionType
    */
   @org.apache.thrift.annotation.Nullable
@@ -186,7 +186,7 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
   }
 
   /**
-   *
+   * 
    * @see ExpressionType
    */
   public Expression setType(@org.apache.thrift.annotation.Nullable ExpressionType type) {
@@ -286,37 +286,37 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
 
   public void setFieldValue(_Fields field, @org.apache.thrift.annotation.Nullable java.lang.Object value) {
     switch (field) {
-      case TYPE:
-        if (value == null) {
-          unsetType();
-        } else {
-          setType((ExpressionType)value);
-        }
-        break;
+    case TYPE:
+      if (value == null) {
+        unsetType();
+      } else {
+        setType((ExpressionType)value);
+      }
+      break;
 
-      case FUNCTION_CALL:
-        if (value == null) {
-          unsetFunctionCall();
-        } else {
-          setFunctionCall((Function)value);
-        }
-        break;
+    case FUNCTION_CALL:
+      if (value == null) {
+        unsetFunctionCall();
+      } else {
+        setFunctionCall((Function)value);
+      }
+      break;
 
-      case LITERAL:
-        if (value == null) {
-          unsetLiteral();
-        } else {
-          setLiteral((Literal)value);
-        }
-        break;
+    case LITERAL:
+      if (value == null) {
+        unsetLiteral();
+      } else {
+        setLiteral((Literal)value);
+      }
+      break;
 
-      case IDENTIFIER:
-        if (value == null) {
-          unsetIdentifier();
-        } else {
-          setIdentifier((Identifier)value);
-        }
-        break;
+    case IDENTIFIER:
+      if (value == null) {
+        unsetIdentifier();
+      } else {
+        setIdentifier((Identifier)value);
+      }
+      break;
 
     }
   }
@@ -324,17 +324,17 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
   @org.apache.thrift.annotation.Nullable
   public java.lang.Object getFieldValue(_Fields field) {
     switch (field) {
-      case TYPE:
-        return getType();
+    case TYPE:
+      return getType();
 
-      case FUNCTION_CALL:
-        return getFunctionCall();
+    case FUNCTION_CALL:
+      return getFunctionCall();
 
-      case LITERAL:
-        return getLiteral();
+    case LITERAL:
+      return getLiteral();
 
-      case IDENTIFIER:
-        return getIdentifier();
+    case IDENTIFIER:
+      return getIdentifier();
 
     }
     throw new java.lang.IllegalStateException();
@@ -347,14 +347,14 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
     }
 
     switch (field) {
-      case TYPE:
-        return isSetType();
-      case FUNCTION_CALL:
-        return isSetFunctionCall();
-      case LITERAL:
-        return isSetLiteral();
-      case IDENTIFIER:
-        return isSetIdentifier();
+    case TYPE:
+      return isSetType();
+    case FUNCTION_CALL:
+      return isSetFunctionCall();
+    case LITERAL:
+      return isSetLiteral();
+    case IDENTIFIER:
+      return isSetIdentifier();
     }
     throw new java.lang.IllegalStateException();
   }
@@ -582,7 +582,7 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
       while (true)
       {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
           break;
         }
         switch (schemeField.id) {
@@ -590,7 +590,7 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
             if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
               struct.type = org.apache.pinot.common.request.ExpressionType.findByValue(iprot.readI32());
               struct.setTypeIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -599,7 +599,7 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
               struct.functionCall = new Function();
               struct.functionCall.read(iprot);
               struct.setFunctionCallIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -608,7 +608,7 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
               struct.literal = new Literal();
               struct.literal.read(iprot);
               struct.setLiteralIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -617,7 +617,7 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
               struct.identifier = new Identifier();
               struct.identifier.read(iprot);
               struct.setIdentifierIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;

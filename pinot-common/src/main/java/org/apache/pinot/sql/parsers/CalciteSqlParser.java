@@ -754,8 +754,6 @@ public class CalciteSqlParser {
       case OR:
         return compileOrExpression(functionNode);
       // BETWEEN and LIKE might be negated (NOT BETWEEN, NOT LIKE)
-      case EXTRACT:
-        return compileExtractExpression(functionNode);
       case BETWEEN:
         negated = ((SqlBetweenOperator) functionNode.getOperator()).isNegated();
         canonicalName = SqlKind.BETWEEN.name();
@@ -815,31 +813,6 @@ public class CalciteSqlParser {
     } else {
       return functionExpression;
     }
-  }
-
-  /**
-   * SELECT EXTRACT(<field> FROM <exp>)
-   *
-   * Input / Output :
-   * SELECT EXTRACT(YEAR FROM '2017-06-15 HH:MM:SS')
-   *
-   * PinotQuery(selectList:[Expression(type:FUNCTION,functionCall:Function(operator:EXTRACT, operands:[Expression(type:LITERAL, literal:Literal(name:YEAR)), Expression(type:IDENTIFIER, identifier:Identifier(name:2017-06-15 HH:MM:SS))]))]
-   *
-   *  calcite.Interval_Qualifier -> pinot.Literal
-   *  calcite.Identifier -> pinot.Identifier
-   */
-  private static Expression compileExtractExpression(SqlBasicCall extractNode) {
-    SqlNode fieldNode = extractNode.getOperandList().get(0); // calcite.Interval_Qualifier YEAR
-    SqlNode expNode = extractNode.getOperandList().get(1); // calcite.Identifier  '2017-06-15 HH:MM:SS'
-
-    List<Expression> operands = new ArrayList<>();
-    operands.add(toExpression(fieldNode)); // YEAR
-    operands.add(toExpression(expNode)); // '2017-06-15 HH:MM:SS'
-
-    Expression extractExpression = RequestUtils.getFunctionExpression(FilterKind.EXTRACT.name());
-    extractExpression.getFunctionCall().setOperands(operands);
-
-    return extractExpression;
   }
 
   /**
