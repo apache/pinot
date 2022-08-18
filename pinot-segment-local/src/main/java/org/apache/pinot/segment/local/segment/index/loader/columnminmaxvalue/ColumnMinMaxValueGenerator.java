@@ -98,7 +98,7 @@ public class ColumnMinMaxValueGenerator {
   private boolean needAddColumnMinMaxValueForColumn(String columnName) {
     ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
     return columnMetadata.hasDictionary() && columnMetadata.getMinValue() == null
-        && columnMetadata.getMaxValue() == null;
+        && columnMetadata.getMaxValue() == null && !columnMetadata.isMinMaxValueInvalid();
   }
 
   private void addColumnMinMaxValueForColumn(String columnName)

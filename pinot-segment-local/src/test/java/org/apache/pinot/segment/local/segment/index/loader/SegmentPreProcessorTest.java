@@ -23,11 +23,13 @@ import java.io.File;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -35,8 +37,10 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -59,6 +63,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -1223,6 +1228,75 @@ public class SegmentPreProcessorTest {
     });
   }
 
+  @Test
+  public void testNeedAddMinMaxValue()
+      throws Exception {
+
+    String[] stringValuesInvalid = {"A,", "B,", "C,", "D,", "E"};
+    String[] stringValuesValid = {"A", "B", "C", "D", "E"};
+    long[] longValues = {1588316400000L, 1588489200000L, 1588662000000L, 1588834800000L, 1589007600000L};
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", FieldSpec.DataType.STRING)
+        .addMetric("longCol", FieldSpec.DataType.LONG).build();
+
+    FileUtils.deleteQuietly(INDEX_DIR);
+
+    // build good segment, no needPreprocess
+    File segment = buildTestSegmentForMinMax(tableConfig, schema, "validSegment", stringValuesValid, longValues);
+    SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(segment.toURI(),
+            new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    indexLoadingConfig.setColumnMinMaxValueGeneratorMode(ColumnMinMaxValueGeneratorMode.ALL);
+    SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema);
+    assertFalse(processor.needProcess());
+
+    // build bad segment, still no needPreprocess, since minMaxInvalid flag should be set
+    FileUtils.deleteQuietly(INDEX_DIR);
+    segment = buildTestSegmentForMinMax(tableConfig, schema, "invalidSegment", stringValuesInvalid, longValues);
+    segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(segment.toURI(),
+        new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
+    indexLoadingConfig = new IndexLoadingConfig();
+    indexLoadingConfig.setColumnMinMaxValueGeneratorMode(ColumnMinMaxValueGeneratorMode.NONE);
+    processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema);
+    assertFalse(processor.needProcess());
+
+    indexLoadingConfig.setColumnMinMaxValueGeneratorMode(ColumnMinMaxValueGeneratorMode.ALL);
+    processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema);
+    assertFalse(processor.needProcess());
+
+    // modify metadata, to remove min/max, now needPreprocess
+    removeMinMaxValuesFromMetadataFile(segment);
+    segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(segment.toURI(),
+        new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
+    processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema);
+    assertTrue(processor.needProcess());
+
+    FileUtils.deleteQuietly(INDEX_DIR);
+  }
+
+  private File buildTestSegmentForMinMax(final TableConfig tableConfig, final Schema schema, String segmentName,
+      String[] stringValues, long[] longValues)
+      throws Exception {
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(INDEX_DIR.getAbsolutePath());
+    config.setSegmentName(segmentName);
+
+    List<GenericRow> rows = new ArrayList<>(3);
+    for (int i = 0; i < 5; i++) {
+      GenericRow row = new GenericRow();
+      row.putValue("stringCol", stringValues[i]);
+      row.putValue("longCol", longValues[i]);
+      rows.add(row);
+    }
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+    driver.getOutputDirectory().deleteOnExit();
+    return driver.getOutputDirectory();
+  }
+
   private static void removeMinMaxValuesFromMetadataFile(File indexDir)
       throws Exception {
     PropertiesConfiguration configuration = SegmentMetadataImpl.getPropertiesConfiguration(indexDir);
@@ -1230,7 +1304,8 @@ public class SegmentPreProcessorTest {
     while (keys.hasNext()) {
       String key = keys.next();
       if (key.endsWith(V1Constants.MetadataKeys.Column.MIN_VALUE) || key.endsWith(
-          V1Constants.MetadataKeys.Column.MAX_VALUE)) {
+          V1Constants.MetadataKeys.Column.MAX_VALUE) || key.endsWith(
+          V1Constants.MetadataKeys.Column.MIN_MAX_VALUE_INVALID)) {
         configuration.clearProperty(key);
       }
     }

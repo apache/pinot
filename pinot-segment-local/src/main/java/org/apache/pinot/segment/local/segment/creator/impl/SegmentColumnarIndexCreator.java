@@ -856,9 +856,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       String maxValue) {
     if (isValidPropertyValue(minValue)) {
       properties.setProperty(getKeyFor(column, MIN_VALUE), minValue);
+    } else {
+      properties.setProperty(getKeyFor(column, MIN_MAX_VALUE_INVALID), true);
     }
     if (isValidPropertyValue(maxValue)) {
       properties.setProperty(getKeyFor(column, MAX_VALUE), maxValue);
+    } else {
+      properties.setProperty(getKeyFor(column, MIN_MAX_VALUE_INVALID), true);
     }
   }
 
