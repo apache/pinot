@@ -104,11 +104,11 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   private double _sumDoubleY = 0;
   private double _sumDoubleXY = 0;
 
-  private long _sumLong = 0l;
+  private long _sumLong = 0L;
   private double _sumFloat = 0;
 
   private double _sumIntDouble = 0;
-  private long _sumIntLong = 0l;
+  private long _sumIntLong = 0L;
   private double _sumIntFloat = 0;
   private double _sumDoubleLong = 0;
   private double _sumDoubleFloat = 0;
