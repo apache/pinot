@@ -202,7 +202,7 @@ const TaskQueueTable = (props) => {
               headerTitle="Scheduling Errors"
               showSearchBox={false}
             >
-              <Box p={3} style={{ wordBreak: 'break-all' }}>
+              <Box p={3} style={{ overflow: 'auto' }}>
                 {mostRecentErrorRunMessage}
               </Box>
             </SimpleAccordion>

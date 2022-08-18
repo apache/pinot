@@ -798,7 +798,7 @@ const getElapsedTime = (startTime) => {
 
 const getTasksList = async (tableName, taskType) => {
   const finalResponse = {
-    columns: ['Task ID', 'Status', 'Start Time', /*'Elapsed Time',*/ 'Finish Time', 'Num of Sub Tasks'],
+    columns: ['Task ID', 'Status', 'Start Time', 'Finish Time', 'Num of Sub Tasks'],
     records: []
   }
   await new Promise((resolve, reject) => {
@@ -811,7 +811,6 @@ const getTasksList = async (tableName, taskType) => {
           taskID,
           status,
           get(debugData, 'data.subtaskInfos.0.startTime'),
-          // startTime ? getElapsedTime(startTime) : '',
           get(debugData, 'data.subtaskInfos.0.finishTime', ''),
           get(debugData, 'data.subtaskCount.total', 0)
         ]);
