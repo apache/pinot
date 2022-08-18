@@ -96,7 +96,6 @@ public class PinotSchemaRestletResource {
 
   @Inject
   AccessControlFactory _accessControlFactory;
-  AccessControlUtils _accessControlUtils = new AccessControlUtils();
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -219,7 +218,7 @@ public class PinotSchemaRestletResource {
     Schema schema = schemaAndUnrecognizedProps.getLeft();
     String endpointUrl = request.getRequestURL().toString();
     validateSchemaName(schema.getSchemaName());
-    _accessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
+    AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
     SuccessResponse successResponse = addSchema(schema, override);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
@@ -251,7 +250,7 @@ public class PinotSchemaRestletResource {
     Schema schema = schemaAndUnrecognizedProperties.getLeft();
     String endpointUrl = request.getRequestURL().toString();
     validateSchemaName(schema.getSchemaName());
-    _accessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
+    AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
     SuccessResponse successResponse = addSchema(schema, override);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProperties.getRight());

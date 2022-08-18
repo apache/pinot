@@ -152,7 +152,6 @@ public class PinotTableRestletResource {
 
   @Inject
   AccessControlFactory _accessControlFactory;
-  AccessControlUtils _accessControlUtils = new AccessControlUtils();
 
   @Inject
   Executor _executor;
@@ -186,7 +185,7 @@ public class PinotTableRestletResource {
       // validate permission
       tableName = tableConfig.getTableName();
       String endpointUrl = request.getRequestURL().toString();
-      _accessControlUtils.validatePermission(tableName, AccessType.CREATE, httpHeaders, endpointUrl,
+      AccessControlUtils.validatePermission(tableName, AccessType.CREATE, httpHeaders, endpointUrl,
           _accessControlFactory.create());
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
@@ -372,7 +371,7 @@ public class PinotTableRestletResource {
 
       // validate if user has permission to change the table state
       String endpointUrl = request.getRequestURL().toString();
-      _accessControlUtils
+      AccessControlUtils
           .validatePermission(tableName, AccessType.UPDATE, httpHeaders, endpointUrl, _accessControlFactory.create());
 
       ArrayNode ret = JsonUtils.newArrayNode();
