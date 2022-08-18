@@ -20,6 +20,7 @@ package org.apache.pinot.common.response;
 
 import java.util.List;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.response.broker.ResultTable;
 
 
 /**
@@ -136,6 +137,18 @@ public interface BrokerResponse {
    * Get number of exceptions recorded in the response.
    */
   int getExceptionsSize();
+
+  /**
+   * set the result table.
+   * @param resultTable result table to be set.
+   */
+  void setResultTable(ResultTable resultTable);
+
+  /**
+   * Get the result table.
+   * @return result table.
+   */
+  ResultTable getResultTable();
 
   /**
    * Get the list of exceptions

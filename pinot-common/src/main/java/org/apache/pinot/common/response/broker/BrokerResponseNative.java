@@ -312,11 +312,13 @@ public class BrokerResponseNative implements BrokerResponse {
 
   @JsonProperty("resultTable")
   @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Override
   public ResultTable getResultTable() {
     return _resultTable;
   }
 
   @JsonProperty("resultTable")
+  @Override
   public void setResultTable(ResultTable resultTable) {
     _resultTable = resultTable;
     _numRowsResultSet = resultTable.getRows().size();

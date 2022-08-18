@@ -27,6 +27,7 @@ import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -48,11 +49,11 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestHandlerDelegate.class);
 
   private final BrokerRequestHandler _singleStageBrokerRequestHandler;
-  private final MultiStageBrokerRequestHandler _multiStageWorkerRequestHandler;
+  private final BrokerRequestHandler _multiStageWorkerRequestHandler;
   private final BrokerMetrics _brokerMetrics;
 
   public BrokerRequestHandlerDelegate(BrokerRequestHandler singleStageBrokerRequestHandler,
-      @Nullable MultiStageBrokerRequestHandler multiStageWorkerRequestHandler, BrokerMetrics brokerMetrics) {
+      @Nullable BrokerRequestHandler multiStageWorkerRequestHandler, BrokerMetrics brokerMetrics) {
     _singleStageBrokerRequestHandler = singleStageBrokerRequestHandler;
     _multiStageWorkerRequestHandler = multiStageWorkerRequestHandler;
     _brokerMetrics = brokerMetrics;
@@ -79,7 +80,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   }
 
   @Override
-  public BrokerResponseNative handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+  public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     if (sqlNodeAndOptions == null) {
