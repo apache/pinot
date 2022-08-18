@@ -50,26 +50,26 @@ public final class AccessControlUtils {
    */
   public static void validatePermission(@Nullable String tableName, AccessType accessType,
       @Nullable HttpHeaders httpHeaders, @Nullable String endpointUrl, AccessControl accessControl) {
-    String accessTypeToEndpointMsg =
-        String.format("access type '%s' to the endpoint '%s' for table '%s'", accessType, endpointUrl, tableName);
+    String message = null;
     try {
       if (StringUtils.isBlank(tableName)) {
-        if (accessControl.hasAccess(accessType, httpHeaders, endpointUrl)) {
-          return;
+        message = String.format("%s '%s'", accessType, endpointUrl);
+        if (!accessControl.hasAccess(accessType, httpHeaders, endpointUrl)) {
+          accessDenied(message);
         }
       } else {
+        message = String.format("%s '%s' for table '%s'", accessType, endpointUrl, tableName);
         String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-        if (accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl)) {
-          return;
+        if (!accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl)) {
+          accessDenied(message);
         }
       }
+    } catch (ControllerApplicationException e) {
+      throw e;
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER,
-          "Caught exception while validating permission for " + accessTypeToEndpointMsg,
+      throw new ControllerApplicationException(LOGGER, "Caught exception while validating permission for " + message,
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
-
-    accessDenied(accessTypeToEndpointMsg);
   }
 
   /**
@@ -86,7 +86,7 @@ public final class AccessControlUtils {
   }
 
   /**
-   * Validate permission for the given access type against the given table
+   * Validate permission for the given access type and endpointUrl
    *
    * @param httpHeaders HTTP headers containing requester identity required by access control object
    * @param endpointUrl the request url for which this access control is called
