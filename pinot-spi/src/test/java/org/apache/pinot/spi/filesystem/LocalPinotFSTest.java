@@ -36,6 +36,9 @@ public class LocalPinotFSTest {
   private File _newTmpDir;
   private File _nonExistentTmpFolder;
 
+  private static final String NON_RECURSIVE_FILE_GLOB = "glob:*Test";
+  private static final String RECURSIVE_FILE_GLOB = "glob:**Test";
+
   @BeforeClass
   public void setUp() {
     _absoluteTmpDirPath =
@@ -87,6 +90,7 @@ public class LocalPinotFSTest {
 
     localPinotFS.copy(testFileUri, secondTestFileUri);
     Assert.assertEquals(2, localPinotFS.listFiles(_absoluteTmpDirPath.toURI(), true).length);
+    Assert.assertEquals(2, localPinotFS.listFilesWithPattern(_absoluteTmpDirPath.toURI(), RECURSIVE_FILE_GLOB).length);
 
     // Check file copy worked when file was not created
     Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
@@ -106,8 +110,13 @@ public class LocalPinotFSTest {
     Assert.assertTrue(testDirFile.createNewFile(), "Could not create file " + testDir.getAbsolutePath());
     Assert.assertEquals(localPinotFS.listFiles(newAbsoluteTempDirPath.toURI(), false),
         new String[]{testDir.getAbsolutePath()});
+
+    Assert.assertEquals(localPinotFS.listFilesWithPattern(newAbsoluteTempDirPath.toURI(), NON_RECURSIVE_FILE_GLOB),
+            new String[]{testDir.getAbsolutePath()});
     Assert.assertEquals(localPinotFS.listFiles(newAbsoluteTempDirPath.toURI(), true),
         new String[]{testDir.getAbsolutePath(), testDirFile.getAbsolutePath()});
+    Assert.assertEquals(localPinotFS.listFilesWithPattern(newAbsoluteTempDirPath.toURI(), RECURSIVE_FILE_GLOB),
+            new String[]{testDir.getAbsolutePath(), testDirFile.getAbsolutePath()});
 
     // Create another parent dir so we can test recursive move
     File newAbsoluteTempDirPath3 = new File(_absoluteTmpDirPath, "absoluteThree");

@@ -160,7 +160,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       outputDirFS.mkdir(stagingDirURI);
     }
     //Get list of files to process
-    String[] files = inputDirFS.listFiles(inputDirURI, true);
+    String[] files = inputDirFS.listFilesWithPattern(inputDirURI, _spec.getExcludeFileNamePattern());
 
     //TODO: sort input files based on creation time
     List<String> filteredFiles = new ArrayList<>();

@@ -139,8 +139,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         throw new RuntimeException("Missing property 'schemaURI' in 'tableSpec'");
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
-      String schemaURI = SegmentGenerationUtils
-          .generateSchemaURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
+      String schemaURI = SegmentGenerationUtils.generateSchemaURI(pinotClusterSpec.getControllerURI(),
+          _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setSchemaURI(schemaURI);
     }
     _schema = SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI(), _spec.getAuthToken());
@@ -151,8 +151,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         throw new RuntimeException("Missing property 'tableConfigURI' in 'tableSpec'");
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
-      String tableConfigURI = SegmentGenerationUtils
-          .generateTableConfigURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
+      String tableConfigURI = SegmentGenerationUtils.generateTableConfigURI(pinotClusterSpec.getControllerURI(),
+          _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setTableConfigURI(tableConfigURI);
     }
     _tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken());
@@ -172,7 +172,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
   public void run()
       throws Exception {
     // Get list of files to process.
-    String[] files = _inputDirFS.listFiles(_inputDirURI, true);
+    String[] files = _inputDirFS.listFilesWithPattern(_inputDirURI, _spec.getIncludeFileNamePattern());
 
     // TODO - sort input files by modification timestamp. Though this is problematic because:
     // a. It can put more load on the external filesystem (e.g. S3), and
@@ -219,8 +219,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
           List<String> siblingFiles = localDirIndex.get(parentPath);
           Collections.sort(siblingFiles);
           for (int i = 0; i < siblingFiles.size(); i++) {
-            URI inputFileURI = SegmentGenerationUtils
-                .getFileURI(siblingFiles.get(i), SegmentGenerationUtils.getDirectoryURI(parentPath));
+            URI inputFileURI = SegmentGenerationUtils.getFileURI(siblingFiles.get(i),
+                SegmentGenerationUtils.getDirectoryURI(parentPath));
             submitSegmentGenTask(localTempDir, inputFileURI, i);
           }
         }

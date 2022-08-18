@@ -182,7 +182,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     outputDirFS.mkdir(stagingSegmentTarUri.toUri());
 
     //Get list of files to process
-    String[] files = inputDirFS.listFiles(inputDirURI, true);
+    String[] files = inputDirFS.listFilesWithPattern(inputDirURI, _spec.getIncludeFileNamePattern());
 
     //TODO: sort input files based on creation time
     List<String> filteredFiles = new ArrayList<>();
