@@ -20,7 +20,6 @@ package org.apache.pinot.broker.api;
 
 import org.apache.pinot.spi.utils.CommonConstants;
 
-
 public abstract class RequesterIdentity {
   public String getClientIp() {
     return CommonConstants.UNKNOWN;

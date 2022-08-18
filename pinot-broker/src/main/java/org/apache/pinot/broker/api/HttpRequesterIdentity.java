@@ -27,7 +27,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * Identity container for HTTP requests with (optional) authorization headers
  */
 public class HttpRequesterIdentity extends RequesterIdentity {
-
   private Multimap<String, String> _httpHeaders;
   private String _endpointUrl;
 
