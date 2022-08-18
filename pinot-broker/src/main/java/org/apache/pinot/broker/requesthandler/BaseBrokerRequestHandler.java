@@ -21,7 +21,6 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.RateLimiter;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -291,16 +290,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
-    // Compile the request
-    long compilationStartTimeNs = System.nanoTime();
+    long compilationStartTimeNs;
     PinotQuery pinotQuery;
     try {
-      if (sqlNodeAndOptions != null) {
-        // Include parse time when the query is already parsed
-        compilationStartTimeNs -= sqlNodeAndOptions.getParseTimeNs();
-      } else {
-        sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-      }
+      // Parse the request
+      sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions
+          : RequestUtils.parseQuery(query, request);
+      // Compile the request into PinotQuery
+      compilationStartTimeNs = System.nanoTime();
       pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
@@ -308,7 +305,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
     }
-    setOptions(pinotQuery, requestId, query, request);
 
     if (isLiteralOnlyQuery(pinotQuery)) {
       LOGGER.debug("Request {} contains only Literal, skipping server query: {}", requestId, query);
@@ -378,8 +374,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     long compilationEndTimeNs = System.nanoTime();
+    // full request compile time = compilationTimeNs + parserTimeNs
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
-        compilationEndTimeNs - compilationStartTimeNs);
+        (compilationEndTimeNs - compilationStartTimeNs) + sqlNodeAndOptions.getParseTimeNs());
 
     // Second-stage table-level access control
     // TODO: Modify AccessControl interface to directly take PinotQuery
@@ -1544,11 +1541,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     throw new BadQueryRequestException("Unknown columnName '" + columnName + "' found in the query");
   }
 
-  public static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
-    return Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=')
-        .split(request.get(optionsKey).asText());
-  }
-
   /**
    * Helper function to decide whether to force the log
    *
@@ -1565,46 +1557,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // If response time is more than 1 sec, force the log
     return totalTimeMs > 1000L;
-  }
-
-  /**
-   * Sets extra options for the given query.
-   */
-  @VisibleForTesting
-  static void setOptions(PinotQuery pinotQuery, long requestId, String query, JsonNode jsonRequest) {
-    Map<String, String> queryOptions = new HashMap<>();
-    if (jsonRequest.has(Broker.Request.DEBUG_OPTIONS)) {
-      Map<String, String> debugOptions = getOptionsFromJson(jsonRequest, Broker.Request.DEBUG_OPTIONS);
-      if (!debugOptions.isEmpty()) {
-        // TODO: Do not set debug options after releasing 0.11.0. Currently we kept it for backward compatibility.
-        LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
-        pinotQuery.setDebugOptions(debugOptions);
-
-        // NOTE: Debug options are deprecated. Put all debug options into query options for backward compatibility.
-        queryOptions.putAll(debugOptions);
-      }
-    }
-    if (jsonRequest.has(Broker.Request.QUERY_OPTIONS)) {
-      Map<String, String> queryOptionsFromJson = getOptionsFromJson(jsonRequest, Broker.Request.QUERY_OPTIONS);
-      queryOptions.putAll(queryOptionsFromJson);
-    }
-    Map<String, String> queryOptionsFromQuery = pinotQuery.getQueryOptions();
-    if (queryOptionsFromQuery != null) {
-      queryOptions.putAll(queryOptionsFromQuery);
-    }
-    boolean enableTrace = jsonRequest.has(Broker.Request.TRACE) && jsonRequest.get(Broker.Request.TRACE).asBoolean();
-    if (enableTrace) {
-      queryOptions.put(Broker.Request.TRACE, "true");
-    }
-    // NOTE: Always set query options because we will put 'timeoutMs' later
-    pinotQuery.setQueryOptions(queryOptions);
-    if (!queryOptions.isEmpty()) {
-      LOGGER.debug("Query options are set to: {} for request {}: {}", queryOptions, requestId, query);
-    }
-    // TODO: Remove the SQL query options after releasing 0.11.0
-    // The query engine will break if these 2 options are missing during version upgrade.
-    queryOptions.put(Broker.Request.QueryOptionKey.GROUP_BY_MODE, Broker.Request.SQL);
-    queryOptions.put(Broker.Request.QueryOptionKey.RESPONSE_FORMAT, Broker.Request.SQL);
   }
 
   /**

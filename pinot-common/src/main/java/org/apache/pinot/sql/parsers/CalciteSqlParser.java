@@ -125,10 +125,10 @@ public class CalciteSqlParser {
       SqlParserImpl sqlParser = newSqlParser(inStream);
       SqlNodeList sqlNodeList = sqlParser.SqlStmtsEof();
       // Extract OPTION statements from sql.
-      SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
+      SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sql, sqlNodeList);
       // add legacy OPTIONS keyword-based options
       if (options.size() > 0) {
-        sqlNodeAndOptions.setExtraOptions(extractOptionsMap(options));
+        sqlNodeAndOptions.putExtraQueryOptions(extractOptionsMap(options));
       }
       sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parseStartTimeNs);
       return sqlNodeAndOptions;
@@ -137,7 +137,8 @@ public class CalciteSqlParser {
     }
   }
 
-  public static SqlNodeAndOptions extractSqlNodeAndOptions(SqlNodeList sqlNodeList) {
+  @VisibleForTesting
+  static SqlNodeAndOptions extractSqlNodeAndOptions(String sql, SqlNodeList sqlNodeList) {
     PinotSqlType sqlType = null;
     SqlNode statementNode = null;
     Map<String, String> options = new HashMap<>();
@@ -169,7 +170,8 @@ public class CalciteSqlParser {
     if (sqlType == null) {
       throw new SqlCompilationException("SqlNode with executable statement not found!");
     }
-    return new SqlNodeAndOptions(statementNode, sqlType, options);
+    // Debug Options are attached from query request JSON. setting it to empty for now.
+    return new SqlNodeAndOptions(sql, statementNode, sqlType, options, new HashMap<>());
   }
 
   public static PinotQuery compileToPinotQuery(String sql)
@@ -182,9 +184,14 @@ public class CalciteSqlParser {
     PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode());
 
     // Set Option statements to PinotQuery.
-    Map<String, String> options = sqlNodeAndOptions.getOptions();
-    if (!options.isEmpty()) {
-      pinotQuery.setQueryOptions(options);
+    Map<String, String> queryOptions = sqlNodeAndOptions.getQueryOptions();
+    if (!queryOptions.isEmpty()) {
+      pinotQuery.setQueryOptions(queryOptions);
+    }
+    // DebugOptions has been deprecated. keeping this for backward compatibility purpose.
+    Map<String, String> debugOptions = sqlNodeAndOptions.getDebugOptions();
+    if (!debugOptions.isEmpty()) {
+      pinotQuery.setDebugOptions(debugOptions);
     }
     return pinotQuery;
   }
