@@ -49,7 +49,7 @@ public class RsvpSourceGenerator implements PinotSourceDataGenerator {
   }
 
   public RSVP createMessage() {
-    String eventId = Math.abs(ThreadLocalRandom.current().nextLong()) + "";
+    String eventId = Math.abs(ThreadLocalRandom.current().nextLong(100)) + "";
     ObjectNode json = JsonUtils.newObjectNode();
     ObjectNode eventJson = JsonUtils.newObjectNode();
     json.set("event", eventJson);
@@ -104,10 +104,10 @@ public class RsvpSourceGenerator implements PinotSourceDataGenerator {
 
     json.put("mtime", DateTime.now().getMillis());
 
-    json.put("rsvp_id", ThreadLocalRandom.current().nextLong());
+    json.put("rsvp_id", ThreadLocalRandom.current().nextLong(100));
     json.put("guests", ThreadLocalRandom.current().nextInt(100));
 
-    json.put("rsvp_count", 1);
+    json.put("rsvp_count", ThreadLocalRandom.current().nextInt(10) + 1);
     return new RSVP(eventId, eventId, json);
   }
 
