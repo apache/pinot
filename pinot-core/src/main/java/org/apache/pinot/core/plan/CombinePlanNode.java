@@ -156,7 +156,6 @@ public class CombinePlanNode implements PlanNode {
         if (cause instanceof BadQueryRequestException) {
           throw (BadQueryRequestException) cause;
         } else if (e instanceof InterruptedException) {
-          Thread.currentThread().interrupt();
           throw new QueryCancelledException("Cancelled while running CombinePlanNode", e);
         } else {
           throw new RuntimeException("Caught exception while running CombinePlanNode.", e);

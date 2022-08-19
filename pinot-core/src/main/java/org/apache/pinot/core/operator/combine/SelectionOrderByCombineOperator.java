@@ -30,6 +30,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,8 +77,10 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator {
     assert orderByExpressions != null;
     if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
       try {
-        return new MinMaxValueBasedSelectionOrderByCombineOperator(_operators, _queryContext,
-            _executorService).getNextBlock();
+        return new MinMaxValueBasedSelectionOrderByCombineOperator(_operators, _queryContext, _executorService)
+            .getNextBlock();
+      } catch (QueryCancelledException e) {
+        throw new QueryCancelledException("Cancelled while running MinMaxValueBasedSelectionOrderByCombineOperator", e);
       } catch (Exception e) {
         LOGGER.warn("Caught exception while using min/max value based combine, using the default combine", e);
       }
