@@ -96,7 +96,7 @@ public enum TransformFunctionType {
   LOOKUP("lookUp"),
   GROOVY("groovy"),
 
-  EXTRACT_YEAR("extractYear"),
+  EXTRACT("extract"),
 
   // Regexp functions
   REGEXP_EXTRACT("regexpExtract"),
