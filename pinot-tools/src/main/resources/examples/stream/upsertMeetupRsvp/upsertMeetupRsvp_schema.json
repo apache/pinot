@@ -8,8 +8,7 @@
   "dimensionFieldSpecs": [
     {
       "dataType": "STRING",
-      "name": "venue_name",
-      "singleValueField": false
+      "name": "venue_name"
     },
     {
       "dataType": "STRING",
@@ -37,8 +36,7 @@
     },
     {
       "dataType": "STRING",
-      "name": "group_name",
-      "singleValueField": false
+      "name": "group_name"
     },
     {
       "dataType": "DOUBLE",
@@ -62,7 +60,7 @@
       "granularity": "1:MILLISECONDS"
     }
   ],
-  "schemaName": "meetupRsvp",
+  "schemaName": "upsertMeetupRsvp",
   "primaryKeyColumns": [
     "event_id"
   ]
