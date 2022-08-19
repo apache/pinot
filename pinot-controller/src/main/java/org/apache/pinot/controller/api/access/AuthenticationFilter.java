@@ -82,6 +82,11 @@ public class AuthenticationFilter implements ContainerRequestFilter {
       return;
     }
 
+    // check if the method's authorization is disabled (i.e. performed manually within method)
+    if (endpointMethod.isAnnotationPresent(ManualAuthorization.class)) {
+      return;
+    }
+
     // Note that table name is extracted from "path parameters" or "query parameters" if it's defined as one of the
     // followings:
     //     - "tableName",

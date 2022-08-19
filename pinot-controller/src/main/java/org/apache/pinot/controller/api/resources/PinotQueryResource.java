@@ -54,6 +54,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.ManualAuthorization;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -87,6 +88,7 @@ public class PinotQueryResource {
 
   @POST
   @Path("sql")
+  @ManualAuthorization // performed by broker
   public String handlePostSql(String requestJsonStr, @Context HttpHeaders httpHeaders) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
