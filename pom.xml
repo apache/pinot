@@ -1336,7 +1336,7 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-enforcer-plugin</artifactId>
           <!-- Note that 3.0.0, while newer, has bugs w/provided transitive dependencies -->
-          <version>3.0.0-M3</version>
+          <version>3.1.0</version>
           <executions>
             <execution>
               <id>enforce-dependency-convergence</id>
