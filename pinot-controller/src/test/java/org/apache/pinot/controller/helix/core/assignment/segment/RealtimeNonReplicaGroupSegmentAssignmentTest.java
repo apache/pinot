@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -164,18 +165,19 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
             SegmentStateModel.OFFLINE);
     currentAssignment.put(offlineSegmentName, offlineSegmentInstanceStateMap);
 
-    // Add an uploaded ONLINE segment to the consuming instances (i.e. no separation between consuming & completed)
-    List<String> uploadedSegmentNames = ImmutableList.of("UploadedSegment1", "UploadedSegment2");
+    // Add an UPLOADED segment to the CONSUMING instances (i.e. no separation between CONSUMING & COMPLETED)
+    List<String> uploadedSegments = ImmutableList.of("UploadedSegment1", "UploadedSegment2");
+    int numUploadedSegments = uploadedSegments.size();
     onlyConsumingInstancePartitionMap =
         ImmutableMap.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
-    for (String uploadedSegName : uploadedSegmentNames) {
+    for (String segmentName : uploadedSegments) {
       List<String> instancesAssigned =
-          _segmentAssignment.assignSegment(uploadedSegName, currentAssignment, onlyConsumingInstancePartitionMap);
-      currentAssignment.put(uploadedSegName,
+          _segmentAssignment.assignSegment(segmentName, currentAssignment, onlyConsumingInstancePartitionMap);
+      currentAssignment.put(segmentName,
           SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
     // Now there should be 103 segments assigned
-    assertEquals(currentAssignment.size(), NUM_SEGMENTS + uploadedSegmentNames.size() + 1);
+    assertEquals(currentAssignment.size(), NUM_SEGMENTS + numUploadedSegments + 1);
     // Each segment should have 3 replicas and all assigned instances should be prefixed with consuming
     currentAssignment.forEach((type, instanceStateMap) -> {
       assertEquals(instanceStateMap.size(), NUM_REPLICAS);
@@ -197,25 +199,25 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     Map<String, Map<String, String>> newAssignment =
         _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null,
             new BaseConfiguration());
-    assertEquals(newAssignment.size(), NUM_SEGMENTS + uploadedSegmentNames.size() + 1);
+    assertEquals(newAssignment.size(), NUM_SEGMENTS + numUploadedSegments + 1);
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       if (segmentId < NUM_SEGMENTS - NUM_PARTITIONS) {
-        // check COMPLETED (ONLINE) segments
+        // Check the COMPLETED (ONLINE) segments
         newAssignment.get(_segments.get(segmentId)).forEach((instance, state) -> {
           assertTrue(instance.startsWith(COMPLETED_INSTANCE_NAME_PREFIX));
           assertEquals(state, SegmentStateModel.ONLINE);
         });
       } else {
-        // check CONSUMING segments
+        // Check the CONSUMING segments
         newAssignment.get(_segments.get(segmentId)).forEach((instance, state) -> {
           assertTrue(instance.startsWith(CONSUMING_INSTANCE_NAME_PREFIX));
           assertEquals(state, SegmentStateModel.CONSUMING);
         });
       }
     }
-    // check the uploaded segments
-    for (String uploadedSegName : uploadedSegmentNames) {
-      newAssignment.get(uploadedSegName).forEach((instance, state) -> {
+    // Check the UPLOADED (ONLINE) segments
+    for (String segmentName : uploadedSegments) {
+      newAssignment.get(segmentName).forEach((instance, state) -> {
         assertTrue(instance.startsWith(COMPLETED_INSTANCE_NAME_PREFIX));
         assertEquals(state, SegmentStateModel.ONLINE);
       });
@@ -225,11 +227,16 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     int[] numSegmentsAssignedPerInstance =
         SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(newAssignment, COMPLETED_INSTANCES);
     assertEquals(numSegmentsAssignedPerInstance.length, NUM_COMPLETED_INSTANCES);
-    int expectedMinNumSegmentsPerInstance =
-        (NUM_SEGMENTS - NUM_PARTITIONS) * NUM_REPLICAS / NUM_COMPLETED_INSTANCES + 1;
-    for (int i = 0; i < NUM_COMPLETED_INSTANCES; i++) {
-      assertTrue(numSegmentsAssignedPerInstance[i] >= expectedMinNumSegmentsPerInstance);
+    int expectedTotalNumSegmentsAssigned = (NUM_SEGMENTS - NUM_PARTITIONS + numUploadedSegments) * NUM_REPLICAS;
+    int expectedMinNumSegmentsPerInstance = expectedTotalNumSegmentsAssigned / NUM_COMPLETED_INSTANCES;
+    int totalNumSegmentsAssigned = 0;
+    for (int numSegmentsAssigned : numSegmentsAssignedPerInstance) {
+      assertTrue(numSegmentsAssigned >= expectedMinNumSegmentsPerInstance,
+          String.format("Expect at least: %d segments assigned per instance, got: %s",
+              expectedMinNumSegmentsPerInstance, Arrays.toString(numSegmentsAssignedPerInstance)));
+      totalNumSegmentsAssigned += numSegmentsAssigned;
     }
+    assertEquals(totalNumSegmentsAssigned, expectedTotalNumSegmentsAssigned);
 
     // Rebalance with COMPLETED instance partitions including CONSUMING segments should give the same assignment
     BaseConfiguration rebalanceConfig = new BaseConfiguration();
