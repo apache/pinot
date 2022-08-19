@@ -142,24 +142,12 @@ public class PinotSegmentUploadDownloadRestletResource {
   @ApiOperation(value = "Download a segment", notes = "Download a segment")
   @TrackInflightRequestMetrics
   @TrackedByGauge(gauge = ControllerGauge.SEGMENT_DOWNLOADS_IN_PROGRESS)
+  @Authenticate(AccessType.READ)
   public Response downloadSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders)
       throws Exception {
-    // Validate data access
-    boolean hasDataAccess;
-    try {
-      AccessControl accessControl = _accessControlFactory.create();
-      hasDataAccess = accessControl.hasDataAccess(httpHeaders, tableName);
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER,
-          "Caught exception while validating access to table: " + tableName, Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
-    if (!hasDataAccess) {
-      throw new ControllerApplicationException(LOGGER, "No data access to table: " + tableName,
-          Response.Status.FORBIDDEN);
-    }
 
     segmentName = URIUtils.decode(segmentName);
     URI dataDirURI = ControllerFilePathProvider.getInstance().getDataDirURI();

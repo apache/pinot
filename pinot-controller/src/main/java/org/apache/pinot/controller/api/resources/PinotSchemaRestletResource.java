@@ -270,7 +270,8 @@ public class PinotSchemaRestletResource {
       @ApiResponse(code = 500, message = "Internal error")
   })
   @ManualAuthorization // performed after parsing schema
-  public String validateSchema(FormDataMultiPart multiPart, @Context HttpHeaders httpHeaders, @Context Request request) {
+  public String validateSchema(FormDataMultiPart multiPart, @Context HttpHeaders httpHeaders,
+      @Context Request request) {
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
         getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
     Schema schema = schemaAndUnrecognizedProps.getLeft();

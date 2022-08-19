@@ -187,6 +187,7 @@ public class TableConfigsRestletResource {
           Response.Status.BAD_REQUEST);
     }
 
+    // validate permission
     TableConfig offlineTableConfig = tableConfigs.getOffline();
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();
     Schema schema = tableConfigs.getSchema();
