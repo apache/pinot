@@ -18,61 +18,20 @@
  */
 package org.apache.pinot.tools;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.tools.admin.PinotAdministrator;
-import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
-public class EmptyQuickstart extends QuickStartBase {
+public class EmptyQuickstart extends Quickstart {
   @Override
   public List<String> types() {
     return Arrays.asList("EMPTY", "DEFAULT");
   }
 
-  public AuthProvider getAuthProvider() {
-    return null;
-  }
-
-  public void execute()
-      throws Exception {
-    File quickstartTmpDir = new File(_dataDir.getAbsolutePath());
-    File dataDir = new File(quickstartTmpDir, "rawdata");
-    if (!dataDir.mkdirs()) {
-      printStatus(Quickstart.Color.YELLOW, "***** Bootstrapping data from existing directory *****");
-    } else {
-      printStatus(Quickstart.Color.YELLOW, "***** Creating new data directory for fresh installation *****");
-    }
-
-    QuickstartRunner runner =
-        new QuickstartRunner(new ArrayList<>(), 1, 1, 1, 1,
-            dataDir, true, getAuthProvider(), getConfigOverrides(), _zkExternalAddress, false);
-
-    if (_zkExternalAddress != null) {
-      printStatus(Quickstart.Color.CYAN, "***** Starting controller, broker and server *****");
-    } else {
-      printStatus(Quickstart.Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
-    }
-
-    runner.startAll();
-
-    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-      try {
-        printStatus(Quickstart.Color.GREEN, "***** Shutting down empty quick start *****");
-        runner.stop();
-      } catch (Exception e) {
-        e.printStackTrace();
-      }
-    }));
-
-    waitForBootstrapToComplete(runner);
-
-    printStatus(Quickstart.Color.YELLOW, "***** Empty quickstart setup complete *****");
-    printStatus(Quickstart.Color.GREEN,
-        "You can always go to http://localhost:9000 to play around in the query console");
+  public String[] getDefaultBatchTableDirectories() {
+    return new String[]{};
   }
 
   public static void main(String[] args)

@@ -20,6 +20,7 @@ package org.apache.pinot.common.response;
 
 import java.util.List;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.response.broker.ResultTable;
 
 
 /**
@@ -108,6 +109,16 @@ public interface BrokerResponse {
   long getNumConsumingSegmentsQueried();
 
   /**
+   * Get number of consuming segments processed by server after server side pruning
+   */
+  long getNumConsumingSegmentsProcessed();
+
+  /**
+   * Get number of consuming segments that had at least one matching document
+   */
+  long getNumConsumingSegmentsMatched();
+
+  /**
    * Get the minimum freshness timestamp across consuming segments that were queried
    */
   long getMinConsumingFreshnessTimeMs();
@@ -126,6 +137,18 @@ public interface BrokerResponse {
    * Get number of exceptions recorded in the response.
    */
   int getExceptionsSize();
+
+  /**
+   * set the result table.
+   * @param resultTable result table to be set.
+   */
+  void setResultTable(ResultTable resultTable);
+
+  /**
+   * Get the result table.
+   * @return result table.
+   */
+  ResultTable getResultTable();
 
   /**
    * Get the list of exceptions

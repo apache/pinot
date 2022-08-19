@@ -22,18 +22,26 @@ import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
+import org.apache.pinot.query.planner.stage.AbstractStageNode;
+import org.apache.pinot.query.planner.stage.AggregateNode;
+import org.apache.pinot.query.planner.stage.FilterNode;
+import org.apache.pinot.query.planner.stage.JoinNode;
+import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
+import org.apache.pinot.query.planner.stage.ProjectNode;
+import org.apache.pinot.query.planner.stage.StageNode;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class QueryEnvironmentTest extends QueryEnvironmentTestBase {
+public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
   @Test(dataProvider = "testQueryParserDataProvider")
   public void testQueryParser(String query, String digest)
@@ -45,7 +53,7 @@ public class QueryEnvironmentTest extends QueryEnvironmentTestBase {
   }
 
   @Test(dataProvider = "testQueryDataProvider")
-  public void testQueryToRel(String query)
+  public void testQueryPlanWithoutException(String query)
       throws Exception {
     try {
       QueryPlan queryPlan = _queryEnvironment.planQuery(query);
@@ -62,6 +70,38 @@ public class QueryEnvironmentTest extends QueryEnvironmentTestBase {
       Assert.fail("query plan should throw exception");
     } catch (RuntimeException e) {
       Assert.assertTrue(e.getCause().getMessage().contains(exceptionSnippet));
+    }
+  }
+
+  @Test
+  public void testQueryGroupByAfterJoinShouldNotDoDataShuffle()
+      throws Exception {
+    String query = "SELECT a.col1, a.col2, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2 "
+        + " WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1, a.col2";
+    QueryPlan queryPlan = _queryEnvironment.planQuery(query);
+    Assert.assertEquals(queryPlan.getQueryStageMap().size(), 5);
+    Assert.assertEquals(queryPlan.getStageMetadataMap().size(), 5);
+    for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
+      if (e.getValue().getScannedTables().size() == 0 && !PlannerUtils.isRootStage(e.getKey())) {
+        StageNode node = queryPlan.getQueryStageMap().get(e.getKey());
+        while (node != null) {
+          if (node instanceof JoinNode) {
+            // JOIN is exchanged with hash distribution (data shuffle)
+            MailboxReceiveNode left = (MailboxReceiveNode) node.getInputs().get(0);
+            MailboxReceiveNode right = (MailboxReceiveNode) node.getInputs().get(1);
+            Assert.assertEquals(left.getExchangeType(), RelDistribution.Type.HASH_DISTRIBUTED);
+            Assert.assertEquals(right.getExchangeType(), RelDistribution.Type.HASH_DISTRIBUTED);
+            break;
+          }
+          if (node instanceof AggregateNode && node.getInputs().get(0) instanceof MailboxReceiveNode) {
+            // AGG is exchanged with singleton since it has already been distributed by JOIN.
+            MailboxReceiveNode input = (MailboxReceiveNode) node.getInputs().get(0);
+            Assert.assertEquals(input.getExchangeType(), RelDistribution.Type.SINGLETON);
+            break;
+          }
+          node = node.getInputs().get(0);
+        }
+      }
     }
   }
 
@@ -95,12 +135,38 @@ public class QueryEnvironmentTest extends QueryEnvironmentTestBase {
   }
 
   @Test
-  public void testQueryProjectFilterPushdownForJoin() {
+  public void testQueryProjectFilterPushDownForJoin() {
     String query = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
         + "WHERE a.col3 >= 0 AND a.col2 IN  ('a', 'b') AND b.col3 < 0";
     QueryPlan queryPlan = _queryEnvironment.planQuery(query);
-    Assert.assertEquals(queryPlan.getQueryStageMap().size(), 4);
-    Assert.assertEquals(queryPlan.getStageMetadataMap().size(), 4);
+    List<StageNode> intermediateStageRoots =
+        queryPlan.getStageMetadataMap().entrySet().stream().filter(e -> e.getValue().getScannedTables().size() == 0)
+            .map(e -> queryPlan.getQueryStageMap().get(e.getKey())).collect(Collectors.toList());
+    // Assert that no project of filter node for any intermediate stage because all should've been pushed down.
+    for (StageNode roots : intermediateStageRoots) {
+      assertNodeTypeNotIn(roots, ImmutableList.of(ProjectNode.class, FilterNode.class));
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Test Utils.
+  // --------------------------------------------------------------------------
+
+  private static void assertNodeTypeNotIn(StageNode node, List<Class<? extends AbstractStageNode>> bannedNodeType) {
+    Assert.assertFalse(isOneOf(bannedNodeType, node));
+    for (StageNode child : node.getInputs()) {
+      assertNodeTypeNotIn(child, bannedNodeType);
+    }
+  }
+
+  private static boolean isOneOf(List<Class<? extends AbstractStageNode>> allowedNodeTypes,
+      StageNode node) {
+    for (Class<? extends AbstractStageNode> allowedNodeType : allowedNodeTypes) {
+      if (node.getClass() == allowedNodeType) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @DataProvider(name = "testQueryParserDataProvider")

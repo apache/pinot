@@ -16,35 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert;
+package org.apache.pinot.common.metadata.controllerjob;
 
-import org.apache.pinot.segment.spi.IndexSegment;
-
-
-/**
- * Indicate a record's location on the local host.
- */
-public class RecordLocation {
-  private final IndexSegment _segment;
-  private final int _docId;
-  /** value used to denote the order */
-  private final Comparable _comparisonValue;
-
-  public RecordLocation(IndexSegment indexSegment, int docId, Comparable comparisonValue) {
-    _segment = indexSegment;
-    _docId = docId;
-    _comparisonValue = comparisonValue;
-  }
-
-  public IndexSegment getSegment() {
-    return _segment;
-  }
-
-  public int getDocId() {
-    return _docId;
-  }
-
-  public Comparable getComparisonValue() {
-    return _comparisonValue;
-  }
+public enum ControllerJobType {
+  RELOAD_SEGMENT,
+  RELOAD_ALL_SEGMENTS
 }

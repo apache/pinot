@@ -18,11 +18,17 @@
  */
 package org.apache.pinot.broker.broker;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -57,9 +63,17 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     if (brokerConf.getProperty(CommonConstants.Broker.BROKER_SERVICE_AUTO_DISCOVERY, false)) {
       register(ServiceAutoDiscoveryFeature.class);
     }
+    ExecutorService executor =
+        Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
+    MultiThreadedHttpConnectionManager connMgr = new MultiThreadedHttpConnectionManager();
+    connMgr.getParams().setConnectionTimeout((int) brokerConf
+        .getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
+            CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
     register(new AbstractBinder() {
       @Override
       protected void configure() {
+        bind(connMgr).to(HttpConnectionManager.class);
+        bind(executor).to(Executor.class);
         bind(sqlQueryExecutor).to(SqlQueryExecutor.class);
         bind(routingManager).to(BrokerRoutingManager.class);
         bind(brokerRequestHandler).to(BrokerRequestHandler.class);
@@ -80,9 +94,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     } catch (IOException e) {
       throw new RuntimeException("Failed to start http server", e);
     }
-    synchronized (PinotReflectionUtils.getReflectionLock()) {
-      setupSwagger();
-    }
+    PinotReflectionUtils.runWithLock(this::setupSwagger);
   }
 
   private void setupSwagger() {
@@ -91,6 +103,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     beanConfig.setDescription("APIs for accessing Pinot broker information");
     beanConfig.setContact("https://github.com/apache/pinot");
     beanConfig.setVersion("1.0");
+    beanConfig.setExpandSuperTypes(false);
     if (_useHttps) {
       beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL});
     } else {

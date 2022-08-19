@@ -33,6 +33,7 @@ on:
       - ".github/workflows/**"
 jobs:
   verify-docker:
+    if: github.repository == 'apache/pinot'
     name: Verify Docker Image
     runs-on: ubuntu-latest
     steps:

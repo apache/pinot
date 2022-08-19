@@ -35,6 +35,7 @@ public class OffsetCriteriaTest {
     Assert.assertTrue(offsetCriteria.isSmallest());
     Assert.assertFalse(offsetCriteria.isLargest());
     Assert.assertFalse(offsetCriteria.isPeriod());
+    Assert.assertFalse(offsetCriteria.isTimestamp());
     Assert.assertFalse(offsetCriteria.isCustom());
     Assert.assertEquals(offsetCriteria.getOffsetString(), "smallest");
 
@@ -43,6 +44,7 @@ public class OffsetCriteriaTest {
     Assert.assertFalse(offsetCriteria.isSmallest());
     Assert.assertTrue(offsetCriteria.isLargest());
     Assert.assertFalse(offsetCriteria.isPeriod());
+    Assert.assertFalse(offsetCriteria.isTimestamp());
     Assert.assertFalse(offsetCriteria.isCustom());
     Assert.assertEquals(offsetCriteria.getOffsetString(), "largest");
 
@@ -51,14 +53,25 @@ public class OffsetCriteriaTest {
     Assert.assertFalse(offsetCriteria.isSmallest());
     Assert.assertFalse(offsetCriteria.isLargest());
     Assert.assertTrue(offsetCriteria.isPeriod());
+    Assert.assertFalse(offsetCriteria.isTimestamp());
     Assert.assertFalse(offsetCriteria.isCustom());
     Assert.assertEquals(offsetCriteria.getOffsetString(), "5d");
+
+    // Build timestamp offset criteria
+    offsetCriteria = new OffsetCriteria.OffsetCriteriaBuilder().withOffsetAsTimestamp("2022-08-09T12:31:38.222Z");
+    Assert.assertFalse(offsetCriteria.isSmallest());
+    Assert.assertFalse(offsetCriteria.isLargest());
+    Assert.assertFalse(offsetCriteria.isPeriod());
+    Assert.assertTrue(offsetCriteria.isTimestamp());
+    Assert.assertFalse(offsetCriteria.isCustom());
+    Assert.assertEquals(offsetCriteria.getOffsetString(), "2022-08-09T12:31:38.222Z");
 
     // Build custom offset criteria
     offsetCriteria = new OffsetCriteria.OffsetCriteriaBuilder().withOffsetCustom("custom criteria");
     Assert.assertFalse(offsetCriteria.isSmallest());
     Assert.assertFalse(offsetCriteria.isLargest());
     Assert.assertFalse(offsetCriteria.isPeriod());
+    Assert.assertFalse(offsetCriteria.isTimestamp());
     Assert.assertTrue(offsetCriteria.isCustom());
     Assert.assertEquals(offsetCriteria.getOffsetString(), "custom criteria");
 
@@ -67,6 +80,7 @@ public class OffsetCriteriaTest {
     Assert.assertTrue(offsetCriteria.isSmallest());
     Assert.assertFalse(offsetCriteria.isLargest());
     Assert.assertFalse(offsetCriteria.isPeriod());
+    Assert.assertFalse(offsetCriteria.isTimestamp());
     Assert.assertFalse(offsetCriteria.isCustom());
 
     // Build largest offset criteria with offset string
@@ -74,6 +88,7 @@ public class OffsetCriteriaTest {
     Assert.assertFalse(offsetCriteria.isSmallest());
     Assert.assertTrue(offsetCriteria.isLargest());
     Assert.assertFalse(offsetCriteria.isPeriod());
+    Assert.assertFalse(offsetCriteria.isTimestamp());
     Assert.assertFalse(offsetCriteria.isCustom());
 
     // Build period offset criteria with offset string
@@ -81,6 +96,15 @@ public class OffsetCriteriaTest {
     Assert.assertFalse(offsetCriteria.isSmallest());
     Assert.assertFalse(offsetCriteria.isLargest());
     Assert.assertTrue(offsetCriteria.isPeriod());
+    Assert.assertFalse(offsetCriteria.isTimestamp());
+    Assert.assertFalse(offsetCriteria.isCustom());
+
+    // Build timestamp offset criteria with offset string
+    offsetCriteria = new OffsetCriteria.OffsetCriteriaBuilder().withOffsetString("2022-08-09T12:31:38.222Z");
+    Assert.assertFalse(offsetCriteria.isSmallest());
+    Assert.assertFalse(offsetCriteria.isLargest());
+    Assert.assertFalse(offsetCriteria.isPeriod());
+    Assert.assertTrue(offsetCriteria.isTimestamp());
     Assert.assertFalse(offsetCriteria.isCustom());
 
     // Build incorrect period offset criteria with offset string
@@ -88,6 +112,7 @@ public class OffsetCriteriaTest {
     Assert.assertFalse(offsetCriteria.isSmallest());
     Assert.assertFalse(offsetCriteria.isLargest());
     Assert.assertFalse(offsetCriteria.isPeriod());
+    Assert.assertFalse(offsetCriteria.isTimestamp());
     Assert.assertTrue(offsetCriteria.isCustom());
 
     // Build custom offset criteria with offset string
@@ -95,6 +120,7 @@ public class OffsetCriteriaTest {
     Assert.assertFalse(offsetCriteria.isSmallest());
     Assert.assertFalse(offsetCriteria.isLargest());
     Assert.assertFalse(offsetCriteria.isPeriod());
+    Assert.assertFalse(offsetCriteria.isTimestamp());
     Assert.assertTrue(offsetCriteria.isCustom());
   }
 }

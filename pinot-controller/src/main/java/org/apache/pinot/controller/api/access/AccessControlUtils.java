@@ -19,9 +19,10 @@
 
 package org.apache.pinot.controller.api.access;
 
-import java.util.Optional;
+import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -31,7 +32,11 @@ import org.slf4j.LoggerFactory;
 /**
  * Utility class to simplify access control validation. This class is simple wrapper around AccessControl class.
  */
-public class AccessControlUtils {
+public final class AccessControlUtils {
+  private AccessControlUtils() {
+    // left blank
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(AccessControlUtils.class);
 
   /**
@@ -43,9 +48,28 @@ public class AccessControlUtils {
    * @param endpointUrl the request url for which this access control is called
    * @param accessControl AccessControl object which does the actual validation
    */
-  public void validatePermission(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl,
-      AccessControl accessControl) {
-    validatePermission(Optional.of(tableName), accessType, httpHeaders, endpointUrl, accessControl);
+  public static void validatePermission(@Nullable String tableName, AccessType accessType,
+      @Nullable HttpHeaders httpHeaders, @Nullable String endpointUrl, AccessControl accessControl) {
+    String message = null;
+    try {
+      if (StringUtils.isBlank(tableName)) {
+        message = String.format("%s '%s'", accessType, endpointUrl);
+        if (!accessControl.hasAccess(accessType, httpHeaders, endpointUrl)) {
+          accessDenied(message);
+        }
+      } else {
+        message = String.format("%s '%s' for table '%s'", accessType, endpointUrl, tableName);
+        String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+        if (!accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl)) {
+          accessDenied(message);
+        }
+      }
+    } catch (ControllerApplicationException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Caught exception while validating permission for " + message,
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
   }
 
   /**
@@ -56,55 +80,26 @@ public class AccessControlUtils {
    * @param endpointUrl the request url for which this access control is called
    * @param accessControl AccessControl object which does the actual validation
    */
-  public void validatePermission(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl,
-      AccessControl accessControl) {
-    validatePermission(Optional.empty(), accessType, httpHeaders, endpointUrl, accessControl);
+  public static void validatePermission(AccessType accessType, @Nullable HttpHeaders httpHeaders,
+      @Nullable String endpointUrl, AccessControl accessControl) {
+    validatePermission(null, accessType, httpHeaders, endpointUrl, accessControl);
   }
 
   /**
-   * Validate permission for the given access type against the given table
-   *
-   * @param tableNameOpt name of the table to be accessed; if `none`, it's a non-table level endpoint.
-   * @param accessType type of the access
-   * @param httpHeaders HTTP headers containing requester identity required by access control object
-   * @param endpointUrl the request url for which this access control is called
-   * @param accessControl AccessControl object which does the actual validation
-   */
-  public void validatePermission(Optional<String> tableNameOpt, AccessType accessType, HttpHeaders httpHeaders,
-      String endpointUrl, AccessControl accessControl) {
-    boolean hasPermission;
-    String accessTypeToEndpointMsg =
-        String.format("access type '%s' to the endpoint '%s'", accessType, endpointUrl) + tableNameOpt
-            .map(name -> String.format(" for table '%s'", name)).orElse("");
-    try {
-      if (tableNameOpt.isPresent()) {
-        String rawTableName = TableNameBuilder.extractRawTableName(tableNameOpt.get());
-        hasPermission = accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl);
-      } else {
-        hasPermission = accessControl.hasAccess(accessType, httpHeaders, endpointUrl);
-      }
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER,
-          "Caught exception while validating permission for " + accessTypeToEndpointMsg,
-          Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
-    if (!hasPermission) {
-      throw new ControllerApplicationException(LOGGER, "Permission is denied for " + accessTypeToEndpointMsg,
-          Response.Status.FORBIDDEN);
-    }
-  }
-
-  /**
-   * Validate permission for the given access type against the given table
+   * Validate permission for the given access type and endpointUrl
    *
    * @param httpHeaders HTTP headers containing requester identity required by access control object
    * @param endpointUrl the request url for which this access control is called
    */
-  public void validatePermission(HttpHeaders httpHeaders, String endpointUrl,
+  public static void validatePermission(@Nullable HttpHeaders httpHeaders, @Nullable String endpointUrl,
       AccessControl accessControl) {
     if (!accessControl.hasAccess(httpHeaders)) {
-      throw new ControllerApplicationException(LOGGER, "Permission is denied for " + endpointUrl,
-          Response.Status.FORBIDDEN);
+      accessDenied(endpointUrl);
     }
+  }
+
+  private static void accessDenied(String resource) {
+    throw new ControllerApplicationException(LOGGER, "Permission is denied for " + resource,
+        Response.Status.FORBIDDEN);
   }
 }

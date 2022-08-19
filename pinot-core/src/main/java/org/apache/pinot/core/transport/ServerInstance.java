@@ -22,7 +22,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 
 
@@ -43,6 +45,7 @@ public class ServerInstance {
 
   private final int _queryServicePort;
   private final int _queryMailboxPort;
+  private final String _adminEndpoint;
 
   /**
    * By default (auto joined instances), server instance name is of format: {@code Server_<hostname>_<port>}, e.g.
@@ -75,6 +78,7 @@ public class ServerInstance {
         INVALID_PORT);
     _queryMailboxPort = instanceConfig.getRecord().getIntField(Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
         INVALID_PORT);
+    _adminEndpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig, _hostname, CommonConstants.HTTP_PROTOCOL);
   }
 
   @VisibleForTesting
@@ -86,6 +90,7 @@ public class ServerInstance {
     _nettyTlsPort = INVALID_PORT;
     _queryServicePort = INVALID_PORT;
     _queryMailboxPort = INVALID_PORT;
+    _adminEndpoint = null;
   }
 
   public String getInstanceId() {
@@ -98,6 +103,10 @@ public class ServerInstance {
 
   public int getPort() {
     return _port;
+  }
+
+  public String getAdminEndpoint() {
+    return _adminEndpoint;
   }
 
   public int getGrpcPort() {

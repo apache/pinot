@@ -126,14 +126,14 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
         IntermediateResultsBlock resultsBlock = new IntermediateResultsBlock(
-            _aggregationFunctions, intermediateRecords, _dataSchema);
+            _aggregationFunctions, intermediateRecords, _dataSchema, _queryContext.isNullHandlingEnabled());
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
         return resultsBlock;
       }
     }
 
     IntermediateResultsBlock resultsBlock = new IntermediateResultsBlock(
-        _aggregationFunctions, groupByExecutor.getResult(), _dataSchema);
+        _aggregationFunctions, groupByExecutor.getResult(), _dataSchema, _queryContext.isNullHandlingEnabled());
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
     return resultsBlock;
   }

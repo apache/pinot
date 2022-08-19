@@ -48,6 +48,8 @@ public class ComplexTypeTransformerTest {
     Map<String, Object> innerMap1 = new HashMap<>();
     innerMap1.put("aa", 2);
     innerMap1.put("bb", "u");
+    innerMap1.put("cc", new byte[]{1, 1});
+
     map1.put("im1", innerMap1);
     Map<String, Object> map2 = new HashMap<>();
     map2.put("c", 3);
@@ -58,6 +60,8 @@ public class ComplexTypeTransformerTest {
     Assert.assertEquals(genericRow.getValue("map1.b"), "v");
     Assert.assertEquals(genericRow.getValue("map1.im1.aa"), 2);
     Assert.assertEquals(genericRow.getValue("map1.im1.bb"), "u");
+    Assert.assertEquals(genericRow.getValue("map1.im1.cc"), new byte[]{1, 1});
+
     Assert.assertEquals(genericRow.getValue("map2.c"), 3);
 
     // test flattening the tuple inside the collection
@@ -243,6 +247,57 @@ public class ComplexTypeTransformerTest {
   }
 
   @Test
+  public void testUnnestMultiLevelArray() {
+    //    {
+    //      "level1" : [ {
+    //      "level2" : {
+    //        "level3" : [ {
+    //          "level4" : "foo_bar"
+    //        }, {
+    //          "level4" : "foo_bar"
+    //        } ]
+    //      }
+    //    }, {
+    //      "level2" : {
+    //        "level3" : [ {
+    //          "level4" : "foo_bar"
+    //        }, {
+    //          "level4" : "foo_bar"
+    //        } ]
+    //      }
+    //    } ]
+    //    }
+    GenericRow genericRow = new GenericRow();
+    Map<String, String> level3 = new HashMap<>();
+    level3.put("level4", "foo_bar");
+
+    Map<String, Object> level2 = new HashMap<>();
+    Object[] level3Arr = new Object[]{level3, level3};
+    level2.put("level3", level3Arr);
+
+    Map<String, Object> level1 = new HashMap<>();
+    level1.put("level2", level2);
+
+    Object[] level1Arr = new Object[]{level1, level1};
+    genericRow.putValue("level1", level1Arr);
+
+    List<String> fieldsToUnnest = new ArrayList<>();
+    fieldsToUnnest.add("level1");
+    fieldsToUnnest.add("level1.level2.level3");
+
+    System.out.println(genericRow);
+    ComplexTypeTransformer complexTypeTransformer = new ComplexTypeTransformer(fieldsToUnnest, ".");
+    GenericRow result = complexTypeTransformer.transform(genericRow);
+
+    Assert.assertNotNull(result.getValue(GenericRow.MULTIPLE_RECORDS_KEY));
+    Collection<GenericRow> rows = (Collection<GenericRow>) result.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+    Assert.assertEquals(rows.size(), 4);
+    for (GenericRow row : rows) {
+      Assert.assertEquals(row.getValue("level1.level2.level3.level4"), "foo_bar");
+    }
+  }
+
+  @Test
   public void testConvertCollectionToString() {
     // json convert inner collections
     // {
@@ -347,7 +402,7 @@ public class ComplexTypeTransformerTest {
     transformer = new ComplexTypeTransformer(Arrays.asList(), ".",
             ComplexTypeConfig.CollectionNotUnnestedToJson.NONE, new HashMap<>());
     transformer.transform(genericRow);
-    Assert.assertTrue(ComplexTypeTransformer.isArray(genericRow.getValue("t.array1")));
+    Assert.assertTrue(ComplexTypeTransformer.isNonPrimitiveArray(genericRow.getValue("t.array1")));
   }
 
   @Test

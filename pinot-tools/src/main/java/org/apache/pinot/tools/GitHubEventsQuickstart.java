@@ -26,19 +26,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.githubevents.PullRequestMergedEventsStream;
-import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.tools.utils.KinesisStarterUtils;
 import org.apache.pinot.tools.utils.StreamSourceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 
 
 /**
@@ -50,23 +46,10 @@ import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
 public class GitHubEventsQuickstart extends QuickStartBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(GitHubEventsQuickstart.class);
   private StreamDataServerStartable _serverStarter;
-  private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private String _personalAccessToken;
   private StreamSourceType _sourceType;
 
   public GitHubEventsQuickstart() {
-  }
-
-  private void startKafka() {
-    _zookeeperInstance = ZkStarter.startLocalZkServer();
-    try {
-      _serverStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
-          KafkaStarterUtils.getDefaultKafkaConfiguration(_zookeeperInstance));
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
-    }
-    _serverStarter.start();
-    _serverStarter.createTopic("pullRequestMergedEvents", KafkaStarterUtils.getTopicCreationProps(2));
   }
 
   private void startKinesis() {
@@ -85,6 +68,15 @@ public class GitHubEventsQuickstart extends QuickStartBase {
     Properties topicProperties = new Properties();
     topicProperties.put(KinesisStarterUtils.NUM_SHARDS, 3);
     _serverStarter.createTopic("pullRequestMergedEvents", topicProperties);
+
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      try {
+        printStatus(Color.GREEN, "***** Shutting down Kinesis *****");
+        _serverStarter.stop();
+      } catch (Exception e) {
+        LOGGER.error("Caught exception in shutting down Kinesis", e);
+      }
+    }));
   }
 
   private void startStreamServer() {
@@ -148,8 +140,6 @@ public class GitHubEventsQuickstart extends QuickStartBase {
       try {
         printStatus(Color.GREEN, "***** Shutting down GitHubEventsQuickStart *****");
         runner.stop();
-        _serverStarter.stop();
-        ZkStarter.stopLocalZkServer(_zookeeperInstance);
         FileUtils.deleteDirectory(quickStartDataDir);
       } catch (Exception e) {
         LOGGER.error("Caught exception in shutting down GitHubEvents QuickStart", e);

@@ -93,11 +93,8 @@ public class PinotAccessControlUserRestletResource {
     @Inject
     PinotHelixResourceManager _pinotHelixResourceManager;
 
-
     @Inject
     AccessControlFactory _accessControlFactory;
-    AccessControlUtils _accessControlUtils = new AccessControlUtils();
-
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -106,8 +103,7 @@ public class PinotAccessControlUserRestletResource {
     public String listUers(@Context HttpHeaders httpHeaders, @Context Request request) {
         try {
             String endpointUrl = request.getRequestURL().toString();
-            _accessControlUtils
-                .validatePermission(httpHeaders, endpointUrl, _accessControlFactory.create());
+            AccessControlUtils.validatePermission(httpHeaders, endpointUrl, _accessControlFactory.create());
             ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
             Map<String, UserConfig> allUserInfo = ZKMetadataProvider.getAllUserInfo(propertyStore);
             return JsonUtils.newObjectNode().set("users", JsonUtils.objectToJsonNode(allUserInfo)).toString();
@@ -124,8 +120,7 @@ public class PinotAccessControlUserRestletResource {
         @Context HttpHeaders httpHeaders, @Context Request request) {
         try {
             String endpointUrl = request.getRequestURL().toString();
-            _accessControlUtils
-                .validatePermission(httpHeaders, endpointUrl, _accessControlFactory.create());
+            AccessControlUtils.validatePermission(httpHeaders, endpointUrl, _accessControlFactory.create());
             ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
             ComponentType componentType = Constants.validateComponentType(componentTypeStr);
             String usernameWithType = username + "_" + componentType.name();
@@ -150,8 +145,7 @@ public class PinotAccessControlUserRestletResource {
             userConfig = JsonUtils.stringToObject(userConfigStr, UserConfig.class);
             username = userConfig.getUserName();
             String endpointUrl = request.getRequestURL().toString();
-            _accessControlUtils
-                .validatePermission(httpHeaders, endpointUrl, _accessControlFactory.create());
+            AccessControlUtils.validatePermission(httpHeaders, endpointUrl, _accessControlFactory.create());
             if (username.contains(".") || username.contains(" ")) {
                 throw new IllegalStateException("Username: " + username + " containing '.' or space is not allowed");
             }
@@ -189,7 +183,7 @@ public class PinotAccessControlUserRestletResource {
             userExist = _pinotHelixResourceManager.hasUser(username, componentTypeStr);
 
             String endpointUrl = request.getRequestURL().toString();
-            _accessControlUtils.validatePermission(httpHeaders, endpointUrl, _accessControlFactory.create());
+            AccessControlUtils.validatePermission(httpHeaders, endpointUrl, _accessControlFactory.create());
 
             _pinotHelixResourceManager.deleteUser(usernameWithComponentType);
             if (userExist) {
@@ -224,8 +218,7 @@ public class PinotAccessControlUserRestletResource {
         String usernameWithComponentType = username + "_" + componentTypeStr;
         try {
             String endpointUrl = request.getRequestURL().toString();
-            _accessControlUtils
-                .validatePermission(httpHeaders, endpointUrl, _accessControlFactory.create());
+            AccessControlUtils.validatePermission(httpHeaders, endpointUrl, _accessControlFactory.create());
 
             userConfig = JsonUtils.stringToObject(userConfigString, UserConfig.class);
             if (passwordChanged) {

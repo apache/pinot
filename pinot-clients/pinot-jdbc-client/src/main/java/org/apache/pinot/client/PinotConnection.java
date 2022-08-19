@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Properties;
 import org.apache.pinot.client.base.AbstractBaseConnection;
 import org.apache.pinot.client.controller.PinotControllerTransport;
+import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +53,7 @@ public class PinotConnection extends AbstractBaseConnection {
     _closed = false;
     _controllerURL = controllerURL;
     if (controllerTransport == null) {
-      _controllerTransport = new PinotControllerTransport();
+      _controllerTransport = new PinotControllerTransportFactory().buildTransport();
     } else {
       _controllerTransport = controllerTransport;
     }

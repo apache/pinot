@@ -120,7 +120,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       tableNameWithType = queryRequest.getTableNameWithType();
 
       // Submit query for execution and register callback for execution results.
-      Futures.addCallback(_queryScheduler.submit(queryRequest),
+      Futures.addCallback(_queryScheduler.submitQuery(queryRequest),
           createCallback(ctx, tableNameWithType, queryArrivalTimeMs, instanceRequest, queryRequest),
           MoreExecutors.directExecutor());
     } catch (Exception e) {

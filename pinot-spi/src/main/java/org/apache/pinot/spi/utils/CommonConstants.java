@@ -205,6 +205,7 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
     public static final String CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND =
         "pinot.broker.query.log.maxRatePerSecond";
+    public static final String CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION = "pinot.broker.enable.query.cancellation";
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
@@ -253,6 +254,12 @@ public class CommonConstants {
     public static final String USE_APPROXIMATE_FUNCTION = "pinot.broker.use.approximate.function";
 
     public static final String CONTROLLER_URL = "pinot.broker.controller.url";
+
+    public static final String CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING =
+        "pinot.broker.request.client.ip.logging";
+
+    // TODO: Support populating clientIp for GrpcRequestIdentity.
+    public static final boolean DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING = false;
 
     public static class Request {
       public static final String SQL = "sql";
@@ -555,6 +562,23 @@ public class CommonConstants {
     public static final String CONFIG_TASK_AUTH_NAMESPACE = "task.auth";
     public static final String MINION_TLS_PREFIX = "pinot.minion.tls";
     public static final String CONFIG_OF_MINION_QUERY_REWRITER_CLASS_NAMES = "pinot.minion.query.rewriter.class.names";
+  }
+
+  public static class ControllerJob {
+    /**
+     * Controller job ZK props
+     */
+    public static final String JOB_TYPE = "jobType";
+    public static final String TABLE_NAME_WITH_TYPE = "tableName";
+    public static final String JOB_ID = "jobId";
+    public static final String SUBMISSION_TIME_MS = "submissionTimeMs";
+    public static final String MESSAGE_COUNT = "messageCount";
+
+    public static final Integer MAXIMUM_CONTROLLER_JOBS_IN_ZK = 100;
+    /**
+     * Segment reload job ZK props
+     */
+    public static final String SEGMENT_RELOAD_JOB_SEGMENT_NAME = "segmentName";
   }
 
   public static class Segment {

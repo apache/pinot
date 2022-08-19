@@ -18,20 +18,46 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import javax.annotation.Nullable;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
+import org.apache.pinot.broker.queryquota.QueryQuotaManager;
+import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 
@@ -155,5 +181,75 @@ public class BaseBrokerRequestHandlerTest {
     Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache), "db.mytable");
     Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.namespace.mytable", tableCache),
         "db.namespace.mytable");
+  }
+
+  @Test
+  public void testCancelQuery()
+      throws Exception {
+    String tableName = "myTable_OFFLINE";
+    // Mock pretty much everything until the query can be submitted.
+    TableCache tableCache = mock(TableCache.class);
+    TableConfig tableCfg = mock(TableConfig.class);
+    when(tableCache.getActualTableName(anyString())).thenReturn(tableName);
+    TenantConfig tenant = new TenantConfig("tier_BROKER", "tier_SERVER", null);
+    when(tableCfg.getTenantConfig()).thenReturn(tenant);
+    when(tableCache.getTableConfig(anyString())).thenReturn(tableCfg);
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(anyString())).thenReturn(true);
+    RoutingTable rt = mock(RoutingTable.class);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(Collections
+        .singletonMap(new ServerInstance(new InstanceConfig("server01_9000")), Collections.singletonList("segment01")));
+    when(routingManager.getRoutingTable(any())).thenReturn(rt);
+    QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
+    when(queryQuotaManager.acquire(anyString())).thenReturn(true);
+    CountDownLatch latch = new CountDownLatch(1);
+    PinotConfiguration config =
+        new PinotConfiguration(Collections.singletonMap("pinot.broker.enable.query.cancellation", "true"));
+    BaseBrokerRequestHandler requestHandler =
+        new BaseBrokerRequestHandler(config, routingManager, new AllowAllAccessControlFactory(),
+            queryQuotaManager, tableCache,
+            new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet())) {
+          @Override
+          public void start() {
+          }
+
+          @Override
+          public void shutDown() {
+          }
+
+          @Override
+          protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+              BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
+              @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
+              @Nullable BrokerRequest realtimeBrokerRequest,
+              @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext)
+              throws Exception {
+            latch.await();
+            return null;
+          }
+        };
+    CompletableFuture.runAsync(() -> {
+      try {
+        JsonNode request = JsonUtils.stringToJsonNode(
+            String.format("{\"sql\":\"select * from %s limit 10\",\"queryOptions\":\"timeoutMs=10000\"}", tableName));
+        RequestContext requestStats = Tracing.getTracer().createRequestScope();
+        requestHandler.handleRequest(request, null, requestStats);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    });
+    TestUtils.waitForCondition((aVoid) -> requestHandler.getRunningServers(1).size() == 1, 500, 5000,
+        "Failed to submit query");
+    Map.Entry<Long, String> entry = requestHandler.getRunningQueries().entrySet().iterator().next();
+    Assert.assertEquals(entry.getKey().longValue(), 1);
+    Assert.assertTrue(entry.getValue().contains("select * from myTable_OFFLINE limit 10"));
+    Set<ServerInstance> servers = requestHandler.getRunningServers(1);
+    Assert.assertEquals(servers.size(), 1);
+    Assert.assertEquals(servers.iterator().next().getHostname(), "server01");
+    Assert.assertEquals(servers.iterator().next().getPort(), 9000);
+    Assert.assertEquals(servers.iterator().next().getInstanceId(), "server01_9000");
+    Assert.assertEquals(servers.iterator().next().getAdminEndpoint(), "http://server01:8097");
+    latch.countDown();
   }
 }

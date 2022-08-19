@@ -250,6 +250,9 @@ public class FilterPlanNode implements PlanNode {
               return new TextContainsFilterOperator(textIndexReader, (TextContainsPredicate) predicate, numDocs);
             case TEXT_MATCH:
               textIndexReader = dataSource.getTextIndex();
+              Preconditions
+                  .checkState(textIndexReader != null, "Cannot apply TEXT_MATCH on column: %s without text index",
+                      column);
               // We could check for real time and segment Lucene reader, but easier to check the other way round
               if (textIndexReader instanceof NativeTextIndexReader
                   || textIndexReader instanceof NativeMutableTextIndex) {
@@ -275,7 +278,8 @@ public class FilterPlanNode implements PlanNode {
                         dataSource.getDataSourceMetadata().getDataType());
               }
               _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
-              return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
+              return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs,
+                  _queryContext.isNullHandlingEnabled());
             case JSON_MATCH:
               JsonIndexReader jsonIndex = dataSource.getJsonIndex();
               Preconditions.checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index",
@@ -300,7 +304,8 @@ public class FilterPlanNode implements PlanNode {
                   PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
                       dataSource.getDataSourceMetadata().getDataType());
               _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
-              return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
+              return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs,
+                  _queryContext.isNullHandlingEnabled());
           }
         }
       default:

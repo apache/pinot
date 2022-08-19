@@ -20,11 +20,13 @@ package org.apache.pinot.query.rules;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
@@ -37,6 +39,10 @@ import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.sql.SqlAggFunction;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.fun.SqlCountAggFunction;
+import org.apache.calcite.sql.fun.SqlSumEmptyIsZeroAggFunction;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.ImmutableBitSet;
@@ -64,6 +70,8 @@ import org.apache.pinot.query.planner.hints.PinotRelationalHints;
 public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   public static final PinotAggregateExchangeNodeInsertRule INSTANCE =
       new PinotAggregateExchangeNodeInsertRule(RelFactories.LOGICAL_BUILDER);
+  private static final Set<SqlKind> SUPPORTED_AGG_KIND = ImmutableSet.of(
+      SqlKind.SUM, SqlKind.SUM0, SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT);
 
   public PinotAggregateExchangeNodeInsertRule(RelBuilderFactory factory) {
     super(operand(LogicalAggregate.class, any()), factory, null);
@@ -106,7 +114,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     List<Integer> groupSetIndices = ImmutableIntList.range(0, oldAggRel.getGroupCount());
     LogicalExchange exchange = null;
     if (groupSetIndices.size() == 0) {
-      exchange = LogicalExchange.create(newLeafAgg, RelDistributions.SINGLETON);
+      exchange = LogicalExchange.create(newLeafAgg, RelDistributions.hash(Collections.emptyList()));
     } else {
       exchange = LogicalExchange.create(newLeafAgg, RelDistributions.hash(groupSetIndices));
     }
@@ -157,15 +165,31 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
    *
    * <p>Note that the intermediate stage input only supports splittable aggregators such as SUM/MIN/MAX.
    * All non-splittable aggregator must be converted into splittable aggregator first.
+   *
+   * <p>For COUNT operations, the intermediate stage will be converted to SUM.
    */
   private static void convertAggCall(RexBuilder rexBuilder, Aggregate oldAggRel, int oldCallIndex,
       AggregateCall oldCall, List<AggregateCall> newCalls, Map<AggregateCall, RexNode> aggCallMapping,
       List<RexNode> inputExprs) {
     final int nGroups = oldAggRel.getGroupCount();
-    AggregateCall newCall = AggregateCall.create(
-        oldCall.getAggregation(), oldCall.isDistinct(), oldCall.isApproximate(), oldCall.ignoreNulls(),
-        convertArgList(nGroups + oldCallIndex, oldCall.getArgList()), oldCall.filterArg, oldCall.distinctKeys,
-        oldCall.collation, oldCall.type, oldCall.getName());
+    final SqlAggFunction oldAggregation = oldCall.getAggregation();
+    final SqlKind aggKind = oldAggregation.getKind();
+    // Check only the supported AGG functions are provided.
+    Preconditions.checkState(SUPPORTED_AGG_KIND.contains(aggKind), "Unsupported SQL aggregation "
+        + "kind: {}. Only splittable aggregation functions are supported!", aggKind);
+
+    // Special treatment on COUNT
+    AggregateCall newCall;
+    if (oldAggregation instanceof SqlCountAggFunction) {
+      newCall = AggregateCall.create(new SqlSumEmptyIsZeroAggFunction(), oldCall.isDistinct(), oldCall.isApproximate(),
+          oldCall.ignoreNulls(), convertArgList(nGroups + oldCallIndex, Collections.singletonList(oldCallIndex)),
+          oldCall.filterArg, oldCall.distinctKeys, oldCall.collation, oldCall.type, oldCall.getName());
+    } else {
+      newCall = AggregateCall.create(
+          oldCall.getAggregation(), oldCall.isDistinct(), oldCall.isApproximate(), oldCall.ignoreNulls(),
+          convertArgList(nGroups + oldCallIndex, oldCall.getArgList()), oldCall.filterArg, oldCall.distinctKeys,
+          oldCall.collation, oldCall.type, oldCall.getName());
+    }
     rexBuilder.addAggCall(newCall,
         nGroups,
         newCalls,

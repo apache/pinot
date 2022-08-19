@@ -16,31 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.utils;
 
-import org.apache.pinot.spi.data.readers.PrimaryKey;
+package org.apache.pinot.server.starter.helix;
 
+public class SegmentReloadStatusValue {
+  private final long _totalSegmentCount;
+  private final long _successCount;
 
-public final class RecordInfo {
-  private final PrimaryKey _primaryKey;
-  private final int _docId;
-  private final Comparable _comparisonValue;
-
-  public RecordInfo(PrimaryKey primaryKey, int docId, Comparable comparisonValue) {
-    _primaryKey = primaryKey;
-    _docId = docId;
-    _comparisonValue = comparisonValue;
+  public SegmentReloadStatusValue(long totalSegmentCount, long successCount) {
+    _totalSegmentCount = totalSegmentCount;
+    _successCount = successCount;
   }
 
-  public PrimaryKey getPrimaryKey() {
-    return _primaryKey;
+  public long getTotalSegmentCount() {
+    return _totalSegmentCount;
   }
 
-  public int getDocId() {
-    return _docId;
-  }
-
-  public Comparable getComparisonValue() {
-    return _comparisonValue;
+  public long getSuccessCount() {
+    return _successCount;
   }
 }

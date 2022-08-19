@@ -25,20 +25,14 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.spi.stream.StreamDataProvider;
-import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.MeetupRsvpStream;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
-import static org.apache.pinot.tools.Quickstart.prettyPrintResponse;
-
 
 public class PartialUpsertQuickStart extends QuickStartBase {
-  private StreamDataServerStartable _kafkaStarter;
 
   public static void main(String[] args)
       throws Exception {
@@ -75,15 +69,7 @@ public class PartialUpsertQuickStart extends QuickStartBase {
     final QuickstartRunner runner =
         new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1, dataDir, getConfigOverrides());
 
-    printStatus(Color.CYAN, "***** Starting Kafka *****");
-    final ZkStarter.ZookeeperInstance zookeeperInstance = ZkStarter.startLocalZkServer();
-    try {
-      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
-          KafkaStarterUtils.getDefaultKafkaConfiguration());
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
-    }
-    _kafkaStarter.start();
+    startKafka();
     _kafkaStarter.createTopic("meetupRSVPEvents", KafkaStarterUtils.getTopicCreationProps(2));
     printStatus(Color.CYAN, "***** Starting  meetup data stream and publishing to Kafka *****");
     MeetupRsvpStream meetupRSVPProvider = new MeetupRsvpStream(true);
@@ -95,8 +81,6 @@ public class PartialUpsertQuickStart extends QuickStartBase {
         printStatus(Color.GREEN, "***** Shutting down realtime quick start *****");
         runner.stop();
         meetupRSVPProvider.stopPublishing();
-        _kafkaStarter.stop();
-        ZkStarter.stopLocalZkServer(zookeeperInstance);
         FileUtils.deleteDirectory(quickstartTmpDir);
       } catch (Exception e) {
         e.printStackTrace();

@@ -265,6 +265,7 @@ public class PinotTaskRestletResource {
   @Path("/tasks/generator/{tableNameWithType}/{taskType}/debug")
   @ApiOperation("Fetch task generation information for the recent runs of the given task for the given table")
   public String getTaskGenerationDebugInto(
+      @Context HttpHeaders httpHeaders,
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,
@@ -294,8 +295,12 @@ public class PinotTaskRestletResource {
 
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, HashBiMap.create(0));
+    Map<String, String> requestHeaders = new HashMap<>();
+    httpHeaders.getRequestHeaders().keySet().forEach(header -> {
+      requestHeaders.put(header, httpHeaders.getHeaderString(header));
+    });
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(controllerUrls, null, true, 10000);
+        completionServiceHelper.doMultiGetRequest(controllerUrls, null, true, requestHeaders, 10000);
 
     List<JsonNode> result = new ArrayList<>();
     serviceResponse._httpResponses.values().forEach(resp -> {

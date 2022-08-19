@@ -32,7 +32,6 @@ import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.MaxAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.MinAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
@@ -174,15 +173,13 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
 
   private AggregationFunction toAggregationFunction(RexExpression aggCall, int aggregationFunctionInputRef) {
     Preconditions.checkState(aggCall instanceof RexExpression.FunctionCall);
+    // TODO(Rong Rong): query options are not supported by the new engine at this moment.
     switch (((RexExpression.FunctionCall) aggCall).getFunctionName()) {
       case "$SUM":
       case "$SUM0":
       case "SUM":
         return new SumAggregationFunction(
             ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
-      case "$COUNT":
-      case "COUNT":
-        return new CountAggregationFunction();
       case "$MIN":
       case "$MIN0":
       case "MIN":
@@ -206,9 +203,6 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       case "$SUM":
       case "$SUM0":
         return ((Number) left).doubleValue() + ((Number) right).doubleValue();
-      case "COUNT":
-      case "$COUNT":
-        return ((Number) left).longValue() + ((Number) right).longValue();
       case "MIN":
       case "$MIN":
       case "$MIN0":

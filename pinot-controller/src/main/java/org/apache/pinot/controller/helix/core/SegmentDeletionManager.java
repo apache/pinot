@@ -335,7 +335,7 @@ public class SegmentDeletionManager {
   }
 
   @Nullable
-  private static Long getRetentionMsFromTableConfig(@Nullable TableConfig tableConfig) {
+  public static Long getRetentionMsFromTableConfig(@Nullable TableConfig tableConfig) {
     if (tableConfig != null) {
       SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
       if (!StringUtils.isEmpty(validationConfig.getDeletedSegmentsRetentionPeriod())) {

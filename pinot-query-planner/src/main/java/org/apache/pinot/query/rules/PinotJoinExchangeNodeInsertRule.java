@@ -70,7 +70,12 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
     RelNode leftExchange;
     RelNode rightExchange;
     List<RelHint> hints = join.getHints();
-    if (hints.contains(PinotRelationalHints.USE_HASH_DISTRIBUTE)) {
+    if (hints.contains(PinotRelationalHints.USE_BROADCAST_DISTRIBUTE)) {
+      // TODO: determine which side should be the broadcast table based on table metadata
+      // TODO: support SINGLETON exchange if the non-broadcast table size is small enough to stay local.
+      leftExchange = LogicalExchange.create(leftInput, RelDistributions.RANDOM_DISTRIBUTED);
+      rightExchange = LogicalExchange.create(rightInput, RelDistributions.BROADCAST_DISTRIBUTED);
+    } else { // if (hints.contains(PinotRelationalHints.USE_HASH_DISTRIBUTE)) {
       RexCall joinCondition = (RexCall) join.getCondition();
       int leftNodeOffset = join.getLeft().getRowType().getFieldNames().size();
       List<List<Integer>> conditions = PlannerUtils.parseJoinConditions(joinCondition, leftNodeOffset);
@@ -78,9 +83,6 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
           RelDistributions.hash(conditions.get(0)));
       rightExchange = LogicalExchange.create(rightInput,
           RelDistributions.hash(conditions.get(1)));
-    } else { // if (hints.contains(PinotRelationalHints.USE_BROADCAST_JOIN))
-      leftExchange = LogicalExchange.create(leftInput, RelDistributions.SINGLETON);
-      rightExchange = LogicalExchange.create(rightInput, RelDistributions.BROADCAST_DISTRIBUTED);
     }
 
     RelNode newJoinNode =

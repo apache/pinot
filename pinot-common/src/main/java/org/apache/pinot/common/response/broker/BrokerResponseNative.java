@@ -42,10 +42,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 @JsonPropertyOrder({
     "resultTable", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried",
-    "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numDocsScanned",
-    "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs",
-    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
-    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
+    "numConsumingSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
+    "numGroupsLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
+    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs", "segmentStatistics",
     "traceInfo"
 })
@@ -66,6 +66,8 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _numSegmentsProcessed = 0L;
   private long _numSegmentsMatched = 0L;
   private long _numConsumingSegmentsQueried = 0L;
+  private long _numConsumingSegmentsProcessed = 0L;
+  private long _numConsumingSegmentsMatched = 0L;
   // the timestamp indicating the freshness of the data queried in consuming segments.
   // This can be ingestion timestamp if provided by the stream, or the last index time
   private long _minConsumingFreshnessTimeMs = 0L;
@@ -310,11 +312,13 @@ public class BrokerResponseNative implements BrokerResponse {
 
   @JsonProperty("resultTable")
   @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Override
   public ResultTable getResultTable() {
     return _resultTable;
   }
 
   @JsonProperty("resultTable")
+  @Override
   public void setResultTable(ResultTable resultTable) {
     _resultTable = resultTable;
     _numRowsResultSet = resultTable.getRows().size();
@@ -428,6 +432,27 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("numConsumingSegmentsQueried")
   public void setNumConsumingSegmentsQueried(long numConsumingSegmentsQueried) {
     _numConsumingSegmentsQueried = numConsumingSegmentsQueried;
+  }
+
+  @JsonProperty("numConsumingSegmentsProcessed")
+  @Override
+  public long getNumConsumingSegmentsProcessed() {
+    return _numConsumingSegmentsProcessed;
+  }
+  @JsonProperty("numConsumingSegmentsProcessed")
+  public void setNumConsumingSegmentsProcessed(long numConsumingSegmentsProcessed) {
+    _numConsumingSegmentsProcessed = numConsumingSegmentsProcessed;
+  }
+
+  @JsonProperty("numConsumingSegmentsMatched")
+  @Override
+  public long getNumConsumingSegmentsMatched() {
+    return _numConsumingSegmentsMatched;
+  }
+
+  @JsonProperty("numConsumingSegmentsMatched")
+  public void setNumConsumingSegmentsMatched(long numConsumingSegmentsMatched) {
+    _numConsumingSegmentsMatched = numConsumingSegmentsMatched;
   }
 
   @JsonProperty("minConsumingFreshnessTimeMs")

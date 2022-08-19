@@ -30,23 +30,35 @@ import org.slf4j.LoggerFactory;
 public class MeetupRsvpStream {
   protected static final Logger LOGGER = LoggerFactory.getLogger(MeetupRsvpStream.class);
   private static final String DEFAULT_TOPIC_NAME = "meetupRSVPEvents";
-  protected String _topicName = DEFAULT_TOPIC_NAME;
+  protected String _topicName;
 
   protected PinotRealtimeSource _pinotRealtimeSource;
 
   public MeetupRsvpStream()
       throws Exception {
-    this(false);
+    this(DEFAULT_TOPIC_NAME, RsvpSourceGenerator.KeyColumn.NONE);
   }
 
   public MeetupRsvpStream(boolean partitionByKey)
       throws Exception {
     // calling this constructor means that we wish to use EVENT_ID as key. RsvpId is used by MeetupRsvpJsonStream
-    this(partitionByKey ? RsvpSourceGenerator.KeyColumn.EVENT_ID : RsvpSourceGenerator.KeyColumn.NONE);
+    this(DEFAULT_TOPIC_NAME,
+        partitionByKey ? RsvpSourceGenerator.KeyColumn.EVENT_ID : RsvpSourceGenerator.KeyColumn.NONE);
+  }
+
+  public MeetupRsvpStream(String topicName)
+      throws Exception {
+    this(topicName, RsvpSourceGenerator.KeyColumn.NONE);
   }
 
   public MeetupRsvpStream(RsvpSourceGenerator.KeyColumn keyColumn)
       throws Exception {
+    this(DEFAULT_TOPIC_NAME, keyColumn);
+  }
+
+  public MeetupRsvpStream(String topicName, RsvpSourceGenerator.KeyColumn keyColumn)
+      throws Exception {
+    _topicName = topicName;
     Properties properties = new Properties();
     properties.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");

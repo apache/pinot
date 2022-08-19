@@ -203,7 +203,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
           list.add(copy);
         }
       }
-    } else if (isArray(value)) {
+    } else if (isNonPrimitiveArray(value)) {
       if (((Object[]) value).length == 0) {
         // use the record itself
         list.add(record);
@@ -245,7 +245,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
           String flattenName = concat(column, entry.getKey());
           Object nestedValue = entry.getValue();
           record.putValue(flattenName, nestedValue);
-          if (nestedValue instanceof Map || nestedValue instanceof Collection || isArray(nestedValue)) {
+          if (nestedValue instanceof Map || nestedValue instanceof Collection || isNonPrimitiveArray(nestedValue)) {
             mapColumns.add(flattenName);
           }
         }
@@ -269,7 +269,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
                 String.format("Caught exception while converting value to JSON string %s", value), e);
           }
         }
-      } else if (isArray(value)) {
+      } else if (isNonPrimitiveArray(value)) {
         Object[] array = (Object[]) value;
         if (_fieldsToUnnest.contains(column)) {
           for (Object inner : array) {
@@ -324,7 +324,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
       return true;
     }
     Object element = value[0];
-    return !(element instanceof Map || element instanceof Collection || isArray(element));
+    return !(element instanceof Map || element instanceof Collection || isNonPrimitiveArray(element));
   }
 
   /**
@@ -336,14 +336,11 @@ public class ComplexTypeTransformer implements RecordTransformer {
       return true;
     }
     Object element = value.iterator().next();
-    return !(element instanceof Map || element instanceof Collection || isArray(element));
+    return !(element instanceof Map || element instanceof Collection || isNonPrimitiveArray(element));
   }
 
-  protected static boolean isArray(Object obj) {
-    if (obj == null) {
-      return false;
-    }
-    return obj.getClass().isArray();
+  protected static boolean isNonPrimitiveArray(Object obj) {
+    return obj instanceof Object[];
   }
 
   private void flattenMap(String path, Map<String, Object> map, Collection<String> fields) {
@@ -355,14 +352,14 @@ public class ComplexTypeTransformer implements RecordTransformer {
         List<String> innerMapFields = new ArrayList<>();
         for (Map.Entry<String, Object> innerEntry : new ArrayList<>(innerMap.entrySet())) {
           Object innerValue = innerEntry.getValue();
-          String innerCancatName = concat(field, innerEntry.getKey());
-          map.put(innerCancatName, innerEntry.getValue());
-          if (innerValue instanceof Map || innerValue instanceof Collection || isArray(innerValue)) {
-            innerMapFields.add(innerCancatName);
+          String innerConcatName = concat(field, innerEntry.getKey());
+          map.put(innerConcatName, innerEntry.getValue());
+          if (innerValue instanceof Map || innerValue instanceof Collection || isNonPrimitiveArray(innerValue)) {
+            innerMapFields.add(innerConcatName);
           }
         }
         if (!innerMapFields.isEmpty()) {
-          flattenMap(concatName, map, innerMapFields);
+          flattenMap(path, map, innerMapFields);
         }
       } else if (value instanceof Collection && _fieldsToUnnest.contains(concatName)) {
         Collection collection = (Collection) value;
@@ -383,7 +380,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
                 String.format("Caught exception while converting value to JSON string %s", value), e);
           }
         }
-      } else if (isArray(value)) {
+      } else if (isNonPrimitiveArray(value)) {
         Object[] array = (Object[]) value;
         if (_fieldsToUnnest.contains(concatName)) {
           for (Object inner : (Object[]) value) {
