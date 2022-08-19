@@ -19,8 +19,11 @@
 package org.apache.pinot.controller.api;
 
 import java.io.IOException;
+import javax.annotation.Nullable;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -50,11 +53,25 @@ public class AccessControlTest {
   }
 
   public static class DenyAllAccessFactory implements AccessControlFactory {
-    private static final AccessControl DENY_ALL_ACCESS = (httpHeaders, tableName) -> !tableName.equals(TABLE_NAME);
-
     @Override
     public AccessControl create() {
-      return DENY_ALL_ACCESS;
+      return new AccessControl() {
+        @Override
+        public boolean hasDataAccess(HttpHeaders httpHeaders, String tableName) {
+          return false;
+        }
+
+        @Override
+        public boolean hasAccess(@Nullable String tableName, AccessType accessType, HttpHeaders httpHeaders,
+            @Nullable String endpointUrl) {
+          return false;
+        }
+
+        @Override
+        public boolean protectAnnotatedOnly() {
+          return false;
+        }
+      };
     }
   }
 }

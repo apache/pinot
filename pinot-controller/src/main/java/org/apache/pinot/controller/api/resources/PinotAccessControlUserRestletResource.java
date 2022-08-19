@@ -36,7 +36,6 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -44,8 +43,6 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.BcryptUtils;
-import org.apache.pinot.controller.api.access.AccessControlFactory;
-import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -54,7 +51,6 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,17 +89,12 @@ public class PinotAccessControlUserRestletResource {
     @Inject
     PinotHelixResourceManager _pinotHelixResourceManager;
 
-    @Inject
-    AccessControlFactory _accessControlFactory;
-
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Path("/users")
     @ApiOperation(value = "List all uses in cluster", notes = "List all users in cluster")
-    public String listUers(@Context HttpHeaders httpHeaders, @Context Request request) {
+    public String listUers() {
         try {
-            String endpointUrl = request.getRequestURL().toString();
-            AccessControlUtils.validatePermission(httpHeaders, endpointUrl, _accessControlFactory.create());
             ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
             Map<String, UserConfig> allUserInfo = ZKMetadataProvider.getAllUserInfo(propertyStore);
             return JsonUtils.newObjectNode().set("users", JsonUtils.objectToJsonNode(allUserInfo)).toString();
@@ -116,11 +107,8 @@ public class PinotAccessControlUserRestletResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Path("/users/{username}")
     @ApiOperation(value = "Get an user in cluster", notes = "Get an user in cluster")
-    public String getUser(@PathParam("username") String username, @QueryParam("component") String componentTypeStr,
-        @Context HttpHeaders httpHeaders, @Context Request request) {
+    public String getUser(@PathParam("username") String username, @QueryParam("component") String componentTypeStr) {
         try {
-            String endpointUrl = request.getRequestURL().toString();
-            AccessControlUtils.validatePermission(httpHeaders, endpointUrl, _accessControlFactory.create());
             ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
             ComponentType componentType = Constants.validateComponentType(componentTypeStr);
             String usernameWithType = username + "_" + componentType.name();
@@ -136,7 +124,7 @@ public class PinotAccessControlUserRestletResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Path("/users")
     @ApiOperation(value = "Add a user", notes = "Add a user")
-    public SuccessResponse addUser(String userConfigStr, @Context HttpHeaders httpHeaders, @Context Request request) {
+    public SuccessResponse addUser(String userConfigStr) {
         // TODO introduce a table config ctor with json string.
 
         UserConfig userConfig;
@@ -144,8 +132,6 @@ public class PinotAccessControlUserRestletResource {
         try {
             userConfig = JsonUtils.stringToObject(userConfigStr, UserConfig.class);
             username = userConfig.getUserName();
-            String endpointUrl = request.getRequestURL().toString();
-            AccessControlUtils.validatePermission(httpHeaders, endpointUrl, _accessControlFactory.create());
             if (username.contains(".") || username.contains(" ")) {
                 throw new IllegalStateException("Username: " + username + " containing '.' or space is not allowed");
             }
@@ -171,8 +157,7 @@ public class PinotAccessControlUserRestletResource {
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "Delete a user", notes = "Delete a user")
     public SuccessResponse deleteUser(@PathParam("username") String username,
-        @QueryParam("component") String componentTypeStr,
-        @Context HttpHeaders httpHeaders, @Context Request request) {
+        @QueryParam("component") String componentTypeStr) {
 
         List<String> usersDeleted = new LinkedList<>();
         String usernameWithComponentType = username + "_" + componentTypeStr;
@@ -181,9 +166,6 @@ public class PinotAccessControlUserRestletResource {
 
             boolean userExist = false;
             userExist = _pinotHelixResourceManager.hasUser(username, componentTypeStr);
-
-            String endpointUrl = request.getRequestURL().toString();
-            AccessControlUtils.validatePermission(httpHeaders, endpointUrl, _accessControlFactory.create());
 
             _pinotHelixResourceManager.deleteUser(usernameWithComponentType);
             if (userExist) {
@@ -210,16 +192,11 @@ public class PinotAccessControlUserRestletResource {
         @PathParam("username") String username,
         @QueryParam("component") String componentTypeStr,
         @QueryParam("passwordChanged") boolean passwordChanged,
-        String userConfigString,
-        @Context HttpHeaders httpHeaders,
-        @Context Request request) {
+        String userConfigString) {
 
         UserConfig userConfig;
         String usernameWithComponentType = username + "_" + componentTypeStr;
         try {
-            String endpointUrl = request.getRequestURL().toString();
-            AccessControlUtils.validatePermission(httpHeaders, endpointUrl, _accessControlFactory.create());
-
             userConfig = JsonUtils.stringToObject(userConfigString, UserConfig.class);
             if (passwordChanged) {
                 userConfig.setPassword(BcryptUtils.encrypt(userConfig.getPassword()));

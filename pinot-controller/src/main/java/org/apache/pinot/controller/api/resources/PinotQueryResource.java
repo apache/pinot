@@ -54,6 +54,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.ManualAuthorization;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
@@ -156,7 +157,7 @@ public class PinotQueryResource {
     // Validate data access
     // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(httpHeaders)) {
+    if (!accessControl.hasAccess(null, AccessType.READ, httpHeaders, null)) {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 
@@ -195,7 +196,7 @@ public class PinotQueryResource {
 
     // Validate data access
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasDataAccess(httpHeaders, rawTableName)) {
+    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, null)) {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 
