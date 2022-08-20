@@ -21,13 +21,14 @@ package org.apache.pinot.core.data.manager.realtime;
 import com.google.common.cache.LoadingCache;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
-import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.NOOP_RATE_LIMITER;
-import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.RateLimiterImpl;
+import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
@@ -70,5 +71,49 @@ public class RealtimeConsumptionRateManagerTest {
     // topic C
     rateLimiter = _consumptionRateManager.createRateLimiter(STREAM_CONFIG_C, TABLE_NAME);
     assertEquals(rateLimiter, NOOP_RATE_LIMITER);
+  }
+
+  @Test
+  public void testBuildCache() throws Exception {
+    PartitionCountFetcher partitionCountFetcher = mock(PartitionCountFetcher.class);
+    LoadingCache<StreamConfig, Integer> cache = buildCache(partitionCountFetcher, 500, TimeUnit.MILLISECONDS);
+    when(partitionCountFetcher.fetch(STREAM_CONFIG_A)).thenReturn(10);
+    when(partitionCountFetcher.fetch(STREAM_CONFIG_B)).thenReturn(20);
+    assertEquals((int) cache.get(STREAM_CONFIG_A), 10); // call fetcher in load method
+    assertEquals((int) cache.get(STREAM_CONFIG_A), 10); // use cache
+    assertEquals((int) cache.get(STREAM_CONFIG_A), 10); // use cache
+    assertEquals((int) cache.get(STREAM_CONFIG_B), 20); // call fetcher in load method
+    assertEquals((int) cache.get(STREAM_CONFIG_B), 20); // use cache
+    verify(partitionCountFetcher, times(1)).fetch(STREAM_CONFIG_A); // count changes
+    verify(partitionCountFetcher, times(1)).fetch(STREAM_CONFIG_B); // count changes
+    when(partitionCountFetcher.fetch(STREAM_CONFIG_A)).thenReturn(11);
+    when(partitionCountFetcher.fetch(STREAM_CONFIG_B)).thenReturn(21);
+    assertEquals((int) cache.get(STREAM_CONFIG_A), 10); // use cache
+    assertEquals((int) cache.get(STREAM_CONFIG_B), 20); // use cache
+    Thread.sleep(550); // wait till cache expires
+    assertEquals((int) cache.get(STREAM_CONFIG_A), 11); // call fetcher in reload method
+    assertEquals((int) cache.get(STREAM_CONFIG_A), 11); // use cache
+    assertEquals((int) cache.get(STREAM_CONFIG_A), 11); // use cache
+    assertEquals((int) cache.get(STREAM_CONFIG_B), 21); // call fetcher in reload method
+    assertEquals((int) cache.get(STREAM_CONFIG_B), 21); // use cache
+    verify(partitionCountFetcher, times(2)).fetch(STREAM_CONFIG_A);
+    verify(partitionCountFetcher, times(2)).fetch(STREAM_CONFIG_B);
+    when(partitionCountFetcher.fetch(STREAM_CONFIG_A)).thenReturn(null); // unsuccessful fetch
+    when(partitionCountFetcher.fetch(STREAM_CONFIG_B)).thenReturn(22);
+    Thread.sleep(550); // wait till cache expires
+    assertEquals((int) cache.get(STREAM_CONFIG_A), 11); // call fetcher in reload method
+    assertEquals((int) cache.get(STREAM_CONFIG_A), 11); // use cache
+    assertEquals((int) cache.get(STREAM_CONFIG_A), 11); // use cache
+    assertEquals((int) cache.get(STREAM_CONFIG_B), 22); // call fetcher in reload method
+    assertEquals((int) cache.get(STREAM_CONFIG_B), 22); // use cache
+    verify(partitionCountFetcher, times(3)).fetch(STREAM_CONFIG_A);
+    verify(partitionCountFetcher, times(3)).fetch(STREAM_CONFIG_B);
+
+    // unsuccessful fetch in the first call for config C
+    when(partitionCountFetcher.fetch(STREAM_CONFIG_C)).thenReturn(null); // unsuccessful fetch
+    assertEquals((int) cache.get(STREAM_CONFIG_C), 1); // call fetcher in load method
+    assertEquals((int) cache.get(STREAM_CONFIG_C), 1); // use cache
+    assertEquals((int) cache.get(STREAM_CONFIG_C), 1); // use cache
+    verify(partitionCountFetcher, times(1)).fetch(STREAM_CONFIG_C);
   }
 }

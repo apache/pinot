@@ -23,6 +23,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.RateLimiter;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -55,7 +57,8 @@ public class RealtimeConsumptionRateManager {
   }
 
   private static class InstanceHolder {
-    private static final RealtimeConsumptionRateManager INSTANCE = new RealtimeConsumptionRateManager(buildCache());
+    private static final RealtimeConsumptionRateManager INSTANCE = new RealtimeConsumptionRateManager(
+        buildCache(DEFAULT_PARTITION_COUNT_FETCHER, CACHE_ENTRY_EXPIRATION_TIME_IN_MINUTES, TimeUnit.MINUTES));
   }
 
   public static RealtimeConsumptionRateManager getInstance() {
@@ -85,17 +88,27 @@ public class RealtimeConsumptionRateManager {
     return new RateLimiterImpl(partitionRateLimit);
   }
 
-  private static LoadingCache<StreamConfig, Integer> buildCache() {
-    return CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRATION_TIME_IN_MINUTES, TimeUnit.MINUTES)
+  @VisibleForTesting
+  static LoadingCache<StreamConfig, Integer> buildCache(PartitionCountFetcher partitionCountFetcher,
+      long duration, TimeUnit unit) {
+    return CacheBuilder.newBuilder().refreshAfterWrite(duration, unit)
         .build(new CacheLoader<StreamConfig, Integer>() {
           @Override
-          public Integer load(StreamConfig streamConfig)
+          public Integer load(StreamConfig key)
               throws Exception {
-            String clientId = streamConfig.getTopicName() + "-consumption.rate.manager";
-            StreamConsumerFactory factory = StreamConsumerFactoryProvider.create(streamConfig);
-            try (StreamMetadataProvider streamMetadataProvider = factory.createStreamMetadataProvider(clientId)) {
-              return streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs*/10_000);
-            }
+            // this method is called the first time cache is used for the given streamConfig
+            Integer count = partitionCountFetcher.fetch(key);
+            // if the count cannot be fetched, don't throw exception; return 1.
+            // The overall consumption rate will be higher, but we prefer that over not consuming at all.
+            return count != null ? count : 1;
+          }
+
+          @Override
+          public ListenableFuture<Integer> reload(StreamConfig key, Integer oldValue)
+              throws Exception {
+            // if partition count fetcher cannot fetch the value, old value is returned
+            Integer count = partitionCountFetcher.fetch(key);
+            return Futures.immediateFuture(count != null ? count : oldValue);
           }
         });
   }
@@ -131,4 +144,22 @@ public class RealtimeConsumptionRateManager {
       return _rate;
     }
   }
+
+  @VisibleForTesting
+  @FunctionalInterface
+  interface PartitionCountFetcher {
+    Integer fetch(StreamConfig streamConfig);
+  }
+
+  @VisibleForTesting
+  static final PartitionCountFetcher DEFAULT_PARTITION_COUNT_FETCHER = streamConfig -> {
+    String clientId = streamConfig.getTopicName() + "-consumption.rate.manager";
+    StreamConsumerFactory factory = StreamConsumerFactoryProvider.create(streamConfig);
+    try (StreamMetadataProvider streamMetadataProvider = factory.createStreamMetadataProvider(clientId)) {
+      return streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs*/10_000);
+    } catch (Exception e) {
+      LOGGER.warn("Error fetching metadata for topic " + streamConfig.getTopicName(), e);
+      return null;
+    }
+  };
 }
