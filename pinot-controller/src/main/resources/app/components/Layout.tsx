@@ -62,9 +62,16 @@ const Layout = (props) => {
     setOpenSidebar(newSidebarState);
   };
 
-  const filterNavigationItems = () => {
-    return navigationItems.filter((item)=>{return item.name.toLowerCase() === 'query console'});
+  const getAppNavigationItems = () => {
+    if (app_state.queryConsoleOnlyView) {
+      return navigationItems.filter((navItem) => navItem.link === '/query');
+    }
+    if (app_state.hideQueryConsoleTab) {
+      return navigationItems.filter((navItem) => navItem.link !== '/query');
   }
+
+    return navigationItems;
+  };
 
   return (
     <Grid container direction="column">
@@ -78,7 +85,7 @@ const Layout = (props) => {
         <Grid container>
           <Grid item>
             <Sidebar
-              list={app_state.queryConsoleOnlyView ? filterNavigationItems() : navigationItems}
+              list={getAppNavigationItems()}
               showMenu={openSidebar}
               selectedId={selectedId}
               highlightSidebarLink={highlightSidebarLink}

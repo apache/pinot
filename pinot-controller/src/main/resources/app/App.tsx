@@ -85,12 +85,17 @@ const App = () => {
   const fetchClusterConfig = async () => {
     const clusterConfig = await PinotMethodUtils.getClusterConfigJSON();
     app_state.queryConsoleOnlyView = clusterConfig?.queryConsoleOnlyView === 'true';
+    app_state.hideQueryConsoleTab = clusterConfig?.hideQueryConsoleTab === 'true';
+
     setLoading(false);
   };
 
   const getRouterData = () => {
     if(app_state.queryConsoleOnlyView){
       return RouterData.filter((routeObj)=>{return routeObj.path === '/query'});
+    }
+    if (app_state.hideQueryConsoleTab) {
+      return RouterData.filter((routeObj) => routeObj.path !== '/query');
     }
     return RouterData;
   };
