@@ -59,7 +59,11 @@ public class KafkaStreamLevelStreamConfig {
     _bootstrapServers = streamConfigMap.get(hlcBootstrapBrokerUrlKey);
     Preconditions.checkNotNull(_bootstrapServers,
         "Must specify bootstrap broker connect string " + hlcBootstrapBrokerUrlKey + " in high level kafka consumer");
+
     _groupId = groupId;
+    if(_groupId == null) {
+      _groupId = tableName;
+    }
 
     _kafkaConsumerProperties = new HashMap<>();
     String kafkaConsumerPropertyPrefix =
