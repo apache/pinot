@@ -52,6 +52,17 @@ const Layout = (props) => {
   const sidebarOpenState = !(localStorage.getItem('pinot_ui:sidebarState') === 'false');
   const [openSidebar, setOpenSidebar] = React.useState(sidebarOpenState);
 
+  const appNavigationItems = React.useMemo(() => {
+    if (app_state.queryConsoleOnlyView) {
+      return navigationItems.filter((navItem) => navItem.link === '/query');
+    }
+    if (app_state.hideQueryConsoleTab) {
+      return navigationItems.filter((navItem) => navItem.link !== '/query');
+  }
+
+    return navigationItems;
+  }, [navigationItems, app_state.queryConsoleOnlyView, app_state.hideQueryConsoleTab]);
+
   const highlightSidebarLink = (id: number) => {
     setSelectedId(id);
   };
@@ -62,16 +73,7 @@ const Layout = (props) => {
     setOpenSidebar(newSidebarState);
   };
 
-  const getAppNavigationItems = () => {
-    if (app_state.queryConsoleOnlyView) {
-      return navigationItems.filter((navItem) => navItem.link === '/query');
-    }
-    if (app_state.hideQueryConsoleTab) {
-      return navigationItems.filter((navItem) => navItem.link !== '/query');
-  }
-
-    return navigationItems;
-  };
+  
 
   return (
     <Grid container direction="column">
@@ -85,7 +87,7 @@ const Layout = (props) => {
         <Grid container>
           <Grid item>
             <Sidebar
-              list={getAppNavigationItems()}
+              list={appNavigationItems}
               showMenu={openSidebar}
               selectedId={selectedId}
               highlightSidebarLink={highlightSidebarLink}
