@@ -28,6 +28,11 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
+import java.nio.file.PathMatcher;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -44,6 +49,7 @@ public class SegmentGenerationUtils {
   private static final String OFFLINE = "OFFLINE";
   public static final String PINOT_PLUGINS_TAR_GZ = "pinot-plugins.tar.gz";
   public static final String PINOT_PLUGINS_DIR = "pinot-plugins-dir";
+  private static final String _RECURSIVE_BLOB_PATTERN = "**";
 
   public static String generateSchemaURI(String controllerUri, String table) {
     return String.format("%s/tables/%s/schema", controllerUri, table);
@@ -228,5 +234,67 @@ public class SegmentGenerationUtils {
       connection.setRequestProperty("Authorization", authToken);
     }
     return IOUtils.toString(connection.getInputStream(), StandardCharsets.UTF_8);
+  }
+
+  /**
+   * Find matching files from root directory specified in fileUri.
+   * If includePattern and excludePattern are not null, get all the files that match includePattern and exclude files
+   * that match excludePattern.
+   * If includePattern is null or contains glob recursive pattern, i.e. **, search files recursively from root
+   * directory.
+   *
+   * @param pinotFs fs for root directory.
+   * @param fileUri uri for root directory.
+   * @param includePattern glob file pattern for include files.
+   * @param excludePattern glob file pattern for exclude files.
+   * @return list of matching files.
+   * @throws IOException on IO failure for list files in root directory.
+   * @throws URISyntaxException for matching file URIs
+   * @throws RuntimeException if there is no matching file.
+   */
+  public static List<String> listMatchedFiles(PinotFS pinotFs, URI fileUri, String includePattern,
+      String excludePattern)
+      throws Exception {
+    String[] files;
+    // listFiles throws IOException
+    if (includePattern == null || includePattern.contains(_RECURSIVE_BLOB_PATTERN)) {
+      files = pinotFs.listFiles(fileUri, true);
+    } else {
+      files = pinotFs.listFiles(fileUri, false);
+    }
+    //TODO: sort input files based on creation time
+    PathMatcher includeFilePathMatcher = null;
+    if (includePattern != null) {
+      includeFilePathMatcher = FileSystems.getDefault().getPathMatcher(includePattern);
+    }
+    PathMatcher excludeFilePathMatcher = null;
+    if (excludePattern != null) {
+      excludeFilePathMatcher = FileSystems.getDefault().getPathMatcher(excludePattern);
+    }
+    List<String> filteredFiles = new ArrayList<>();
+    for (String file : files) {
+      if (includeFilePathMatcher != null) {
+        if (!includeFilePathMatcher.matches(Paths.get(file))) {
+          continue;
+        }
+      }
+      if (excludeFilePathMatcher != null) {
+        if (excludeFilePathMatcher.matches(Paths.get(file))) {
+          continue;
+        }
+      }
+      if (!pinotFs.isDirectory(new URI(file))) {
+        // In case PinotFS implementations list files without a scheme (e.g. hdfs://), then we may lose it in the
+        // input file path. Call SegmentGenerationUtils.getFileURI() to fix this up.
+        // getFileURI throws URISyntaxException
+        filteredFiles.add(SegmentGenerationUtils.getFileURI(file, fileUri).toString());
+      }
+    }
+    if (filteredFiles.isEmpty()) {
+      throw new RuntimeException(String.format(
+          "No file found in the input directory: %s matching includeFileNamePattern: %s,"
+              + " excludeFileNamePattern: %s", fileUri, includePattern, excludePattern));
+    }
+    return filteredFiles;
   }
 }

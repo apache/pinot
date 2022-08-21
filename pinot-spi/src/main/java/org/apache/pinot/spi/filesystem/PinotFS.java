@@ -28,6 +28,7 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
+
 /**
  * PinotFS is a restricted FS API that exposes functionality that is required for Pinot to use
  * different FS implementations. The restrictions are in place due to 2 driving factors:
@@ -142,22 +143,6 @@ public interface PinotFS extends Closeable, Serializable {
    */
   long length(URI fileUri)
       throws IOException;
-
-  /**
-   * Lists all the files and directories at the location provided.
-   * Lists recursively if {@code inputFilePattern} starts with "glob:**".
-   * Throws IOException if this abstract pathname is not valid, or if an I/O error occurs.
-   * @param fileUri location of file
-   * @return an array of strings that contains file paths
-   * @throws IOException on IO failure. See specific implementation
-   */
-  default String[] listFilesWithPattern(URI fileUri, String inputFilePattern)
-      throws IOException {
-    if (inputFilePattern.startsWith(PinotFSFactory.RECURSIVE_BLOB_PREFIX)) {
-      return listFiles(fileUri, true);
-    }
-    return listFiles(fileUri, false);
-  }
 
   /**
    * Lists all the files and directories at the location provided.

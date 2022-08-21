@@ -23,9 +23,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
 import java.net.URLEncoder;
-import java.nio.file.FileSystems;
 import java.nio.file.Path;
-import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -160,44 +158,9 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       outputDirFS.mkdir(stagingDirURI);
     }
     //Get list of files to process
-    String[] files = inputDirFS.listFiles(inputDirURI, true);
-
-    //TODO: sort input files based on creation time
-    List<String> filteredFiles = new ArrayList<>();
-    PathMatcher includeFilePathMatcher = null;
-    if (_spec.getIncludeFileNamePattern() != null) {
-      includeFilePathMatcher = FileSystems.getDefault().getPathMatcher(_spec.getIncludeFileNamePattern());
-    }
-    PathMatcher excludeFilePathMatcher = null;
-    if (_spec.getExcludeFileNamePattern() != null) {
-      excludeFilePathMatcher = FileSystems.getDefault().getPathMatcher(_spec.getExcludeFileNamePattern());
-    }
-
-    for (String file : files) {
-      if (includeFilePathMatcher != null) {
-        if (!includeFilePathMatcher.matches(Paths.get(file))) {
-          continue;
-        }
-      }
-      if (excludeFilePathMatcher != null) {
-        if (excludeFilePathMatcher.matches(Paths.get(file))) {
-          continue;
-        }
-      }
-      if (!inputDirFS.isDirectory(new URI(file))) {
-        // In case PinotFS implementations list files without a scheme (e.g. hdfs://), then we may lose it in the
-        // input file path. Call SegmentGenerationUtils.getFileURI() to fix this up.
-        filteredFiles.add(SegmentGenerationUtils.getFileURI(file, inputDirURI).toString());
-      }
-    }
-
-    if (filteredFiles.isEmpty()) {
-      throw new RuntimeException(
-          String.format("No file found in the input directory: %s matching includeFileNamePattern: %s,"
-                  + " excludeFileNamePattern: %s", _spec.getInputDirURI(), _spec.getIncludeFileNamePattern(),
-              _spec.getExcludeFileNamePattern()));
-    }
-
+    List<String> filteredFiles =
+        SegmentGenerationUtils.listMatchedFiles(inputDirFS, inputDirURI, _spec.getIncludeFileNamePattern(),
+            _spec.getExcludeFileNamePattern());
     LOGGER.info("Found {} files to create Pinot segments!", filteredFiles.size());
     try {
       JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
