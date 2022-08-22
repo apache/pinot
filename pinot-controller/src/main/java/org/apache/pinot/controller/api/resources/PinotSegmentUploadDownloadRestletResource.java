@@ -141,7 +141,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Path("/segments/{tableName}/{segmentName}")
   @ApiOperation(value = "Download a segment", notes = "Download a segment")
   @TrackInflightRequestMetrics
-  @TrackedByGauge(gauge = ControllerGauge.CONTROLLER_SEGMENT_DOWNLOADS_IN_PROGRESS_COUNT)
+  @TrackedByGauge(gauge = ControllerGauge.SEGMENT_DOWNLOADS_IN_PROGRESS)
   public Response downloadSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
@@ -467,7 +467,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiResponse(code = 500, message = "Internal error")
   })
   @TrackInflightRequestMetrics
-  @TrackedByGauge(gauge = ControllerGauge.CONTROLLER_SEGMENT_UPLOADS_IN_PROGRESS_COUNT)
+  @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
   // We use this endpoint with URI upload because a request sent with the multipart content type will reject the POST
   // request if a multipart object is not sent. This endpoint does not move the segment to its final location;
   // it keeps it at the downloadURI header that is set. We will not support this endpoint going forward.
@@ -507,7 +507,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiResponse(code = 500, message = "Internal error")
   })
   @TrackInflightRequestMetrics
-  @TrackedByGauge(gauge = ControllerGauge.CONTROLLER_SEGMENT_UPLOADS_IN_PROGRESS_COUNT)
+  @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
   // For the multipart endpoint, we will always move segment to final location regardless of the segment endpoint.
   public void uploadSegmentAsMultiPart(FormDataMultiPart multiPart,
       @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
@@ -545,7 +545,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiResponse(code = 500, message = "Internal error")
   })
   @TrackInflightRequestMetrics
-  @TrackedByGauge(gauge = ControllerGauge.CONTROLLER_SEGMENT_UPLOADS_IN_PROGRESS_COUNT)
+  @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
   // We use this endpoint with URI upload because a request sent with the multipart content type will reject the POST
   // request if a multipart object is not sent. This endpoint is recommended for use. It differs from the first
   // endpoint in how it moves the segment to a Pinot-determined final directory.
@@ -586,7 +586,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiResponse(code = 500, message = "Internal error")
   })
   @TrackInflightRequestMetrics
-  @TrackedByGauge(gauge = ControllerGauge.CONTROLLER_SEGMENT_UPLOADS_IN_PROGRESS_COUNT)
+  @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
   // This behavior does not differ from v1 of the same endpoint.
   public void uploadSegmentAsMultiPartV2(FormDataMultiPart multiPart,
       @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)

@@ -113,10 +113,10 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   MISSING_CONSUMING_SEGMENT_MAX_DURATION_MINUTES("missingSegmentsMaxDurationInMinutes", false),
 
   // Number of in progress segment downloads
-  CONTROLLER_SEGMENT_DOWNLOADS_IN_PROGRESS_COUNT("segmentDownloadsInProgressCount", true),
+  SEGMENT_DOWNLOADS_IN_PROGRESS("segmentDownloadsInProgress", true),
 
   // Number of in progress segment uploads
-  CONTROLLER_SEGMENT_UPLOADS_IN_PROGRESS_COUNT("segmentUploadsInProgressCount", true);
+  SEGMENT_UPLOADS_IN_PROGRESS("segmentUploadsInProgress", true);
 
 
   private final String _gaugeName;

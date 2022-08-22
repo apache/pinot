@@ -26,7 +26,6 @@ import javax.ws.rs.ext.WriterInterceptorContext;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -65,7 +64,7 @@ public class InflightRequestMetricsInterceptorTest {
     when(_resourceInfo.getResourceMethod()).thenReturn(methodOne);
     _interceptor.filter(_containerRequestContext);
     verify(_controllerMetrics)
-        .addValueToGlobalGauge(ControllerGauge.CONTROLLER_SEGMENT_DOWNLOADS_IN_PROGRESS_COUNT, 1L);
+        .addValueToGlobalGauge(ControllerGauge.SEGMENT_DOWNLOADS_IN_PROGRESS, 1L);
   }
 
   @Test
@@ -75,7 +74,7 @@ public class InflightRequestMetricsInterceptorTest {
     when(_resourceInfo.getResourceMethod()).thenReturn(methodOne);
     _interceptor.aroundWriteTo(_writerInterceptorContext);
     verify(_controllerMetrics)
-        .addValueToGlobalGauge(ControllerGauge.CONTROLLER_SEGMENT_DOWNLOADS_IN_PROGRESS_COUNT, -1L);
+        .addValueToGlobalGauge(ControllerGauge.SEGMENT_DOWNLOADS_IN_PROGRESS, -1L);
   }
 
   @Test(expectedExceptions = IOException.class)
@@ -87,13 +86,13 @@ public class InflightRequestMetricsInterceptorTest {
     try {
       _interceptor.aroundWriteTo(_writerInterceptorContext);
     } finally {
-      verify(_controllerMetrics).addValueToGlobalGauge(ControllerGauge.CONTROLLER_SEGMENT_DOWNLOADS_IN_PROGRESS_COUNT, -1L);
+      verify(_controllerMetrics).addValueToGlobalGauge(ControllerGauge.SEGMENT_DOWNLOADS_IN_PROGRESS, -1L);
     }
   }
 
   private static class TrackedClass {
     @TrackInflightRequestMetrics
-    @TrackedByGauge(gauge = ControllerGauge.CONTROLLER_SEGMENT_DOWNLOADS_IN_PROGRESS_COUNT)
+    @TrackedByGauge(gauge = ControllerGauge.SEGMENT_DOWNLOADS_IN_PROGRESS)
     public void trackedMethod() {
     }
   }
