@@ -138,7 +138,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // Sub-query
         new Object[]{"SELECT b.col1, b.col3, i.maxVal FROM b JOIN "
             + "  (SELECT a.col2 AS joinKey, MAX(a.col3) AS maxVal FROM a GROUP BY a.col2) AS i "
-            + "  ON b.col1 = i.joinKey", 3}
+            + "  ON b.col1 = i.joinKey", 3},
+
+        // Aggregate query with HAVING clause
+        new Object[]{"SELECT a.col2, COUNT(*) FROM a GROUP BY a.col2 HAVING COUNT(*) < 5", 1},
     };
   }
 }
