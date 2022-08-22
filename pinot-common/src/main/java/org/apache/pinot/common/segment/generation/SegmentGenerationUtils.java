@@ -35,7 +35,11 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.JsonUtils;
-
+import java.util.List;
+import java.nio.file.PathMatcher;
+import java.nio.file.FileSystems;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 
 public class SegmentGenerationUtils {
   private SegmentGenerationUtils() {
@@ -228,5 +232,64 @@ public class SegmentGenerationUtils {
       connection.setRequestProperty("Authorization", authToken);
     }
     return IOUtils.toString(connection.getInputStream(), StandardCharsets.UTF_8);
+  }
+
+
+  /**
+   * Find matching files from root directory specified in fileUri.
+   * If includePattern and excludePattern are not null, get all the files that match includePattern and exclude files
+   * that match excludePattern.
+   * If
+   *
+   * @param pinotFs root directly fs
+   * @param fileUri root directly uri
+   * @param includePattern optional glob patterns for files to include
+   * @param excludePattern optional glob patterns for files to exclude
+   * @param searchRecrusively if ture, search files recursively from directory specified in fileUri
+   * @return list of matching files.
+   * @throws IOException on IO failure for list files in root directory.
+   * @throws URISyntaxException for matching file URIs
+   * @throws RuntimeException if there is no matching file.
+   */
+  public static List<String> listMatchedFilesWithRecursiveOption(PinotFS pinotFs, URI fileUri, String includePattern,
+      String excludePattern, boolean searchRecrusively)
+      throws Exception {
+    String[] files;
+    // listFiles throws IOException
+    files = pinotFs.listFiles(fileUri, searchRecrusively);
+    //TODO: sort input files based on creation time
+    PathMatcher includeFilePathMatcher = null;
+    if (includePattern != null) {
+      includeFilePathMatcher = FileSystems.getDefault().getPathMatcher(includePattern);
+    }
+    PathMatcher excludeFilePathMatcher = null;
+    if (excludePattern != null) {
+      excludeFilePathMatcher = FileSystems.getDefault().getPathMatcher(excludePattern);
+    }
+    List<String> filteredFiles = new ArrayList<>();
+    for (String file : files) {
+      if (includeFilePathMatcher != null) {
+        if (!includeFilePathMatcher.matches(Paths.get(file))) {
+          continue;
+        }
+      }
+      if (excludeFilePathMatcher != null) {
+        if (excludeFilePathMatcher.matches(Paths.get(file))) {
+          continue;
+        }
+      }
+      if (!pinotFs.isDirectory(new URI(file))) {
+        // In case PinotFS implementations list files without a scheme (e.g. hdfs://), then we may lose it in the
+        // input file path. Call SegmentGenerationUtils.getFileURI() to fix this up.
+        // getFileURI throws URISyntaxException
+        filteredFiles.add(SegmentGenerationUtils.getFileURI(file, fileUri).toString());
+      }
+    }
+    if (filteredFiles.isEmpty()) {
+      throw new RuntimeException(String.format(
+          "No file found in the input directory: %s matching includeFileNamePattern: %s,"
+              + " excludeFileNamePattern: %s", fileUri, includePattern, excludePattern));
+    }
+    return filteredFiles;
   }
 }

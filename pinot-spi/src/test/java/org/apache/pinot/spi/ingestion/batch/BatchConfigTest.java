@@ -24,6 +24,7 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -47,7 +48,9 @@ public class BatchConfigTest {
     String recordReaderClass = "org.foo.CSVRecordReader";
     String recordReaderConfigClass = "org.foo.CSVRecordReaderConfig";
     String separator = "|";
+    String searchRecursively = "true";
     batchConfigMap.put(BatchConfigProperties.INPUT_DIR_URI, inputDir);
+    batchConfigMap.put(BatchConfigProperties.SEARCH_RECURSIVELY, searchRecursively);
     batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, outputDir);
     batchConfigMap.put(BatchConfigProperties.INPUT_FS_CLASS, inputFsClass);
     batchConfigMap.put(BatchConfigProperties.OUTPUT_FS_CLASS, outputFsClass);
@@ -83,5 +86,6 @@ public class BatchConfigTest {
     assertEquals(batchConfig.getRecordReaderProps().get(BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".separator"),
         separator);
     assertEquals(batchConfig.getTableNameWithType(), tableName);
+    assertTrue(batchConfig.isSearchRecursively());
   }
 }

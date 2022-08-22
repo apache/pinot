@@ -28,6 +28,7 @@ public class BatchConfigProperties {
   public static final String TABLE_NAME = "tableName";
 
   public static final String INPUT_DIR_URI = "inputDirURI";
+  public static final String SEARCH_RECURSIVELY = "searchRecursively";
   public static final String OUTPUT_DIR_URI = "outputDirURI";
   public static final String INPUT_FS_CLASS = "input.fs.className";
   public static final String INPUT_FS_PROP_PREFIX = "input.fs.prop";

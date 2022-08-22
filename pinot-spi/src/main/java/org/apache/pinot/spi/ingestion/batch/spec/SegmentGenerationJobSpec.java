@@ -46,6 +46,10 @@ public class SegmentGenerationJobSpec implements Serializable {
   private String _inputDirURI;
 
   /**
+   * If true, search input files recursively from root directly specified in _inputDirURI.
+   */
+  private boolean _searchRecursively = false;
+  /**
    * include file name pattern, supported glob pattern.
    * Sample usage:
    *    'glob:*.avro' will include all avro files just under the inputDirURI, not sub directories;
@@ -161,6 +165,13 @@ public class SegmentGenerationJobSpec implements Serializable {
     _inputDirURI = inputDirURI;
   }
 
+  public boolean isSearchRecursively() {
+    return _searchRecursively;
+  }
+
+  public void setSearchRecursively(boolean searchRecursively) {
+    _searchRecursively = searchRecursively;
+  }
   public String getIncludeFileNamePattern() {
     return _includeFileNamePattern;
   }
