@@ -128,6 +128,7 @@ public class RealtimeConsumptionRateManagerTest {
 
   @Test
   public void testMetricEmitter() {
+
     // setup metric emitter
     double rateLimit = 2; // 2 msgs/sec = 120 msgs/min
     ServerMetrics serverMetrics = mock(ServerMetrics.class);
