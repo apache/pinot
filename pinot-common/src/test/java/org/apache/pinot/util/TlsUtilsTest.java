@@ -19,7 +19,10 @@
 package org.apache.pinot.util;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
@@ -28,8 +31,45 @@ public class TlsUtilsTest {
   @Test
   public void testTlsSettingsReference() throws Exception {
     PropertiesConfiguration props = new PropertiesConfiguration();
-    props.load(TlsUtilsTest.class.getClassLoader()
-        .getResourceAsStream("sample_broker_config.properties"));
+    props.load(TlsUtilsTest.class.getClassLoader().getResourceAsStream("sample_broker_config.properties"));
     PinotConfiguration configuration = new PinotConfiguration(props);
+    TlsConfig internalTls =
+        TlsUtils.extractTlsConfig(configuration, "pinot.broker.client.access.protocols.internal.tls");
+    Assert.assertEquals(internalTls.getKeyStorePath(), "/home/tls-store/keystore-internal.jks");
+    Assert.assertEquals(internalTls.getKeyStorePassword(), "first-secret");
+    Assert.assertEquals(internalTls.getKeyStoreType(), "JKS");
+    Assert.assertTrue(internalTls.isClientAuthEnabled());
+    Assert.assertEquals(internalTls.getTrustStorePath(), "/home/tls-store/truststore-internal.jks");
+    Assert.assertEquals(internalTls.getTrustStorePassword(), "second-secret");
+    Assert.assertEquals(internalTls.getTrustStoreType(), "JKS");
+
+    TlsConfig externalTls =
+        TlsUtils.extractTlsConfig(configuration, "pinot.broker.client.access.protocols.external.tls");
+    Assert.assertEquals(externalTls.getKeyStorePath(), "/home/tls-store/keystore-external.jks");
+    Assert.assertEquals(externalTls.getKeyStorePassword(), "third-secret");
+    Assert.assertEquals(externalTls.getKeyStoreType(), "PKCS");
+    Assert.assertFalse(externalTls.isClientAuthEnabled());
+    Assert.assertEquals(externalTls.getTrustStorePath(), "/home/tls-store/truststore-external.jks");
+    Assert.assertEquals(externalTls.getTrustStorePassword(), "forth-secret");
+    Assert.assertEquals(externalTls.getTrustStoreType(), "PKCS");
+
+    TlsConfig brokerTls = TlsUtils.extractTlsConfig(configuration, "pinot.broker.tls");
+    Assert.assertEquals(brokerTls.getKeyStorePath(), "/home/tls-store/keystore-internal.jks");
+    Assert.assertEquals(brokerTls.getKeyStorePassword(), "first-secret");
+    Assert.assertEquals(brokerTls.getKeyStoreType(), "JKS");
+    Assert.assertTrue(brokerTls.isClientAuthEnabled());
+    Assert.assertEquals(brokerTls.getTrustStorePath(), "/home/tls-store/truststore-internal.jks");
+    Assert.assertEquals(brokerTls.getTrustStorePassword(), "second-secret");
+    Assert.assertEquals(brokerTls.getTrustStoreType(), "JKS");
+  }
+
+  @Test(expectedExceptions = RuntimeException.class)
+  public void testTlsSettingsSelfReference()
+      throws Exception {
+    PropertiesConfiguration props = new PropertiesConfiguration();
+    props.load(TlsUtilsTest.class.getClassLoader().getResourceAsStream("sample_broker_config.properties"));
+    PinotConfiguration configuration = new PinotConfiguration(props);
+    TlsConfig internalTls = TlsUtils.extractTlsConfig(configuration, "pinot.shared.tls.bad_setting");
+    Assert.fail("should throw exception for circular reference");
   }
 }
