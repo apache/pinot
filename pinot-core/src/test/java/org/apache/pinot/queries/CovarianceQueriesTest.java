@@ -65,16 +65,18 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "CovarianceQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
+
+  // test segments 1-4 evenly divide testSegment into 4 distinct segments
   private static final String SEGMENT_NAME_1 = "testSegment1";
   private static final String SEGMENT_NAME_2 = "testSegment2";
   private static final String SEGMENT_NAME_3 = "testSegment3";
   private static final String SEGMENT_NAME_4 = "testSegment4";
 
   private static final int NUM_RECORDS = 2000;
+  private static final int NUM_GROUPS = 10;
   private static final int MAX_VALUE = 500;
   private static final double RELATIVE_EPSILON = 0.0001;
   private static final double DELTA = 0.0001;
-  private static final int NUM_GROUPS = 10;
 
   private static final String INT_COLUMN_X = "intColumnX";
   private static final String INT_COLUMN_Y = "intColumnY";
@@ -83,10 +85,6 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   private static final String LONG_COLUMN = "longColumn";
   private static final String FLOAT_COLUMN = "floatColumn";
   private static final String GROUP_BY_COLUMN = "groupByColumn";
-
-  // add a group by column with 10 groups across 2000 rows
-  // case 1: group by + cov called on this column => all covariances are 0's
-  // case 2: group by called on this column => compare results against java's cov func
 
   private static final Schema SCHEMA =
       new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN_X, FieldSpec.DataType.INT)
@@ -129,15 +127,14 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   private double _expectedCovDoubleFloat;
   private double _expectedCovLongFloat;
 
-  private CovarianceTuple[] _expectedGroupByResultVer1;
-  private CovarianceTuple[] _expectedGroupByResultVer2;
-  private double[] _expectedFinalResultVer1;
-  private double[] _expectedFinalResultVer2;
+  private CovarianceTuple[] _expectedGroupByResultVer1 = new CovarianceTuple[NUM_GROUPS];
+  private CovarianceTuple[] _expectedGroupByResultVer2 = new CovarianceTuple[NUM_GROUPS];
+  private double[] _expectedFinalResultVer1 = new double[NUM_GROUPS];
+  private double[] _expectedFinalResultVer2 = new double[NUM_GROUPS];
 
   @Override
   protected String getFilter() {
-    // TODO
-    return null;
+    return "where groupByColumn > 1000";
   }
 
   @Override
@@ -155,9 +152,9 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
 
-    // set up a single segment used for inner segment and inter identical segment test
-    Random rand = new Random();
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
+
+    Random rand = new Random();
     int[] intColX = rand.ints(NUM_RECORDS, -MAX_VALUE, MAX_VALUE).toArray();
     int[] intColY = rand.ints(NUM_RECORDS, -MAX_VALUE, MAX_VALUE).toArray();
     double[] doubleColX = rand.doubles(NUM_RECORDS, -MAX_VALUE, MAX_VALUE).toArray();
@@ -166,11 +163,6 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     double[] floatCol = new double[NUM_RECORDS];
     double[] groupByCol = new double[NUM_RECORDS];
 
-    // set up group by results
-    _expectedGroupByResultVer1 = new CovarianceTuple[NUM_GROUPS];
-    _expectedGroupByResultVer2 = new CovarianceTuple[NUM_GROUPS];
-    _expectedFinalResultVer1 = new double[NUM_GROUPS];
-    _expectedFinalResultVer2 = new double[NUM_GROUPS];
     int groupSize = NUM_RECORDS / NUM_GROUPS;
     double sumX = 0;
     double sumY = 0;
@@ -188,7 +180,7 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
       long longVal = longCol[i];
       float floatVal = -MAX_VALUE + rand.nextFloat() * 2 * MAX_VALUE;
 
-      // set up inner seg group by results
+      // set up inner segment group by results
       groupByVal = (int) Math.floor(i / groupSize);
       if (i % groupSize == 0 && groupByVal > 0) {
         _expectedGroupByResultVer1[groupByVal - 1] = new CovarianceTuple(sumX, sumGroupBy, sumXGroupBy, groupSize);
@@ -209,6 +201,7 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
       floatCol[i] = floatVal;
       groupByCol[i] = groupByVal;
 
+      // calculate inner segment results
       _sumIntX += intX;
       _sumIntY += intY;
       _sumDoubleX += doubleX;
@@ -236,6 +229,7 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     _expectedGroupByResultVer1[groupByVal] = new CovarianceTuple(sumX, sumGroupBy, sumXGroupBy, groupSize);
     _expectedGroupByResultVer2[groupByVal] = new CovarianceTuple(sumX, sumY, sumXY, groupSize);
 
+    // calculate inter segment result
     Covariance cov = new Covariance();
     double[] newIntColX = Arrays.stream(intColX).asDoubleStream().toArray();
     double[] newIntColY = Arrays.stream(intColY).asDoubleStream().toArray();
@@ -249,7 +243,7 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     _expectedCovDoubleFloat = cov.covariance(doubleColX, floatCol, false);
     _expectedCovLongFloat = cov.covariance(newLongCol, floatCol, false);
 
-    // set up group by final results
+    // calculate inter segment group by results
     for (int i = 0; i < NUM_GROUPS; i++) {
       double[] colX = Arrays.copyOfRange(doubleColX, i * groupSize, (i + 1) * groupSize);
       double[] colGroupBy = Arrays.copyOfRange(groupByCol, i * groupSize, (i + 1) * groupSize);
@@ -258,11 +252,13 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
       _expectedFinalResultVer2[i] = cov.covariance(colX, colY, false);
     }
 
+    // generate testSegment
     ImmutableSegment immutableSegment = setUpSingeSegment(records, SEGMENT_NAME);
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
 
-    // split the records into 4 distinct segments for distinct inter segment test
+    // divide testSegment into 4 distinct segments for distinct inter segment tests
+    // by doing so, we can avoid calculating global covariance again
     _instances = new ArrayList<>();
     int segmentSize = NUM_RECORDS / 4;
     ImmutableSegment immutableSegment1 = setUpSingeSegment(records.subList(0, segmentSize), SEGMENT_NAME_1);
@@ -272,13 +268,13 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
         setUpSingeSegment(records.subList(segmentSize * 2, segmentSize * 3), SEGMENT_NAME_3);
     ImmutableSegment immutableSegment4 =
         setUpSingeSegment(records.subList(segmentSize * 3, NUM_RECORDS), SEGMENT_NAME_4);
+    // generate 2 instances each with 2 distinct segments
     _instances.add(Arrays.asList(immutableSegment1, immutableSegment2));
     _instances.add(Arrays.asList(immutableSegment3, immutableSegment4));
   }
 
   private ImmutableSegment setUpSingeSegment(List<GenericRow> recordSet, String segmentName)
       throws Exception {
-
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(segmentName);
@@ -289,7 +285,6 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     driver.build();
 
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName), ReadMode.mmap);
-
     return immutableSegment;
   }
 
@@ -338,6 +333,7 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   public void testAggregationGroupBy() {
 
     // Inner Segment
+    // case 1: cov_pop(col1, groupByCol) group by groupByCol => all covariances are 0's
     String query =
         "SELECT COV_POP(doubleColumnX, groupByColumn) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
     Object operator = getOperator(query);
@@ -361,6 +357,7 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     checkGroupByResults(brokerResponse, _expectedFinalResultVer1);
 
     // Inner Segment
+    // case 2: cov_pop(col1, col2) group by groupByCol => nondeterministic cov
     query = "SELECT COV_POP(doubleColumnX, doubleColumnY) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
     operator = getOperator(query);
     assertTrue(operator instanceof AggregationGroupByOrderByOperator);
