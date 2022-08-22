@@ -266,14 +266,18 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     _instances = new ArrayList<>();
     int segmentSize = NUM_RECORDS / 4;
     ImmutableSegment immutableSegment1 = setUpSingeSegment(records.subList(0, segmentSize), SEGMENT_NAME_1);
-    ImmutableSegment immutableSegment2 = setUpSingeSegment(records.subList(segmentSize, segmentSize * 2), SEGMENT_NAME_2);
-    ImmutableSegment immutableSegment3 = setUpSingeSegment(records.subList(segmentSize * 2, segmentSize * 3), SEGMENT_NAME_3);
-    ImmutableSegment immutableSegment4 = setUpSingeSegment(records.subList(segmentSize * 3, NUM_RECORDS), SEGMENT_NAME_4);
+    ImmutableSegment immutableSegment2 =
+        setUpSingeSegment(records.subList(segmentSize, segmentSize * 2), SEGMENT_NAME_2);
+    ImmutableSegment immutableSegment3 =
+        setUpSingeSegment(records.subList(segmentSize * 2, segmentSize * 3), SEGMENT_NAME_3);
+    ImmutableSegment immutableSegment4 =
+        setUpSingeSegment(records.subList(segmentSize * 3, NUM_RECORDS), SEGMENT_NAME_4);
     _instances.add(Arrays.asList(immutableSegment1, immutableSegment2));
     _instances.add(Arrays.asList(immutableSegment3, immutableSegment4));
   }
 
-  private ImmutableSegment setUpSingeSegment(List<GenericRow> recordSet, String segmentName) throws Exception {
+  private ImmutableSegment setUpSingeSegment(List<GenericRow> recordSet, String segmentName)
+      throws Exception {
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);

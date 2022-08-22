@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.annotation.Nullable;
-import javax.xml.crypto.Data;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -203,11 +202,13 @@ public abstract class BaseQueriesTest {
     return getBrokerResponseDistinctInstance(query, PLAN_MAKER, instances);
   }
 
-  private BrokerResponseNative getBrokerResponseDistinctInstance(String query, PlanMaker planMaker, List<List<IndexSegment>> instances) {
+  private BrokerResponseNative getBrokerResponseDistinctInstance(String query, PlanMaker planMaker,
+      List<List<IndexSegment>> instances) {
     return getBrokerResponseDistinctInstance(query, PLAN_MAKER, instances, null);
   }
 
-  private BrokerResponseNative getBrokerResponseDistinctInstance(String query, PlanMaker planMaker, List<List<IndexSegment>> instances, @Nullable Map<String, String> extraQueryOptions) {
+  private BrokerResponseNative getBrokerResponseDistinctInstance(String query, PlanMaker planMaker,
+      List<List<IndexSegment>> instances, @Nullable Map<String, String> extraQueryOptions) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     if (extraQueryOptions != null) {
       Map<String, String> queryOptions = pinotQuery.getQueryOptions();
@@ -220,7 +221,8 @@ public abstract class BaseQueriesTest {
     return getBrokerResponseDistinctInstance(pinotQuery, planMaker, instances);
   }
 
-  private BrokerResponseNative getBrokerResponseDistinctInstance(PinotQuery pinotQuery, PlanMaker planMaker, List<List<IndexSegment>> instances) {
+  private BrokerResponseNative getBrokerResponseDistinctInstance(PinotQuery pinotQuery, PlanMaker planMaker,
+      List<List<IndexSegment>> instances) {
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
     QueryContext serverQueryContext =
