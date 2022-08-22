@@ -77,8 +77,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   private final QueryScheduler _queryScheduler;
   private final ServerMetrics _serverMetrics;
   private final AccessControl _accessControl;
-  private final boolean _enableQueryCancellation;
-  private final Map<String, Future<byte[]>> _queryFuturesById = new ConcurrentHashMap<>();
+  private final Map<String, Future<byte[]>> _queryFuturesById;
 
   public InstanceRequestHandler(String instanceName, PinotConfiguration config, QueryScheduler queryScheduler,
       ServerMetrics serverMetrics, AccessControl accessControl) {
@@ -91,10 +90,11 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     } catch (TTransportException e) {
       throw new RuntimeException("Failed to initialize Thrift Deserializer", e);
     }
-    _enableQueryCancellation =
-        Boolean.parseBoolean(config.getProperty(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION));
-    if (_enableQueryCancellation) {
+    if (Boolean.parseBoolean(config.getProperty(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION))) {
+      _queryFuturesById = new ConcurrentHashMap<>();
       LOGGER.info("Enable query cancellation");
+    } else {
+      _queryFuturesById = null;
     }
   }
 
@@ -163,7 +163,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   void submitQuery(ServerQueryRequest queryRequest, ChannelHandlerContext ctx, String tableNameWithType,
       long queryArrivalTimeMs, InstanceRequest instanceRequest) {
     ListenableFuture<byte[]> future = _queryScheduler.submit(queryRequest);
-    if (_enableQueryCancellation) {
+    if (_queryFuturesById != null) {
       String queryId = queryRequest.getQueryId();
       // Track the running query for cancellation.
       if (LOGGER.isDebugEnabled()) {
@@ -181,7 +181,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     return new FutureCallback<byte[]>() {
       @Override
       public void onSuccess(@Nullable byte[] responseBytes) {
-        if (_enableQueryCancellation) {
+        if (_queryFuturesById != null) {
           String queryId = queryRequest.getQueryId();
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Remove track of running query: {} on success", queryId);
@@ -200,7 +200,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
 
       @Override
       public void onFailure(Throwable t) {
-        if (_enableQueryCancellation) {
+        if (_queryFuturesById != null) {
           String queryId = queryRequest.getQueryId();
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Remove track of running query: {} on failure", queryId);
@@ -208,15 +208,20 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
           _queryFuturesById.remove(queryId);
         }
         // Send exception response.
-        Exception ex = new Exception(t);
-        if (t instanceof CancellationException) {
-          LOGGER.info("Query: {} got cancelled", queryRequest.getQueryId());
-          ex = (Exception) t;
+        Exception e;
+        if (t instanceof Exception) {
+          e = (Exception) t;
+          if (e instanceof CancellationException) {
+            LOGGER.info("Query: {} got cancelled", queryRequest.getQueryId());
+          } else {
+            LOGGER.error("Exception while processing instance request", e);
+          }
         } else {
-          LOGGER.error("Exception while processing instance request", t);
+          LOGGER.error("Error while processing instance request", t);
+          e = new Exception(t);
         }
         sendErrorResponse(ctx, instanceRequest.getRequestId(), tableNameWithType, queryArrivalTimeMs,
-            DataTableFactory.getEmptyDataTable(), ex);
+            DataTableFactory.getEmptyDataTable(), e);
       }
     };
   }
@@ -239,7 +244,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
    * @return true if a running query exists for the given queryId.
    */
   public boolean cancelQuery(String queryId) {
-    Preconditions.checkArgument(_enableQueryCancellation, "Query cancellation is not enabled on server");
+    Preconditions.checkState(_queryFuturesById != null, "Query cancellation is not enabled on server");
     // Keep the future as it'll be cleaned up by the thread executing the query.
     Future<byte[]> future = _queryFuturesById.get(queryId);
     if (future == null) {
@@ -259,7 +264,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
    * @return list of ids of the queries currently running on the server.
    */
   public Set<String> getRunningQueryIds() {
-    Preconditions.checkArgument(_enableQueryCancellation, "Query cancellation is not enabled on server");
+    Preconditions.checkState(_queryFuturesById != null, "Query cancellation is not enabled on server");
     return new HashSet<>(_queryFuturesById.keySet());
   }
 

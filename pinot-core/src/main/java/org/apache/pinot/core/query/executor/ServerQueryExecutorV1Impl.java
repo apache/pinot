@@ -252,7 +252,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         LOGGER.info("Caught BadQueryRequestException while processing requestId: {}, {}", requestId, e.getMessage());
         dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       } else if (e instanceof QueryCancelledException) {
-        LOGGER.info("Cancelled while processing requestId: {}, {}", requestId, e.getMessage());
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Cancelled while processing requestId: {}", requestId, e);
+        } else {
+          LOGGER.info("Cancelled while processing requestId: {}, {}", requestId, e.getMessage());
+        }
         // NOTE most likely the onFailure() callback registered on query future in InstanceRequestHandler would
         // return the error table to broker sooner than here. But in case of race condition, we construct the error
         // table here too.

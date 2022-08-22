@@ -80,7 +80,7 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator {
         return new MinMaxValueBasedSelectionOrderByCombineOperator(_operators, _queryContext, _executorService)
             .getNextBlock();
       } catch (QueryCancelledException e) {
-        throw new QueryCancelledException("Cancelled while running MinMaxValueBasedSelectionOrderByCombineOperator", e);
+        throw e;
       } catch (Exception e) {
         LOGGER.warn("Caught exception while using min/max value based combine, using the default combine", e);
       }

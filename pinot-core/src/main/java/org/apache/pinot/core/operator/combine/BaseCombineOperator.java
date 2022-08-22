@@ -119,8 +119,8 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     IntermediateResultsBlock mergedBlock;
     try {
       mergedBlock = mergeResults();
-    } catch (InterruptedException ie) {
-      throw new QueryCancelledException("Cancelled while merging results blocks", ie);
+    } catch (InterruptedException e) {
+      throw new QueryCancelledException("Cancelled while merging results blocks", e);
     } catch (Exception e) {
       LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
       mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
