@@ -70,7 +70,7 @@ public final class TlsUtils {
   private static final String TRUSTSTORE_PATH = "truststore.path";
   private static final String TRUSTSTORE_PASSWORD = "truststore.password";
   private static final String SSL_PROVIDER = "ssl.provider";
-  private static final String TLS_REF="ref";
+  private static final String TLS_REF = "ref";
   private static final String SHARED_TLS_PREFIX = "pinot.shared.tls";
 
   private static final AtomicReference<SSLContext> SSL_CONTEXT_REF = new AtomicReference<>();
