@@ -65,10 +65,15 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "CovarianceQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
+  private static final String SEGMENT_NAME_1 = "testSegment1";
+  private static final String SEGMENT_NAME_2 = "testSegment2";
+  private static final String SEGMENT_NAME_3 = "testSegment3";
+  private static final String SEGMENT_NAME_4 = "testSegment4";
 
   private static final int NUM_RECORDS = 2000;
   private static final int MAX_VALUE = 500;
-  private static final double RELATIVE_EPSILON = 0.00001;
+  private static final double RELATIVE_EPSILON = 0.0001;
+  private static final double DELTA = 0.0001;
   private static final int NUM_GROUPS = 10;
 
   private static final String INT_COLUMN_X = "intColumnX";
@@ -96,6 +101,7 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
+  private List<List<IndexSegment>> _instances;
   private int _sumIntX = 0;
   private int _sumIntY = 0;
   private int _sumIntXY = 0;
@@ -148,6 +154,8 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   public void setUp()
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
+
+    // set up a single segment used for inner segment and inter identical segment test
     Random rand = new Random();
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
     int[] intColX = rand.ints(NUM_RECORDS, -MAX_VALUE, MAX_VALUE).toArray();
@@ -200,6 +208,13 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
 
       floatCol[i] = floatVal;
       groupByCol[i] = groupByVal;
+
+      _sumIntX += intX;
+      _sumIntY += intY;
+      _sumDoubleX += doubleX;
+      _sumDoubleY += doubleY;
+      _sumLong += longVal;
+      _sumFloat += floatVal;
       _sumIntXY += intX * intY;
       _sumDoubleXY += doubleX * doubleY;
       _sumIntDouble += intX * doubleX;
@@ -220,13 +235,6 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     }
     _expectedGroupByResultVer1[groupByVal] = new CovarianceTuple(sumX, sumGroupBy, sumXGroupBy, groupSize);
     _expectedGroupByResultVer2[groupByVal] = new CovarianceTuple(sumX, sumY, sumXY, groupSize);
-
-    _sumIntX = Arrays.stream(intColX).sum();
-    _sumIntY = Arrays.stream(intColY).sum();
-    _sumDoubleX = Arrays.stream(doubleColX).sum();
-    _sumDoubleY = Arrays.stream(doubleColY).sum();
-    _sumLong = Arrays.stream(longCol).sum();
-    _sumFloat = Arrays.stream(floatCol).sum();
 
     Covariance cov = new Covariance();
     double[] newIntColX = Arrays.stream(intColX).asDoubleStream().toArray();
@@ -250,18 +258,35 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
       _expectedFinalResultVer2[i] = cov.covariance(colX, colY, false);
     }
 
+    ImmutableSegment immutableSegment = setUpSingeSegment(records, SEGMENT_NAME);
+    _indexSegment = immutableSegment;
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+
+    // split the records into 4 distinct segments for distinct inter segment test
+    _instances = new ArrayList<>();
+    int segmentSize = NUM_RECORDS / 4;
+    ImmutableSegment immutableSegment1 = setUpSingeSegment(records.subList(0, segmentSize), SEGMENT_NAME_1);
+    ImmutableSegment immutableSegment2 = setUpSingeSegment(records.subList(segmentSize, segmentSize * 2), SEGMENT_NAME_2);
+    ImmutableSegment immutableSegment3 = setUpSingeSegment(records.subList(segmentSize * 2, segmentSize * 3), SEGMENT_NAME_3);
+    ImmutableSegment immutableSegment4 = setUpSingeSegment(records.subList(segmentSize * 3, NUM_RECORDS), SEGMENT_NAME_4);
+    _instances.add(Arrays.asList(immutableSegment1, immutableSegment2));
+    _instances.add(Arrays.asList(immutableSegment3, immutableSegment4));
+  }
+
+  private ImmutableSegment setUpSingeSegment(List<GenericRow> recordSet, String segmentName) throws Exception {
+
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
-    segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
+    segmentGeneratorConfig.setSegmentName(segmentName);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(recordSet));
     driver.build();
 
-    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.mmap);
-    _indexSegment = immutableSegment;
-    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName), ReadMode.mmap);
+
+    return immutableSegment;
   }
 
   @Test
@@ -288,27 +313,26 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
         NUM_RECORDS);
     checkWithPrecision((CovarianceTuple) aggregationResult.get(7), _sumLong, _sumFloat, _sumLongFloat, NUM_RECORDS);
 
-    // Inter segments
+    // Inter segments with 4 identical segments (2 instances each having 2 identical segments)
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
     assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
     assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 6 * NUM_RECORDS);
     assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
-    Object[] results = brokerResponse.getResultTable().getRows().get(0);
-    assertEquals(results.length, 8);
-    // Cov results should be the same as if there's only one segment
-    assertTrue(Precision.equalsWithRelativeTolerance((double) results[0], _expectedCovIntXY, RELATIVE_EPSILON));
-    assertTrue(Precision.equalsWithRelativeTolerance((double) results[1], _expectedCovDoubleXY, RELATIVE_EPSILON));
-    assertTrue(Precision.equalsWithRelativeTolerance((double) results[2], _expectedCovIntDouble, RELATIVE_EPSILON));
-    assertTrue(Precision.equalsWithRelativeTolerance((double) results[3], _expectedCovIntLong, RELATIVE_EPSILON));
-    assertTrue(Precision.equalsWithRelativeTolerance((double) results[4], _expectedCovIntFloat, RELATIVE_EPSILON));
-    assertTrue(Precision.equalsWithRelativeTolerance((double) results[5], _expectedCovDoubleLong, RELATIVE_EPSILON));
-    assertTrue(Precision.equalsWithRelativeTolerance((double) results[6], _expectedCovDoubleFloat, RELATIVE_EPSILON));
-    assertTrue(Precision.equalsWithRelativeTolerance((double) results[7], _expectedCovLongFloat, RELATIVE_EPSILON));
+    checkResultTableWithPrecision(brokerResponse);
+
+    // Inter segments with 4 distinct segments (2 instances each having 2 distinct segments)
+    brokerResponse = getBrokerResponseDistinctInstance(query, _instances);
+    assertEquals(brokerResponse.getNumDocsScanned(), NUM_RECORDS);
+    assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
+    assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 6 * NUM_RECORDS);
+    assertEquals(brokerResponse.getTotalDocs(), NUM_RECORDS);
+    checkResultTableWithPrecision(brokerResponse);
   }
 
   @Test
   public void testAggregationGroupBy() {
+
     // Inner Segment
     String query =
         "SELECT COV_POP(doubleColumnX, groupByColumn) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
@@ -319,21 +343,18 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
         NUM_RECORDS * 2, NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
-
     for (int i = 0; i < NUM_GROUPS; i++) {
       CovarianceTuple actualCovTuple = (CovarianceTuple) aggregationGroupByResult.getResultForGroupId(0, i);
       CovarianceTuple expectedCovTuple = _expectedGroupByResultVer1[i];
       checkWithPrecision(actualCovTuple, expectedCovTuple);
     }
 
-    // Inter Segment
+    // Inter Segment with 4 identical segments
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    List<Object[]> rows = resultTable.getRows();
-    for (int i = 0; i < NUM_GROUPS; i++) {
-      Precision.equalsWithRelativeTolerance((double) rows.get(i)[0], _expectedFinalResultVer1[i], RELATIVE_EPSILON);
-      Precision.equals((double) rows.get(i)[0], _expectedFinalResultVer2[i], 0.0001);
-    }
+    checkGroupByResults(brokerResponse, _expectedFinalResultVer1);
+    // Inter Segment with 4 distinct segments
+    brokerResponse = getBrokerResponseDistinctInstance(query, _instances);
+    checkGroupByResults(brokerResponse, _expectedFinalResultVer1);
 
     // Inner Segment
     query = "SELECT COV_POP(doubleColumnX, doubleColumnY) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
@@ -351,14 +372,12 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
       checkWithPrecision(actualCovTuple, expectedCovTuple);
     }
 
-    // Inter Segment
+    // Inter Segment with 4 identical segments
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
-    for (int i = 0; i < NUM_GROUPS; i++) {
-      Precision.equalsWithRelativeTolerance((double) rows.get(i)[0], _expectedFinalResultVer2[i], RELATIVE_EPSILON);
-      Precision.equals((double) rows.get(i)[0], _expectedFinalResultVer2[i], 0.0001);
-    }
+    checkGroupByResults(brokerResponse, _expectedFinalResultVer2);
+    // Inter Segment with 4 distinct segments
+    brokerResponse = getBrokerResponseDistinctInstance(query, _instances);
+    checkGroupByResults(brokerResponse, _expectedFinalResultVer2);
   }
 
   private void checkWithPrecision(CovarianceTuple tuple, double sumX, double sumY, double sumXY, int count) {
@@ -372,10 +391,36 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     checkWithPrecision(actual, expected.getSumX(), expected.getSumY(), expected.getSumXY(), (int) expected.getCount());
   }
 
+  private void checkResultTableWithPrecision(BrokerResponseNative brokerResponse) {
+    Object[] results = brokerResponse.getResultTable().getRows().get(0);
+    assertEquals(results.length, 8);
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[0], _expectedCovIntXY, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[1], _expectedCovDoubleXY, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[2], _expectedCovIntDouble, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[3], _expectedCovIntLong, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[4], _expectedCovIntFloat, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[5], _expectedCovDoubleLong, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[6], _expectedCovDoubleFloat, RELATIVE_EPSILON));
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[7], _expectedCovLongFloat, RELATIVE_EPSILON));
+  }
+
+  private void checkGroupByResults(BrokerResponseNative brokerResponse, double[] expectedResults) {
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    for (int i = 0; i < NUM_GROUPS; i++) {
+      assertTrue(Precision.equals((double) rows.get(i)[0], expectedResults[i], DELTA));
+    }
+  }
+
   @AfterClass
   public void tearDown()
       throws IOException {
     _indexSegment.destroy();
+    for (List<IndexSegment> indexList : _instances) {
+      for (IndexSegment seg : indexList) {
+        seg.destroy();
+      }
+    }
     FileUtils.deleteDirectory(INDEX_DIR);
   }
 }

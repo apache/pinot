@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.annotation.Nullable;
+import javax.xml.crypto.Data;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -196,5 +197,68 @@ public abstract class BaseQueriesTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     OPTIMIZER.optimize(pinotQuery, config, schema);
     return getBrokerResponse(pinotQuery, PLAN_MAKER);
+  }
+
+  protected BrokerResponseNative getBrokerResponseDistinctInstance(String query, List<List<IndexSegment>> instances) {
+    return getBrokerResponseDistinctInstance(query, PLAN_MAKER, instances);
+  }
+
+  private BrokerResponseNative getBrokerResponseDistinctInstance(String query, PlanMaker planMaker, List<List<IndexSegment>> instances) {
+    return getBrokerResponseDistinctInstance(query, PLAN_MAKER, instances, null);
+  }
+
+  private BrokerResponseNative getBrokerResponseDistinctInstance(String query, PlanMaker planMaker, List<List<IndexSegment>> instances, @Nullable Map<String, String> extraQueryOptions) {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    if (extraQueryOptions != null) {
+      Map<String, String> queryOptions = pinotQuery.getQueryOptions();
+      if (queryOptions == null) {
+        queryOptions = new HashMap<>();
+        pinotQuery.setQueryOptions(queryOptions);
+      }
+      queryOptions.putAll(extraQueryOptions);
+    }
+    return getBrokerResponseDistinctInstance(pinotQuery, planMaker, instances);
+  }
+
+  private BrokerResponseNative getBrokerResponseDistinctInstance(PinotQuery pinotQuery, PlanMaker planMaker, List<List<IndexSegment>> instances) {
+    PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+    QueryContext serverQueryContext =
+        serverPinotQuery == pinotQuery ? queryContext : QueryContextConverterUtils.getQueryContext(serverPinotQuery);
+
+    // Server side
+    serverQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    Plan plan1 = planMaker.makeInstancePlan(instances.get(0), serverQueryContext, EXECUTOR_SERVICE, null);
+    Plan plan2 = planMaker.makeInstancePlan(instances.get(1), serverQueryContext, EXECUTOR_SERVICE, null);
+
+    DataTable instanceResponse1 =
+        queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan1) : plan1.execute();
+    DataTable instanceResponse2 =
+        queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan2) : plan2.execute();
+
+    // Broker side
+    // Use 2 Threads for 2 data-tables
+    BrokerReduceService brokerReduceService = new BrokerReduceService(new PinotConfiguration(
+        Collections.singletonMap(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
+    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    try {
+      // For multi-threaded BrokerReduceService, we cannot reuse the same data-table
+      byte[] serializedResponse1 = instanceResponse1.toBytes();
+      byte[] serializedResponse2 = instanceResponse2.toBytes();
+      dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE),
+          DataTableFactory.getDataTable(serializedResponse1));
+      dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),
+          DataTableFactory.getDataTable(serializedResponse2));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
+    BrokerRequest serverBrokerRequest =
+        serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
+    BrokerResponseNative brokerResponse =
+        brokerReduceService.reduceOnDataTable(brokerRequest, serverBrokerRequest, dataTableMap,
+            CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
+    brokerReduceService.shutDown();
+    return brokerResponse;
   }
 }
