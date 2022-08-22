@@ -47,7 +47,6 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.methods.DeleteMethod;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -781,25 +780,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     boolean enableClientIpLogging = _config.getProperty(Broker.CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING,
         Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING);
-    String clientIp = "unknown";
-    // If reverse proxy is used X-Forwarded-For will be populated
-    // If X-Forwarded-For is not present, check if x-real-ip is present
-    // Since X-Forwarded-For can contain comma separated list of values, we convert it to ";" delimiter to avoid
-    // downstream parsing errors for other fields where "," is being used
+    String clientIp = CommonConstants.UNKNOWN;
     if (enableClientIpLogging && requesterIdentity != null) {
-      for (Map.Entry<String, String> entry : ((HttpRequesterIdentity) requesterIdentity).getHttpHeaders().entries()) {
-        String key = entry.getKey();
-        String value = entry.getValue();
-        if (key.equalsIgnoreCase("x-forwarded-for")) {
-          if (value.contains(",")) {
-            clientIp = String.join(";", value.split(","));
-          } else {
-            clientIp = value;
-          }
-        } else if (key.equalsIgnoreCase("x-real-ip")) {
-          clientIp = value;
-        }
-      }
+        clientIp = requesterIdentity.getClientIp();
     }
 
     // Please keep the format as name=value comma-separated with no spaces
