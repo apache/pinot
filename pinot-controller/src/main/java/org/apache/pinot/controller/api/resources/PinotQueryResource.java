@@ -103,7 +103,7 @@ public class PinotQueryResource {
         queryOptions = requestJson.get("queryOptions").asText();
       }
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
-      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -116,7 +116,7 @@ public class PinotQueryResource {
       @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
-      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -124,12 +124,12 @@ public class PinotQueryResource {
   }
 
   private String executeSqlQuery(@Context HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
-      String queryOptions)
+      String queryOptions, String endpointUrl)
       throws Exception {
     if (queryOptions != null && queryOptions.contains(QueryOptionKey.USE_MULTISTAGE_ENGINE)) {
       if (_controllerConf.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED,
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
-        return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders);
+        return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, endpointUrl);
       } else {
         throw new UnsupportedOperationException("V2 Multi-Stage query engine not enabled. "
             + "Please see https://docs.pinot.apache.org/ for instruction to enable V2 engine.");
@@ -139,7 +139,8 @@ public class PinotQueryResource {
       PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
       switch (sqlType) {
         case DQL:
-          return getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
+          return getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders,
+              endpointUrl);
         case DML:
           Map<String, String> headers =
               httpHeaders.getRequestHeaders().entrySet().stream().filter(entry -> !entry.getValue().isEmpty())
@@ -152,12 +153,13 @@ public class PinotQueryResource {
     }
   }
 
-  private String getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders) {
+  private String getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders,
+      String endpointUrl) {
 
     // Validate data access
     // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(null, AccessType.READ, httpHeaders, null)) {
+    if (!accessControl.hasAccess(null, AccessType.READ, httpHeaders, endpointUrl)) {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 
@@ -180,7 +182,7 @@ public class PinotQueryResource {
   }
 
   private String getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled, String queryOptions,
-      HttpHeaders httpHeaders) {
+      HttpHeaders httpHeaders, String endpointUrl) {
     // Get resource table name.
     String tableName;
     try {
@@ -196,7 +198,7 @@ public class PinotQueryResource {
 
     // Validate data access
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, null)) {
+    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, endpointUrl)) {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 
