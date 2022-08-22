@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.combine;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
@@ -41,7 +40,6 @@ public class DistinctCombineOperator extends BaseCombineOperator {
     _hasOrderBy = queryContext.getOrderByExpressions() != null;
   }
 
-
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
@@ -52,29 +50,24 @@ public class DistinctCombineOperator extends BaseCombineOperator {
     if (_hasOrderBy) {
       return false;
     }
-    List<Object> result = resultsBlock.getAggregationResult();
-    assert result != null && result.size() == 1 && result.get(0) instanceof DistinctTable;
-    DistinctTable distinctTable = (DistinctTable) result.get(0);
+    DistinctTable distinctTable = resultsBlock.getDistinctTable();
+    assert distinctTable != null;
     return distinctTable.size() >= _queryContext.getLimit();
   }
 
   @Override
   protected void mergeResultsBlocks(IntermediateResultsBlock mergedBlock, IntermediateResultsBlock blockToMerge) {
-    // TODO: Use a separate way to represent DISTINCT instead of aggregation.
-    List<Object> mergedResults = mergedBlock.getAggregationResult();
-    assert mergedResults != null && mergedResults.size() == 1 && mergedResults.get(0) instanceof DistinctTable;
-    DistinctTable mergedDistinctTable = (DistinctTable) mergedResults.get(0);
-
-    List<Object> resultsToMerge = blockToMerge.getAggregationResult();
-    assert resultsToMerge != null && resultsToMerge.size() == 1 && resultsToMerge.get(0) instanceof DistinctTable;
-    DistinctTable distinctTableToMerge = (DistinctTable) resultsToMerge.get(0);
+    DistinctTable mergedDistinctTable = mergedBlock.getDistinctTable();
+    DistinctTable distinctTableToMerge = blockToMerge.getDistinctTable();
+    assert mergedDistinctTable != null && distinctTableToMerge != null;
 
     // Convert the merged table into a main table if necessary in order to merge other tables
     if (!mergedDistinctTable.isMainTable()) {
-      DistinctTable mainDistinctTable = new DistinctTable(distinctTableToMerge.getDataSchema(),
-          _queryContext.getOrderByExpressions(), _queryContext.getLimit(), _queryContext.isNullHandlingEnabled());
+      DistinctTable mainDistinctTable =
+          new DistinctTable(distinctTableToMerge.getDataSchema(), _queryContext.getOrderByExpressions(),
+              _queryContext.getLimit(), _queryContext.isNullHandlingEnabled());
       mainDistinctTable.mergeTable(mergedDistinctTable);
-      mergedBlock.setAggregationResults(Collections.singletonList(mainDistinctTable));
+      mergedBlock.setDistinctTable(mainDistinctTable);
       mergedDistinctTable = mainDistinctTable;
     }
 

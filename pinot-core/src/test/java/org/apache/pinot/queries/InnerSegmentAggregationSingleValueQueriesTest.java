@@ -18,21 +18,11 @@
  */
 package org.apache.pinot.queries;
 
-import java.util.List;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
-import org.apache.pinot.core.operator.query.DistinctOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
-import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.testng.annotations.Test;
-
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
 
 
 @SuppressWarnings("ConstantConditions")
@@ -181,64 +171,5 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(), new Object[]{
         1361199163, 178133991, 296467636, 788414092, 1719301234, "P", "MaztCmmxxgguBUxPti", 1284373442, 752388855
     }, 1L, 1361199163L, 178133991, 296467636, 788414092L, 1L);
-  }
-
-  /**
-   * Test DISTINCT on single column single segment. Since the dataset
-   * is Avro files, the only thing we currently check
-   * for correctness is the actual number of DISTINCT
-   * records returned
-   */
-  @Test
-  public void testSingleColumnDistinct() {
-    String query = "SELECT DISTINCT column1 FROM testTable LIMIT 1000000";
-    BaseOperator<IntermediateResultsBlock> distinctOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = distinctOperator.nextBlock();
-    List<Object> operatorResult = resultsBlock.getAggregationResult();
-
-    assertEquals(operatorResult.size(), 1);
-    assertTrue(operatorResult.get(0) instanceof DistinctTable);
-
-    DistinctTable distinctTable = (DistinctTable) operatorResult.get(0);
-    assertEquals(distinctTable.size(), 6582);
-
-    DataSchema dataSchema = distinctTable.getDataSchema();
-    assertEquals(dataSchema.getColumnNames(), new String[]{"column1"});
-    assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
-
-    for (Record record : distinctTable.getRecords()) {
-      assertNotNull(record);
-      assertEquals(record.getValues().length, 1);
-    }
-  }
-
-  /**
-   * Test DISTINCT on multiple column single segment. Since the dataset
-   * is Avro files, the only thing we currently check
-   * for correctness is the actual number of DISTINCT
-   * records returned
-   */
-  @Test
-  public void testMultiColumnDistinct() {
-    String query = "SELECT DISTINCT column1, column3 FROM testTable LIMIT 1000000";
-    DistinctOperator distinctOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = distinctOperator.nextBlock();
-    List<Object> operatorResult = resultsBlock.getAggregationResult();
-
-    assertEquals(operatorResult.size(), 1);
-    assertTrue(operatorResult.get(0) instanceof DistinctTable);
-
-    DistinctTable distinctTable = (DistinctTable) operatorResult.get(0);
-    assertEquals(distinctTable.size(), 21968);
-
-    DataSchema dataSchema = distinctTable.getDataSchema();
-    assertEquals(dataSchema.getColumnNames(), new String[]{"column1", "column3"});
-    assertEquals(dataSchema.getColumnDataTypes(),
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
-
-    for (Record record : distinctTable.getRecords()) {
-      assertNotNull(record);
-      assertEquals(record.getValues().length, 2);
-    }
   }
 }

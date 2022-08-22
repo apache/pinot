@@ -43,7 +43,9 @@ import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
+import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.NullValueUtils;
@@ -52,6 +54,8 @@ import org.roaringbitmap.RoaringBitmap;
 
 /**
  * The <code>IntermediateResultsBlock</code> class is the holder of the server side inter-segment results.
+ *
+ * TODO: Break it into segment level result and server level result
  */
 @SuppressWarnings("rawtypes")
 public class IntermediateResultsBlock implements Block {
@@ -61,8 +65,10 @@ public class IntermediateResultsBlock implements Block {
   private AggregationFunction[] _aggregationFunctions;
   private List<Object> _aggregationResult;
   private AggregationGroupByResult _aggregationGroupByResult;
-  private List<ProcessingException> _processingExceptions;
   private Collection<IntermediateRecord> _intermediateRecords;
+  private DistinctAggregationFunction _distinctFunction;
+  private DistinctTable _distinctTable;
+  private List<ProcessingException> _processingExceptions;
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
@@ -129,6 +135,17 @@ public class IntermediateResultsBlock implements Block {
     _nullHandlingEnabled = nullHandlingEnabled;
   }
 
+  /**
+   * Constructor for distinct result.
+   */
+  public IntermediateResultsBlock(DistinctAggregationFunction distinctFunction, DistinctTable distinctTable) {
+    _distinctFunction = distinctFunction;
+    _distinctTable = distinctTable;
+  }
+
+  /**
+   * Constructor for server level group-by result.
+   */
   public IntermediateResultsBlock(Table table, boolean nullHandlingEnabled) {
     _table = table;
     _dataSchema = table.getDataSchema();
@@ -190,6 +207,25 @@ public class IntermediateResultsBlock implements Block {
   @Nullable
   public AggregationGroupByResult getAggregationGroupByResult() {
     return _aggregationGroupByResult;
+  }
+
+  @Nullable
+  public Collection<IntermediateRecord> getIntermediateRecords() {
+    return _intermediateRecords;
+  }
+
+  @Nullable
+  public DistinctAggregationFunction getDistinctFunction() {
+    return _distinctFunction;
+  }
+
+  @Nullable
+  public DistinctTable getDistinctTable() {
+    return _distinctTable;
+  }
+
+  public void setDistinctTable(DistinctTable distinctTable) {
+    _distinctTable = distinctTable;
   }
 
   @Nullable
@@ -321,14 +357,6 @@ public class IntermediateResultsBlock implements Block {
     _queryHasMVSelectionOrderBy = queryHasMVSelectionOrderBy;
   }
 
-  /**
-   * Get the collection of intermediate records
-   */
-  @Nullable
-  public Collection<IntermediateRecord> getIntermediateRecords() {
-    return _intermediateRecords;
-  }
-
   public DataTable getDataTable()
       throws Exception {
 
@@ -345,6 +373,10 @@ public class IntermediateResultsBlock implements Block {
       return getAggregationResultDataTable();
     }
 
+    if (_distinctTable != null) {
+      return getDistinctResultDataTable();
+    }
+
     return getMetadataDataTable();
   }
 
@@ -359,8 +391,7 @@ public class IntermediateResultsBlock implements Block {
       Object[] colDefaultNullValues = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
         if (storedColumnDataTypes[colId] != ColumnDataType.OBJECT) {
-          colDefaultNullValues[colId] =
-              NullValueUtils.getDefaultNullValue(storedColumnDataTypes[colId].toDataType());
+          colDefaultNullValues[colId] = NullValueUtils.getDefaultNullValue(storedColumnDataTypes[colId].toDataType());
         }
         nullBitmaps[colId] = new RoaringBitmap();
       }
@@ -448,8 +479,8 @@ public class IntermediateResultsBlock implements Block {
 
   private DataTable getSelectionResultDataTable()
       throws Exception {
-    return attachMetadataToDataTable(SelectionOperatorUtils.getDataTableFromRows(
-        _selectionResult, _dataSchema, _nullHandlingEnabled));
+    return attachMetadataToDataTable(
+        SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _dataSchema, _nullHandlingEnabled));
   }
 
   private DataTable getAggregationResultDataTable()
@@ -537,6 +568,18 @@ public class IntermediateResultsBlock implements Block {
     return attachMetadataToDataTable(dataTable);
   }
 
+  private DataTable getDistinctResultDataTable()
+      throws IOException {
+    String[] columnNames = new String[]{_distinctFunction.getColumnName()};
+    ColumnDataType[] columnDataTypes = new ColumnDataType[]{ColumnDataType.OBJECT};
+    DataTableBuilder dataTableBuilder =
+        DataTableFactory.getDataTableBuilder(new DataSchema(columnNames, columnDataTypes));
+    dataTableBuilder.startRow();
+    dataTableBuilder.setColumn(0, _distinctTable);
+    dataTableBuilder.finishRow();
+    return attachMetadataToDataTable(dataTableBuilder.build());
+  }
+
   private DataTable getMetadataDataTable() {
     return attachMetadataToDataTable(DataTableFactory.getEmptyDataTable());
   }
@@ -549,10 +592,10 @@ public class IntermediateResultsBlock implements Block {
         .put(MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), String.valueOf(_numEntriesScannedPostFilter));
     dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), String.valueOf(_numSegmentsProcessed));
     dataTable.getMetadata().put(MetadataKey.NUM_SEGMENTS_MATCHED.getName(), String.valueOf(_numSegmentsMatched));
-    dataTable.getMetadata().put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(),
-        String.valueOf(_numConsumingSegmentsProcessed));
-    dataTable.getMetadata().put(MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName(),
-        String.valueOf(_numConsumingSegmentsMatched));
+    dataTable.getMetadata()
+        .put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), String.valueOf(_numConsumingSegmentsProcessed));
+    dataTable.getMetadata()
+        .put(MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName(), String.valueOf(_numConsumingSegmentsMatched));
     dataTable.getMetadata().put(MetadataKey.NUM_RESIZES.getName(), String.valueOf(_numResizes));
     dataTable.getMetadata().put(MetadataKey.RESIZE_TIME_MS.getName(), String.valueOf(_resizeTimeMs));
 

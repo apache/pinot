@@ -26,11 +26,9 @@ import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctExecutorFactory;
-import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
@@ -55,8 +53,8 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
     _distinctAggregationFunction = distinctAggregationFunction;
     _transformOperator = transformOperator;
     _queryContext = queryContext;
-    _distinctExecutor = DistinctExecutorFactory.getDistinctExecutor(
-        distinctAggregationFunction, transformOperator, _queryContext.isNullHandlingEnabled());
+    _distinctExecutor = DistinctExecutorFactory.getDistinctExecutor(distinctAggregationFunction, transformOperator,
+        _queryContext.isNullHandlingEnabled());
   }
 
   @Override
@@ -68,10 +66,7 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
         break;
       }
     }
-    DistinctTable distinctTable = _distinctExecutor.getResult();
-    // TODO: Use a separate way to represent DISTINCT instead of aggregation.
-    return new IntermediateResultsBlock(new AggregationFunction[]{_distinctAggregationFunction},
-        Collections.singletonList(distinctTable), _queryContext.isNullHandlingEnabled());
+    return new IntermediateResultsBlock(_distinctAggregationFunction, _distinctExecutor.getResult());
   }
 
   @Override
