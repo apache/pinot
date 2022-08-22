@@ -185,22 +185,24 @@ public class SelectionCombineOperatorTest {
     assertEquals(combineResult.getNumEntriesScannedPostFilter(), numDocsScanned);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
     assertEquals(combineResult.getNumConsumingSegmentsProcessed(), NUM_CONSUMING_SEGMENTS);
+    int numSegmentsMatched = combineResult.getNumSegmentsMatched();
+    assertTrue(numSegmentsMatched >= 1 && numSegmentsMatched <= CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY);
     // The check below depends on the order of segment processing. When segments# <= 10 (the value of
     // CombinePlanNode.TARGET_NUM_PLANS_PER_THREAD to be specific), the segments are processed in the order as they
     // are prepared, which is OFFLINE segments followed by RT segments and this case makes the value here equal to 0.
     // But when segments# > 10, the segments are processed in a different order and some RT segments can be processed
-    // ahead of the other OFFLINE segments. In specific, half of the RT segments can be processed.
+    // ahead of the other OFFLINE segments, but no more than CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY for sure
+    // as each thread only processes one segment.
+    int numConsumingSegmentsMatched = combineResult.getNumConsumingSegmentsMatched();
     if (NUM_SEGMENTS <= 10) {
-      assertEquals(combineResult.getNumConsumingSegmentsMatched(), 0, String
-          .format("NumConsumingSegmentsMatched: %d, NumSegments: %d", combineResult.getNumConsumingSegmentsMatched(),
-              NUM_SEGMENTS));
+      assertEquals(numConsumingSegmentsMatched, 0, "numSegments: " + NUM_SEGMENTS);
     } else {
-      assertEquals(combineResult.getNumConsumingSegmentsMatched(), NUM_CONSUMING_SEGMENTS / 2, String
-          .format("NumConsumingSegmentsMatched: %d, NumSegments: %d", combineResult.getNumConsumingSegmentsMatched(),
+      assertTrue(numConsumingSegmentsMatched >= 0
+          && numConsumingSegmentsMatched <= CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY, String
+          .format("numConsumingSegmentsMatched: %d, maxThreadsPerQuery: %d, numSegments: %d",
+              combineResult.getNumConsumingSegmentsMatched(), CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY,
               NUM_SEGMENTS));
     }
-    int numSegmentsMatched = combineResult.getNumSegmentsMatched();
-    assertTrue(numSegmentsMatched >= 1 && numSegmentsMatched <= CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY);
     assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
 
     combineResult = getCombineResult("SELECT * FROM testTable LIMIT 10000");
