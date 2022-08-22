@@ -95,6 +95,11 @@ public class RealtimeConsumptionRateManager {
   }
 
   @VisibleForTesting
+  ConsumptionRateLimiter createRateLimiter(StreamConfig streamConfig, String tableName) {
+    return createRateLimiter(streamConfig, tableName, null, null);
+  }
+
+  @VisibleForTesting
   static LoadingCache<StreamConfig, Integer> buildCache(PartitionCountFetcher partitionCountFetcher,
       long duration, TimeUnit unit) {
     return CacheBuilder.newBuilder().refreshAfterWrite(duration, unit)
