@@ -24,19 +24,16 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.Test;
 
-<<<<<<< HEAD
 import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.*;
-=======
 import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.MetricEmitter;
 import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.NOOP_RATE_LIMITER;
 import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.RateLimiterImpl;
->>>>>>> 845edc0eeb (mvn checkstyle:apply)
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
