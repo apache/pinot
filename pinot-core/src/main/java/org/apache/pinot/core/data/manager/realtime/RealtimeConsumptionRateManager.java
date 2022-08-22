@@ -206,7 +206,7 @@ public class RealtimeConsumptionRateManager {
         if (_previousMinute != -1) { // not first time
           double actualRate = _aggregateNumMessages / ((nowInMinutes - _previousMinute) * 60.0); // messages per second
           ratioPercentage = (int) Math.round(actualRate / rateLimit * 100);
-          _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.CONSUMPTION_RATE_TO_LIMIT_RATIO_PERCENT,
+          _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.CONSUMPTION_QUOTA_UTILIZATION,
               ratioPercentage);
         }
         _aggregateNumMessages = numMsgsConsumed;
