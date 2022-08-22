@@ -48,7 +48,7 @@ public class IngestionJobLauncherTest {
         null, context, _defaultEnvironmentValues);
     Assert.assertEquals(spec.getInputDirURI(), "file:///path/to/input/2020/05/06");
     Assert.assertEquals(spec.getOutputDirURI(), "file:///path/to/output/2020/05/06");
-    Assert.assertTrue(spec.isSearchRecursively());
+    Assert.assertFalse(spec.isSearchRecursively());
   }
 
   @Test
@@ -58,7 +58,7 @@ public class IngestionJobLauncherTest {
         null, null);
     Assert.assertEquals("\ufff0", spec.getRecordReaderSpec().getConfigs().get("multiValueDelimiter"));
     // searchRecursively is set to false by default.
-    Assert.assertFalse(spec.isSearchRecursively());
+    Assert.assertTrue(spec.isSearchRecursively());
   }
 
   @Test

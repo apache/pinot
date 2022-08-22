@@ -48,7 +48,8 @@ public class SegmentGenerationJobSpec implements Serializable {
   /**
    * If true, search input files recursively from root directly specified in _inputDirURI.
    */
-  private boolean _searchRecursively = false;
+  // TODO: set the default value to false after all clients are aware of this.
+  private boolean _searchRecursively = true;
   /**
    * include file name pattern, supported glob pattern.
    * Sample usage:
