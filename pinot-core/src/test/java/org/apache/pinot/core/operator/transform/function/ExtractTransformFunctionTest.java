@@ -22,6 +22,7 @@ public class ExtractTransformFunctionTest extends BaseTransformFunctionTest {
         {"hour", (LongToIntFunction) DateTimeFunctions::hour},
         {"minute", (LongToIntFunction) DateTimeFunctions::minute},
         {"second", (LongToIntFunction) DateTimeFunctions::second},
+        // TODO: Need to add timezone_hour and timezone_minute
 //      "timezone_hour",
 //      "timezone_minute",
     };
@@ -33,28 +34,12 @@ public class ExtractTransformFunctionTest extends BaseTransformFunctionTest {
     // SELECT EXTRACT(YEAR FROM '2017-10-10')
 
     ExpressionContext expression = RequestContextUtils.getExpression(String.format("extract(%s FROM %s)", field, TIMESTAMP_COLUMN));
+    
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ExtractTransformFunction);
-    String[] value = transformFunction.transformToStringValuesSV(_projectionBlock);
+    int[] value = transformFunction.transformToIntValuesSV(_projectionBlock);
     for(int i=0; i< _projectionBlock.getNumDocs(); ++i) {
-      switch (field) {
-        case "year":
-          assertEquals(value[i], String.valueOf(expected.applyAsInt(_timeValues[i])));
-          break;
-        case "month":
-          assertEquals(value[i], String.valueOf(expected.applyAsInt(_timeValues[i])));
-          break;
-        case "hour":
-          assertEquals(value[i], String.valueOf(expected.applyAsInt(_timeValues[i])));
-          break;
-        case "minute":
-          assertEquals(value[i], String.valueOf(expected.applyAsInt(_timeValues[i])));
-          break;
-        case "day":
-          assertEquals(value[i], String.valueOf(expected.applyAsInt(_timeValues[i])));
-          break;
-        default:
-      }
+      assertEquals(value[i], expected.applyAsInt(_timeValues[i]));
     }
   }
 }
