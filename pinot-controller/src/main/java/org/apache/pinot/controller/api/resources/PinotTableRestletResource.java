@@ -550,7 +550,7 @@ public class PinotTableRestletResource {
     // validate permission
     String tableName = tableConfig.getLeft().getTableName();
     String endpointUrl = request.getRequestURL().toString();
-    AccessControlUtils.validatePermission(tableName, AccessType.CREATE, httpHeaders, endpointUrl,
+    AccessControlUtils.validatePermission(tableName, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
 
     ObjectNode validationResponse =
@@ -586,7 +586,7 @@ public class PinotTableRestletResource {
     // validate permission
     String schemaName = schema != null ? schema.getSchemaName() : null;
     String endpointUrl = request.getRequestURL().toString();
-    AccessControlUtils.validatePermission(schemaName, AccessType.CREATE, httpHeaders, endpointUrl,
+    AccessControlUtils.validatePermission(schemaName, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
 
     return validateConfig(tableSchemaConfig.getTableConfig(), schema, typesToSkip).toString();

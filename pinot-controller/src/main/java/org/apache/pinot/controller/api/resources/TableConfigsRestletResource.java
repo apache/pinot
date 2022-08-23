@@ -403,18 +403,18 @@ public class TableConfigsRestletResource {
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();
 
     AccessControlUtils
-        .validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl, accessControl);
+        .validatePermission(schema.getSchemaName(), AccessType.READ, httpHeaders, endpointUrl, accessControl);
 
     if (offlineTableConfig != null) {
       tuneConfig(offlineTableConfig, schema);
       AccessControlUtils
-          .validatePermission(offlineTableConfig.getTableName(), AccessType.CREATE, httpHeaders, endpointUrl,
+          .validatePermission(offlineTableConfig.getTableName(), AccessType.READ, httpHeaders, endpointUrl,
               accessControl);
     }
     if (realtimeTableConfig != null) {
       tuneConfig(realtimeTableConfig, schema);
       AccessControlUtils
-          .validatePermission(realtimeTableConfig.getTableName(), AccessType.CREATE, httpHeaders, endpointUrl,
+          .validatePermission(realtimeTableConfig.getTableName(), AccessType.READ, httpHeaders, endpointUrl,
               accessControl);
     }
 
