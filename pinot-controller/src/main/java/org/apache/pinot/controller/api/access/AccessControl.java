@@ -41,7 +41,9 @@ public interface AccessControl {
    * @return Whether the client has data access to the table
    */
   @Deprecated
-  boolean hasDataAccess(HttpHeaders httpHeaders, String tableName);
+  default boolean hasDataAccess(HttpHeaders httpHeaders, String tableName) {
+    return hasAccess(tableName, AccessType.READ, httpHeaders, null);
+  }
 
   /**
    * Return whether the client has permission to the given table

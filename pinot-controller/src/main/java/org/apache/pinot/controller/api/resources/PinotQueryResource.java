@@ -139,8 +139,7 @@ public class PinotQueryResource {
       PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
       switch (sqlType) {
         case DQL:
-          return getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders,
-              endpointUrl);
+          return getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
         case DML:
           Map<String, String> headers =
               httpHeaders.getRequestHeaders().entrySet().stream().filter(entry -> !entry.getValue().isEmpty())
@@ -182,7 +181,7 @@ public class PinotQueryResource {
   }
 
   private String getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled, String queryOptions,
-      HttpHeaders httpHeaders, String endpointUrl) {
+      HttpHeaders httpHeaders) {
     // Get resource table name.
     String tableName;
     try {
@@ -198,7 +197,7 @@ public class PinotQueryResource {
 
     // Validate data access
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, endpointUrl)) {
+    if (!accessControl.hasDataAccess(httpHeaders, rawTableName)) {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 
