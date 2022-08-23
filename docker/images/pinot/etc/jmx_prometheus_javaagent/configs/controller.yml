@@ -74,6 +74,9 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.realtimeTableCount\"><>(\\w+)"
   name: "pinot_controller_realtimeTableCount_$1"
   cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.offlineTableCount\"><>(\\w+)"
+  name: "pinot_controller_offlineTableCount_$1"
+  cache: true
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ValidationMetrics\", name=\"pinot.controller.(\\w+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_validateion_$2_$3"
   cache: true
