@@ -20,16 +20,16 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
 
   private class FakeFreshnessBasedConsumptionStatusChecker extends FreshnessBasedConsumptionStatusChecker {
 
-    private final Long now;
+    private final long now;
 
     public FakeFreshnessBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager,
-        Set<String> consumingSegments, Long minFreshnessMs, Long now) {
+        Set<String> consumingSegments, long minFreshnessMs, long now) {
       super(instanceDataManager, consumingSegments, minFreshnessMs);
       this.now = now;
     }
 
     @Override
-    protected Long now() {
+    protected long now() {
       return now;
     }
   }
@@ -45,7 +45,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
         new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10000L);
 
     // TableDataManager is not set up yet
-    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedMinFreshness(), 3);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     // setup TableDataMangers
     TableDataManager tableDataManagerA = mock(TableDataManager.class);
@@ -77,10 +77,10 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrB0.getSegment()).thenReturn(mockSegment);
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(1500));
 
-    when(segMngrA0.fetchLatestStreamOffset(5000L)).thenReturn(new LongMsgOffset(20));
-    when(segMngrA1.fetchLatestStreamOffset(5000L)).thenReturn(new LongMsgOffset(200));
-    when(segMngrB0.fetchLatestStreamOffset(5000L)).thenReturn(new LongMsgOffset(2000));
-    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedMinFreshness(), 3);
+    when(segMngrA0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(20));
+    when(segMngrA1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(200));
+    when(segMngrB0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(2000));
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     //              current offset          latest stream offset    current time    last ingestion time
     // segA0              20                       20                     now               0
@@ -90,7 +90,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     // The unexpected case where currentOffset > latestOffset
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(300));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(1998));
-    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedMinFreshness(), 1);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
 
     //              current offset          latest stream offset    current time    last ingestion time
     // segA0              20                       20                     100               0
@@ -98,10 +98,10 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     // segB0              1999                     2000                   100               0
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(1999));
     // current offset is 1 less than latest offset which is why we return 0 here
-    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedMinFreshness(), 0);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 
-  private void setupLatestIngestionTimestamp(LLRealtimeSegmentDataManager segmentDataManager, Long latestIngestionTimestamp) {
+  private void setupLatestIngestionTimestamp(LLRealtimeSegmentDataManager segmentDataManager, long latestIngestionTimestamp) {
     MutableSegment mockSegment = mock(MutableSegment.class);
     SegmentMetadata mockSegmentMetdata = mock(SegmentMetadata.class);
     when(mockSegment.getSegmentMetadata()).thenReturn(mockSegmentMetdata);
@@ -120,7 +120,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
         new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 100L);
 
     // TableDataManager is not set up yet
-    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedMinFreshness(), 3);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     // setup TableDataMangers
     TableDataManager tableDataManagerA = mock(TableDataManager.class);
@@ -136,9 +136,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
 
-    when(segMngrA0.fetchLatestStreamOffset(5000L)).thenReturn(new LongMsgOffset(20));
-    when(segMngrA1.fetchLatestStreamOffset(5000L)).thenReturn(new LongMsgOffset(200));
-    when(segMngrB0.fetchLatestStreamOffset(5000L)).thenReturn(new LongMsgOffset(2000));
+    when(segMngrA0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(20));
+    when(segMngrA1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(200));
+    when(segMngrB0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(2000));
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
@@ -151,7 +151,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     // segA0              0                       20                     100               Long.MIN_VALUE
     // segA1              0                       200                    100               -1
     // segB0              0                       2000                   100               0
-    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedMinFreshness(), 3);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     //              current offset          latest stream offset    current time    last ingestion time
     // segA0              0                       20                     100               90
@@ -161,14 +161,14 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     // Unexpected case where latest ingested is somehow after current time
     setupLatestIngestionTimestamp(segMngrA1, 101L);
     setupLatestIngestionTimestamp(segMngrB0, 89L);
-    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedMinFreshness(), 1);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
 
     //              current offset          latest stream offset    current time    last ingestion time
     // segA0              20                       20                     100               90
     // segA1              200                      200                    100               101
     // segB0              1999                     2000                   100               95
     setupLatestIngestionTimestamp(segMngrB0, 95L);
-    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedMinFreshness(), 0);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 
   @Test
@@ -182,7 +182,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
         new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 100L);
 
     // TableDataManager is not set up yet
-    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedMinFreshness(), 3);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     // setup TableDataMangers
     TableDataManager tableDataManagerA = mock(TableDataManager.class);
@@ -198,9 +198,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
 
-    when(segMngrA0.fetchLatestStreamOffset(5000L)).thenReturn(new LongMsgOffset(20));
-    when(segMngrA1.fetchLatestStreamOffset(5000L)).thenReturn(new LongMsgOffset(200));
-    when(segMngrB0.fetchLatestStreamOffset(5000L)).thenReturn(new LongMsgOffset(2000));
+    when(segMngrA0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(20));
+    when(segMngrA1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(200));
+    when(segMngrB0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(2000));
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
@@ -213,7 +213,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     // segA0              0                       20                     100               Long.MIN_VALUE
     // segA1              0                       200                    100               -1
     // segB0              0                       2000                   100               0
-    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedMinFreshness(), 3);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     // segB0 is now committed; ImmutableSegmentDataManager is returned by table data manager
     ImmutableSegmentDataManager immSegMngrB0 = mock(ImmutableSegmentDataManager.class);
@@ -226,7 +226,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     setupLatestIngestionTimestamp(segMngrA0, 90L);
     // Unexpected case where latest ingested is somehow after current time
     setupLatestIngestionTimestamp(segMngrA1, 101L);
-    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedMinFreshness(), 0);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 
   @Test
@@ -240,7 +240,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
         new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 100L);
 
     // TableDataManager is not set up yet
-    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedMinFreshness(), 3);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     // setup TableDataMangers
     TableDataManager tableDataManagerA = mock(TableDataManager.class);
@@ -256,9 +256,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
 
-    when(segMngrA0.fetchLatestStreamOffset(5000L)).thenReturn(new LongMsgOffset(20));
-    when(segMngrA1.fetchLatestStreamOffset(5000L)).thenReturn(new LongMsgOffset(200));
-    when(segMngrB0.fetchLatestStreamOffset(5000L)).thenReturn(null);
+    when(segMngrA0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(20));
+    when(segMngrA1.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(200));
+    when(segMngrB0.fetchLatestStreamOffset()).thenReturn(null);
     when(segMngrA0.getCurrentOffset()).thenReturn(null);
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
@@ -271,7 +271,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     // segA0              null                    20                     100               Long.MIN_VALUE
     // segA1              0                       200                    100               90
     // segB0              0                       null                   100               0
-    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedMinFreshness(), 2);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 2);
 
     //              current offset          latest stream offset    current time    last ingestion time
     // segA0              20                      20                     100               89
@@ -279,7 +279,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     // segB0              0                       0                      100               0
     setupLatestIngestionTimestamp(segMngrA0, 89L);
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
-    when(segMngrB0.fetchLatestStreamOffset(5000L)).thenReturn(new LongMsgOffset(0));
-    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedMinFreshness(), 0);
+    when(segMngrB0.fetchLatestStreamOffset()).thenReturn(new LongMsgOffset(0));
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 }

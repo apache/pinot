@@ -248,12 +248,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     Set<String> consumingSegments = new HashSet<>();
     boolean checkRealtime = realtimeConsumptionCatchupWaitMs > 0;
     if (isFreshnessStatusCheckerEnabled && realtimeMinFreshnessMs <= 0) {
-      LOGGER.warn("Realtime min freshness {} must be > 0. Will not setup freshness based checker.", realtimeMinFreshnessMs);
+      LOGGER.warn("Realtime min freshness {} must be > 0. Setting relatime min freshness to default {}.",
+          realtimeMinFreshnessMs, Server.DEFAULT_STARTUP_REALTIME_MIN_FRESHNESS_MS);
+      realtimeMinFreshnessMs = Server.DEFAULT_STARTUP_REALTIME_MIN_FRESHNESS_MS;
     }
-    if (isFreshnessStatusCheckerEnabled && isOffsetBasedConsumptionStatusCheckerEnabled) {
-      LOGGER.warn("Offset and Freshness checkers both enabled. Will only setup freshness based checker.");
-    }
-    boolean checkRealtimeFreshness = realtimeMinFreshnessMs > 0;
 
     for (String resourceName : _helixAdmin.getResourcesInCluster(_helixClusterName)) {
       // Only monitor table resources
@@ -299,9 +297,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
         LOGGER.info("Setting up freshness based status checker");
         FreshnessBasedConsumptionStatusChecker freshnessStatusChecker =
             new FreshnessBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments,
-                (long) realtimeMinFreshnessMs);
+                realtimeMinFreshnessMs);
         Supplier<Integer> getNumConsumingSegmentsNotReachedMinFreshness =
-            freshnessStatusChecker::getNumConsumingSegmentsNotReachedMinFreshness;
+            freshnessStatusChecker::getNumConsumingSegmentsNotReachedIngestionCriteria;
         serviceStatusCallbackListBuilder.add(
             new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
                 _instanceId, realtimeConsumptionCatchupWaitMs, getNumConsumingSegmentsNotReachedMinFreshness));
@@ -310,7 +308,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         OffsetBasedConsumptionStatusChecker consumptionStatusChecker =
             new OffsetBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments);
         Supplier<Integer> getNumConsumingSegmentsNotReachedTheirLatestOffset =
-            consumptionStatusChecker::getNumConsumingSegmentsNotReachedTheirLatestOffset;
+            consumptionStatusChecker::getNumConsumingSegmentsNotReachedIngestionCriteria;
         serviceStatusCallbackListBuilder.add(
             new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
                 _instanceId, realtimeConsumptionCatchupWaitMs, getNumConsumingSegmentsNotReachedTheirLatestOffset));

@@ -390,7 +390,9 @@ public class CommonConstants {
     public static final boolean DEFAULT_ENABLE_REALTIME_FRESHNESS_BASED_CONSUMPTION_STATUS_CHECKER = false;
     public static final String CONFIG_OF_STARTUP_REALTIME_MIN_FRESHNESS_MS =
         "pinot.server.starter.realtimeMinFreshnessMs";
-    public static final int DEFAULT_STARTUP_REALTIME_MIN_FRESHNESS_MS = 0;
+    // Use 10 seconds by default so high volume stream are able to catch up.
+    // This is also the default in the case a user misconfigures this by setting to <= 0.
+    public static final int DEFAULT_STARTUP_REALTIME_MIN_FRESHNESS_MS = 10000;
 
     public static final String DEFAULT_READ_MODE = "mmap";
     // Whether to reload consuming segment on scheme update
