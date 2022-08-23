@@ -23,25 +23,17 @@ import org.apache.calcite.sql.SqlNode;
 
 
 public class SqlNodeAndOptions {
-  private String _sql;
   private final SqlNode _sqlNode;
   private final PinotSqlType _sqlType;
   // TODO: support option literals other than STRING
-  private final Map<String, String> _queryOptions;
-  private final Map<String, String> _debugOptions;
+  private final Map<String, String> _options;
+
   private long _parseTimeNs;
 
-  public SqlNodeAndOptions(String sql, SqlNode sqlNode, PinotSqlType sqlType, Map<String, String> queryOptions,
-      Map<String, String> debugOptions) {
-    _sql = sql;
+  public SqlNodeAndOptions(SqlNode sqlNode, PinotSqlType sqlType, Map<String, String> options) {
     _sqlNode = sqlNode;
     _sqlType = sqlType;
-    _queryOptions = queryOptions;
-    _debugOptions = debugOptions;
-  }
-
-  public String getSql() {
-    return _sql;
+    _options = options;
   }
 
   public SqlNode getSqlNode() {
@@ -52,12 +44,8 @@ public class SqlNodeAndOptions {
     return _sqlType;
   }
 
-  public Map<String, String> getQueryOptions() {
-    return _queryOptions;
-  }
-
-  public Map<String, String> getDebugOptions() {
-    return _debugOptions;
+  public Map<String, String> getOptions() {
+    return _options;
   }
 
   public long getParseTimeNs() {
@@ -68,17 +56,9 @@ public class SqlNodeAndOptions {
     _parseTimeNs = parseTimeNs;
   }
 
-  public void putExtraQueryOptions(Map<String, String> extractOptionsMap) {
-    putOptionsIfNotPresent(_queryOptions, extractOptionsMap);
-  }
-
-  public void putExtraDebugOptions(Map<String, String> extraDebugOptions) {
-    putOptionsIfNotPresent(_debugOptions, extraDebugOptions);
-  }
-
-  static void putOptionsIfNotPresent(Map<String, String> destination, Map<String, String> source) {
-    for (Map.Entry<String, String> e : source.entrySet()) {
-      destination.putIfAbsent(e.getKey(), e.getValue());
+  public void setExtraOptions(Map<String, String> extractOptionsMap) {
+    for (Map.Entry<String, String> e : extractOptionsMap.entrySet()) {
+      _options.putIfAbsent(e.getKey(), e.getValue());
     }
   }
 }

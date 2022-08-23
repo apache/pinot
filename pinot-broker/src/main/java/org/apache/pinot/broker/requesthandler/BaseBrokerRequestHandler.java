@@ -294,8 +294,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     PinotQuery pinotQuery;
     try {
       // Parse the request
-      sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions
-          : RequestUtils.parseQuery(query, request);
+      sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions : RequestUtils.parseQuery(request);
       // Compile the request into PinotQuery
       compilationStartTimeNs = System.nanoTime();
       pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);

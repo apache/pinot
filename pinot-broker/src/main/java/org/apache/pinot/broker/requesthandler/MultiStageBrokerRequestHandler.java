@@ -134,8 +134,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
     // Parse the request
-    sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions
-        : RequestUtils.parseQuery(query, request);
+    sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions : RequestUtils.parseQuery(request);
     // Compile the request
     long compilationStartTimeNs = System.nanoTime();
     QueryPlan queryPlan;

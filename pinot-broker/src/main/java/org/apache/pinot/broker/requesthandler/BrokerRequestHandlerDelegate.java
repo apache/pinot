@@ -84,25 +84,21 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     if (sqlNodeAndOptions == null) {
-      JsonNode sql = request.get(Request.SQL);
-      if (sql == null) {
-        throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
-      }
       try {
-        sqlNodeAndOptions = RequestUtils.parseQuery(sql.asText(), request);
+        sqlNodeAndOptions = RequestUtils.parseQuery(request);
       } catch (Exception e) {
-        LOGGER.info("Caught exception while compiling SQL: {}, {}", sql.asText(), e.getMessage());
+        LOGGER.info("Caught exception while compiling SQL: {}, {}", request, e.getMessage());
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
         requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
         return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
       }
     }
     if (request.has(CommonConstants.Broker.Request.QUERY_OPTIONS)) {
-      sqlNodeAndOptions.putExtraQueryOptions(RequestUtils.getOptionsFromJson(request,
+      sqlNodeAndOptions.setExtraOptions(RequestUtils.getOptionsFromJson(request,
           CommonConstants.Broker.Request.QUERY_OPTIONS));
     }
 
-    if (_multiStageWorkerRequestHandler != null && Boolean.parseBoolean(sqlNodeAndOptions.getQueryOptions().get(
+    if (_multiStageWorkerRequestHandler != null && Boolean.parseBoolean(sqlNodeAndOptions.getOptions().get(
           CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
         return _multiStageWorkerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
     } else {

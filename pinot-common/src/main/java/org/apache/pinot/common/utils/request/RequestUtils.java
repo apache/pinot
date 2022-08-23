@@ -32,6 +32,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.FilterKind;
@@ -48,10 +49,14 @@ public class RequestUtils {
   private RequestUtils() {
   }
 
-  public static SqlNodeAndOptions parseQuery(String query, JsonNode request)
+  public static SqlNodeAndOptions parseQuery(JsonNode request)
       throws SqlCompilationException {
     long parserStartTimeNs = System.nanoTime();
-    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
+    JsonNode sql = request.get(CommonConstants.Broker.Request.SQL);
+    if (sql == null) {
+      throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
+    }
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql.asText());
     setOptions(sqlNodeAndOptions, request);
     sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parserStartTimeNs);
     return sqlNodeAndOptions;
@@ -62,16 +67,14 @@ public class RequestUtils {
    */
   @VisibleForTesting
   public static void setOptions(SqlNodeAndOptions sqlNodeAndOptions, JsonNode jsonRequest) {
-    String query = sqlNodeAndOptions.getSql();;
     Map<String, String> queryOptions = new HashMap<>();
     if (jsonRequest.has(CommonConstants.Broker.Request.DEBUG_OPTIONS)) {
       Map<String, String> debugOptions = RequestUtils.getOptionsFromJson(jsonRequest,
           CommonConstants.Broker.Request.DEBUG_OPTIONS);
+      // TODO: remove debug options after releasing 0.11.0.
       if (!debugOptions.isEmpty()) {
-        // TODO: Do not set debug options after releasing 0.11.0. Currently we kept it for backward compatibility.
-        LOGGER.debug("Debug options are set to: {} for request query: {}", debugOptions, query);
-        sqlNodeAndOptions.putExtraDebugOptions(debugOptions);
         // NOTE: Debug options are deprecated. Put all debug options into query options for backward compatibility.
+        LOGGER.debug("Debug options are set to: {}", debugOptions);
         queryOptions.putAll(debugOptions);
       }
     }
@@ -80,24 +83,20 @@ public class RequestUtils {
           CommonConstants.Broker.Request.QUERY_OPTIONS);
       queryOptions.putAll(queryOptionsFromJson);
     }
-    Map<String, String> queryOptionsFromQuery = sqlNodeAndOptions.getQueryOptions();
-    if (queryOptionsFromQuery != null) {
-      queryOptions.putAll(queryOptionsFromQuery);
-    }
     boolean enableTrace = jsonRequest.has(CommonConstants.Broker.Request.TRACE) && jsonRequest.get(
         CommonConstants.Broker.Request.TRACE).asBoolean();
     if (enableTrace) {
       queryOptions.put(CommonConstants.Broker.Request.TRACE, "true");
     }
     if (!queryOptions.isEmpty()) {
-      LOGGER.debug("Query options are set to: {} for request query: {}", queryOptions, query);
+      LOGGER.debug("Query options are set to: {}", queryOptions);
     }
     // TODO: Remove the SQL query options after releasing 0.11.0
     // The query engine will break if these 2 options are missing during version upgrade.
     queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.GROUP_BY_MODE, CommonConstants.Broker.Request.SQL);
     queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.RESPONSE_FORMAT, CommonConstants.Broker.Request.SQL);
     // Setting all query options back into SqlNodeAndOptions. The above ordering matters due to priority overwrite rule
-    sqlNodeAndOptions.putExtraQueryOptions(queryOptions);
+    sqlNodeAndOptions.setExtraOptions(queryOptions);
   }
 
   public static Expression getIdentifierExpression(String identifier) {
