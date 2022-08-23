@@ -498,8 +498,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    * otherwise
    */
   private boolean processStreamEvents(MessageBatch messagesAndOffsets, long idlePipeSleepTimeMillis) {
-
-    int messageCount = messagesAndOffsets.getUnfilteredMessageCount();
+    int messageCount = messagesAndOffsets.getMessageCount();
     _rateLimiter.throttle(messageCount);
 
     PinotMeter realtimeRowsConsumedMeter = null;
