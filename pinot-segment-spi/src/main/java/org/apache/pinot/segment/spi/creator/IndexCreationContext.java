@@ -64,6 +64,8 @@ public interface IndexCreationContext {
 
   Comparable<?> getMaxValue();
 
+  boolean forwardIndexDisabled();
+
   final class Builder {
     private File _indexDir;
     private int _lengthOfLongestEntry;
@@ -78,6 +80,7 @@ public interface IndexCreationContext {
     private boolean _hasDictionary = true;
     private Comparable<?> _minValue;
     private Comparable<?> _maxValue;
+    private boolean _forwardIndexDisabled = false;
 
     public Builder withColumnIndexCreationInfo(ColumnIndexCreationInfo columnIndexCreationInfo) {
       return withLengthOfLongestEntry(columnIndexCreationInfo.getLengthOfLongestEntry())
@@ -161,10 +164,15 @@ public interface IndexCreationContext {
       return this;
     }
 
+    public Builder withforwardIndexDisabled(boolean forwardIndexDisabled) {
+      _forwardIndexDisabled = forwardIndexDisabled;
+      return this;
+    }
+
     public Common build() {
       return new Common(Objects.requireNonNull(_indexDir), _lengthOfLongestEntry, _maxNumberOfMultiValueElements,
           _maxRowLengthInBytes, _onHeap, Objects.requireNonNull(_fieldSpec), _sorted, _cardinality,
-          _totalNumberOfEntries, _totalDocs, _hasDictionary, _minValue, _maxValue);
+          _totalNumberOfEntries, _totalDocs, _hasDictionary, _minValue, _maxValue, _forwardIndexDisabled);
     }
   }
 
@@ -187,11 +195,13 @@ public interface IndexCreationContext {
     private final boolean _hasDictionary;
     private final Comparable<?> _minValue;
     private final Comparable<?> _maxValue;
+    private final boolean _forwardIndexDisabled;
 
     public Common(File indexDir, int lengthOfLongestEntry,
         int maxNumberOfMultiValueElements, int maxRowLengthInBytes, boolean onHeap,
         FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries,
-        int totalDocs, boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue) {
+        int totalDocs, boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue,
+        boolean forwardIndexDisabled) {
       _indexDir = indexDir;
       _lengthOfLongestEntry = lengthOfLongestEntry;
       _maxNumberOfMultiValueElements = maxNumberOfMultiValueElements;
@@ -205,6 +215,7 @@ public interface IndexCreationContext {
       _hasDictionary = hasDictionary;
       _minValue = minValue;
       _maxValue = maxValue;
+      _forwardIndexDisabled = forwardIndexDisabled;
     }
 
     public FieldSpec getFieldSpec() {
@@ -259,6 +270,11 @@ public interface IndexCreationContext {
     @Override
     public Comparable<?> getMaxValue() {
       return _maxValue;
+    }
+
+    @Override
+    public boolean forwardIndexDisabled() {
+      return _forwardIndexDisabled;
     }
 
     public BloomFilter forBloomFilter(BloomFilterConfig bloomFilterConfig) {
@@ -366,6 +382,11 @@ public interface IndexCreationContext {
     @Override
     public Comparable getMaxValue() {
       return _delegate.getMaxValue();
+    }
+
+    @Override
+    public boolean forwardIndexDisabled() {
+      return _delegate.forwardIndexDisabled();
     }
   }
 

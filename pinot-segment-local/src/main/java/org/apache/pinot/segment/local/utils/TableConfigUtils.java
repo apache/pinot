@@ -42,6 +42,7 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -847,6 +848,7 @@ public final class TableConfigUtils {
    * Validates the Field Config List in the given TableConfig
    * Ensures that every referred column name exists in the corresponding schema
    * Additional checks for TEXT and FST index types
+   * Validates index compatibility for forward index disabled columns
    */
   private static void validateFieldConfigList(@Nullable List<FieldConfig> fieldConfigList,
       @Nullable IndexingConfig indexingConfigs, @Nullable Schema schema) {
@@ -873,6 +875,25 @@ public final class TableConfigUtils {
             break;
           default:
             break;
+        }
+
+        // Validate the forward index disabled compatibility if enabled for this column
+        Map<String, String> fieldConfigProperties = fieldConfig.getProperties();
+        if (fieldConfigProperties != null) {
+          boolean forwardIndexDisabled = Boolean.parseBoolean(fieldConfigProperties
+              .getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED, FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
+          if (forwardIndexDisabled) {
+            Preconditions.checkState((noDictionaryColumns == null || !noDictionaryColumns.contains(columnName))
+                && (indexingConfigs.getInvertedIndexColumns() != null
+                    && indexingConfigs.getInvertedIndexColumns().contains(columnName))
+                && (indexingConfigs.getSortedColumn() == null
+                    || !indexingConfigs.getSortedColumn().contains(columnName))
+                && (indexingConfigs.getRangeIndexColumns() == null
+                    || !indexingConfigs.getRangeIndexColumns().contains(columnName)
+                    || indexingConfigs.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION),
+                "Forward index disabled columns must have dictionary and inverted index and must not be sorted or "
+                    + "have range index with version < 2");
+          }
         }
       }
 

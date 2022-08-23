@@ -36,6 +36,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
@@ -176,18 +177,45 @@ public class TextIndexHandler implements IndexHandler {
     // segmentDirectory is indicated to us by SegmentDirectoryPaths, we create lucene index there. There is no
     // further need to move around the lucene index directory since it is created with correct directory structure
     // based on segmentVersion.
-    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
-        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        TextIndexCreator textIndexCreator = indexCreatorProvider.newTextIndexCreator(IndexCreationContext.builder()
-            .withColumnMetadata(columnMetadata).withIndexDir(segmentDirectory).build().forTextIndex(_fstType, true))) {
-      if (columnMetadata.isSingleValue()) {
-        processSVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
-            columnMetadata);
+    try (TextIndexCreator textIndexCreator = indexCreatorProvider.newTextIndexCreator(
+        IndexCreationContext.builder().withColumnMetadata(columnMetadata).withIndexDir(segmentDirectory).build()
+            .forTextIndex(_fstType, true))) {
+      if (columnMetadata.forwardIndexDisabled()) {
+        try (Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata)) {
+          // Create the text index if the dictionary length is 1 as this is for a default column (i.e. newly added
+          // column). For existing columns it is not possible to create the text index without forward index
+          Preconditions.checkState(dictionary.length() == 1,
+              "Creating text index for forward index disabled default column, dictionary size must be 1");
+          if (columnMetadata.isSingleValue()) {
+            for (int docId = 0; docId < numDocs; docId++) {
+              textIndexCreator.add(dictionary.getStringValue(0));
+            }
+          } else {
+            Preconditions.checkState(columnMetadata.getMaxNumberOfMultiValues() == 1
+                && columnMetadata.getTotalNumberOfEntries() == numDocs, "Creating text index for forward index "
+                + "disabled default column only, MV column has too many entries");
+            int[] dictIdBuffer = new int[]{0};
+            String[] valueBuffer = new String[1];
+            for (int docId = 0; docId < numDocs; docId++) {
+              valueBuffer[0] = dictionary.getStringValue(dictIdBuffer[0]);
+              textIndexCreator.add(valueBuffer, 1);
+            }
+          }
+          textIndexCreator.seal();
+        }
       } else {
-        processMVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
-            columnMetadata);
+        try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
+            ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
+          if (columnMetadata.isSingleValue()) {
+            processSVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
+                columnMetadata);
+          } else {
+            processMVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
+                columnMetadata);
+          }
+          textIndexCreator.seal();
+        }
       }
-      textIndexCreator.seal();
     }
 
     LOGGER.info("Created text index for column: {} in segment: {}", columnName, segmentName);

@@ -60,6 +60,11 @@ public class TableConfig extends BaseJsonConfig {
   // Double underscore is reserved for real-time segment name delimiter
   private static final String TABLE_NAME_FORBIDDEN_SUBSTRING = "__";
 
+  // TODO: Remove this flag once the reload path to create forward index from inverted index and dictionary is
+  //       added. This feature will be disabled until the reload path is updated to handle forward index enable ->
+  //       disable and forward index disable -> enable.
+  public static boolean _disallowForwardIndexDisabled = true;
+
   /* MANDATORY FIELDS */
 
   @JsonPropertyDescription("The name for the table (with type suffix), e.g. \"myTable_OFFLINE\" (mandatory)")
@@ -142,6 +147,18 @@ public class TableConfig extends BaseJsonConfig {
     Preconditions.checkArgument(tenantConfig != null, "'tenants' must be configured");
     Preconditions.checkArgument(indexingConfig != null, "'tableIndexConfig' must be configured");
     Preconditions.checkArgument(customConfig != null, "'metadata' must be configured");
+
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        Map<String, String> fieldConfigProperties = fieldConfig.getProperties();
+        if (fieldConfigProperties != null) {
+          boolean forwardIndexDisabled = Boolean.parseBoolean(fieldConfigProperties.getOrDefault(
+              FieldConfig.FORWARD_INDEX_DISABLED, FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
+          Preconditions.checkState(!_disallowForwardIndexDisabled || !forwardIndexDisabled, String.format(
+              "Not allowed to disable the forward index, currently disabled for column: %s", fieldConfig.getName()));
+        }
+      }
+    }
 
     // NOTE: Handle lower case table type and raw table name for backward-compatibility
     _tableType = TableType.valueOf(tableType.toUpperCase());

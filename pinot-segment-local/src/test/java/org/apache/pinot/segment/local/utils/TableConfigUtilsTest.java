@@ -895,6 +895,67 @@ public class TableConfigUtilsTest {
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(), "Set compression codec to null for dictionary encoding type");
     }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(Arrays.asList("myCol1")).build();
+    try {
+      // Enable forward index disabled flag for a raw column
+      Map<String, String> fieldConfigProperties = new HashMap<>();
+      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
+      FieldConfig fieldConfig = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null,
+          fieldConfigProperties);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for myCol1 without dictionary and with forward index disabled");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(),
+          "Forward index disabled columns must have dictionary and inverted index and must not be sorted");
+    }
+
+    try {
+      // Enable forward index disabled flag for a column without inverted index
+      Map<String, String> fieldConfigProperties = new HashMap<>();
+      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
+      FieldConfig fieldConfig = new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, null, null, null, null,
+          fieldConfigProperties);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for conflicting myCol2 with forward index disabled but no inverted index");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(),
+          "Forward index disabled columns must have dictionary and inverted index and must not be sorted");
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(Arrays.asList("myCol1")).setInvertedIndexColumns(Arrays.asList("myCol2")).build();
+    try {
+      // Enable forward index disabled flag for a column with inverted index
+      Map<String, String> fieldConfigProperties = new HashMap<>();
+      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
+      FieldConfig fieldConfig = new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY,
+          FieldConfig.IndexType.INVERTED, null, null, null, fieldConfigProperties);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      Assert.fail("Should not fail as myCol2 has forward index disabled but inverted index enabled");
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(Arrays.asList("myCol1")).setInvertedIndexColumns(Arrays.asList("myCol2"))
+        .setSortedColumn("myCol2").build();
+    try {
+      // Enable forward index disabled flag for a column with inverted index and is sorted
+      Map<String, String> fieldConfigProperties = new HashMap<>();
+      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
+      FieldConfig fieldConfig = new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY,
+          FieldConfig.IndexType.INVERTED, null, null, null, fieldConfigProperties);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for conflicting myCol2 with forward index disabled but is sorted");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(),
+          "Forward index disabled columns must have dictionary and inverted index and must not be sorted");
+    }
   }
 
   @Test

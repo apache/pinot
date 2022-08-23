@@ -71,6 +71,11 @@ public interface DataSourceMetadata {
   int getMaxNumValuesPerMVEntry();
 
   /**
+   * Returns whether forward index is disabled for this column or not, returns 'true' if disabled
+   */
+  boolean forwardIndexDisabled();
+
+  /**
    * Returns the minimum value of the column, or {@code null} if it is not available.
    */
   @Nullable

@@ -26,9 +26,11 @@ import java.util.Objects;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.bloom.OnHeapGuavaBloomFilterCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueNoOpForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueNoOpForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
@@ -88,17 +90,25 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
             context.getMaxRowLengthInBytes());
       }
     } else {
-      if (context.getFieldSpec().isSingleValueField()) {
-        if (context.isSorted()) {
-          return new SingleValueSortedForwardIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
-              context.getCardinality());
+      if (context.forwardIndexDisabled()) {
+        if (context.getFieldSpec().isSingleValueField()) {
+          return new SingleValueNoOpForwardIndexCreator();
         } else {
-          return new SingleValueUnsortedForwardIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
-              context.getCardinality(), context.getTotalDocs());
+          return new MultiValueNoOpForwardIndexCreator();
         }
       } else {
-        return new MultiValueUnsortedForwardIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
-            context.getCardinality(), context.getTotalDocs(), context.getTotalNumberOfEntries());
+        if (context.getFieldSpec().isSingleValueField()) {
+          if (context.isSorted()) {
+            return new SingleValueSortedForwardIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
+                context.getCardinality());
+          } else {
+            return new SingleValueUnsortedForwardIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
+                context.getCardinality(), context.getTotalDocs());
+          }
+        } else {
+          return new MultiValueUnsortedForwardIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
+              context.getCardinality(), context.getTotalDocs(), context.getTotalNumberOfEntries());
+        }
       }
     }
   }

@@ -133,7 +133,10 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _rangeIndex = null;
     }
 
-    PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
+    boolean forwardIndexDisabled = metadata.forwardIndexDisabled();
+    PinotDataBuffer fwdIndexBuffer = forwardIndexDisabled ? null
+        : segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
+
     if (metadata.hasDictionary()) {
       // Dictionary-based index
       _dictionary = loadDictionary(segmentReader.getIndexFor(columnName, ColumnIndexType.DICTIONARY), metadata,
@@ -142,6 +145,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         // Single-value
         if (metadata.isSorted()) {
           // Sorted
+          // forwardIndexDisabled columns do not need to be handled here as forward index cannot be disabled on a
+          // sorted column
           SortedIndexReader<?> sortedIndexReader = indexReaderProvider.newSortedIndexReader(fwdIndexBuffer, metadata);
           _forwardIndex = sortedIndexReader;
           _invertedIndex = sortedIndexReader;

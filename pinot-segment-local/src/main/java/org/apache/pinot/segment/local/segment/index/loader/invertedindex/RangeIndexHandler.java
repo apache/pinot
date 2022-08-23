@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
@@ -34,6 +35,7 @@ import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.RangeIndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.ColumnIndexType;
@@ -149,23 +151,47 @@ public class RangeIndexHandler implements IndexHandler {
       RangeIndexCreatorProvider indexCreatorProvider)
       throws IOException {
     int numDocs = columnMetadata.getTotalDocs();
-    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
-        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata, indexCreatorProvider)) {
-      if (columnMetadata.isSingleValue()) {
-        // Single-value column
-        for (int i = 0; i < numDocs; i++) {
-          rangeIndexCreator.add(forwardIndexReader.getDictId(i, readerContext));
+    try (CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata, indexCreatorProvider)) {
+      if (columnMetadata.forwardIndexDisabled()) {
+        try (Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata)) {
+          // Create the range index if the dictionary length is 1 as this is for a default column (i.e. newly added
+          // column). For existing columns it is not possible to create the range index without forward index
+          Preconditions.checkState(dictionary.length() == 1,
+              "Creating range index for forward index disabled default column, dictionary size must be 1");
+          if (columnMetadata.isSingleValue()) {
+            for (int i = 0; i < numDocs; i++) {
+              rangeIndexCreator.add(0);
+            }
+          } else {
+            Preconditions.checkState(columnMetadata.getMaxNumberOfMultiValues() == 1
+                && columnMetadata.getTotalNumberOfEntries() == numDocs, "Creating range index for forward index "
+                + "disabled default column only, MV column has too many entries");
+            int[] dictIds = new int[]{0};
+            for (int i = 0; i < numDocs; i++) {
+              rangeIndexCreator.add(dictIds, 1);
+            }
+          }
+          rangeIndexCreator.seal();
         }
       } else {
-        // Multi-value column
-        int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
-        for (int i = 0; i < numDocs; i++) {
-          int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
-          rangeIndexCreator.add(dictIds, length);
+        try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
+            ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
+          if (columnMetadata.isSingleValue()) {
+            // Single-value column
+            for (int i = 0; i < numDocs; i++) {
+              rangeIndexCreator.add(forwardIndexReader.getDictId(i, readerContext));
+            }
+          } else {
+            // Multi-value column
+            int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
+            for (int i = 0; i < numDocs; i++) {
+              int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
+              rangeIndexCreator.add(dictIds, length);
+            }
+          }
+          rangeIndexCreator.seal();
         }
       }
-      rangeIndexCreator.seal();
     }
   }
 

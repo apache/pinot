@@ -67,6 +67,11 @@ public class EmptyDataSource extends BaseDataSource {
       return -1;
     }
 
+    @Override
+    public boolean forwardIndexDisabled() {
+      return false;
+    }
+
     @Nullable
     @Override
     public Comparable getMinValue() {

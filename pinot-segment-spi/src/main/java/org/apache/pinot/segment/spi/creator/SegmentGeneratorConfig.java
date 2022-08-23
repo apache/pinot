@@ -82,6 +82,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private final List<String> _textIndexCreationColumns = new ArrayList<>();
   private final List<String> _fstIndexCreationColumns = new ArrayList<>();
   private final Map<String, JsonIndexConfig> _jsonIndexConfigs = new HashMap<>();
+  private final List<String> _forwardIndexDisabledColumns = new ArrayList<>();
   private final Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
   private final Map<String, List<TimestampIndexGranularity>> _timestampIndexConfigs = new HashMap<>();
   private final List<String> _columnSortOrder = new ArrayList<>();
@@ -232,6 +233,7 @@ public class SegmentGeneratorConfig implements Serializable {
       extractFSTIndexColumnsFromTableConfig(tableConfig);
       extractH3IndexConfigsFromTableConfig(tableConfig);
       extractCompressionCodecConfigsFromTableConfig(tableConfig);
+      extractForwardIndexDisabledColumnsFromTableConfig(tableConfig);
 
       _fstTypeForFSTIndex = indexingConfig.getFSTIndexType();
       _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
@@ -360,6 +362,30 @@ public class SegmentGeneratorConfig implements Serializable {
     }
   }
 
+  /**
+   * Forward index disabled info for each column is specified
+   * using {@link FieldConfig} model of indicating per column
+   * encoding and indexing information. Since SegmentGeneratorConfig
+   * is created from TableConfig, we extract the forward index disabled info
+   * from fieldConfigList in TableConfig via the properties bag.
+   * @param tableConfig table config
+   */
+  private void extractForwardIndexDisabledColumnsFromTableConfig(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        Map<String, String> fieldConfigProperties = fieldConfig.getProperties();
+        if (fieldConfigProperties != null) {
+          boolean forwardIndexDisabled = Boolean.parseBoolean(fieldConfigProperties
+              .getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED, FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
+          if (forwardIndexDisabled) {
+            _forwardIndexDisabledColumns.add(fieldConfig.getName());
+          }
+        }
+      }
+    }
+  }
+
   public Map<String, String> getCustomProperties() {
     return _customProperties;
   }
@@ -426,6 +452,10 @@ public class SegmentGeneratorConfig implements Serializable {
     return _jsonIndexConfigs;
   }
 
+  public List<String> getForwardIndexDisabledColumns() {
+    return _forwardIndexDisabledColumns;
+  }
+
   public Map<String, H3IndexConfig> getH3IndexConfigs() {
     return _h3IndexConfigs;
   }
@@ -458,6 +488,20 @@ public class SegmentGeneratorConfig implements Serializable {
   public void setTextIndexCreationColumns(List<String> textIndexCreationColumns) {
     if (textIndexCreationColumns != null) {
       _textIndexCreationColumns.addAll(textIndexCreationColumns);
+    }
+  }
+
+  @VisibleForTesting
+  public void setRangeIndexCreationColumns(List<String> rangeIndexCreationColumns) {
+    if (rangeIndexCreationColumns != null) {
+      _rangeIndexCreationColumns.addAll(rangeIndexCreationColumns);
+    }
+  }
+
+  @VisibleForTesting
+  public void setForwardIndexDisabledColumns(List<String> forwardIndexDisabledColumns) {
+    if (forwardIndexDisabledColumns != null) {
+      _forwardIndexDisabledColumns.addAll(forwardIndexDisabledColumns);
     }
   }
 

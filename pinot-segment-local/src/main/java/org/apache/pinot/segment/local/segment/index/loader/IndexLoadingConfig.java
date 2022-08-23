@@ -73,6 +73,7 @@ public class IndexLoadingConfig {
   private final Map<String, String> _noDictionaryConfig = new HashMap<>();
   private final Set<String> _varLengthDictionaryColumns = new HashSet<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
+  private Set<String> _forwardIndexDisabledColumns = new HashSet<>();
   private Map<String, BloomFilterConfig> _bloomFilterConfigs = new HashMap<>();
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
@@ -169,6 +170,7 @@ public class IndexLoadingConfig {
     extractTextIndexColumnsFromTableConfig(tableConfig);
     extractFSTIndexColumnsFromTableConfig(tableConfig);
     extractH3IndexConfigsFromTableConfig(tableConfig);
+    extractForwardIndexDisabledColumnsFromTableConfig(tableConfig);
 
     Map<String, List<TimestampIndexGranularity>> timestampIndexConfigs =
         SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(tableConfig);
@@ -330,6 +332,30 @@ public class IndexLoadingConfig {
   }
 
   /**
+   * Forward index disabled info for each column is specified
+   * using {@link FieldConfig} model of indicating per column
+   * encoding and indexing information. Since IndexLoadingConfig
+   * is created from TableConfig, we extract the no forward index info
+   * from fieldConfigList in TableConfig via the properties bag.
+   * @param tableConfig table config
+   */
+  private void extractForwardIndexDisabledColumnsFromTableConfig(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        Map<String, String> fieldConfigProperties = fieldConfig.getProperties();
+        if (fieldConfigProperties != null) {
+          boolean forwardIndexDisabled = Boolean.parseBoolean(fieldConfigProperties
+              .getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED, FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
+          if (forwardIndexDisabled) {
+            _forwardIndexDisabledColumns.add(fieldConfig.getName());
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * For tests only.
    */
   public IndexLoadingConfig() {
@@ -348,6 +374,14 @@ public class IndexLoadingConfig {
 
   public List<String> getSortedColumns() {
     return _sortedColumns;
+  }
+
+  /**
+   * For tests only.
+   */
+  @VisibleForTesting
+  public void setSortedColumns(List<String> sortedColumns) {
+    _sortedColumns = sortedColumns;
   }
 
   public Set<String> getInvertedIndexColumns() {
@@ -480,6 +514,14 @@ public class IndexLoadingConfig {
     _onHeapDictionaryColumns = onHeapDictionaryColumns;
   }
 
+  /**
+   * For tests only.
+   */
+  @VisibleForTesting
+  public void setForwardIndexDisabledColumns(Set<String> forwardIndexDisabledColumns) {
+    _forwardIndexDisabledColumns = forwardIndexDisabledColumns;
+  }
+
   public Set<String> getNoDictionaryColumns() {
     return _noDictionaryColumns;
   }
@@ -496,7 +538,7 @@ public class IndexLoadingConfig {
     return _compressionConfigs;
   }
 
-  public Map<String, String> getnoDictionaryConfig() {
+  public Map<String, String> getNoDictionaryConfig() {
     return _noDictionaryConfig;
   }
 
@@ -506,6 +548,10 @@ public class IndexLoadingConfig {
 
   public Set<String> getOnHeapDictionaryColumns() {
     return _onHeapDictionaryColumns;
+  }
+
+  public Set<String> getForwardIndexDisabledColumns() {
+    return _forwardIndexDisabledColumns;
   }
 
   public Map<String, BloomFilterConfig> getBloomFilterConfigs() {
