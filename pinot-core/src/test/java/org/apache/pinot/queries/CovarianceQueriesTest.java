@@ -246,8 +246,8 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     _expectedCovDoubleFloat = cov.covariance(doubleColX, floatCol, false);
     _expectedCovLongFloat = cov.covariance(newLongCol, floatCol, false);
 
-    double[] filteredX = Arrays.copyOfRange(doubleColX, 0, 1000);
-    double[] filteredY = Arrays.copyOfRange(doubleColY, 0, 1000);
+    double[] filteredX = Arrays.copyOfRange(doubleColX, 0, NUM_RECORDS / 2);
+    double[] filteredY = Arrays.copyOfRange(doubleColY, 0, NUM_RECORDS / 2);
     _expectedCovWithFilter = cov.covariance(filteredX, filteredY, false);
 
     // calculate inter segment group by results
