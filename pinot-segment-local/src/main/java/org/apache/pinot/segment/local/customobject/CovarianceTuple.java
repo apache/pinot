@@ -22,6 +22,7 @@ package org.apache.pinot.segment.local.customobject;
 import java.nio.ByteBuffer;
 import javax.annotation.Nonnull;
 
+
 /**
  * Intermediate state used by CovarianceAggregationFunction which helps calculate
  * population covariance and sample covariance

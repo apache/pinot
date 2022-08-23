@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
@@ -99,7 +100,7 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
-  private List<List<IndexSegment>> _instances;
+  private List<List<IndexSegment>> _distinctInstances;
   private int _sumIntX = 0;
   private int _sumIntY = 0;
   private int _sumIntXY = 0;
@@ -134,6 +135,8 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   private double[] _expectedFinalResultVer1 = new double[NUM_GROUPS];
   private double[] _expectedFinalResultVer2 = new double[NUM_GROUPS];
 
+  private boolean _useIdenticalSegment = false;
+
   @Override
   protected String getFilter() {
     // filter out half of the rows based on group id
@@ -148,6 +151,14 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   @Override
   protected List<IndexSegment> getIndexSegments() {
     return _indexSegments;
+  }
+
+  @Override
+  protected List<List<IndexSegment>> getDistinctInstances() {
+    if (_useIdenticalSegment) {
+      return Collections.singletonList(_indexSegments);
+    }
+    return _distinctInstances;
   }
 
   @BeforeClass
@@ -266,7 +277,7 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
 
     // divide testSegment into 4 distinct segments for distinct inter segment tests
     // by doing so, we can avoid calculating global covariance again
-    _instances = new ArrayList<>();
+    _distinctInstances = new ArrayList<>();
     int segmentSize = NUM_RECORDS / 4;
     ImmutableSegment immutableSegment1 = setUpSingleSegment(records.subList(0, segmentSize), SEGMENT_NAME_1);
     ImmutableSegment immutableSegment2 =
@@ -276,8 +287,8 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     ImmutableSegment immutableSegment4 =
         setUpSingleSegment(records.subList(segmentSize * 3, NUM_RECORDS), SEGMENT_NAME_4);
     // generate 2 instances each with 2 distinct segments
-    _instances.add(Arrays.asList(immutableSegment1, immutableSegment2));
-    _instances.add(Arrays.asList(immutableSegment3, immutableSegment4));
+    _distinctInstances.add(Arrays.asList(immutableSegment1, immutableSegment2));
+    _distinctInstances.add(Arrays.asList(immutableSegment3, immutableSegment4));
   }
 
   private ImmutableSegment setUpSingleSegment(List<GenericRow> recordSet, String segmentName)
@@ -298,10 +309,11 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   @Test
   public void testAggregationOnly() {
     // Inner Segment
-    String query = "SELECT COVAR_POP(intColumnX, intColumnY), COVAR_POP(doubleColumnX, doubleColumnY), COVAR_POP(intColumnX, "
-        + "doubleColumnX), " + "COVAR_POP(intColumnX, longColumn), COVAR_POP(intColumnX, floatColumn), "
-        + "COVAR_POP(doubleColumnX, longColumn), COVAR_POP(doubleColumnX, floatColumn), COVAR_POP(longColumn, "
-        + "floatColumn)  FROM testTable";
+    String query =
+        "SELECT COVAR_POP(intColumnX, intColumnY), COVAR_POP(doubleColumnX, doubleColumnY), COVAR_POP(intColumnX, "
+            + "doubleColumnX), " + "COVAR_POP(intColumnX, longColumn), COVAR_POP(intColumnX, floatColumn), "
+            + "COVAR_POP(doubleColumnX, longColumn), COVAR_POP(doubleColumnX, floatColumn), COVAR_POP(longColumn, "
+            + "floatColumn)  FROM testTable";
     Object operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
     IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
@@ -320,7 +332,9 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     checkWithPrecision((CovarianceTuple) aggregationResult.get(7), _sumLong, _sumFloat, _sumLongFloat, NUM_RECORDS);
 
     // Inter segments with 4 identical segments (2 instances each having 2 identical segments)
+    _useIdenticalSegment = true;
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    _useIdenticalSegment = false;
     assertEquals(brokerResponse.getNumDocsScanned(), 4 * NUM_RECORDS);
     assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
     assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * 6 * NUM_RECORDS);
@@ -328,7 +342,7 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     checkResultTableWithPrecision(brokerResponse);
 
     // Inter segments with 4 distinct segments (2 instances each having 2 distinct segments)
-    brokerResponse = getBrokerResponseDistinctInstance(query, _instances);
+    brokerResponse = getBrokerResponse(query);
     assertEquals(brokerResponse.getNumDocsScanned(), NUM_RECORDS);
     assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
     assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 6 * NUM_RECORDS);
@@ -336,8 +350,10 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     checkResultTableWithPrecision(brokerResponse);
 
     // Inter segments with 4 identical segments with filter
+    _useIdenticalSegment = true;
     query = "SELECT COVAR_POP(doubleColumnX, doubleColumnY) FROM testTable" + getFilter();
     brokerResponse = getBrokerResponse(query);
+    _useIdenticalSegment = false;
     assertEquals(brokerResponse.getNumDocsScanned(), 2 * NUM_RECORDS);
     assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
     assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * NUM_RECORDS);
@@ -367,15 +383,18 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     }
 
     // Inter Segment with 4 identical segments
+    _useIdenticalSegment = true;
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     checkGroupByResults(brokerResponse, _expectedFinalResultVer1);
+    _useIdenticalSegment = false;
     // Inter Segment with 4 distinct segments
-    brokerResponse = getBrokerResponseDistinctInstance(query, _instances);
+    brokerResponse = getBrokerResponse(query);
     checkGroupByResults(brokerResponse, _expectedFinalResultVer1);
 
     // Inner Segment
     // case 2: COVAR_POP(col1, col2) group by groupByCol => nondeterministic cov
-    query = "SELECT COVAR_POP(doubleColumnX, doubleColumnY) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
+    query =
+        "SELECT COVAR_POP(doubleColumnX, doubleColumnY) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
     operator = getOperator(query);
     assertTrue(operator instanceof AggregationGroupByOrderByOperator);
     resultsBlock = ((AggregationGroupByOrderByOperator) operator).nextBlock();
@@ -391,10 +410,12 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     }
 
     // Inter Segment with 4 identical segments
+    _useIdenticalSegment = true;
     brokerResponse = getBrokerResponse(query);
     checkGroupByResults(brokerResponse, _expectedFinalResultVer2);
+    _useIdenticalSegment = false;
     // Inter Segment with 4 distinct segments
-    brokerResponse = getBrokerResponseDistinctInstance(query, _instances);
+    brokerResponse = getBrokerResponse(query);
     checkGroupByResults(brokerResponse, _expectedFinalResultVer2);
   }
 
@@ -434,7 +455,7 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   public void tearDown()
       throws IOException {
     _indexSegment.destroy();
-    for (List<IndexSegment> indexList : _instances) {
+    for (List<IndexSegment> indexList : _distinctInstances) {
       for (IndexSegment seg : indexList) {
         seg.destroy();
       }

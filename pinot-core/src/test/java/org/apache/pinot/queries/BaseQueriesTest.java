@@ -67,6 +67,10 @@ public abstract class BaseQueriesTest {
 
   protected abstract List<IndexSegment> getIndexSegments();
 
+  protected List<List<IndexSegment>> getDistinctInstances() {
+    return Collections.singletonList(getIndexSegments());
+  }
+
   /**
    * Run query on single index segment.
    * <p>Use this to test a single operator.
@@ -91,7 +95,9 @@ public abstract class BaseQueriesTest {
   /**
    * Run query on multiple index segments.
    * <p>Use this to test the whole flow from server to broker.
-   * <p>The result should be equivalent to querying 4 identical index segments.
+   * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
+   * should be equivalent to querying 4 identical index segments. Otherwise, the result will be equivalent to
+   * querying 2 distinct instances each having 2 segments.
    */
   protected BrokerResponseNative getBrokerResponse(String query) {
     return getBrokerResponse(query, PLAN_MAKER);
@@ -100,7 +106,9 @@ public abstract class BaseQueriesTest {
   /**
    * Run query with hard-coded filter on multiple index segments.
    * <p>Use this to test the whole flow from server to broker.
-   * <p>The result should be equivalent to querying 4 identical index segments.
+   * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
+   * should be equivalent to querying 4 identical index segments. Otherwise, the result will be equivalent to
+   * querying 2 distinct instances each having 2 segments.
    */
   protected BrokerResponseNative getBrokerResponseWithFilter(String query) {
     return getBrokerResponse(query + getFilter());
@@ -109,7 +117,9 @@ public abstract class BaseQueriesTest {
   /**
    * Run query on multiple index segments with custom plan maker.
    * <p>Use this to test the whole flow from server to broker.
-   * <p>The result should be equivalent to querying 4 identical index segments.
+   * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
+   * should be equivalent to querying 4 identical index segments. Otherwise, the result will be equivalent to
+   * querying 2 distinct instances each having 2 segments.
    */
   protected BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker) {
     return getBrokerResponse(query, planMaker, null);
@@ -118,7 +128,9 @@ public abstract class BaseQueriesTest {
   /**
    * Run query on multiple index segments.
    * <p>Use this to test the whole flow from server to broker.
-   * <p>The result should be equivalent to querying 4 identical index segments.
+   * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
+   * should be equivalent to querying 4 identical index segments. Otherwise, the result will be equivalent to
+   * querying 2 distinct instances each having 2 segments.
    */
   protected BrokerResponseNative getBrokerResponse(String query, @Nullable Map<String, String> extraQueryOptions) {
     return getBrokerResponse(query, PLAN_MAKER, extraQueryOptions);
@@ -127,7 +139,9 @@ public abstract class BaseQueriesTest {
   /**
    * Run query on multiple index segments with custom plan maker and queryOptions.
    * <p>Use this to test the whole flow from server to broker.
-   * <p>The result should be equivalent to querying 4 identical index segments.
+   * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
+   * should be equivalent to querying 4 identical index segments. Otherwise, the result will be equivalent to
+   * querying 2 distinct instances each having 2 segments.
    */
   private BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker,
       @Nullable Map<String, String> extraQueryOptions) {
@@ -146,13 +160,20 @@ public abstract class BaseQueriesTest {
   /**
    * Run query on multiple index segments with custom plan maker.
    * <p>Use this to test the whole flow from server to broker.
-   * <p>The result should be equivalent to querying 4 identical index segments.
+   * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
+   * should be equivalent to querying 4 identical index segments. Otherwise, the result will be equivalent to
+   * querying 2 distinct instances each having 2 segments.
    */
   private BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery, PlanMaker planMaker) {
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
     QueryContext serverQueryContext =
         serverPinotQuery == pinotQuery ? queryContext : QueryContextConverterUtils.getQueryContext(serverPinotQuery);
+
+    List<List<IndexSegment>> instances = getDistinctInstances();
+    if (instances.size() == 2) {
+      return getBrokerResponseDistinctInstances(pinotQuery, planMaker);
+    }
 
     // Server side
     serverQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
@@ -189,7 +210,9 @@ public abstract class BaseQueriesTest {
   /**
    * Run optimized query on multiple index segments.
    * <p>Use this to test the whole flow from server to broker.
-   * <p>The result should be equivalent to querying 4 identical index segments.
+   * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
+   * should be equivalent to querying 4 identical index segments. Otherwise, the result will be equivalent to
+   * querying 2 distinct instances each having 2 segments.
    */
   protected BrokerResponseNative getBrokerResponseForOptimizedQuery(String query, @Nullable TableConfig config,
       @Nullable Schema schema) {
@@ -198,36 +221,19 @@ public abstract class BaseQueriesTest {
     return getBrokerResponse(pinotQuery, PLAN_MAKER);
   }
 
-  protected BrokerResponseNative getBrokerResponseDistinctInstance(String query, List<List<IndexSegment>> instances) {
-    return getBrokerResponseDistinctInstance(query, PLAN_MAKER, instances);
-  }
-
-  private BrokerResponseNative getBrokerResponseDistinctInstance(String query, PlanMaker planMaker,
-      List<List<IndexSegment>> instances) {
-    return getBrokerResponseDistinctInstance(query, PLAN_MAKER, instances, null);
-  }
-
-  private BrokerResponseNative getBrokerResponseDistinctInstance(String query, PlanMaker planMaker,
-      List<List<IndexSegment>> instances, @Nullable Map<String, String> extraQueryOptions) {
-    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    if (extraQueryOptions != null) {
-      Map<String, String> queryOptions = pinotQuery.getQueryOptions();
-      if (queryOptions == null) {
-        queryOptions = new HashMap<>();
-        pinotQuery.setQueryOptions(queryOptions);
-      }
-      queryOptions.putAll(extraQueryOptions);
-    }
-    return getBrokerResponseDistinctInstance(pinotQuery, planMaker, instances);
-  }
-
-  private BrokerResponseNative getBrokerResponseDistinctInstance(PinotQuery pinotQuery, PlanMaker planMaker,
-      List<List<IndexSegment>> instances) {
+  /**
+   * Run query on multiple index segments with custom plan maker.
+   * This test is particularly useful for testing statistical aggregation functions such as COVAR_POP, COVAR_SAMP, etc.
+   * <p>Use this to test the whole flow from server to broker.
+   * <p>The result will be equivalent to querying 2 distinct instances each having 2 segments.
+   */
+  private BrokerResponseNative getBrokerResponseDistinctInstances(PinotQuery pinotQuery, PlanMaker planMaker) {
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
     QueryContext serverQueryContext =
         serverPinotQuery == pinotQuery ? queryContext : QueryContextConverterUtils.getQueryContext(serverPinotQuery);
 
+    List<List<IndexSegment>> instances = getDistinctInstances();
     // Server side
     serverQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     Plan plan1 = planMaker.makeInstancePlan(instances.get(0), serverQueryContext, EXECUTOR_SERVICE, null);
