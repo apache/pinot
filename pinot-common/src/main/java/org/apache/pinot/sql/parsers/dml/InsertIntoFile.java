@@ -68,7 +68,7 @@ public class InsertIntoFile implements DataManipulationStatement {
     String tableName = operandList.get(0) != null ? StringUtils.joinWith(",", operandList.get(0), operandList.get(1))
         : operandList.get(1).toString();
     // Set Options
-    Map<String, String> optionsMap = sqlNodeAndOptions.getQueryOptions();
+    Map<String, String> optionsMap = sqlNodeAndOptions.getOptions();
     List<String> inputDirList = new ArrayList<>();
     ((SqlNodeList) operandList.get(2)).getList()
         .forEach(sqlNode1 -> inputDirList.add(sqlNode1.toString().replace("'", "")));

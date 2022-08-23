@@ -68,14 +68,14 @@ public class BrokerRequestOptionsTest {
     jsonRequest.put(Request.DEBUG_OPTIONS, "debugOption1=foo");
     sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
     RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().size(), 1);
+    Assert.assertEquals(sqlNodeAndOptions.getOptions().size(), 1 + LEGACY_PQL_QUERY_OPTION_SIZE);
     Assert.assertEquals(sqlNodeAndOptions.getOptions().get("debugOption1"), "foo");
 
     // Has multiple debugOptions
     jsonRequest.put(Request.DEBUG_OPTIONS, "debugOption1=foo;debugOption2=bar");
     sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
     RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().size(), 2);
+    Assert.assertEquals(sqlNodeAndOptions.getOptions().size(), 2 + LEGACY_PQL_QUERY_OPTION_SIZE);
     Assert.assertEquals(sqlNodeAndOptions.getOptions().get("debugOption1"), "foo");
     Assert.assertEquals(sqlNodeAndOptions.getOptions().get("debugOption2"), "bar");
 

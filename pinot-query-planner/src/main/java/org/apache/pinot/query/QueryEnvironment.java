@@ -127,7 +127,7 @@ public class QueryEnvironment {
   public QueryPlan planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
     PlannerContext plannerContext = new PlannerContext();
     try {
-      plannerContext.setOptions(sqlNodeAndOptions.getQueryOptions());
+      plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       SqlNode validated = validate(sqlNodeAndOptions.getSqlNode());
       RelRoot relation = toRelation(validated, plannerContext);
       RelNode optimized = optimize(relation, plannerContext);
@@ -154,7 +154,7 @@ public class QueryEnvironment {
       throws Exception {
     // 1. invoke CalciteSqlParser to parse out SqlNode;
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-    plannerContext.setOptions(sqlNodeAndOptions.getQueryOptions());
+    plannerContext.setOptions(sqlNodeAndOptions.getOptions());
     return sqlNodeAndOptions.getSqlNode();
   }
 

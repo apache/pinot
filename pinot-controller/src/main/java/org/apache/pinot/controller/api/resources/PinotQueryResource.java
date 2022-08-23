@@ -124,10 +124,10 @@ public class PinotQueryResource {
       @Nullable String queryOptions)
       throws Exception {
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
-    Map<String, String> options = sqlNodeAndOptions.getQueryOptions();
+    Map<String, String> options = sqlNodeAndOptions.getOptions();
     if (queryOptions != null) {
       Map<String, String> optionsFromString = RequestUtils.getOptionsFromString(queryOptions);
-      sqlNodeAndOptions.putExtraQueryOptions(optionsFromString);
+      sqlNodeAndOptions.setExtraOptions(optionsFromString);
     }
 
     // Determine which engine to used based on query options.
