@@ -166,8 +166,7 @@ public class ConnectionFactory {
    * @param transport pinot transport
    * @return A connection to the set of brokers specified
    */
-  public static Connection fromHostList(Properties properties, List<String> brokers,
-      PinotClientTransport transport) {
+  public static Connection fromHostList(Properties properties, List<String> brokers, PinotClientTransport transport) {
     return new Connection(properties, brokers, transport);
   }
 

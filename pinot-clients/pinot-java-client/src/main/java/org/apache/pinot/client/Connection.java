@@ -25,7 +25,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
@@ -112,25 +111,25 @@ public class Connection {
    * Extract tableName from the given query
    * @param query
    * @return tableName
-   * @throws PinotClientException 
+   * @throws PinotClientException
    */
+  @Nullable
   public String getTableNameFromQuery(String query) {
     PinotQuery pinotQuery;
 
     try {
       pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    } catch (PinotClientException e) {
-      LOGGER.error("Caught exception while compiling SQL request: {}, {}", query, e.getMessage());
+    } catch (Exception e) {
       throw new PinotClientException("Caught exception while compiling SQL request");
     }
-    
-    if(pinotQuery.getDataSource() != null) {
+
+    if (pinotQuery.getDataSource() != null) {
       return pinotQuery.getDataSource().getTableName();
     }
-    
+
     return null;
   }
-  
+
   /**
    * Executes a query.
    *
@@ -141,11 +140,11 @@ public class Connection {
    */
   public ResultSetGroup execute(@Nullable String tableName, String query)
       throws PinotClientException {
-    
-    if(tableName == null) {
-      tableName = getTableNameFromQuery(query);  
+
+    if (tableName == null) {
+      tableName = getTableNameFromQuery(query);
     }
-    
+
     String brokerHostPort = _brokerSelector.selectBroker(tableName);
     if (brokerHostPort == null) {
       throw new PinotClientException("Could not find broker to query for table: " + tableName);
