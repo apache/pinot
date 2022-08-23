@@ -1427,6 +1427,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           "Cannot fetch latest stream offset for clientId {} and partitionGroupId {} with maxWaitTime {}", _clientId,
           _partitionGroupId, maxWaitTimeMs);
     }
+    return null;
   }
 
   /*
