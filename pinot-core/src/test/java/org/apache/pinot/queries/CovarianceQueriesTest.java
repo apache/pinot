@@ -127,6 +127,8 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   private double _expectedCovDoubleFloat;
   private double _expectedCovLongFloat;
 
+  private double _expectedCovWithFilter;
+
   private CovarianceTuple[] _expectedGroupByResultVer1 = new CovarianceTuple[NUM_GROUPS];
   private CovarianceTuple[] _expectedGroupByResultVer2 = new CovarianceTuple[NUM_GROUPS];
   private double[] _expectedFinalResultVer1 = new double[NUM_GROUPS];
@@ -134,7 +136,8 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
 
   @Override
   protected String getFilter() {
-    return "where groupByColumn >= 1000";
+    // filter out half of the rows based on group id
+    return " WHERE groupByColumn < " + (NUM_GROUPS / 2);
   }
 
   @Override
@@ -243,6 +246,10 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     _expectedCovDoubleFloat = cov.covariance(doubleColX, floatCol, false);
     _expectedCovLongFloat = cov.covariance(newLongCol, floatCol, false);
 
+    double[] filteredX = Arrays.copyOfRange(doubleColX, 0, 1000);
+    double[] filteredY = Arrays.copyOfRange(doubleColY, 0, 1000);
+    _expectedCovWithFilter = cov.covariance(filteredX, filteredY, false);
+
     // calculate inter segment group by results
     for (int i = 0; i < NUM_GROUPS; i++) {
       double[] colX = Arrays.copyOfRange(doubleColX, i * groupSize, (i + 1) * groupSize);
@@ -327,6 +334,16 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 6 * NUM_RECORDS);
     assertEquals(brokerResponse.getTotalDocs(), NUM_RECORDS);
     checkResultTableWithPrecision(brokerResponse);
+
+    // Inter segments with 4 identical segments with filter
+    query = "SELECT COV_POP(doubleColumnX, doubleColumnY) FROM testTable" + getFilter();
+    brokerResponse = getBrokerResponse(query);
+    assertEquals(brokerResponse.getNumDocsScanned(), 2 * NUM_RECORDS);
+    assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
+    assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * NUM_RECORDS);
+    assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
+    Object[] results = brokerResponse.getResultTable().getRows().get(0);
+    assertTrue(Precision.equalsWithRelativeTolerance((double) results[0], _expectedCovWithFilter, RELATIVE_EPSILON));
   }
 
   @Test
