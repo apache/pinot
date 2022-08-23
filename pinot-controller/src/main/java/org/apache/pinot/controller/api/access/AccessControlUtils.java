@@ -54,8 +54,14 @@ public final class AccessControlUtils {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
     try {
-      if (accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl)) {
-        return;
+      if (rawTableName == null) {
+        if (accessControl.hasAccess(accessType, httpHeaders, endpointUrl)) {
+          return;
+        }
+      } else {
+        if (accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl)) {
+          return;
+        }
       }
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Caught exception while validating permission for "
