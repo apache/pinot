@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 
 
 public abstract class IngestionBasedConsumptionStatusChecker {
-  protected final Logger LOGGER = LoggerFactory.getLogger(getClass());
+  protected final Logger _logger = LoggerFactory.getLogger(getClass());
 
   // constructor parameters
   protected final InstanceDataManager _instanceDataManager;
@@ -36,21 +36,21 @@ public abstract class IngestionBasedConsumptionStatusChecker {
       }
       TableDataManager tableDataManager = getTableDataManager(segName);
       if (tableDataManager == null) {
-        LOGGER.info("TableDataManager is not yet setup for segment {}. Will check consumption status later", segName);
+        _logger.info("TableDataManager is not yet setup for segment {}. Will check consumption status later", segName);
         continue;
       }
       SegmentDataManager segmentDataManager = null;
       try {
         segmentDataManager = tableDataManager.acquireSegment(segName);
         if (segmentDataManager == null) {
-          LOGGER.info("SegmentDataManager is not yet setup for segment {}. Will check consumption status later",
+          _logger.info("SegmentDataManager is not yet setup for segment {}. Will check consumption status later",
               segName);
           continue;
         }
         if (!(segmentDataManager instanceof LLRealtimeSegmentDataManager)) {
           // There's a possibility that a consuming segment has converted to a committed segment. If that's the case,
           // segment data manager will not be of type LLRealtime.
-          LOGGER.info("Segment {} is already committed and is considered caught up.", segName);
+          _logger.info("Segment {} is already committed and is considered caught up.", segName);
           _caughtUpSegments.add(segName);
           continue;
         }

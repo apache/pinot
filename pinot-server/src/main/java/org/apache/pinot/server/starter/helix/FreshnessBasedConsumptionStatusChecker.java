@@ -28,8 +28,8 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
 /**
- * This class is used at startup time to have a more accurate estimate of the catchup period in which no query execution
- * happens and consumers try to catch up to the latest messages available in streams.
+ * This class is used at startup time to have a more accurate estimate of the catchup period in which no query
+ * execution happens and consumers try to catch up to the latest messages available in streams.
  * To achieve this, every time status check is called - {@link #getNumConsumingSegmentsNotReachedIngestionCriteria} -
  * for each consuming segment, we check if either:
  *   - the segment's latest ingested offset has reached the current stream offset that's
@@ -77,7 +77,7 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
 
     // We check latestIngestionTimestamp >= 0 because the default freshness when unknown is Long.MIN_VALUE
     if (latestIngestionTimestamp >= 0 && freshnessMs <= _minFreshnessMs) {
-      LOGGER.info("Segment {} with freshness {}ms has caught up within min freshness {}", segmentName, freshnessMs,
+      _logger.info("Segment {} with freshness {}ms has caught up within min freshness {}", segmentName, freshnessMs,
           _minFreshnessMs);
       return true;
     }
@@ -88,14 +88,14 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
     StreamPartitionMsgOffset currentOffset = rtSegmentDataManager.getCurrentOffset();
     StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.fetchLatestStreamOffset();
     if (isOffsetCaughtUp(currentOffset, latestStreamOffset)) {
-      LOGGER.info(
-          "Segment {} with freshness {}ms has not caught up within min freshness {}. But the current ingested offset is equal to the latest available offset {}.",
-          segmentName, freshnessMs, _minFreshnessMs, currentOffset);
+      _logger.info("Segment {} with freshness {}ms has not caught up within min freshness {}."
+              + "But the current ingested offset is equal to the latest available offset {}.", segmentName, freshnessMs,
+          _minFreshnessMs, currentOffset);
       return true;
     }
 
-    LOGGER.info(
-        "Segment {} with freshness {}ms has not caught up within min freshness {}. At offset {}. Latest offset {}.",
+    _logger.info("Segment {} with freshness {}ms has not caught up within "
+            + "min freshness {}. At offset {}. Latest offset {}.",
         segmentName, freshnessMs, _minFreshnessMs, currentOffset, latestStreamOffset);
     return false;
   }

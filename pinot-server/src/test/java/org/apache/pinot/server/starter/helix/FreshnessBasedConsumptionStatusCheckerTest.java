@@ -20,17 +20,17 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
 
   private class FakeFreshnessBasedConsumptionStatusChecker extends FreshnessBasedConsumptionStatusChecker {
 
-    private final long now;
+    private final long _now;
 
     public FakeFreshnessBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager,
         Set<String> consumingSegments, long minFreshnessMs, long now) {
       super(instanceDataManager, consumingSegments, minFreshnessMs);
-      this.now = now;
+      _now = now;
     }
 
     @Override
     protected long now() {
-      return now;
+      return _now;
     }
   }
 
@@ -101,7 +101,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 
-  private void setupLatestIngestionTimestamp(LLRealtimeSegmentDataManager segmentDataManager, long latestIngestionTimestamp) {
+  private void setupLatestIngestionTimestamp(LLRealtimeSegmentDataManager segmentDataManager,
+      long latestIngestionTimestamp) {
     MutableSegment mockSegment = mock(MutableSegment.class);
     SegmentMetadata mockSegmentMetdata = mock(SegmentMetadata.class);
     when(mockSegment.getSegmentMetadata()).thenReturn(mockSegmentMetdata);
@@ -117,7 +118,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 100L);
+        new FakeFreshnessBasedConsumptionStatusChecker(
+            instanceDataManager, consumingSegments, 10L, 100L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
