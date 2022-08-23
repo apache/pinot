@@ -26,8 +26,12 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.RateLimiter;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -69,7 +73,8 @@ public class RealtimeConsumptionRateManager {
     _isThrottlingAllowed = true;
   }
 
-  public ConsumptionRateLimiter createRateLimiter(StreamConfig streamConfig, String tableName) {
+  public ConsumptionRateLimiter createRateLimiter(StreamConfig streamConfig, String tableName,
+      ServerMetrics serverMetrics, String metricKeyName) {
     if (!streamConfig.getTopicConsumptionRateLimit().isPresent()) {
       return NOOP_RATE_LIMITER;
     }
@@ -85,7 +90,13 @@ public class RealtimeConsumptionRateManager {
     LOGGER.info("A consumption rate limiter is set up for topic {} in table {} with rate limit: {} "
             + "(topic rate limit: {}, partition count: {})", streamConfig.getTopicName(), tableName, partitionRateLimit,
         topicRateLimit, partitionCount);
-    return new RateLimiterImpl(partitionRateLimit);
+    MetricEmitter metricEmitter = new MetricEmitter(serverMetrics, metricKeyName);
+    return new RateLimiterImpl(partitionRateLimit, metricEmitter);
+  }
+
+  @VisibleForTesting
+  ConsumptionRateLimiter createRateLimiter(StreamConfig streamConfig, String tableName) {
+    return createRateLimiter(streamConfig, tableName, null, null);
   }
 
   @VisibleForTesting
@@ -126,14 +137,17 @@ public class RealtimeConsumptionRateManager {
   static class RateLimiterImpl implements ConsumptionRateLimiter {
     private final double _rate;
     private final RateLimiter _rateLimiter;
+    private MetricEmitter _metricEmitter;
 
-    private RateLimiterImpl(double rate) {
+    private RateLimiterImpl(double rate, MetricEmitter metricEmitter) {
       _rate = rate;
       _rateLimiter = RateLimiter.create(rate);
+      _metricEmitter = metricEmitter;
     }
 
     @Override
     public void throttle(int numMsgs) {
+      _metricEmitter.emitMetric(numMsgs, _rate, Clock.systemUTC().instant());
       if (InstanceHolder.INSTANCE._isThrottlingAllowed && numMsgs > 0) {
         _rateLimiter.acquire(numMsgs);
       }
@@ -162,4 +176,43 @@ public class RealtimeConsumptionRateManager {
       return null;
     }
   };
+
+  /**
+   * This class is responsible to emit a gauge metric for the ratio of the actual consumption rate to the rate limit.
+   * Number of messages consumed are aggregated over one minute. Each minute the ratio percentage is calculated and
+   * emitted.
+   */
+  @VisibleForTesting
+  static class MetricEmitter {
+
+    private final ServerMetrics _serverMetrics;
+    private final String _metricKeyName;
+
+    // state variables
+    private long _previousMinute = -1;
+    private int _aggregateNumMessages = 0;
+
+    public MetricEmitter(ServerMetrics serverMetrics, String metricKeyName) {
+      _serverMetrics = serverMetrics;
+      _metricKeyName = metricKeyName;
+    }
+
+    int emitMetric(int numMsgsConsumed, double rateLimit, Instant now) {
+      int ratioPercentage = 0;
+      long nowInMinutes = now.getEpochSecond() / 60;
+      if (nowInMinutes == _previousMinute) {
+        _aggregateNumMessages += numMsgsConsumed;
+      } else {
+        if (_previousMinute != -1) { // not first time
+          double actualRate = _aggregateNumMessages / ((nowInMinutes - _previousMinute) * 60.0); // messages per second
+          ratioPercentage = (int) Math.round(actualRate / rateLimit * 100);
+          _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.CONSUMPTION_QUOTA_UTILIZATION,
+              ratioPercentage);
+        }
+        _aggregateNumMessages = numMsgsConsumed;
+        _previousMinute = nowInMinutes;
+      }
+      return ratioPercentage;
+    }
+  }
 }
