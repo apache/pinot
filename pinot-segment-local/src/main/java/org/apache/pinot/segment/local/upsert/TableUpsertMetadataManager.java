@@ -35,7 +35,7 @@ public interface TableUpsertMetadataManager extends Closeable {
 
   void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, ServerMetrics serverMetrics);
 
-  ConcurrentMapPartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
+  PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 
   UpsertConfig.Mode getUpsertMode();
 }
