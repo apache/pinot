@@ -36,8 +36,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 /**
  * Aggregation function which returns the population covariance of 2 expressions.
- * cov_pop(exp1, exp2) = mean(exp1 * exp2) - mean(exp1) * mean(exp2)
- *
+ * COVAR_POP(exp1, exp2) = mean(exp1 * exp2) - mean(exp1) * mean(exp2)
+ * COVAR_SAMP(exp1, exp2) = (sum(exp1 * exp2) - sum(exp1) * sum(exp2)) / (count - 1)
  */
 public class CovarianceAggregationFunction implements AggregationFunction<CovarianceTuple, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
