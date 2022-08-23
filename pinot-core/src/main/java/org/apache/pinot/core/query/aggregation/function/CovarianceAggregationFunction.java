@@ -43,15 +43,17 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
   protected final ExpressionContext _expression1;
   protected final ExpressionContext _expression2;
+  protected final boolean _isSample;
 
-  public CovarianceAggregationFunction(List<ExpressionContext> arguments) {
+  public CovarianceAggregationFunction(List<ExpressionContext> arguments, boolean isSample) {
     _expression1 = arguments.get(0);
     _expression2 = arguments.get(1);
+    _isSample = isSample;
   }
 
   @Override
   public AggregationFunctionType getType() {
-    return AggregationFunctionType.COVPOP;
+    return AggregationFunctionType.COVARPOP;
   }
 
   @Override
@@ -199,6 +201,9 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
       double sumX = covarianceTuple.getSumX();
       double sumY = covarianceTuple.getSumY();
       double sumXY = covarianceTuple.getSumXY();
+      if (_isSample) {
+        return (sumXY / (count - 1)) - (sumX / (count - 1)) * (sumY / (count - 1));
+      }
       return (sumXY / count) - (sumX / count) * (sumY / count);
     }
   }

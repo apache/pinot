@@ -268,8 +268,10 @@ public class AggregationFunctionFactory {
             return new StUnionAggregationFunction(firstArgument);
           case HISTOGRAM:
             return new HistogramAggregationFunction(arguments);
-          case COVPOP:
-            return new CovarianceAggregationFunction(arguments);
+          case COVARPOP:
+            return new CovarianceAggregationFunction(arguments, false);
+          case COVARSAMP:
+            return new CovarianceAggregationFunction(arguments, true);
           default:
             throw new IllegalArgumentException();
         }

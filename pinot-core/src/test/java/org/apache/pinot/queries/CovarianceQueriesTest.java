@@ -298,9 +298,9 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   @Test
   public void testAggregationOnly() {
     // Inner Segment
-    String query = "SELECT COV_POP(intColumnX, intColumnY), COV_POP(doubleColumnX, doubleColumnY), COV_POP(intColumnX, "
-        + "doubleColumnX), " + "COV_POP(intColumnX, longColumn), COV_POP(intColumnX, floatColumn), "
-        + "COV_POP(doubleColumnX, longColumn), COV_POP(doubleColumnX, floatColumn), COV_POP(longColumn, "
+    String query = "SELECT COVAR_POP(intColumnX, intColumnY), COVAR_POP(doubleColumnX, doubleColumnY), COVAR_POP(intColumnX, "
+        + "doubleColumnX), " + "COVAR_POP(intColumnX, longColumn), COVAR_POP(intColumnX, floatColumn), "
+        + "COVAR_POP(doubleColumnX, longColumn), COVAR_POP(doubleColumnX, floatColumn), COVAR_POP(longColumn, "
         + "floatColumn)  FROM testTable";
     Object operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
@@ -336,7 +336,7 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     checkResultTableWithPrecision(brokerResponse);
 
     // Inter segments with 4 identical segments with filter
-    query = "SELECT COV_POP(doubleColumnX, doubleColumnY) FROM testTable" + getFilter();
+    query = "SELECT COVAR_POP(doubleColumnX, doubleColumnY) FROM testTable" + getFilter();
     brokerResponse = getBrokerResponse(query);
     assertEquals(brokerResponse.getNumDocsScanned(), 2 * NUM_RECORDS);
     assertEquals(brokerResponse.getNumEntriesScannedInFilter(), 0);
@@ -350,9 +350,9 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
   public void testAggregationGroupBy() {
 
     // Inner Segment
-    // case 1: cov_pop(col1, groupByCol) group by groupByCol => all covariances are 0's
+    // case 1: (col1, groupByCol) group by groupByCol => all covariances are 0's
     String query =
-        "SELECT COV_POP(doubleColumnX, groupByColumn) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
+        "SELECT COVAR_POP(doubleColumnX, groupByColumn) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
     Object operator = getOperator(query);
     assertTrue(operator instanceof AggregationGroupByOrderByOperator);
     IntermediateResultsBlock resultsBlock = ((AggregationGroupByOrderByOperator) operator).nextBlock();
@@ -374,8 +374,8 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     checkGroupByResults(brokerResponse, _expectedFinalResultVer1);
 
     // Inner Segment
-    // case 2: cov_pop(col1, col2) group by groupByCol => nondeterministic cov
-    query = "SELECT COV_POP(doubleColumnX, doubleColumnY) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
+    // case 2: COVAR_POP(col1, col2) group by groupByCol => nondeterministic cov
+    query = "SELECT COVAR_POP(doubleColumnX, doubleColumnY) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
     operator = getOperator(query);
     assertTrue(operator instanceof AggregationGroupByOrderByOperator);
     resultsBlock = ((AggregationGroupByOrderByOperator) operator).nextBlock();
