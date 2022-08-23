@@ -1,5 +1,5 @@
 {
-  "schemaName": "meetupRsvp",
+  "schemaName": "upsertJsonMeetupRsvp",
   "dimensionFieldSpecs": [
     {
       "name": "event_json",

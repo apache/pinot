@@ -19,6 +19,7 @@
 package org.apache.pinot.tools;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
@@ -41,6 +42,7 @@ import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.streams.AirlineDataStream;
 import org.apache.pinot.tools.streams.MeetupRsvpStream;
+import org.apache.pinot.tools.streams.RsvpSourceGenerator;
 import org.apache.pinot.tools.utils.JarUtils;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
@@ -73,12 +75,16 @@ public abstract class QuickStartBase {
       "examples/batch/githubComplexTypeEvents"
   };
 
-  protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = ImmutableMap.of(
-      "airlineStats", "examples/stream/airlineStats",
-      "githubEvents", "examples/minions/stream/githubEvents",
-      "meetupRsvp", "examples/stream/meetupRsvp",
-      "meetupRsvpJson", "examples/stream/meetupRsvpJson",
-      "meetupRsvpComplexType", "examples/stream/meetupRsvpComplexType");
+  protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = ImmutableMap.<String, String>builder()
+      .put("airlineStats", "examples/stream/airlineStats")
+      .put("githubEvents", "examples/minions/stream/githubEvents")
+      .put("meetupRsvp", "examples/stream/meetupRsvp")
+      .put("meetupRsvpJson", "examples/stream/meetupRsvpJson")
+      .put("meetupRsvpComplexType", "examples/stream/meetupRsvpComplexType")
+      .put("upsertMeetupRsvp", "examples/stream/upsertMeetupRsvp")
+      .put("upsertJsonMeetupRsvp", "examples/stream/upsertJsonMeetupRsvp")
+      .put("upsertPartialMeetupRsvp", "examples/stream/upsertPartialMeetupRsvp")
+      .build();
 
   protected File _dataDir = FileUtils.getTempDirectory();
   protected String[] _bootstrapDataDirs;
@@ -270,19 +276,35 @@ public abstract class QuickStartBase {
       JsonNode columns = response.get("resultTable").get("dataSchema").get("columnNames");
       int numColumns = columns.size();
       for (int i = 0; i < numColumns; i++) {
-        responseBuilder.append(columns.get(i).asText()).append(TAB);
+        responseBuilder.append(jsonNode2String(columns.get(i))).append(TAB);
       }
       responseBuilder.append(NEW_LINE);
       JsonNode rows = response.get("resultTable").get("rows");
       for (int i = 0; i < rows.size(); i++) {
         JsonNode row = rows.get(i);
         for (int j = 0; j < numColumns; j++) {
-          responseBuilder.append(row.get(j).asText()).append(TAB);
+          responseBuilder.append(jsonNode2String(row.get(j))).append(TAB);
         }
         responseBuilder.append(NEW_LINE);
       }
     }
     return responseBuilder.toString();
+  }
+
+  private static String jsonNode2String(JsonNode jsonNode) {
+    if (jsonNode instanceof ArrayNode) {
+      ArrayNode arrayNode = (ArrayNode) jsonNode;
+      String result = "[";
+      for (int i = 0; i < arrayNode.size() - 1; i++) {
+        result += jsonNode2String(arrayNode.get(i)) + ", ";
+      }
+      if (arrayNode.size() > 0) {
+        result += jsonNode2String(arrayNode.get(arrayNode.size() - 1));
+      }
+      result += "]";
+      return result;
+    }
+    return jsonNode.asText();
   }
 
   protected Map<String, String> getDefaultStreamTableDirectories() {
@@ -395,6 +417,51 @@ public abstract class QuickStartBase {
           Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
               meetupRSVPComplexTypeProvider.stopPublishing();
+            } catch (Exception e) {
+              e.printStackTrace();
+            }
+          }));
+          break;
+        case "upsertMeetupRsvp":
+          kafkaStarter.createTopic("upsertMeetupRSVPEvents", KafkaStarterUtils.getTopicCreationProps(2));
+          printStatus(Quickstart.Color.CYAN,
+              "***** Starting upsertMeetupRSVPEvents data stream and publishing to Kafka *****");
+          MeetupRsvpStream upsertMeetupRsvpProvider =
+              new MeetupRsvpStream("upsertMeetupRSVPEvents", RsvpSourceGenerator.KeyColumn.EVENT_ID);
+          upsertMeetupRsvpProvider.run();
+          Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+              upsertMeetupRsvpProvider.stopPublishing();
+            } catch (Exception e) {
+              e.printStackTrace();
+            }
+          }));
+          break;
+        case "upsertJsonMeetupRsvp":
+          kafkaStarter.createTopic("upsertJsonMeetupRSVPEvents", KafkaStarterUtils.getTopicCreationProps(2));
+          printStatus(Quickstart.Color.CYAN,
+              "***** Starting upsertJsonMeetupRSVPEvents data stream and publishing to Kafka *****");
+          MeetupRsvpStream upsertJsonMeetupRsvpProvider =
+              new MeetupRsvpStream("upsertJsonMeetupRSVPEvents", RsvpSourceGenerator.KeyColumn.RSVP_ID);
+          upsertJsonMeetupRsvpProvider.run();
+          Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+              upsertJsonMeetupRsvpProvider.stopPublishing();
+            } catch (Exception e) {
+              e.printStackTrace();
+            }
+          }));
+          break;
+        case "upsertPartialMeetupRsvp":
+          kafkaStarter.createTopic("upsertPartialMeetupRSVPEvents", KafkaStarterUtils.getTopicCreationProps(2));
+          printStatus(Quickstart.Color.CYAN,
+              "***** Starting upsertPartialMeetupRSVPEvents data stream and publishing to Kafka *****");
+          MeetupRsvpStream upsertPartialMeetupRsvpProvider =
+              new MeetupRsvpStream("upsertPartialMeetupRSVPEvents", RsvpSourceGenerator.KeyColumn.EVENT_ID);
+          upsertPartialMeetupRsvpProvider.run();
+          Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+              upsertPartialMeetupRsvpProvider.stopPublishing();
             } catch (Exception e) {
               e.printStackTrace();
             }

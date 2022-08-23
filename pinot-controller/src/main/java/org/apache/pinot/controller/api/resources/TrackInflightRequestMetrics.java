@@ -16,12 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.api;
+package org.apache.pinot.controller.api.resources;
 
-import org.apache.pinot.spi.utils.CommonConstants;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import javax.ws.rs.NameBinding;
 
-public abstract class RequesterIdentity {
-  public String getClientIp() {
-    return CommonConstants.UNKNOWN;
-  }
+/**
+ * JAX-RS annotation used to enable request metrics interceptor {@link InflightRequestMetricsInterceptor}.
+ *
+ * See {@link PinotSegmentUploadDownloadRestletResource#downloadSegment} for an example of its usage.
+ */
+@NameBinding
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention(RetentionPolicy.RUNTIME)
+public @interface TrackInflightRequestMetrics {
 }

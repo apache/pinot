@@ -19,6 +19,8 @@
 package org.apache.pinot.broker.api;
 
 import com.google.common.collect.Multimap;
+import java.util.Map;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -42,5 +44,34 @@ public class HttpRequesterIdentity extends RequesterIdentity {
 
   public void setEndpointUrl(String endpointUrl) {
     _endpointUrl = endpointUrl;
+  }
+
+  /**
+   * If reverse proxy is used X-Forwarded-For will be populated
+   * If X-Forwarded-For is not present, check if x-real-ip is present
+   * Since X-Forwarded-For can contain comma separated list of values, we convert it to ";" delimiter to avoid
+   * downstream parsing errors for other fields where "," is being used
+   */
+  @Override
+  public String getClientIp() {
+    if (_httpHeaders != null) {
+      StringBuilder clientIp = new StringBuilder();
+      for (Map.Entry<String, String> entry : _httpHeaders.entries()) {
+        String key = entry.getKey();
+        String value = entry.getValue();
+        if (key.equalsIgnoreCase("x-forwarded-for")) {
+          if (value.contains(",")) {
+            clientIp.append(String.join(";", value.split(",")));
+          } else {
+            clientIp.append(value);
+          }
+        } else if (key.equalsIgnoreCase("x-real-ip")) {
+          clientIp.append(value);
+        }
+      }
+      return clientIp.length() == 0 ? CommonConstants.UNKNOWN : clientIp.toString();
+    } else {
+      return super.getClientIp();
+    }
   }
 }

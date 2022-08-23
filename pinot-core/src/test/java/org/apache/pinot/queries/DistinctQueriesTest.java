@@ -1190,11 +1190,9 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    */
   private DistinctTable getDistinctTableInnerSegment(String query) {
     BaseOperator<IntermediateResultsBlock> distinctOperator = getOperator(query);
-    List<Object> operatorResult = distinctOperator.nextBlock().getAggregationResult();
-    assertNotNull(operatorResult);
-    assertEquals(operatorResult.size(), 1);
-    assertTrue(operatorResult.get(0) instanceof DistinctTable);
-    return (DistinctTable) operatorResult.get(0);
+    DistinctTable distinctTable = distinctOperator.nextBlock().getDistinctTable();
+    assertNotNull(distinctTable);
+    return distinctTable;
   }
 
   /**

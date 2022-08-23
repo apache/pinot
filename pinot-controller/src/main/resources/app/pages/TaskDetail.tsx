@@ -19,7 +19,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { get, each } from 'lodash';
-import moment from 'moment';
 import { Grid, makeStyles } from '@material-ui/core';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import CustomizedTables from '../components/Table';
@@ -103,9 +102,6 @@ const TaskDetail = (props) => {
           </Grid>
           <Grid item xs={12}>
             <strong>Start Time:</strong> {get(taskDebugData, 'startTime', '')}
-          </Grid>
-          <Grid item xs={12}>
-            <strong>Elapsed Time:</strong> {get(taskDebugData, 'startTime') ? PinotMethodUtils.getElapsedTime(moment(get(taskDebugData, 'startTime'), 'YYYY-MM-DD hh:mm:ss')) : ''}
           </Grid>
           <Grid item xs={12}>
             <strong>Finish Time:</strong> {get(taskDebugData, 'subtaskInfos.0.finishTime', '')}

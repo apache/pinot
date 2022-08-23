@@ -16,12 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.api;
+package org.apache.pinot.controller.api.resources;
 
-import org.apache.pinot.spi.utils.CommonConstants;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import org.apache.pinot.common.metrics.ControllerGauge;
 
-public abstract class RequesterIdentity {
-  public String getClientIp() {
-    return CommonConstants.UNKNOWN;
-  }
+
+/**
+ * A method-level annotation for tracking inflight request metrics using {@link InflightRequestMetricsInterceptor}.
+ * The gauge specified by this annotation will be incremented when the request starts and decremented once the request
+ * has completed processing.
+ */
+@Target({ElementType.METHOD})
+@Retention(RetentionPolicy.RUNTIME)
+public @interface TrackedByGauge {
+  ControllerGauge gauge();
 }
