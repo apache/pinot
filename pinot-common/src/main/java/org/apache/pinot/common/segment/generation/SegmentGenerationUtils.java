@@ -28,6 +28,11 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
+import java.nio.file.PathMatcher;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -35,11 +40,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.JsonUtils;
-import java.util.List;
-import java.nio.file.PathMatcher;
-import java.nio.file.FileSystems;
-import java.nio.file.Paths;
-import java.util.ArrayList;
 
 public class SegmentGenerationUtils {
   private SegmentGenerationUtils() {

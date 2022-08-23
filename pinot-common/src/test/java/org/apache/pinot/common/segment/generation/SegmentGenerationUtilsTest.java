@@ -19,20 +19,20 @@
 
 package org.apache.pinot.common.segment.generation;
 
+import com.google.common.collect.Lists;
+import java.io.File;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-import com.google.common.collect.Lists;
-import java.io.File;
-import java.io.IOException;
 import java.nio.file.Files;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import java.util.List;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 public class SegmentGenerationUtilsTest {
 
