@@ -53,15 +53,14 @@ public class KafkaStreamLevelStreamConfig {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
 
     _kafkaTopicName = streamConfig.getTopicName();
-    String hlcBootstrapBrokerUrlKey =
-        KafkaStreamConfigProperties
-            .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER);
+    String hlcBootstrapBrokerUrlKey = KafkaStreamConfigProperties.constructStreamProperty(
+        KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER);
     _bootstrapServers = streamConfigMap.get(hlcBootstrapBrokerUrlKey);
     Preconditions.checkNotNull(_bootstrapServers,
         "Must specify bootstrap broker connect string " + hlcBootstrapBrokerUrlKey + " in high level kafka consumer");
 
     _groupId = groupId;
-    if(_groupId == null) {
+    if (_groupId == null) {
       _groupId = tableName;
     }
 
@@ -70,8 +69,8 @@ public class KafkaStreamLevelStreamConfig {
         KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.KAFKA_CONSUMER_PROP_PREFIX);
     for (String key : streamConfigMap.keySet()) {
       if (key.startsWith(kafkaConsumerPropertyPrefix)) {
-        _kafkaConsumerProperties
-            .put(StreamConfigProperties.getPropertySuffix(key, kafkaConsumerPropertyPrefix), streamConfigMap.get(key));
+        _kafkaConsumerProperties.put(StreamConfigProperties.getPropertySuffix(key, kafkaConsumerPropertyPrefix),
+            streamConfigMap.get(key));
       }
     }
   }
@@ -100,8 +99,8 @@ public class KafkaStreamLevelStreamConfig {
   @Override
   public String toString() {
     return "KafkaStreamLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\'' + ", _groupId='" + _groupId
-        + '\'' + ", _bootstrapServers='"
-        + _bootstrapServers + '\'' + ", _kafkaConsumerProperties=" + _kafkaConsumerProperties + '}';
+        + '\'' + ", _bootstrapServers='" + _bootstrapServers + '\'' + ", _kafkaConsumerProperties="
+        + _kafkaConsumerProperties + '}';
   }
 
   @Override
@@ -116,10 +115,9 @@ public class KafkaStreamLevelStreamConfig {
 
     KafkaStreamLevelStreamConfig that = (KafkaStreamLevelStreamConfig) o;
 
-    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils
-        .isEqual(_groupId, that._groupId) && EqualityUtils
-        .isEqual(_bootstrapServers, that._bootstrapServers) && EqualityUtils
-        .isEqual(_kafkaConsumerProperties, that._kafkaConsumerProperties);
+    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils.isEqual(_groupId,
+        that._groupId) && EqualityUtils.isEqual(_bootstrapServers, that._bootstrapServers) && EqualityUtils.isEqual(
+        _kafkaConsumerProperties, that._kafkaConsumerProperties);
   }
 
   @Override

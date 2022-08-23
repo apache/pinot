@@ -29,21 +29,19 @@ import org.testng.annotations.Test;
 public class KafkaStreamLevelStreamConfigTest {
   private static final String KAFKA_DECODER_CLASS_NAME =
       "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder";
-  
-  private StreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
-      String socketTimeout) {
+
+  private StreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer, String socketTimeout) {
     return getStreamConfig(topic, bootstrapHosts, buffer, socketTimeout, null, null, null);
   }
 
-  private StreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
-      String socketTimeout, String fetcherSize, String fetcherMinBytes, String isolationLevel) {
+  private StreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer, String socketTimeout,
+      String fetcherSize, String fetcherMinBytes, String isolationLevel) {
     return getStreamConfig(topic, bootstrapHosts, buffer, socketTimeout, fetcherSize, fetcherMinBytes, isolationLevel,
         null);
   }
 
-  public StreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
-      String socketTimeout, String fetcherSize, String fetcherMinBytes, String isolationLevel,
-      String populateRowMetadata) {
+  public StreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer, String socketTimeout,
+      String fetcherSize, String fetcherMinBytes, String isolationLevel, String populateRowMetadata) {
     Map<String, String> streamConfigMap = new HashMap<>();
     String streamType = "kafka";
     String consumerType = StreamConfig.ConsumerType.LOWLEVEL.toString();
@@ -82,7 +80,7 @@ public class KafkaStreamLevelStreamConfigTest {
 
     return new StreamConfig(tableNameWithType, streamConfigMap);
   }
-  
+
   @Test
   public void testGroupIdWhenNull() {
     StreamConfig streamConfig = getStreamConfig("topic", "bootstrapHosts", "", "");
