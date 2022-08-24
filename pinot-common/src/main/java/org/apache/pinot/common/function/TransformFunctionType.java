@@ -145,7 +145,8 @@ public enum TransformFunctionType {
   COSH("cosh"),
   TANH("tanh"),
   DEGREES("degrees"),
-  RADIANS("radians");
+  RADIANS("radians"),
+  IS_DISTINCT_FROM("is_distinct_from");
 
   private static final Set<String> NAMES = Arrays.stream(values()).flatMap(
       func -> func.getAliases().stream().flatMap(name -> Stream.of(name, StringUtils.remove(name, '_').toUpperCase(),

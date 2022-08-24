@@ -217,6 +217,8 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.DEGREES, DegreesTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.RADIANS, RadiansTransformFunction.class);
 
+    typeToImplementation.put(TransformFunctionType.IS_DISTINCT_FROM, IsDisinctFromTransformFunction.class);
+
     Map<String, Class<? extends TransformFunction>> registry = new HashMap<>(typeToImplementation.size());
     for (Map.Entry<TransformFunctionType, Class<? extends TransformFunction>> entry : typeToImplementation.entrySet()) {
       for (String alias : entry.getKey().getAliases()) {
