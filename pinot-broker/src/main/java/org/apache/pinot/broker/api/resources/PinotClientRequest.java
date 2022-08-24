@@ -190,8 +190,8 @@ public class PinotClientRequest {
   @GET
   @Path("queries")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get queryIds of the running queries submitted via the requested broker", notes = "The id is "
-      + "assigned by the requested broker and only unique at the scope of this broker")
+  @ApiOperation(value = "Get running queries submitted via the requested broker", notes = "The id is assigned by the "
+      + "requested broker and only unique at the scope of this broker")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
   })
