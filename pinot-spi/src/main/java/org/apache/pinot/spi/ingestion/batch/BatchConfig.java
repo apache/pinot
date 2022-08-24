@@ -32,8 +32,6 @@ public class BatchConfig {
 
   private final FileFormat _inputFormat;
   private final String _inputDirURI;
-  // TODO: update the default value to false.
-  private boolean _searchRecursively = true;
   private final String _inputFsClassName;
   private final Map<String, String> _inputFsProps;
 
@@ -75,7 +73,6 @@ public class BatchConfig {
       _inputFormat = null;
     }
     _inputDirURI = batchConfigsMap.get(BatchConfigProperties.INPUT_DIR_URI);
-    _searchRecursively = Boolean.parseBoolean(batchConfigsMap.get(BatchConfigProperties.SEARCH_RECURSIVELY));
     _inputFsClassName = batchConfigsMap.get(BatchConfigProperties.INPUT_FS_CLASS);
     _inputFsProps =
         IngestionConfigUtils.extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.INPUT_FS_PROP_PREFIX);
@@ -119,10 +116,6 @@ public class BatchConfig {
 
   public String getInputDirURI() {
     return _inputDirURI;
-  }
-
-  public boolean isSearchRecursively() {
-    return _searchRecursively;
   }
 
   public String getOutputDirURI() {

@@ -42,6 +42,7 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.JsonUtils;
 
+
 public class SegmentGenerationUtils {
   private SegmentGenerationUtils() {
   }
