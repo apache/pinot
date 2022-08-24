@@ -114,9 +114,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     //              current offset          latest stream offset    current time    last ingestion time
     // segA0              20                       20                     100               0
     // segA1              200                      200                    100               0
-    // segB0              1999                     2000                   100               0
-    when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(1999));
-    // current offset is 1 less than latest offset which is why we return 0 here
+    // segB0              2000                     2000                   100               0
+    when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(2000));
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 

@@ -46,19 +46,10 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
 
   private boolean isOffsetCaughtUp(StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestOffset) {
     if (currentOffset != null && latestOffset != null) {
-      if (currentOffset.compareTo(latestOffset) == 0) {
-        return true;
-      }
-      if (currentOffset instanceof LongMsgOffset && latestOffset instanceof LongMsgOffset) {
-        long currentOffsetLong = ((LongMsgOffset) currentOffset).getOffset();
-        long latestOffsetLong = ((LongMsgOffset) latestOffset).getOffset();
-        // Kafka's "latest" offset is actually the next available offset. Therefore it will be 1 ahead of the
-        // current offset in the case we are caught up.
-        // We expect currentOffset == latestOffset if no messages have ever been published. Both will be 0.
-        // Otherwise, we never expect currentOffset > latestOffset, but we allow this to be caught up in case
-        // it ever happens, so we're not stuck starting up.
-        return currentOffsetLong >= latestOffsetLong - 1;
-      }
+      // Kafka's "latest" offset is actually the next available offset. Therefore it will be 1 ahead of the
+      // current offset in the case we are caught up.
+      // TODO: implement a way to have this work correctly for kafka consumers
+      return currentOffset.compareTo(latestOffset) >= 0;
     }
     return false;
   }
