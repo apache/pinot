@@ -57,6 +57,8 @@ public class SqlNodeAndOptions {
   }
 
   public void setExtraOptions(Map<String, String> extractOptionsMap) {
-    _options.putAll(extractOptionsMap);
+    for (Map.Entry<String, String> e : extractOptionsMap.entrySet()) {
+      _options.putIfAbsent(e.getKey(), e.getValue());
+    }
   }
 }
