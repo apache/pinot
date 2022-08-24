@@ -27,8 +27,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -36,11 +34,9 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.IngestionJobLauncher;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
-import org.apache.pinot.spi.ingestion.batch.spec.TlsSpec;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.GroovyTemplateUtils;
 import org.apache.pinot.tools.Command;
-import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.launcher.SparkAppHandle;
 import org.apache.spark.launcher.SparkLauncher;
 import org.slf4j.Logger;
@@ -79,6 +75,10 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   private List<String> _pluginsToLoad;
   @CommandLine.Option(names = {"-pinotJarsDir"}, required = true, description = "Pinot binary installation directory")
   private String _pinotJarDir;
+  @CommandLine.Option(names = {"-deployMode"}, required = false, description = "Spark Deploy Mode")
+  private String _deployMode;
+  @CommandLine.Option(names = {"-master"}, required = false, defaultValue = "local", description = "Spark Master")
+  private String _sparkMaster;
 
   private AuthProvider _authProvider;
 
@@ -124,8 +124,10 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   public boolean execute()
       throws Exception {
     SparkLauncher sparkLauncher = new SparkLauncher();
-    sparkLauncher.setMaster("yarn");
-    sparkLauncher.setDeployMode("cluster");
+    sparkLauncher.setMaster(_sparkMaster);
+    if(_deployMode != null) {
+      sparkLauncher.setDeployMode(_deployMode);
+    }
     sparkLauncher.setMainClass("org.apache.pinot.tools.admin.command.LaunchDataIngestionJobCommand");
     SegmentGenerationJobSpec spec;
     try {
@@ -142,11 +144,19 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
     }
 
     addDepsJarToDistributedCache(sparkLauncher, _pinotJarDir);
+    addAppResource(sparkLauncher, _pinotJarDir);
+
     //TODO: Add rest of the args
     sparkLauncher.addAppArgs("-jobSpecFile", _jobSpecFile);
 
     sparkLauncher.setAppName("Pinot Spark Ingestion Job");
-    SparkAppHandle sparkAppHandle = sparkLauncher.startApplication(new SparkAppListener());
+    sparkLauncher.setVerbose(true);
+    sparkLauncher.redirectToLog(LOGGER.getName());
+    SparkAppListener listener = new SparkAppListener();
+//    SparkAppHandle sparkAppHandle = sparkLauncher.startApplication(listener);
+//    sparkAppHandle.addListener(listener);
+    Process process = sparkLauncher.launch();
+    process.waitFor();
     return true;
   }
 
@@ -154,11 +164,40 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
     @Override
     public void stateChanged(SparkAppHandle sparkAppHandle) {
       LOGGER.info("Current app State: {} for appId: {}", sparkAppHandle.getState(), sparkAppHandle.getAppId());
+      while(sparkAppHandle.getState() != SparkAppHandle.State.FINISHED) {
+        try {
+          Thread.sleep(1000L);
+        }catch (Exception e) {
+
+        }
+      }
     }
 
     @Override
     public void infoChanged(SparkAppHandle sparkAppHandle) {
       LOGGER.info("Current app info State: {} for appId: {}", sparkAppHandle.getState(), sparkAppHandle.getAppId());
+    }
+  }
+  private void addAppResource(SparkLauncher sparkLauncher, String depsJarDir)
+      throws IOException {
+    if (depsJarDir != null) {
+      URI depsJarDirURI = URI.create(depsJarDir + "/lib");
+      if (depsJarDirURI.getScheme() == null) {
+        depsJarDirURI = new File(depsJarDir+ "/lib").toURI();
+      }
+      PinotFS pinotFS = PinotFSFactory.create(depsJarDirURI.getScheme());
+      String[] files = pinotFS.listFiles(depsJarDirURI, true);
+      for (String file : files) {
+        if (!pinotFS.isDirectory(URI.create(file))) {
+          if (file.endsWith(".jar")) {
+            LOGGER.info("Adding deps jar: {} to appResource", file);
+              sparkLauncher.addJar(file);
+//              Path path = Paths.get(URI.create(file));
+              //TODO: Handle local vs s3 correctly
+              sparkLauncher.setAppResource(file);
+          }
+        }
+      }
     }
   }
 
@@ -176,17 +215,36 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
         if (!pinotFS.isDirectory(URI.create(file))) {
           if (file.endsWith(".jar")) {
             LOGGER.info("Adding deps jar: {} to distributed cache", file);
-            if(_pluginsToLoad.isEmpty()) {
-              sparkLauncher.addJar(file);
-              Path path = Paths.get(URI.create(file));
-              jarFiles.add(path.getFileName().toString());
+            if (_pluginsToLoad == null || _pluginsToLoad.isEmpty()) {
+              URI fileUri = URI.create(file);
+              if (fileUri.getScheme() == null) {
+                fileUri = new File(file).toURI();
+              }
+              Path path = Paths.get(fileUri);
+              if(_deployMode != null && _deployMode.contentEquals("cluster")) {
+                sparkLauncher.addJar(path.getFileName().toString());
+                jarFiles.add(path.getFileName().toString());
+              } else {
+                sparkLauncher.addJar(file);
+                jarFiles.add(file);
+              }
             } else {
-              Path path = Paths.get(URI.create(file));
+
+              URI fileUri = URI.create(file);
+              if (fileUri.getScheme() == null) {
+                fileUri = new File(file).toURI();
+              }
+              Path path = Paths.get(fileUri);
               String fileName = path.getFileName().toString();
               String parentDir = path.getParent().getFileName().toString();
-              if(_pluginsToLoad.contains(parentDir)) {
-                sparkLauncher.addJar(file);
-                jarFiles.add(fileName);
+              if (_pluginsToLoad.contains(parentDir)) {
+                if(_deployMode != null && _deployMode.contentEquals("cluster")) {
+                  sparkLauncher.addJar(fileName);
+                  jarFiles.add(fileName);
+                } else {
+                  sparkLauncher.addJar(file);
+                  jarFiles.add(file);
+                }
               }
             }
           }
