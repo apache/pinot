@@ -210,15 +210,6 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
     if (count == 0L) {
       return DEFAULT_FINAL_RESULT;
     } else {
-      /* Population covariance between two random variables X and Y is defined as either:
-       * covarPop(X,Y) = E[(X - E[X]) * (Y - E[Y])] or
-       * covarPop(X,Y) = E[X*Y] - E[X]*E[Y],
-       * where E[X] represents mean of X
-       * @see <a href="https://en.wikipedia.org/wiki/Covariance">Covariance</a>
-       * The calculations here are based on the second definition shown above.
-       * Sample covariance = covarPop(X, Y) * besselCorrection
-       * @see <a href="https://en.wikipedia.org/wiki/Bessel%27s_correction">Bessel's correction</a>
-       * */
       double sumX = covarianceTuple.getSumX();
       double sumY = covarianceTuple.getSumY();
       double sumXY = covarianceTuple.getSumXY();
