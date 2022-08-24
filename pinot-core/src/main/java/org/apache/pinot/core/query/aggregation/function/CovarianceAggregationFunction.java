@@ -204,7 +204,7 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
       double popCov = (sumXY / count) - (sumX / count) * (sumY / count);
       double besselCorrection = count / (count - 1);
       if (_isSample) {
-        return popCov / besselCorrection;
+        return popCov * besselCorrection;
       }
       return popCov;
     }
