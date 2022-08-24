@@ -41,6 +41,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.trace.TraceCallable;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -154,6 +155,8 @@ public class CombinePlanNode implements PlanNode {
         Throwable cause = e.getCause();
         if (cause instanceof BadQueryRequestException) {
           throw (BadQueryRequestException) cause;
+        } else if (e instanceof InterruptedException) {
+          throw new QueryCancelledException("Cancelled while running CombinePlanNode", e);
         } else {
           throw new RuntimeException("Caught exception while running CombinePlanNode.", e);
         }

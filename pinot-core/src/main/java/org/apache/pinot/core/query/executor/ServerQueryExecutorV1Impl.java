@@ -76,6 +76,7 @@ import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.joda.time.Interval;
@@ -245,16 +246,26 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           queryRequest.isEnableStreaming());
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
-
-      // Do not log error for BadQueryRequestException because it's caused by bad query
+      dataTable = DataTableFactory.getEmptyDataTable();
+      // Do not log verbose error for BadQueryRequestException and QueryCancelledException.
       if (e instanceof BadQueryRequestException) {
         LOGGER.info("Caught BadQueryRequestException while processing requestId: {}, {}", requestId, e.getMessage());
+        dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+      } else if (e instanceof QueryCancelledException) {
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Cancelled while processing requestId: {}", requestId, e);
+        } else {
+          LOGGER.info("Cancelled while processing requestId: {}, {}", requestId, e.getMessage());
+        }
+        // NOTE most likely the onFailure() callback registered on query future in InstanceRequestHandler would
+        // return the error table to broker sooner than here. But in case of race condition, we construct the error
+        // table here too.
+        dataTable.addException(QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR,
+            "Query cancelled on: " + _instanceDataManager.getInstanceId()));
       } else {
         LOGGER.error("Exception processing requestId {}", requestId, e);
+        dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       }
-
-      dataTable = DataTableFactory.getEmptyDataTable();
-      dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     } finally {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);

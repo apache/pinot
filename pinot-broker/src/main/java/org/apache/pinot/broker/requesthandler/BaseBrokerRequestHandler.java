@@ -134,8 +134,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final int _defaultHllLog2m;
   private final boolean _enableQueryLimitOverride;
   private final boolean _enableDistinctCountBitmapOverride;
-  private final Map<Long, QueryServers> _queriesById = new ConcurrentHashMap<>();
-  private final boolean _enableQueryCancellation;
+  private final Map<Long, QueryServers> _queriesById;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
@@ -164,13 +163,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         Broker.DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND));
     _numDroppedLog = new AtomicInteger(0);
     _numDroppedLogRateLimiter = RateLimiter.create(1.0);
-    _enableQueryCancellation =
+    boolean enableQueryCancellation =
         Boolean.parseBoolean(config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION));
+    _queriesById = enableQueryCancellation ? new ConcurrentHashMap<>() : null;
     LOGGER.info(
         "Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps, "
-            + "enabling query cancellation: {}",
-        _brokerId, _brokerTimeoutMs, _queryResponseLimit, _queryLogLength, _queryLogRateLimiter.getRate(),
-        _enableQueryCancellation);
+            + "enabling query cancellation: {}", _brokerId, _brokerTimeoutMs, _queryResponseLimit, _queryLogLength,
+        _queryLogRateLimiter.getRate(), enableQueryCancellation);
   }
 
   private String getDefaultBrokerId() {
@@ -184,13 +183,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   @Override
   public Map<Long, String> getRunningQueries() {
-    Preconditions.checkArgument(_enableQueryCancellation, "Query cancellation is not enabled on broker");
+    Preconditions.checkState(_queriesById != null, "Query cancellation is not enabled on broker");
     return _queriesById.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue()._query));
   }
 
   @VisibleForTesting
   Set<ServerInstance> getRunningServers(long requestId) {
-    Preconditions.checkArgument(_enableQueryCancellation, "Query cancellation is not enabled on broker");
+    Preconditions.checkState(_queriesById != null, "Query cancellation is not enabled on broker");
     QueryServers queryServers = _queriesById.get(requestId);
     return (queryServers == null) ? Collections.emptySet() : queryServers._servers;
   }
@@ -199,7 +198,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   public boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpConnectionManager connMgr,
       Map<String, Integer> serverResponses)
       throws Exception {
-    Preconditions.checkArgument(_enableQueryCancellation, "Query cancellation is not enabled on broker");
+    Preconditions.checkState(_queriesById != null, "Query cancellation is not enabled on broker");
     QueryServers queryServers = _queriesById.get(queryId);
     if (queryServers == null) {
       return false;
@@ -278,7 +277,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       requestContext.setQuery(query);
       return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
     } finally {
-      if (_enableQueryCancellation) {
+      if (_queriesById != null) {
         _queriesById.remove(requestId);
         LOGGER.debug("Remove track of running query: {}", requestId);
       }
@@ -665,7 +664,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         realtimeRoutingTable = null;
       }
     }
-    if (_enableQueryCancellation) {
+    if (_queriesById != null) {
       // Start to track the running query for cancellation just before sending it out to servers to avoid any potential
       // failures that could happen before sending it out, like failures to calculate the routing table etc.
       // TODO: Even tracking the query as late as here, a potential race condition between calling cancel API and

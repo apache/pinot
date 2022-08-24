@@ -16,31 +16,40 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.scheduler;
+package org.apache.pinot.core.transport;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 
-public class QuerySchedulerTest {
+public class InstanceRequestHandlerTest {
   @Test
   public void testCancelQuery() {
     PinotConfiguration config = new PinotConfiguration();
-    config.setProperty("enable.query.cancellation", "true");
+    config.setProperty("pinot.server.enable.query.cancellation", "true");
     QueryScheduler qs = createQueryScheduler(config);
+    InstanceRequestHandler handler =
+        new InstanceRequestHandler("server01", config, qs, mock(ServerMetrics.class), mock(AccessControl.class));
+
     Set<String> queryIds = new HashSet<>();
     queryIds.add("foo");
     queryIds.add("bar");
@@ -48,14 +57,17 @@ public class QuerySchedulerTest {
     for (String id : queryIds) {
       ServerQueryRequest query = mock(ServerQueryRequest.class);
       when(query.getQueryId()).thenReturn(id);
-      qs.submitQuery(query);
+      ChannelHandlerContext ctx = mock(ChannelHandlerContext.class);
+      ChannelFuture chFu = mock(ChannelFuture.class);
+      when(ctx.writeAndFlush(any())).thenReturn(chFu);
+      handler.submitQuery(query, ctx, "myTable01", System.currentTimeMillis(), mock(InstanceRequest.class));
     }
-    Assert.assertEquals(qs.getRunningQueryIds(), queryIds);
+    Assert.assertEquals(handler.getRunningQueryIds(), queryIds);
     for (String id : queryIds) {
-      qs.cancelQuery(id);
+      handler.cancelQuery(id);
     }
-    Assert.assertTrue(qs.getRunningQueryIds().isEmpty());
-    Assert.assertFalse(qs.cancelQuery("unknown"));
+    Assert.assertTrue(handler.getRunningQueryIds().isEmpty());
+    Assert.assertFalse(handler.cancelQuery("unknown"));
   }
 
   private QueryScheduler createQueryScheduler(PinotConfiguration config) {

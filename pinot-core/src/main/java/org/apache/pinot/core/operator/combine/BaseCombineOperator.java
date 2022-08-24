@@ -37,6 +37,7 @@ import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -118,6 +119,8 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     IntermediateResultsBlock mergedBlock;
     try {
       mergedBlock = mergeResults();
+    } catch (InterruptedException e) {
+      throw new QueryCancelledException("Cancelled while merging results blocks", e);
     } catch (Exception e) {
       LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
       mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));

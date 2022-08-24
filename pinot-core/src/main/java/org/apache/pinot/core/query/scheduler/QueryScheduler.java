@@ -19,18 +19,12 @@
 package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.RateLimiter;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAccumulator;
@@ -77,9 +71,7 @@ public abstract class QueryScheduler {
   private final RateLimiter _queryLogRateLimiter;
   private final RateLimiter _numDroppedLogRateLimiter;
   private final AtomicInteger _numDroppedLogCounter;
-  private final boolean _enableQueryCancellation;
   protected volatile boolean _isRunning = false;
-  private final Map<String, Future<byte[]>> _queryFuturesById = new ConcurrentHashMap<>();
   /**
    * Constructor to initialize QueryScheduler
    * @param queryExecutor QueryExecutor engine to use
@@ -102,11 +94,6 @@ public abstract class QueryScheduler {
     _numDroppedLogRateLimiter = RateLimiter.create(1.0d);
     _numDroppedLogCounter = new AtomicInteger(0);
     LOGGER.info("Query log max rate: {}", _queryLogRateLimiter.getRate());
-
-    _enableQueryCancellation = Boolean.parseBoolean(config.getProperty(ENABLE_QUERY_CANCELLATION_KEY));
-    if (_enableQueryCancellation) {
-      LOGGER.info("Enable query cancellation");
-    }
   }
 
   /**
@@ -116,76 +103,6 @@ public abstract class QueryScheduler {
    *    future may return immediately or be scheduled for execution at a later time.
    */
   public abstract ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest);
-
-  /**
-   * Submit a query for execution and track runtime context about the query for things like cancellation.
-   * @param queryRequest query to schedule for execution
-   * @return Listenable future for query result representing serialized response. Custom callbacks can be added on
-   * the future to clean up the runtime context tracked during query execution.
-   */
-  public ListenableFuture<byte[]> submitQuery(ServerQueryRequest queryRequest) {
-    ListenableFuture<byte[]> future = submit(queryRequest);
-    if (_enableQueryCancellation) {
-      String queryId = queryRequest.getQueryId();
-      // Track the running query for cancellation.
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("Keep track of running query: {}", queryId);
-      }
-      _queryFuturesById.put(queryId, future);
-      // And remove the track when the query ends.
-      Futures.addCallback(future, new FutureCallback<byte[]>() {
-        @Override
-        public void onSuccess(@Nullable byte[] ignored) {
-          if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("Remove track of running query: {} on success", queryId);
-          }
-          _queryFuturesById.remove(queryId);
-        }
-
-        @Override
-        public void onFailure(Throwable ignored) {
-          if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("Remove track of running query: {} on failure", queryId);
-          }
-          _queryFuturesById.remove(queryId);
-        }
-      }, MoreExecutors.directExecutor());
-    }
-    return future;
-  }
-
-  /**
-   * Cancel a query as identified by the queryId. This method is non-blocking and the query may still run for a while
-   * after calling this method. This method can be called multiple times.
-   * TODO: refine the errmsg when query is cancelled, instead of bubbling up the executor's CancellationException.
-   *
-   * @param queryId a unique Id to find the query
-   * @return true if a running query exists for the given queryId.
-   */
-  public boolean cancelQuery(String queryId) {
-    Preconditions.checkArgument(_enableQueryCancellation, "Query cancellation is not enabled on server");
-    // Keep the future as it'll be cleaned up by the thread executing the query.
-    Future<byte[]> future = _queryFuturesById.get(queryId);
-    if (future == null) {
-      return false;
-    }
-    boolean done = future.isDone();
-    if (!done) {
-      future.cancel(true);
-    }
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Cancelled query: {} that's done: {}", queryId, done);
-    }
-    return true;
-  }
-
-  /**
-   * @return list of ids of the queries currently running on the server.
-   */
-  public Set<String> getRunningQueryIds() {
-    Preconditions.checkArgument(_enableQueryCancellation, "Query cancellation is not enabled on server");
-    return new HashSet<>(_queryFuturesById.keySet());
-  }
 
   /**
    * Query scheduler name for logging

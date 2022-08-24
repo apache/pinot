@@ -68,7 +68,7 @@ public class QueryResource {
       @ApiParam(value = "QueryId as in the format of <brokerId>_<requestId>", required = true) @PathParam("queryId")
           String queryId) {
     try {
-      if (_serverInstance.getQueryScheduler().cancelQuery(queryId)) {
+      if (_serverInstance.getInstanceRequestHandler().cancelQuery(queryId)) {
         return "Cancelled query: " + queryId;
       }
     } catch (Exception e) {
@@ -91,7 +91,7 @@ public class QueryResource {
   })
   public Set<String> getRunningQueryIds() {
     try {
-      return _serverInstance.getQueryScheduler().getRunningQueryIds();
+      return _serverInstance.getInstanceRequestHandler().getRunningQueryIds();
     } catch (Exception e) {
       throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
           .entity("Failed to get queryIds of running queries on the server due to error: " + e.getMessage()).build());
