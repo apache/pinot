@@ -5,22 +5,73 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.runtime.operator.OperatorUtils;
 
 
 public abstract class FilterOperand extends TransformOperand {
 
+  @SuppressWarnings({"unchecked", "rawtypes"})
   public static FilterOperand toFilterOperand(RexExpression rexExpression, DataSchema dataSchema) {
     Preconditions.checkState(rexExpression instanceof RexExpression.FunctionCall);
     RexExpression.FunctionCall functionCall = (RexExpression.FunctionCall) rexExpression;
-    switch (functionCall.getFunctionName()) {
+    switch (OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName())) {
       case "AND":
         return new And(functionCall.getFunctionOperands(), dataSchema);
       case "OR":
         return new Or(functionCall.getFunctionOperands(), dataSchema);
       case "NOT":
         return new Not(toFilterOperand(functionCall.getFunctionOperands().get(0), dataSchema));
+      case "EQ":
+        return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
+          @Override
+          public Boolean apply(Object[] row) {
+            return ((Comparable) _lhs._resultType.convert(_lhs.apply(row))).compareTo(
+                _lhs._resultType.convert(_rhs.apply(row))) == 0;
+          }
+        };
+      case "NE":
+      case "NE2":
+        return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
+          @Override
+          public Boolean apply(Object[] row) {
+            return ((Comparable) _lhs._resultType.convert(_lhs.apply(row))).compareTo(
+                _lhs._resultType.convert(_rhs.apply(row))) != 0;
+          }
+        };
+      case "GT":
+        return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
+          @Override
+          public Boolean apply(Object[] row) {
+            return ((Comparable) _lhs._resultType.convert(_lhs.apply(row))).compareTo(
+                _lhs._resultType.convert(_rhs.apply(row))) > 0;
+          }
+        };
+      case "GE":
+        return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
+          @Override
+          public Boolean apply(Object[] row) {
+            return ((Comparable) _lhs._resultType.convert(_lhs.apply(row))).compareTo(
+                _lhs._resultType.convert(_rhs.apply(row))) >= 0;
+          }
+        };
+      case "LT":
+        return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
+          @Override
+          public Boolean apply(Object[] row) {
+            return ((Comparable) _lhs._resultType.convert(_lhs.apply(row))).compareTo(
+                _lhs._resultType.convert(_rhs.apply(row))) < 0;
+          }
+        };
+      case "LE":
+        return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
+          @Override
+          public Boolean apply(Object[] row) {
+            return ((Comparable) _lhs._resultType.convert(_lhs.apply(row))).compareTo(
+                _lhs._resultType.convert(_rhs.apply(row))) <= 0;
+          }
+        };
       default:
-        return new Predicate(new FunctionOperand(functionCall, dataSchema));
+        throw new UnsupportedOperationException("Unsupported filter predicate: " + functionCall.getFunctionName());
     }
   }
 
@@ -79,16 +130,13 @@ public abstract class FilterOperand extends TransformOperand {
     }
   }
 
-  private static class Predicate extends FilterOperand {
-    private final FunctionOperand _functionOperand;
+  private static abstract class Predicate extends FilterOperand {
+    protected final TransformOperand _lhs;
+    protected final TransformOperand _rhs;
 
-    public Predicate(FunctionOperand functionOperand) {
-      _functionOperand = functionOperand;
-    }
-
-    @Override
-    public Boolean apply(Object[] row) {
-      return (Boolean) _functionOperand.apply(row);
+    public Predicate(List<RexExpression> functionOperands, DataSchema dataSchema) {
+      _lhs = TransformOperand.toTransformOperand(functionOperands.get(0), dataSchema);
+      _rhs = TransformOperand.toTransformOperand(functionOperands.get(1), dataSchema);
     }
   }
 }

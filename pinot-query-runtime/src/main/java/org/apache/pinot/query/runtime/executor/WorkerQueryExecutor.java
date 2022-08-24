@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.executor;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;

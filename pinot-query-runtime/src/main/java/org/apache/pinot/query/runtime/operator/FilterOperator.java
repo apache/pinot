@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -27,10 +26,6 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.common.datablock.DataBlockUtils;
 import org.apache.pinot.core.operator.BaseOperator;
-import org.apache.pinot.core.query.reduce.filter.AndRowMatcher;
-import org.apache.pinot.core.query.reduce.filter.NotRowMatcher;
-import org.apache.pinot.core.query.reduce.filter.OrRowMatcher;
-import org.apache.pinot.core.query.reduce.filter.RowMatcher;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
