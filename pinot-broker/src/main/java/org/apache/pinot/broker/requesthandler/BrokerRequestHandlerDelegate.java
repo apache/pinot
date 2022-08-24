@@ -83,7 +83,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       throws Exception {
     if (sqlNodeAndOptions == null) {
       try {
-        sqlNodeAndOptions = RequestUtils.parseQuery(request);
+        sqlNodeAndOptions = RequestUtils.parseQuery(request.get(CommonConstants.Broker.Request.SQL).asText(), request);
       } catch (Exception e) {
         LOGGER.info("Caught exception while compiling SQL: {}, {}", request, e.getMessage());
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);

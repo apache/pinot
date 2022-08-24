@@ -32,7 +32,6 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.FilterKind;
@@ -49,14 +48,10 @@ public class RequestUtils {
   private RequestUtils() {
   }
 
-  public static SqlNodeAndOptions parseQuery(JsonNode request)
+  public static SqlNodeAndOptions parseQuery(String query, JsonNode request)
       throws SqlCompilationException {
     long parserStartTimeNs = System.nanoTime();
-    JsonNode sql = request.get(CommonConstants.Broker.Request.SQL);
-    if (sql == null) {
-      throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
-    }
-    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql.asText());
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
     setOptions(sqlNodeAndOptions, request);
     sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parserStartTimeNs);
     return sqlNodeAndOptions;
