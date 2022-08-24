@@ -48,6 +48,8 @@ public class IngestionJobLauncherTest {
         null, context, _defaultEnvironmentValues);
     Assert.assertEquals(spec.getInputDirURI(), "file:///path/to/input/2020/05/06");
     Assert.assertEquals(spec.getOutputDirURI(), "file:///path/to/output/2020/05/06");
+    // searchRecursively is set to false in the yaml file.
+    Assert.assertFalse(spec.isSearchRecursively());
   }
 
   @Test
@@ -56,6 +58,8 @@ public class IngestionJobLauncherTest {
         GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_unicode.yaml").getFile(), null,
         null, null);
     Assert.assertEquals("\ufff0", spec.getRecordReaderSpec().getConfigs().get("multiValueDelimiter"));
+    // searchRecursively is set to true by default.
+    Assert.assertTrue(spec.isSearchRecursively());
   }
 
   @Test

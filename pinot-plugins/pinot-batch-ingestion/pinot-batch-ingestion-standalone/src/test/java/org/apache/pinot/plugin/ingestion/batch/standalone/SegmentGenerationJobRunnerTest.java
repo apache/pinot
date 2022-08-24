@@ -125,6 +125,7 @@ public class SegmentGenerationJobRunnerTest {
     File schemaFile = makeSchemaFile(testDir, schemaName);
     File tableConfigFile = makeTableConfigFile(testDir, schemaName);
     SegmentGenerationJobSpec jobSpec = makeJobSpec(inputDir, outputDir, schemaFile, tableConfigFile);
+    jobSpec.setSearchRecursively(true);
     SegmentGenerationJobRunner jobRunner = new SegmentGenerationJobRunner(jobSpec);
     jobRunner.run();
 

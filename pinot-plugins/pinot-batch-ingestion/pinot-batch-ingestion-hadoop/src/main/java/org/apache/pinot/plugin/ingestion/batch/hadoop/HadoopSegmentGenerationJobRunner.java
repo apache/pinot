@@ -26,8 +26,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.FileSystems;
-import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -142,13 +140,14 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
       PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
     }
-
-    //Get pinotFS for input
+    //Get list of files to process
     URI inputDirURI = new URI(_spec.getInputDirURI());
     if (inputDirURI.getScheme() == null) {
       inputDirURI = new File(_spec.getInputDirURI()).toURI();
     }
     PinotFS inputDirFS = PinotFSFactory.create(inputDirURI.getScheme());
+    List<String> filteredFiles = SegmentGenerationUtils.listMatchedFilesWithRecursiveOption(inputDirFS, inputDirURI,
+        _spec.getIncludeFileNamePattern(), _spec.getExcludeFileNamePattern(), _spec.isSearchRecursively());
 
     //Get outputFS for writing output pinot segments
     URI outputDirURI = new URI(_spec.getOutputDirURI());
@@ -181,71 +180,35 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     Path stagingSegmentTarUri = new Path(stagingDirURI.toString(), SEGMENT_TAR_SUBDIR_NAME);
     outputDirFS.mkdir(stagingSegmentTarUri.toUri());
 
-    //Get list of files to process
-    String[] files = inputDirFS.listFiles(inputDirURI, true);
-
-    //TODO: sort input files based on creation time
-    List<String> filteredFiles = new ArrayList<>();
-    PathMatcher includeFilePathMatcher = null;
-    if (_spec.getIncludeFileNamePattern() != null) {
-      includeFilePathMatcher = FileSystems.getDefault().getPathMatcher(_spec.getIncludeFileNamePattern());
-    }
-    PathMatcher excludeFilePathMatcher = null;
-    if (_spec.getExcludeFileNamePattern() != null) {
-      excludeFilePathMatcher = FileSystems.getDefault().getPathMatcher(_spec.getExcludeFileNamePattern());
-    }
-
-    for (String file : files) {
-      if (includeFilePathMatcher != null) {
-        if (!includeFilePathMatcher.matches(Paths.get(file))) {
-          continue;
-        }
-      }
-      if (excludeFilePathMatcher != null) {
-        if (excludeFilePathMatcher.matches(Paths.get(file))) {
-          continue;
-        }
-      }
-      if (!inputDirFS.isDirectory(new URI(file))) {
-        filteredFiles.add(file);
-      }
-    }
-
+    // numDataFiles is guaranteed to be greater than zero since listMatchedFilesWithRecursiveOption will throw
+    // runtime exception if the matched files list is empty.
     int numDataFiles = filteredFiles.size();
-    if (numDataFiles == 0) {
-      String errorMessage = String
-          .format("No data file founded in [%s], with include file pattern: [%s] and exclude file  pattern [%s]",
-              _spec.getInputDirURI(), _spec.getIncludeFileNamePattern(), _spec.getExcludeFileNamePattern());
-      LOGGER.error(errorMessage);
-      throw new RuntimeException(errorMessage);
-    } else {
-      LOGGER.info("Creating segments with data files: {}", filteredFiles);
-      if (!SegmentGenerationJobUtils.useGlobalDirectorySequenceId(_spec.getSegmentNameGeneratorSpec())) {
-        Map<String, List<String>> localDirIndex = new HashMap<>();
-        for (String filteredFile : filteredFiles) {
-          java.nio.file.Path filteredParentPath = Paths.get(filteredFile).getParent();
-          if (!localDirIndex.containsKey(filteredParentPath.toString())) {
-            localDirIndex.put(filteredParentPath.toString(), new ArrayList<>());
-          }
-          localDirIndex.get(filteredParentPath.toString()).add(filteredFile);
+
+    LOGGER.info("Creating segments with data files: {}", filteredFiles);
+    if (!SegmentGenerationJobUtils.useGlobalDirectorySequenceId(_spec.getSegmentNameGeneratorSpec())) {
+      Map<String, List<String>> localDirIndex = new HashMap<>();
+      for (String filteredFile : filteredFiles) {
+        java.nio.file.Path filteredParentPath = Paths.get(filteredFile).getParent();
+        if (!localDirIndex.containsKey(filteredParentPath.toString())) {
+          localDirIndex.put(filteredParentPath.toString(), new ArrayList<>());
         }
-        for (String parentPath : localDirIndex.keySet()) {
-          List<String> siblingFiles = localDirIndex.get(parentPath);
-          Collections.sort(siblingFiles);
-          for (int i = 0; i < siblingFiles.size(); i++) {
-            URI inputFileURI = SegmentGenerationUtils
-                .getFileURI(siblingFiles.get(i), SegmentGenerationUtils.getDirectoryURI(parentPath));
-            createInputFileUriAndSeqIdFile(inputFileURI, outputDirFS, stagingInputDir, i);
-          }
-        }
-      } else {
-        for (int i = 0; i < numDataFiles; i++) {
-          URI inputFileURI = SegmentGenerationUtils.getFileURI(filteredFiles.get(i), inputDirURI);
+        localDirIndex.get(filteredParentPath.toString()).add(filteredFile);
+      }
+      for (String parentPath : localDirIndex.keySet()) {
+        List<String> siblingFiles = localDirIndex.get(parentPath);
+        Collections.sort(siblingFiles);
+        for (int i = 0; i < siblingFiles.size(); i++) {
+          URI inputFileURI = SegmentGenerationUtils.getFileURI(siblingFiles.get(i),
+              SegmentGenerationUtils.getDirectoryURI(parentPath));
           createInputFileUriAndSeqIdFile(inputFileURI, outputDirFS, stagingInputDir, i);
         }
       }
+    } else {
+      for (int i = 0; i < numDataFiles; i++) {
+        URI inputFileURI = SegmentGenerationUtils.getFileURI(filteredFiles.get(i), inputDirURI);
+        createInputFileUriAndSeqIdFile(inputFileURI, outputDirFS, stagingInputDir, i);
+      }
     }
-
     try {
       // Set up the job
       Job job = Job.getInstance(getConf());

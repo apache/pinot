@@ -23,8 +23,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
-import java.nio.file.FileSystems;
-import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -172,37 +170,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
   public void run()
       throws Exception {
     // Get list of files to process.
-    String[] files = _inputDirFS.listFiles(_inputDirURI, true);
-
-    // TODO - sort input files by modification timestamp. Though this is problematic because:
-    // a. It can put more load on the external filesystem (e.g. S3), and
-    // b. The call to Collections.sort(siblingFiles) below will reorder files by name.
-
-    List<String> filteredFiles = new ArrayList<>();
-    PathMatcher includeFilePathMatcher = null;
-    if (_spec.getIncludeFileNamePattern() != null) {
-      includeFilePathMatcher = FileSystems.getDefault().getPathMatcher(_spec.getIncludeFileNamePattern());
-    }
-    PathMatcher excludeFilePathMatcher = null;
-    if (_spec.getExcludeFileNamePattern() != null) {
-      excludeFilePathMatcher = FileSystems.getDefault().getPathMatcher(_spec.getExcludeFileNamePattern());
-    }
-
-    for (String file : files) {
-      if (includeFilePathMatcher != null) {
-        if (!includeFilePathMatcher.matches(Paths.get(file))) {
-          continue;
-        }
-      }
-      if (excludeFilePathMatcher != null) {
-        if (excludeFilePathMatcher.matches(Paths.get(file))) {
-          continue;
-        }
-      }
-      if (!_inputDirFS.isDirectory(new URI(file))) {
-        filteredFiles.add(file);
-      }
-    }
+    List<String> filteredFiles = SegmentGenerationUtils.listMatchedFilesWithRecursiveOption(_inputDirFS, _inputDirURI,
+        _spec.getIncludeFileNamePattern(), _spec.getExcludeFileNamePattern(), _spec.isSearchRecursively());
 
     File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());
     try {
