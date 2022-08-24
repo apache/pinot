@@ -13,32 +13,27 @@ import org.joda.time.chrono.ISOChronology;
 public class ExtractTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "extract";
   private TransformFunction _mainTransformFunction;
-  protected String _field;
+  protected Field _field;
   protected Chronology _chronology = ISOChronology.getInstanceUTC();
-  
+
+  private enum Field {
+    YEAR, MONTH, DAY, HOUR, MINUTE, SECOND
+  }
+
   @Override
-  public String getName() { return FUNCTION_NAME; }
+  public String getName() {
+    return FUNCTION_NAME;
+  }
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
-    if (arguments.size() != 2) { 
-      throw new IllegalArgumentException("Exactly 2 arguments are required for EXTRACT transform function"); 
+    if (arguments.size() != 2) {
+      throw new IllegalArgumentException("Exactly 2 arguments are required for EXTRACT transform function");
     }
 
-    _field = ((LiteralTransformFunction) arguments.get(0)).getLiteral();
-    if(!validField(_field)) {
-      throw new IllegalArgumentException("FIELD in EXTRACT expression is not valid");
-    }
-    
+    _field = Field.valueOf(((LiteralTransformFunction) arguments.get(0)).getLiteral());
+
     _mainTransformFunction = arguments.get(1);
-  }
-
-  private boolean validField(String field) {
-    String[] fieldsList = {"YEAR", "MONTH", "DAY", "HOUR", "MINUTE", "SECOND"}; 
-    for(String it : fieldsList) {
-      if(it.equals(field)) { return true; }
-    }
-    return false;
   }
 
   @Override
@@ -49,48 +44,49 @@ public class ExtractTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
-    
-    if(_intValuesSV == null || _intValuesSV.length < numDocs) {
+
+    if (_intValuesSV == null || _intValuesSV.length < numDocs) {
       _intValuesSV = new int[numDocs];
     }
 
     long[] timestamps = _mainTransformFunction.transformToLongValuesSV(projectionBlock);
-    
+
     convert(timestamps, numDocs, _intValuesSV);
-    
+
     return _intValuesSV;
   }
 
   private void convert(long[] timestamps, int numDocs, int[] output) {
-    for(int i=0; i<numDocs; ++i) {
+    for (int i = 0; i < numDocs; ++i) {
       DateTimeField accessor;
       
       switch (_field) {
-        case "YEAR":
+        case YEAR:
           accessor = _chronology.year();
           output[i] = accessor.get(timestamps[i]);
           break;
-        case "MONTH":
+        case MONTH:
           accessor = _chronology.monthOfYear();
           output[i] = accessor.get(timestamps[i]);
           break;
-        case "DAY":
+        case DAY:
           accessor = _chronology.dayOfMonth();
           output[i] = accessor.get(timestamps[i]);
           break;
-        case "HOUR":
+        case HOUR:
           accessor = _chronology.hourOfDay();
           output[i] = accessor.get(timestamps[i]);
           break;
-        case "MINUTE":
+        case MINUTE:
           accessor = _chronology.minuteOfHour();
           output[i] = accessor.get(timestamps[i]);
           break;
-        case "SECOND":
+        case SECOND:
           accessor = _chronology.secondOfMinute();
           output[i] = accessor.get(timestamps[i]);
           break;
         default:
+          throw new IllegalArgumentException("Unsupported FIELD type");
       }
     }
   }
