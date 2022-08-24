@@ -96,8 +96,11 @@ public abstract class BaseQueriesTest {
    * Run query on multiple index segments.
    * <p>Use this to test the whole flow from server to broker.
    * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
-   * should be equivalent to querying 4 identical index segments. Otherwise, the result will be equivalent to
-   * querying 2 distinct instances each having 2 segments.
+   * should be equivalent to querying 4 identical index segments.
+   * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
+   * different index segments in the test and overriding getDistinctInstances.
+   * This can be particularly useful to test statistical aggregation functions.
+   * @see CovarianceQueriesTest for an example use case.
    */
   protected BrokerResponseNative getBrokerResponse(String query) {
     return getBrokerResponse(query, PLAN_MAKER);
@@ -107,8 +110,11 @@ public abstract class BaseQueriesTest {
    * Run query with hard-coded filter on multiple index segments.
    * <p>Use this to test the whole flow from server to broker.
    * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
-   * should be equivalent to querying 4 identical index segments. Otherwise, the result will be equivalent to
-   * querying 2 distinct instances each having 2 segments.
+   * should be equivalent to querying 4 identical index segments.
+   * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
+   * different index segments in the test and overriding getDistinctInstances.
+   * This can be particularly useful to test statistical aggregation functions.
+   * @see CovarianceQueriesTest for an example use case.
    */
   protected BrokerResponseNative getBrokerResponseWithFilter(String query) {
     return getBrokerResponse(query + getFilter());
@@ -118,8 +124,11 @@ public abstract class BaseQueriesTest {
    * Run query on multiple index segments with custom plan maker.
    * <p>Use this to test the whole flow from server to broker.
    * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
-   * should be equivalent to querying 4 identical index segments. Otherwise, the result will be equivalent to
-   * querying 2 distinct instances each having 2 segments.
+   * should be equivalent to querying 4 identical index segments.
+   * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
+   * different index segments in the test and overriding getDistinctInstances.
+   * This can be particularly useful to test statistical aggregation functions.
+   * @see CovarianceQueriesTest for an example use case.
    */
   protected BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker) {
     return getBrokerResponse(query, planMaker, null);
@@ -129,8 +138,11 @@ public abstract class BaseQueriesTest {
    * Run query on multiple index segments.
    * <p>Use this to test the whole flow from server to broker.
    * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
-   * should be equivalent to querying 4 identical index segments. Otherwise, the result will be equivalent to
-   * querying 2 distinct instances each having 2 segments.
+   * should be equivalent to querying 4 identical index segments.
+   * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
+   * different index segments in the test and overriding getDistinctInstances.
+   * This can be particularly useful to test statistical aggregation functions.
+   * @see CovarianceQueriesTest for an example use case.
    */
   protected BrokerResponseNative getBrokerResponse(String query, @Nullable Map<String, String> extraQueryOptions) {
     return getBrokerResponse(query, PLAN_MAKER, extraQueryOptions);
@@ -140,8 +152,11 @@ public abstract class BaseQueriesTest {
    * Run query on multiple index segments with custom plan maker and queryOptions.
    * <p>Use this to test the whole flow from server to broker.
    * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
-   * should be equivalent to querying 4 identical index segments. Otherwise, the result will be equivalent to
-   * querying 2 distinct instances each having 2 segments.
+   * should be equivalent to querying 4 identical index segments.
+   * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
+   * different index segments in the test and overriding getDistinctInstances.
+   * This can be particularly useful to test statistical aggregation functions.
+   * @see CovarianceQueriesTest for an example use case.
    */
   private BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker,
       @Nullable Map<String, String> extraQueryOptions) {
@@ -161,8 +176,11 @@ public abstract class BaseQueriesTest {
    * Run query on multiple index segments with custom plan maker.
    * <p>Use this to test the whole flow from server to broker.
    * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
-   * should be equivalent to querying 4 identical index segments. Otherwise, the result will be equivalent to
-   * querying 2 distinct instances each having 2 segments.
+   * should be equivalent to querying 4 identical index segments.
+   * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
+   * different index segments in the test and overriding getDistinctInstances.
+   * This can be particularly useful to test statistical aggregation functions.
+   * @see CovarianceQueriesTest for an example use case.
    */
   private BrokerResponseNative getBrokerResponse(PinotQuery pinotQuery, PlanMaker planMaker) {
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
@@ -211,8 +229,11 @@ public abstract class BaseQueriesTest {
    * Run optimized query on multiple index segments.
    * <p>Use this to test the whole flow from server to broker.
    * <p>Unless explicitly override getDistinctInstances or initialize 2 distinct index segments in test, the result
-   * should be equivalent to querying 4 identical index segments. Otherwise, the result will be equivalent to
-   * querying 2 distinct instances each having 2 segments.
+   * should be equivalent to querying 4 identical index segments.
+   * In order to query 2 distinct instances, the caller of this function should handle initializing 2 instances with
+   * different index segments in the test and overriding getDistinctInstances.
+   * This can be particularly useful to test statistical aggregation functions.
+   * @see CovarianceQueriesTest for an example use case.
    */
   protected BrokerResponseNative getBrokerResponseForOptimizedQuery(String query, @Nullable TableConfig config,
       @Nullable Schema schema) {
@@ -225,7 +246,11 @@ public abstract class BaseQueriesTest {
    * Run query on multiple index segments with custom plan maker.
    * This test is particularly useful for testing statistical aggregation functions such as COVAR_POP, COVAR_SAMP, etc.
    * <p>Use this to test the whole flow from server to broker.
-   * <p>The result will be equivalent to querying 2 distinct instances each having 2 segments.
+   * <p>The result will be equivalent to querying 2 distinct instances.
+   * The caller of this function should handle initializing 2 instances with different index segments in the test and
+   * overriding getDistinctInstances.
+   * This can be particularly useful to test statistical aggregation functions.
+   * @see CovarianceQueriesTest for an example use case.
    */
   private BrokerResponseNative getBrokerResponseDistinctInstances(PinotQuery pinotQuery, PlanMaker planMaker) {
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
