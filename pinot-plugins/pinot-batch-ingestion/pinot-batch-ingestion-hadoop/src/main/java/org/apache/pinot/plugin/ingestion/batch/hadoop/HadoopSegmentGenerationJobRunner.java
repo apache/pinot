@@ -140,6 +140,14 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
       PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
     }
+    //Get list of files to process
+    URI inputDirURI = new URI(_spec.getInputDirURI());
+    if (inputDirURI.getScheme() == null) {
+      inputDirURI = new File(_spec.getInputDirURI()).toURI();
+    }
+    PinotFS inputDirFS = PinotFSFactory.create(inputDirURI.getScheme());
+    List<String> filteredFiles = SegmentGenerationUtils.listMatchedFilesWithRecursiveOption(inputDirFS, inputDirURI,
+        _spec.getIncludeFileNamePattern(), _spec.getExcludeFileNamePattern(), _spec.isSearchRecursively());
 
     //Get outputFS for writing output pinot segments
     URI outputDirURI = new URI(_spec.getOutputDirURI());
@@ -171,15 +179,6 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     outputDirFS.mkdir(stagingInputDir.toUri());
     Path stagingSegmentTarUri = new Path(stagingDirURI.toString(), SEGMENT_TAR_SUBDIR_NAME);
     outputDirFS.mkdir(stagingSegmentTarUri.toUri());
-
-    //Get list of files to process
-    URI inputDirURI = new URI(_spec.getInputDirURI());
-    if (inputDirURI.getScheme() == null) {
-      inputDirURI = new File(_spec.getInputDirURI()).toURI();
-    }
-    PinotFS inputDirFS = PinotFSFactory.create(inputDirURI.getScheme());
-    List<String> filteredFiles = SegmentGenerationUtils.listMatchedFilesWithRecursiveOption(inputDirFS, inputDirURI,
-        _spec.getIncludeFileNamePattern(), _spec.getExcludeFileNamePattern(), _spec.isSearchRecursively());
 
     // numDataFiles is guaranteed to be greater than zero since listMatchedFilesWithRecursiveOption will throw
     // runtime exception if the matched files list is empty.

@@ -32,7 +32,8 @@ public class BatchConfig {
 
   private final FileFormat _inputFormat;
   private final String _inputDirURI;
-  private final boolean _searchRecursively;
+  // TODO: update the default value to false.
+  private boolean _searchRecursively = true;
   private final String _inputFsClassName;
   private final Map<String, String> _inputFsProps;
 

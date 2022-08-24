@@ -50,6 +50,7 @@ public class SegmentGenerationJobSpec implements Serializable {
    */
   // TODO: set the default value to false after all clients are aware of this.
   private boolean _searchRecursively = true;
+
   /**
    * include file name pattern, supported glob pattern.
    * Sample usage:
@@ -173,6 +174,7 @@ public class SegmentGenerationJobSpec implements Serializable {
   public void setSearchRecursively(boolean searchRecursively) {
     _searchRecursively = searchRecursively;
   }
+
   public String getIncludeFileNamePattern() {
     return _includeFileNamePattern;
   }

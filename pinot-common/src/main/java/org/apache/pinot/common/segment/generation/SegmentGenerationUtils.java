@@ -33,6 +33,7 @@ import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -236,27 +237,22 @@ public class SegmentGenerationUtils {
 
 
   /**
-   * Find matching files from root directory specified in fileUri.
-   * If includePattern and excludePattern are not null, get all the files that match includePattern and exclude files
-   * that match excludePattern.
-   * If
-   *
-   * @param pinotFs root directly fs
-   * @param fileUri root directly uri
+   * @param pinotFs root directory fs
+   * @param fileUri root directory uri
    * @param includePattern optional glob patterns for files to include
    * @param excludePattern optional glob patterns for files to exclude
-   * @param searchRecrusively if ture, search files recursively from directory specified in fileUri
+   * @param searchRecursively if ture, search files recursively from directory specified in fileUri
    * @return list of matching files.
    * @throws IOException on IO failure for list files in root directory.
    * @throws URISyntaxException for matching file URIs
    * @throws RuntimeException if there is no matching file.
    */
-  public static List<String> listMatchedFilesWithRecursiveOption(PinotFS pinotFs, URI fileUri, String includePattern,
-      String excludePattern, boolean searchRecrusively)
+  public static List<String> listMatchedFilesWithRecursiveOption(PinotFS pinotFs, URI fileUri,
+      @Nullable String includePattern, @Nullable String excludePattern, boolean searchRecursively)
       throws Exception {
     String[] files;
     // listFiles throws IOException
-    files = pinotFs.listFiles(fileUri, searchRecrusively);
+    files = pinotFs.listFiles(fileUri, searchRecursively);
     //TODO: sort input files based on creation time
     PathMatcher includeFilePathMatcher = null;
     if (includePattern != null) {
