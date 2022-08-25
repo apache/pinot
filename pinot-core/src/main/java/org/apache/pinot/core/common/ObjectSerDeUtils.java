@@ -538,6 +538,7 @@ public class ObjectSerDeUtils {
         return new byte[Integer.BYTES];
       }
 
+      // Besides the value bytes, we store: size, key type, value type, length for each key, length for each value
       long bufferSize = (3 + 2 * (long) size) * Integer.BYTES;
       byte[][] keyBytesArray = new byte[size][];
       byte[][] valueBytesArray = new byte[size][];
@@ -733,6 +734,7 @@ public class ObjectSerDeUtils {
     @Override
     public byte[] serialize(Set<String> stringSet) {
       int size = stringSet.size();
+      // Besides the value bytes, we store: size, length for each value
       long bufferSize = (1 + (long) size) * Integer.BYTES;
       byte[][] valueBytesArray = new byte[size][];
       int index = 0;
@@ -776,6 +778,7 @@ public class ObjectSerDeUtils {
     @Override
     public byte[] serialize(Set<ByteArray> bytesSet) {
       int size = bytesSet.size();
+      // Besides the value bytes, we store: size, length for each value
       long bufferSize = (1 + (long) size) * Integer.BYTES;
       for (ByteArray value : bytesSet) {
         bufferSize += value.length();
@@ -941,6 +944,7 @@ public class ObjectSerDeUtils {
         return new byte[Integer.BYTES];
       }
 
+      // Besides the value bytes, we store: size, value type, length for each value
       long bufferSize = (2 + (long) size) * Integer.BYTES;
       byte[][] valueBytesArray = new byte[size][];
       int valueType = ObjectType.getObjectType(list.get(0)).getValue();
