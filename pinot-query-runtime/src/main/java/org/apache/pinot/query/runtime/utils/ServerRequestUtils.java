@@ -33,6 +33,7 @@ import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
+import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -114,6 +115,15 @@ public class ServerRequestUtils {
       // set group-by list
       pinotQuery.setGroupByList(CalciteRexExpressionParser.convertGroupByList(
           ((AggregateNode) node).getGroupSet(), pinotQuery));
+    } else if (node instanceof SortNode) {
+      pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(((SortNode) node).getCollationKeys(),
+          ((SortNode) node).getCollationDirections(), pinotQuery));
+      if (((SortNode) node).getFetch() > 0) {
+        pinotQuery.setLimit(((SortNode) node).getFetch());
+      }
+      if (((SortNode) node).getOffset() > 0) {
+        pinotQuery.setOffset(((SortNode) node).getOffset());
+      }
     } else if (node instanceof MailboxSendNode) {
       // TODO: MailboxSendNode should be the root of the leaf stage. but ignore for now since it is handle seperately
       // in QueryRunner as a single step sender.
