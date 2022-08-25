@@ -27,6 +27,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -47,6 +48,7 @@ import picocli.CommandLine;
  * Class to implement LaunchDataIngestionJob command.
  *
  */
+//TODO: Scala version causing NoSuchMethodError at runtime
 @CommandLine.Command(name = "LaunchSparkDataIngestionJob")
 public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(LaunchSparkDataIngestionJobCommand.class);
@@ -63,12 +65,14 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   private String _propertyFile;
   @CommandLine.Option(names = {"-pluginsToLoad"}, required = false, arity = "1..*", description = "Plugins to Load")
   private List<String> _pluginsToLoad;
-  @CommandLine.Option(names = {"-pinotJarsDir"}, required = false, description = "Pinot binary installation directory")
-  private String _pinotJarDir;
+  @CommandLine.Option(names = {"-pinotBaseDir"}, required = false, description = "Pinot binary installation directory")
+  private String _pinotBaseDir;
   @CommandLine.Option(names = {"-deployMode"}, required = false, description = "Spark Deploy Mode")
   private String _deployMode;
   @CommandLine.Option(names = {"-master"}, required = false, defaultValue = "local", description = "Spark Master")
   private String _sparkMaster;
+  @CommandLine.Option(names = {"-sparkConf"}, required = false, split = ":", mapFallbackValue = "", description = "Spark Conf")
+  private Map<String, String> _sparkConf;
   @CommandLine.Unmatched
   private String[] _unmatchedArgs;
 
@@ -114,11 +118,12 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   @Override
   public boolean execute()
       throws Exception {
-    if (_pinotJarDir == null) {
-      if (System.getenv("BASEDIR") != null) {
-        _pinotJarDir = System.getenv("BASEDIR");
+    if (_pinotBaseDir == null) {
+      String baseDir = System.getProperty("basedir");
+      if (baseDir != null) {
+        _pinotBaseDir = baseDir;
       } else {
-        throw new RuntimeException("Either option -pinotJarDir or env BASEDIR must be set. "
+        throw new RuntimeException("Either option -pinotBaseDir or env BASEDIR must be set. "
             + "Currently null");
       }
     }
@@ -143,11 +148,21 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
       PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
     }
 
-    addDepsJarToDistributedCache(sparkLauncher, _pinotJarDir);
-    addAppResource(sparkLauncher, _pinotJarDir);
+    addDepsJarToDistributedCache(sparkLauncher, _pinotBaseDir);
+    addAppResource(sparkLauncher, _pinotBaseDir);
 
-    //TODO: Add rest of the args
-    sparkLauncher.addAppArgs("-jobSpecFile", _jobSpecFile);
+    URI jobSpecFileUri = URI.create(_jobSpecFile);
+    if (jobSpecFileUri.getScheme() == null) {
+      jobSpecFileUri = new File(_jobSpecFile).toURI();
+    }
+
+    if(_deployMode != null && _deployMode.contentEquals("cluster")) {
+      sparkLauncher.addFile(_jobSpecFile);
+      sparkLauncher.addAppArgs("-jobSpecFile", Paths.get(jobSpecFileUri).getFileName().toString());
+    } else {
+      sparkLauncher.addAppArgs("-jobSpecFile", _jobSpecFile);
+    }
+
     if (_propertyFile != null) {
       sparkLauncher.addAppArgs("-propertyFile", _propertyFile);
     }
@@ -156,10 +171,15 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
       sparkLauncher.addAppArgs("-values", Joiner.on(",").join(_values));
     }
 
+    if (_sparkConf != null) {
+      for (Map.Entry<String, String> conf : _sparkConf.entrySet()) {
+        sparkLauncher.setConf(conf.getKey(), conf.getValue());
+      }
+    }
+
     if (_unmatchedArgs != null) {
       sparkLauncher.addAppArgs(_unmatchedArgs);
     }
-
     sparkLauncher.setAppName("Pinot Spark Ingestion Job");
     sparkLauncher.setVerbose(true);
     sparkLauncher.redirectToLog(LOGGER.getName());
@@ -229,8 +249,8 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
       }
 
       String extraClassPaths = Joiner.on(":").join(jarFiles);
-      sparkLauncher.setConf("spark.driver.extraClassPath", extraClassPaths);
-      sparkLauncher.setConf("spark.executor.extraClassPath", extraClassPaths);
+      sparkLauncher.setConf(SparkLauncher.DRIVER_EXTRA_CLASSPATH, extraClassPaths);
+      sparkLauncher.setConf(SparkLauncher.EXECUTOR_EXTRA_CLASSPATH, extraClassPaths);
     }
   }
 
