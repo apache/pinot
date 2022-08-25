@@ -74,7 +74,8 @@ public abstract class IngestionBasedConsumptionStatusChecker {
           continue;
         }
 
-        if (isSegmentCaughtUp(segName, segmentDataManager)) {
+        LLRealtimeSegmentDataManager rtSegmentDataManager = (LLRealtimeSegmentDataManager) segmentDataManager;
+        if (isSegmentCaughtUp(segName, rtSegmentDataManager)) {
           _caughtUpSegments.add(segName);
         }
       } finally {
@@ -86,7 +87,7 @@ public abstract class IngestionBasedConsumptionStatusChecker {
     return _consumingSegments.size() - _caughtUpSegments.size();
   }
 
-  protected abstract boolean isSegmentCaughtUp(String segmentName, SegmentDataManager segmentDataManager);
+  protected abstract boolean isSegmentCaughtUp(String segmentName, LLRealtimeSegmentDataManager rtSegmentDataManager);
 
   private TableDataManager getTableDataManager(String segmentName) {
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);

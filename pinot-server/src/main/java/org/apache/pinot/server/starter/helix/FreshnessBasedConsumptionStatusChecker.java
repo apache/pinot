@@ -22,7 +22,6 @@ package org.apache.pinot.server.starter.helix;
 import java.util.Set;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
-import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
@@ -58,8 +57,7 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
   }
 
   @Override
-  protected boolean isSegmentCaughtUp(String segmentName, SegmentDataManager segmentDataManager) {
-    LLRealtimeSegmentDataManager rtSegmentDataManager = (LLRealtimeSegmentDataManager) segmentDataManager;
+  protected boolean isSegmentCaughtUp(String segmentName, LLRealtimeSegmentDataManager rtSegmentDataManager) {
     long now = now();
     long latestIngestionTimestamp =
         rtSegmentDataManager.getSegment().getSegmentMetadata().getLatestIngestionTimestamp();
