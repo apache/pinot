@@ -389,10 +389,7 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
 
   /**
    * Today selection ORDER BY only on MV columns (irrespective of whether it's dictionary based or raw) doesn't work
-   * as the semantics of how such queries should behave isn't clear. If the MV column is the first expression in the
-   * ORDER BY, the planner fails the query. The query would have failed at execution anyways. For backward
-   * compatibility we allow queries with a mix of SV and MV columns provided the SV column is the first order-by
-   * expression.
+   * as the semantics of how such queries should behave isn't clear. Such queries should always fail.
    */
   @Test
   public void testSelectionOrderBy() {
@@ -402,6 +399,12 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
 
       String query1 = "SELECT mvRawFloatCol from testTable WHERE mvRawFloatCol < 5 ORDER BY mvRawFloatCol LIMIT 10";
       assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query1));
+
+      String query2 = "SELECT mvIntCol, mvFloatCol from testTable ORDER BY mvIntCol, mvFloatCol LIMIT 10";
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query2));
+
+      String query3 = "SELECT mvRawIntCol, mvRawFloatCol from testTable ORDER BY mvRawIntCol, mvRawFloatCol LIMIT 10";
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query3));
     }
     {
       String query = "SELECT mvFloatCol, svIntCol from testTable WHERE mvFloatCol < 5 ORDER BY mvFloatCol, svIntCol "
@@ -413,33 +416,37 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query1));
     }
     {
-      String query = "SELECT svIntCol, mvRawFloatCol from testTable WHERE mvRawFloatCol < 5 ORDER BY svIntCol, "
+      String query = "SELECT svIntCol, mvFloatCol from testTable WHERE mvRawFloatCol < 5 ORDER BY svIntCol, "
+          + "mvFloatCol LIMIT 10";
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
+
+      String query1 = "SELECT svIntCol, mvRawFloatCol from testTable WHERE mvRawFloatCol < 5 ORDER BY svIntCol, "
           + "mvRawFloatCol LIMIT 10";
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query1));
+    }
+    {
+      String query = "SELECT VALUEIN(mvIntCol, '0') from testTable WHERE mvIntCol IN (0) ORDER BY "
+          + "VALUEIN(mvIntCol, '0') DESC LIMIT 10";
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
+
+      String query1 = "SELECT VALUEIN(mvRawIntCol, '0') from testTable WHERE mvRawIntCol IN (0) ORDER BY "
+          + "VALUEIN(mvRawIntCol, '0') DESC LIMIT 10";
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query1));
+    }
+    {
+      // Arraylength eventually translates to a SV column, so this should pass
+      String query = "SELECT ARRAYLENGTH(mvRawLongCol), ARRAYLENGTH(mvLongCol) from testTable ORDER BY "
+          + "ARRAYLENGTH(mvRawLongCol), ARRAYLENGTH(mvLongCol) LIMIT 10";
       BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertEquals(brokerResponseNative.getExceptionsSize(), 0);
-      ResultTable resultTable = getBrokerResponse(query).getResultTable();
-      assertNotNull(resultTable);
-      DataSchema dataSchema = new DataSchema(new String[]{
-          "svIntCol", "mvRawFloatCol"
-      }, new DataSchema.ColumnDataType[]{
-          DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.FLOAT_ARRAY
-      });
-      assertEquals(resultTable.getDataSchema(), dataSchema);
+      assertTrue(brokerResponseNative.getProcessingExceptions() == null
+          || brokerResponseNative.getProcessingExceptions().size() == 0);
+      ResultTable resultTable = brokerResponseNative.getResultTable();
+      assertEquals(resultTable.getRows().size(), 10);
       List<Object[]> recordRows = resultTable.getRows();
-      assertEquals(recordRows.size(), 10);
-
-      int[] expectedSVInts = new int[]{0, 0, 0, 0, 1, 1, 1, 1, 2, 2};
-
-      for (int i = 0; i < 10; i++) {
-        Object[] values = recordRows.get(i);
-        assertEquals(values.length, 2);
-        int svValue = (int) values[0];
-        assertEquals(svValue, expectedSVInts[i]);
-        float[] floats = (float[]) values[1];
-        assertEquals(floats.length, 2);
-
-        assertEquals((float) svValue, floats[0]);
-        assertEquals(floats[0] + 100, floats[1]);
+      for (Object[] row : recordRows) {
+        assertEquals(row.length, 2);
+        assertEquals(row[0], MV_LENGTH);
+        assertEquals(row[1], MV_LENGTH);
       }
     }
   }

@@ -82,7 +82,6 @@ public class IntermediateResultsBlock implements Block {
   private long _resizeTimeMs;
   private long _executionThreadCpuTimeNs;
   private int _numServerThreads;
-  private boolean _queryHasMVSelectionOrderBy;
 
   private Table _table;
 
@@ -347,14 +346,6 @@ public class IntermediateResultsBlock implements Block {
 
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
-  }
-
-  public boolean isQueryHasMVSelectionOrderBy() {
-    return _queryHasMVSelectionOrderBy;
-  }
-
-  public void setQueryHasMVSelectionOrderBy(boolean queryHasMVSelectionOrderBy) {
-    _queryHasMVSelectionOrderBy = queryHasMVSelectionOrderBy;
   }
 
   public DataTable getDataTable()

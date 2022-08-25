@@ -87,8 +87,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   private int _numDocsScanned = 0;
   private long _numEntriesScannedPostFilter = 0;
 
-  private boolean _queryHasMVSelectionOrderBy = false;
-
   public SelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, TransformOperator transformOperator, boolean allOrderByColsPreSorted) {
     _indexSegment = indexSegment;
@@ -127,12 +125,20 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     // Compare all single-value columns
     int numOrderByExpressions = _orderByExpressions.size();
     List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
+    List<OrderByExpressionContext> mvOrderByExpressions = new ArrayList<>();
     for (int i = 0; i < numOrderByExpressions; i++) {
       if (_orderByExpressionMetadata[i].isSingleValue()) {
         valueIndexList.add(i);
       } else {
-        _queryHasMVSelectionOrderBy = true;
+        mvOrderByExpressions.add(_orderByExpressions.get(i));
       }
+    }
+
+    if (mvOrderByExpressions.size() > 0) {
+      // MV columns should not be part of the selection order by only list
+      throw new UnsupportedOperationException(
+          String.format("MV columns %s should not be included in selection order-by only queries",
+              mvOrderByExpressions));
     }
 
     int numValuesToCompare = valueIndexList.size();
@@ -240,16 +246,13 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    IntermediateResultsBlock resultsBlock;
     if (_allOrderByColsPreSorted) {
-      resultsBlock = computeAllPreSorted();
+      return computeAllPreSorted();
     } else if (_expressions.size() == _orderByExpressions.size()) {
-      resultsBlock = computeAllOrdered();
+      return computeAllOrdered();
     } else {
-      resultsBlock = computePartiallyOrdered();
+      return computePartiallyOrdered();
     }
-    resultsBlock.setQueryHasMVSelectionOrderBy(_queryHasMVSelectionOrderBy);
-    return resultsBlock;
   }
 
   private IntermediateResultsBlock computeAllPreSorted() {
