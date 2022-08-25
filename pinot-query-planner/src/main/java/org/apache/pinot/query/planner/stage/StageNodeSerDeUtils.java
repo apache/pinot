@@ -75,6 +75,8 @@ public final class StageNodeSerDeUtils {
         return new FilterNode(stageId);
       case "AggregateNode":
         return new AggregateNode(stageId);
+      case "SortNode":
+        return new SortNode(stageId);
       case "MailboxSendNode":
         return new MailboxSendNode(stageId);
       case "MailboxReceiveNode":

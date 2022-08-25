@@ -67,7 +67,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   private Object[][] provideTestSqlAndRowCount() {
     return new Object[][] {
         new Object[]{"SELECT * FROM b ORDER BY col1, col2 DESC LIMIT 3", 3},
-        new Object[]{"SELECT * FROM a ORDER BY col1", 15},
+        new Object[]{"SELECT * FROM a ORDER BY col1 LIMIT 20", 15},
 
         // No match filter
         new Object[]{"SELECT * FROM b WHERE col3 < 0", 0},

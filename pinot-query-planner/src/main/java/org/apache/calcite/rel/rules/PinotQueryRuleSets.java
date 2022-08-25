@@ -88,6 +88,7 @@ public class PinotQueryRuleSets {
 
           // Pinot specific rules
           PinotJoinExchangeNodeInsertRule.INSTANCE,
-          PinotAggregateExchangeNodeInsertRule.INSTANCE
+          PinotAggregateExchangeNodeInsertRule.INSTANCE,
+          PinotSortExchangeNodeInsertRule.INSTANCE
       );
 }
