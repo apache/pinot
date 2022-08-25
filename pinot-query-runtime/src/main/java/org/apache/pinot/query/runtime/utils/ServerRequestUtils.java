@@ -46,8 +46,6 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
  * conversion step is needed so that the V2 query plan can be converted into a compatible format to run V1 executor.
  */
 public class ServerRequestUtils {
-  private static final int DEFAULT_LEAF_NODE_LIMIT = 1_000_000;
-
   private ServerRequestUtils() {
     // do not instantiate.
   }
@@ -85,7 +83,7 @@ public class ServerRequestUtils {
 
   public static PinotQuery constructPinotQuery(DistributedStagePlan distributedStagePlan) {
     PinotQuery pinotQuery = new PinotQuery();
-    pinotQuery.setLimit(DEFAULT_LEAF_NODE_LIMIT);
+    pinotQuery.unsetLimit();
     pinotQuery.setExplain(false);
     walkStageTree(distributedStagePlan.getStageRoot(), pinotQuery);
     return pinotQuery;
