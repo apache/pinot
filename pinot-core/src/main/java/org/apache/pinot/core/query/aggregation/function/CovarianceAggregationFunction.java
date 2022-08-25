@@ -213,12 +213,14 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
       double sumX = covarianceTuple.getSumX();
       double sumY = covarianceTuple.getSumY();
       double sumXY = covarianceTuple.getSumXY();
-      double popCov = (sumXY / count) - (sumX / count) * (sumY / count);
-      double besselCorrection = count / (count - 1);
       if (_isSample) {
-        return popCov * besselCorrection;
+        if (count - 1 == 0L) {
+          return DEFAULT_FINAL_RESULT;
+        }
+        // sample cov = population cov * (count / (count - 1))
+        return (sumXY / (count - 1)) - (sumX * sumY) / (count * (count - 1));
       }
-      return popCov;
+      return (sumXY / count) - (sumX * sumY) / (count * count);
     }
   }
 
