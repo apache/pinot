@@ -141,7 +141,8 @@ public class WorkerQueryExecutor {
     } else if (stageNode instanceof SortNode) {
       SortNode sortNode = (SortNode) stageNode;
       return new SortOperator(getOperator(requestId, sortNode.getInputs().get(0), metadataMap),
-          sortNode.getCollationKeys(), sortNode.getCollationDirections(), sortNode.getDataSchema());
+          sortNode.getCollationKeys(), sortNode.getCollationDirections(), sortNode.getFetch(), sortNode.getOffset(),
+          sortNode.getDataSchema());
     } else {
       throw new UnsupportedOperationException(
           String.format("Stage node type %s is not supported!", stageNode.getClass().getSimpleName()));

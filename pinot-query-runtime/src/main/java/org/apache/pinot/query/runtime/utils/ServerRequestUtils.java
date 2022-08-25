@@ -116,8 +116,10 @@ public class ServerRequestUtils {
       pinotQuery.setGroupByList(CalciteRexExpressionParser.convertGroupByList(
           ((AggregateNode) node).getGroupSet(), pinotQuery));
     } else if (node instanceof SortNode) {
-      pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(((SortNode) node).getCollationKeys(),
-          ((SortNode) node).getCollationDirections(), pinotQuery));
+      if (((SortNode) node).getCollationKeys().size() > 0) {
+        pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(((SortNode) node).getCollationKeys(),
+            ((SortNode) node).getCollationDirections(), pinotQuery));
+      }
       if (((SortNode) node).getFetch() > 0) {
         pinotQuery.setLimit(((SortNode) node).getFetch());
       }
