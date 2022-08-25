@@ -80,6 +80,7 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.access.ManualAuthorization;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
@@ -168,6 +169,7 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Adds a table", notes = "Adds a table")
+  @ManualAuthorization // performed after parsing table configs
   public ConfigSuccessResponse addTable(
       String tableConfigStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
@@ -531,10 +533,12 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Validate table config for a table",
       notes = "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
+  @ManualAuthorization // performed after parsing TableConfig
   public ObjectNode checkTableConfig(
       String tableConfigStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
-      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip) {
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
+      @Context Request request) {
     Pair<TableConfig, Map<String, Object>> tableConfig;
     try {
       tableConfig = JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class);
@@ -542,6 +546,13 @@ public class PinotTableRestletResource {
       String msg = String.format("Invalid table config json string: %s", tableConfigStr);
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
+
+    // validate permission
+    String tableName = tableConfig.getLeft().getTableName();
+    String endpointUrl = request.getRequestURL().toString();
+    AccessControlUtils.validatePermission(tableName, AccessType.READ, httpHeaders, endpointUrl,
+        _accessControlFactory.create());
+
     ObjectNode validationResponse =
         validateConfig(tableConfig.getLeft(), _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig.getLeft()),
             typesToSkip);
@@ -559,15 +570,25 @@ public class PinotTableRestletResource {
           + "Validate given table config and schema. If specified schema is null, attempt to retrieve schema using the "
           + "table name. This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
+  @ManualAuthorization // performed after parsing TableAndSchemaConfig
   public String validateTableAndSchema(
       TableAndSchemaConfig tableSchemaConfig,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
-      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip) {
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
+      @Context Request request) {
     TableConfig tableConfig = tableSchemaConfig.getTableConfig();
     Schema schema = tableSchemaConfig.getSchema();
+
     if (schema == null) {
       schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
     }
+
+    // validate permission
+    String schemaName = schema != null ? schema.getSchemaName() : null;
+    String endpointUrl = request.getRequestURL().toString();
+    AccessControlUtils.validatePermission(schemaName, AccessType.READ, httpHeaders, endpointUrl,
+        _accessControlFactory.create());
+
     return validateConfig(tableSchemaConfig.getTableConfig(), schema, typesToSkip).toString();
   }
 

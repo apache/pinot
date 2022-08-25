@@ -35,7 +35,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -76,11 +75,6 @@ public class PinotControllerAuthResource {
       @ApiParam(value = "API access type") @QueryParam("accessType") AccessType accessType,
       @ApiParam(value = "Endpoint URL") @QueryParam("endpointUrl") String endpointUrl) {
     AccessControl accessControl = _accessControlFactory.create();
-
-    if (StringUtils.isBlank(tableName)) {
-      return accessControl.hasAccess(accessType, _httpHeaders, endpointUrl);
-    }
-
     return accessControl.hasAccess(tableName, accessType, _httpHeaders, endpointUrl);
   }
 

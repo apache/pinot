@@ -31,8 +31,6 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
-import org.apache.pinot.spi.config.user.ComponentType;
-import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -93,12 +91,6 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
         @Override
         public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
             return getPrincipal(httpHeaders).isPresent();
-        }
-
-        @Override
-        public boolean hasAccess(HttpHeaders httpHeaders) {
-            return getPrincipal(httpHeaders)
-                .filter(p -> p.hasPermission(RoleType.ADMIN, ComponentType.CONTROLLER)).isPresent();
         }
 
         private Optional<ZkBasicAuthPrincipal> getPrincipal(HttpHeaders headers) {

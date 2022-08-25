@@ -50,56 +50,32 @@ public final class AccessControlUtils {
    */
   public static void validatePermission(@Nullable String tableName, AccessType accessType,
       @Nullable HttpHeaders httpHeaders, @Nullable String endpointUrl, AccessControl accessControl) {
-    String message = null;
+    String userMessage = getUserMessage(tableName, accessType, endpointUrl);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+
     try {
-      if (StringUtils.isBlank(tableName)) {
-        message = String.format("%s '%s'", accessType, endpointUrl);
-        if (!accessControl.hasAccess(accessType, httpHeaders, endpointUrl)) {
-          accessDenied(message);
+      if (rawTableName == null) {
+        if (accessControl.hasAccess(accessType, httpHeaders, endpointUrl)) {
+          return;
         }
       } else {
-        message = String.format("%s '%s' for table '%s'", accessType, endpointUrl, tableName);
-        String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-        if (!accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl)) {
-          accessDenied(message);
+        if (accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl)) {
+          return;
         }
       }
-    } catch (ControllerApplicationException e) {
-      throw e;
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, "Caught exception while validating permission for " + message,
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+      throw new ControllerApplicationException(LOGGER, "Caught exception while validating permission for "
+          + userMessage, Response.Status.INTERNAL_SERVER_ERROR, e);
     }
-  }
 
-  /**
-   * Validate permission for the given access type for a non-table level endpoint
-   *
-   * @param accessType type of the access
-   * @param httpHeaders HTTP headers containing requester identity required by access control object
-   * @param endpointUrl the request url for which this access control is called
-   * @param accessControl AccessControl object which does the actual validation
-   */
-  public static void validatePermission(AccessType accessType, @Nullable HttpHeaders httpHeaders,
-      @Nullable String endpointUrl, AccessControl accessControl) {
-    validatePermission(null, accessType, httpHeaders, endpointUrl, accessControl);
-  }
-
-  /**
-   * Validate permission for the given access type and endpointUrl
-   *
-   * @param httpHeaders HTTP headers containing requester identity required by access control object
-   * @param endpointUrl the request url for which this access control is called
-   */
-  public static void validatePermission(@Nullable HttpHeaders httpHeaders, @Nullable String endpointUrl,
-      AccessControl accessControl) {
-    if (!accessControl.hasAccess(httpHeaders)) {
-      accessDenied(endpointUrl);
-    }
-  }
-
-  private static void accessDenied(String resource) {
-    throw new ControllerApplicationException(LOGGER, "Permission is denied for " + resource,
+    throw new ControllerApplicationException(LOGGER, "Permission is denied for " + userMessage,
         Response.Status.FORBIDDEN);
+  }
+
+  private static String getUserMessage(String tableName, AccessType accessType, String endpointUrl) {
+    if (StringUtils.isBlank(tableName)) {
+      return String.format("%s '%s'", accessType, endpointUrl);
+    }
+    return String.format("%s '%s' for table '%s'", accessType, endpointUrl, tableName);
   }
 }

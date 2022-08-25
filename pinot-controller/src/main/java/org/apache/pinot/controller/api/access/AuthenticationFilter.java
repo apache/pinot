@@ -67,9 +67,10 @@ public class AuthenticationFilter implements ContainerRequestFilter {
   @Override
   public void filter(ContainerRequestContext requestContext)
       throws IOException {
+    Request request = _requestProvider.get();
     Method endpointMethod = _resourceInfo.getResourceMethod();
     AccessControl accessControl = _accessControlFactory.create();
-    String endpointUrl = _requestProvider.get().getRequestURL().toString();
+    String endpointUrl = request.getRequestURI().substring(request.getContextPath().length()); // extract path only
     UriInfo uriInfo = requestContext.getUriInfo();
 
     // exclude public/unprotected paths
@@ -79,6 +80,11 @@ public class AuthenticationFilter implements ContainerRequestFilter {
 
     // check if authentication is required implicitly
     if (accessControl.protectAnnotatedOnly() && !endpointMethod.isAnnotationPresent(Authenticate.class)) {
+      return;
+    }
+
+    // check if the method's authorization is disabled (i.e. performed manually within method)
+    if (endpointMethod.isAnnotationPresent(ManualAuthorization.class)) {
       return;
     }
 
