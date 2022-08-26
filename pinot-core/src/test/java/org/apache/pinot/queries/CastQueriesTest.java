@@ -123,7 +123,7 @@ public class CastQueriesTest extends BaseQueriesTest {
         + "cast(sum(" + Y_COL + ") as int) "
         + "from " + RAW_TABLE_NAME;
     AggregationOperator aggregationOperator = getOperator(query);
-    List<Object> aggregationResult = aggregationOperator.nextBlock().getAggregationResult();
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 2);
     assertEquals(((Number) aggregationResult.get(0)).intValue(), NUM_RECORDS / 2);
@@ -155,7 +155,7 @@ public class CastQueriesTest extends BaseQueriesTest {
         + " from " + RAW_TABLE_NAME
         + " where " + CLASSIFICATION_COLUMN + " = cast(0 as string) limit " + NUM_RECORDS;
     SelectionOnlyOperator selectionOperator = getOperator(query);
-    Collection<Object[]> result = selectionOperator.nextBlock().getSelectionResult();
+    Collection<Object[]> result = selectionOperator.nextBlock().getRows();
     assertNotNull(result);
     assertEquals(result.size(), NUM_RECORDS / BUCKET_SIZE);
     for (Object[] row : result) {

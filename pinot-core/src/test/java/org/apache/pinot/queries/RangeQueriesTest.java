@@ -216,7 +216,7 @@ public class RangeQueriesTest extends BaseQueriesTest {
   public void testSelectionOverRangeFilter(String query, int min, int max, boolean inclusive) {
     Operator<?> operator = getOperator(query);
     assertTrue(operator instanceof SelectionOnlyOperator);
-    for (Object[] row : Objects.requireNonNull(((SelectionOnlyOperator) operator).nextBlock().getSelectionResult())) {
+    for (Object[] row : Objects.requireNonNull(((SelectionOnlyOperator) operator).nextBlock().getRows())) {
       int value = (int) row[0];
       assertTrue(inclusive ? value >= min : value > min);
       assertTrue(inclusive ? value <= max : value < max);
@@ -227,7 +227,7 @@ public class RangeQueriesTest extends BaseQueriesTest {
   public void testCountOverRangeFilter(String query, int expectedCount) {
     Operator<?> operator = getOperator(query);
     assertTrue(operator instanceof FastFilteredCountOperator);
-    List<Object> aggregationResult = ((FastFilteredCountOperator) operator).nextBlock().getAggregationResult();
+    List<Object> aggregationResult = ((FastFilteredCountOperator) operator).nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
     assertEquals(((Number) aggregationResult.get(0)).intValue(), expectedCount, query);

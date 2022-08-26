@@ -34,7 +34,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
@@ -194,10 +195,10 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     // Inner segment
     for (Object operator : Arrays.asList(getOperator(query), getOperatorWithFilter(query))) {
       assertTrue(operator instanceof NonScanBasedAggregationOperator);
-      IntermediateResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
+      AggregationResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
           0, 0, NUM_RECORDS);
-      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      List<Object> aggregationResult = resultsBlock.getResults();
       assertNotNull(aggregationResult);
       assertEquals(aggregationResult.size(), 6);
       for (int i = 0; i < 6; i++) {
@@ -223,7 +224,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
       }
     }
     AggregationOperator aggregationOperator = getOperator(query);
-    List<Object> aggregationResult = aggregationOperator.nextBlock().getAggregationResult();
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 6);
     for (int i = 0; i < 6; i++) {
@@ -243,7 +244,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
 
     // Inner segment
     AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+    GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         6 * NUM_RECORDS, NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
@@ -278,10 +279,10 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     Object[] interSegmentsExpectedResults = new Object[5];
     for (Object operator : Arrays.asList(getOperator(query), getOperatorWithFilter(query))) {
       assertTrue(operator instanceof NonScanBasedAggregationOperator);
-      IntermediateResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
+      AggregationResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
           0, 0, NUM_RECORDS);
-      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      List<Object> aggregationResult = resultsBlock.getResults();
       assertNotNull(aggregationResult);
       assertEquals(aggregationResult.size(), 5);
       for (int i = 0; i < 5; i++) {
@@ -318,7 +319,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
       }
     }
     AggregationOperator aggregationOperator = getOperator(query);
-    List<Object> aggregationResult = aggregationOperator.nextBlock().getAggregationResult();
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 5);
     for (int i = 0; i < 5; i++) {
@@ -341,7 +342,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     // Change log2m
     query = "SELECT DISTINCTCOUNTHLL(intColumn, 12) FROM testTable";
     NonScanBasedAggregationOperator nonScanOperator = getOperator(query);
-    aggregationResult = nonScanOperator.nextBlock().getAggregationResult();
+    aggregationResult = nonScanOperator.nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
     assertTrue(aggregationResult.get(0) instanceof HyperLogLog);
@@ -362,10 +363,10 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     Object[] interSegmentsExpectedResults = new Object[6];
     for (Object operator : Arrays.asList(getOperator(query), getOperatorWithFilter(query))) {
       assertTrue(operator instanceof NonScanBasedAggregationOperator);
-      IntermediateResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
+      AggregationResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
           0, 0, NUM_RECORDS);
-      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      List<Object> aggregationResult = resultsBlock.getResults();
       assertNotNull(aggregationResult);
       assertEquals(aggregationResult.size(), 6);
       for (int i = 0; i < 6; i++) {
@@ -402,7 +403,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
       }
     }
     AggregationOperator aggregationOperator = getOperator(query);
-    List<Object> aggregationResult = aggregationOperator.nextBlock().getAggregationResult();
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 6);
     for (int i = 0; i < 6; i++) {
@@ -425,7 +426,7 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     // Change log2m
     query = "SELECT DISTINCTCOUNTSMARTHLL(intColumn, 'threshold=10;log2m=8') FROM testTable";
     NonScanBasedAggregationOperator nonScanOperator = getOperator(query);
-    aggregationResult = nonScanOperator.nextBlock().getAggregationResult();
+    aggregationResult = nonScanOperator.nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
     assertTrue(aggregationResult.get(0) instanceof HyperLogLog);

@@ -28,7 +28,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -39,7 +39,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 /**
  * Operator which executes DISTINCT operation based on dictionary
  */
-public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateResultsBlock> {
+public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "DISTINCT_DICTIONARY";
 
   private final DistinctAggregationFunction _distinctAggregationFunction;
@@ -70,8 +70,8 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<IntermediateRe
   }
 
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
-    return new IntermediateResultsBlock(_distinctAggregationFunction, buildResult());
+  protected DistinctResultsBlock getNextBlock() {
+    return new DistinctResultsBlock(_distinctAggregationFunction, buildResult());
   }
 
   /**

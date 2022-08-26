@@ -27,7 +27,8 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -169,10 +170,10 @@ public class IdSetQueriesTest extends BaseQueriesTest {
     {
       // Without filter
       AggregationOperator aggregationOperator = getOperator(query);
-      IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+      AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
           11 * NUM_RECORDS, NUM_RECORDS);
-      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      List<Object> aggregationResult = resultsBlock.getResults();
       assertNotNull(aggregationResult);
       assertEquals(aggregationResult.size(), 11);
       RoaringBitmapIdSet intIdSet = (RoaringBitmapIdSet) aggregationResult.get(0);
@@ -228,10 +229,10 @@ public class IdSetQueriesTest extends BaseQueriesTest {
     {
       // With filter
       AggregationOperator aggregationOperator = getOperatorWithFilter(query);
-      IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+      AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 0, 0,
           NUM_RECORDS);
-      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      List<Object> aggregationResult = resultsBlock.getResults();
       assertNotNull(aggregationResult);
       assertEquals(aggregationResult.size(), 11);
       for (int i = 0; i < 11; i++) {
@@ -326,7 +327,7 @@ public class IdSetQueriesTest extends BaseQueriesTest {
     // Inner segment
     {
       AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
-      IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+      GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
           11 * NUM_RECORDS, NUM_RECORDS);
       AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
@@ -459,10 +460,10 @@ public class IdSetQueriesTest extends BaseQueriesTest {
     // Inner segment
     {
       AggregationOperator aggregationOperator = getOperator(query);
-      IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+      AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
           NUM_RECORDS, NUM_RECORDS);
-      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      List<Object> aggregationResult = resultsBlock.getResults();
       assertNotNull(aggregationResult);
       assertEquals(aggregationResult.size(), 1);
       // Should directly create BloomFilterIdSet
@@ -514,10 +515,10 @@ public class IdSetQueriesTest extends BaseQueriesTest {
     {
       String query = "SELECT COUNT(*) FROM testTable where INIDSET(intColumn, '" + serializedIdSet + "') = 1";
       AggregationOperator aggregationOperator = getOperator(query);
-      IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+      AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(),
           expectedNumMatchingRecords, NUM_RECORDS, 0, NUM_RECORDS);
-      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      List<Object> aggregationResult = resultsBlock.getResults();
       assertNotNull(aggregationResult);
       assertEquals(aggregationResult.size(), 1);
       assertEquals((long) aggregationResult.get(0), expectedNumMatchingRecords);
@@ -526,10 +527,10 @@ public class IdSetQueriesTest extends BaseQueriesTest {
     {
       String query = "SELECT COUNT(*) FROM testTable where IN_ID_SET(intColumn, '" + serializedIdSet + "') = 0";
       AggregationOperator aggregationOperator = getOperator(query);
-      IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+      AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(),
           NUM_RECORDS - expectedNumMatchingRecords, NUM_RECORDS, 0, NUM_RECORDS);
-      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      List<Object> aggregationResult = resultsBlock.getResults();
       assertNotNull(aggregationResult);
       assertEquals(aggregationResult.size(), 1);
       assertEquals((long) aggregationResult.get(0), NUM_RECORDS - expectedNumMatchingRecords);

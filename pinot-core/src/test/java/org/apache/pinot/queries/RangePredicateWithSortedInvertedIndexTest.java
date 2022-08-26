@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -223,8 +222,7 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
 
   private void runQuery(String query, int count, List<Pairs.IntPair> intPairs, int numColumns) {
     SelectionOnlyOperator operator = getOperator(query);
-    IntermediateResultsBlock block = operator.nextBlock();
-    Collection<Object[]> rows = block.getSelectionResult();
+    Collection<Object[]> rows = operator.nextBlock().getRows();
     assertNotNull(rows, ERROR_MESSAGE);
     assertEquals(rows.size(), count, ERROR_MESSAGE);
     if (count > 0) {

@@ -39,7 +39,9 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -56,7 +58,7 @@ import org.slf4j.LoggerFactory;
  *   all threads
  */
 @SuppressWarnings("rawtypes")
-public class GroupByOrderByCombineOperator extends BaseCombineOperator {
+public class GroupByOrderByCombineOperator extends BaseCombineOperator<GroupByResultsBlock> {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
   public static final int MAX_GROUP_BY_KEYS_MERGED_PER_INTERRUPTION_CHECK = 10_000;
 
@@ -117,7 +119,6 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     return queryContext;
   }
 
-
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
@@ -134,7 +135,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
-        IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) operator.nextBlock();
+        GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
         if (_indexedTable == null) {
           synchronized (this) {
             if (_indexedTable == null) {
@@ -237,7 +238,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
    * </ul>
    */
   @Override
-  protected IntermediateResultsBlock mergeResults()
+  protected BaseResultsBlock mergeResults()
       throws Exception {
     long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
     boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
@@ -247,13 +248,12 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
           String.format("Timed out while combining group-by order-by results after %dms, queryContext = %s", timeoutMs,
               _queryContext);
       LOGGER.error(errorMessage);
-      return new IntermediateResultsBlock(new TimeoutException(errorMessage));
+      return new ExceptionResultsBlock(new TimeoutException(errorMessage));
     }
 
     IndexedTable indexedTable = _indexedTable;
     indexedTable.finish(false);
-    IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(
-        indexedTable, _queryContext.isNullHandlingEnabled());
+    GroupByResultsBlock mergedBlock = new GroupByResultsBlock(indexedTable);
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
     mergedBlock.setNumResizes(indexedTable.getNumResizes());
     mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
@@ -267,6 +267,6 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   }
 
   @Override
-  protected void mergeResultsBlocks(IntermediateResultsBlock mergedBlock, IntermediateResultsBlock blockToMerge) {
+  protected void mergeResultsBlocks(GroupByResultsBlock mergedBlock, GroupByResultsBlock blockToMerge) {
   }
 }

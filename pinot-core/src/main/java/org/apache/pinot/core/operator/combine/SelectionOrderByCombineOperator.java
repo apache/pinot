@@ -27,7 +27,8 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.spi.exception.QueryCancelledException;
@@ -43,7 +44,7 @@ import org.slf4j.LoggerFactory;
  * (process all segments).
  */
 @SuppressWarnings("rawtypes")
-public class SelectionOrderByCombineOperator extends BaseCombineOperator {
+public class SelectionOrderByCombineOperator extends BaseCombineOperator<SelectionResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SelectionOrderByCombineOperator.class);
 
   private static final String EXPLAIN_NAME = "COMBINE_SELECT_ORDERBY";
@@ -55,7 +56,6 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator {
     super(operators, queryContext, executorService);
     _numRowsToKeep = queryContext.getLimit() + queryContext.getOffset();
   }
-
 
   @Override
   public String toExplainString() {
@@ -72,13 +72,13 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator {
    * (process all segments).
    */
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
+  protected BaseResultsBlock getNextBlock() {
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     assert orderByExpressions != null;
     if (orderByExpressions.get(0).getExpression().getType() == ExpressionContext.Type.IDENTIFIER) {
       try {
-        return new MinMaxValueBasedSelectionOrderByCombineOperator(_operators, _queryContext, _executorService)
-            .getNextBlock();
+        return new MinMaxValueBasedSelectionOrderByCombineOperator(_operators, _queryContext,
+            _executorService).getNextBlock();
       } catch (QueryCancelledException e) {
         throw e;
       } catch (Exception e) {
@@ -89,7 +89,7 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator {
   }
 
   @Override
-  protected void mergeResultsBlocks(IntermediateResultsBlock mergedBlock, IntermediateResultsBlock blockToMerge) {
+  protected void mergeResultsBlocks(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge) {
     DataSchema mergedDataSchema = mergedBlock.getDataSchema();
     DataSchema dataSchemaToMerge = blockToMerge.getDataSchema();
     assert mergedDataSchema != null && dataSchemaToMerge != null;
@@ -104,8 +104,8 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator {
       return;
     }
 
-    PriorityQueue<Object[]> mergedRows = (PriorityQueue<Object[]>) mergedBlock.getSelectionResult();
-    Collection<Object[]> rowsToMerge = blockToMerge.getSelectionResult();
+    PriorityQueue<Object[]> mergedRows = (PriorityQueue<Object[]>) mergedBlock.getRows();
+    Collection<Object[]> rowsToMerge = blockToMerge.getRows();
     assert mergedRows != null && rowsToMerge != null;
     SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge, _numRowsToKeep);
   }

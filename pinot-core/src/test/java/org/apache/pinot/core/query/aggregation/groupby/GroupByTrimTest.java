@@ -22,14 +22,16 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.data.table.Table;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.combine.GroupByOrderByCombineOperator;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.plan.AggregationGroupByOrderByPlanNode;
@@ -124,10 +126,10 @@ public class GroupByTrimTest {
         new GroupByOrderByCombineOperator(Collections.singletonList(groupByOperator), queryContext, _executorService);
 
     // Execute the query
-    IntermediateResultsBlock resultsBlock = combineOperator.nextBlock();
+    GroupByResultsBlock resultsBlock = (GroupByResultsBlock) combineOperator.nextBlock();
 
     // Extract the execution result
-    List<Pair<Double, Double>> extractedResult = extractTestResult(resultsBlock);
+    List<Pair<Double, Double>> extractedResult = extractTestResult(resultsBlock.getTable());
 
     assertEquals(extractedResult, expectedResult);
   }
@@ -206,13 +208,13 @@ public class GroupByTrimTest {
    *
    * @return A list of expected results
    */
-  private List<Pair<Double, Double>> extractTestResult(IntermediateResultsBlock resultsBlock)
-      throws Exception {
-    DataTable dataTable = resultsBlock.getDataTable();
-    int numRows = dataTable.getNumberOfRows();
+  private List<Pair<Double, Double>> extractTestResult(Table table) {
+    int numRows = table.size();
     List<Pair<Double, Double>> result = new ArrayList<>(numRows);
-    for (int i = 0; i < numRows; i++) {
-      result.add(Pair.of(dataTable.getDouble(i, 0), dataTable.getDouble(i, 1)));
+    Iterator<Record> iterator = table.iterator();
+    while (iterator.hasNext()) {
+      Object[] values = iterator.next().getValues();
+      result.add(Pair.of((Double) values[0], (Double) values[1]));
     }
     result.sort((o1, o2) -> Double.compare(o2.getRight(), o1.getRight()));
     return result;

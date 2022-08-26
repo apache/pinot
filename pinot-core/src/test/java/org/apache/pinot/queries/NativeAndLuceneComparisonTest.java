@@ -29,7 +29,7 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -223,16 +223,16 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
   private void testSelectionResults(String nativeQuery, String luceneQuery) {
     _indexSegment = _nativeIndexSegment;
     _indexSegments = Arrays.asList(_nativeIndexSegment);
-    Operator<IntermediateResultsBlock> operator = getOperator(nativeQuery);
-    IntermediateResultsBlock operatorResult = operator.nextBlock();
-    List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
+    Operator<SelectionResultsBlock> operator = getOperator(nativeQuery);
+    SelectionResultsBlock operatorResult = operator.nextBlock();
+    List<Object[]> resultset = (List<Object[]>) operatorResult.getRows();
     Assert.assertNotNull(resultset);
 
     _indexSegment = _luceneSegment;
     _indexSegments = Arrays.asList(_luceneSegment);
     operator = getOperator(luceneQuery);
     operatorResult = operator.nextBlock();
-    List<Object[]> resultset2 = (List<Object[]>) operatorResult.getSelectionResult();
+    List<Object[]> resultset2 = (List<Object[]>) operatorResult.getRows();
     Assert.assertNotNull(resultset2);
 
     Assert.assertEquals(resultset.size(), resultset2.size());

@@ -182,8 +182,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
 
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, executorService, null);
-    return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode, indexSegments, fetchContexts,
-        queryContext, serverMetrics));
+    return new GlobalPlanImplV0(
+        new InstanceResponsePlanNode(combinePlanNode, indexSegments, fetchContexts, queryContext));
   }
 
   private void applyQueryOptions(QueryContext queryContext) {
@@ -273,14 +273,13 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     if (QueryContextUtils.isSelectionOnlyQuery(queryContext)) {
       // selection-only is streamed in StreamingSelectionPlanNode --> here only metadata block is returned.
       return new GlobalPlanImplV0(
-          new InstanceResponsePlanNode(combinePlanNode, indexSegments, Collections.emptyList(), queryContext,
-              serverMetrics));
+          new InstanceResponsePlanNode(combinePlanNode, indexSegments, Collections.emptyList(), queryContext));
     } else {
       // non-selection-only requires a StreamingInstanceResponsePlanNode to stream data block back and metadata block
       // as final return.
       return new GlobalPlanImplV0(
-          new StreamingInstanceResponsePlanNode(combinePlanNode, indexSegments, Collections.emptyList(),
-              streamObserver, queryContext, serverMetrics));
+          new StreamingInstanceResponsePlanNode(combinePlanNode, indexSegments, Collections.emptyList(), queryContext,
+              streamObserver));
     }
   }
 

@@ -21,7 +21,7 @@ package org.apache.pinot.core.operator.combine;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.segment.spi.MutableSegment;
 
 
@@ -53,7 +53,7 @@ public class CombineOperatorUtils {
   /**
    * Sets the execution statistics into the results block.
    */
-  public static void setExecutionStatistics(IntermediateResultsBlock resultsBlock, List<Operator> operators,
+  public static void setExecutionStatistics(BaseResultsBlock resultsBlock, List<Operator> operators,
       long threadCpuTimeNs, int numServerThreads) {
     int numSegmentsProcessed = operators.size();
     int numSegmentsMatched = 0;
