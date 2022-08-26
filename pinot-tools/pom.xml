@@ -34,6 +34,8 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <aws.version>2.14.28</aws.version>
+    <scala.version>2.12</scala.version>
+    <spark.version>3.2.1</spark.version>
   </properties>
   <dependencies>
     <dependency>
@@ -277,8 +279,8 @@
     -->
     <dependency>
       <groupId>org.apache.spark</groupId>
-      <artifactId>spark-launcher_2.12</artifactId>
-      <version>2.4.8</version>
+      <artifactId>spark-launcher_${scala.version}</artifactId>
+      <version>${spark.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.scala-lang</groupId>

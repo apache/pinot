@@ -123,16 +123,6 @@ if [ -z "$PLUGINS_CLASSPATH" ] ; then
     fi
   fi
 
-    if [ -z "$PLUGINS_EXTERNAL_DIR" ] ; then
-      PLUGINS_EXTERNAL_DIR="$BASEDIR"/plugins-external
-    else
-      if [[ "$PLUGINS_EXTERNAL_DIR" = *,* ]]
-      then
-          echo "\$PLUGINS_DIR should use ; as the delimiter"
-          exit 1
-      fi
-    fi
-
   export IFS=';'
   for DIR in $PLUGINS_DIR; do
     if [ -d "$DIR" ] ; then
@@ -165,37 +155,6 @@ if [ -z "$PLUGINS_CLASSPATH" ] ; then
       fi
     fi
   done
-  for DIR in $PLUGINS_EXTERNAL_DIR; do
-      if [ -d "$DIR" ] ; then
-        unset IFS
-        if [ -n "$PLUGINS_INCLUDE" ] ; then
-          if [[ "$PLUGINS_INCLUDE" = *,* ]]
-          then
-              echo "\$PLUGINS_INCLUDE should use ; as the delimiter"
-              exit 1
-          fi
-          export IFS=';'
-          for PLUGIN_JAR in $PLUGINS_INCLUDE; do
-              PLUGIN_JAR_PATH=$(find "$DIR" -path \*/"$PLUGIN_JAR"/"$PLUGIN_JAR"-\*.jar)
-              if [ -n "$PLUGINS_CLASSPATH" ] ; then
-                PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR_PATH
-              else
-                PLUGINS_CLASSPATH=$PLUGIN_JAR_PATH
-              fi
-          done
-          unset IFS
-        else
-          PLUGIN_JARS=$(find "$DIR" -name \*.jar)
-          for PLUGIN_JAR in $PLUGIN_JARS ; do
-            if [ -n "$PLUGINS_CLASSPATH" ] ; then
-              PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR
-            else
-              PLUGINS_CLASSPATH=$PLUGIN_JAR
-            fi
-          done
-        fi
-      fi
-    done
 
   unset IFS
 fi
