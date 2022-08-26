@@ -23,9 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.sql.SqlNode;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
@@ -43,13 +41,15 @@ import org.testng.annotations.Test;
 
 public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
-  @Test(dataProvider = "testQueryParserDataProvider")
-  public void testQueryParser(String query, String digest)
+  @Test(dataProvider = "testQueryPlanDataProvider")
+  public void testQueryPlanExplain(String query, String digest)
       throws Exception {
-    PlannerContext plannerContext = new PlannerContext();
-    SqlNode sqlNode = _queryEnvironment.parse(query, plannerContext);
-    _queryEnvironment.validate(sqlNode);
-    Assert.assertEquals(sqlNode.toString(), digest);
+    try {
+      String explainedPlan = _queryEnvironment.explainQuery(query);
+      Assert.assertEquals(explainedPlan, digest);
+    } catch (RuntimeException e) {
+      Assert.fail("failed to explain query: " + query, e);
+    }
   }
 
   @Test(dataProvider = "testQueryDataProvider")
@@ -169,14 +169,6 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     return false;
   }
 
-  @DataProvider(name = "testQueryParserDataProvider")
-  private Object[][] provideQueriesAndDigest() {
-    return new Object[][] {
-        new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0",
-            "SELECT *\n" + "FROM `a`\n" + "INNER JOIN `b` ON `a`.`col1` = `b`.`col2`\n" + "WHERE `a`.`col3` >= 0"},
-    };
-  }
-
   @DataProvider(name = "testQueryExceptionDataProvider")
   private Object[][] provideQueriesWithException() {
     return new Object[][] {
@@ -184,6 +176,29 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         new Object[]{"SELECT b.col1 - a.col3 FROM a JOIN c ON a.col1 = c.col3", "Table 'b' not found"},
         // non-agg column not being grouped
         new Object[]{"SELECT a.col1, SUM(a.col3) FROM a", "'a.col1' is not being grouped"},
+    };
+  }
+
+  @DataProvider(name = "testQueryPlanDataProvider")
+  private Object[][] provideQueriesWithExplainedPlan() {
+    return new Object[][] {
+        new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a", "{\n"
+            + "  \"rels\": [\n" + "    {\n" + "      \"id\": \"0\",\n" + "      \"relOp\": \"LogicalTableScan\",\n"
+            + "      \"table\": [\n" + "        \"a\"\n" + "      ],\n" + "      \"inputs\": []\n" + "    },\n"
+            + "    {\n" + "      \"id\": \"1\",\n" + "      \"relOp\": \"LogicalProject\",\n" + "      \"fields\": [\n"
+            + "        \"col1\",\n" + "        \"col3\"\n" + "      ],\n" + "      \"exprs\": [\n" + "        {\n"
+            + "          \"input\": 2,\n" + "          \"name\": \"$2\"\n" + "        },\n" + "        {\n"
+            + "          \"input\": 1,\n" + "          \"name\": \"$1\"\n" + "        }\n" + "      ]\n" + "    }\n"
+            + "  ]\n" + "}"},
+        new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
+            "Execution Plan\n" + "digraph {\n" + "\"LogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
+                + "\"LogicalAggregate\\n\" -> \"LogicalExchange\\n\" [label=\"0\"]\n"
+                + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n" + "}\n"},
+        new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1", "Execution Plan\n"
+            + "LogicalProject(col1=[$0], col3=[$1])\n" + "  LogicalJoin(condition=[=($0, $2)], joinType=[inner])\n"
+            + "    LogicalExchange(distribution=[hash[0]])\n" + "      LogicalProject(col1=[$2])\n"
+            + "        LogicalTableScan(table=[[a]])\n" + "    LogicalExchange(distribution=[hash[1]])\n"
+            + "      LogicalProject(col3=[$1], col1=[$2])\n" + "        LogicalTableScan(table=[[b]])\n"},
     };
   }
 }

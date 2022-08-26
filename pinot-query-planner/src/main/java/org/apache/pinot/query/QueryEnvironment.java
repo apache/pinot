@@ -38,6 +38,9 @@ import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.hint.HintStrategyTable;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.sql.SqlExplain;
+import org.apache.calcite.sql.SqlExplainFormat;
+import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
@@ -47,6 +50,7 @@ import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.pinot.query.context.PlannerContext;
+import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.planner.logical.StagePlanner;
@@ -125,18 +129,39 @@ public class QueryEnvironment {
    * @return a dispatchable query plan
    */
   public QueryPlan planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
-    PlannerContext plannerContext = new PlannerContext();
     try {
+      PlannerContext plannerContext = new PlannerContext();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      SqlNode validated = validate(sqlNodeAndOptions.getSqlNode());
-      RelRoot relation = toRelation(validated, plannerContext);
-      RelNode optimized = optimize(relation, plannerContext);
-      return toDispatchablePlan(optimized, plannerContext);
+      RelNode relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
+      return toDispatchablePlan(relRoot, plannerContext);
     } catch (Exception e) {
       throw new RuntimeException("Error composing query plan for: " + sqlQuery, e);
-    } finally {
-      _planner.close();
-      _planner.reset();
+    }
+  }
+
+  /**
+   * Explain a SQL query.
+   *
+   * Similar to {@link QueryEnvironment#planQuery(String, SqlNodeAndOptions)}, this API runs the query compilation.
+   * But it doesn't run the distributed {@link QueryPlan} generation, instead it only returns the explained logical
+   * plan.
+   *
+   * @param sqlQuery SQL query string.
+   * @param sqlNodeAndOptions parsed SQL query.
+   * @return the explained query plan.
+   */
+  public String explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
+    try {
+      SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
+      PlannerContext plannerContext = new PlannerContext();
+      plannerContext.setOptions(sqlNodeAndOptions.getOptions());
+      RelNode relRoot = compileQuery(explain.getExplicandum(), plannerContext);
+      SqlExplainFormat format = explain.getFormat() == null ? SqlExplainFormat.DOT : explain.getFormat();
+      SqlExplainLevel level = explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES
+          : explain.getDetailLevel();
+      return PlannerUtils.explainPlan(relRoot, format, level);
+    } catch (Exception e) {
+      throw new RuntimeException("Error explain query plan for: " + sqlQuery, e);
     }
   }
 
@@ -145,20 +170,29 @@ public class QueryEnvironment {
     return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery));
   }
 
+  @VisibleForTesting
+  public String explainQuery(String sqlQuery) {
+    return explainQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery));
+  }
+
   // --------------------------------------------------------------------------
   // steps
   // --------------------------------------------------------------------------
 
   @VisibleForTesting
-  protected SqlNode parse(String query, PlannerContext plannerContext)
+  protected RelNode compileQuery(SqlNode sqlNode, PlannerContext plannerContext)
       throws Exception {
-    // 1. invoke CalciteSqlParser to parse out SqlNode;
-    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-    plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-    return sqlNodeAndOptions.getSqlNode();
+    try {
+      SqlNode validated = validate(sqlNode);
+      RelRoot relation = toRelation(validated, plannerContext);
+      return optimize(relation, plannerContext);
+    } finally {
+      _planner.close();
+      _planner.reset();
+    }
   }
 
-  protected SqlNode validate(SqlNode parsed)
+  private SqlNode validate(SqlNode parsed)
       throws Exception {
     // 2. validator to validate.
     SqlNode validated = _validator.validate(parsed);
@@ -169,7 +203,7 @@ public class QueryEnvironment {
     return validated;
   }
 
-  protected RelRoot toRelation(SqlNode parsed, PlannerContext plannerContext) {
+  private RelRoot toRelation(SqlNode parsed, PlannerContext plannerContext) {
     // 3. convert sqlNode to relNode.
     RexBuilder rexBuilder = new RexBuilder(_typeFactory);
     RelOptCluster cluster = RelOptCluster.create(_relOptPlanner, rexBuilder);
@@ -179,12 +213,7 @@ public class QueryEnvironment {
     return sqlToRelConverter.convertQuery(parsed, false, true);
   }
 
-  // TODO: add hint strategy table based on plannerContext.
-  private HintStrategyTable getHintStrategyTable(PlannerContext plannerContext) {
-    return HintStrategyTable.builder().build();
-  }
-
-  protected RelNode optimize(RelRoot relRoot, PlannerContext plannerContext) {
+  private RelNode optimize(RelRoot relRoot, PlannerContext plannerContext) {
     // 4. optimize relNode
     // TODO: add support for traits, cost factory.
     try {
@@ -196,9 +225,19 @@ public class QueryEnvironment {
     }
   }
 
-  protected QueryPlan toDispatchablePlan(RelNode relRoot, PlannerContext plannerContext) {
+  private QueryPlan toDispatchablePlan(RelNode relRoot, PlannerContext plannerContext) {
     // 5. construct a dispatchable query plan.
     StagePlanner queryStagePlanner = new StagePlanner(plannerContext, _workerManager);
     return queryStagePlanner.makePlan(relRoot);
+  }
+
+
+  // --------------------------------------------------------------------------
+  // utils
+  // --------------------------------------------------------------------------
+
+  // TODO: add hint strategy table based on plannerContext.
+  private HintStrategyTable getHintStrategyTable(PlannerContext plannerContext) {
+    return HintStrategyTable.builder().build();
   }
 }
