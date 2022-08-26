@@ -48,8 +48,7 @@ import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.core.plan.DocIdSetPlanNode.MAX_DOC_PER_CALL;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 
 
 /**
@@ -208,7 +207,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
 
   // Check for thread interruption, every time after merging 10_000 keys
   private void checkMergePhaseInterruption(long mergedKeys) {
-    if (mergedKeys % MAX_DOC_PER_CALL == 0 && Thread.interrupted()) {
+    if (mergedKeys % DocIdSetPlanNode.MAX_DOC_PER_CALL == 0 && Thread.interrupted()) {
       throw new EarlyTerminationException();
     }
   }
