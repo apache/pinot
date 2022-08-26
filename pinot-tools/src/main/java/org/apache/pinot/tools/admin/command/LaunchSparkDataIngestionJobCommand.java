@@ -28,6 +28,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.calcite.rel.core.Join;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -38,6 +40,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.GroovyTemplateUtils;
 import org.apache.pinot.tools.Command;
+import org.apache.spark.launcher.SparkAppHandle;
 import org.apache.spark.launcher.SparkLauncher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +66,7 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   @CommandLine.Option(names = {"-propertyFile"}, required = false, description = "A property file contains context "
       + "values to set the job spec template")
   private String _propertyFile;
-  @CommandLine.Option(names = {"-pluginsToLoad"}, required = false, arity = "1..*", description = "Plugins to Load")
+  @CommandLine.Option(names = {"-pluginsToLoad"}, required = false, arity = "1..*", split = ":", description = "Plugins to Load")
   private List<String> _pluginsToLoad;
   @CommandLine.Option(names = {"-pinotBaseDir"}, required = false, description = "Pinot binary installation directory")
   private String _pinotBaseDir;
@@ -148,8 +151,13 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
       PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
     }
 
-    addDepsJarToDistributedCache(sparkLauncher, _pinotBaseDir);
-    addAppResource(sparkLauncher, _pinotBaseDir);
+    List<String> extraClassPaths = new ArrayList<>();
+    addDepsJarToDistributedCache(sparkLauncher, _pinotBaseDir, extraClassPaths);
+    addAppResource(sparkLauncher, _pinotBaseDir, extraClassPaths);
+
+    String extraClassPathsString = Joiner.on(":").join(extraClassPaths);
+    sparkLauncher.setConf(SparkLauncher.DRIVER_EXTRA_CLASSPATH, extraClassPathsString);
+    sparkLauncher.setConf(SparkLauncher.EXECUTOR_EXTRA_CLASSPATH, extraClassPathsString);
 
     URI jobSpecFileUri = URI.create(_jobSpecFile);
     if (jobSpecFileUri.getScheme() == null) {
@@ -188,7 +196,19 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
     return true;
   }
 
-  private void addAppResource(SparkLauncher sparkLauncher, String depsJarDir)
+  class SparkAppListener implements SparkAppHandle.Listener {
+    @Override
+    public void stateChanged(SparkAppHandle sparkAppHandle) {
+      LOGGER.info("Spark Application State changed: {}", sparkAppHandle.getState().toString());
+    }
+
+    @Override
+    public void infoChanged(SparkAppHandle sparkAppHandle) {
+      LOGGER.info("Spark Info changed: {}", sparkAppHandle.getState().toString());
+    }
+  }
+
+  private void addAppResource(SparkLauncher sparkLauncher, String depsJarDir, List<String> extraClassPath)
       throws IOException {
     if (depsJarDir != null) {
       URI depsJarDirURI = URI.create(depsJarDir);
@@ -201,16 +221,15 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
         if (!pinotFS.isDirectory(URI.create(file))) {
           if (file.endsWith(".jar") && file.contains("pinot-all")) {
             LOGGER.info("Adding jar: {} to appResource", file);
-            URI fileUri = URI.create(file);
-            if (fileUri.getScheme() == null) {
-              fileUri = new File(file).toURI();
-            }
-            Path path = Paths.get(fileUri);
-            String fileName = path.getFileName().toString();
+            String fileName = FilenameUtils.getName(file);
             if (_deployMode != null && _deployMode.contentEquals("cluster")) {
               sparkLauncher.setAppResource("local://" + fileName);
+              sparkLauncher.addJar(file);
+              extraClassPath.add(fileName);
             } else {
               sparkLauncher.setAppResource(file);
+              sparkLauncher.addJar(file);
+              extraClassPath.add(file);
             }
           }
         }
@@ -218,7 +237,7 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
     }
   }
 
-  private void addDepsJarToDistributedCache(SparkLauncher sparkLauncher, String depsJarDir)
+  private void addDepsJarToDistributedCache(SparkLauncher sparkLauncher, String depsJarDir, List<String> extraClassPath)
       throws IOException {
     if (depsJarDir != null) {
       URI depsJarDirURI = URI.create(depsJarDir);
@@ -227,38 +246,29 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
       }
       PinotFS pinotFS = PinotFSFactory.create(depsJarDirURI.getScheme());
       String[] files = pinotFS.listFiles(depsJarDirURI, true);
-      List<String> jarFiles = new ArrayList<>();
       for (String file : files) {
         if (!pinotFS.isDirectory(URI.create(file))) {
           if (file.endsWith(".jar")) {
-            LOGGER.info("Adding deps jar: {} to distributed cache", file);
-            URI fileUri = URI.create(file);
-            if (fileUri.getScheme() == null) {
-              fileUri = new File(file).toURI();
-            }
-            Path path = Paths.get(fileUri);
-            String fileName = path.getFileName().toString();
-            String parentDir = path.getParent().getFileName().toString();
+            String fileName = FilenameUtils.getName(file);
+            String parentDir = FilenameUtils.getName(file.substring(0, file.lastIndexOf('/')));
             if (_pluginsToLoad != null && _pluginsToLoad.contains(parentDir)) {
-              addJarFilePath(sparkLauncher, fileName, jarFiles, file);
-            } else {
-              addJarFilePath(sparkLauncher, fileName, jarFiles, file);
+              addJarFilePath(sparkLauncher, fileName, extraClassPath, file);
+            } else if(_pluginsToLoad == null) {
+              addJarFilePath(sparkLauncher, fileName, extraClassPath, file);
             }
           }
         }
       }
-
-      String extraClassPaths = Joiner.on(":").join(jarFiles);
-      sparkLauncher.setConf(SparkLauncher.DRIVER_EXTRA_CLASSPATH, extraClassPaths);
-      sparkLauncher.setConf(SparkLauncher.EXECUTOR_EXTRA_CLASSPATH, extraClassPaths);
     }
   }
 
   private void addJarFilePath(SparkLauncher sparkLauncher, String fileName, List<String> jarFiles, String file) {
     if (_deployMode != null && _deployMode.contentEquals("cluster")) {
-      sparkLauncher.addJar(fileName);
+      LOGGER.info("Adding deps jar: {} to distributed cache for deployMode: {}", fileName, _deployMode);
+      sparkLauncher.addJar(file);
       jarFiles.add(fileName);
     } else {
+      LOGGER.info("Adding deps jar: {} to distributed cache for deployMode: {}", file, _deployMode);
       sparkLauncher.addJar(file);
       jarFiles.add(file);
     }
