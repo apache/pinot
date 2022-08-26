@@ -198,7 +198,10 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     while (numBlocksMerged < _numOperators) {
       IntermediateResultsBlock blockToMerge =
           _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-      if (blockToMerge == null) {
+      // Timeout has reached, shouldn't continue to process. `_blockingQueue.poll` will continue to return blocks even
+      // if negative timeout is provided; therefore an extra check is needed
+      boolean timeoutReached = endTimeMs < System.currentTimeMillis();
+      if (blockToMerge == null || timeoutReached) {
         // Query times out, skip merging the remaining results blocks
         LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
             _queryContext);

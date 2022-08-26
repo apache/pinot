@@ -45,8 +45,11 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.core.plan.DocIdSetPlanNode.MAX_DOC_PER_CALL;
 
 
 /**
@@ -165,6 +168,8 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
         // Merge aggregation group-by result.
         // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
         Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
+        // Count the number of merged keys
+        long mergedKeys = 0;
         // For now, only GroupBy OrderBy query has pre-constructed intermediate records
         if (intermediateRecords == null) {
           // Merge aggregation group-by result.
@@ -181,12 +186,16 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
                 values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
               }
               _indexedTable.upsert(new Key(keys), new Record(values));
+              mergedKeys++;
+              checkMergePhaseInterruption(mergedKeys);
             }
           }
         } else {
           for (IntermediateRecord intermediateResult : intermediateRecords) {
             //TODO: change upsert api so that it accepts intermediateRecord directly
             _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
+            mergedKeys++;
+            checkMergePhaseInterruption(mergedKeys);
           }
         }
       } finally {
@@ -194,6 +203,13 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
+    }
+  }
+
+  // Check for thread interruption, every time after merging 10_000 keys
+  private void checkMergePhaseInterruption(long mergedKeys) {
+    if (mergedKeys % MAX_DOC_PER_CALL == 0 && Thread.interrupted()) {
+      throw new EarlyTerminationException();
     }
   }
 
