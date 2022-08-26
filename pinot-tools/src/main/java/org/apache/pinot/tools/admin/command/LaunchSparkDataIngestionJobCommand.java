@@ -19,6 +19,7 @@
 package org.apache.pinot.tools.admin.command;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -30,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.core.Join;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.JavaVersion;
+import org.apache.commons.lang3.SystemUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -51,7 +54,9 @@ import picocli.CommandLine;
  * Class to implement LaunchDataIngestionJob command.
  *
  */
-//TODO: Scala version causing NoSuchMethodError at runtime
+//TODO: Fix Scala version causing NoSuchMethodError at runtime with a few plugins
+//TODO: Cleanup descriptions for options
+//TODO: Add options for most popular spark confs such as numExecutors
 @CommandLine.Command(name = "LaunchSparkDataIngestionJob")
 public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(LaunchSparkDataIngestionJobCommand.class);
@@ -74,6 +79,11 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   private String _deployMode;
   @CommandLine.Option(names = {"-master"}, required = false, defaultValue = "local", description = "Spark Master")
   private String _sparkMaster;
+  @CommandLine.Option(names = {"-sparkVersion"}, required = false, defaultValue = "SPARK_3", description = "Spark "
+      + "Type - can be one of Spark_2 or Spark_3")
+  private SparkType _sparkVersion;
+  @CommandLine.Option(names = {"-verbose"}, required = false, defaultValue = "true", description = "Enable verbose logging")
+  private boolean _verbose;
   @CommandLine.Option(names = {"-sparkConf"}, required = false, split = ":", mapFallbackValue = "", description = "Spark Conf")
   private Map<String, String> _sparkConf;
   @CommandLine.Unmatched
@@ -131,6 +141,17 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
       }
     }
 
+    Preconditions.checkNotNull(System.getenv("SPARK_HOME"),
+        "SPARK_HOME environment variable should be set to Spark installation path");
+
+    boolean isAppropriateJavaVersion = SystemUtils.isJavaVersionAtMost(_sparkVersion.getJavaVersion());
+    if (!isAppropriateJavaVersion) {
+      LOGGER.warn(
+          "Platform java version should be at most: {}, found: {}. "
+              + "Ignore this warning if you are running from different environment than your spark cluster",
+          _sparkVersion.getSparkVersion(), SystemUtils.JAVA_SPECIFICATION_VERSION);
+    }
+
     SparkLauncher sparkLauncher = new SparkLauncher();
     sparkLauncher.setMaster(_sparkMaster);
     if (_deployMode != null) {
@@ -159,14 +180,9 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
     sparkLauncher.setConf(SparkLauncher.DRIVER_EXTRA_CLASSPATH, extraClassPathsString);
     sparkLauncher.setConf(SparkLauncher.EXECUTOR_EXTRA_CLASSPATH, extraClassPathsString);
 
-    URI jobSpecFileUri = URI.create(_jobSpecFile);
-    if (jobSpecFileUri.getScheme() == null) {
-      jobSpecFileUri = new File(_jobSpecFile).toURI();
-    }
-
     if(_deployMode != null && _deployMode.contentEquals("cluster")) {
       sparkLauncher.addFile(_jobSpecFile);
-      sparkLauncher.addAppArgs("-jobSpecFile", Paths.get(jobSpecFileUri).getFileName().toString());
+      sparkLauncher.addAppArgs("-jobSpecFile", FilenameUtils.getName(_jobSpecFile));
     } else {
       sparkLauncher.addAppArgs("-jobSpecFile", _jobSpecFile);
     }
@@ -189,7 +205,7 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
       sparkLauncher.addAppArgs(_unmatchedArgs);
     }
     sparkLauncher.setAppName("Pinot Spark Ingestion Job");
-    sparkLauncher.setVerbose(true);
+    sparkLauncher.setVerbose(_verbose);
     sparkLauncher.redirectToLog(LOGGER.getName());
     Process process = sparkLauncher.launch();
     process.waitFor();
@@ -208,6 +224,7 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
     }
   }
 
+  //TODO: Handle DFS paths correctly
   private void addAppResource(SparkLauncher sparkLauncher, String depsJarDir, List<String> extraClassPath)
       throws IOException {
     if (depsJarDir != null) {
@@ -218,18 +235,23 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
       PinotFS pinotFS = PinotFSFactory.create(depsJarDirURI.getScheme());
       String[] files = pinotFS.listFiles(depsJarDirURI, true);
       for (String file : files) {
-        if (!pinotFS.isDirectory(URI.create(file))) {
+        URI fileUri = URI.create(file);
+        if (!pinotFS.isDirectory(fileUri)) {
           if (file.endsWith(".jar") && file.contains("pinot-all")) {
             LOGGER.info("Adding jar: {} to appResource", file);
             String fileName = FilenameUtils.getName(file);
-            if (_deployMode != null && _deployMode.contentEquals("cluster")) {
+            if(_deployMode != null && _deployMode.contentEquals("cluster")) {
               sparkLauncher.setAppResource("local://" + fileName);
               sparkLauncher.addJar(file);
               extraClassPath.add(fileName);
-            } else {
-              sparkLauncher.setAppResource(file);
+            } else  if (fileUri.getScheme() == null || fileUri.getScheme().contentEquals("file")) {
+              sparkLauncher.setAppResource("local://" + file);
               sparkLauncher.addJar(file);
               extraClassPath.add(file);
+            } else {
+              sparkLauncher.setAppResource("local://" + fileName);
+              sparkLauncher.addJar(file);
+              extraClassPath.add(fileName);
             }
           }
         }
@@ -249,12 +271,11 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
       for (String file : files) {
         if (!pinotFS.isDirectory(URI.create(file))) {
           if (file.endsWith(".jar")) {
-            String fileName = FilenameUtils.getName(file);
             String parentDir = FilenameUtils.getName(file.substring(0, file.lastIndexOf('/')));
-            if (_pluginsToLoad != null && _pluginsToLoad.contains(parentDir)) {
-              addJarFilePath(sparkLauncher, fileName, extraClassPath, file);
-            } else if(_pluginsToLoad == null) {
-              addJarFilePath(sparkLauncher, fileName, extraClassPath, file);
+
+            if (_pluginsToLoad == null || _pluginsToLoad.contains(parentDir) ||
+                _sparkVersion.getPluginName().contentEquals(parentDir)) {
+              addJarFilePath(sparkLauncher, extraClassPath, file);
             }
           }
         }
@@ -262,15 +283,24 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
     }
   }
 
-  private void addJarFilePath(SparkLauncher sparkLauncher, String fileName, List<String> jarFiles, String file) {
-    if (_deployMode != null && _deployMode.contentEquals("cluster")) {
-      LOGGER.info("Adding deps jar: {} to distributed cache for deployMode: {}", fileName, _deployMode);
-      sparkLauncher.addJar(file);
-      jarFiles.add(fileName);
+  private void addJarFilePath(SparkLauncher sparkLauncher, List<String> extraClassPath, String file) {
+    URI fileUri = URI.create(file);
+    sparkLauncher.addJar(file);
+    if(_deployMode != null && _deployMode.contentEquals("cluster")) {
+      LOGGER.info("Adding deps jar: {} to distributed cache", file);
+      String fileName = FilenameUtils.getName(file);
+      if(!fileName.isEmpty()) {
+        extraClassPath.add(fileName);
+      }
+    } else if (fileUri.getScheme() == null || fileUri.getScheme().contentEquals("file")) {
+      LOGGER.info("Adding deps jar: {} to distributed cache", file);
+      extraClassPath.add(file);
     } else {
-      LOGGER.info("Adding deps jar: {} to distributed cache for deployMode: {}", file, _deployMode);
-      sparkLauncher.addJar(file);
-      jarFiles.add(file);
+      LOGGER.info("Adding deps jar: {} to distributed cache", file);
+      String fileName = FilenameUtils.getName(file);
+      if(!fileName.isEmpty()) {
+        extraClassPath.add(fileName);
+      }
     }
   }
 
@@ -299,5 +329,32 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   public static void main(String[] args) {
     PluginManager.get().init();
     new CommandLine(new LaunchSparkDataIngestionJobCommand()).execute(args);
+  }
+
+  enum SparkType {
+    SPARK_2("2.4.0", "pinot-batch-ingestion-spark-2.4", JavaVersion.JAVA_1_8),
+    SPARK_3("3.2.1", "pinot-batch-ingestion-spark-3.2", JavaVersion.JAVA_11);
+
+    private final String _sparkVersion;
+    private final String _pluginName;
+    private final JavaVersion _javaVersion;
+
+    SparkType(String sparkVersion, String pluginName, JavaVersion javaVersion) {
+      _sparkVersion = sparkVersion;
+      _pluginName = pluginName;
+      _javaVersion = javaVersion;
+    }
+
+    public String getSparkVersion() {
+      return _sparkVersion;
+    }
+
+    public String getPluginName() {
+      return _pluginName;
+    }
+
+    public JavaVersion getJavaVersion() {
+      return _javaVersion;
+    }
   }
 }
