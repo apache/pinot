@@ -74,7 +74,7 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
     // message is too old to pass the freshness check. We check this condition separately to avoid hitting
     // the stream consumer to check partition count if we're already caught up.
     StreamPartitionMsgOffset currentOffset = rtSegmentDataManager.getCurrentOffset();
-    StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.fetchLatestStreamOffset();
+    StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.fetchLatestStreamOffset(5000);
     if (isOffsetCaughtUp(currentOffset, latestStreamOffset)) {
       _logger.info("Segment {} with freshness {}ms has not caught up within min freshness {}."
               + "But the current ingested offset is equal to the latest available offset {}.", segmentName, freshnessMs,
