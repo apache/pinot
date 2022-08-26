@@ -59,7 +59,7 @@ public class ExtractTransformFunction extends BaseTransformFunction {
   private void convert(long[] timestamps, int numDocs, int[] output) {
     for (int i = 0; i < numDocs; ++i) {
       DateTimeField accessor;
-      
+
       switch (_field) {
         case YEAR:
           accessor = _chronology.year();
