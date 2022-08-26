@@ -103,7 +103,17 @@ public abstract class QuickStartBase {
     return this;
   }
 
-  /** @return Table name if specified by command line argument -bootstrapTableDir; otherwise, default. */
+  /* @return bootstrap path if specified by command line argument -bootstrapTableDir; otherwise, null. */
+  public String getBootstrapDataDir() {
+    return _bootstrapDataDirs != null && _bootstrapDataDirs.length == 1 ? _bootstrapDataDirs[0] : null;
+  }
+
+  /** @return Table name specified by command line argument -bootstrapTableDir */
+  public String getTableName() {
+    return Paths.get(getBootstrapDataDir()).getFileName().toString();
+  }
+
+  /** @return Table name if specified by input bootstrap directory. */
   public String getTableName(String bootstrapDataDir) {
     return Paths.get(bootstrapDataDir).getFileName().toString();
   }
@@ -146,16 +156,19 @@ public abstract class QuickStartBase {
   protected List<QuickstartTableRequest> bootstrapOfflineTableDirectories(File quickstartTmpDir)
       throws IOException {
     List<QuickstartTableRequest> quickstartTableRequests = new ArrayList<>();
-    for (String directory : getDefaultBatchTableDirectories()) {
-      String tableName = getTableName(directory);
-      File baseDir = new File(quickstartTmpDir, tableName);
-      File dataDir = new File(baseDir, "rawdata");
-      Preconditions.checkState(dataDir.mkdirs());
-      if (useDefaultBootstrapTableDir()) {
+    if (useDefaultBootstrapTableDir()) {
+      for (String directory : getDefaultBatchTableDirectories()) {
+        String tableName = getTableName(directory);
+        File baseDir = new File(quickstartTmpDir, tableName);
+        File dataDir = new File(baseDir, "rawdata");
+        Preconditions.checkState(dataDir.mkdirs());
         copyResourceTableToTmpDirectory(directory, tableName, baseDir, dataDir, false);
-      } else {
-        copyFilesystemTableToTmpDirectory(directory, tableName, baseDir);
+        quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath()));
       }
+    } else {
+      String tableName = getTableName();
+      File baseDir = new File(quickstartTmpDir, tableName);
+      copyFilesystemTableToTmpDirectory(getBootstrapDataDir(), tableName, baseDir);
       quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath()));
     }
     return quickstartTableRequests;
