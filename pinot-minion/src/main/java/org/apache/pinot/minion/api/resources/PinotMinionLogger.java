@@ -25,8 +25,11 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -37,6 +40,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.utils.LoggerFileServer;
 import org.apache.pinot.common.utils.LoggerUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -50,6 +54,9 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
 @Path("/")
 public class PinotMinionLogger {
+
+  @Inject
+  private LoggerFileServer _loggerFileServer;
 
   @GET
   @Path("/loggers")
@@ -79,5 +86,33 @@ public class PinotMinionLogger {
   public Map<String, String> setLoggerLevel(@ApiParam(value = "Logger name") @PathParam("loggerName") String loggerName,
       @ApiParam(value = "Logger level") @QueryParam("level") String level) {
     return LoggerUtils.setLoggerLevel(loggerName, level);
+  }
+
+  @GET
+  @Path("/loggers/files")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get all local log files")
+  public Set<String> getLocalLogFiles() {
+    try {
+      if (_loggerFileServer == null) {
+        throw new WebApplicationException("Root log directory doesn't exist", Response.Status.INTERNAL_SERVER_ERROR);
+      }
+      return _loggerFileServer.getAllPaths();
+    } catch (IOException e) {
+      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @GET
+  @Path("/loggers/download")
+  @Produces(MediaType.APPLICATION_OCTET_STREAM)
+  @ApiOperation(value = "Download a log file")
+  public Response downloadLogFile(
+      @ApiParam(value = "Log file path", required = true) @QueryParam("filePath") String filePath) {
+    if (_loggerFileServer == null) {
+      throw new WebApplicationException("Root log directory is not configured",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return _loggerFileServer.downloadLogFile(filePath);
   }
 }

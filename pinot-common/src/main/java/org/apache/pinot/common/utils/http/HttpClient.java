@@ -288,7 +288,7 @@ public class HttpClient implements AutoCloseable {
     }
   }
 
-  protected CloseableHttpResponse execute(HttpUriRequest request)
+  public CloseableHttpResponse execute(HttpUriRequest request)
       throws IOException {
     return _httpClient.execute(request);
   }

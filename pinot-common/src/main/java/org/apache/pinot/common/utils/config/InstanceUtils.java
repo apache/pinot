@@ -25,6 +25,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -156,5 +157,25 @@ public class InstanceUtils {
     } else {
       mapFields.remove(POOL_KEY);
     }
+  }
+
+  public static String getInstanceBaseUri(InstanceConfig instanceConfig) {
+    Map<String, String> fieldMap = instanceConfig.getRecord().getSimpleFields();
+    String hostName = instanceConfig.getHostName();
+    String adminPort;
+    String scheme;
+    if (fieldMap.containsKey(CommonConstants.Helix.Instance.ADMIN_HTTPS_PORT_KEY)) {
+      // For Pinot Server admin https port
+      adminPort = fieldMap.get(CommonConstants.Helix.Instance.ADMIN_HTTPS_PORT_KEY);
+      scheme = "https";
+    } else if (fieldMap.containsKey(ExtraInstanceConfig.PinotInstanceConfigProperty.PINOT_TLS_PORT.toString())) {
+      // For Pinot Controller/Broker TLS port
+      adminPort = fieldMap.get(ExtraInstanceConfig.PinotInstanceConfigProperty.PINOT_TLS_PORT.toString());
+      scheme = "https";
+    } else {
+      adminPort = fieldMap.getOrDefault(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, instanceConfig.getPort());
+      scheme = "http";
+    }
+    return String.format("%s://%s:%s", scheme, hostName, adminPort);
   }
 }
