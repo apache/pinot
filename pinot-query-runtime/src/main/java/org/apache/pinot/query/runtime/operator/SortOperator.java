@@ -56,8 +56,8 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
     _dataSchema = dataSchema;
     _upstreamErrorBlock = null;
     _isSortedBlockConstructed = false;
-    _numRowsToKeep = _fetch > 0 ? Math.min(SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY, _fetch + _offset)
-        : SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY;
+    _numRowsToKeep = _fetch > 0 ? Math.min(SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY,
+        _fetch + (Math.max(_offset, 0))) : SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY;
     _rows = new PriorityQueue<>(_numRowsToKeep, SelectionOperatorUtils.getTypeCompatibleComparator(
         toOrderByExpressions(collationKeys, collationDirections), dataSchema, false));
   }
@@ -90,15 +90,16 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
       return _upstreamErrorBlock;
     }
     if (!_isSortedBlockConstructed) {
-      int currentOffest = 0;
+      int currentOffset = 0;
       List<Object[]> rows = new ArrayList<>(_rows.size());
       while (_rows.size() > 0) {
         Object[] row = _rows.poll();
-        if (currentOffest > _offset) {
+        if (currentOffset > _offset) {
           rows.add(row);
         }
-        currentOffest++;
+        currentOffset++;
       }
+      _isSortedBlockConstructed = true;
       if (rows.size() == 0) {
         return TransferableBlockUtils.getEndOfStreamTransferableBlock(_dataSchema);
       } else {
