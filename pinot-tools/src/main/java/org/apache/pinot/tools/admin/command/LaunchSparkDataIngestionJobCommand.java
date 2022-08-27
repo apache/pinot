@@ -23,13 +23,10 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.apache.calcite.rel.core.Join;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.JavaVersion;
 import org.apache.commons.lang3.SystemUtils;
@@ -43,7 +40,6 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.GroovyTemplateUtils;
 import org.apache.pinot.tools.Command;
-import org.apache.spark.launcher.SparkAppHandle;
 import org.apache.spark.launcher.SparkLauncher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -287,7 +283,8 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   }
 
   private boolean shouldLoadPlugin(String parentDir) {
-    boolean shouldLoadPlugin = _pluginsToLoad == null && !_pluginsToExclude.contains(parentDir);
+    boolean shouldLoadPlugin = _pluginsToLoad == null && !_pluginsToExclude.contains(parentDir)
+        && !parentDir.contains("spark");
     shouldLoadPlugin = shouldLoadPlugin || (_pluginsToLoad != null && _pluginsToLoad.contains(parentDir));
     shouldLoadPlugin = shouldLoadPlugin || _sparkVersion.getPluginName().contentEquals(parentDir);
     return shouldLoadPlugin;

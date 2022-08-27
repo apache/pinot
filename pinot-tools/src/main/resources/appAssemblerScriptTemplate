@@ -155,7 +155,6 @@ if [ -z "$PLUGINS_CLASSPATH" ] ; then
       fi
     fi
   done
-
   unset IFS
 fi
 
