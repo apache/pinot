@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.core.operator.transform.function;
 
 import java.util.function.LongToIntFunction;
@@ -16,13 +34,17 @@ public class ExtractTransformFunctionTest extends BaseTransformFunctionTest {
   @DataProvider
   public static Object[][] testCases() {
     return new Object[][]{
-        {"year", (LongToIntFunction) DateTimeFunctions::year}, {"month",
-        (LongToIntFunction) DateTimeFunctions::month}, {"day", (LongToIntFunction) DateTimeFunctions::dayOfMonth}, {
-          "hour", (LongToIntFunction) DateTimeFunctions::hour}, {"minute",
-        (LongToIntFunction) DateTimeFunctions::minute}, {"second", (LongToIntFunction) DateTimeFunctions::second},
+        //@formatter:off
+        {"year", (LongToIntFunction) DateTimeFunctions::year}, 
+        {"month", (LongToIntFunction) DateTimeFunctions::month}, 
+        {"day", (LongToIntFunction) DateTimeFunctions::dayOfMonth}, 
+        {"hour", (LongToIntFunction) DateTimeFunctions::hour}, 
+        {"minute", (LongToIntFunction) DateTimeFunctions::minute}, 
+        {"second", (LongToIntFunction) DateTimeFunctions::second},
         // TODO: Need to add timezone_hour and timezone_minute
 //      "timezone_hour",
 //      "timezone_minute",
+      //@formatter:on
     };
   }
 
