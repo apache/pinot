@@ -42,6 +42,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -395,43 +396,43 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
   public void testSelectionOrderBy() {
     {
       String query = "SELECT mvFloatCol from testTable WHERE mvFloatCol < 5 ORDER BY mvFloatCol LIMIT 10";
-      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query));
 
       String query1 = "SELECT mvRawFloatCol from testTable WHERE mvRawFloatCol < 5 ORDER BY mvRawFloatCol LIMIT 10";
-      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query1));
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query1));
 
       String query2 = "SELECT mvIntCol, mvFloatCol from testTable ORDER BY mvIntCol, mvFloatCol LIMIT 10";
-      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query2));
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query2));
 
       String query3 = "SELECT mvRawIntCol, mvRawFloatCol from testTable ORDER BY mvRawIntCol, mvRawFloatCol LIMIT 10";
-      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query3));
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query3));
     }
     {
       String query = "SELECT mvFloatCol, svIntCol from testTable WHERE mvFloatCol < 5 ORDER BY mvFloatCol, svIntCol "
           + "LIMIT 10";
-      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query));
 
       String query1 = "SELECT mvRawFloatCol, svIntCol from testTable WHERE mvRawFloatCol < 5 ORDER BY mvRawFloatCol, "
           + "svIntCol LIMIT 10";
-      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query1));
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query1));
     }
     {
       String query = "SELECT svIntCol, mvFloatCol from testTable WHERE mvRawFloatCol < 5 ORDER BY svIntCol, "
           + "mvFloatCol LIMIT 10";
-      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query));
 
       String query1 = "SELECT svIntCol, mvRawFloatCol from testTable WHERE mvRawFloatCol < 5 ORDER BY svIntCol, "
           + "mvRawFloatCol LIMIT 10";
-      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query1));
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query1));
     }
     {
       String query = "SELECT VALUEIN(mvIntCol, '0') from testTable WHERE mvIntCol IN (0) ORDER BY "
           + "VALUEIN(mvIntCol, '0') DESC LIMIT 10";
-      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query));
 
       String query1 = "SELECT VALUEIN(mvRawIntCol, '0') from testTable WHERE mvRawIntCol IN (0) ORDER BY "
           + "VALUEIN(mvRawIntCol, '0') DESC LIMIT 10";
-      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query1));
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query1));
     }
     {
       // Arraylength eventually translates to a SV column, so this should pass

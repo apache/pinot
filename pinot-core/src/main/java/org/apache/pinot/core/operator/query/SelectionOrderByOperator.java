@@ -47,6 +47,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -125,20 +126,15 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     // Compare all single-value columns
     int numOrderByExpressions = _orderByExpressions.size();
     List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
-    List<OrderByExpressionContext> mvOrderByExpressions = new ArrayList<>();
     for (int i = 0; i < numOrderByExpressions; i++) {
       if (_orderByExpressionMetadata[i].isSingleValue()) {
         valueIndexList.add(i);
       } else {
-        mvOrderByExpressions.add(_orderByExpressions.get(i));
+        // MV columns should not be part of the selection order by only list
+        throw new BadQueryRequestException(
+            String.format("MV expression: %s should not be included in the ORDER-BY clause",
+                _orderByExpressions.get(i)));
       }
-    }
-
-    if (mvOrderByExpressions.size() > 0) {
-      // MV columns should not be part of the selection order by only list
-      throw new UnsupportedOperationException(
-          String.format("MV columns %s should not be included in selection order-by only queries",
-              mvOrderByExpressions));
     }
 
     int numValuesToCompare = valueIndexList.size();
