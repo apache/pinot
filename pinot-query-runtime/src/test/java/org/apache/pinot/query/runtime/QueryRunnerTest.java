@@ -140,8 +140,13 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
             + "  (SELECT a.col2 AS joinKey, MAX(a.col3) AS maxVal FROM a GROUP BY a.col2) AS i "
             + "  ON b.col1 = i.joinKey", 3},
 
-        // Aggregate query with HAVING clause
-        new Object[]{"SELECT a.col2, COUNT(*) FROM a GROUP BY a.col2 HAVING COUNT(*) < 5", 1},
+        // Aggregate query with HAVING clause,
+        // - "foo" and "bar" occurred 6 times each and "alice" occurred 3 times. --> COUNT(*) < 5 matches "alice"
+        // - col2=="foo"<->col3==1, col2=="bar"<->col3==2, col2="alice"<->col3==42, so SUM(col3) >= 10 matches "bar"
+        // - last condition doesn't match anything.
+        new Object[]{"SELECT a.col2, COUNT(*), MAX(a.col3), MIN(a.col3), SUM(a.col3) FROM a GROUP BY a.col2 "
+            + "HAVING COUNT(*) < 5 OR (COUNT(*) > 5 AND SUM(a.col3) >= 10) "
+            + "OR (MIN(a.col3) != 20 AND SUM(a.col3) = 100)", 2},
     };
   }
 }

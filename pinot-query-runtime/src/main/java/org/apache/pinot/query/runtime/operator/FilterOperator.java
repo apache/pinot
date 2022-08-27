@@ -33,7 +33,7 @@ import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
 
 
 public class FilterOperator extends BaseOperator<TransferableBlock> {
-  private static final String EXPLAIN_NAME = "HAVING_FILTER";
+  private static final String EXPLAIN_NAME = "FILTER";
   private final BaseOperator<TransferableBlock> _upstreamOperator;
   private final FilterOperand _filterOperand;
   private final DataSchema _dataSchema;
