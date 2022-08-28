@@ -42,6 +42,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -51,6 +52,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -386,15 +388,72 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
     }
   }
 
+  /**
+   * Today selection ORDER BY only on MV columns (irrespective of whether it's dictionary based or raw) doesn't work
+   * as the semantics of how such queries should behave isn't clear. Such queries should always fail.
+   */
   @Test
-  public void testNonAggregateMVGroupBY() {
+  public void testSelectionOrderBy() {
     {
-      // TODO: Today selection ORDER BY only on MV columns (irrespective of whether it's dictionary based or raw)
-      //       doesn't work. Fix ORDER BY only for MV columns
       String query = "SELECT mvFloatCol from testTable WHERE mvFloatCol < 5 ORDER BY mvFloatCol LIMIT 10";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertEquals(brokerResponseNative.getProcessingExceptions().size(), 2);
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query));
+
+      String query1 = "SELECT mvRawFloatCol from testTable WHERE mvRawFloatCol < 5 ORDER BY mvRawFloatCol LIMIT 10";
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query1));
+
+      String query2 = "SELECT mvIntCol, mvFloatCol from testTable ORDER BY mvIntCol, mvFloatCol LIMIT 10";
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query2));
+
+      String query3 = "SELECT mvRawIntCol, mvRawFloatCol from testTable ORDER BY mvRawIntCol, mvRawFloatCol LIMIT 10";
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query3));
     }
+    {
+      String query = "SELECT mvFloatCol, svIntCol from testTable WHERE mvFloatCol < 5 ORDER BY mvFloatCol, svIntCol "
+          + "LIMIT 10";
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query));
+
+      String query1 = "SELECT mvRawFloatCol, svIntCol from testTable WHERE mvRawFloatCol < 5 ORDER BY mvRawFloatCol, "
+          + "svIntCol LIMIT 10";
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query1));
+    }
+    {
+      String query = "SELECT svIntCol, mvFloatCol from testTable WHERE mvRawFloatCol < 5 ORDER BY svIntCol, "
+          + "mvFloatCol LIMIT 10";
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query));
+
+      String query1 = "SELECT svIntCol, mvRawFloatCol from testTable WHERE mvRawFloatCol < 5 ORDER BY svIntCol, "
+          + "mvRawFloatCol LIMIT 10";
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query1));
+    }
+    {
+      String query = "SELECT VALUEIN(mvIntCol, '0') from testTable WHERE mvIntCol IN (0) ORDER BY "
+          + "VALUEIN(mvIntCol, '0') DESC LIMIT 10";
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query));
+
+      String query1 = "SELECT VALUEIN(mvRawIntCol, '0') from testTable WHERE mvRawIntCol IN (0) ORDER BY "
+          + "VALUEIN(mvRawIntCol, '0') DESC LIMIT 10";
+      assertThrows(BadQueryRequestException.class, () -> getBrokerResponse(query1));
+    }
+    {
+      // Arraylength eventually translates to a SV column, so this should pass
+      String query = "SELECT ARRAYLENGTH(mvRawLongCol), ARRAYLENGTH(mvLongCol) from testTable ORDER BY "
+          + "ARRAYLENGTH(mvRawLongCol), ARRAYLENGTH(mvLongCol) LIMIT 10";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() == null
+          || brokerResponseNative.getProcessingExceptions().size() == 0);
+      ResultTable resultTable = brokerResponseNative.getResultTable();
+      assertEquals(resultTable.getRows().size(), 10);
+      List<Object[]> recordRows = resultTable.getRows();
+      for (Object[] row : recordRows) {
+        assertEquals(row.length, 2);
+        assertEquals(row[0], MV_LENGTH);
+        assertEquals(row[1], MV_LENGTH);
+      }
+    }
+  }
+
+  @Test
+  public void testNonAggregateMVGroupBy() {
     {
       // Test a group by query on some raw MV rows. Order by on SV column added for determinism
       String query = "SELECT svIntCol, mvRawFloatCol, mvRawDoubleCol, mvRawStringCol from testTable GROUP BY "

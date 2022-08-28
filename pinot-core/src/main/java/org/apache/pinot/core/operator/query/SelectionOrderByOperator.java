@@ -47,6 +47,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -86,8 +87,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
   private int _numDocsScanned = 0;
   private long _numEntriesScannedPostFilter = 0;
-
-  private boolean _queryHasMVSelectionOrderBy = false;
 
   public SelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, TransformOperator transformOperator, boolean allOrderByColsPreSorted) {
@@ -131,7 +130,10 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       if (_orderByExpressionMetadata[i].isSingleValue()) {
         valueIndexList.add(i);
       } else {
-        _queryHasMVSelectionOrderBy = true;
+        // MV columns should not be part of the selection order by only list
+        throw new BadQueryRequestException(
+            String.format("MV expression: %s should not be included in the ORDER-BY clause",
+                _orderByExpressions.get(i)));
       }
     }
 
@@ -240,16 +242,13 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
   @Override
   protected IntermediateResultsBlock getNextBlock() {
-    IntermediateResultsBlock resultsBlock;
     if (_allOrderByColsPreSorted) {
-      resultsBlock = computeAllPreSorted();
+      return computeAllPreSorted();
     } else if (_expressions.size() == _orderByExpressions.size()) {
-      resultsBlock = computeAllOrdered();
+      return computeAllOrdered();
     } else {
-      resultsBlock = computePartiallyOrdered();
+      return computePartiallyOrdered();
     }
-    resultsBlock.setQueryHasMVSelectionOrderBy(_queryHasMVSelectionOrderBy);
-    return resultsBlock;
   }
 
   private IntermediateResultsBlock computeAllPreSorted() {
