@@ -196,17 +196,15 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     int numBlocksMerged = 0;
     long endTimeMs = _queryContext.getEndTimeMs();
     while (numBlocksMerged < _numOperators) {
-      IntermediateResultsBlock blockToMerge =
-          _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       // Timeout has reached, shouldn't continue to process. `_blockingQueue.poll` will continue to return blocks even
       // if negative timeout is provided; therefore an extra check is needed
-      boolean timeoutReached = endTimeMs < System.currentTimeMillis();
-      if (blockToMerge == null || timeoutReached) {
-        // Query times out, skip merging the remaining results blocks
-        LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
-            _queryContext);
-        return new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
-            new TimeoutException("Timed out while polling results block")));
+      if (endTimeMs - System.currentTimeMillis() < 0){
+        return generateTimeOutResult(numBlocksMerged);
+      }
+      IntermediateResultsBlock blockToMerge =
+          _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+      if (blockToMerge == null) {
+        return generateTimeOutResult(numBlocksMerged);
       }
       if (blockToMerge.getProcessingExceptions() != null) {
         // Caught exception while processing segment, skip merging the remaining results blocks and directly return the
@@ -225,6 +223,14 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
       }
     }
     return mergedBlock;
+  }
+
+  private IntermediateResultsBlock generateTimeOutResult(int numBlocksMerged) {
+    // Query times out, skip merging the remaining results blocks
+    LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
+        _queryContext);
+    return new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
+        new TimeoutException("Timed out while polling results block")));
   }
 
   /**

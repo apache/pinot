@@ -40,7 +40,6 @@ import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -59,6 +58,8 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("rawtypes")
 public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
+  public static final int MAX_GROUP_BY_KEYS_PER_MERGE_CALL = 10_000;
+
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByOrderByCombineOperator.class);
 
   private static final String EXPLAIN_NAME = "COMBINE_GROUPBY_ORDERBY";
@@ -168,7 +169,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
         // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
         Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
         // Count the number of merged keys
-        long mergedKeys = 0;
+        int mergedKeys = 0;
         // For now, only GroupBy OrderBy query has pre-constructed intermediate records
         if (intermediateRecords == null) {
           // Merge aggregation group-by result.
@@ -206,8 +207,8 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   }
 
   // Check for thread interruption, every time after merging 10_000 keys
-  private void checkMergePhaseInterruption(long mergedKeys) {
-    if (mergedKeys % DocIdSetPlanNode.MAX_DOC_PER_CALL == 0 && Thread.interrupted()) {
+  private void checkMergePhaseInterruption(int mergedKeys) {
+    if (mergedKeys % MAX_GROUP_BY_KEYS_PER_MERGE_CALL == 0 && Thread.interrupted()) {
       throw new EarlyTerminationException();
     }
   }
