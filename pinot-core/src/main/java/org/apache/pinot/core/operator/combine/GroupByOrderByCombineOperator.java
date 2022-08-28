@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("rawtypes")
 public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
-  public static final int MAX_GROUP_BY_KEYS_PER_MERGE_CALL = 10_000;
+  public static final int MAX_GROUP_BY_KEYS_MERGED_PER_INTERRUPTION_CHECK = 10_000;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByOrderByCombineOperator.class);
 
@@ -208,7 +208,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
 
   // Check for thread interruption, every time after merging 10_000 keys
   private void checkMergePhaseInterruption(int mergedKeys) {
-    if (mergedKeys % MAX_GROUP_BY_KEYS_PER_MERGE_CALL == 0 && Thread.interrupted()) {
+    if (mergedKeys % MAX_GROUP_BY_KEYS_MERGED_PER_INTERRUPTION_CHECK == 0 && Thread.interrupted()) {
       throw new EarlyTerminationException();
     }
   }
