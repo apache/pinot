@@ -31,6 +31,16 @@ import static org.testng.Assert.assertEquals;
 public class CastTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test
+  public void testCastTransformFunctionMV() {
+
+    // TODO: arraySUM(cast(longmvcol, 'intMV')) --> result type should be integer
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("arrayAverage(CAST(%s AS intMV))", DOUBLE_MV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    transformFunction.transformToDoubleValuesSV(_projectionBlock);
+  }
+
+  @Test
   public void testCastTransformFunction() {
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("CAST(%s AS string)", INT_SV_COLUMN));

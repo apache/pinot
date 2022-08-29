@@ -94,6 +94,12 @@ public class ArrayCopyUtils {
     }
   }
 
+  public static void copy(long[] src, long[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = src[i];
+    }
+  }
+
   public static void copy(float[] src, int[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = (int) src[i];
@@ -121,6 +127,12 @@ public class ArrayCopyUtils {
   public static void copy(float[] src, String[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = Float.toString(src[i]);
+    }
+  }
+
+  public static void copy(float[] src, float[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = src[i];
     }
   }
 
@@ -153,6 +165,12 @@ public class ArrayCopyUtils {
   public static void copy(double[] src, String[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = Double.toString(src[i]);
+    }
+  }
+
+  public static void copy(double[] src, double[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = src[i];
     }
   }
 
@@ -228,6 +246,12 @@ public class ArrayCopyUtils {
     }
   }
 
+  public static void copy(String[] src, String[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = src[i];
+    }
+  }
+
   public static void copy(byte[][] src, String[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = BytesUtils.toHexString(src[i]);
@@ -237,6 +261,245 @@ public class ArrayCopyUtils {
   public static void copy(byte[][] src, BigDecimal[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = BigDecimalUtils.deserialize(src[i]);
+    }
+  }
+  public static void copy(int[][] src, int[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new int[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(int[][] src, long[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new long[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(int[][] src, float[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new float[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(int[][] src, double[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new double[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(int[][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new String[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(int[][] src, BigDecimal[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new BigDecimal[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(double[][] src, int[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new int[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(double[][] src, long[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new long[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(double[][] src, float[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new float[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(double[][] src, double[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new double[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(double[][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new String[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(double[][] src, BigDecimal[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new BigDecimal[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(String[][] src, int[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new int[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(String[][] src, long[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new long[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(String[][] src, float[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new float[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(String[][] src, double[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new double[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(String[][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new String[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(String[][] src, BigDecimal[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new BigDecimal[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(long[][] src, int[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new int[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(long[][] src, long[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new long[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(long[][] src, float[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new float[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(long[][] src, double[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new double[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(long[][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new String[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(long[][] src, BigDecimal[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new BigDecimal[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(float[][] src, int[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new int[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(float[][] src, long[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new long[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(float[][] src, float[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new float[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(float[][] src, double[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new double[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(float[][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new String[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(float[][] src, BigDecimal[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new BigDecimal[rowLength];
+      copy(src[i], dest[i], rowLength);
     }
   }
 }
