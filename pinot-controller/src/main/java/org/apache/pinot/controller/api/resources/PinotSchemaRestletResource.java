@@ -253,7 +253,7 @@ public class PinotSchemaRestletResource {
     Schema schema = schemaAndUnrecognizedProperties.getLeft();
     String endpointUrl = request.getRequestURL().toString();
     validateSchemaName(schema.getSchemaName());
-    AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.READ, httpHeaders, endpointUrl,
+    AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
     SuccessResponse successResponse = addSchema(schema, override);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProperties.getRight());
@@ -311,7 +311,7 @@ public class PinotSchemaRestletResource {
     Schema schema = schemaAndUnrecognizedProps.getLeft();
     String endpointUrl = request.getRequestURL().toString();
     validateSchemaInternal(schema);
-    AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
+    AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
     ObjectNode response = schema.toJsonObject();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(schemaAndUnrecognizedProps.getRight()));
