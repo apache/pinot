@@ -1077,6 +1077,7 @@ public class PinotLLCRealtimeSegmentManager {
     // Get the latest segment ZK metadata for each partition
     Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap = getLatestSegmentZKMetadataMap(realtimeTableName);
 
+    // create a map of <parition id, start offset> using data already fetched in newPartitionGroupMetadataList
     Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToStartOffset = new HashMap<>();
     for (PartitionGroupMetadata metadata : newPartitionGroupMetadataList) {
       partitionGroupIdToStartOffset.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
@@ -1157,6 +1158,8 @@ public class PinotLLCRealtimeSegmentManager {
           if (isAllInstancesInState(instanceStateMap, SegmentStateModel.OFFLINE)) {
             LOGGER.info("Repairing segment: {} which is OFFLINE for all instances in IdealState", latestSegmentName);
             if (partitionGroupIdToSmallestStreamOffset == null) {
+              // Smallest offset is fetched from stream once and stored in partitionGroupIdToSmallestStreamOffset.
+              // This is to prevent fetching the same info for each and every partition group.
               partitionGroupIdToSmallestStreamOffset = fetchPartitionGroupIdToSmallestOffset(streamConfig);
             }
             StreamPartitionMsgOffset startOffset =
@@ -1174,6 +1177,8 @@ public class PinotLLCRealtimeSegmentManager {
                 // Create a new IN_PROGRESS segment in PROPERTYSTORE,
                 // add it as CONSUMING segment to IDEALSTATE.
                 if (partitionGroupIdToSmallestStreamOffset == null) {
+                  // Smallest offset is fetched from stream once and stored in partitionGroupIdToSmallestStreamOffset.
+                  // This is to prevent fetching the same info for each and every partition group.
                   partitionGroupIdToSmallestStreamOffset = fetchPartitionGroupIdToSmallestOffset(streamConfig);
                 }
                 StreamPartitionMsgOffset startOffset =
