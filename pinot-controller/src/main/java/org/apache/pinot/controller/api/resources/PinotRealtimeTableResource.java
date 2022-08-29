@@ -128,7 +128,8 @@ public class PinotRealtimeTableResource {
   @GET
   @Path("/tables/{tableName}/pauseStatus")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Return pause status of a realtime table", notes = "Return pause status of a realtime table along with list of consuming segments.")
+  @ApiOperation(value = "Return pause status of a realtime table",
+      notes = "Return pause status of a realtime table along with list of consuming segments.")
   public Response getConsumptionStatus(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
