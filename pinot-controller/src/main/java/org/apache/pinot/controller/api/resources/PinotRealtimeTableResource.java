@@ -90,6 +90,26 @@ public class PinotRealtimeTableResource {
     }
   }
 
+  @POST
+  @Path("/tables/{tableName}/forceCommit")
+  @ApiOperation(value = "Force commit the current consuming segments",
+      notes = "Force commit the current segments in consuming state and restart consumption. "
+          + "This should be used after schema/table config changes. "
+          + "Please note that this is an asynchronous operation, "
+          + "and 200 response does not mean it has actually been done already")
+  public Response forceCommit(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    validate(tableNameWithType);
+    try {
+      _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType);
+      return Response.ok().build();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+
   @GET
   @Path("/tables/{tableName}/pauseStatus")
   @Produces(MediaType.APPLICATION_JSON)
