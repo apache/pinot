@@ -84,22 +84,15 @@ public class PinotRealtimeTableResource {
           + "gone, the first available offsets are picked to minimize the data loss.")
   public Response resumeConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "earliest | latest | best") @QueryParam("consumeFrom") String consumeFrom) {
+      @ApiParam(value = "smallest | largest") @QueryParam("consumeFrom") String consumeFrom) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validate(tableNameWithType);
-    String offsetCriteria;
-    if ("earliest".equalsIgnoreCase(consumeFrom)) {
-      offsetCriteria = "smallest";
-    } else if ("latest".equalsIgnoreCase(consumeFrom)) {
-      offsetCriteria = "largest";
-    } else if (consumeFrom == null || "best".equalsIgnoreCase(consumeFrom)) {
-      offsetCriteria = null;
-    } else {
+    if (consumeFrom != null && !consumeFrom.equalsIgnoreCase("smallest") && !consumeFrom.equalsIgnoreCase("largest")) {
       throw new ControllerApplicationException(LOGGER,
           String.format("consumeFrom param '%s' is not valid.", consumeFrom), Response.Status.BAD_REQUEST);
     }
     try {
-      return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, offsetCriteria)).build();
+      return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, consumeFrom)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
