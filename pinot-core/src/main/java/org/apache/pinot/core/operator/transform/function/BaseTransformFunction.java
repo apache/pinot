@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -85,11 +86,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
     if (_intValuesSV == null) {
       _intValuesSV = new int[length];
     }
-
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
@@ -126,11 +125,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
     if (_longValuesSV == null) {
       _longValuesSV = new long[length];
     }
-
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
@@ -167,11 +164,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
     if (_floatValuesSV == null) {
       _floatValuesSV = new float[length];
     }
-
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
@@ -208,11 +203,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
     if (_doubleValuesSV == null) {
       _doubleValuesSV = new double[length];
     }
-
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
@@ -249,10 +242,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null || _bigDecimalValuesSV.length < length) {
+    if (_bigDecimalValuesSV == null) {
       _bigDecimalValuesSV = new BigDecimal[length];
     }
-
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
@@ -293,17 +285,26 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
     if (_stringValuesSV == null) {
       _stringValuesSV = new String[length];
     }
-
+    DataType dataType = getResultMetadata().getDataType();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
-      dictionary.readStringValues(dictIds, length, _stringValuesSV);
+      if (dataType == DataType.BOOLEAN) {
+        for (int i = 0; i < length; i++) {
+          _stringValuesSV[i] = Boolean.toString(dictionary.getIntValue(dictIds[i]) == 1);
+        }
+      } else if (dataType == DataType.TIMESTAMP) {
+        for (int i = 0; i < length; i++) {
+          _stringValuesSV[i] = new Timestamp(dictionary.getLongValue(dictIds[i])).toString();
+        }
+      } else {
+        dictionary.readStringValues(dictIds, length, _stringValuesSV);
+      }
     } else {
-      switch (getResultMetadata().getDataType().getStoredType()) {
+      switch (dataType) {
         case INT:
           int[] intValues = transformToIntValuesSV(projectionBlock);
           ArrayCopyUtils.copy(intValues, _stringValuesSV, length);
@@ -324,6 +325,18 @@ public abstract class BaseTransformFunction implements TransformFunction {
           BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
           ArrayCopyUtils.copy(bigDecimalValues, _stringValuesSV, length);
           break;
+        case BOOLEAN:
+          intValues = transformToIntValuesSV(projectionBlock);
+          for (int i = 0; i < length; i++) {
+            _stringValuesSV[i] = Boolean.toString(intValues[i] == 1);
+          }
+          break;
+        case TIMESTAMP:
+          longValues = transformToLongValuesSV(projectionBlock);
+          for (int i = 0; i < length; i++) {
+            _stringValuesSV[i] = new Timestamp(longValues[i]).toString();
+          }
+          break;
         case BYTES:
           byte[][] bytesValues = transformToBytesValuesSV(projectionBlock);
           ArrayCopyUtils.copy(bytesValues, _stringValuesSV, length);
@@ -338,11 +351,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
     if (_byteValuesSV == null) {
       _byteValuesSV = new byte[length][];
     }
-
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[] dictIds = transformToDictIdsSV(projectionBlock);
@@ -363,11 +374,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
     if (_intValuesMV == null) {
       _intValuesMV = new int[length][];
     }
-
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
@@ -430,11 +439,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
     if (_longValuesMV == null) {
       _longValuesMV = new long[length][];
     }
-
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
@@ -497,11 +504,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
     if (_floatValuesMV == null) {
       _floatValuesMV = new float[length][];
     }
-
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
@@ -564,11 +569,9 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
     if (_doubleValuesMV == null) {
       _doubleValuesMV = new double[length][];
     }
-
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
@@ -631,23 +634,44 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
-
     if (_stringValuesMV == null) {
       _stringValuesMV = new String[length][];
     }
-
+    DataType dataType = getResultMetadata().getDataType();
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
       int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
-      for (int i = 0; i < length; i++) {
-        int[] dictIds = dictIdsMV[i];
-        int numValues = dictIds.length;
-        String[] stringValues = new String[numValues];
-        dictionary.readStringValues(dictIds, numValues, stringValues);
-        _stringValuesMV[i] = stringValues;
+      if (dataType == DataType.BOOLEAN) {
+        for (int i = 0; i < length; i++) {
+          int[] dictIds = dictIdsMV[i];
+          int numValues = dictIds.length;
+          String[] stringValues = new String[numValues];
+          for (int j = 0; j < numValues; j++) {
+            stringValues[j] = Boolean.toString(dictionary.getIntValue(dictIds[i]) == 1);
+          }
+          _stringValuesMV[i] = stringValues;
+        }
+      } else if (dataType == DataType.TIMESTAMP) {
+        for (int i = 0; i < length; i++) {
+          int[] dictIds = dictIdsMV[i];
+          int numValues = dictIds.length;
+          String[] stringValues = new String[numValues];
+          for (int j = 0; j < numValues; j++) {
+            stringValues[j] = new Timestamp(dictionary.getLongValue(dictIds[i])).toString();
+          }
+          _stringValuesMV[i] = stringValues;
+        }
+      } else {
+        for (int i = 0; i < length; i++) {
+          int[] dictIds = dictIdsMV[i];
+          int numValues = dictIds.length;
+          String[] stringValues = new String[numValues];
+          dictionary.readStringValues(dictIds, numValues, stringValues);
+          _stringValuesMV[i] = stringValues;
+        }
       }
     } else {
-      switch (getResultMetadata().getDataType().getStoredType()) {
+      switch (dataType) {
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
           for (int i = 0; i < length; i++) {
@@ -685,6 +709,30 @@ public abstract class BaseTransformFunction implements TransformFunction {
             int numValues = doubleValues.length;
             String[] stringValues = new String[numValues];
             ArrayCopyUtils.copy(doubleValues, stringValues, numValues);
+            _stringValuesMV[i] = stringValues;
+          }
+          break;
+        case BOOLEAN:
+          intValuesMV = transformToIntValuesMV(projectionBlock);
+          for (int i = 0; i < length; i++) {
+            int[] intValues = intValuesMV[i];
+            int numValues = intValues.length;
+            String[] stringValues = new String[numValues];
+            for (int j = 0; j < numValues; j++) {
+              stringValues[j] = Boolean.toString(intValues[i] == 1);
+            }
+            _stringValuesMV[i] = stringValues;
+          }
+          break;
+        case TIMESTAMP:
+          longValuesMV = transformToLongValuesMV(projectionBlock);
+          for (int i = 0; i < length; i++) {
+            long[] longValues = longValuesMV[i];
+            int numValues = longValues.length;
+            String[] stringValues = new String[numValues];
+            for (int j = 0; j < numValues; j++) {
+              stringValues[j] = new Timestamp(longValues[i]).toString();
+            }
             _stringValuesMV[i] = stringValues;
           }
           break;
