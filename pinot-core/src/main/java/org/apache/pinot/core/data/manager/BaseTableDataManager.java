@@ -142,7 +142,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _isStreamSegmentDownloadUntar = tableDataManagerParams.isStreamSegmentDownloadUntar();
     if (_isStreamSegmentDownloadUntar) {
       LOGGER.info("Using streamed download-untar for segment download! "
-              + "The rate limit interval for streamed download-untar is {} ms",
+              + "The rate limit interval for streamed download-untar is {} bytes/s",
           _streamSegmentDownloadUntarRateLimitBytesPerSec);
     }
     int maxParallelSegmentDownloads = tableDataManagerParams.getMaxParallelSegmentDownloads();
