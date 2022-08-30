@@ -79,9 +79,9 @@ public class PinotRealtimeTableResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Resume consumption of a realtime table", notes =
       "Resume the consumption for a realtime table. ConsumeFrom parameter indicates from which offsets "
-          + "consumption should resume. If consumeFrom parameter is not provided or 'best' option is chosen, "
-          + "consumption continues based on the offsets in segment ZK metadata, and in case the offsets are already "
-          + "gone, the first available offsets are picked to minimize the data loss.")
+          + "consumption should resume. If consumeFrom parameter is not provided, consumption continues based on the "
+          + "offsets in segment ZK metadata, and in case the offsets are already gone, the first available offsets are "
+          + "picked to minimize the data loss.")
   public Response resumeConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "smallest | largest") @QueryParam("consumeFrom") String consumeFrom) {
