@@ -19,8 +19,11 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -32,21 +35,66 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test
   public void testCastTransformFunctionMV() {
-    // TODO: arraySUM(cast(longmvcol, 'intMV')) --> result type should be integer
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("CAST(%s AS longMV)", STRING_LONG_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
     assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
-    long[][] expectedValues = new long[NUM_ROWS][];
+    long[][] expectedLongValues = new long[NUM_ROWS][];
+    ArrayCopyUtils.copy(_stringLongFormatMVValues, expectedLongValues, NUM_ROWS);
+    testCastTransformFunctionMV(transformFunction, expectedLongValues);
+
+    expression = RequestContextUtils.getExpression(
+        String.format("CAST(CAST(CAST(%s AS longMV) as doubleMV) as intMV)", STRING_LONG_MV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CastTransformFunction);
+    assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
+    long[][] innerLongValues = new long[NUM_ROWS][];
+    ArrayCopyUtils.copy(_stringLongFormatMVValues, innerLongValues, NUM_ROWS);
+    double[][] innerDoubleValues = new double[NUM_ROWS][];
+    ArrayCopyUtils.copy(innerLongValues, innerDoubleValues, NUM_ROWS);
+    int[][] expectedIntValues = new int[NUM_ROWS][];
+    ArrayCopyUtils.copy(innerDoubleValues, expectedIntValues, NUM_ROWS);
+    testCastTransformFunctionMV(transformFunction, expectedIntValues);
+
+    expression =
+        RequestContextUtils.getExpression(String.format("CAST(CAST(%s AS intMV) as floatMV)", FLOAT_MV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CastTransformFunction);
+    assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
+    int[][] innerLayerInt = new int[NUM_ROWS][];
+    ArrayCopyUtils.copy(_floatMVValues, innerLayerInt, NUM_ROWS);
+    float[][] expectedFloatValues = new float[NUM_ROWS][];
+    ArrayCopyUtils.copy(innerLayerInt, expectedFloatValues, NUM_ROWS);
+    testCastTransformFunctionMV(transformFunction, expectedFloatValues);
+
+    expression = RequestContextUtils.getExpression(
+        String.format("CAST(CAST(CAST(%s AS floatMV) as intMV) as stringMV)", INT_MV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CastTransformFunction);
+    assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
+    float[][] innerFloatValues = new float[NUM_ROWS][];
+    ArrayCopyUtils.copy(_intMVValues, innerFloatValues, NUM_ROWS);
+    innerLayerInt = new int[NUM_ROWS][];
+    ArrayCopyUtils.copy(innerFloatValues, innerLayerInt, NUM_ROWS);
+    String[][] expectedStringValues = new String[NUM_ROWS][];
+    ArrayCopyUtils.copy(innerLayerInt, expectedStringValues, NUM_ROWS);
+    testCastTransformFunctionMV(transformFunction, expectedStringValues);
+
+    expression = RequestContextUtils.getExpression(String.format("arrayMax(cAst(%s AS intMV))", DOUBLE_MV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    FieldSpec.DataType resultDataType = transformFunction.getResultMetadata().getDataType();
+    Assert.assertEquals(resultDataType, FieldSpec.DataType.INT);
+
+    expression = RequestContextUtils.getExpression(String.format("arraySum(cAst(%s AS intMV))", DOUBLE_MV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    int[][] afterCast = new int[NUM_ROWS][];
+    ArrayCopyUtils.copy(_doubleMVValues, afterCast, NUM_ROWS);
+    double[] expectedArraySums = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      int rowLen = _stringLongFormatMVValues[i].length;
-      expectedValues[i] = new long[rowLen];
-      for (int j = 0; j < rowLen; j++) {
-        expectedValues[i][j] = Long.parseLong(_stringLongFormatMVValues[i][j]);
-      }
+      expectedArraySums[i] = Arrays.stream(afterCast[i]).sum();
     }
-    testCastTransformFunctionMV(transformFunction, expectedValues);
+    testTransformFunction(transformFunction, expectedArraySums);
   }
 
   @Test
