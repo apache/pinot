@@ -20,14 +20,9 @@ package org.apache.pinot.plugin.inputformat.parquet;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.parquet.format.converter.ParquetMetadataConverter;
-import org.apache.parquet.hadoop.ParquetFileReader;
-import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -38,8 +33,6 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
  * It has two implementations: {@link ParquetAvroRecordReader} (Default) and {@link ParquetNativeRecordReader}.
  */
 public class ParquetRecordReader implements RecordReader {
-  private static final String AVRO_SCHEMA_METADATA_KEY = "parquet.avro.schema";
-
   private RecordReader _internalParquetRecordReader;
   private boolean _useAvroParquetRecordReader = true;
 
@@ -54,13 +47,7 @@ public class ParquetRecordReader implements RecordReader {
       _internalParquetRecordReader = new ParquetNativeRecordReader();
     } else {
       // No reader type specified. Determine using file metadata
-      ParquetMetadata parquetMetadata =
-          ParquetFileReader.readFooter(new Configuration(), new Path(dataFile.getAbsolutePath()),
-              ParquetMetadataConverter.NO_FILTER);
-      Map<String, String> fileKeyValueMeta = parquetMetadata.getFileMetaData().getKeyValueMetaData();
-      boolean useParquetAvroRecordReader = fileKeyValueMeta.containsKey(AVRO_SCHEMA_METADATA_KEY);
-
-      if (useParquetAvroRecordReader) {
+      if (ParquetUtils.hasAvroSchemaInFileMetadata(new Path(dataFile.getAbsolutePath()))) {
         _internalParquetRecordReader = new ParquetAvroRecordReader();
       } else {
         _useAvroParquetRecordReader = false;
