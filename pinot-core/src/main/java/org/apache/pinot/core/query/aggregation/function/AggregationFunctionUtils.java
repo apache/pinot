@@ -18,14 +18,11 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.google.common.math.DoubleMath;
-import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -64,31 +61,6 @@ public class AggregationFunctionUtils {
       }
     }
     return null;
-  }
-
-  public static String formatValue(Object value) {
-    if (value instanceof Double) {
-      double doubleValue = (double) value;
-
-      // NOTE: String.format() is very expensive, so avoid it for whole numbers that can fit in Long.
-      //       We simply append ".00000" to long, in order to keep the existing behavior.
-      if (doubleValue <= Long.MAX_VALUE && doubleValue >= Long.MIN_VALUE && DoubleMath.isMathematicalInteger(
-          doubleValue)) {
-        return (long) doubleValue + ".00000";
-      } else {
-        return String.format(Locale.US, "%1.5f", doubleValue);
-      }
-    } else {
-      return value.toString();
-    }
-  }
-
-  public static Serializable getSerializableValue(Object value) {
-    if (value instanceof Number) {
-      return (Number) value;
-    } else {
-      return value.toString();
-    }
   }
 
   /**
