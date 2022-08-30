@@ -22,7 +22,6 @@ import java.io.File;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -54,9 +53,11 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class NullHandlingTransformFunctionTest {
@@ -175,13 +176,11 @@ public class NullHandlingTransformFunctionTest {
       throws Exception {
     ExpressionContext expression = RequestContextUtils.getExpression(String.format("%s IS NULL", columnName));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof IsNullTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.IS_NULL.getName());
-    int[] expectedValues = new int[NUM_ROWS];
+    assertTrue(transformFunction instanceof IsNullTransformFunction);
+    assertEquals(transformFunction.getName(), TransformFunctionType.IS_NULL.getName());
+    boolean[] expectedValues = new boolean[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % NULL_VALUE_MOD == 0) {
-        expectedValues[i] = 1;
-      }
+      expectedValues[i] = i % NULL_VALUE_MOD == 0;
     }
     testTransformFunction(expression, expectedValues);
   }
@@ -199,33 +198,30 @@ public class NullHandlingTransformFunctionTest {
 
   public void testIsNotNullTransformFunction(String columnName)
       throws Exception {
-    ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("%s IS NOT NULL", columnName));
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format("%s IS NOT NULL", columnName));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof IsNotNullTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.IS_NOT_NULL.getName());
-    int[] expectedValues = new int[NUM_ROWS];
-    Arrays.fill(expectedValues, 1);
+    assertTrue(transformFunction instanceof IsNotNullTransformFunction);
+    assertEquals(transformFunction.getName(), TransformFunctionType.IS_NOT_NULL.getName());
+    boolean[] expectedValues = new boolean[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % NULL_VALUE_MOD == 0) {
-        expectedValues[i] = 0;
-      }
+      expectedValues[i] = i % NULL_VALUE_MOD != 0;
     }
     testTransformFunction(expression, expectedValues);
   }
 
-  protected void testTransformFunction(ExpressionContext expression, int[] expectedValues) throws Exception {
+  protected void testTransformFunction(ExpressionContext expression, boolean[] expectedValues)
+      throws Exception {
     int[] intValues = getTransformFunctionInstance(expression).transformToIntValuesSV(_projectionBlock);
     long[] longValues = getTransformFunctionInstance(expression).transformToLongValuesSV(_projectionBlock);
     float[] floatValues = getTransformFunctionInstance(expression).transformToFloatValuesSV(_projectionBlock);
     double[] doubleValues = getTransformFunctionInstance(expression).transformToDoubleValuesSV(_projectionBlock);
     String[] stringValues = getTransformFunctionInstance(expression).transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(intValues[i], expectedValues[i]);
-      Assert.assertEquals(longValues[i], expectedValues[i]);
-      Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
-      Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
-      Assert.assertEquals(stringValues[i], Integer.toString(expectedValues[i]));
+      assertEquals(intValues[i] == 1, expectedValues[i]);
+      assertEquals(longValues[i] == 1, expectedValues[i]);
+      assertEquals(floatValues[i] == 1, expectedValues[i]);
+      assertEquals(doubleValues[i] == 1, expectedValues[i]);
+      assertEquals(stringValues[i], Boolean.toString(expectedValues[i]));
     }
   }
 

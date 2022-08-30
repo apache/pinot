@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.io.File;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
@@ -219,7 +220,11 @@ public abstract class BaseTransformFunctionTest {
       Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
       Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
       Assert.assertEquals(bigDecimalValues[i].intValue(), expectedValues[i]);
-      Assert.assertEquals(stringValues[i], Integer.toString(expectedValues[i]));
+      if (transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BOOLEAN) {
+        Assert.assertEquals(stringValues[i], Boolean.toString(expectedValues[i] == 1));
+      } else {
+        Assert.assertEquals(stringValues[i], Integer.toString(expectedValues[i]));
+      }
     }
   }
 
@@ -236,7 +241,11 @@ public abstract class BaseTransformFunctionTest {
       Assert.assertEquals(floatValues[i], (float) expectedValues[i]);
       Assert.assertEquals(doubleValues[i], (double) expectedValues[i]);
       Assert.assertEquals(bigDecimalValues[i].longValue(), expectedValues[i]);
-      Assert.assertEquals(stringValues[i], Long.toString(expectedValues[i]));
+      if (transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.TIMESTAMP) {
+        Assert.assertEquals(stringValues[i], new Timestamp(expectedValues[i]).toString());
+      } else {
+        Assert.assertEquals(stringValues[i], Long.toString(expectedValues[i]));
+      }
     }
   }
 
