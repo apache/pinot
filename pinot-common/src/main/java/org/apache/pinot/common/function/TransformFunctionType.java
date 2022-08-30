@@ -90,6 +90,7 @@ public enum TransformFunctionType {
   ARRAYMIN("arrayMin"),
   ARRAYMAX("arrayMax"),
   ARRAYSUM("arraySum"),
+  ARRAYCARDINALITY("arrayCardinality", "cardinality"),
   VALUEIN("valueIn"),
   MAPVALUE("mapValue"),
   INIDSET("inIdSet"),
