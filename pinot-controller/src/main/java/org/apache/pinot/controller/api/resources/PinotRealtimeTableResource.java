@@ -31,6 +31,7 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -61,8 +62,7 @@ public class PinotRealtimeTableResource {
   @POST
   @Path("/tables/{tableName}/pauseConsumption")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Pause consumption of a realtime table",
-      notes = "Pause the consumption of a realtime table")
+  @ApiOperation(value = "Pause consumption of a realtime table", notes = "Pause the consumption of a realtime table")
   public Response pauseConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
@@ -77,14 +77,22 @@ public class PinotRealtimeTableResource {
   @POST
   @Path("/tables/{tableName}/resumeConsumption")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Resume consumption of a realtime table",
-      notes = "Resume the consumption for a realtime table")
+  @ApiOperation(value = "Resume consumption of a realtime table", notes =
+      "Resume the consumption for a realtime table. ConsumeFrom parameter indicates from which offsets "
+          + "consumption should resume. If consumeFrom parameter is not provided, consumption continues based on the "
+          + "offsets in segment ZK metadata, and in case the offsets are already gone, the first available offsets are "
+          + "picked to minimize the data loss.")
   public Response resumeConsumption(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "smallest | largest") @QueryParam("consumeFrom") String consumeFrom) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validate(tableNameWithType);
+    if (consumeFrom != null && !consumeFrom.equalsIgnoreCase("smallest") && !consumeFrom.equalsIgnoreCase("largest")) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("consumeFrom param '%s' is not valid.", consumeFrom), Response.Status.BAD_REQUEST);
+    }
     try {
-      return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType)).build();
+      return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, consumeFrom)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
