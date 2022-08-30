@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.standalone;
 
-import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.plugin.ingestion.batch.common.BaseSegmentPushJobRunner;
-import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
@@ -38,24 +38,12 @@ public class SegmentUriPushJobRunner extends BaseSegmentPushJobRunner {
     init(spec);
   }
 
-  public void getSegmentsToPush() {
-    for (String file : _files) {
-      URI uri = URI.create(file);
-      if (uri.getPath().endsWith(Constants.TAR_GZ_FILE_EXT)) {
-        URI updatedURI = SegmentPushUtils
-            .generateSegmentTarURI(_outputDirURI, uri, _spec.getPushJobSpec().getSegmentUriPrefix(),
-                _spec.getPushJobSpec().getSegmentUriSuffix());
-        _segmentsToPush.add(updatedURI.toString());
-      }
-    }
+  public List<String> getSegmentsToReplace(Map<String, String> segmentsUriToTarPathMap) {
+    return SegmentPushUtils.getSegmentNames(BatchConfigProperties.SegmentPushType.URI, segmentsUriToTarPathMap);
   }
 
-  public List<String> getSegmentsTo() {
-    return ConsistentDataPushUtils.getUriSegmentsTo(_segmentsToPush);
-  }
-
-  public void uploadSegments()
+  public void uploadSegments(Map<String, String> segmentsUriToTarPathMap)
       throws AttemptsExceededException, RetriableOperationException {
-    SegmentPushUtils.sendSegmentUris(_spec, _segmentsToPush);
+    SegmentPushUtils.sendSegmentUris(_spec, new ArrayList<>(segmentsUriToTarPathMap.keySet()));
   }
 }

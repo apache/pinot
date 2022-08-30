@@ -48,6 +48,7 @@ import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
@@ -370,5 +371,37 @@ public class SegmentPushUtils implements Serializable {
       FileUtils.deleteQuietly(tarFile);
       FileUtils.deleteQuietly(segmentMetadataDir);
     }
+  }
+
+  public static List<String> getSegmentNames(BatchConfigProperties.SegmentPushType pushMode,
+      Map<String, String> segmentsUriToTarPathMap) {
+    List<String> segmentNames = new ArrayList<>();
+    if (pushMode.equals(BatchConfigProperties.SegmentPushType.TAR) || pushMode.equals(
+        BatchConfigProperties.SegmentPushType.METADATA)) {
+      for (String tarFilePath : segmentsUriToTarPathMap.values()) {
+        File tarFile = new File(tarFilePath);
+        String fileName = tarFile.getName();
+        Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
+        String segmentName = getSegmentNameFromPath(fileName);
+        segmentNames.add(segmentName);
+      }
+    }
+    if (pushMode.equals(BatchConfigProperties.SegmentPushType.URI)) {
+      for (String segmentUri : segmentsUriToTarPathMap.keySet()) {
+        Preconditions.checkArgument(segmentUri.endsWith(Constants.TAR_GZ_FILE_EXT));
+        String segmentName = getSegmentNameFromPath(segmentUri);
+        segmentNames.add(segmentName);
+      }
+    }
+    return segmentNames;
+  }
+
+  /**
+   * Obtain segment name given filePath by reading from after the last slash (if present) up to and before the tar
+   * extension.
+   */
+  public static String getSegmentNameFromPath(String filePath) {
+    int startIndex = filePath.contains("/") ? filePath.lastIndexOf("/") + 1 : 0;
+    return filePath.substring(startIndex, filePath.length() - Constants.TAR_GZ_FILE_EXT.length());
   }
 }

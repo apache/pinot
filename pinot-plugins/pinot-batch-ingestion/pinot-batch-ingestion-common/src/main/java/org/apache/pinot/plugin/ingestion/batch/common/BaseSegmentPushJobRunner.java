@@ -22,10 +22,10 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
+import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -39,8 +39,6 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
   protected String[] _files;
   protected PinotFS _outputDirFS;
   protected URI _outputDirURI;
-  protected List<String> _segmentsToPush = new ArrayList<>();
-  protected Map<String, String> _segmentUriToTarPathMap;
   protected boolean _consistentPushEnabled;
 
   /**
@@ -71,7 +69,7 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
    * Initialize filesystems and obtain the raw input files for upload.
    */
   public void initFileSys() {
-    // init all file systems
+    // Init all file systems
     List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
       PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
@@ -97,20 +95,19 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
   }
 
   /**
-   * Populates either _segmentsToPush or _segmentUriToTarPathMap based on push type.
+   * Returns segment names, which will be supplied to the segment replacement protocol as the new set of segments to
+   * atomically update when consistent data push is enabled.
+   * @param segmentsUriToTarPathMap Map from segment URI to corresponding tar path. Either the URIs (keys), the
+   *                                tarPaths (values), or both may be used depending on upload mode.
    */
-  public abstract void getSegmentsToPush();
+  public abstract List<String> getSegmentsToReplace(Map<String, String> segmentsUriToTarPathMap);
 
   /**
-   * Returns segmentsTo based on segments obtained from getSegmentsToPush.
-   * The result will to be supplied to the segment replacement protocol when consistent data push is enabled.
+   * Upload segments supplied in segmentsUriToTarPathMap.
+   * @param segmentsUriToTarPathMap Map from segment URI to corresponding tar path. Either the URIs (keys), the
+   *                                tarPaths (values), or both may be used depending on upload mode.
    */
-  public abstract List<String> getSegmentsTo();
-
-  /**
-   * Upload segment obtained by getSegmentsToPush.
-   */
-  public abstract void uploadSegments()
+  public abstract void uploadSegments(Map<String, String> segmentsUriToTarPathMap)
       throws Exception;
 
   /**
@@ -123,12 +120,13 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
     initFileSys();
     Map<URI, String> uriToLineageEntryIdMap = null;
     try {
-      getSegmentsToPush();
+      Map<String, String> segmentsUriToTarPathMap =
+          SegmentPushUtils.getSegmentUriToTarPathMap(_outputDirURI, _spec.getPushJobSpec(), _files);
       if (_consistentPushEnabled) {
-        List<String> segmentsTo = getSegmentsTo();
-        uriToLineageEntryIdMap = ConsistentDataPushUtils.preUpload(_spec, segmentsTo);
+        List<String> segmentsToReplace = getSegmentsToReplace(segmentsUriToTarPathMap);
+        uriToLineageEntryIdMap = ConsistentDataPushUtils.preUpload(_spec, segmentsToReplace);
       }
-      uploadSegments();
+      uploadSegments(segmentsUriToTarPathMap);
       if (_consistentPushEnabled) {
         ConsistentDataPushUtils.postUpload(_spec, uriToLineageEntryIdMap);
       }

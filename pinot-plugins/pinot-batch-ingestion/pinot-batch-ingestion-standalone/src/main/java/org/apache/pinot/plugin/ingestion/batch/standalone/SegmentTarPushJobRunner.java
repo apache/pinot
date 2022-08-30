@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.standalone;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.plugin.ingestion.batch.common.BaseSegmentPushJobRunner;
-import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
@@ -36,20 +37,12 @@ public class SegmentTarPushJobRunner extends BaseSegmentPushJobRunner {
     init(spec);
   }
 
-  public void getSegmentsToPush() {
-    for (String file : _files) {
-      if (file.endsWith(Constants.TAR_GZ_FILE_EXT)) {
-        _segmentsToPush.add(file);
-      }
-    }
+  public List<String> getSegmentsToReplace(Map<String, String> segmentsUriToTarPathMap) {
+    return SegmentPushUtils.getSegmentNames(BatchConfigProperties.SegmentPushType.TAR, segmentsUriToTarPathMap);
   }
 
-  public List<String> getSegmentsTo() {
-    return ConsistentDataPushUtils.getTarSegmentsTo(_segmentsToPush);
-  }
-
-  public void uploadSegments()
+  public void uploadSegments(Map<String, String> segmentsUriToTarPathMap)
       throws AttemptsExceededException, RetriableOperationException {
-    SegmentPushUtils.pushSegments(_spec, _outputDirFS, _segmentsToPush);
+    SegmentPushUtils.pushSegments(_spec, _outputDirFS, new ArrayList<>(segmentsUriToTarPathMap.values()));
   }
 }

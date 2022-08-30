@@ -217,7 +217,9 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
 
     List<File> avroFiles = getAllAvroFiles();
 
-    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(0), offlineTableConfig, schema, "_with_move",
+    String firstTimeStamp = Long.toString(System.currentTimeMillis());
+
+    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(0), offlineTableConfig, schema, firstTimeStamp,
         _segmentDir, _tarDir);
 
     // First test standalone metadata push job runner
@@ -255,9 +257,9 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     // test segment loaded
     JsonNode segmentsList = getSegmentsList();
     Assert.assertEquals(segmentsList.size(), 1);
-    String segmentNameWithMove = segmentsList.get(0).asText();
-    Assert.assertTrue(segmentNameWithMove.endsWith("_with_move"));
-    long numDocs = getNumDocs(segmentNameWithMove);
+    String firstSegmentName = segmentsList.get(0).asText();
+    Assert.assertTrue(firstSegmentName.endsWith(firstTimeStamp));
+    long numDocs = getNumDocs(firstSegmentName);
     testCountStar(numDocs);
 
     // Fetch segment lineage entry after running segment metadata push with consistent push enabled.
@@ -269,7 +271,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     // SegmentsFrom should be empty as we started with a blank table.
     Assert.assertTrue(segmentLineageResponse.contains("\"segmentsFrom\":[]"));
     // SegmentsTo should contain uploaded segment.
-    Assert.assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"" + segmentNameWithMove + "\"]"));
+    Assert.assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"" + firstSegmentName + "\"]"));
 
     // Clear segment and tar dir
     for (File segment : _segmentDir.listFiles()) {
@@ -279,7 +281,9 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
       FileUtils.deleteQuietly(tar);
     }
 
-    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(1), offlineTableConfig, schema, "_without_move",
+    String secondTimeStamp = Long.toString(System.currentTimeMillis());
+
+    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(1), offlineTableConfig, schema, secondTimeStamp,
         _segmentDir, _tarDir);
     jobSpec.setPushJobSpec(new PushJobSpec());
 
@@ -292,21 +296,19 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     runner.init(jobSpec);
     runner.run();
 
-    // should not see new segments in dataDir
-    //Assert.assertEquals(dataDirSegments.listFiles().length, 1);
     Assert.assertEquals(_tarDir.listFiles().length, 1);
 
     // test segment loaded
     segmentsList = getSegmentsList();
     Assert.assertEquals(segmentsList.size(), 2);
-    String segmentNameWithoutMove = null;
+    String secondSegmentName = null;
     for (JsonNode segment : segmentsList) {
-      if (segment.asText().endsWith("_without_move")) {
-        segmentNameWithoutMove = segment.asText();
+      if (segment.asText().endsWith(secondTimeStamp)) {
+        secondSegmentName = segment.asText();
       }
     }
-    Assert.assertNotNull(segmentNameWithoutMove);
-    numDocs = getNumDocs(segmentNameWithoutMove);
+    Assert.assertNotNull(secondSegmentName);
+    numDocs = getNumDocs(secondSegmentName);
     testCountStar(numDocs);
 
     // Fetch segment lineage entry after running segment tar push with consistent push enabled.
@@ -316,9 +318,9 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     // Segment lineage should be in completed state.
     Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"COMPLETED\""));
     // SegmentsFrom should contain the previous segment
-    Assert.assertTrue(segmentLineageResponse.contains("\"segmentsFrom\":[\"" + segmentNameWithMove + "\"]"));
+    Assert.assertTrue(segmentLineageResponse.contains("\"segmentsFrom\":[\"" + firstSegmentName + "\"]"));
     // SegmentsTo should contain uploaded segment.
-    Assert.assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"" + segmentNameWithoutMove + "\"]"));
+    Assert.assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"" + secondSegmentName + "\"]"));
   }
 
   protected TableConfig createOfflineTableConfigWithConsistentPush() {

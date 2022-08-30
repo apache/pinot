@@ -19,12 +19,10 @@
 package org.apache.pinot.segment.local.utils;
 
 import com.google.common.base.Preconditions;
-import java.io.File;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -40,7 +38,6 @@ import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
@@ -221,53 +218,6 @@ public class ConsistentDataPushUtils {
         }
       }
     }
-  }
-
-  /**
-   * Ensures that all files in tarFilePaths have the expected tar file extension and obtain segment names given
-   * tarFilePaths.
-   */
-  public static List<String> getTarSegmentsTo(List<String> tarFilePaths) {
-    List<String> segmentsTo = new ArrayList<>();
-    for (String tarFilePath : tarFilePaths) {
-      File tarFile = new File(tarFilePath);
-      String fileName = tarFile.getName();
-      Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
-      String segmentName = getSegmentNameFromFilePath(fileName);
-      segmentsTo.add(segmentName);
-    }
-    return segmentsTo;
-  }
-
-  /**
-   * Ensures that all URIs in segmentUris have the expected tar file extension and obtain segment names given
-   * segmentUris.
-   */
-  public static List<String> getUriSegmentsTo(List<String> segmentUris) {
-    List<String> segmentsTo = new ArrayList<>();
-    for (String segmentUri : segmentUris) {
-      Preconditions.checkArgument(segmentUri.endsWith(Constants.TAR_GZ_FILE_EXT));
-      String segmentName = getSegmentNameFromFilePath(segmentUri);
-      segmentsTo.add(segmentName);
-    }
-    return segmentsTo;
-  }
-
-  /**
-   * Ensures that all tarPaths in segmentUriToTarPathMap have the expected tar file extension and obtain segment names
-   * given tarPaths.
-   */
-  public static List<String> getMetadataSegmentsTo(Map<String, String> segmentUriToTarPathMap) {
-    return getTarSegmentsTo(new ArrayList<>(segmentUriToTarPathMap.values()));
-  }
-
-  /**
-   * Obtain segment name given filePath by reading from after the last slash (if present) up to and before the tar
-   * extension.
-   */
-  public static String getSegmentNameFromFilePath(String filePath) {
-    int startIndex = filePath.contains("/") ? filePath.lastIndexOf("/") + 1 : 0;
-    return filePath.substring(startIndex, filePath.length() - Constants.TAR_GZ_FILE_EXT.length());
   }
 
   public static TableConfig getTableConfig(SegmentGenerationJobSpec spec) {
