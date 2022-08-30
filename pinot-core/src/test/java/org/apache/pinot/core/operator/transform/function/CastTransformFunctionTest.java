@@ -150,7 +150,6 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     assertEquals(expectedBigDecimalValues, bigDecimalScalarValues);
   }
 
-  @Test
   private void testCastTransformFunctionMV(TransformFunction transformFunction, int[][] expectedValues) {
     int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
     long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
