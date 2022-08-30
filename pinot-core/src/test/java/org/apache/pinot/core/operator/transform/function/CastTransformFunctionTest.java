@@ -169,7 +169,6 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     }
   }
 
-  @Test
   private void testCastTransformFunctionMV(TransformFunction transformFunction, long[][] expectedValues) {
     int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
     long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
@@ -188,7 +187,6 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     }
   }
 
-  @Test
   private void testCastTransformFunctionMV(TransformFunction transformFunction, float[][] expectedValues) {
     int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
     long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
@@ -207,7 +205,6 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     }
   }
 
-  @Test
   private void testCastTransformFunctionMV(TransformFunction transformFunction, double[][] expectedValues) {
     int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
     long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
@@ -226,7 +223,6 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     }
   }
 
-  @Test
   private void testCastTransformFunctionMV(TransformFunction transformFunction, String[][] expectedValues) {
     int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
     long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
