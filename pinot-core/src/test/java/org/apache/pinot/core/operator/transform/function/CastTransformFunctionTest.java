@@ -32,12 +32,21 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test
   public void testCastTransformFunctionMV() {
-
     // TODO: arraySUM(cast(longmvcol, 'intMV')) --> result type should be integer
     ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("arrayAverage(CAST(%s AS intMV))", DOUBLE_MV_COLUMN));
+        RequestContextUtils.getExpression(String.format("CAST(%s AS longMV)", STRING_LONG_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    Assert.assertTrue(transformFunction instanceof CastTransformFunction);
+    assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
+    long[][] expectedValues = new long[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int rowLen = _stringLongFormatMVValues[i].length;
+      expectedValues[i] = new long[rowLen];
+      for (int j = 0; j < rowLen; j++) {
+        expectedValues[i][j] = Long.parseLong(_stringLongFormatMVValues[i][j]);
+      }
+    }
+    testCastTransformFunctionMV(transformFunction, expectedValues);
   }
 
   @Test
@@ -139,5 +148,100 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedBigDecimalValues);
     assertEquals(expectedBigDecimalValues, bigDecimalScalarValues);
+  }
+
+  @Test
+  private void testCastTransformFunctionMV(TransformFunction transformFunction, int[][] expectedValues) {
+    int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
+    long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
+    float[][] floatMVValues = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubleMVValues = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    String[][] stringMVValues = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int rowLen = expectedValues[i].length;
+      for (int j = 0; j < rowLen; j++) {
+        Assert.assertEquals(intMVValues[i][j], expectedValues[i][j]);
+        Assert.assertEquals(longMVValues[i][j], (long) expectedValues[i][j]);
+        Assert.assertEquals(floatMVValues[i][j], (float) expectedValues[i][j]);
+        Assert.assertEquals(doubleMVValues[i][j], (double) expectedValues[i][j]);
+        Assert.assertEquals(stringMVValues[i][j], Integer.toString(expectedValues[i][j]));
+      }
+    }
+  }
+
+  @Test
+  private void testCastTransformFunctionMV(TransformFunction transformFunction, long[][] expectedValues) {
+    int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
+    long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
+    float[][] floatMVValues = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubleMVValues = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    String[][] stringMVValues = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int rowLen = expectedValues[i].length;
+      for (int j = 0; j < rowLen; j++) {
+        Assert.assertEquals(intMVValues[i][j], (int) expectedValues[i][j]);
+        Assert.assertEquals(longMVValues[i][j], expectedValues[i][j]);
+        Assert.assertEquals(floatMVValues[i][j], (float) expectedValues[i][j]);
+        Assert.assertEquals(doubleMVValues[i][j], (double) expectedValues[i][j]);
+        Assert.assertEquals(stringMVValues[i][j], Long.toString(expectedValues[i][j]));
+      }
+    }
+  }
+
+  @Test
+  private void testCastTransformFunctionMV(TransformFunction transformFunction, float[][] expectedValues) {
+    int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
+    long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
+    float[][] floatMVValues = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubleMVValues = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    String[][] stringMVValues = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int rowLen = expectedValues[i].length;
+      for (int j = 0; j < rowLen; j++) {
+        Assert.assertEquals(intMVValues[i][j], (int) expectedValues[i][j]);
+        Assert.assertEquals(longMVValues[i][j], (long) expectedValues[i][j]);
+        Assert.assertEquals(floatMVValues[i][j], expectedValues[i][j]);
+        Assert.assertEquals(doubleMVValues[i][j], (double) expectedValues[i][j]);
+        Assert.assertEquals(stringMVValues[i][j], Float.toString(expectedValues[i][j]));
+      }
+    }
+  }
+
+  @Test
+  private void testCastTransformFunctionMV(TransformFunction transformFunction, double[][] expectedValues) {
+    int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
+    long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
+    float[][] floatMVValues = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubleMVValues = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    String[][] stringMVValues = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int rowLen = expectedValues[i].length;
+      for (int j = 0; j < rowLen; j++) {
+        Assert.assertEquals(intMVValues[i][j], (int) expectedValues[i][j]);
+        Assert.assertEquals(longMVValues[i][j], (long) expectedValues[i][j]);
+        Assert.assertEquals(floatMVValues[i][j], (float) expectedValues[i][j]);
+        Assert.assertEquals(doubleMVValues[i][j], expectedValues[i][j]);
+        Assert.assertEquals(stringMVValues[i][j], Double.toString(expectedValues[i][j]));
+      }
+    }
+  }
+
+  @Test
+  private void testCastTransformFunctionMV(TransformFunction transformFunction, String[][] expectedValues) {
+    int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
+    long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
+    float[][] floatMVValues = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubleMVValues = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    String[][] stringMVValues = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int rowLen = expectedValues[i].length;
+      for (int j = 0; j < rowLen; j++) {
+        Assert.assertEquals(intMVValues[i][j], Integer.parseInt(expectedValues[i][j]));
+        Assert.assertEquals(longMVValues[i][j], Long.parseLong(expectedValues[i][j]));
+        Assert.assertEquals(floatMVValues[i][j], Float.parseFloat(expectedValues[i][j]));
+        Assert.assertEquals(doubleMVValues[i][j], Double.parseDouble(expectedValues[i][j]));
+        Assert.assertEquals(stringMVValues[i][j], expectedValues[i][j]);
+      }
+    }
   }
 }

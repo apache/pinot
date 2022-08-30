@@ -148,7 +148,6 @@ public class CastTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    // TODO: Timestamp cast
     DataType resultDataType = _resultMetadata.getDataType();
     DataType resultStoredType = resultDataType.getStoredType();
     int length = projectionBlock.getNumDocs();
