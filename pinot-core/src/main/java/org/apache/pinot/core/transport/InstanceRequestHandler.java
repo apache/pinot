@@ -73,7 +73,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   private static final int SLOW_QUERY_LATENCY_THRESHOLD_MS = 100;
 
   private final String _instanceName;
-  private final TDeserializer _deserializer;
+  private final ThreadLocal<TDeserializer> _deserializer;
   private final QueryScheduler _queryScheduler;
   private final ServerMetrics _serverMetrics;
   private final AccessControl _accessControl;
@@ -85,11 +85,14 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     _queryScheduler = queryScheduler;
     _serverMetrics = serverMetrics;
     _accessControl = accessControl;
-    try {
-      _deserializer = new TDeserializer(new TCompactProtocol.Factory());
-    } catch (TTransportException e) {
-      throw new RuntimeException("Failed to initialize Thrift Deserializer", e);
-    }
+    _deserializer = ThreadLocal.withInitial(() -> {
+      try {
+        return new TDeserializer(new TCompactProtocol.Factory());
+      } catch (TTransportException e) {
+        throw new RuntimeException("Failed to initialize Thrift Deserializer", e);
+      }
+    });
+
     if (Boolean.parseBoolean(config.getProperty(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION))) {
       _queryFuturesById = new ConcurrentHashMap<>();
       LOGGER.info("Enable query cancellation");
@@ -135,7 +138,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
 
       // Parse instance request into ServerQueryRequest.
       msg.readBytes(requestBytes);
-      _deserializer.deserialize(instanceRequest, requestBytes);
+      _deserializer.get().deserialize(instanceRequest, requestBytes);
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
       queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
           .stopAndRecord();
