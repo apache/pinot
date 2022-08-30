@@ -363,12 +363,9 @@ public class FileBasedSegmentWriterTest {
     segmentWriter.collect(getGenericRow("record7", 1616238000000L));
     segmentWriter.collect(getGenericRow("record8", 1616238000000L));
     segmentWriter.collect(getGenericRow("record9", 1616238000000L));
-    try {
-      segmentWriter.flush();
-      Assert.fail();
-    } catch (RuntimeException e) {
-      // expected.
-    }
+
+    // the flush shall work
+    segmentWriter.flush();
 
     segmentWriter.close();
     FileUtils.deleteQuietly(_outputDir);
