@@ -34,7 +34,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.BaseOperator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -1189,7 +1189,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
    * Helper method to get the DistinctTable result for one single segment for the given query.
    */
   private DistinctTable getDistinctTableInnerSegment(String query) {
-    BaseOperator<IntermediateResultsBlock> distinctOperator = getOperator(query);
+    BaseOperator<DistinctResultsBlock> distinctOperator = getOperator(query);
     DistinctTable distinctTable = distinctOperator.nextBlock().getDistinctTable();
     assertNotNull(distinctTable);
     return distinctTable;

@@ -123,7 +123,7 @@ public class SumGreatestLeastQueriesTest extends BaseQueriesTest {
         + "sum(least(" + ON_COLUMN + ", " + OFF_COLUMN + ")) "
         + "from " + RAW_TABLE_NAME;
     AggregationOperator aggregationOperator = getOperator(query);
-    List<Object> aggregationResult = aggregationOperator.nextBlock().getAggregationResult();
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 4);
     assertEquals(((Number) aggregationResult.get(0)).intValue(), NUM_RECORDS);

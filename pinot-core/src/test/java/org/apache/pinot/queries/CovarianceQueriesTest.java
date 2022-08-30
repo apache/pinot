@@ -31,8 +31,8 @@ import org.apache.commons.math3.stat.correlation.Covariance;
 import org.apache.commons.math3.util.Precision;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -130,10 +130,10 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
 
   private double _expectedCovWithFilter;
 
-  private CovarianceTuple[] _expectedGroupByResultVer1 = new CovarianceTuple[NUM_GROUPS];
-  private CovarianceTuple[] _expectedGroupByResultVer2 = new CovarianceTuple[NUM_GROUPS];
-  private double[] _expectedFinalResultVer1 = new double[NUM_GROUPS];
-  private double[] _expectedFinalResultVer2 = new double[NUM_GROUPS];
+  private final CovarianceTuple[] _expectedGroupByResultVer1 = new CovarianceTuple[NUM_GROUPS];
+  private final CovarianceTuple[] _expectedGroupByResultVer2 = new CovarianceTuple[NUM_GROUPS];
+  private final double[] _expectedFinalResultVer1 = new double[NUM_GROUPS];
+  private final double[] _expectedFinalResultVer2 = new double[NUM_GROUPS];
 
   private boolean _useIdenticalSegment = false;
 
@@ -302,8 +302,7 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(recordSet));
     driver.build();
 
-    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName), ReadMode.mmap);
-    return immutableSegment;
+    return ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName), ReadMode.mmap);
   }
 
   @Test
@@ -314,12 +313,11 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
             + "doubleColumnX), " + "COVAR_POP(intColumnX, longColumn), COVAR_POP(intColumnX, floatColumn), "
             + "COVAR_POP(doubleColumnX, longColumn), COVAR_POP(doubleColumnX, floatColumn), COVAR_POP(longColumn, "
             + "floatColumn)  FROM testTable";
-    Object operator = getOperator(query);
-    assertTrue(operator instanceof AggregationOperator);
-    IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
+    AggregationOperator aggregationOperator = getOperator(query);
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 6, NUM_RECORDS);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
     checkWithPrecision((CovarianceTuple) aggregationResult.get(0), _sumIntX, _sumIntY, _sumIntXY, NUM_RECORDS);
     checkWithPrecision((CovarianceTuple) aggregationResult.get(1), _sumDoubleX, _sumDoubleY, _sumDoubleXY, NUM_RECORDS);
@@ -369,10 +367,9 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     // case 1: (col1, groupByCol) group by groupByCol => all covariances are 0's
     String query =
         "SELECT COVAR_POP(doubleColumnX, groupByColumn) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
-    Object operator = getOperator(query);
-    assertTrue(operator instanceof AggregationGroupByOrderByOperator);
-    IntermediateResultsBlock resultsBlock = ((AggregationGroupByOrderByOperator) operator).nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
+    AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
+    GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
@@ -395,10 +392,9 @@ public class CovarianceQueriesTest extends BaseQueriesTest {
     // case 2: COVAR_POP(col1, col2) group by groupByCol => nondeterministic cov
     query =
         "SELECT COVAR_POP(doubleColumnX, doubleColumnY) FROM testTable GROUP BY groupByColumn ORDER BY groupByColumn";
-    operator = getOperator(query);
-    assertTrue(operator instanceof AggregationGroupByOrderByOperator);
-    resultsBlock = ((AggregationGroupByOrderByOperator) operator).nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
+    groupByOperator = getOperator(query);
+    resultsBlock = groupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 3, NUM_RECORDS);
     aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);

@@ -28,8 +28,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
@@ -76,7 +75,7 @@ public class AggregationPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator<IntermediateResultsBlock> run() {
+  public Operator<AggregationResultsBlock> run() {
     assert _queryContext.getAggregationFunctions() != null;
     return _queryContext.isHasFilteredAggregations() ? buildFilteredAggOperator() : buildNonFilteredAggOperator();
   }
@@ -84,7 +83,7 @@ public class AggregationPlanNode implements PlanNode {
   /**
    * Build the operator to be used for filtered aggregations
    */
-  private BaseOperator<IntermediateResultsBlock> buildFilteredAggOperator() {
+  private FilteredAggregationOperator buildFilteredAggOperator() {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     // Build the operator chain for the main predicate
     Pair<FilterPlanNode, BaseFilterOperator> filterOperatorPair = buildFilterOperator(_queryContext.getFilter());
@@ -99,8 +98,8 @@ public class AggregationPlanNode implements PlanNode {
    * @param mainTransformOperator Transform operator corresponding to the main predicate
    * @param numTotalDocs Number of total docs
    */
-  private BaseOperator<IntermediateResultsBlock> buildFilterOperatorInternal(
-      BaseFilterOperator mainPredicateFilterOperator, TransformOperator mainTransformOperator, int numTotalDocs) {
+  private FilteredAggregationOperator buildFilterOperatorInternal(BaseFilterOperator mainPredicateFilterOperator,
+      TransformOperator mainTransformOperator, int numTotalDocs) {
     Map<FilterContext, Pair<List<AggregationFunction>, TransformOperator>> filterContextToAggFuncsMap = new HashMap<>();
     List<AggregationFunction> nonFilteredAggregationFunctions = new ArrayList<>();
     List<Pair<AggregationFunction, FilterContext>> aggregationFunctions =
@@ -141,8 +140,7 @@ public class AggregationPlanNode implements PlanNode {
     aggToTransformOpList.add(
         Pair.of(nonFilteredAggregationFunctions.toArray(new AggregationFunction[0]), mainTransformOperator));
 
-    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList, numTotalDocs,
-        _queryContext.isNullHandlingEnabled());
+    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), aggToTransformOpList, numTotalDocs);
   }
 
   /**
@@ -170,7 +168,7 @@ public class AggregationPlanNode implements PlanNode {
    * if the query has no filtered aggregates at all. If a query has mixed aggregates, filtered
    * aggregates code will be invoked
    */
-  public Operator<IntermediateResultsBlock> buildNonFilteredAggOperator() {
+  public Operator<AggregationResultsBlock> buildNonFilteredAggOperator() {
     assert _queryContext.getAggregationFunctions() != null;
 
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
@@ -213,7 +211,7 @@ public class AggregationPlanNode implements PlanNode {
               TransformOperator transformOperator =
                   new StarTreeTransformPlanNode(_queryContext, starTreeV2, aggregationFunctionColumnPairs, null,
                       predicateEvaluatorsMap).run();
-              return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, true, false);
+              return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, true);
             }
           }
         }
@@ -225,8 +223,7 @@ public class AggregationPlanNode implements PlanNode {
     TransformOperator transformOperator =
         new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
-    return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false,
-        _queryContext.isNullHandlingEnabled());
+    return new AggregationOperator(aggregationFunctions, transformOperator, numTotalDocs, false);
   }
 
   /**

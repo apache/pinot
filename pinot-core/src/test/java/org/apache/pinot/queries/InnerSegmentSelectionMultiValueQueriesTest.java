@@ -25,7 +25,7 @@ import java.util.PriorityQueue;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.testng.annotations.Test;
 
@@ -45,7 +45,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
 
     // Test query without filter
     EmptySelectionOperator emptySelectionOperator = getOperator(SELECT_STAR_QUERY + limit);
-    IntermediateResultsBlock resultsBlock = emptySelectionOperator.nextBlock();
+    SelectionResultsBlock resultsBlock = emptySelectionOperator.nextBlock();
     ExecutionStatistics executionStatistics = emptySelectionOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 0L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
@@ -60,7 +60,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
         DataSchema.ColumnDataType.INT_ARRAY);
-    assertTrue(resultsBlock.getSelectionResult().isEmpty());
+    assertTrue(resultsBlock.getRows().isEmpty());
 
     // Test query with filter
     emptySelectionOperator = getOperator(SELECT_STAR_QUERY + FILTER + limit);
@@ -78,14 +78,14 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
         DataSchema.ColumnDataType.INT_ARRAY);
-    assertTrue(resultsBlock.getSelectionResult().isEmpty());
+    assertTrue(resultsBlock.getRows().isEmpty());
   }
 
   @Test
   public void testSelectStar() {
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOnlyOperator = getOperator(SELECT_STAR_QUERY);
-    IntermediateResultsBlock resultsBlock = selectionOnlyOperator.nextBlock();
+    BaseOperator<SelectionResultsBlock> selectionOnlyOperator = getOperator(SELECT_STAR_QUERY);
+    SelectionResultsBlock resultsBlock = selectionOnlyOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
@@ -100,7 +100,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
         DataSchema.ColumnDataType.INT_ARRAY);
-    List<Object[]> selectionResult = (List<Object[]>) resultsBlock.getSelectionResult();
+    List<Object[]> selectionResult = (List<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     Object[] firstRow = selectionResult.get(0);
     assertEquals(firstRow.length, 10);
@@ -124,7 +124,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
         DataSchema.ColumnDataType.INT_ARRAY);
-    selectionResult = (List<Object[]>) resultsBlock.getSelectionResult();
+    selectionResult = (List<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     firstRow = selectionResult.get(0);
     assertEquals(firstRow.length, 10);
@@ -135,8 +135,8 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
   @Test
   public void testSelectionOnly() {
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOnlyOperator = getOperator(SELECTION_QUERY);
-    IntermediateResultsBlock resultsBlock = selectionOnlyOperator.nextBlock();
+    BaseOperator<SelectionResultsBlock> selectionOnlyOperator = getOperator(SELECTION_QUERY);
+    SelectionResultsBlock resultsBlock = selectionOnlyOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
@@ -151,7 +151,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
         DataSchema.ColumnDataType.INT_ARRAY);
-    List<Object[]> selectionResult = (List<Object[]>) resultsBlock.getSelectionResult();
+    List<Object[]> selectionResult = (List<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     Object[] firstRow = selectionResult.get(0);
     assertEquals(firstRow.length, 3);
@@ -175,7 +175,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
         DataSchema.ColumnDataType.INT_ARRAY);
-    selectionResult = (List<Object[]>) resultsBlock.getSelectionResult();
+    selectionResult = (List<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     firstRow = selectionResult.get(0);
     assertEquals(firstRow.length, 3);
@@ -186,8 +186,8 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
   @Test
   public void testSelectionOrderBy() {
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOrderByOperator = getOperator(SELECTION_QUERY + ORDER_BY);
-    IntermediateResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(SELECTION_QUERY + ORDER_BY);
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 100000L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
@@ -203,7 +203,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
         DataSchema.ColumnDataType.INT_ARRAY);
-    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     Object[] lastRow = selectionResult.peek();
     assertEquals(lastRow.length, 4);
@@ -228,7 +228,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
         DataSchema.ColumnDataType.INT_ARRAY);
-    selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+    selectionResult = (PriorityQueue<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     lastRow = selectionResult.peek();
     assertEquals(lastRow.length, 4);

@@ -21,7 +21,7 @@ package org.apache.pinot.core.operator;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -39,14 +39,14 @@ import org.apache.pinot.spi.exception.EarlyTerminationException;
  * and we need to acquire the segment before any access is made to the buffers.
  */
 @SuppressWarnings("unchecked")
-public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<IntermediateResultsBlock> {
+public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResultsBlock> {
   private static final String EXPLAIN_NAME = "ACQUIRE_RELEASE_COLUMNS_SEGMENT";
 
   private final PlanNode _planNode;
   private final IndexSegment _indexSegment;
   private final FetchContext _fetchContext;
 
-  private Operator<IntermediateResultsBlock> _childOperator;
+  private Operator<BaseResultsBlock> _childOperator;
 
   public AcquireReleaseColumnsSegmentOperator(PlanNode planNode, IndexSegment indexSegment, FetchContext fetchContext) {
     _planNode = planNode;
@@ -58,8 +58,8 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<Intermedi
    * Runs the planNode to get the childOperator, and then proceeds with execution.
    */
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
-    _childOperator = (Operator<IntermediateResultsBlock>) _planNode.run();
+  protected BaseResultsBlock getNextBlock() {
+    _childOperator = (Operator<BaseResultsBlock>) _planNode.run();
     return _childOperator.nextBlock();
   }
 

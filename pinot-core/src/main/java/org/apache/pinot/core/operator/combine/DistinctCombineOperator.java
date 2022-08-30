@@ -21,7 +21,7 @@ package org.apache.pinot.core.operator.combine;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -30,7 +30,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  * Combine operator for distinct queries.
  */
 @SuppressWarnings("rawtypes")
-public class DistinctCombineOperator extends BaseCombineOperator {
+public class DistinctCombineOperator extends BaseCombineOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "COMBINE_DISTINCT";
 
   private final boolean _hasOrderBy;
@@ -46,17 +46,15 @@ public class DistinctCombineOperator extends BaseCombineOperator {
   }
 
   @Override
-  protected boolean isQuerySatisfied(IntermediateResultsBlock resultsBlock) {
+  protected boolean isQuerySatisfied(DistinctResultsBlock resultsBlock) {
     if (_hasOrderBy) {
       return false;
     }
-    DistinctTable distinctTable = resultsBlock.getDistinctTable();
-    assert distinctTable != null;
-    return distinctTable.size() >= _queryContext.getLimit();
+    return resultsBlock.getDistinctTable().size() >= _queryContext.getLimit();
   }
 
   @Override
-  protected void mergeResultsBlocks(IntermediateResultsBlock mergedBlock, IntermediateResultsBlock blockToMerge) {
+  protected void mergeResultsBlocks(DistinctResultsBlock mergedBlock, DistinctResultsBlock blockToMerge) {
     DistinctTable mergedDistinctTable = mergedBlock.getDistinctTable();
     DistinctTable distinctTableToMerge = blockToMerge.getDistinctTable();
     assert mergedDistinctTable != null && distinctTableToMerge != null;

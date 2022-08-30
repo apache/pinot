@@ -34,7 +34,7 @@ import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -206,7 +206,7 @@ public class CombineSlowOperatorsTest {
    *       for each query.
    */
   private void testCombineOperator(List<Operator> operators, BaseOperator combineOperator) {
-    IntermediateResultsBlock intermediateResultsBlock = (IntermediateResultsBlock) combineOperator.nextBlock();
+    BaseResultsBlock intermediateResultsBlock = (BaseResultsBlock) combineOperator.nextBlock();
     List<ProcessingException> processingExceptions = intermediateResultsBlock.getProcessingExceptions();
     assertNotNull(processingExceptions);
     assertEquals(processingExceptions.size(), 1);

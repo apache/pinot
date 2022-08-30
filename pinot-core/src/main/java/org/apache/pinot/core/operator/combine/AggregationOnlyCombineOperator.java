@@ -21,7 +21,7 @@ package org.apache.pinot.core.operator.combine;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -30,7 +30,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  * Combine operator for aggregation only queries.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class AggregationOnlyCombineOperator extends BaseCombineOperator {
+public class AggregationOnlyCombineOperator extends BaseCombineOperator<AggregationResultsBlock> {
   private static final String EXPLAIN_NAME = "COMBINE_AGGREGATE";
 
   public AggregationOnlyCombineOperator(List<Operator> operators, QueryContext queryContext,
@@ -44,10 +44,10 @@ public class AggregationOnlyCombineOperator extends BaseCombineOperator {
   }
 
   @Override
-  protected void mergeResultsBlocks(IntermediateResultsBlock mergedBlock, IntermediateResultsBlock blockToMerge) {
+  protected void mergeResultsBlocks(AggregationResultsBlock mergedBlock, AggregationResultsBlock blockToMerge) {
     AggregationFunction[] aggregationFunctions = mergedBlock.getAggregationFunctions();
-    List<Object> mergedResults = mergedBlock.getAggregationResult();
-    List<Object> resultsToMerge = blockToMerge.getAggregationResult();
+    List<Object> mergedResults = mergedBlock.getResults();
+    List<Object> resultsToMerge = blockToMerge.getResults();
     assert aggregationFunctions != null && mergedResults != null && resultsToMerge != null;
 
     int numAggregationFunctions = aggregationFunctions.length;

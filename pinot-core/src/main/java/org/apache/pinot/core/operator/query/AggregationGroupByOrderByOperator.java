@@ -28,8 +28,8 @@ import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
@@ -45,7 +45,7 @@ import org.apache.pinot.spi.trace.Tracing;
  * single segment.
  */
 @SuppressWarnings("rawtypes")
-public class AggregationGroupByOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
+public class AggregationGroupByOrderByOperator extends BaseOperator<GroupByResultsBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE_GROUPBY_ORDERBY";
 
   private final AggregationFunction[] _aggregationFunctions;
@@ -95,7 +95,7 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
   }
 
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
+  protected GroupByResultsBlock getNextBlock() {
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
     if (_useStarTree) {
@@ -125,15 +125,13 @@ public class AggregationGroupByOrderByOperator extends BaseOperator<Intermediate
       if (groupByExecutor.getNumGroups() > trimSize) {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
-        IntermediateResultsBlock resultsBlock = new IntermediateResultsBlock(
-            _aggregationFunctions, intermediateRecords, _dataSchema, _queryContext.isNullHandlingEnabled());
+        GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
         return resultsBlock;
       }
     }
 
-    IntermediateResultsBlock resultsBlock = new IntermediateResultsBlock(
-        _aggregationFunctions, groupByExecutor.getResult(), _dataSchema, _queryContext.isNullHandlingEnabled());
+    GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, groupByExecutor.getResult());
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
     return resultsBlock;
   }

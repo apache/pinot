@@ -309,7 +309,7 @@ public class FastFilteredCountTest extends BaseQueriesTest {
   public void test(String query, int expectedCount) {
     Operator<?> operator = getOperator(query);
     assertTrue(operator instanceof FastFilteredCountOperator);
-    List<Object> aggregationResult = ((FastFilteredCountOperator) operator).nextBlock().getAggregationResult();
+    List<Object> aggregationResult = ((FastFilteredCountOperator) operator).nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
     assertEquals(((Number) aggregationResult.get(0)).intValue(), expectedCount, query);

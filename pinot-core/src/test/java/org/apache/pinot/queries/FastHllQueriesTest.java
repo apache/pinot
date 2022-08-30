@@ -26,7 +26,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -109,26 +110,26 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     // Test inner segment queries
     // Test base query
     AggregationOperator aggregationOperator = getOperator(BASE_QUERY);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    AggregationResultsBlock aggregationResultsBlock = aggregationOperator.nextBlock();
     ExecutionStatistics executionStatistics = aggregationOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 30000L, 0L, 60000L, 30000L);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = aggregationResultsBlock.getResults();
     assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 21L);
     assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1762L);
     // Test query with filter
     aggregationOperator = getOperatorWithFilter(BASE_QUERY);
-    resultsBlock = aggregationOperator.nextBlock();
+    aggregationResultsBlock = aggregationOperator.nextBlock();
     executionStatistics = aggregationOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 6129L, 84134L, 12258L, 30000L);
-    aggregationResult = resultsBlock.getAggregationResult();
+    aggregationResult = aggregationResultsBlock.getResults();
     assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 17L);
     assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1197L);
     // Test query with group-by
     AggregationGroupByOrderByOperator groupByOperator = getOperator(BASE_QUERY + GROUP_BY);
-    resultsBlock = groupByOperator.nextBlock();
+    GroupByResultsBlock groupByResultsBlock = groupByOperator.nextBlock();
     executionStatistics = groupByOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 30000L, 0L, 90000L, 30000L);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    AggregationGroupByResult aggregationGroupByResult = groupByResultsBlock.getAggregationGroupByResult();
     GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
     assertEquals(firstGroupKey._keys[0], "");
     assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForGroupId(0, firstGroupKey._groupId)).cardinality(),

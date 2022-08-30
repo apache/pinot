@@ -23,8 +23,8 @@ import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
@@ -36,14 +36,13 @@ import org.apache.pinot.segment.spi.IndexSegment;
 /**
  * Operator for distinct queries on a single segment.
  */
-public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
+public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "DISTINCT";
 
   private final IndexSegment _indexSegment;
   private final DistinctAggregationFunction _distinctAggregationFunction;
   private final TransformOperator _transformOperator;
   private final DistinctExecutor _distinctExecutor;
-  private final QueryContext _queryContext;
 
   private int _numDocsScanned = 0;
 
@@ -52,13 +51,12 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
     _indexSegment = indexSegment;
     _distinctAggregationFunction = distinctAggregationFunction;
     _transformOperator = transformOperator;
-    _queryContext = queryContext;
     _distinctExecutor = DistinctExecutorFactory.getDistinctExecutor(distinctAggregationFunction, transformOperator,
-        _queryContext.isNullHandlingEnabled());
+        queryContext.isNullHandlingEnabled());
   }
 
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
+  protected DistinctResultsBlock getNextBlock() {
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       _numDocsScanned += transformBlock.getNumDocs();
@@ -66,7 +64,7 @@ public class DistinctOperator extends BaseOperator<IntermediateResultsBlock> {
         break;
       }
     }
-    return new IntermediateResultsBlock(_distinctAggregationFunction, _distinctExecutor.getResult());
+    return new DistinctResultsBlock(_distinctAggregationFunction, _distinctExecutor.getResult());
   }
 
   @Override

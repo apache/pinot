@@ -25,7 +25,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -36,7 +36,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * on a single segment.
  * <p>NOTE: this operator short circuit underlying operators and directly returns the data schema without any rows.
  */
-public class EmptySelectionOperator extends BaseOperator<IntermediateResultsBlock> {
+public class EmptySelectionOperator extends BaseOperator<SelectionResultsBlock> {
 
   private static final String EXPLAIN_NAME = "SELECT_EMPTY";
 
@@ -63,10 +63,9 @@ public class EmptySelectionOperator extends BaseOperator<IntermediateResultsBloc
   }
 
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
-    return new IntermediateResultsBlock(_dataSchema, Collections.emptyList(), false);
+  protected SelectionResultsBlock getNextBlock() {
+    return new SelectionResultsBlock(_dataSchema, Collections.emptyList());
   }
-
 
   @Override
   public String toExplainString() {

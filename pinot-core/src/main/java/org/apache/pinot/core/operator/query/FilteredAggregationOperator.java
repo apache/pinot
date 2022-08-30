@@ -26,8 +26,8 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
@@ -41,13 +41,12 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
  * FilteredAggregationOperator will come into execution.
  */
 @SuppressWarnings("rawtypes")
-public class FilteredAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
+public class FilteredAggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE_FILTERED";
 
   private final AggregationFunction[] _aggregationFunctions;
   private final List<Pair<AggregationFunction[], TransformOperator>> _aggFunctionsWithTransformOperator;
   private final long _numTotalDocs;
-  private final boolean _nullHandlingEnabled;
 
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
@@ -56,16 +55,14 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
   // We can potentially do away with aggregationFunctions parameter, but its cleaner to pass it in than to construct
   // it from aggFunctionsWithTransformOperator
   public FilteredAggregationOperator(AggregationFunction[] aggregationFunctions,
-      List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator, long numTotalDocs,
-      boolean nullHandlingEnabled) {
+      List<Pair<AggregationFunction[], TransformOperator>> aggFunctionsWithTransformOperator, long numTotalDocs) {
     _aggregationFunctions = aggregationFunctions;
     _aggFunctionsWithTransformOperator = aggFunctionsWithTransformOperator;
     _numTotalDocs = numTotalDocs;
-    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
+  protected AggregationResultsBlock getNextBlock() {
     int numAggregations = _aggregationFunctions.length;
     Object[] result = new Object[numAggregations];
     IdentityHashMap<AggregationFunction, Integer> resultIndexMap = new IdentityHashMap<>(numAggregations);
@@ -92,7 +89,7 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
       _numEntriesScannedInFilter += transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * transformOperator.getNumColumnsProjected();
     }
-    return new IntermediateResultsBlock(_aggregationFunctions, Arrays.asList(result), _nullHandlingEnabled);
+    return new AggregationResultsBlock(_aggregationFunctions, Arrays.asList(result));
   }
 
   @Override
