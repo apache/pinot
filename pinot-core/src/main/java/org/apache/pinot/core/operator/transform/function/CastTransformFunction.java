@@ -47,57 +47,52 @@ public class CastTransformFunction extends BaseTransformFunction {
 
     _transformFunction = arguments.get(0);
     TransformFunction castFormatTransformFunction = arguments.get(1);
+    boolean isSVCol = _transformFunction.getResultMetadata().isSingleValue();
 
     if (castFormatTransformFunction instanceof LiteralTransformFunction) {
       String targetType = ((LiteralTransformFunction) castFormatTransformFunction).getLiteral().toUpperCase();
       switch (targetType) {
         case "INT":
         case "INTEGER":
-          _resultMetadata = INT_SV_NO_DICTIONARY_METADATA;
+          _resultMetadata = isSVCol ? INT_SV_NO_DICTIONARY_METADATA : INT_MV_NO_DICTIONARY_METADATA;
           break;
         case "LONG":
-          _resultMetadata = LONG_SV_NO_DICTIONARY_METADATA;
+          _resultMetadata = isSVCol ? LONG_SV_NO_DICTIONARY_METADATA : LONG_MV_NO_DICTIONARY_METADATA;
           break;
         case "FLOAT":
-          _resultMetadata = FLOAT_SV_NO_DICTIONARY_METADATA;
+          _resultMetadata = isSVCol ? FLOAT_SV_NO_DICTIONARY_METADATA : FLOAT_MV_NO_DICTIONARY_METADATA;
           break;
         case "DOUBLE":
-          _resultMetadata = DOUBLE_SV_NO_DICTIONARY_METADATA;
+          _resultMetadata = isSVCol ? DOUBLE_SV_NO_DICTIONARY_METADATA : DOUBLE_MV_NO_DICTIONARY_METADATA;
           break;
         case "DECIMAL":
         case "BIGDECIMAL":
         case "BIG_DECIMAL":
+          // TODO: MV cast to BIG_DECIMAL type
           _resultMetadata = BIG_DECIMAL_SV_NO_DICTIONARY_METADATA;
           break;
         case "BOOL":
         case "BOOLEAN":
+          if (!isSVCol) {
+            throw new IllegalArgumentException("MV cast is not supported for type - " + targetType);
+          }
           _resultMetadata = BOOLEAN_SV_NO_DICTIONARY_METADATA;
           break;
         case "TIMESTAMP":
+          if (!isSVCol) {
+            throw new IllegalArgumentException("MV cast is not supported for type - " + targetType);
+          }
           _resultMetadata = TIMESTAMP_SV_NO_DICTIONARY_METADATA;
           break;
         case "STRING":
         case "VARCHAR":
-          _resultMetadata = STRING_SV_NO_DICTIONARY_METADATA;
+          _resultMetadata = isSVCol ? STRING_SV_NO_DICTIONARY_METADATA : STRING_MV_NO_DICTIONARY_METADATA;
           break;
         case "JSON":
+          if (!isSVCol) {
+            throw new IllegalArgumentException("MV cast is not supported for type - " + targetType);
+          }
           _resultMetadata = JSON_SV_NO_DICTIONARY_METADATA;
-          break;
-        case "INTEGERMV":
-        case "INTMV":
-          _resultMetadata = INT_MV_NO_DICTIONARY_METADATA;
-          break;
-        case "FLOATMV":
-          _resultMetadata = FLOAT_MV_NO_DICTIONARY_METADATA;
-          break;
-        case "LONGMV":
-          _resultMetadata = LONG_MV_NO_DICTIONARY_METADATA;
-          break;
-        case "DOUBLEMV":
-          _resultMetadata = DOUBLE_MV_NO_DICTIONARY_METADATA;
-          break;
-        case "STRINGMV":
-          _resultMetadata = STRING_MV_NO_DICTIONARY_METADATA;
           break;
         default:
           throw new IllegalArgumentException("Unable to cast expression to type - " + targetType);

@@ -36,7 +36,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void testCastTransformFunctionMV() {
     ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("CAST(%s AS longMV)", STRING_LONG_MV_COLUMN));
+        RequestContextUtils.getExpression(String.format("CAST(%s AS LONG)", STRING_LONG_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
     assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
@@ -45,7 +45,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     testCastTransformFunctionMV(transformFunction, expectedLongValues);
 
     expression = RequestContextUtils.getExpression(
-        String.format("CAST(CAST(CAST(%s AS longMV) as doubleMV) as intMV)", STRING_LONG_MV_COLUMN));
+        String.format("CAST(CAST(CAST(%s AS LONG) as DOUBLE) as INT)", STRING_LONG_MV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
     assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
@@ -58,7 +58,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     testCastTransformFunctionMV(transformFunction, expectedIntValues);
 
     expression =
-        RequestContextUtils.getExpression(String.format("CAST(CAST(%s AS intMV) as floatMV)", FLOAT_MV_COLUMN));
+        RequestContextUtils.getExpression(String.format("CAST(CAST(%s AS INT) as FLOAT)", FLOAT_MV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
     assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
@@ -69,7 +69,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     testCastTransformFunctionMV(transformFunction, expectedFloatValues);
 
     expression = RequestContextUtils.getExpression(
-        String.format("CAST(CAST(CAST(%s AS floatMV) as intMV) as stringMV)", INT_MV_COLUMN));
+        String.format("CAST(CAST(CAST(%s AS FLOAT) as INT) as STRING)", INT_MV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CastTransformFunction);
     assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
@@ -81,12 +81,12 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     ArrayCopyUtils.copy(innerLayerInt, expectedStringValues, NUM_ROWS);
     testCastTransformFunctionMV(transformFunction, expectedStringValues);
 
-    expression = RequestContextUtils.getExpression(String.format("arrayMax(cAst(%s AS intMV))", DOUBLE_MV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("arrayMax(cAst(%s AS INT))", DOUBLE_MV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     FieldSpec.DataType resultDataType = transformFunction.getResultMetadata().getDataType();
     Assert.assertEquals(resultDataType, FieldSpec.DataType.INT);
 
-    expression = RequestContextUtils.getExpression(String.format("arraySum(cAst(%s AS intMV))", DOUBLE_MV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("arraySum(cAst(%s AS INT))", DOUBLE_MV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[][] afterCast = new int[NUM_ROWS][];
     ArrayCopyUtils.copy(_doubleMVValues, afterCast, NUM_ROWS);
