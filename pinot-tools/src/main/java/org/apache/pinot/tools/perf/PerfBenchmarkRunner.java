@@ -168,7 +168,8 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
       List<String> invertedIndexColumns, List<String> bloomFilterColumns)
       throws Exception {
     boolean tableConfigured = false;
-    File[] segments = new File(dataDir, tableName).listFiles();
+    // Skip BaseTableDataManager._resourceTmpDir
+    File[] segments = new File(dataDir, tableName).listFiles((dir, name) -> !name.equals("tmp"));
     Preconditions.checkNotNull(segments);
     for (File segment : segments) {
       if (segment.isDirectory()) {
