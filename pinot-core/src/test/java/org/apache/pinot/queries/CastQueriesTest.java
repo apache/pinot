@@ -61,6 +61,7 @@ public class CastQueriesTest extends BaseQueriesTest {
   private static final String CLASSIFICATION_COLUMN = "class";
   private static final String X_COL = "x";
   private static final String Y_COL = "y";
+ // private static final String STRING_COL = RandomStringUtils.randomAlphanumeric(10, 100);
 
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
       .addSingleValueDimension(X_COL, FieldSpec.DataType.DOUBLE)

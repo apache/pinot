@@ -710,6 +710,84 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  public void testCastMV()
+      throws Exception {
+
+    // simple cast
+    String sqlQuery = "SELECT DivLongestGTimes from myTable LIMIT 100";
+    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"FLOAT_ARRAY\"]");
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 100);
+
+    String sqlQueryCast = "SELECT CAST(DivLongestGTimes as DOUBLE) FROM myTable LIMIT 100";
+    JsonNode responseCast = postQuery(sqlQueryCast, _brokerBaseApiUrl);
+    JsonNode resultTableCast = responseCast.get("resultTable");
+    JsonNode dataSchemaCast = resultTableCast.get("dataSchema");
+    assertEquals(dataSchemaCast.get("columnDataTypes").toString(), "[\"DOUBLE_ARRAY\"]");
+    JsonNode rowsCast = responseCast.get("resultTable").get("rows");
+    assertEquals(rowsCast.size(), 100);
+    for (int i = 0; i < 100; i++) {
+      JsonNode row = rows.get(i).get(0);
+      JsonNode rowCast = rowsCast.get(i).get(0);
+      assertTrue(rowCast.isArray());
+      assertTrue(row.isArray());
+      assertEquals(row.size(), rowCast.size());
+      for (int j = 0; j < rowCast.size(); j++) {
+        float original = row.get(j).floatValue();
+        assertTrue(rowCast.get(j).isDouble());
+        double resultCast = rowCast.get(j).asDouble();
+        assertEquals(resultCast, (double) original);
+      }
+    }
+
+    // nested cast
+    sqlQuery = "SELECT DivAirportIDs, DivTotalGTimes from myTable LIMIT 100";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT_ARRAY\",\"LONG_ARRAY\"]");
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 100);
+
+    sqlQueryCast =
+        "SELECT CAST(CAST(CAST(DivAirportIDs AS FLOAT) as INT) as STRING), CAST(CAST(DivTotalGTimes AS STRING) AS "
+            + "LONG) FROM myTable LIMIT 100";
+    responseCast = postQuery(sqlQueryCast, _brokerBaseApiUrl);
+    resultTableCast = responseCast.get("resultTable");
+    dataSchemaCast = resultTableCast.get("dataSchema");
+    assertEquals(dataSchemaCast.get("columnDataTypes").toString(), "[\"STRING_ARRAY\",\"LONG_ARRAY\"]");
+    rowsCast = responseCast.get("resultTable").get("rows");
+    assertEquals(rowsCast.size(), 100);
+    for (int i = 0; i < 100; i++) {
+      JsonNode col1 = rows.get(i).get(0);
+      JsonNode col1Cast = rowsCast.get(i).get(0);
+      assertTrue(col1Cast.isArray());
+      assertTrue(col1.isArray());
+      assertEquals(col1.size(), col1Cast.size());
+      for (int j = 0; j < col1Cast.size(); j++) {
+        int original = col1.get(j).asInt();
+        assertTrue(col1Cast.get(j).isTextual());
+        String resultCast = col1Cast.get(j).asText();
+        assertEquals(resultCast, String.valueOf((int) ((float) original)));
+      }
+
+      JsonNode col2 = rows.get(i).get(1);
+      JsonNode col2Cast = rowsCast.get(i).get(1);
+      assertTrue(col2Cast.isArray());
+      assertTrue(col2.isArray());
+      assertEquals(col2.size(), col2Cast.size());
+      for (int j = 0; j < col2Cast.size(); j++) {
+        long original = col2.get(j).asLong();
+        long resultCast = col2Cast.get(j).asLong();
+        assertEquals(resultCast, Long.parseLong(String.valueOf(original)));
+      }
+    }
+  }
+
+  @Test
   public void testUrlFunc()
       throws Exception {
     String sqlQuery = "SELECT encodeUrl('key1=value 1&key2=value@!$2&key3=value%3'), "
