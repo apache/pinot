@@ -158,6 +158,14 @@ public class SegmentZKMetadata implements ZKMetadata {
     setNonNegativeValue(Segment.CRC, crc);
   }
 
+  public String getTier() {
+    return _simpleFields.get(Segment.TIER);
+  }
+
+  public void setTier(String tier) {
+    setValue(Segment.TIER, tier);
+  }
+
   public long getCreationTime() {
     return _znRecord.getLongField(Segment.CREATION_TIME, -1);
   }

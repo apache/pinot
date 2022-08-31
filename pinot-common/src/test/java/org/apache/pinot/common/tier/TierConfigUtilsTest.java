@@ -186,4 +186,33 @@ public class TierConfigUtilsTest {
     Assert.assertEquals(tierComparator.compare(tier6, tier5), -1);
     Assert.assertEquals(tierComparator.compare(tier4, tier7), 1);
   }
+
+  @Test
+  public void testGetDataDirFromTierConfig() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    try {
+      TierConfigUtils.getDataDirFromTierConfig("myTable", "tier1", tableConfig);
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "No tierConfigs for table: myTable");
+    }
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(Lists
+        .newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null))).build();
+    try {
+      TierConfigUtils.getDataDirFromTierConfig("myTable", "tier1", tableConfig);
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "No configs for tier: tier1 on table: myTable");
+    }
+    try {
+      TierConfigUtils.getDataDirFromTierConfig("myTable", "myTier", tableConfig);
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "No backend properties for tier: myTier on table: myTable");
+    }
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(Lists
+        .newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null,
+            Collections.singletonMap("dataDir", "/foo/bar")))).build();
+    String dataDir = TierConfigUtils.getDataDirFromTierConfig("myTable", "myTier", tableConfig);
+    Assert.assertEquals(dataDir, "/foo/bar");
+  }
 }

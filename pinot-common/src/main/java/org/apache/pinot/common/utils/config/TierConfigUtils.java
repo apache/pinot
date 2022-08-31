@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.common.utils.config;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.tier.FixedTierSegmentSelector;
 import org.apache.pinot.common.tier.Tier;
@@ -30,6 +33,7 @@ import org.apache.pinot.common.tier.TierSegmentSelector;
 import org.apache.pinot.common.tier.TimeBasedTierSegmentSelector;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -45,6 +49,28 @@ public final class TierConfigUtils {
    */
   public static boolean shouldRelocateToTiers(TableConfig tableConfig) {
     return CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList());
+  }
+
+  public static String getDataDirFromTierConfig(String tableNameWithType, String tierName, TableConfig tableConfig) {
+    List<TierConfig> tierCfgs = tableConfig.getTierConfigsList();
+    Preconditions
+        .checkState(tierCfgs != null && !tierCfgs.isEmpty(), "No tierConfigs for table: %s", tableNameWithType);
+    TierConfig tierCfg = null;
+    for (TierConfig tc : tierCfgs) {
+      if (tierName.equalsIgnoreCase(tc.getName())) {
+        tierCfg = tc;
+        break;
+      }
+    }
+    Preconditions.checkNotNull(tierCfg, "No configs for tier: %s on table: %s", tierName, tableNameWithType);
+    // TODO: check if the tier configs are predefined in ClusterConfigs.
+    Map<String, String> backendProps = tierCfg.getTierBackendProperties();
+    Preconditions
+        .checkNotNull(backendProps, "No backend properties for tier: %s on table: %s", tierName, tableNameWithType);
+    String dataDir = backendProps.get(CommonConstants.Tier.BACKEND_PROP_DATA_DIR);
+    Preconditions.checkState(StringUtils.isNotEmpty(dataDir), "No dataDir for tier: %s on table: %s", tierName,
+        tableNameWithType);
+    return dataDir;
   }
 
   /**

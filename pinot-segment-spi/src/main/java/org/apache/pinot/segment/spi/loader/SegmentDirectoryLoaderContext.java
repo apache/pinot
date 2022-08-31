@@ -31,17 +31,21 @@ public class SegmentDirectoryLoaderContext {
   private final TableConfig _tableConfig;
   private final Schema _schema;
   private final String _instanceId;
+  private final String _tableDataDir;
   private final String _segmentName;
   private final String _segmentCrc;
+  private final String _segmentTier;
   private final PinotConfiguration _segmentDirectoryConfigs;
 
-  private SegmentDirectoryLoaderContext(TableConfig tableConfig, Schema schema, String instanceId, String segmentName,
-      String segmentCrc, PinotConfiguration segmentDirectoryConfigs) {
+  private SegmentDirectoryLoaderContext(TableConfig tableConfig, Schema schema, String instanceId, String tableDataDir,
+      String segmentName, String segmentCrc, String segmentTier, PinotConfiguration segmentDirectoryConfigs) {
     _tableConfig = tableConfig;
     _schema = schema;
     _instanceId = instanceId;
+    _tableDataDir = tableDataDir;
     _segmentName = segmentName;
     _segmentCrc = segmentCrc;
+    _segmentTier = segmentTier;
     _segmentDirectoryConfigs = segmentDirectoryConfigs;
   }
 
@@ -57,12 +61,20 @@ public class SegmentDirectoryLoaderContext {
     return _instanceId;
   }
 
+  public String getTableDataDir() {
+    return _tableDataDir;
+  }
+
   public String getSegmentName() {
     return _segmentName;
   }
 
   public String getSegmentCrc() {
     return _segmentCrc;
+  }
+
+  public String getSegmentTier() {
+    return _segmentTier;
   }
 
   public PinotConfiguration getSegmentDirectoryConfigs() {
@@ -75,6 +87,8 @@ public class SegmentDirectoryLoaderContext {
     private String _instanceId;
     private String _segmentName;
     private String _segmentCrc;
+    private String _segmentTier;
+    private String _tableDataDir;
     private PinotConfiguration _segmentDirectoryConfigs;
 
     public Builder setTableConfig(TableConfig tableConfig) {
@@ -102,14 +116,24 @@ public class SegmentDirectoryLoaderContext {
       return this;
     }
 
+    public Builder setSegmentTier(String segmentTier) {
+      _segmentTier = segmentTier;
+      return this;
+    }
+
+    public Builder setTableDataDir(String tableDataDir) {
+      _tableDataDir = tableDataDir;
+      return this;
+    }
+
     public Builder setSegmentDirectoryConfigs(PinotConfiguration segmentDirectoryConfigs) {
       _segmentDirectoryConfigs = segmentDirectoryConfigs;
       return this;
     }
 
     public SegmentDirectoryLoaderContext build() {
-      return new SegmentDirectoryLoaderContext(_tableConfig, _schema, _instanceId, _segmentName, _segmentCrc,
-          _segmentDirectoryConfigs);
+      return new SegmentDirectoryLoaderContext(_tableConfig, _schema, _instanceId, _tableDataDir, _segmentName,
+          _segmentCrc, _segmentTier, _segmentDirectoryConfigs);
     }
   }
 }
