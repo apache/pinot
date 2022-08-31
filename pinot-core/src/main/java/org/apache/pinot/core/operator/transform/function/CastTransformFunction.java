@@ -70,7 +70,10 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "DECIMAL":
         case "BIGDECIMAL":
         case "BIG_DECIMAL":
-          // TODO: MV cast to BIG_DECIMAL type
+          if (!isSVCol) {
+            // TODO: MV cast to BIG_DECIMAL type
+            throw new IllegalArgumentException("MV cast is not supported for type - " + targetType);
+          }
           _resultMetadata = BIG_DECIMAL_SV_NO_DICTIONARY_METADATA;
           break;
         case "BOOL":
