@@ -375,7 +375,7 @@ public class SegmentPushUtils implements Serializable {
 
   public static List<String> getSegmentNames(BatchConfigProperties.SegmentPushType pushMode,
       Map<String, String> segmentsUriToTarPathMap) {
-    List<String> segmentNames = new ArrayList<>();
+    List<String> segmentNames = new ArrayList<>(segmentsUriToTarPathMap.size());
     if (pushMode.equals(BatchConfigProperties.SegmentPushType.TAR) || pushMode.equals(
         BatchConfigProperties.SegmentPushType.METADATA)) {
       for (String tarFilePath : segmentsUriToTarPathMap.values()) {
@@ -401,7 +401,6 @@ public class SegmentPushUtils implements Serializable {
    * extension.
    */
   public static String getSegmentNameFromPath(String filePath) {
-    int startIndex = filePath.contains("/") ? filePath.lastIndexOf("/") + 1 : 0;
-    return filePath.substring(startIndex, filePath.length() - Constants.TAR_GZ_FILE_EXT.length());
+    return filePath.substring(filePath.lastIndexOf("/") + 1, filePath.length() - Constants.TAR_GZ_FILE_EXT.length());
   }
 }

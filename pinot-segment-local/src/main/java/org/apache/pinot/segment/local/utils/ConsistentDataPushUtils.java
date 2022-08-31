@@ -248,7 +248,7 @@ public class ConsistentDataPushUtils {
       try {
         controllerURI = new URI(pinotClusterSpec.getControllerURI());
         Map<String, List<String>> segments =
-            FILE_UPLOAD_DOWNLOAD_CLIENT.getSegments(controllerURI, rawTableName, TableType.OFFLINE.toString(), true);
+            FILE_UPLOAD_DOWNLOAD_CLIENT.getSegments(controllerURI, rawTableName, TableType.OFFLINE, true);
         offlineSegments = segments.get(TableType.OFFLINE.toString());
         uriToOfflineSegments.put(controllerURI, offlineSegments);
       } catch (URISyntaxException e) {

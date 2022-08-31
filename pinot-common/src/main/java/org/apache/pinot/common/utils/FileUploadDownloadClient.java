@@ -755,14 +755,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * Returns a map from a given tableType to a list of segments for that given tableType (OFFLINE or REALTIME)
    * If tableType is left unspecified, both OFFLINE and REALTIME segments will be returned in the map.
    */
-  public Map<String, List<String>> getSegments(URI uri, String rawTableName, @Nullable String tableType,
+  public Map<String, List<String>> getSegments(URI uri, String rawTableName, @Nullable TableType tableType,
       boolean excludeReplacedSegments)
       throws URISyntaxException, IOException {
     List<String> tableTypes;
-    if (tableType == null || tableType.isEmpty()) {
+    if (tableType == null) {
       tableTypes = Arrays.asList(TableType.OFFLINE.toString(), TableType.REALTIME.toString());
     } else {
-      tableTypes = Arrays.asList(tableType);
+      tableTypes = Arrays.asList(tableType.toString());
     }
     ControllerRequestURLBuilder controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(uri.toString());
     Map<String, List<String>> tableTypeToSegments = new HashMap<>();
@@ -776,6 +776,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
       try {
         response = HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(requestBuilder.build()));
       } catch (HttpErrorStatusException e) {
+        LOGGER.info("Caught HttpErrorStatusException while getting segments for table: {} with type: {}", rawTableName,
+            tableTypeToFilter, e);
         tableTypeToSegments.put(tableTypeToFilter, segments);
         continue;
       }
