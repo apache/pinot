@@ -44,6 +44,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +55,7 @@ public class ConsistentDataPushUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPushUtils.class);
   private static final FileUploadDownloadClient FILE_UPLOAD_DOWNLOAD_CLIENT = new FileUploadDownloadClient();
+  private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.fixedDelayRetryPolicy(5, 10_000L);
   public static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";
 
   /**
@@ -81,7 +83,8 @@ public class ConsistentDataPushUtils {
    * uriToLineageEntryIdMap is non-empty if and only if consistent data push is enabled.
    * If uriToLineageEntryIdMap is non-empty, end the consistent data push protocol for each controller.
    */
-  public static void postUpload(SegmentGenerationJobSpec spec, Map<URI, String> uriToLineageEntryIdMap) {
+  public static void postUpload(SegmentGenerationJobSpec spec, Map<URI, String> uriToLineageEntryIdMap)
+      throws Exception {
     String rawTableName = spec.getTableSpec().getTableName();
     if (uriToLineageEntryIdMap != null && !uriToLineageEntryIdMap.isEmpty()) {
       LOGGER.info("End consistent push for table: " + rawTableName);
@@ -121,9 +124,6 @@ public class ConsistentDataPushUtils {
     AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
     LOGGER.info("Start replace segment URIs: " + segmentsUris);
 
-    int attempts = 1;
-    long retryWaitMs = 1000L;
-
     for (Map.Entry<URI, URI> entry : segmentsUris.entrySet()) {
       URI controllerUri = entry.getKey();
       URI startSegmentUri = entry.getValue();
@@ -141,12 +141,11 @@ public class ConsistentDataPushUtils {
 
       StartReplaceSegmentsRequest startReplaceSegmentsRequest =
           new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo);
-      RetryPolicies.exponentialBackoffRetryPolicy(attempts, retryWaitMs, 5).attempt(() -> {
+      DEFAULT_RETRY_POLICY.attempt(() -> {
         try {
           SimpleHttpResponse response =
               FILE_UPLOAD_DOWNLOAD_CLIENT.startReplaceSegments(startSegmentUri, startReplaceSegmentsRequest,
                   authProvider);
-
           String responseString = response.getResponse();
           LOGGER.info(
               "Got response {}: {} while sending start replace segment request for table: {}, uploadURI: {}, request:"
@@ -177,20 +176,33 @@ public class ConsistentDataPushUtils {
   /**
    * Ends consistent data push protocol for each Pinot cluster in the spec.
    */
-  public static void endReplaceSegments(SegmentGenerationJobSpec spec, Map<URI, String> uriToLineageEntryIdMap) {
+  public static void endReplaceSegments(SegmentGenerationJobSpec spec, Map<URI, String> uriToLineageEntryIdMap)
+      throws Exception {
     AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
     String rawTableName = spec.getTableSpec().getTableName();
-    for (URI uri : uriToLineageEntryIdMap.keySet()) {
-      String segmentLineageEntryId = uriToLineageEntryIdMap.get(uri);
-      try {
-        FILE_UPLOAD_DOWNLOAD_CLIENT.endReplaceSegments(
-            FileUploadDownloadClient.getEndReplaceSegmentsURI(uri, rawTableName, TableType.OFFLINE.toString(),
-                segmentLineageEntryId), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, authProvider);
-      } catch (URISyntaxException e) {
-        throw new RuntimeException("Got invalid controller uri - '" + uri + "'");
-      } catch (HttpErrorStatusException | IOException e) {
-        e.printStackTrace();
-      }
+    for (URI controllerUri : uriToLineageEntryIdMap.keySet()) {
+      String segmentLineageEntryId = uriToLineageEntryIdMap.get(controllerUri);
+      URI uri =
+          FileUploadDownloadClient.getEndReplaceSegmentsURI(controllerUri, rawTableName, TableType.OFFLINE.toString(),
+              segmentLineageEntryId);
+      DEFAULT_RETRY_POLICY.attempt(() -> {
+        try {
+          SimpleHttpResponse response =
+              FILE_UPLOAD_DOWNLOAD_CLIENT.endReplaceSegments(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, authProvider);
+          LOGGER.info("Got response {}: {} while sending end replace segment request for table: {}, uploadURI: {}",
+              response.getStatusCode(), response.getResponse(), rawTableName, uri);
+          return true;
+        } catch (SocketTimeoutException se) {
+          // In case of the timeout, we should re-try.
+          return false;
+        } catch (HttpErrorStatusException e) {
+          if (e.getStatusCode() >= 500) {
+            return false;
+          } else {
+            throw e;
+          }
+        }
+      });
     }
   }
 
@@ -253,7 +265,7 @@ public class ConsistentDataPushUtils {
         uriToOfflineSegments.put(controllerURI, offlineSegments);
       } catch (URISyntaxException e) {
         throw new RuntimeException("Got invalid controller uri - '" + pinotClusterSpec.getControllerURI() + "'");
-      } catch (IOException e) {
+      } catch (Exception e) {
         e.printStackTrace();
       }
     }

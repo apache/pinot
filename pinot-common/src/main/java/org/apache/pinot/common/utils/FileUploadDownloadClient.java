@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
+import javax.ws.rs.core.Response;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
@@ -61,6 +63,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -755,50 +758,66 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * Returns a map from a given tableType to a list of segments for that given tableType (OFFLINE or REALTIME)
    * If tableType is left unspecified, both OFFLINE and REALTIME segments will be returned in the map.
    */
-  public Map<String, List<String>> getSegments(URI uri, String rawTableName, @Nullable TableType tableType,
-      boolean excludeReplacedSegments)
-      throws URISyntaxException, IOException {
+  public Map<String, List<String>> getSegments(URI controllerUri, String rawTableName, @Nullable TableType tableType,
+      boolean excludeReplacedSegments) throws Exception {
     List<String> tableTypes;
     if (tableType == null) {
       tableTypes = Arrays.asList(TableType.OFFLINE.toString(), TableType.REALTIME.toString());
     } else {
       tableTypes = Arrays.asList(tableType.toString());
     }
-    ControllerRequestURLBuilder controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(uri.toString());
+    ControllerRequestURLBuilder controllerRequestURLBuilder =
+        ControllerRequestURLBuilder.baseUrl(controllerUri.toString());
     Map<String, List<String>> tableTypeToSegments = new HashMap<>();
     for (String tableTypeToFilter : tableTypes) {
-      List<String> segments = new ArrayList<>();
-      RequestBuilder requestBuilder = RequestBuilder.get(
-          controllerRequestURLBuilder.forSegmentListAPIWithTableTypeAndExcludeReplacedSegments(rawTableName,
-              tableTypeToFilter, excludeReplacedSegments)).setVersion(HttpVersion.HTTP_1_1);
+      tableTypeToSegments.put(tableTypeToFilter, new ArrayList<>());
+      String uri = controllerRequestURLBuilder.forSegmentListAPIWithTableTypeAndExcludeReplacedSegments(rawTableName,
+          tableTypeToFilter, excludeReplacedSegments);
+      RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
       HttpClient.setTimeout(requestBuilder, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
-      SimpleHttpResponse response;
-      try {
-        response = HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(requestBuilder.build()));
-      } catch (HttpErrorStatusException e) {
-        LOGGER.info("Caught HttpErrorStatusException while getting segments for table: {} with type: {}", rawTableName,
-            tableTypeToFilter, e);
-        tableTypeToSegments.put(tableTypeToFilter, segments);
-        continue;
-      }
-      String responseString = response.getResponse();
-      JsonNode responseJsonNode = JsonUtils.stringToJsonNode(responseString);
-      Iterator<JsonNode> responseElements = responseJsonNode.elements();
-      while (responseElements.hasNext()) {
-        JsonNode responseElementJsonNode = responseElements.next();
-        if (!responseElementJsonNode.has(tableTypeToFilter)) {
-          continue;
+      RetryPolicies.fixedDelayRetryPolicy(5, 10_000L).attempt(() -> {
+        try {
+          SimpleHttpResponse response =
+              HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(requestBuilder.build()));
+          LOGGER.info("Response {}: {} received for GET request to URI: {}", response.getStatusCode(),
+              response.getResponse(), uri);
+          tableTypeToSegments.put(tableTypeToFilter,
+              getSegmentNamesFromResponse(tableTypeToFilter, response.getResponse()));
+          return true;
+        } catch (SocketTimeoutException se) {
+          // In case of the timeout, we should re-try.
+          return false;
+        } catch (HttpErrorStatusException e) {
+          if (e.getStatusCode() < 500) {
+            if (e.getStatusCode() == Response.Status.NOT_FOUND.getStatusCode()) {
+              LOGGER.error("Segments not found for table {} when sending request uri: {}", rawTableName, uri);
+            }
+          }
+          return false;
         }
-        JsonNode jsonArray = responseElementJsonNode.get(tableTypeToFilter);
-        Iterator<JsonNode> elements = jsonArray.elements();
-        while (elements.hasNext()) {
-          JsonNode segmentJsonNode = elements.next();
-          segments.add(segmentJsonNode.asText());
-        }
-      }
-      tableTypeToSegments.put(tableTypeToFilter, segments);
+      });
     }
     return tableTypeToSegments;
+  }
+
+  public List<String> getSegmentNamesFromResponse(String tableType, String responseString)
+      throws IOException {
+    List<String> segments = new ArrayList<>();
+    JsonNode responseJsonNode = JsonUtils.stringToJsonNode(responseString);
+    Iterator<JsonNode> responseElements = responseJsonNode.elements();
+    while (responseElements.hasNext()) {
+      JsonNode responseElementJsonNode = responseElements.next();
+      if (!responseElementJsonNode.has(tableType)) {
+        continue;
+      }
+      JsonNode jsonArray = responseElementJsonNode.get(tableType);
+      Iterator<JsonNode> elements = jsonArray.elements();
+      while (elements.hasNext()) {
+        JsonNode segmentJsonNode = elements.next();
+        segments.add(segmentJsonNode.asText());
+      }
+    }
+    return segments;
   }
 
   /**
