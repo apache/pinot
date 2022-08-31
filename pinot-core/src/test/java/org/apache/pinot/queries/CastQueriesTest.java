@@ -26,7 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
@@ -149,8 +149,8 @@ public class CastQueriesTest extends BaseQueriesTest {
   @Test
   public void testCastMV() {
     String query = String.format("select cast(%s as LONG) as col1 from %s limit 100", STRING_MV_COL, RAW_TABLE_NAME);
-    IntermediateResultsBlock block = ((SelectionOnlyOperator) getOperator(query)).nextBlock();
-    List<Object[]> results = (List<Object[]>) block.getSelectionResult();
+    SelectionResultsBlock block = ((SelectionOnlyOperator) getOperator(query)).nextBlock();
+    List<Object[]> results = (List<Object[]>) block.getRows();
     for (int i = 0; i < 100; i++) {
       Object[] row = results.get(i);
       long[] cast = (long[]) row[0];
