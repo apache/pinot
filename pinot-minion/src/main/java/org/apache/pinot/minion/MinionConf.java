@@ -21,6 +21,7 @@ package org.apache.pinot.minion;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -58,6 +59,9 @@ public class MinionConf extends PinotConfiguration {
   }
 
   public String getInstanceId() {
+    if (StringUtils.isNotBlank(getProperty(CommonConstants.Minion.CONFIG_OF_MINION_ID))) {
+      return getProperty(CommonConstants.Minion.CONFIG_OF_MINION_ID);
+    }
     return getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY);
   }
 

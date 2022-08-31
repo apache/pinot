@@ -240,7 +240,7 @@ public class PerfBenchmarkDriver {
     String brokerInstanceName = "Broker_localhost_" + CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;
 
     Map<String, Object> properties = new HashMap<>();
-    properties.put(CommonConstants.Helix.Instance.INSTANCE_ID_KEY, brokerInstanceName);
+    properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_ID, brokerInstanceName);
     properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, BROKER_TIMEOUT_MS);
     properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
