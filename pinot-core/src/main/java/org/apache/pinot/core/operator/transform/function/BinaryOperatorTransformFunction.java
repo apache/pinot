@@ -45,10 +45,10 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
 
   private final int _op;
   private final TransformFunctionType _transformFunctionType;
-  private TransformFunction _leftTransformFunction;
-  private TransformFunction _rightTransformFunction;
-  private DataType _leftStoredType;
-  private DataType _rightStoredType;
+  protected TransformFunction _leftTransformFunction;
+  protected TransformFunction _rightTransformFunction;
+  protected DataType _leftStoredType;
+  protected DataType _rightStoredType;
   private int[] _results;
 
   protected BinaryOperatorTransformFunction(TransformFunctionType transformFunctionType) {

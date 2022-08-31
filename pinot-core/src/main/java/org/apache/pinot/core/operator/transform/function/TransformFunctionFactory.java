@@ -202,6 +202,8 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.IS_NULL, IsNullTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.IS_NOT_NULL,
         IsNotNullTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IS_DISTINCT_FROM, IsDistinctFromTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IS_NOT_DISTINCT_FROM, IsNotDistinctFromTransformFunction.class);
 
     // Trignometric functions
     typeToImplementation.put(TransformFunctionType.SIN, SinTransformFunction.class);
@@ -216,8 +218,6 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.TANH, TanhTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.DEGREES, DegreesTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.RADIANS, RadiansTransformFunction.class);
-
-    typeToImplementation.put(TransformFunctionType.IS_DISTINCT_FROM, IsDisinctFromTransformFunction.class);
 
     Map<String, Class<? extends TransformFunction>> registry = new HashMap<>(typeToImplementation.size());
     for (Map.Entry<TransformFunctionType, Class<? extends TransformFunction>> entry : typeToImplementation.entrySet()) {

@@ -63,6 +63,9 @@ public enum TransformFunctionType {
   IS_NULL("is_null"),
   IS_NOT_NULL("is_not_null"),
 
+  IS_DISTINCT_FROM("is_distinct_from"),
+  IS_NOT_DISTINCT_FROM("is_not_distinct_from"),
+
   AND("and"),
   OR("or"),
   NOT("not"),   // NOT operator doesn't cover the transform for NOT IN and NOT LIKE
@@ -145,8 +148,7 @@ public enum TransformFunctionType {
   COSH("cosh"),
   TANH("tanh"),
   DEGREES("degrees"),
-  RADIANS("radians"),
-  IS_DISTINCT_FROM("is_distinct_from");
+  RADIANS("radians");
 
   private static final Set<String> NAMES = Arrays.stream(values()).flatMap(
       func -> func.getAliases().stream().flatMap(name -> Stream.of(name, StringUtils.remove(name, '_').toUpperCase(),
