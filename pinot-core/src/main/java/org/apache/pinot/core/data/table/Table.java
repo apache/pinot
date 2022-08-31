@@ -55,11 +55,16 @@ public interface Table {
    */
   Iterator<Record> iterator();
 
+  default void finish(boolean sort) {
+    finish(sort, false);
+  }
+
   /**
    * Finish any pre exit processing
    * @param sort sort the final results if true
+   * @param storeFinalResult whether to store final aggregation result
    */
-  void finish(boolean sort);
+  void finish(boolean sort, boolean storeFinalResult);
 
   /**
    * Returns the data schema of the table

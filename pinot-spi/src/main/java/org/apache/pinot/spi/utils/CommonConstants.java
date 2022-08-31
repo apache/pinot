@@ -283,6 +283,7 @@ public class CommonConstants {
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
+        public static final String SERVER_RETURN_FINAL_RESULT = "serverReturnFinalResult";
 
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated

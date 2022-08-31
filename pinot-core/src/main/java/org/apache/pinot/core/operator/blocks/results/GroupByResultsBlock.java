@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.blocks.results;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Collection;
@@ -193,13 +194,10 @@ public class GroupByResultsBlock extends BaseResultsBlock {
         dataTableBuilder.setColumn(columnIndex, (BigDecimal) value);
         break;
       case STRING:
-        dataTableBuilder.setColumn(columnIndex, (String) value);
+        dataTableBuilder.setColumn(columnIndex, value.toString());
         break;
       case BYTES:
         dataTableBuilder.setColumn(columnIndex, (ByteArray) value);
-        break;
-      case OBJECT:
-        dataTableBuilder.setColumn(columnIndex, value);
         break;
       case INT_ARRAY:
         dataTableBuilder.setColumn(columnIndex, (int[]) value);
@@ -211,10 +209,17 @@ public class GroupByResultsBlock extends BaseResultsBlock {
         dataTableBuilder.setColumn(columnIndex, (float[]) value);
         break;
       case DOUBLE_ARRAY:
-        dataTableBuilder.setColumn(columnIndex, (double[]) value);
+        if (value instanceof DoubleArrayList) {
+          dataTableBuilder.setColumn(columnIndex, ((DoubleArrayList) value).elements());
+        } else {
+          dataTableBuilder.setColumn(columnIndex, (double[]) value);
+        }
         break;
       case STRING_ARRAY:
         dataTableBuilder.setColumn(columnIndex, (String[]) value);
+        break;
+      case OBJECT:
+        dataTableBuilder.setColumn(columnIndex, value);
         break;
       default:
         throw new IllegalStateException("Unsupported stored type: " + storedColumnDataType);
