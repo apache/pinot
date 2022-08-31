@@ -714,24 +714,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
 
     // simple cast
-    String sqlQuery = "SELECT DivLongestGTimes from myTable LIMIT 100";
+    String sqlQuery = "SELECT DivLongestGTimes, CAST(DivLongestGTimes as DOUBLE) from myTable LIMIT 100";
     JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
     JsonNode resultTable = response.get("resultTable");
     JsonNode dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"FLOAT_ARRAY\"]");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"FLOAT_ARRAY\",\"DOUBLE_ARRAY\"]");
     JsonNode rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 100);
 
-    String sqlQueryCast = "SELECT CAST(DivLongestGTimes as DOUBLE) FROM myTable LIMIT 100";
-    JsonNode responseCast = postQuery(sqlQueryCast, _brokerBaseApiUrl);
-    JsonNode resultTableCast = responseCast.get("resultTable");
-    JsonNode dataSchemaCast = resultTableCast.get("dataSchema");
-    assertEquals(dataSchemaCast.get("columnDataTypes").toString(), "[\"DOUBLE_ARRAY\"]");
-    JsonNode rowsCast = responseCast.get("resultTable").get("rows");
-    assertEquals(rowsCast.size(), 100);
     for (int i = 0; i < 100; i++) {
       JsonNode row = rows.get(i).get(0);
-      JsonNode rowCast = rowsCast.get(i).get(0);
+      JsonNode rowCast = rows.get(i).get(1);
       assertTrue(rowCast.isArray());
       assertTrue(row.isArray());
       assertEquals(row.size(), rowCast.size());
@@ -744,26 +737,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
 
     // nested cast
-    sqlQuery = "SELECT DivAirportIDs, DivTotalGTimes from myTable LIMIT 100";
+    sqlQuery = "SELECT DivAirportIDs, CAST(CAST(CAST(DivAirportIDs AS FLOAT) as INT) as STRING),"
+        + " DivTotalGTimes, CAST(CAST(DivTotalGTimes AS STRING) AS LONG) from myTable ORDER BY CARRIER LIMIT 100";
     response = postQuery(sqlQuery, _brokerBaseApiUrl);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT_ARRAY\",\"LONG_ARRAY\"]");
+    assertEquals(dataSchema.get("columnDataTypes").toString(),
+        "[\"INT_ARRAY\",\"STRING_ARRAY\",\"LONG_ARRAY\",\"LONG_ARRAY\"]");
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 100);
 
-    sqlQueryCast =
-        "SELECT CAST(CAST(CAST(DivAirportIDs AS FLOAT) as INT) as STRING), CAST(CAST(DivTotalGTimes AS STRING) AS "
-            + "LONG) FROM myTable LIMIT 100";
-    responseCast = postQuery(sqlQueryCast, _brokerBaseApiUrl);
-    resultTableCast = responseCast.get("resultTable");
-    dataSchemaCast = resultTableCast.get("dataSchema");
-    assertEquals(dataSchemaCast.get("columnDataTypes").toString(), "[\"STRING_ARRAY\",\"LONG_ARRAY\"]");
-    rowsCast = responseCast.get("resultTable").get("rows");
-    assertEquals(rowsCast.size(), 100);
     for (int i = 0; i < 100; i++) {
       JsonNode col1 = rows.get(i).get(0);
-      JsonNode col1Cast = rowsCast.get(i).get(0);
+      JsonNode col1Cast = rows.get(i).get(1);
       assertTrue(col1Cast.isArray());
       assertTrue(col1.isArray());
       assertEquals(col1.size(), col1Cast.size());
@@ -774,8 +760,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         assertEquals(resultCast, String.valueOf((int) ((float) original)));
       }
 
-      JsonNode col2 = rows.get(i).get(1);
-      JsonNode col2Cast = rowsCast.get(i).get(1);
+      JsonNode col2 = rows.get(i).get(2);
+      JsonNode col2Cast = rows.get(i).get(3);
       assertTrue(col2Cast.isArray());
       assertTrue(col2.isArray());
       assertEquals(col2.size(), col2Cast.size());
