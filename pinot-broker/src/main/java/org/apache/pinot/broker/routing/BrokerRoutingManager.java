@@ -75,7 +75,7 @@ import org.slf4j.LoggerFactory;
  * <ul>
  *   <li>{@link #buildRouting(String)}: Builds/rebuilds the routing for a table</li>
  *   <li>{@link #removeRouting(String)}: Removes the routing for a table</li>
- *   <li>{@link #refreshSegment(String, String): Refreshes the metadata for a segment}</li>
+ *   <li>{@link #refreshSegment(String, String)}: Refreshes the metadata for a segment</li>
  *   <li>{@link #routingExists(String)}: Returns whether the routing exists for a table</li>
  *   <li>{@link #getRoutingTable(BrokerRequest)}: Returns the routing table for a query</li>
  *   <li>{@link #getTimeBoundaryInfo(String)}: Returns the time boundary info for a table</li>
