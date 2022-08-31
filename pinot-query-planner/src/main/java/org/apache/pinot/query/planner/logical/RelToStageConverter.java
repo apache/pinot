@@ -150,6 +150,7 @@ public final class RelToStageConverter {
       case VARCHAR:
         return DataSchema.ColumnDataType.STRING;
       case BINARY:
+      case VARBINARY:
         return DataSchema.ColumnDataType.BYTES;
       default:
         throw new IllegalStateException("Unexpected RelDataTypeField: " + relDataTypeField.getType());
