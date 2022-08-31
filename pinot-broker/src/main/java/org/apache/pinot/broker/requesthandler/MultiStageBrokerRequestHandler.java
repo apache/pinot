@@ -133,13 +133,22 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
-    // Parse the request
-    sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions : RequestUtils.parseQuery(query, request);
-    // Compile the request
-    long compilationStartTimeNs = System.nanoTime();
+    long compilationStartTimeNs;
     QueryPlan queryPlan;
     try {
-      queryPlan = _queryEnvironment.planQuery(query, sqlNodeAndOptions);
+      // Parse the request
+      sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions : RequestUtils.parseQuery(query, request);
+      // Compile the request
+      compilationStartTimeNs = System.nanoTime();
+      switch (sqlNodeAndOptions.getSqlNode().getKind()) {
+        case EXPLAIN:
+          String plan = _queryEnvironment.explainQuery(query, sqlNodeAndOptions);
+          return constructMultistageExplainPlan(query, plan);
+        case SELECT:
+        default:
+          queryPlan = _queryEnvironment.planQuery(query, sqlNodeAndOptions);
+          break;
+      }
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
@@ -165,6 +174,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     brokerResponse.setResultTable(toResultTable(queryResults));
     requestContext.setQueryProcessingTime(totalTimeMs);
     augmentStatistics(requestContext, brokerResponse);
+    return brokerResponse;
+  }
+
+  private BrokerResponseNative constructMultistageExplainPlan(String sql, String plan) {
+    BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[]{sql, plan});
+    DataSchema multistageExplainResultSchema = new DataSchema(new String[]{"SQL", "PLAN"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
+    brokerResponse.setResultTable(new ResultTable(multistageExplainResultSchema, rows));
     return brokerResponse;
   }
 
