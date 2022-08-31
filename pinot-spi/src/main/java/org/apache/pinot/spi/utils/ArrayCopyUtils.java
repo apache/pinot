@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.utils;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 
 
 /**
@@ -91,6 +92,20 @@ public class ArrayCopyUtils {
   public static void copy(long[] src, String[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = Long.toString(src[i]);
+    }
+  }
+
+  // specialize copy from timestamp array to string array
+  public static void copyTimestamp(long[] src, String[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = new Timestamp(src[i]).toString();
+    }
+  }
+
+  // specialize copy from boolean array to string array
+  public static void copyBoolean(int[] src, String[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = Boolean.toString(src[i] == 1);
     }
   }
 
@@ -500,6 +515,22 @@ public class ArrayCopyUtils {
       int rowLength = src[i].length;
       dest[i] = new BigDecimal[rowLength];
       copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copyTimestamp(long[][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new String[rowLength];
+      copyTimestamp(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copyBoolean(int[][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new String[rowLength];
+      copyBoolean(src[i], dest[i], rowLength);
     }
   }
 }

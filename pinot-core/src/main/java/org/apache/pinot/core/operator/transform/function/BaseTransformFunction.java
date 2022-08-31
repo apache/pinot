@@ -335,15 +335,11 @@ public abstract class BaseTransformFunction implements TransformFunction {
           break;
         case BOOLEAN:
           intValues = transformToIntValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _stringValuesSV[i] = Boolean.toString(intValues[i] == 1);
-          }
+          ArrayCopyUtils.copyBoolean(intValues, _stringValuesSV, length);
           break;
         case TIMESTAMP:
           longValues = transformToLongValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _stringValuesSV[i] = new Timestamp(longValues[i]).toString();
-          }
+          ArrayCopyUtils.copyTimestamp(longValues, _stringValuesSV, length);
           break;
         case BYTES:
           byte[][] bytesValues = transformToBytesValuesSV(projectionBlock);
@@ -602,27 +598,11 @@ public abstract class BaseTransformFunction implements TransformFunction {
           break;
         case BOOLEAN:
           intValuesMV = transformToIntValuesMV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            int[] intValues = intValuesMV[i];
-            int numValues = intValues.length;
-            String[] stringValues = new String[numValues];
-            for (int j = 0; j < numValues; j++) {
-              stringValues[j] = Boolean.toString(intValues[i] == 1);
-            }
-            _stringValuesMV[i] = stringValues;
-          }
+          ArrayCopyUtils.copyBoolean(intValuesMV, _stringValuesMV, length);
           break;
         case TIMESTAMP:
           longValuesMV = transformToLongValuesMV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            long[] longValues = longValuesMV[i];
-            int numValues = longValues.length;
-            String[] stringValues = new String[numValues];
-            for (int j = 0; j < numValues; j++) {
-              stringValues[j] = new Timestamp(longValues[i]).toString();
-            }
-            _stringValuesMV[i] = stringValues;
-          }
+          ArrayCopyUtils.copyTimestamp(longValuesMV, _stringValuesMV, length);
           break;
         default:
           throw new IllegalStateException();

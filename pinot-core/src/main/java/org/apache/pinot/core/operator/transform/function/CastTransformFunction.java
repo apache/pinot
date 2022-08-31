@@ -122,7 +122,7 @@ public class CastTransformFunction extends BaseTransformFunction {
 
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    if(_resultMetadata.getDataType().getStoredType() == DataType.STRING) {
+    if (_resultMetadata.getDataType().getStoredType() == DataType.STRING) {
       return _transformFunction.transformToStringValuesMV(projectionBlock);
     } else {
       return super.transformToStringValuesMV(projectionBlock);
