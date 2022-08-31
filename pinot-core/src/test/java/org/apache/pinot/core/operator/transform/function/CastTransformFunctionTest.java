@@ -86,6 +86,7 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     FieldSpec.DataType resultDataType = transformFunction.getResultMetadata().getDataType();
     Assert.assertEquals(resultDataType, FieldSpec.DataType.INT);
 
+    // checks that arraySum triggers transformToDoubleMV in cast function which correctly cast to INT
     expression = RequestContextUtils.getExpression(String.format("arraySum(cAst(%s AS INT))", DOUBLE_MV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[][] afterCast = new int[NUM_ROWS][];

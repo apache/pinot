@@ -24,7 +24,9 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
@@ -55,18 +57,23 @@ public class CastQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "CastQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
+  private static final Random RANDOM = new Random();
 
   private static final int NUM_RECORDS = 1000;
   private static final int BUCKET_SIZE = 8;
+  private static final int NUM_ENTRY_MV = 2;
   private static final String CLASSIFICATION_COLUMN = "class";
   private static final String X_COL = "x";
   private static final String Y_COL = "y";
- // private static final String STRING_COL = RandomStringUtils.randomAlphanumeric(10, 100);
+  private static final String STRING_MV_COL = "stringMvCol";
+
+  private long[][] _expectedLongValues = new long[NUM_RECORDS][];
 
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
       .addSingleValueDimension(X_COL, FieldSpec.DataType.DOUBLE)
       .addSingleValueDimension(Y_COL, FieldSpec.DataType.DOUBLE)
       .addSingleValueDimension(CLASSIFICATION_COLUMN, FieldSpec.DataType.STRING)
+      .addMultiValueDimension(STRING_MV_COL, FieldSpec.DataType.STRING)
       .build();
 
   private static final TableConfig TABLE_CONFIG =
@@ -101,6 +108,14 @@ public class CastQueriesTest extends BaseQueriesTest {
       record.putValue(X_COL, 0.5);
       record.putValue(Y_COL, 0.25);
       record.putValue(CLASSIFICATION_COLUMN, "" + (i % BUCKET_SIZE));
+      String[] mvCol = new String[NUM_ENTRY_MV];
+      _expectedLongValues[i] = new long[NUM_ENTRY_MV];
+      for (int j = 0; j < mvCol.length; j++) {
+        long longVal = RANDOM.nextLong();
+        _expectedLongValues[i][j] = longVal;
+        mvCol[j] = String.valueOf(longVal);
+      }
+      record.putValue(STRING_MV_COL, mvCol);
       records.add(record);
     }
 
@@ -129,6 +144,18 @@ public class CastQueriesTest extends BaseQueriesTest {
     assertEquals(aggregationResult.size(), 2);
     assertEquals(((Number) aggregationResult.get(0)).intValue(), NUM_RECORDS / 2);
     assertEquals(((Number) aggregationResult.get(1)).intValue(), NUM_RECORDS / 4);
+  }
+
+  @Test
+  public void testCastMV() {
+    String query = String.format("select cast(%s as LONG) as col1 from %s limit 100", STRING_MV_COL, RAW_TABLE_NAME);
+    IntermediateResultsBlock block = ((SelectionOnlyOperator) getOperator(query)).nextBlock();
+    List<Object[]> results = (List<Object[]>) block.getSelectionResult();
+    for (int i = 0; i < 100; i++) {
+      Object[] row = results.get(i);
+      long[] cast = (long[]) row[0];
+      assertEquals(cast, _expectedLongValues[i]);
+    }
   }
 
   @Test
