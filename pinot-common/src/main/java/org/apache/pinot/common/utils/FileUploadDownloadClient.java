@@ -775,7 +775,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
           tableTypeToFilter, excludeReplacedSegments);
       RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
       HttpClient.setTimeout(requestBuilder, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
-      RetryPolicies.fixedDelayRetryPolicy(5, 10_000L).attempt(() -> {
+      RetryPolicies.exponentialBackoffRetryPolicy(5, 10_000L, 2.0).attempt(() -> {
         try {
           SimpleHttpResponse response =
               HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(requestBuilder.build()));
