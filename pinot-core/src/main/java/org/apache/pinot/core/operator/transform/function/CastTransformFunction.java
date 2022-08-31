@@ -19,14 +19,12 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
 
 public class CastTransformFunction extends BaseTransformFunction {
@@ -118,93 +116,16 @@ public class CastTransformFunction extends BaseTransformFunction {
     if (resultStoredType == DataType.DOUBLE) {
       return _transformFunction.transformToDoubleValuesMV(projectionBlock);
     } else {
-      int length = projectionBlock.getNumDocs();
-      if (_doubleValuesMV == null || _doubleValuesMV.length < length) {
-        _doubleValuesMV = new double[length][];
-      }
-      switch (resultStoredType) {
-        case INT:
-          int[][] intValues = _transformFunction.transformToIntValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(intValues, _doubleValuesMV, length);
-          break;
-        case LONG:
-          long[][] longValues = _transformFunction.transformToLongValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(longValues, _doubleValuesMV, length);
-          break;
-        case FLOAT:
-          float[][] floatValues = _transformFunction.transformToFloatValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(floatValues, _doubleValuesMV, length);
-          break;
-        case STRING:
-          String[][] stringValues = _transformFunction.transformToStringValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(stringValues, _doubleValuesMV, length);
-          break;
-        default:
-          throw new IllegalStateException();
-      }
+      return super.transformToDoubleValuesMV(projectionBlock);
     }
-    return _doubleValuesMV;
   }
 
   @Override
   public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    DataType resultDataType = _resultMetadata.getDataType();
-    DataType resultStoredType = resultDataType.getStoredType();
-    int length = projectionBlock.getNumDocs();
-    if (resultStoredType == DataType.STRING) {
-      // Specialize BOOLEAN and TIMESTAMP when casting to STRING
-      DataType inputDataType = _transformFunction.getResultMetadata().getDataType();
-      if (inputDataType.getStoredType() != inputDataType) {
-        if (_stringValuesMV == null || _stringValuesMV.length < length) {
-          _stringValuesMV = new String[length][];
-        }
-        if (inputDataType == DataType.BOOLEAN) {
-          int[][] intValues = _transformFunction.transformToIntValuesMV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            int rowLen = intValues[i].length;
-            for (int j = 0; j < rowLen; j++) {
-              _stringValuesMV[i][j] = Boolean.toString(intValues[i][j] == 1);
-            }
-          }
-        } else {
-          assert inputDataType == DataType.TIMESTAMP;
-          long[][] longValues = _transformFunction.transformToLongValuesMV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            int rowLen = longValues[i].length;
-            for (int j = 0; j < rowLen; j++) {
-              _stringValuesMV[i][j] = new Timestamp(longValues[i][j]).toString();
-            }
-          }
-        }
-        return _stringValuesMV;
-      } else {
-        return _transformFunction.transformToStringValuesMV(projectionBlock);
-      }
+    if(_resultMetadata.getDataType().getStoredType() == DataType.STRING) {
+      return _transformFunction.transformToStringValuesMV(projectionBlock);
     } else {
-      if (_stringValuesMV == null || _stringValuesMV.length < length) {
-        _stringValuesMV = new String[length][];
-      }
-      switch (resultDataType) {
-        case INT:
-          int[][] intValues = _transformFunction.transformToIntValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(intValues, _stringValuesMV, length);
-          break;
-        case LONG:
-          long[][] longValues = _transformFunction.transformToLongValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(longValues, _stringValuesMV, length);
-          break;
-        case FLOAT:
-          float[][] floatValues = _transformFunction.transformToFloatValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(floatValues, _stringValuesMV, length);
-          break;
-        case DOUBLE:
-          double[][] doubleValues = _transformFunction.transformToDoubleValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(doubleValues, _stringValuesMV, length);
-          break;
-        default:
-          throw new IllegalStateException();
-      }
-      return _stringValuesMV;
+      return super.transformToStringValuesMV(projectionBlock);
     }
   }
 
@@ -214,32 +135,8 @@ public class CastTransformFunction extends BaseTransformFunction {
     if (resultStoredType == DataType.INT) {
       return _transformFunction.transformToIntValuesMV(projectionBlock);
     } else {
-      int length = projectionBlock.getNumDocs();
-      if (_intValuesMV == null || _intValuesMV.length < length) {
-        _intValuesMV = new int[length][];
-      }
-      switch (resultStoredType) {
-        case DOUBLE:
-          double[][] doubleValues = _transformFunction.transformToDoubleValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(doubleValues, _intValuesMV, length);
-          break;
-        case LONG:
-          long[][] longValues = _transformFunction.transformToLongValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(longValues, _intValuesMV, length);
-          break;
-        case FLOAT:
-          float[][] floatValues = _transformFunction.transformToFloatValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(floatValues, _intValuesMV, length);
-          break;
-        case STRING:
-          String[][] stringValues = _transformFunction.transformToStringValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(stringValues, _intValuesMV, length);
-          break;
-        default:
-          throw new IllegalStateException();
-      }
+      return super.transformToIntValuesMV(projectionBlock);
     }
-    return _intValuesMV;
   }
 
   @Override
@@ -248,32 +145,8 @@ public class CastTransformFunction extends BaseTransformFunction {
     if (resultStoredType == DataType.FLOAT) {
       return _transformFunction.transformToFloatValuesMV(projectionBlock);
     } else {
-      int length = projectionBlock.getNumDocs();
-      if (_floatValuesMV == null || _floatValuesMV.length < length) {
-        _floatValuesMV = new float[length][];
-      }
-      switch (resultStoredType) {
-        case DOUBLE:
-          double[][] doubleValues = _transformFunction.transformToDoubleValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(doubleValues, _floatValuesMV, length);
-          break;
-        case LONG:
-          long[][] longValues = _transformFunction.transformToLongValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(longValues, _floatValuesMV, length);
-          break;
-        case INT:
-          int[][] intValues = _transformFunction.transformToIntValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(intValues, _floatValuesMV, length);
-          break;
-        case STRING:
-          String[][] stringValues = _transformFunction.transformToStringValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(stringValues, _floatValuesMV, length);
-          break;
-        default:
-          throw new IllegalStateException();
-      }
+      return super.transformToFloatValuesMV(projectionBlock);
     }
-    return _floatValuesMV;
   }
 
   @Override
@@ -282,32 +155,8 @@ public class CastTransformFunction extends BaseTransformFunction {
     if (resultStoredType == DataType.LONG) {
       return _transformFunction.transformToLongValuesMV(projectionBlock);
     } else {
-      int length = projectionBlock.getNumDocs();
-      if (_longValuesMV == null || _longValuesMV.length < length) {
-        _longValuesMV = new long[length][];
-      }
-      switch (resultStoredType) {
-        case DOUBLE:
-          double[][] doubleValues = _transformFunction.transformToDoubleValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(doubleValues, _longValuesMV, length);
-          break;
-        case FLOAT:
-          float[][] floatValues = _transformFunction.transformToFloatValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(floatValues, _longValuesMV, length);
-          break;
-        case INT:
-          int[][] intValues = _transformFunction.transformToIntValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(intValues, _longValuesMV, length);
-          break;
-        case STRING:
-          String[][] stringValues = _transformFunction.transformToStringValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(stringValues, _longValuesMV, length);
-          break;
-        default:
-          throw new IllegalStateException();
-      }
+      return super.transformToLongValuesMV(projectionBlock);
     }
-    return _longValuesMV;
   }
 
   @Override
