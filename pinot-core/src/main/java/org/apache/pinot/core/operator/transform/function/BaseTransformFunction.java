@@ -54,6 +54,14 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.JSON, true, false);
   protected static final TransformResultMetadata BYTES_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, true, false);
+  protected static final TransformResultMetadata LONG_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.LONG, false, false);
+  protected static final TransformResultMetadata DOUBLE_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.DOUBLE, false, false);
+  protected static final TransformResultMetadata INT_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.INT, false, false);
+  protected static final TransformResultMetadata FLOAT_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.FLOAT, false, false);
 
   protected int[] _intValuesSV;
   protected long[] _longValuesSV;
