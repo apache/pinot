@@ -203,7 +203,7 @@ public class InnerSegmentSelectionMultiValueRawQueriesTest extends BaseMultiValu
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
         DataSchema.ColumnDataType.INT_ARRAY);
-    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getRows();
+    PriorityQueue<Object[]> selectionResult = resultsBlock.getRowsAsPriorityQueue();
     assertEquals(selectionResult.size(), 10);
     Object[] lastRow = selectionResult.peek();
     assertEquals(lastRow.length, 4);
@@ -228,7 +228,7 @@ public class InnerSegmentSelectionMultiValueRawQueriesTest extends BaseMultiValu
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), DataSchema.ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")),
         DataSchema.ColumnDataType.INT_ARRAY);
-    selectionResult = (PriorityQueue<Object[]>) resultsBlock.getRows();
+    selectionResult = resultsBlock.getRowsAsPriorityQueue();
     assertEquals(selectionResult.size(), 10);
     lastRow = selectionResult.peek();
     assertEquals(lastRow.length, 4);

@@ -19,6 +19,9 @@
 package org.apache.pinot.core.operator.blocks.results;
 
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.PriorityQueue;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -31,10 +34,18 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 public class SelectionResultsBlock extends BaseResultsBlock {
   private final DataSchema _dataSchema;
   private final Collection<Object[]> _rows;
+  @Nullable
+  private final Comparator<? super Object[]> _comparator;
 
   public SelectionResultsBlock(DataSchema dataSchema, Collection<Object[]> rows) {
+    this(dataSchema, rows, rows instanceof PriorityQueue ? ((PriorityQueue<Object[]>) rows).comparator() : null);
+  }
+
+  public SelectionResultsBlock(DataSchema dataSchema, Collection<Object[]> rows,
+      @Nullable Comparator<? super Object[]> comparator) {
     _dataSchema = dataSchema;
     _rows = rows;
+    _comparator = comparator;
   }
 
   public DataSchema getDataSchema() {
@@ -43,6 +54,18 @@ public class SelectionResultsBlock extends BaseResultsBlock {
 
   public Collection<Object[]> getRows() {
     return _rows;
+  }
+
+  public PriorityQueue<Object[]> getRowsAsPriorityQueue() {
+    if (_rows instanceof PriorityQueue) {
+      return ((PriorityQueue<Object[]>) _rows);
+    }
+    if (_comparator == null) {
+      throw new IllegalStateException("This instance doesn't define an order on which be sorted");
+    }
+    PriorityQueue<Object[]> result = new PriorityQueue<>(_comparator);
+    result.addAll(_rows);
+    return result;
   }
 
   @Override

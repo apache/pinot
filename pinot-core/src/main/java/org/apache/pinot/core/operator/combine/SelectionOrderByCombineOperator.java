@@ -104,7 +104,7 @@ public class SelectionOrderByCombineOperator extends BaseCombineOperator<Selecti
       return;
     }
 
-    PriorityQueue<Object[]> mergedRows = (PriorityQueue<Object[]>) mergedBlock.getRows();
+    PriorityQueue<Object[]> mergedRows = mergedBlock.getRowsAsPriorityQueue();
     Collection<Object[]> rowsToMerge = blockToMerge.getRows();
     assert mergedRows != null && rowsToMerge != null;
     SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge, _numRowsToKeep);

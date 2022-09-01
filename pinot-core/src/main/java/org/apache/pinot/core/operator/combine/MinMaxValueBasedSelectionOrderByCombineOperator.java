@@ -204,7 +204,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
-      PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getRows();
+      PriorityQueue<Object[]> selectionResult = resultsBlock.getRowsAsPriorityQueue();
       if (selectionResult != null && selectionResult.size() == _numRowsToKeep) {
         // Segment result has enough rows, update the boundary value
         assert selectionResult.peek() != null;
@@ -272,7 +272,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       numBlocksMerged++;
 
       // Update the boundary value if enough rows are collected
-      PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) mergedBlock.getRows();
+      PriorityQueue<Object[]> selectionResult = mergedBlock.getRowsAsPriorityQueue();
       if (selectionResult != null && selectionResult.size() == _numRowsToKeep) {
         assert selectionResult.peek() != null;
         _globalBoundaryValue.set((Comparable) selectionResult.peek()[0]);
@@ -297,7 +297,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       return;
     }
 
-    PriorityQueue<Object[]> mergedRows = (PriorityQueue<Object[]>) mergedBlock.getRows();
+    PriorityQueue<Object[]> mergedRows = mergedBlock.getRowsAsPriorityQueue();
     Collection<Object[]> rowsToMerge = blockToMerge.getRows();
     assert mergedRows != null && rowsToMerge != null;
     SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge, _numRowsToKeep);

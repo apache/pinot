@@ -97,4 +97,8 @@ public class QueryOptionsUtils {
     }
     return nullHandlingEnabled;
   }
+
+  public static boolean isSkipOrderByOptimization(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.getOrDefault("skip-order-by", "false"));
+  }
 }
