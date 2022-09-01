@@ -335,11 +335,15 @@ public abstract class BaseTransformFunction implements TransformFunction {
           break;
         case BOOLEAN:
           intValues = transformToIntValuesSV(projectionBlock);
-          ArrayCopyUtils.copyBoolean(intValues, _stringValuesSV, length);
+          for (int i = 0; i < length; i++) {
+            _stringValuesSV[i] = Boolean.toString(intValues[i] == 1);
+          }
           break;
         case TIMESTAMP:
           longValues = transformToLongValuesSV(projectionBlock);
-          ArrayCopyUtils.copyTimestamp(longValues, _stringValuesSV, length);
+          for (int i = 0; i < length; i++) {
+            _stringValuesSV[i] = new Timestamp(longValues[i]).toString();
+          }
           break;
         case BYTES:
           byte[][] bytesValues = transformToBytesValuesSV(projectionBlock);
@@ -395,19 +399,43 @@ public abstract class BaseTransformFunction implements TransformFunction {
       switch (getResultMetadata().getDataType().getStoredType()) {
         case LONG:
           long[][] longValuesMV = transformToLongValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(longValuesMV, _intValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            long[] longValues = longValuesMV[i];
+            int numValues = longValues.length;
+            int[] intValues = new int[numValues];
+            ArrayCopyUtils.copy(longValues, intValues, numValues);
+            _intValuesMV[i] = intValues;
+          }
           break;
         case FLOAT:
           float[][] floatValuesMV = transformToFloatValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(floatValuesMV, _intValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            float[] floatValues = floatValuesMV[i];
+            int numValues = floatValues.length;
+            int[] intValues = new int[numValues];
+            ArrayCopyUtils.copy(floatValues, intValues, numValues);
+            _intValuesMV[i] = intValues;
+          }
           break;
         case DOUBLE:
           double[][] doubleValuesMV = transformToDoubleValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(doubleValuesMV, _intValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            double[] doubleValues = doubleValuesMV[i];
+            int numValues = doubleValues.length;
+            int[] intValues = new int[numValues];
+            ArrayCopyUtils.copy(doubleValues, intValues, numValues);
+            _intValuesMV[i] = intValues;
+          }
           break;
         case STRING:
           String[][] stringValuesMV = transformToStringValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(stringValuesMV, _intValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            String[] stringValues = stringValuesMV[i];
+            int numValues = stringValues.length;
+            int[] intValues = new int[numValues];
+            ArrayCopyUtils.copy(stringValues, intValues, numValues);
+            _intValuesMV[i] = intValues;
+          }
           break;
         default:
           throw new IllegalStateException();
@@ -436,19 +464,43 @@ public abstract class BaseTransformFunction implements TransformFunction {
       switch (getResultMetadata().getDataType().getStoredType()) {
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(intValuesMV, _longValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            int[] intValues = intValuesMV[i];
+            int numValues = intValues.length;
+            long[] longValues = new long[numValues];
+            ArrayCopyUtils.copy(intValues, longValues, numValues);
+            _longValuesMV[i] = longValues;
+          }
           break;
         case FLOAT:
           float[][] floatValuesMV = transformToFloatValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(floatValuesMV, _longValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            float[] floatValues = floatValuesMV[i];
+            int numValues = floatValues.length;
+            long[] longValues = new long[numValues];
+            ArrayCopyUtils.copy(floatValues, longValues, numValues);
+            _longValuesMV[i] = longValues;
+          }
           break;
         case DOUBLE:
           double[][] doubleValuesMV = transformToDoubleValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(doubleValuesMV, _longValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            double[] doubleValues = doubleValuesMV[i];
+            int numValues = doubleValues.length;
+            long[] longValues = new long[numValues];
+            ArrayCopyUtils.copy(doubleValues, longValues, numValues);
+            _longValuesMV[i] = longValues;
+          }
           break;
         case STRING:
           String[][] stringValuesMV = transformToStringValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(stringValuesMV, _longValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            String[] stringValues = stringValuesMV[i];
+            int numValues = stringValues.length;
+            long[] longValues = new long[numValues];
+            ArrayCopyUtils.copy(stringValues, longValues, numValues);
+            _longValuesMV[i] = longValues;
+          }
           break;
         default:
           throw new IllegalStateException();
@@ -477,19 +529,43 @@ public abstract class BaseTransformFunction implements TransformFunction {
       switch (getResultMetadata().getDataType().getStoredType()) {
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(intValuesMV, _floatValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            int[] intValues = intValuesMV[i];
+            int numValues = intValues.length;
+            float[] floatValues = new float[numValues];
+            ArrayCopyUtils.copy(intValues, floatValues, numValues);
+            _floatValuesMV[i] = floatValues;
+          }
           break;
         case LONG:
           long[][] longValuesMV = transformToLongValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(longValuesMV, _floatValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            long[] longValues = longValuesMV[i];
+            int numValues = longValues.length;
+            float[] floatValues = new float[numValues];
+            ArrayCopyUtils.copy(longValues, floatValues, numValues);
+            _floatValuesMV[i] = floatValues;
+          }
           break;
         case DOUBLE:
           double[][] doubleValuesMV = transformToDoubleValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(doubleValuesMV, _floatValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            double[] doubleValues = doubleValuesMV[i];
+            int numValues = doubleValues.length;
+            float[] floatValues = new float[numValues];
+            ArrayCopyUtils.copy(doubleValues, floatValues, numValues);
+            _floatValuesMV[i] = floatValues;
+          }
           break;
         case STRING:
           String[][] stringValuesMV = transformToStringValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(stringValuesMV, _floatValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            String[] stringValues = stringValuesMV[i];
+            int numValues = stringValues.length;
+            float[] floatValues = new float[numValues];
+            ArrayCopyUtils.copy(stringValues, floatValues, numValues);
+            _floatValuesMV[i] = floatValues;
+          }
           break;
         default:
           throw new IllegalStateException();
@@ -518,19 +594,43 @@ public abstract class BaseTransformFunction implements TransformFunction {
       switch (getResultMetadata().getDataType().getStoredType()) {
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(intValuesMV, _doubleValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            int[] intValues = intValuesMV[i];
+            int numValues = intValues.length;
+            double[] doubleValues = new double[numValues];
+            ArrayCopyUtils.copy(intValues, doubleValues, numValues);
+            _doubleValuesMV[i] = doubleValues;
+          }
           break;
         case LONG:
           long[][] longValuesMV = transformToLongValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(longValuesMV, _doubleValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            long[] longValues = longValuesMV[i];
+            int numValues = longValues.length;
+            double[] doubleValues = new double[numValues];
+            ArrayCopyUtils.copy(longValues, doubleValues, numValues);
+            _doubleValuesMV[i] = doubleValues;
+          }
           break;
         case FLOAT:
           float[][] floatValuesMV = transformToFloatValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(floatValuesMV, _doubleValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            float[] floatValues = floatValuesMV[i];
+            int numValues = floatValues.length;
+            double[] doubleValues = new double[numValues];
+            ArrayCopyUtils.copy(floatValues, doubleValues, numValues);
+            _doubleValuesMV[i] = doubleValues;
+          }
           break;
         case STRING:
           String[][] stringValuesMV = transformToStringValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(stringValuesMV, _doubleValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            String[] stringValues = stringValuesMV[i];
+            int numValues = stringValues.length;
+            double[] doubleValues = new double[numValues];
+            ArrayCopyUtils.copy(stringValues, doubleValues, numValues);
+            _doubleValuesMV[i] = doubleValues;
+          }
           break;
         default:
           throw new IllegalStateException();
@@ -582,27 +682,67 @@ public abstract class BaseTransformFunction implements TransformFunction {
       switch (dataType) {
         case INT:
           int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(intValuesMV, _stringValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            int[] intValues = intValuesMV[i];
+            int numValues = intValues.length;
+            String[] stringValues = new String[numValues];
+            ArrayCopyUtils.copy(intValues, stringValues, numValues);
+            _stringValuesMV[i] = stringValues;
+          }
           break;
         case LONG:
           long[][] longValuesMV = transformToLongValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(longValuesMV, _stringValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            long[] longValues = longValuesMV[i];
+            int numValues = longValues.length;
+            String[] stringValues = new String[numValues];
+            ArrayCopyUtils.copy(longValues, stringValues, numValues);
+            _stringValuesMV[i] = stringValues;
+          }
           break;
         case FLOAT:
           float[][] floatValuesMV = transformToFloatValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(floatValuesMV, _stringValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            float[] floatValues = floatValuesMV[i];
+            int numValues = floatValues.length;
+            String[] stringValues = new String[numValues];
+            ArrayCopyUtils.copy(floatValues, stringValues, numValues);
+            _stringValuesMV[i] = stringValues;
+          }
           break;
         case DOUBLE:
           double[][] doubleValuesMV = transformToDoubleValuesMV(projectionBlock);
-          ArrayCopyUtils.copy(doubleValuesMV, _stringValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            double[] doubleValues = doubleValuesMV[i];
+            int numValues = doubleValues.length;
+            String[] stringValues = new String[numValues];
+            ArrayCopyUtils.copy(doubleValues, stringValues, numValues);
+            _stringValuesMV[i] = stringValues;
+          }
           break;
         case BOOLEAN:
           intValuesMV = transformToIntValuesMV(projectionBlock);
-          ArrayCopyUtils.copyBoolean(intValuesMV, _stringValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            int[] intValues = intValuesMV[i];
+            int numValues = intValues.length;
+            String[] stringValues = new String[numValues];
+            for (int j = 0; j < numValues; j++) {
+              stringValues[j] = Boolean.toString(intValues[i] == 1);
+            }
+            _stringValuesMV[i] = stringValues;
+          }
           break;
         case TIMESTAMP:
           longValuesMV = transformToLongValuesMV(projectionBlock);
-          ArrayCopyUtils.copyTimestamp(longValuesMV, _stringValuesMV, length);
+          for (int i = 0; i < length; i++) {
+            long[] longValues = longValuesMV[i];
+            int numValues = longValues.length;
+            String[] stringValues = new String[numValues];
+            for (int j = 0; j < numValues; j++) {
+              stringValues[j] = new Timestamp(longValues[i]).toString();
+            }
+            _stringValuesMV[i] = stringValues;
+          }
           break;
         default:
           throw new IllegalStateException();
