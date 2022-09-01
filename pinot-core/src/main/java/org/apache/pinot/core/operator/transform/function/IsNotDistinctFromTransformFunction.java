@@ -28,7 +28,7 @@ package org.apache.pinot.core.operator.transform.function;
  * NUll IS_NOT_DISTINCT_FROM Null: 1
  * ValueA IS_NOT_DISTINCT_FROM ValueB: EQUALS(ValueA, ValueB)
  *
- * Not this operator only takes column names for now.
+ * Note this operator only takes column names for now.
  * SQL Syntax:
  *    columnA IS_NOT_DISTINCT_FROM columnB
  *

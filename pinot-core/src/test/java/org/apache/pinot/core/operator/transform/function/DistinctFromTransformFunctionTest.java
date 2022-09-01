@@ -50,11 +50,12 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 public class DistinctFromTransformFunctionTest {
   private static final String ENABLE_NULL_SEGMENT_NAME = "testSegment1";
   private static final String DISABLE_NULL_SEGMENT_NAME = "testSegment2";
-  private static final String IS_DISTINCT_FROM = "is_distinct_from";
-  private static final String IS_NOT_DISTINCT_FROM = "is_not_distinct_from";
+  private static final String IS_DISTINCT_FROM_EXPR = "%s IS DISTINCT FROM %s";
+  private static final String IS_NOT_DISTINCT_FROM_EXPR = "%s IS NOT DISTINCT FROM %s";
   private static final Random RANDOM = new Random();
 
   private static final int NUM_ROWS = 1000;
@@ -145,13 +146,17 @@ public class DistinctFromTransformFunctionTest {
   }
 
   protected void testTransformFunction(ExpressionContext expression, boolean[] expectedValues,
-      ProjectionBlock projectionBlock)
+      ProjectionBlock projectionBlock, Map<String, DataSource> dataSourceMap)
       throws Exception {
-    int[] intValues = getTransformFunctionInstance(expression).transformToIntValuesSV(projectionBlock);
-    long[] longValues = getTransformFunctionInstance(expression).transformToLongValuesSV(projectionBlock);
-    float[] floatValues = getTransformFunctionInstance(expression).transformToFloatValuesSV(projectionBlock);
-    double[] doubleValues = getTransformFunctionInstance(expression).transformToDoubleValuesSV(projectionBlock);
-    String[] stringValues = getTransformFunctionInstance(expression).transformToStringValuesSV(projectionBlock);
+    int[] intValues = getTransformFunctionInstance(expression, dataSourceMap).transformToIntValuesSV(projectionBlock);
+    long[] longValues =
+        getTransformFunctionInstance(expression, dataSourceMap).transformToLongValuesSV(projectionBlock);
+    float[] floatValues =
+        getTransformFunctionInstance(expression, dataSourceMap).transformToFloatValuesSV(projectionBlock);
+    double[] doubleValues =
+        getTransformFunctionInstance(expression, dataSourceMap).transformToDoubleValuesSV(projectionBlock);
+    String[] stringValues =
+        getTransformFunctionInstance(expression, dataSourceMap).transformToStringValuesSV(projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(intValues[i] == 1, expectedValues[i]);
       Assert.assertEquals(longValues[i] == 1, expectedValues[i]);
@@ -161,21 +166,22 @@ public class DistinctFromTransformFunctionTest {
     }
   }
 
-  private TransformFunction getTransformFunctionInstance(ExpressionContext expression) {
-    return TransformFunctionFactory.get(expression, _enableNullDataSourceMap);
+  private TransformFunction getTransformFunctionInstance(ExpressionContext expression,
+      Map<String, DataSource> dataSourceMap) {
+    return TransformFunctionFactory.get(expression, dataSourceMap);
   }
 
   // Test that left column of the operator has null values and right column is not null.
   @Test
   public void testDistinctFromLeftNull()
       throws Exception {
-    ExpressionContext isDistinctFromExpression = RequestContextUtils.getExpression(
-        String.format("%s(%s, %s)", IS_DISTINCT_FROM, INT_SV_NULL_COLUMN, INT_SV_COLUMN));
+    ExpressionContext isDistinctFromExpression =
+        RequestContextUtils.getExpression(String.format(IS_DISTINCT_FROM_EXPR, INT_SV_NULL_COLUMN, INT_SV_COLUMN));
     TransformFunction isDistinctFromTransformFunction =
         TransformFunctionFactory.get(isDistinctFromExpression, _enableNullDataSourceMap);
     Assert.assertEquals(isDistinctFromTransformFunction.getName(), "is_distinct_from");
-    ExpressionContext isNotDistinctFromExpression = RequestContextUtils.getExpression(
-        String.format("%s(%s, %s)", IS_NOT_DISTINCT_FROM, INT_SV_NULL_COLUMN, INT_SV_COLUMN));
+    ExpressionContext isNotDistinctFromExpression =
+        RequestContextUtils.getExpression(String.format(IS_NOT_DISTINCT_FROM_EXPR, INT_SV_NULL_COLUMN, INT_SV_COLUMN));
     TransformFunction isNotDistinctFromTransformFunction =
         TransformFunctionFactory.get(isNotDistinctFromExpression, _enableNullDataSourceMap);
     Assert.assertEquals(isNotDistinctFromTransformFunction.getName(), "is_not_distinct_from");
@@ -193,23 +199,27 @@ public class DistinctFromTransformFunctionTest {
         isNotDistinctFromExpectedIntValues[i] = false;
       }
     }
-    testTransformFunction(isDistinctFromExpression, isDistinctFromExpectedIntValues, _enableNullProjectionBlock);
-    testTransformFunction(isNotDistinctFromExpression, isNotDistinctFromExpectedIntValues, _enableNullProjectionBlock);
-    testTransformFunction(isDistinctFromExpression, isDistinctFromExpectedIntValues, _disableNullProjectionBlock);
-    testTransformFunction(isNotDistinctFromExpression, isNotDistinctFromExpectedIntValues, _disableNullProjectionBlock);
+    testTransformFunction(isDistinctFromExpression, isDistinctFromExpectedIntValues, _enableNullProjectionBlock,
+        _enableNullDataSourceMap);
+    testTransformFunction(isNotDistinctFromExpression, isNotDistinctFromExpectedIntValues, _enableNullProjectionBlock,
+        _enableNullDataSourceMap);
+    testTransformFunction(isDistinctFromExpression, isDistinctFromExpectedIntValues, _disableNullProjectionBlock,
+        _disableNullDataSourceMap);
+    testTransformFunction(isNotDistinctFromExpression, isNotDistinctFromExpectedIntValues, _disableNullProjectionBlock,
+        _disableNullDataSourceMap);
   }
 
   // Test that right column of the operator has null values and left column is not null.
   @Test
   public void testDistinctFromRightNull()
       throws Exception {
-    ExpressionContext isDistinctFromExpression = RequestContextUtils.getExpression(
-        String.format("%s(%s, %s)", IS_DISTINCT_FROM, INT_SV_COLUMN, INT_SV_NULL_COLUMN));
+    ExpressionContext isDistinctFromExpression =
+        RequestContextUtils.getExpression(String.format(IS_DISTINCT_FROM_EXPR, INT_SV_COLUMN, INT_SV_NULL_COLUMN));
     TransformFunction isDistinctFromTransformFunction =
         TransformFunctionFactory.get(isDistinctFromExpression, _enableNullDataSourceMap);
     Assert.assertEquals(isDistinctFromTransformFunction.getName(), "is_distinct_from");
-    ExpressionContext isNotDistinctFromExpression = RequestContextUtils.getExpression(
-        String.format("%s(%s, %s)", IS_NOT_DISTINCT_FROM, INT_SV_COLUMN, INT_SV_NULL_COLUMN));
+    ExpressionContext isNotDistinctFromExpression =
+        RequestContextUtils.getExpression(String.format(IS_NOT_DISTINCT_FROM_EXPR, INT_SV_COLUMN, INT_SV_NULL_COLUMN));
     TransformFunction isNotDistinctFromTransformFunction =
         TransformFunctionFactory.get(isNotDistinctFromExpression, _enableNullDataSourceMap);
     Assert.assertEquals(isNotDistinctFromTransformFunction.getName(), "is_not_distinct_from");
@@ -227,23 +237,27 @@ public class DistinctFromTransformFunctionTest {
         isNotDistinctFromExpectedIntValues[i] = false;
       }
     }
-    testTransformFunction(isDistinctFromExpression, isDistinctFromExpectedIntValues, _enableNullProjectionBlock);
-    testTransformFunction(isNotDistinctFromExpression, isNotDistinctFromExpectedIntValues, _enableNullProjectionBlock);
-    testTransformFunction(isDistinctFromExpression, isDistinctFromExpectedIntValues, _disableNullProjectionBlock);
-    testTransformFunction(isNotDistinctFromExpression, isNotDistinctFromExpectedIntValues, _disableNullProjectionBlock);
+    testTransformFunction(isDistinctFromExpression, isDistinctFromExpectedIntValues, _enableNullProjectionBlock,
+        _enableNullDataSourceMap);
+    testTransformFunction(isNotDistinctFromExpression, isNotDistinctFromExpectedIntValues, _enableNullProjectionBlock,
+        _enableNullDataSourceMap);
+    testTransformFunction(isDistinctFromExpression, isDistinctFromExpectedIntValues, _disableNullProjectionBlock,
+        _disableNullDataSourceMap);
+    testTransformFunction(isNotDistinctFromExpression, isNotDistinctFromExpectedIntValues, _disableNullProjectionBlock,
+        _disableNullDataSourceMap);
   }
 
   // Test the cases where both left and right columns of th operator has null values.
   @Test
   public void testDistinctFromBothNull()
       throws Exception {
-    ExpressionContext isDistinctFromExpression = RequestContextUtils.getExpression(
-        String.format("%s(%s, %s)", IS_DISTINCT_FROM, INT_SV_NULL_COLUMN, INT_SV_NULL_COLUMN));
+    ExpressionContext isDistinctFromExpression =
+        RequestContextUtils.getExpression(String.format(IS_DISTINCT_FROM_EXPR, INT_SV_NULL_COLUMN, INT_SV_NULL_COLUMN));
     TransformFunction isDistinctFromTransformFunction =
         TransformFunctionFactory.get(isDistinctFromExpression, _enableNullDataSourceMap);
     Assert.assertEquals(isDistinctFromTransformFunction.getName(), "is_distinct_from");
     ExpressionContext isNotDistinctFromExpression = RequestContextUtils.getExpression(
-        String.format("%s(%s, %s)", IS_NOT_DISTINCT_FROM, INT_SV_NULL_COLUMN, INT_SV_NULL_COLUMN));
+        String.format(IS_NOT_DISTINCT_FROM_EXPR, INT_SV_NULL_COLUMN, INT_SV_NULL_COLUMN));
     TransformFunction isNotDistinctFromTransformFunction =
         TransformFunctionFactory.get(isNotDistinctFromExpression, _enableNullDataSourceMap);
     Assert.assertEquals(isNotDistinctFromTransformFunction.getName(), "is_not_distinct_from");
@@ -253,20 +267,24 @@ public class DistinctFromTransformFunctionTest {
       isDistinctFromExpectedIntValues[i] = false;
       isNotDistinctFromExpectedIntValues[i] = true;
     }
-    testTransformFunction(isDistinctFromExpression, isDistinctFromExpectedIntValues, _enableNullProjectionBlock);
-    testTransformFunction(isNotDistinctFromExpression, isNotDistinctFromExpectedIntValues, _enableNullProjectionBlock);
-    testTransformFunction(isDistinctFromExpression, isDistinctFromExpectedIntValues, _disableNullProjectionBlock);
-    testTransformFunction(isNotDistinctFromExpression, isNotDistinctFromExpectedIntValues, _disableNullProjectionBlock);
+    testTransformFunction(isDistinctFromExpression, isDistinctFromExpectedIntValues, _enableNullProjectionBlock,
+        _enableNullDataSourceMap);
+    testTransformFunction(isNotDistinctFromExpression, isNotDistinctFromExpectedIntValues, _enableNullProjectionBlock,
+        _enableNullDataSourceMap);
+    testTransformFunction(isDistinctFromExpression, isDistinctFromExpectedIntValues, _disableNullProjectionBlock,
+        _disableNullDataSourceMap);
+    testTransformFunction(isNotDistinctFromExpression, isNotDistinctFromExpectedIntValues, _disableNullProjectionBlock,
+        _disableNullDataSourceMap);
   }
 
   // Test that non-column-names appear in one side of the operator.
   @Test
   public void testIllegalColumnName()
       throws Exception {
-    ExpressionContext isDistinctFromExpression = RequestContextUtils.getExpression(
-        String.format("%s(%d, %s)", IS_DISTINCT_FROM, _intSVValues[0], INT_SV_NULL_COLUMN));
+    ExpressionContext isDistinctFromExpression =
+        RequestContextUtils.getExpression(String.format(IS_DISTINCT_FROM_EXPR, _intSVValues[0], INT_SV_NULL_COLUMN));
     ExpressionContext isNotDistinctFromExpression = RequestContextUtils.getExpression(
-        String.format("%s(%d, %s)", IS_NOT_DISTINCT_FROM, _intSVValues[0], INT_SV_NULL_COLUMN));
+        String.format(IS_NOT_DISTINCT_FROM_EXPR, _intSVValues[0], INT_SV_NULL_COLUMN));
 
     Assert.assertThrows(RuntimeException.class, () -> {
       TransformFunctionFactory.get(isDistinctFromExpression, _enableNullDataSourceMap);
@@ -281,9 +299,9 @@ public class DistinctFromTransformFunctionTest {
   public void testIllegalNumArgs()
       throws Exception {
     ExpressionContext isDistinctFromExpression = RequestContextUtils.getExpression(
-        String.format("%s(%s, %s, %s)", IS_DISTINCT_FROM, INT_SV_COLUMN, INT_SV_NULL_COLUMN, INT_SV_COLUMN));
+        String.format("is_distinct_from(%s, %s, %s)", INT_SV_COLUMN, INT_SV_NULL_COLUMN, INT_SV_COLUMN));
     ExpressionContext isNotDistinctFromExpression = RequestContextUtils.getExpression(
-        String.format("%s(%s, %s, %s)", IS_NOT_DISTINCT_FROM, INT_SV_COLUMN, INT_SV_NULL_COLUMN, INT_SV_COLUMN));
+        String.format("is_not_distinct_from(%s, %s, %s)", INT_SV_COLUMN, INT_SV_NULL_COLUMN, INT_SV_COLUMN));
 
     Assert.assertThrows(RuntimeException.class, () -> {
       TransformFunctionFactory.get(isDistinctFromExpression, _enableNullDataSourceMap);

@@ -39,10 +39,52 @@ import org.roaringbitmap.PeekableIntIterator;
  * This function only supports two arguments which are both column names.
  */
 public class DistinctFromTransformFunction extends BinaryOperatorTransformFunction {
+  private int[] _results;
+  // null iterator for left argument.
+  private PeekableIntIterator _leftNullValueVectorIterator;
+  // null iterator for right argument.
+  private PeekableIntIterator _rightNullValueVectorIterator;
+  // If _getDistinct is 1, act IsDistinctFrom transformation, otherwise act as IsNotDistinctFrom.
+  private int _getDistinct;
+
   // getDistinct is set to true for IsDistinctFrom, otherwise it is for IsNotDistinctFrom.
   protected DistinctFromTransformFunction(boolean getDistinct) {
     super(getDistinct ? TransformFunctionType.NOT_EQUALS : TransformFunctionType.EQUALS);
     _getDistinct = getDistinct ? 1 : 0;
+  }
+
+  // Returns a bit vector of document length where each bit represents whether the row is null or not.
+  // Set the value as not null by default if null option is disabled.
+  static private BitSet getNullBits(@Nullable PeekableIntIterator nullValueVectorIterator, int length, int[] docIds) {
+    BitSet nullBits = new BitSet(length);
+    if (nullValueVectorIterator == null) {
+      return nullBits;
+    }
+    int currentDocIdIndex = 0;
+    while (nullValueVectorIterator.hasNext() & currentDocIdIndex < length) {
+      nullValueVectorIterator.advanceIfNeeded(docIds[currentDocIdIndex]);
+      currentDocIdIndex = Arrays.binarySearch(docIds, currentDocIdIndex, length, nullValueVectorIterator.next());
+      if (currentDocIdIndex >= 0) {
+        nullBits.set(currentDocIdIndex);
+        currentDocIdIndex++;
+      } else {
+        currentDocIdIndex = -currentDocIdIndex - 1;
+      }
+    }
+    return nullBits;
+  }
+
+  // Returns null iterator based on nullValueVectorIterator.
+  // If null value is not enabled, which means nullValueVectorIterator can be null, this function will return a null.
+  @Nullable
+  static private PeekableIntIterator getNullValueIterator(Map<String, DataSource> dataSourceMap,
+      TransformFunction transformFunction, PeekableIntIterator nullValueVectorIterator) {
+    String columnName = ((IdentifierTransformFunction) transformFunction).getColumnName();
+    NullValueVectorReader nullValueVectorReader = dataSourceMap.get(columnName).getNullValueVector();
+    if (nullValueVectorIterator != null) {
+      return nullValueVectorReader.getNullBitmap().getIntIterator();
+    }
+    return null;
   }
 
   @Override
@@ -95,39 +137,4 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
     }
     return _results;
   }
-
-  // Returns a bit vector of document length where each bit represents whether the row is null or not.
-  // Set the value as not null by default if null option is disabled.
-  private BitSet getNullBits(@Nullable PeekableIntIterator nullValueVectorIterator, int length, int[] docIds) {
-    BitSet nullBits = new BitSet(length);
-    if (nullValueVectorIterator == null) {
-      return nullBits;
-    }
-    int currentDocIdIndex = 0;
-    while (nullValueVectorIterator.hasNext() & currentDocIdIndex < length) {
-      nullValueVectorIterator.advanceIfNeeded(docIds[currentDocIdIndex]);
-      currentDocIdIndex = Arrays.binarySearch(docIds, currentDocIdIndex, length, nullValueVectorIterator.next());
-      if (currentDocIdIndex >= 0) {
-        nullBits.set(currentDocIdIndex);
-        currentDocIdIndex++;
-      } else {
-        currentDocIdIndex = -currentDocIdIndex - 1;
-      }
-    }
-    return nullBits;
-  }
-
-  static private PeekableIntIterator getNullValueIterator(Map<String, DataSource> dataSourceMap,
-      TransformFunction transformFunction, PeekableIntIterator nullValueVectorIterator) {
-    String columnName = ((IdentifierTransformFunction) transformFunction).getColumnName();
-    NullValueVectorReader nullValueVectorReader = dataSourceMap.get(columnName).getNullValueVector();
-    if (nullValueVectorIterator != null) {
-      return nullValueVectorReader.getNullBitmap().getIntIterator();
-    }
-    return null;
-  }
-  private int[] _results;
-  private PeekableIntIterator _leftNullValueVectorIterator;
-  private PeekableIntIterator _rightNullValueVectorIterator;
-  private int _getDistinct;
 }
