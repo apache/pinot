@@ -85,12 +85,13 @@ public enum TransformFunctionType {
   MINUTE("minute"),
   SECOND("second"),
   MILLISECOND("millisecond"),
-  ARRAYLENGTH("arrayLength"),
+  // The only column accepted by "cardinality" function is multi-value array, thus  putting "cardinality" as alias.
+  // TODO: once we support other types of multiset, we should make CARDINALITY its own function
+  ARRAYLENGTH("arrayLength", "cardinality"),
   ARRAYAVERAGE("arrayAverage"),
   ARRAYMIN("arrayMin"),
   ARRAYMAX("arrayMax"),
   ARRAYSUM("arraySum"),
-  ARRAYCARDINALITY("arrayCardinality", "cardinality"),
   VALUEIN("valueIn"),
   MAPVALUE("mapValue"),
   INIDSET("inIdSet"),

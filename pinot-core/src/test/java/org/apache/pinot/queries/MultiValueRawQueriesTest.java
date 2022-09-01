@@ -614,12 +614,12 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
     {
       // Test a select with a ARRAYLENGTH transform function
       String query = "SELECT ARRAYLENGTH(mvRawLongCol), ARRAYLENGTH(mvLongCol), CARDINALITY(mvRawLongCol), "
-          + "ARRAYCARDINALITY(mvLongCol) from testTable GROUP BY ARRAYLENGTH(mvRawLongCol), ARRAYLENGTH(mvLongCol), "
-          + "CARDINALITY(mvRawLongCol), ARRAYCARDINALITY(mvLongCol) LIMIT 10";
+          + "CARDINALITY(mvLongCol) from testTable GROUP BY ARRAYLENGTH(mvRawLongCol), ARRAYLENGTH(mvLongCol), "
+          + "CARDINALITY(mvRawLongCol), CARDINALITY(mvLongCol) LIMIT 10";
       ResultTable resultTable = getBrokerResponse(query).getResultTable();
       assertNotNull(resultTable);
       DataSchema dataSchema = new DataSchema(new String[]{"arraylength(mvRawLongCol)", "arraylength(mvLongCol)",
-          "cardinality(mvRawLongCol)", "arraycardinality(mvLongCol)"},
+          "cardinality(mvRawLongCol)", "cardinality(mvLongCol)"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
               DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
       assertEquals(resultTable.getDataSchema(), dataSchema);
@@ -945,7 +945,7 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
     {
       // Test a select with filter query on an arraylength transform function
       String query = "SELECT mvRawIntCol, mvRawDoubleCol, mvRawStringCol FROM testTable WHERE "
-          + "ARRAYLENGTH(mvRawIntCol) < 5 AND ARRAYCARDINALITY(mvRawIntCol) < 5 AND CARDINALITY(mvRawIntCol) < 5 "
+          + "ARRAYLENGTH(mvRawIntCol) < 5 AND CARDINALITY(mvRawIntCol) < 5 AND CARDINALITY(mvRawIntCol) < 5 "
           + "LIMIT 10";
       ResultTable resultTable = getBrokerResponse(query).getResultTable();
       assertNotNull(resultTable);
