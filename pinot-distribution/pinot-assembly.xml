@@ -48,14 +48,6 @@
     <!-- Start Include Pinot Stream Ingestion Plugins-->
     <file>
       <source>
-        ${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kafka-0.9/target/pinot-kafka-0.9-${project.version}-shaded.jar
-      </source>
-      <destName>
-        plugins/pinot-stream-ingestion/pinot-kafka-0.9/pinot-kafka-0.9-${project.version}-shaded.jar
-      </destName>
-    </file>
-    <file>
-      <source>
         ${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kafka-${kafka.version}/target/pinot-kafka-${kafka.version}-${project.version}-shaded.jar
       </source>
       <destName>
@@ -67,11 +59,6 @@
         ${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kinesis/target/pinot-kinesis-${project.version}-shaded.jar
       </source>
       <destName>plugins/pinot-stream-ingestion/pinot-kinesis/pinot-kinesis-${project.version}-shaded.jar</destName>
-    </file>
-
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-pulsar/target/pinot-pulsar-${project.version}-shaded.jar</source>
-      <destName>plugins/pinot-stream-ingestion/pinot-pulsar/pinot-pulsar-${project.version}-shaded.jar</destName>
     </file>
 
     <!-- End Include Pinot Stream Ingestion Plugins-->
@@ -90,14 +77,6 @@
       </source>
       <destName>
         plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-hadoop/pinot-batch-ingestion-hadoop-${project.version}-shaded.jar
-      </destName>
-    </file>
-    <file>
-      <source>
-        ${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark-2.4/target/pinot-batch-ingestion-spark-2.4-${project.version}-shaded.jar
-      </source>
-      <destName>
-        plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-2.4/pinot-batch-ingestion-spark-2.4-${project.version}-shaded.jar
       </destName>
     </file>
     <file>
