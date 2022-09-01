@@ -38,7 +38,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
  *    EQUALS(columnA, 'fooBar')
  *
  */
-public class EqualsTransformFunction extends BinaryOperatorTransformFunction {
+public class EqualsTransformFunction extends SingleValueBinaryOperatorTransformFunction {
 
   public EqualsTransformFunction() {
     super(TransformFunctionType.EQUALS);

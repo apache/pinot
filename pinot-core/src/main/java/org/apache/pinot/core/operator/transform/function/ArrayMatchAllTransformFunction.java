@@ -22,25 +22,25 @@ import org.apache.pinot.common.function.TransformFunctionType;
 
 
 /**
- * The <code>GreaterThanOrEqualTransformFunction</code> extends <code>BinaryOperatorTransformFunction</code> to
- * implement the binary operator(<=).
- *
- * The results are in boolean format and stored as an integer array with 1 represents true and 0 represents false.
- *
- * SQL Syntax:
- *    columnA <= 12
- *    columnA <= 12.0
- *    columnA <= 'fooBar'
- *
- * Sample Usage:
- *    LESS_THAN_OR_EQUAL(columnA, 12)
- *    LESS_THAN_OR_EQUAL(columnA, 12.0)
- *    LESS_THAN_OR_EQUAL(columnA, 'fooBar')
  *
  */
-public class LessThanOrEqualTransformFunction extends SingleValueBinaryOperatorTransformFunction {
+public class ArrayMatchAllTransformFunction extends ArrayBinaryOperatorTransformFunction {
 
-  public LessThanOrEqualTransformFunction() {
-    super(TransformFunctionType.LESS_THAN_OR_EQUAL);
+  protected ArrayMatchAllTransformFunction() {
+    super(TransformFunctionType.ARRAYMATCHALL);
+  }
+
+  // Utility functions override
+
+  protected int initResult() {
+    return 1;
+  }
+
+  protected int mergeIntResult(int prev, int curr) {
+    return prev != 0 && curr != 0 ? 1 : 0;
+  }
+
+  protected boolean isEarlyTerminate(int result) {
+    return result == 0;
   }
 }

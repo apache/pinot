@@ -38,7 +38,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
  *    GREATER_THAN_OR_EQUAL(columnA, 'fooBar')
  *
  */
-public class GreaterThanOrEqualTransformFunction extends BinaryOperatorTransformFunction {
+public class GreaterThanOrEqualTransformFunction extends SingleValueBinaryOperatorTransformFunction {
 
   public GreaterThanOrEqualTransformFunction() {
     super(TransformFunctionType.GREATER_THAN_OR_EQUAL);

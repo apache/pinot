@@ -135,6 +135,11 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.REGEXP_EXTRACT,
         RegexpExtractTransformFunction.class);
 
+    // Array binary functions
+    typeToImplementation.put(TransformFunctionType.ARRAYMATCHALL, ArrayMatchAllTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAYMATCHANY, ArrayMatchAnyTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAYMATCHNONE, ArrayMatchNoneTransformFunction.class);
+
     // Array functions
     typeToImplementation.put(TransformFunctionType.ARRAYAVERAGE,
         ArrayAverageTransformFunction.class);

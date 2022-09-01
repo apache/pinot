@@ -38,7 +38,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
  *    LESS_THAN(columnA, 'fooBar')
  *
  */
-public class LessThanTransformFunction extends BinaryOperatorTransformFunction {
+public class LessThanTransformFunction extends SingleValueBinaryOperatorTransformFunction {
 
   public LessThanTransformFunction() {
     super(TransformFunctionType.LESS_THAN);

@@ -38,7 +38,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
  *    NOT_EQUALS(columnA, 'fooBar')
  *
  */
-public class NotEqualsTransformFunction extends BinaryOperatorTransformFunction {
+public class NotEqualsTransformFunction extends SingleValueBinaryOperatorTransformFunction {
 
   public NotEqualsTransformFunction() {
     super(TransformFunctionType.NOT_EQUALS);
