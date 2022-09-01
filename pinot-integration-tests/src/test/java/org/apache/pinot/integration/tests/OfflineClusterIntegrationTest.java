@@ -89,6 +89,7 @@ import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.E
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
 import static org.testng.Assert.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -964,6 +965,43 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "aGVsbG8h");
     assertEquals(response.get("resultTable").get("rows").get(0).get(10).asText(),
         "hello!");
+  }
+
+  @Test
+  public void testBooleanLiteralsFunc()
+      throws Exception {
+    // Test boolean equal true case.
+    String sqlQuery =
+        "SELECT (true = true) = true FROM mytable";
+    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertTrue(rows.get(0).get(0).asBoolean());
+    // Test boolean equal false case.
+    sqlQuery =
+        "SELECT (true = true) = false FROM mytable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertFalse(rows.get(0).get(0).asBoolean());
+    // Test boolean not equal true case.
+    sqlQuery =
+        "SELECT true != false FROM mytable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertTrue(rows.get(0).get(0).asBoolean());
+    // Test boolean not equal false case.
+    sqlQuery =
+        "SELECT true != true FROM mytable";
+    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(rows.size(), 1);
+    assertFalse(rows.get(0).get(0).asBoolean());
   }
 
   @Test(dependsOnMethods = "testBloomFilterTriggering")

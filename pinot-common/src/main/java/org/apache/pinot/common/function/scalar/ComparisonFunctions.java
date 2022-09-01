@@ -20,6 +20,13 @@ package org.apache.pinot.common.function.scalar;
 
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
+
+/*
+ * All functions are registered with a) function name and function param types b) function names and number of function
+ * params.
+ * To enable function param type matching, primitive type function argument has to be wrapped as Object class because
+ * literal is always an Object type.
+ */
 public class ComparisonFunctions {
 
   private static final double DOUBLE_COMPARISON_TOLERANCE = 1e-7d;
@@ -48,14 +55,24 @@ public class ComparisonFunctions {
   }
 
   @ScalarFunction
-  public static boolean notEquals(double a, double b) {
+  public static boolean notEquals(Double a, Double b) {
     return Math.abs(a - b) >= DOUBLE_COMPARISON_TOLERANCE;
   }
 
   @ScalarFunction
-  public static boolean equals(double a, double b) {
+  public static boolean notEquals(Boolean a, Boolean b) {
+    return !a.equals(b);
+  }
+
+  @ScalarFunction
+  public static boolean equals(Double a, Double b) {
     // To avoid approximation errors
     return Math.abs(a - b) < DOUBLE_COMPARISON_TOLERANCE;
+  }
+
+  @ScalarFunction
+  public static boolean equals(Boolean a, Boolean b) {
+    return a.equals(b);
   }
 
   @ScalarFunction

@@ -66,7 +66,7 @@ public class RequestContextUtils {
   public static ExpressionContext getExpression(Expression thriftExpression) {
     switch (thriftExpression.getType()) {
       case LITERAL:
-        return ExpressionContext.forLiteral(thriftExpression.getLiteral().getFieldValue().toString());
+        return ExpressionContext.forLiteral(thriftExpression.getLiteral().getFieldValue());
       case IDENTIFIER:
         return ExpressionContext.forIdentifier(thriftExpression.getIdentifier().getName());
       case FUNCTION:

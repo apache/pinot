@@ -446,7 +446,7 @@ public class TableResizer {
         _argumentExtractors[i] = argumentExtractor;
         argumentTypes[i] = argumentExtractor.getValueType();
       }
-      _postAggregationFunction = new PostAggregationFunction(function.getFunctionName(), argumentTypes);
+      _postAggregationFunction = new PostAggregationFunction(function, argumentTypes);
     }
 
     @Override

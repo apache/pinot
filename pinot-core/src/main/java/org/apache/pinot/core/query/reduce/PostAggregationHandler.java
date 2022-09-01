@@ -161,7 +161,7 @@ public class PostAggregationHandler implements ValueExtractorFactory {
         _argumentExtractors[i] = argumentExtractor;
         argumentTypes[i] = argumentExtractor.getColumnDataType();
       }
-      _postAggregationFunction = new PostAggregationFunction(function.getFunctionName(), argumentTypes);
+      _postAggregationFunction = new PostAggregationFunction(function, argumentTypes);
     }
 
     @Override

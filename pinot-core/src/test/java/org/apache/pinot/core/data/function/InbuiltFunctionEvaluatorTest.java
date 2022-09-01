@@ -96,6 +96,24 @@ public class InbuiltFunctionEvaluatorTest {
   }
 
   @Test
+  public void testEqualsFunctionWithBooleanLiteral() {
+    String expression = "(true = true) = true";
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
+    assertTrue(evaluator.getArguments().isEmpty());
+    GenericRow row = new GenericRow();
+    assertEquals(evaluator.evaluate(row), true);
+  }
+
+  @Test
+  public void testNotEqualsFunctionWithBooleanLiteral() {
+    String expression = "(true != true) = true";
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
+    assertTrue(evaluator.getArguments().isEmpty());
+    GenericRow row = new GenericRow();
+    assertEquals(evaluator.evaluate(row), false);
+  }
+
+  @Test
   public void testNestedFunction() {
     String expression = "reverse(reverse(testColumn))";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);

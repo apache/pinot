@@ -116,7 +116,7 @@ public class StringPredicateFilterOptimizer implements StatementOptimizer {
       // Check if the function returns STRING as output.
       Function function = expression.getFunctionCall();
       FunctionInfo functionInfo =
-          FunctionRegistry.getFunctionInfo(function.getOperator(), function.getOperands().size());
+          FunctionRegistry.getFunctionInfo(function);
       return functionInfo != null && functionInfo.getMethod().getReturnType() == String.class;
     }
 

@@ -35,10 +35,13 @@ public class ExpressionContext {
   }
 
   private final Type _type;
-  private final String _value;
+
+  // TODO: Get rid of the wrapper for primitive types since it is expensive.
+  private final Object _value;
+
   private final FunctionContext _function;
 
-  public static ExpressionContext forLiteral(String literal) {
+  public static ExpressionContext forLiteral(Object literal) {
     return new ExpressionContext(Type.LITERAL, literal, null);
   }
 
@@ -50,7 +53,7 @@ public class ExpressionContext {
     return new ExpressionContext(Type.FUNCTION, null, function);
   }
 
-  private ExpressionContext(Type type, String value, FunctionContext function) {
+  private ExpressionContext(Type type, Object value, FunctionContext function) {
     _type = type;
     _value = value;
     _function = function;
@@ -60,12 +63,20 @@ public class ExpressionContext {
     return _type;
   }
 
+  public String getLiteralTypeName(){
+    if(_value == null){
+      return "null";
+    }
+    return _value.getClass().getTypeName();
+  }
+
+  // TODO: change the return type to raw type to save deserialize/serialize cost.
   public String getLiteral() {
-    return _value;
+    return _value.toString();
   }
 
   public String getIdentifier() {
-    return _value;
+    return _value.toString();
   }
 
   public FunctionContext getFunction() {
@@ -78,7 +89,7 @@ public class ExpressionContext {
   public void getColumns(Set<String> columns) {
     if (_type == Type.IDENTIFIER) {
       if (!_value.equals("*")) {
-        columns.add(_value);
+        columns.add(_value.toString());
       }
     } else if (_type == Type.FUNCTION) {
       _function.getColumns(columns);
@@ -110,9 +121,9 @@ public class ExpressionContext {
   public String toString() {
     switch (_type) {
       case LITERAL:
-        return '\'' + _value + '\'';
+        return '\'' + _value.toString() + '\'';
       case IDENTIFIER:
-        return _value;
+        return _value.toString();
       case FUNCTION:
         return _function.toString();
       default:

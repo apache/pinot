@@ -22,10 +22,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class FunctionDefinitionRegistryTest {
@@ -60,16 +57,34 @@ public class FunctionDefinitionRegistryTest {
   }
 
   @ScalarFunction(names = {"testFunc1", "testFunc2"})
-  public static String testScalarFunction(long randomArg1, String randomArg2) {
+  public static String testScalarFunction(Long randomArg1, String randomArg2) {
+    return null;
+  }
+
+  @ScalarFunction(names = {"testFunc2"})
+  public static String testScalarFunction2(Long randomArg1, Long randomArg2) {
     return null;
   }
 
   @Test
   public void testScalarFunctionNames() {
-    assertNotNull(FunctionRegistry.getFunctionInfo("testFunc1", 2));
-    assertNotNull(FunctionRegistry.getFunctionInfo("testFunc2", 2));
-    assertNull(FunctionRegistry.getFunctionInfo("testScalarFunction", 2));
-    assertNull(FunctionRegistry.getFunctionInfo("testFunc1", 1));
-    assertNull(FunctionRegistry.getFunctionInfo("testFunc2", 1));
+    assertNotNull(FunctionRegistry.getFunctionInfo("testFunc1", 2, ""));
+    assertNotNull(FunctionRegistry.getFunctionInfo("testFunc2", 2, ""));
+    assertNull(FunctionRegistry.getFunctionInfo("testScalarFunction", 2, ""));
+    assertNull(FunctionRegistry.getFunctionInfo("testFunc1", 1, ""));
+    assertNull(FunctionRegistry.getFunctionInfo("testFunc2", 1, ""));
+    FunctionInfo func2LongString =
+        FunctionRegistry.getFunctionInfo("testFunc2", 2, "java.lang.Long,java.lang.String");
+    assertNotNull(func2LongString);
+    Class[] paramTypes = func2LongString.getMethod().getParameterTypes();
+    assertEquals(paramTypes.length, 2);
+    assertEquals(paramTypes[0].getTypeName(), "java.lang.Long");
+    assertEquals(paramTypes[1].getTypeName(), "java.lang.String");
+    FunctionInfo func2LongLong = FunctionRegistry.getFunctionInfo("testFunc2", 2, "java.lang.Long,java.lang.Long");
+    assertNotNull(func2LongLong);
+    Class[] paramTypes2 = func2LongLong.getMethod().getParameterTypes();
+    assertEquals(paramTypes2.length, 2);
+    assertEquals(paramTypes2[0].getTypeName(), "java.lang.Long");
+    assertEquals(paramTypes2[1].getTypeName(), "java.lang.Long");
   }
 }

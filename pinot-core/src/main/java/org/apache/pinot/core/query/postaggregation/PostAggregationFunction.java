@@ -23,6 +23,7 @@ import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.FunctionUtils;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.PinotDataType;
 
@@ -35,16 +36,17 @@ public class PostAggregationFunction {
   private final PinotDataType[] _argumentTypes;
   private final ColumnDataType _resultType;
 
-  public PostAggregationFunction(String functionName, ColumnDataType[] argumentTypes) {
+  public PostAggregationFunction(FunctionContext function, ColumnDataType[] argumentTypes) {
+    String functionName = function.getFunctionName();
     int numArguments = argumentTypes.length;
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(function);
     if (functionInfo == null) {
       if (FunctionRegistry.containsFunction(functionName)) {
         throw new IllegalArgumentException(
-          String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
+            String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
       } else {
-        throw new IllegalArgumentException(
-          String.format("Unsupported function: %s not found", functionName));
+        throw new IllegalArgumentException(String.format("Unsupported function: %s not found", functionName));
       }
     }
     _functionInvoker = new FunctionInvoker(functionInfo);

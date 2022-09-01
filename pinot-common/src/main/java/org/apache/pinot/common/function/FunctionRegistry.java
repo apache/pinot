@@ -22,10 +22,16 @@ import com.google.common.base.Preconditions;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.StringJoiner;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
@@ -40,8 +46,18 @@ public class FunctionRegistry {
   private FunctionRegistry() {
   }
 
+  // Delimiter used to encode function parameters.
+  public static final String FUNCTION_PARAM_DELIMITER = ",";
   private static final Logger LOGGER = LoggerFactory.getLogger(FunctionRegistry.class);
+
+  // Map between lowercase function name with '_' removed to <# of function parameters, function info>
+  // TODO: Deprecate the usage of FUNCTION_INFO_MAP.
   private static final Map<String, Map<Integer, FunctionInfo>> FUNCTION_INFO_MAP = new HashMap<>();
+
+  // Map between lowercase function name with '_' removed to <function argument string, function info>
+  // If a function is not founded this map, FUNCTION_INFO_MAP is used to look for the function by default to see if
+  // any conversion can be done to use existing function.
+  private static final Map<String, Map<String, FunctionInfo>> FUNCTION_PARAMETER_INFO_MAP = new HashMap<>();
 
   /**
    * Registers the scalar functions via reflection.
@@ -93,10 +109,20 @@ public class FunctionRegistry {
    */
   public static void registerFunction(String functionName, Method method, boolean nullableParameters) {
     FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), nullableParameters);
-    String canonicalName = canonicalize(functionName);
+    final String canonicalName = canonicalize(functionName);
     Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.computeIfAbsent(canonicalName, k -> new HashMap<>());
-    Preconditions.checkState(functionInfoMap.put(method.getParameterCount(), functionInfo) == null,
-        "Function: %s with %s parameters is already registered", functionName, method.getParameterCount());
+    // Only put one default implementation for # of params.
+    if (!functionInfoMap.containsKey(method.getParameterCount())) {
+      functionInfoMap.put(method.getParameterCount(), functionInfo);
+    }
+    // Only encode the param type if there are more than zero param.
+    String encodedParamName = getEncodedParams(method.getParameterTypes());
+    if (!encodedParamName.isEmpty()) {
+      Map<String, FunctionInfo> functionParamMap =
+          FUNCTION_PARAMETER_INFO_MAP.computeIfAbsent(canonicalName, k -> new HashMap<>());
+      Preconditions.checkState(functionParamMap.put(encodedParamName, functionInfo) == null,
+          "Function: %s with %s parameters is already registered", functionName, encodedParamName);
+    }
   }
 
   /**
@@ -106,18 +132,74 @@ public class FunctionRegistry {
     return FUNCTION_INFO_MAP.containsKey(canonicalize(functionName));
   }
 
+  @Nullable
+  public static FunctionInfo getFunctionInfo(Function function) {
+    String functionName = function.getOperator();
+    List<Expression> operands = function.getOperands();
+    int numOperands = operands.size();
+    String encodedParams = getEncodedParamsForExpr(operands);
+    return getFunctionInfo(functionName, numOperands, encodedParams);
+  }
+
+  @Nullable
+  public static FunctionInfo getFunctionInfo(FunctionContext function) {
+    String functionName = canonicalize(function.getFunctionName());
+    List<ExpressionContext> arguments = function.getArguments();
+    int numArguments = arguments.size();
+    String encodedParams = getEncodedParamsForExprContext(arguments);
+    return getFunctionInfo(functionName, numArguments, encodedParams);
+  }
+
+  /*
+   * TODO: Deprecate the usage of this function. Currently, the only usage is when function is RexExpression
+   *  .FunctionCall type. Introducing the call with RexExpression.FunctionCall type will cause circular dependency.
+   */
+
   /**
    * Returns the {@link FunctionInfo} associated with the given function name and number of parameters, or {@code null}
    * if there is no matching method. This method should be called after the FunctionRegistry is initialized and all
    * methods are already registered.
    */
   @Nullable
-  public static FunctionInfo getFunctionInfo(String functionName, int numParameters) {
-    Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.get(canonicalize(functionName));
+  public static FunctionInfo getFunctionInfo(String functionName, int numParameters, String encodedParamNames) {
+    final String canonicalFuncName = canonicalize(functionName);
+    Map<String, FunctionInfo> functionParamInfoMap = FUNCTION_PARAMETER_INFO_MAP.get(canonicalFuncName);
+    FunctionInfo functionInfo = null;
+    if (functionParamInfoMap != null) {
+      functionInfo = functionParamInfoMap.getOrDefault(encodedParamNames, null);
+      if (functionInfo != null) {
+        return functionInfo;
+      }
+    }
+    Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.get(canonicalFuncName);
     return functionInfoMap != null ? functionInfoMap.get(numParameters) : null;
   }
 
   private static String canonicalize(String functionName) {
     return StringUtils.remove(functionName, '_').toLowerCase();
+  }
+
+  public static String getEncodedParams(Class[] parameters) {
+    StringJoiner encodedParams = new StringJoiner(FUNCTION_PARAM_DELIMITER);
+    for (Class param : parameters) {
+      encodedParams.add(param.getTypeName());
+    }
+    return encodedParams.toString();
+  }
+
+  public static String getEncodedParamsForExpr(List<Expression> expressions) {
+    StringJoiner encodedParams = new StringJoiner(FUNCTION_PARAM_DELIMITER);
+    for (Expression exp : expressions) {
+      encodedParams.add(exp.getLiteral().getFieldValue().getClass().getTypeName());
+    }
+    return encodedParams.toString();
+  }
+
+  public static String getEncodedParamsForExprContext(List<ExpressionContext> arguments) {
+    StringJoiner encodedParams = new StringJoiner(FUNCTION_PARAM_DELIMITER);
+    for (ExpressionContext param : arguments) {
+      encodedParams.add(param.getLiteralTypeName());
+    }
+    return encodedParams.toString();
   }
 }

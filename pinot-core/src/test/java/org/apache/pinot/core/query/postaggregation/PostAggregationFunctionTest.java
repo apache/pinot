@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.query.postaggregation;
 
+import com.google.common.collect.ImmutableList;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
@@ -32,36 +35,70 @@ public class PostAggregationFunctionTest {
   @Test
   public void testPostAggregationFunction() {
     // Plus
+    FunctionContext functionCtx = new FunctionContext(FunctionContext.Type.TRANSFORM, "plus",
+        ImmutableList.of(ExpressionContext.forLiteral(1), ExpressionContext.forLiteral(2L)));
     PostAggregationFunction function =
-        new PostAggregationFunction("plus", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
+        new PostAggregationFunction(functionCtx, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
     assertEquals(function.getResultType(), ColumnDataType.DOUBLE);
     assertEquals(function.invoke(new Object[]{1, 2L}), 3.0);
 
     // Minus
-    function = new PostAggregationFunction("MINUS", new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.DOUBLE});
+    functionCtx = new FunctionContext(FunctionContext.Type.TRANSFORM, "MINUS",
+        ImmutableList.of(ExpressionContext.forLiteral(3f), ExpressionContext.forLiteral(4.0)));
+    function =
+        new PostAggregationFunction(functionCtx, new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.DOUBLE});
     assertEquals(function.getResultType(), ColumnDataType.DOUBLE);
     assertEquals(function.invoke(new Object[]{3f, 4.0}), -1.0);
 
     // Times
-    function = new PostAggregationFunction("tImEs", new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT});
+    functionCtx = new FunctionContext(FunctionContext.Type.TRANSFORM, "tImEs",
+        ImmutableList.of(ExpressionContext.forLiteral("5"), ExpressionContext.forLiteral(6)));
+    function =
+        new PostAggregationFunction(functionCtx, new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT});
     assertEquals(function.getResultType(), ColumnDataType.DOUBLE);
     assertEquals(function.invoke(new Object[]{"5", 6}), 30.0);
 
     // Reverse
-    function = new PostAggregationFunction("reverse", new ColumnDataType[]{ColumnDataType.LONG});
+    functionCtx = new FunctionContext(FunctionContext.Type.TRANSFORM, "reverse",
+        ImmutableList.of(ExpressionContext.forLiteral(new Object[]{"1234567890"})));
+    function = new PostAggregationFunction(functionCtx, new ColumnDataType[]{ColumnDataType.LONG});
     assertEquals(function.getResultType(), ColumnDataType.STRING);
     assertEquals(function.invoke(new Object[]{"1234567890"}), "0987654321");
 
     // ST_AsText
-    function = new PostAggregationFunction("ST_AsText", new ColumnDataType[]{ColumnDataType.BYTES});
+    functionCtx = new FunctionContext(FunctionContext.Type.TRANSFORM, "ST_AsText",
+        ImmutableList.of(ExpressionContext.forLiteral(new Object[]{
+            GeometrySerializer.serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20)))
+        })));
+    function = new PostAggregationFunction(functionCtx, new ColumnDataType[]{ColumnDataType.BYTES});
     assertEquals(function.getResultType(), ColumnDataType.STRING);
     assertEquals(function.invoke(
-        new Object[]{GeometrySerializer.serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20)))}),
+            new Object[]{GeometrySerializer.serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10,
+                20)))}),
         "POINT (10 20)");
 
     // Cast
-    function = new PostAggregationFunction("cast", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
+    functionCtx = new FunctionContext(FunctionContext.Type.TRANSFORM, "cast",
+        ImmutableList.of(ExpressionContext.forLiteral(1), ExpressionContext.forLiteral("LONG")));
+    function =
+        new PostAggregationFunction(functionCtx, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
     assertEquals(function.getResultType(), ColumnDataType.OBJECT);
     assertEquals(function.invoke(new Object[]{1, "LONG"}), 1L);
+
+    // Boolean literals equal
+    functionCtx = new FunctionContext(FunctionContext.Type.TRANSFORM, "equals",
+        ImmutableList.of(ExpressionContext.forLiteral(true), ExpressionContext.forLiteral(true)));
+    function =
+        new PostAggregationFunction(functionCtx, new ColumnDataType[]{ColumnDataType.BOOLEAN, ColumnDataType.BOOLEAN});
+    assertEquals(function.getResultType(), ColumnDataType.BOOLEAN);
+    assertEquals(function.invoke(new Object[]{true, true}), true);
+
+    // Boolean literals notEquals
+    functionCtx = new FunctionContext(FunctionContext.Type.TRANSFORM, "notEquals",
+        ImmutableList.of(ExpressionContext.forLiteral(true), ExpressionContext.forLiteral(true)));
+    function =
+        new PostAggregationFunction(functionCtx, new ColumnDataType[]{ColumnDataType.BOOLEAN, ColumnDataType.BOOLEAN});
+    assertEquals(function.getResultType(), ColumnDataType.BOOLEAN);
+    assertEquals(function.invoke(new Object[]{true, true}), false);
   }
 }

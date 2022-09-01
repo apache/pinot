@@ -275,7 +275,6 @@ public class TransformFunctionFactory {
         String functionName = canonicalize(function.getFunctionName());
         List<ExpressionContext> arguments = function.getArguments();
         int numArguments = arguments.size();
-
         TransformFunction transformFunction;
         Class<? extends TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
         if (transformFunctionClass != null) {
@@ -287,7 +286,7 @@ public class TransformFunctionFactory {
           }
         } else {
           // Scalar function
-          FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+          FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(function);
           if (functionInfo == null) {
             if (FunctionRegistry.containsFunction(functionName)) {
               throw new BadQueryRequestException(

@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.StringJoiner;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
@@ -140,10 +141,16 @@ public class TransformOperator extends BaseOperator<TransferableBlock> {
       for (RexExpression childRexExpression : operandExpressions) {
         _childOperandList.add(toFunctionOperands(childRexExpression, dataSchema));
       }
-      FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(
-          OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName()), operandExpressions.size());
-      Preconditions.checkNotNull(functionInfo, "Cannot find function with Name: "
-          + functionCall.getFunctionName());
+      for (RexExpression argument : operandExpressions) {
+        if (!(argument instanceof RexExpression.Literal)) {
+          throw new IllegalStateException("Function argument has to be literal");
+        }
+      }
+      String encodedParamName = getEncodedParams(operandExpressions);
+      FunctionInfo functionInfo =
+          FunctionRegistry.getFunctionInfo(functionCall.getFunctionName(), operandExpressions.size(), encodedParamName);
+
+      Preconditions.checkNotNull(functionInfo, "Cannot find function with Name: " + functionCall.getFunctionName());
       _functionInvoker = new FunctionInvoker(functionInfo);
       _resultName = computeColumnName(functionCall.getFunctionName(), _childOperandList);
       _resultType = FunctionUtils.getColumnDataType(_functionInvoker.getResultClass());
@@ -184,5 +191,13 @@ public class TransformOperator extends BaseOperator<TransferableBlock> {
     public Object apply(Object[] row) {
       return row[_refIndex];
     }
+  }
+
+  private static String getEncodedParams(List<RexExpression> arguments) {
+    StringJoiner encodedParams = new StringJoiner(FunctionRegistry.FUNCTION_PARAM_DELIMITER);
+    for (RexExpression param : arguments) {
+      encodedParams.add(((RexExpression.Literal) param).getValue().getClass().getTypeName());
+    }
+    return encodedParams.toString();
   }
 }
