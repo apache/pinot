@@ -53,6 +53,7 @@ public class IndexingConfig extends BaseJsonConfig {
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _aggregateMetrics;
   private boolean _nullHandlingEnabled;
+  private boolean _useDefaultValueOnError;
 
   /**
    * If `optimizeDictionaryForMetrics` enabled, dictionary is not created for the metric columns
@@ -281,6 +282,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
     _nullHandlingEnabled = nullHandlingEnabled;
+  }
+
+  public boolean useDefaultValueOnError() {
+    return _useDefaultValueOnError;
+  }
+
+  public void setUseDefaultValueOnError(boolean useDefaultValueOnError) {
+    _useDefaultValueOnError = useDefaultValueOnError;
   }
 
   public boolean isOptimizeDictionaryForMetrics() {

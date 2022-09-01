@@ -67,7 +67,7 @@ public class ExpressionTransformerTest {
         .setIngestionConfig(ingestionConfig).build();
 
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
-    DataTypeTransformer dataTypeTransformer = new DataTypeTransformer(pinotSchema);
+    DataTypeTransformer dataTypeTransformer = new DataTypeTransformer(tableConfig, pinotSchema);
 
     // test functions from schema
     GenericRow genericRow = new GenericRow();

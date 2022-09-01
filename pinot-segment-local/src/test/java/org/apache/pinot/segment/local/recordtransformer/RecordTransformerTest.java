@@ -132,7 +132,7 @@ public class RecordTransformerTest {
 
   @Test
   public void testDataTypeTransformer() {
-    RecordTransformer transformer = new DataTypeTransformer(SCHEMA);
+    RecordTransformer transformer = new DataTypeTransformer(TABLE_CONFIG, SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);
@@ -158,6 +158,30 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
       assertTrue(record.getNullValueFields().isEmpty());
+    }
+  }
+
+  @Test
+  public void testDataTypeTransformerIncorrectDataTypes() {
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", DataType.BYTES)
+        .addSingleValueDimension("svLong", DataType.LONG).build();
+
+    RecordTransformer transformer = new DataTypeTransformer(TABLE_CONFIG, schema);
+    GenericRow record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      assertThrows(() -> transformer.transform(record));
+    }
+
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setUseDefaultValueOnError(true).setTableName("testTable").build();
+
+    tableConfig.getIndexingConfig().setUseDefaultValueOnError(true);
+    RecordTransformer transformerWithDefaultNulls = new DataTypeTransformer(tableConfig, schema);
+    GenericRow record1 = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record1 = transformerWithDefaultNulls.transform(record1);
+      assertNotNull(record1);
+      assertNull(record1.getValue("svInt"));
     }
   }
 
