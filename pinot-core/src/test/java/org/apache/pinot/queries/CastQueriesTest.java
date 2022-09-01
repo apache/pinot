@@ -166,8 +166,9 @@ public class CastQueriesTest extends BaseQueriesTest {
     assertTrue(aggregationResultsBlockResults.get(0) instanceof Roaring64NavigableMapIdSet);
     Roaring64NavigableMapIdSet idSet = (Roaring64NavigableMapIdSet) aggregationResultsBlockResults.get(0);
     for (int i = 0; i < NUM_RECORDS; i++) {
-      for (int j = 0; j < NUM_ENTRY_MV; j++)
-      assertTrue(idSet.contains(_expectedLongValues[i][j]));
+      for (int j = 0; j < NUM_ENTRY_MV; j++) {
+        assertTrue(idSet.contains(_expectedLongValues[i][j]));
+      }
     }
   }
 

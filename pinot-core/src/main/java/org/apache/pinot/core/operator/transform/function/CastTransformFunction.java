@@ -70,20 +70,23 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "BIG_DECIMAL":
           if (!isSVCol) {
             // TODO: MV cast to BIG_DECIMAL type
-            throw new IllegalArgumentException("Cast is not supported on multi-value column to target type: " + targetType);
+            throw new IllegalArgumentException(
+                "Cast is not supported on multi-value column to target type: " + targetType);
           }
           _resultMetadata = BIG_DECIMAL_SV_NO_DICTIONARY_METADATA;
           break;
         case "BOOL":
         case "BOOLEAN":
           if (!isSVCol) {
-            throw new IllegalArgumentException("Cast is not supported on multi-value column to target type: " + targetType);
+            throw new IllegalArgumentException(
+                "Cast is not supported on multi-value column to target type: " + targetType);
           }
           _resultMetadata = BOOLEAN_SV_NO_DICTIONARY_METADATA;
           break;
         case "TIMESTAMP":
           if (!isSVCol) {
-            throw new IllegalArgumentException("Cast is not supported on multi-value column to target type: " + targetType);
+            throw new IllegalArgumentException(
+                "Cast is not supported on multi-value column to target type: " + targetType);
           }
           _resultMetadata = TIMESTAMP_SV_NO_DICTIONARY_METADATA;
           break;
@@ -93,7 +96,8 @@ public class CastTransformFunction extends BaseTransformFunction {
           break;
         case "JSON":
           if (!isSVCol) {
-            throw new IllegalArgumentException("Cast is not supported on multi-value column to target type: " + targetType);
+            throw new IllegalArgumentException(
+                "Cast is not supported on multi-value column to target type: " + targetType);
           }
           _resultMetadata = JSON_SV_NO_DICTIONARY_METADATA;
           break;
