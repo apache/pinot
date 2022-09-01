@@ -173,4 +173,42 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     csvRecordReader.init(file, null, csvRecordReaderConfig);
     Assert.assertTrue(csvRecordReader.hasNext());
   }
+
+  @Test
+  public void testNullValueString()
+      throws IOException {
+    //setup
+    String nullString = "NULL";
+    //create a single value CSV
+    Schema pinotSchema = getPinotSchema();
+    //write only the first column in the schema
+    String column = pinotSchema.getColumnNames().toArray(new String[0])[0];
+    //use a different file name so that other tests aren't affected
+    File file = new File(_tempDir, "data1.csv");
+    try (FileWriter fileWriter = new FileWriter(file);
+        CSVPrinter csvPrinter = new CSVPrinter(fileWriter,
+            CSVFormat.DEFAULT.withHeader("col1", "col2", "col3").withNullString(nullString))) {
+      for (Map<String, Object> r : _records) {
+        Object[] record = new Object[3];
+        record[0] = r.get(column);
+        csvPrinter.printRecord(record);
+      }
+    }
+
+    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
+    csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
+    csvRecordReaderConfig.setHeader("col1,col2,col3");
+    csvRecordReaderConfig.setNullStringValue(nullString);
+    CSVRecordReader csvRecordReader = new CSVRecordReader();
+
+    //execute and assert
+    csvRecordReader.init(file, null, csvRecordReaderConfig);
+    Assert.assertTrue(csvRecordReader.hasNext());
+    csvRecordReader.next();
+
+    GenericRow row = csvRecordReader.next();
+    Assert.assertNotNull(row.getValue("col1"));
+    Assert.assertNull(row.getValue("col2"));
+    Assert.assertNull(row.getValue("col3"));
+  }
 }
