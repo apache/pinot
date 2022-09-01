@@ -125,8 +125,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.MINUTE, DateTimeTransformFunction.Minute.class);
     typeToImplementation.put(TransformFunctionType.SECOND, DateTimeTransformFunction.Second.class);
     typeToImplementation.put(TransformFunctionType.MILLISECOND, DateTimeTransformFunction.Millisecond.class);
-    typeToImplementation.put(TransformFunctionType.ARRAYLENGTH,
-        ArrayLengthTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAYLENGTH, ArrayLengthTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.VALUEIN, ValueInTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.MAPVALUE, MapValueTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.INIDSET, InIdSetTransformFunction.class);

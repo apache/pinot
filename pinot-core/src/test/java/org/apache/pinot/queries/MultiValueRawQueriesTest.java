@@ -613,21 +613,28 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
     }
     {
       // Test a select with a ARRAYLENGTH transform function
-      String query = "SELECT ARRAYLENGTH(mvRawLongCol), ARRAYLENGTH(mvLongCol) from testTable GROUP BY "
-          + "ARRAYLENGTH(mvRawLongCol), ARRAYLENGTH(mvLongCol) LIMIT 10";
+      String query = "SELECT ARRAYLENGTH(mvRawLongCol), ARRAYLENGTH(mvLongCol), CARDINALITY(mvRawLongCol), "
+          + "CARDINALITY(mvLongCol) from testTable GROUP BY ARRAYLENGTH(mvRawLongCol), ARRAYLENGTH(mvLongCol), "
+          + "CARDINALITY(mvRawLongCol), CARDINALITY(mvLongCol) LIMIT 10";
       ResultTable resultTable = getBrokerResponse(query).getResultTable();
       assertNotNull(resultTable);
-      DataSchema dataSchema = new DataSchema(new String[]{"arraylength(mvRawLongCol)", "arraylength(mvLongCol)"},
-          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
+      DataSchema dataSchema = new DataSchema(new String[]{"arraylength(mvRawLongCol)", "arraylength(mvLongCol)",
+          "cardinality(mvRawLongCol)", "cardinality(mvLongCol)"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
+              DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
       assertEquals(resultTable.getDataSchema(), dataSchema);
       List<Object[]> recordRows = resultTable.getRows();
       assertEquals(recordRows.size(), 1);
       Object[] values = recordRows.get(0);
-      assertEquals(values.length, 2);
+      assertEquals(values.length, 4);
       int intRawVal = (int) values[0];
       int intVal = (int) values[1];
+      int intRawVal2 = (int) values[2];
+      int intVal2 = (int) values[3];
       assertEquals(intRawVal, 2);
       assertEquals(intVal, intRawVal);
+      assertEquals(intRawVal2, intRawVal);
+      assertEquals(intVal2, intRawVal);
     }
   }
 
@@ -937,8 +944,9 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
     }
     {
       // Test a select with filter query on an arraylength transform function
-      String query = "SELECT mvRawIntCol, mvRawDoubleCol, mvRawStringCol from testTable where "
-          + "ARRAYLENGTH(mvRawIntCol) < 5 LIMIT 10";
+      String query = "SELECT mvRawIntCol, mvRawDoubleCol, mvRawStringCol FROM testTable WHERE "
+          + "ARRAYLENGTH(mvRawIntCol) < 5 AND CARDINALITY(mvRawIntCol) < 5 AND CARDINALITY(mvRawIntCol) < 5 "
+          + "LIMIT 10";
       ResultTable resultTable = getBrokerResponse(query).getResultTable();
       assertNotNull(resultTable);
       DataSchema dataSchema = new DataSchema(new String[]{
