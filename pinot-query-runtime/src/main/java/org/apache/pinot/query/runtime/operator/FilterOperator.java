@@ -29,29 +29,21 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
+import org.apache.pinot.query.runtime.operator.operands.FilterOperand;
 
 
-/**
- * This basic {@code TransformOperator} implement basic transformations.
- */
-public class TransformOperator extends BaseOperator<TransferableBlock> {
-  private static final String EXPLAIN_NAME = "TRANSFORM";
+public class FilterOperator extends BaseOperator<TransferableBlock> {
+  private static final String EXPLAIN_NAME = "FILTER";
   private final BaseOperator<TransferableBlock> _upstreamOperator;
-  private final List<TransformOperand> _transformOperandsList;
-  private final int _resultColumnSize;
-  private final DataSchema _resultSchema;
+  private final FilterOperand _filterOperand;
+  private final DataSchema _dataSchema;
   private TransferableBlock _upstreamErrorBlock;
 
-  public TransformOperator(BaseOperator<TransferableBlock> upstreamOperator, DataSchema dataSchema,
-      List<RexExpression> transforms, DataSchema upstreamDataSchema) {
+  public FilterOperator(BaseOperator<TransferableBlock> upstreamOperator, DataSchema dataSchema, RexExpression filter) {
     _upstreamOperator = upstreamOperator;
-    _resultColumnSize = transforms.size();
-    _transformOperandsList = new ArrayList<>(_resultColumnSize);
-    for (RexExpression rexExpression : transforms) {
-      _transformOperandsList.add(TransformOperand.toTransformOperand(rexExpression, upstreamDataSchema));
-    }
-    _resultSchema = dataSchema;
+    _dataSchema = dataSchema;
+    _filterOperand = FilterOperand.toFilterOperand(filter, dataSchema);
+    _upstreamErrorBlock = null;
   }
 
   @Override
@@ -84,18 +76,16 @@ public class TransformOperator extends BaseOperator<TransferableBlock> {
       List<Object[]> resultRows = new ArrayList<>();
       List<Object[]> container = block.getContainer();
       for (Object[] row : container) {
-        Object[] resultRow = new Object[_resultColumnSize];
-        for (int i = 0; i < _resultColumnSize; i++) {
-          resultRow[i] = _transformOperandsList.get(i).apply(row);
+        if (_filterOperand.apply(row)) {
+          resultRows.add(row);
         }
-        resultRows.add(resultRow);
       }
-      return new TransferableBlock(resultRows, _resultSchema, BaseDataBlock.Type.ROW);
+      return new TransferableBlock(resultRows, _dataSchema, BaseDataBlock.Type.ROW);
     } else if (block.isErrorBlock()) {
       _upstreamErrorBlock = block;
       return _upstreamErrorBlock;
     } else {
-      return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(_resultSchema));
+      return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(_dataSchema));
     }
   }
 }

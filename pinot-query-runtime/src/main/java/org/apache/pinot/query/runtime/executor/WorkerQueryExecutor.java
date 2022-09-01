@@ -39,6 +39,7 @@ import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
+import org.apache.pinot.query.runtime.operator.FilterOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -128,7 +129,9 @@ public class WorkerQueryExecutor {
       return new AggregateOperator(inputOperator, aggregateNode.getDataSchema(), aggregateNode.getAggCalls(),
           aggregateNode.getGroupSet(), aggregateNode.getInputs().get(0).getDataSchema());
     } else if (stageNode instanceof FilterNode) {
-      throw new UnsupportedOperationException("Unsupported!");
+      FilterNode filterNode = (FilterNode) stageNode;
+      return new FilterOperator(getOperator(requestId, filterNode.getInputs().get(0), metadataMap),
+          filterNode.getDataSchema(), filterNode.getCondition());
     } else if (stageNode instanceof ProjectNode) {
       ProjectNode projectNode = (ProjectNode) stageNode;
       return new TransformOperator(getOperator(requestId, projectNode.getInputs().get(0), metadataMap),
