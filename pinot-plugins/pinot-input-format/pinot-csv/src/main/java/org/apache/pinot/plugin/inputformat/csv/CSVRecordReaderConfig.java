@@ -35,6 +35,7 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
   private boolean _multiValueDelimiterEnabled = true; // when false, skip parsing for multiple values
   private Character _commentMarker;   // Default is null
   private Character _escapeCharacter; // Default is null
+  private String _nullStringValue;
 
   public String getFileFormat() {
     return _fileFormat;
@@ -90,6 +91,14 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
 
   public void setEscapeCharacter(Character escapeCharacter) {
     _escapeCharacter = escapeCharacter;
+  }
+
+  public String getNullStringValue() {
+    return _nullStringValue;
+  }
+
+  public void setNullStringValue(String nullStringValue) {
+    _nullStringValue = nullStringValue;
   }
 
   @Override
