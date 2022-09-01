@@ -27,11 +27,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +51,7 @@ public class DataTypeTransformer implements RecordTransformer {
 
   private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
   private boolean _useDefaultValueOnError;
+  private DateTimeFieldSpec _timeColumnSpec;
 
   public DataTypeTransformer(TableConfig tableConfig, Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -56,6 +61,10 @@ public class DataTypeTransformer implements RecordTransformer {
     }
 
     _useDefaultValueOnError = tableConfig.getIndexingConfig().useDefaultValueOnError();
+    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    if (StringUtils.isNotEmpty(timeColumnName)) {
+      _timeColumnSpec = schema.getSpecForTimeColumn(timeColumnName);
+    }
   }
 
   @Override
@@ -67,6 +76,16 @@ public class DataTypeTransformer implements RecordTransformer {
         if (value == null) {
           continue;
         }
+
+        if (_useDefaultValueOnError && _timeColumnSpec != null && column.equals(_timeColumnSpec.getName())) {
+          DateTimeFormatSpec dateTimeFormatSpec = _timeColumnSpec.getFormatSpec();
+          long timeInMs = dateTimeFormatSpec.fromFormatToMillis(value.toString());
+          if (!TimeUtils.timeValueInValidRange(timeInMs)) {
+            record.putValue(column, null);
+            continue;
+          }
+        }
+
         PinotDataType dest = entry.getValue();
         if (dest != PinotDataType.JSON) {
           value = standardize(column, value, dest.isSingleValue());

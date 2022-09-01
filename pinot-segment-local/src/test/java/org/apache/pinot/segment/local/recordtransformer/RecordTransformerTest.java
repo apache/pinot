@@ -175,13 +175,50 @@ public class RecordTransformerTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setUseDefaultValueOnError(true).setTableName("testTable").build();
 
-    tableConfig.getIndexingConfig().setUseDefaultValueOnError(true);
     RecordTransformer transformerWithDefaultNulls = new DataTypeTransformer(tableConfig, schema);
     GenericRow record1 = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record1 = transformerWithDefaultNulls.transform(record1);
       assertNotNull(record1);
       assertNull(record1.getValue("svInt"));
+    }
+  }
+
+  @Test
+  public void testDataTypeTransformerInvalidTimestamp() {
+    String timeCol = "timeCol";
+    Schema schema = new Schema.SchemaBuilder().addDateTime(timeCol, DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP",
+        "1:MILLISECONDS").build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(timeCol).setTableName("testTable").build();
+
+    RecordTransformer transformer = new DataTypeTransformer(tableConfig, schema);
+    GenericRow record = getRecord();
+    record.putValue(timeCol, 1);
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      assertThrows(() -> transformer.transform(record));
+    }
+
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(timeCol).setUseDefaultValueOnError(true)
+            .setTableName("testTable").build();
+
+    RecordTransformer transformerWithDefaultNulls = new DataTypeTransformer(tableConfig, schema);
+    GenericRow record1 = getRecord();
+    record1.putValue(timeCol, 1);
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record1 = transformerWithDefaultNulls.transform(record1);
+      assertNotNull(record1);
+      assertNull(record1.getValue(timeCol));
+    }
+
+    GenericRow record2 = getRecord();
+    Long currentTimeMillis = System.currentTimeMillis();
+    record2.putValue(timeCol, currentTimeMillis);
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record2 = transformerWithDefaultNulls.transform(record2);
+      assertNotNull(record2);
+      assertEquals(record2.getValue(timeCol), currentTimeMillis);
     }
   }
 
