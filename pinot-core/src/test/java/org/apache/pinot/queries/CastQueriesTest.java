@@ -26,12 +26,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.query.utils.idset.Roaring64NavigableMapIdSet;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -50,6 +52,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class CastQueriesTest extends BaseQueriesTest {
@@ -155,6 +158,16 @@ public class CastQueriesTest extends BaseQueriesTest {
       Object[] row = results.get(i);
       long[] cast = (long[]) row[0];
       assertEquals(cast, _expectedLongValues[i]);
+    }
+
+    query = String.format("select id_set(cast(%s as LONG)) as col1 from %s limit 100", STRING_MV_COL, RAW_TABLE_NAME);
+    AggregationResultsBlock aggregationResultsBlock = ((AggregationOperator) getOperator(query)).nextBlock();
+    List<Object> aggregationResultsBlockResults = aggregationResultsBlock.getResults();
+    assertTrue(aggregationResultsBlockResults.get(0) instanceof Roaring64NavigableMapIdSet);
+    Roaring64NavigableMapIdSet idSet = (Roaring64NavigableMapIdSet) aggregationResultsBlockResults.get(0);
+    for (int i = 0; i < NUM_RECORDS; i++) {
+      for (int j = 0; j < NUM_ENTRY_MV; j++)
+      assertTrue(idSet.contains(_expectedLongValues[i][j]));
     }
   }
 
