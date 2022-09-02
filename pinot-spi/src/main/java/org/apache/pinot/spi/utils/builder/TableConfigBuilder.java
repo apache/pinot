@@ -97,7 +97,8 @@ public class TableConfigBuilder {
   private Map<String, String> _streamConfigs;
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _nullHandlingEnabled;
-  private boolean _useDefaultValueOnError;
+  private boolean _continueOnError;
+  private boolean _validateTimeValue;
   private List<String> _varLengthDictionaryColumns;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private List<String> _jsonIndexColumns;
@@ -310,8 +311,13 @@ public class TableConfigBuilder {
     return this;
   }
 
-  public TableConfigBuilder setUseDefaultValueOnError(boolean useDefaultValueOnError) {
-    _useDefaultValueOnError = useDefaultValueOnError;
+  public TableConfigBuilder setContinueOnError(boolean continueOnError) {
+    _continueOnError = continueOnError;
+    return this;
+  }
+
+  public TableConfigBuilder setValidateTimeValue(boolean validateTimeValue) {
+    _validateTimeValue = validateTimeValue;
     return this;
   }
 
@@ -426,7 +432,8 @@ public class TableConfigBuilder {
     indexingConfig.setStreamConfigs(_streamConfigs);
     indexingConfig.setSegmentPartitionConfig(_segmentPartitionConfig);
     indexingConfig.setNullHandlingEnabled(_nullHandlingEnabled);
-    indexingConfig.setUseDefaultValueOnError(_useDefaultValueOnError);
+    indexingConfig.setContinueOnError(_continueOnError);
+    indexingConfig.setValidateTimeValue(_validateTimeValue);
     indexingConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
     indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
     indexingConfig.setJsonIndexColumns(_jsonIndexColumns);

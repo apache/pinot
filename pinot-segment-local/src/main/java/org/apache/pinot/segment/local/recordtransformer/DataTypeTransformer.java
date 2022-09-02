@@ -50,8 +50,10 @@ public class DataTypeTransformer implements RecordTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTypeTransformer.class);
 
   private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
-  private boolean _useDefaultValueOnError;
-  private DateTimeFieldSpec _timeColumnSpec;
+  private final boolean _continueOnError;
+  private final boolean _validateTimeValues;
+  private final String _timeColumnName;
+  private final DateTimeFormatSpec _timeColumnSpec;
 
   public DataTypeTransformer(TableConfig tableConfig, Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -60,11 +62,18 @@ public class DataTypeTransformer implements RecordTransformer {
       }
     }
 
-    _useDefaultValueOnError = tableConfig.getIndexingConfig().useDefaultValueOnError();
-    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-    if (StringUtils.isNotEmpty(timeColumnName)) {
-      _timeColumnSpec = schema.getSpecForTimeColumn(timeColumnName);
+    _continueOnError = tableConfig.getIndexingConfig().isContinueOnError();
+    _validateTimeValues = tableConfig.getIndexingConfig().isValidateTimeValue();
+    _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+
+    DateTimeFormatSpec timeColumnSpec = null;
+    if (StringUtils.isNotEmpty(_timeColumnName)) {
+      DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(_timeColumnName);
+      if (dateTimeFieldSpec != null) {
+        timeColumnSpec = dateTimeFieldSpec.getFormatSpec();
+      }
     }
+    _timeColumnSpec = timeColumnSpec;
   }
 
   @Override
@@ -77,10 +86,11 @@ public class DataTypeTransformer implements RecordTransformer {
           continue;
         }
 
-        if (_useDefaultValueOnError && _timeColumnSpec != null && column.equals(_timeColumnSpec.getName())) {
-          DateTimeFormatSpec dateTimeFormatSpec = _timeColumnSpec.getFormatSpec();
-          long timeInMs = dateTimeFormatSpec.fromFormatToMillis(value.toString());
+        if (_validateTimeValues && _timeColumnSpec != null && column.equals(_timeColumnName)) {
+          long timeInMs = _timeColumnSpec.fromFormatToMillis(value.toString());
           if (!TimeUtils.timeValueInValidRange(timeInMs)) {
+            LOGGER.debug("Time value {} is not in valid range for column: {}, must be between: {}",
+                timeInMs, _timeColumnName, TimeUtils.VALID_TIME_INTERVAL);
             record.putValue(column, null);
             continue;
           }
@@ -122,7 +132,7 @@ public class DataTypeTransformer implements RecordTransformer {
 
         record.putValue(column, value);
       } catch (Exception e) {
-        if (!_useDefaultValueOnError) {
+        if (!_continueOnError) {
           throw new RuntimeException("Caught exception while transforming data type for column: " + column, e);
         } else {
           LOGGER.debug("Caught exception while transforming data type for column: {}", column, e);

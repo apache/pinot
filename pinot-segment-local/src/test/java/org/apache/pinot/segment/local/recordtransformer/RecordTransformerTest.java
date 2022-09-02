@@ -173,7 +173,7 @@ public class RecordTransformerTest {
     }
 
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setUseDefaultValueOnError(true).setTableName("testTable").build();
+        new TableConfigBuilder(TableType.OFFLINE).setContinueOnError(true).setTableName("testTable").build();
 
     RecordTransformer transformerWithDefaultNulls = new DataTypeTransformer(tableConfig, schema);
     GenericRow record1 = getRecord();
@@ -200,7 +200,7 @@ public class RecordTransformerTest {
     }
 
     tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(timeCol).setUseDefaultValueOnError(true)
+        new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(timeCol).setValidateTimeValue(true)
             .setTableName("testTable").build();
 
     RecordTransformer transformerWithDefaultNulls = new DataTypeTransformer(tableConfig, schema);
