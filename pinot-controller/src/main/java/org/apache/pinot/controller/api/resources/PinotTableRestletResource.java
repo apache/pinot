@@ -232,7 +232,7 @@ public class PinotTableRestletResource {
     }
   }
 
-  @PUT
+  @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/recommender")
   @ApiOperation(value = "Recommend config", notes = "Recommend a config with input json")
