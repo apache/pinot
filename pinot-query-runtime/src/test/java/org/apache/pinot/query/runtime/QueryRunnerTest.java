@@ -132,7 +132,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
         // GROUP BY after JOIN
         // only 3 GROUP BY key exist because b.col2 cycles between "foo", "bar", "alice".
-        new Object[]{"SELECT a.col1, SUM(b.col3) FROM a JOIN b ON a.col1 = b.col2 "
+        new Object[]{"SELECT a.col1, SUM(b.col3), COUNT(*), SUM(2) FROM a JOIN b ON a.col1 = b.col2 "
             + " WHERE a.col3 >= 0 GROUP BY a.col1", 3},
 
         // Sub-query
