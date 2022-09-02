@@ -29,7 +29,6 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
-import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.testng.annotations.Test;
 
@@ -88,7 +87,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     String query = "SELECT daysSinceEpoch FROM testTable WHERE "
         + "dateTimeConvert(daysSinceEpoch, '1:DAYS:EPOCH', '1:MILLISECONDS:EPOCH', '1:MILLISECONDS') > ago('P1D') "
         + "ORDER BY daysSinceEpoch LIMIT 10";
-    SelectionOrderByOperator selectionOrderByOperator = getOperator(query);
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(query);
     SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
     verifySelectionOrderByAgoFunctionResult(resultsBlock);
 
