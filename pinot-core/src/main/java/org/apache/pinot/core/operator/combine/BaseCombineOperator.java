@@ -159,7 +159,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
-        resultsBlock = (T) operator.nextBlock();
+        resultsBlock = createInitialResultBlock((T) operator.nextBlock());
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
@@ -213,7 +213,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
         return blockToMerge;
       }
       if (mergedBlock == null) {
-        mergedBlock = (T) blockToMerge;
+        mergedBlock = createInitialResultBlock((T) blockToMerge);
       } else {
         mergeResultsBlocks(mergedBlock, (T) blockToMerge);
       }
@@ -246,6 +246,18 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
    * result is already handled.
    */
   protected abstract void mergeResultsBlocks(T mergedBlock, T blockToMerge);
+
+  /**
+   * Converts the given generic IntermediateResultBlock into the specific type of IntermediateResultBlock that is
+   * supported by this combine operator.
+   *
+   * This operator may return the same object if the runtime type of the given block already matches which what it is
+   * expected.
+   *
+   * The returned object will usually be the one received as first argument of
+   * {@link #mergeResultsBlocks(BaseResultsBlock, BaseResultsBlock)}.
+   */
+  protected abstract T createInitialResultBlock(BaseResultsBlock block);
 
   @Override
   public List<Operator> getChildOperators() {

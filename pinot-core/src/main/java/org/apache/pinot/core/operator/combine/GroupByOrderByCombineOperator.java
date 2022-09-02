@@ -269,4 +269,9 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator<GroupByRe
   @Override
   protected void mergeResultsBlocks(GroupByResultsBlock mergedBlock, GroupByResultsBlock blockToMerge) {
   }
+
+  @Override
+  protected GroupByResultsBlock createInitialResultBlock(BaseResultsBlock block) {
+    return (GroupByResultsBlock) block;
+  }
 }

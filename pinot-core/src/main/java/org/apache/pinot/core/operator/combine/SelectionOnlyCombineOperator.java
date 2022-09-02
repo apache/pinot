@@ -95,4 +95,9 @@ public class SelectionOnlyCombineOperator extends BaseCombineOperator<SelectionR
     assert mergedRows != null && rowsToMerge != null;
     SelectionOperatorUtils.mergeWithoutOrdering(mergedRows, rowsToMerge, _numRowsToKeep);
   }
+
+  @Override
+  protected SelectionResultsBlock createInitialResultBlock(BaseResultsBlock block) {
+    return (SelectionResultsBlock) block;
+  }
 }

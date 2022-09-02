@@ -263,7 +263,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
         return blockToMerge;
       }
       if (mergedBlock == null) {
-        mergedBlock = (SelectionResultsBlock) blockToMerge;
+        mergedBlock = createInitialResultBlock(blockToMerge);
       } else {
         if (blockToMerge != LAST_RESULTS_BLOCK) {
           mergeResultsBlocks(mergedBlock, (SelectionResultsBlock) blockToMerge);
@@ -301,6 +301,13 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     Collection<Object[]> rowsToMerge = blockToMerge.getRows();
     assert mergedRows != null && rowsToMerge != null;
     SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge, _numRowsToKeep);
+  }
+
+  @Override
+  protected SelectionResultsBlock createInitialResultBlock(BaseResultsBlock block) {
+    // We need to create a new copy to be sure we are using a stable priority queue, because it is going to be modified.
+    SelectionResultsBlock selectionBlock = (SelectionResultsBlock) block;
+    return new SelectionResultsBlock(selectionBlock.getDataSchema(), selectionBlock.getRowsAsPriorityQueue());
   }
 
   private static class MinMaxValueContext {
