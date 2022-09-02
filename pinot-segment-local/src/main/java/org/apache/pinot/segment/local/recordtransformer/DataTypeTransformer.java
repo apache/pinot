@@ -53,7 +53,7 @@ public class DataTypeTransformer implements RecordTransformer {
   private final boolean _continueOnError;
   private final boolean _validateTimeValues;
   private final String _timeColumnName;
-  private final DateTimeFormatSpec _timeColumnSpec;
+  private final DateTimeFormatSpec _timeFormatSpec;
 
   public DataTypeTransformer(TableConfig tableConfig, Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -69,11 +69,11 @@ public class DataTypeTransformer implements RecordTransformer {
     DateTimeFormatSpec timeColumnSpec = null;
     if (StringUtils.isNotEmpty(_timeColumnName)) {
       DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(_timeColumnName);
-      if (dateTimeFieldSpec != null) {
-        timeColumnSpec = dateTimeFieldSpec.getFormatSpec();
-      }
+      Preconditions.checkState(dateTimeFieldSpec != null, "Failed to find spec for time column: %s from schema: %s",
+          _timeColumnName, schema.getSchemaName());
+      timeColumnSpec = dateTimeFieldSpec.getFormatSpec();
     }
-    _timeColumnSpec = timeColumnSpec;
+    _timeFormatSpec = timeColumnSpec;
   }
 
   @Override
@@ -86,13 +86,19 @@ public class DataTypeTransformer implements RecordTransformer {
           continue;
         }
 
-        if (_validateTimeValues && _timeColumnSpec != null && column.equals(_timeColumnName)) {
-          long timeInMs = _timeColumnSpec.fromFormatToMillis(value.toString());
+        if (_validateTimeValues && _timeFormatSpec != null && column.equals(_timeColumnName)) {
+          long timeInMs = _timeFormatSpec.fromFormatToMillis(value.toString());
           if (!TimeUtils.timeValueInValidRange(timeInMs)) {
-            LOGGER.debug("Time value {} is not in valid range for column: {}, must be between: {}",
-                timeInMs, _timeColumnName, TimeUtils.VALID_TIME_INTERVAL);
-            record.putValue(column, null);
-            continue;
+            if (_continueOnError) {
+              LOGGER.debug("Time value {} is not in valid range for column: {}, must be between: {}", timeInMs,
+                  _timeColumnName, TimeUtils.VALID_TIME_INTERVAL);
+              record.putValue(column, null);
+              continue;
+            } else {
+              throw new RuntimeException(
+                  String.format("Time value %s is not in valid range for column: %s, must be between: %s", timeInMs,
+                      _timeColumnName, TimeUtils.VALID_TIME_INTERVAL));
+            }
           }
         }
 

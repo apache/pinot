@@ -186,6 +186,7 @@ public class RecordTransformerTest {
 
   @Test
   public void testDataTypeTransformerInvalidTimestamp() {
+    // Invalid Timestamp and Validation disabled
     String timeCol = "timeCol";
     Schema schema = new Schema.SchemaBuilder().addDateTime(timeCol, DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP",
         "1:MILLISECONDS").build();
@@ -194,31 +195,51 @@ public class RecordTransformerTest {
 
     RecordTransformer transformer = new DataTypeTransformer(tableConfig, schema);
     GenericRow record = getRecord();
-    record.putValue(timeCol, 1);
+    record.putValue(timeCol, 1L);
     for (int i = 0; i < NUM_ROUNDS; i++) {
-      assertThrows(() -> transformer.transform(record));
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue(timeCol), 1L);
     }
 
+    // Invalid Timestamp and Validation enabled
     tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(timeCol).setValidateTimeValue(true)
+        new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(timeCol)
+            .setValidateTimeValue(true)
             .setTableName("testTable").build();
 
-    RecordTransformer transformerWithDefaultNulls = new DataTypeTransformer(tableConfig, schema);
+    RecordTransformer transformerWithValidation = new DataTypeTransformer(tableConfig, schema);
     GenericRow record1 = getRecord();
-    record1.putValue(timeCol, 1);
+    record1.putValue(timeCol, 1L);
     for (int i = 0; i < NUM_ROUNDS; i++) {
-      record1 = transformerWithDefaultNulls.transform(record1);
-      assertNotNull(record1);
-      assertNull(record1.getValue(timeCol));
+      assertThrows(() -> transformerWithValidation.transform(record1));
     }
 
+    // Invalid timestamp, validation enabled and ignoreErrors enabled
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(timeCol)
+            .setValidateTimeValue(true)
+            .setContinueOnError(true)
+            .setTableName("testTable").build();
+
+    transformer = new DataTypeTransformer(tableConfig, schema);
     GenericRow record2 = getRecord();
-    Long currentTimeMillis = System.currentTimeMillis();
-    record2.putValue(timeCol, currentTimeMillis);
+    record2.putValue(timeCol, 1L);
     for (int i = 0; i < NUM_ROUNDS; i++) {
-      record2 = transformerWithDefaultNulls.transform(record2);
+      record2 = transformer.transform(record2);
       assertNotNull(record2);
-      assertEquals(record2.getValue(timeCol), currentTimeMillis);
+      assertNull(record2.getValue(timeCol));
+    }
+
+    // Valid timestamp
+    transformer = new DataTypeTransformer(TABLE_CONFIG, schema);
+    GenericRow record3 = getRecord();
+    Long currentTimeMillis = System.currentTimeMillis();
+    record3.putValue(timeCol, currentTimeMillis);
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record3 = transformer.transform(record3);
+      assertNotNull(record3);
+      assertEquals(record3.getValue(timeCol), currentTimeMillis);
     }
   }
 
