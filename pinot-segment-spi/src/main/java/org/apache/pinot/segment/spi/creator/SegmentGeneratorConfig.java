@@ -113,6 +113,8 @@ public class SegmentGeneratorConfig implements Serializable {
   private boolean _onHeap = false;
   private boolean _skipTimeValueCheck = false;
   private boolean _nullHandlingEnabled = false;
+  private boolean _continueOnError = false;
+  private boolean _validateTimeValue = false;
   private boolean _failOnEmptySegment = false;
   private boolean _optimizeDictionaryForMetrics = false;
   private double _noDictionarySizeRatioThreshold = DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
@@ -223,6 +225,8 @@ public class SegmentGeneratorConfig implements Serializable {
       _fstTypeForFSTIndex = tableConfig.getIndexingConfig().getFSTIndexType();
 
       _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
+      _continueOnError = indexingConfig.isContinueOnError();
+      _validateTimeValue = indexingConfig.isValidateTimeValue();
       _optimizeDictionaryForMetrics = indexingConfig.isOptimizeDictionaryForMetrics();
       _noDictionarySizeRatioThreshold = indexingConfig.getNoDictionarySizeRatioThreshold();
     }
@@ -782,6 +786,22 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
     _nullHandlingEnabled = nullHandlingEnabled;
+  }
+
+  public boolean isContinueOnError() {
+    return _continueOnError;
+  }
+
+  public void setContinueOnError(boolean continueOnError) {
+    _continueOnError = continueOnError;
+  }
+
+  public boolean isValidateTimeValue() {
+    return _validateTimeValue;
+  }
+
+  public void setValidateTimeValue(boolean validateTimeValue) {
+    _validateTimeValue = validateTimeValue;
   }
 
   public boolean isOptimizeDictionaryForMetrics() {
