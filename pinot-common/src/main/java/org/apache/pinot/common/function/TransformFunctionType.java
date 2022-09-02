@@ -65,6 +65,7 @@ public enum TransformFunctionType {
 
   AND("and"),
   OR("or"),
+  NOT("not"),
 
   CAST("cast"),
   CASE("case"),
