@@ -99,7 +99,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     List<RexExpression> functionOperands = ((RexExpression.FunctionCall) rexExpression).getFunctionOperands();
     Preconditions.checkState(functionOperands.size() < 2);
     return functionOperands.size() > 0 ? functionOperands.get(0)
-        : new RexExpression.Literal(FieldSpec.DataType.INT, SqlTypeName.INTEGER, 1) ;
+        : new RexExpression.Literal(FieldSpec.DataType.INT, SqlTypeName.INTEGER, 1);
   }
 
   @Override
