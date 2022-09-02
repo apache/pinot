@@ -76,17 +76,19 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // thus the final JOIN result will be 15 x 1 = 15.
         // Next join with table C which has (5 on server1 and 10 on server2), since data is identical. each of the row
         // of the A JOIN B will have identical value of col3 as table C.col3 has. Since the values are cycling between
-        // (1, 2, 42, 1, 2). we will have 6 1s, 6 2s, and 3 42s, total result count will be 36 + 36 + 9 = 81
-        new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col3 = c.col3", 81},
+        // (1, 42, 1, 42, 1). we will have 9 1s, and 6 42s, total result count will be 9 * 9 + 6 * 6 = 117
+        new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col3 = c.col3", 117},
 
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
         // thus the final JOIN result will be 15 x 1 = 15.
         new Object[]{"SELECT * FROM a JOIN b on a.col1 = b.col1", 15},
 
-        // Query with function in JOIN keys, table A and B are both (1, 2, 42, 1, 2), with table A cycling 3 times.
-        // Final result would have 6 x 2 = 12 (6 (1)s on with MOD result 1, on both tables)
-        //     + 9 x 1 = 9 (6 (2)s & 3 (42)s on table A MOD 2 = 0, 1 (42)s on table B MOD 3 = 0): 21 rows in total.
-        new Object[]{"SELECT a.col1, a.col3, b.col3 FROM a JOIN b ON MOD(a.col3, 2) = MOD(b.col3, 3)", 21},
+        // Query with function in JOIN keys, table A and B are both (1, 42, 1, 42, 1), with table A cycling 3 times.
+        // Because:
+        //   - MOD(a.col3, 2) will have 6 (42)s equal to 0 and 9 (1)s equals to 1
+        //   - MOD(b.col3, 3) will have 2 (42)s equal to 0 and 3 (1)s equals to 1;
+        // final results are 6 * 2 + 9 * 3 = 27 rows
+        new Object[]{"SELECT a.col1, a.col3, b.col3 FROM a JOIN b ON MOD(a.col3, 2) = MOD(b.col3, 3)", 39},
 
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
         // thus the final JOIN result will be 15 x 1 = 15.
@@ -100,6 +102,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
         // Projection pushdown
         new Object[]{"SELECT a.col1, a.col3 + a.col3 FROM a WHERE a.col3 >= 0 AND a.col2 = 'alice'", 3},
+
+        // Partial filter pushdown
+        new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND a.col3 > b.col3", 3},
 
         // Aggregation with group by
         new Object[]{"SELECT a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 GROUP BY a.col1", 5},
@@ -140,13 +145,15 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
             + "  (SELECT a.col2 AS joinKey, MAX(a.col3) AS maxVal FROM a GROUP BY a.col2) AS i "
             + "  ON b.col1 = i.joinKey", 3},
 
-        // Aggregate query with HAVING clause,
-        // - "foo" and "bar" occurred 6 times each and "alice" occurred 3 times. --> COUNT(*) < 5 matches "alice"
-        // - col2=="foo"<->col3==1, col2=="bar"<->col3==2, col2="alice"<->col3==42, so SUM(col3) >= 10 matches "bar"
+        // Aggregate query with HAVING clause, "foo" and "bar" occurred 6/2 times each and "alice" occurred 3/1 times
+        // numbers are cycle in (1, 42, 1, 42, 1), and (foo, bar, alice, foo, bar)
+        // - COUNT(*) < 5 matches "alice" (3 times)
+        // - COUNT(*) > 5 matches "foo" and "bar" (6 times); so both will be selected out SUM(a.col3) = (1 + 42) * 3
         // - last condition doesn't match anything.
+        // total to 3 rows.
         new Object[]{"SELECT a.col2, COUNT(*), MAX(a.col3), MIN(a.col3), SUM(a.col3) FROM a GROUP BY a.col2 "
-            + "HAVING COUNT(*) < 5 OR (COUNT(*) > 5 AND SUM(a.col3) >= 10) "
-            + "OR (MIN(a.col3) != 20 AND SUM(a.col3) = 100)", 2},
+            + "HAVING COUNT(*) < 5 OR (COUNT(*) > 5 AND SUM(a.col3) >= 10)"
+            + "OR (MIN(a.col3) != 20 AND SUM(a.col3) = 100)", 3},
     };
   }
 }

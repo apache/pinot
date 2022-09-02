@@ -73,7 +73,7 @@ public class QueryServerEnclosure {
   private static final int NUM_ROWS = 5;
   private static final int DEFAULT_EXECUTOR_THREAD_NUM = 5;
   private static final String[] STRING_FIELD_LIST = new String[]{"foo", "bar", "alice", "bob", "charlie"};
-  private static final int[] INT_FIELD_LIST = new int[]{1, 2, 42};
+  private static final int[] INT_FIELD_LIST = new int[]{1, 42};
 
   private final ExecutorService _testExecutor;
   private final int _queryRunnerPort;

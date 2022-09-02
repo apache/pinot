@@ -16,15 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.rules;
+package org.apache.calcite.rel.rules;
 
 import java.util.Arrays;
 import java.util.Collection;
 import org.apache.calcite.adapter.enumerable.EnumerableRules;
 import org.apache.calcite.plan.RelOptRule;
-import org.apache.calcite.rel.rules.CoreRules;
-import org.apache.calcite.rel.rules.PinotFilterIntoJoinRule;
-import org.apache.calcite.rel.rules.PruneEmptyRules;
 
 
 /**
