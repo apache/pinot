@@ -107,6 +107,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
   public void buildSegment()
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
+    TableConfig._disallowForwardIndexDisabled = false;
 
     // Get resource file path.
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
@@ -139,7 +140,6 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
           null, Collections.singletonMap(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString())));
 
       // Build table config based on segment 1 as it contains both columns under no forward index
-      TableConfig._disallowForwardIndexDisabled = false;
       _tableConfig =
           new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("daysSinceEpoch")
               .setFieldConfigList(fieldConfigList).setRangeIndexColumns(Arrays.asList("column6")).build();
@@ -213,6 +213,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
   @AfterTest
   public void deleteSegment() {
     FileUtils.deleteQuietly(INDEX_DIR);
+    TableConfig._disallowForwardIndexDisabled = true;
   }
 
   @Override
