@@ -908,8 +908,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for myCol1 without dictionary and with forward index disabled");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(),
-          "Forward index disabled columns must have dictionary and inverted index and must not be sorted");
+      Assert.assertEquals(e.getMessage(), "Forward index disabled columns must have dictionary and inverted index and "
+          + "must not be sorted or have range index with version < 2");
     }
 
     try {
@@ -922,8 +922,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for conflicting myCol2 with forward index disabled but no inverted index");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(),
-          "Forward index disabled columns must have dictionary and inverted index and must not be sorted");
+      Assert.assertEquals(e.getMessage(), "Forward index disabled columns must have dictionary and inverted index and "
+          + "must not be sorted or have range index with version < 2");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -953,8 +953,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for conflicting myCol2 with forward index disabled but is sorted");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(),
-          "Forward index disabled columns must have dictionary and inverted index and must not be sorted");
+      Assert.assertEquals(e.getMessage(), "Forward index disabled columns must have dictionary and inverted index and "
+          + "must not be sorted or have range index with version < 2");
     }
   }
 
