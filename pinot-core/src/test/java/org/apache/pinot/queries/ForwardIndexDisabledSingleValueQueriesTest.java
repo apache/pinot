@@ -48,9 +48,7 @@ import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -81,8 +79,8 @@ import static org.testng.Assert.assertTrue;
  */
 public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest {
   private static final String AVRO_DATA = "data" + File.separator + "test_data-sv.avro";
-  private static final String SEGMENT_NAME_1 = "testTable_126164076_167572854";
-  private static final String SEGMENT_NAME_2 = "testTable_126164076_167572855";
+  private static final String SEGMENT_NAME_1 = "testTable_126164076_167572857";
+  private static final String SEGMENT_NAME_2 = "testTable_126164076_167572858";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(),
       "ForwardIndexDisabledSingleValueQueriesTest");
 
@@ -96,15 +94,15 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       + " AND daysSinceEpoch = 126164076";
 
   private IndexSegment _indexSegment;
-  // Contains 2 index segments, one with 2 columns with no forward index enabled, and the other with just 1.
+  // Contains 2 index segments, one with 2 columns with forward index disabled, and the other with just 1.
   private List<IndexSegment> _indexSegments;
 
   private TableConfig _tableConfig;
   private List<String> _invertedIndexColumns;
   private List<String> _forwardIndexDisabledColumns;
 
-  @BeforeTest
-  public void buildSegment()
+  @BeforeClass
+  public void buildAndLoadSegment()
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
     TableConfig._disallowForwardIndexDisabled = false;
@@ -127,6 +125,12 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
 
     createSegment(filePath, SEGMENT_NAME_1, schema);
     createSegment(filePath, SEGMENT_NAME_2, schema);
+
+    ImmutableSegment immutableSegment1 = loadSegmentWithMetadataChecks(SEGMENT_NAME_1);
+    ImmutableSegment immutableSegment2 = loadSegmentWithMetadataChecks(SEGMENT_NAME_2);
+
+    _indexSegment = immutableSegment1;
+    _indexSegments = Arrays.asList(immutableSegment1, immutableSegment2);
   }
 
   private void createSegment(String filePath, String segmentName, Schema schema)
@@ -170,16 +174,6 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     driver.build();
   }
 
-  @BeforeClass
-  public void loadSegment()
-      throws Exception {
-    ImmutableSegment immutableSegment1 = loadSegmentWithMetadataChecks(SEGMENT_NAME_1);
-    ImmutableSegment immutableSegment2 = loadSegmentWithMetadataChecks(SEGMENT_NAME_2);
-
-    _indexSegment = immutableSegment1;
-    _indexSegments = Arrays.asList(immutableSegment1, immutableSegment2);
-  }
-
   private ImmutableSegment loadSegmentWithMetadataChecks(String segmentName)
       throws Exception {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
@@ -206,14 +200,10 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
   }
 
   @AfterClass
-  public void destroySegment() {
-    _indexSegments.forEach((IndexSegment::destroy));
-  }
-
-  @AfterTest
-  public void deleteSegment() {
+  public void deleteAndDestroySegment() {
     FileUtils.deleteQuietly(INDEX_DIR);
     TableConfig._disallowForwardIndexDisabled = true;
+    _indexSegments.forEach((IndexSegment::destroy));
   }
 
   @Override
