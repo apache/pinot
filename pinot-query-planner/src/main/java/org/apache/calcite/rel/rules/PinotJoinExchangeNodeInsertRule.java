@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.rules;
+package org.apache.calcite.rel.rules;
 
 import com.google.common.collect.ImmutableList;
 import java.util.List;
@@ -78,7 +78,7 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
     } else { // if (hints.contains(PinotRelationalHints.USE_HASH_DISTRIBUTE)) {
       RexCall joinCondition = (RexCall) join.getCondition();
       int leftNodeOffset = join.getLeft().getRowType().getFieldNames().size();
-      List<List<Integer>> conditions = PlannerUtils.parseJoinConditions(joinCondition, leftNodeOffset);
+      List<List<Integer>> conditions = PlannerUtils.getJoinKeyFromConditions(joinCondition, leftNodeOffset);
       leftExchange = LogicalExchange.create(leftInput,
           RelDistributions.hash(conditions.get(0)));
       rightExchange = LogicalExchange.create(rightInput,

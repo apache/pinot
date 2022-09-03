@@ -44,7 +44,7 @@ public class PlannerUtils {
     // do not instantiate.
   }
 
-  public static List<List<Integer>> parseJoinConditions(RexCall joinCondition, int leftNodeOffset) {
+  public static List<List<Integer>> getJoinKeyFromConditions(RexCall joinCondition, int leftNodeOffset) {
     switch (joinCondition.getOperator().getKind()) {
       case EQUALS:
         RexNode left = joinCondition.getOperands().get(0);
@@ -59,7 +59,7 @@ public class PlannerUtils {
         predicateColumns.add(new ArrayList<>());
         for (RexNode operand : joinCondition.getOperands()) {
           Preconditions.checkState(operand instanceof RexCall);
-          List<List<Integer>> subPredicate = parseJoinConditions((RexCall) operand, leftNodeOffset);
+          List<List<Integer>> subPredicate = getJoinKeyFromConditions((RexCall) operand, leftNodeOffset);
           predicateColumns.get(0).addAll(subPredicate.get(0));
           predicateColumns.get(1).addAll(subPredicate.get(1));
         }

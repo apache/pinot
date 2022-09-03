@@ -16,14 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.rules;
+package org.apache.calcite.rel.rules;
 
 import java.util.Arrays;
 import java.util.Collection;
 import org.apache.calcite.adapter.enumerable.EnumerableRules;
 import org.apache.calcite.plan.RelOptRule;
-import org.apache.calcite.rel.rules.CoreRules;
-import org.apache.calcite.rel.rules.PruneEmptyRules;
 
 
 /**
@@ -39,8 +37,8 @@ public class PinotQueryRuleSets {
           EnumerableRules.ENUMERABLE_PROJECT_RULE, EnumerableRules.ENUMERABLE_SORT_RULE,
           EnumerableRules.ENUMERABLE_TABLE_SCAN_RULE,
 
-          // push a filter into a join
-          CoreRules.FILTER_INTO_JOIN,
+          // push a filter into a join, replaced CoreRules.FILTER_INTO_JOIN with special config
+          PinotFilterIntoJoinRule.INSTANCE,
           // push filter through an aggregation
           CoreRules.FILTER_AGGREGATE_TRANSPOSE,
           // push filter through set operation

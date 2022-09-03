@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.rules;
+package org.apache.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
