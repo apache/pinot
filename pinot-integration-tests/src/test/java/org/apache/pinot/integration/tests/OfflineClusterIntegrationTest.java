@@ -142,7 +142,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String MAX_NUM_MULTI_VALUES_MAP_KEY = "maxNumMultiValuesMap";
   // TODO: This might lead to flaky test, as this disk size is not deterministic
   //       as it depends on the iteration order of a HashSet.
-  private static final int DISK_SIZE_IN_BYTES = 20797128;
+  private static final int DISK_SIZE_IN_BYTES = 20843088;
   private static final int NUM_ROWS = 115545;
 
   private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
