@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import com.uber.h3core.H3Core;
-import com.uber.h3core.exceptions.LineUndefinedException;
-import com.uber.h3core.util.GeoCoord;
+import com.uber.h3core.H3CoreV3;
+import com.uber.h3core.util.LatLng;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -44,13 +43,13 @@ public class H3Utils {
   private H3Utils() {
   }
 
-  public static final H3Core H3_CORE;
+  public static final H3CoreV3 H3_CORE;
 
   static {
     try {
-      H3_CORE = H3Core.newInstance();
+      H3_CORE = H3CoreV3.newInstance();
     } catch (IOException e) {
-      throw new RuntimeException("Failed to instantiate H3 instance", e);
+      throw new RuntimeException("Failed to instantiate H3 V3 instance", e);
     }
   }
 
@@ -63,7 +62,7 @@ public class H3Utils {
     for (int i = 0; i < endpointH3Cells.size() - 1; i++) {
       try {
         coveringH3Cells.addAll(H3_CORE.h3Line(endpointH3Cells.getLong(i), endpointH3Cells.getLong(i + 1)));
-      } catch (LineUndefinedException e) {
+      } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }
@@ -72,7 +71,7 @@ public class H3Utils {
 
   private static Pair<LongSet, LongSet> coverPolygonInH3(Polygon polygon, int resolution) {
     List<Long> polyfillCells = H3_CORE.polyfill(Arrays.stream(polygon.getExteriorRing().getCoordinates())
-            .map(coordinate -> new GeoCoord(coordinate.y, coordinate.x)).collect(Collectors.toList()),
+            .map(coordinate -> new LatLng(coordinate.y, coordinate.x)).collect(Collectors.toList()),
         Collections.emptyList(), resolution);
     // TODO: this can be further optimized to use native H3 implementation. They have plan to support natively.
     // https://github.com/apache/pinot/issues/8547
@@ -96,7 +95,7 @@ public class H3Utils {
   }
 
   private static Polygon createPolygonFromH3Cell(long h3Cell) {
-    List<GeoCoord> boundary = H3_CORE.h3ToGeoBoundary(h3Cell);
+    List<LatLng> boundary = H3_CORE.h3ToGeoBoundary(h3Cell);
     boundary.add(boundary.get(0));
     return GeometryUtils.GEOMETRY_FACTORY.createPolygon(
         boundary.stream().map(geoCoord -> new Coordinate(geoCoord.lng, geoCoord.lat)).toArray(Coordinate[]::new));
