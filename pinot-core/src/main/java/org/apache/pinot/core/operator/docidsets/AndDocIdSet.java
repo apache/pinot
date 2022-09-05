@@ -81,7 +81,7 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
       }
     }
 
-    bitmapBasedDocIdIterators.sort(Comparator.comparing(x-> x.getDocIds().getCardinality()));
+    bitmapBasedDocIdIterators.sort(Comparator.comparing(x -> x.getDocIds().getCardinality()));
 
     int numSortedDocIdIterators = sortedDocIdIterators.size();
     int numBitmapBasedDocIdIterators = bitmapBasedDocIdIterators.size();
