@@ -160,71 +160,7 @@ public class GenericRowSerializer {
 
     // Second pass: serialize the values
     for (int i = 0; i < _numFields; i++) {
-      Object value = row.getValue(_fieldNames[i]);
-
-      if (_isSingleValueFields[i]) {
-        switch (_storedTypes[i]) {
-          case INT:
-            byteBuffer.putInt((int) value);
-            break;
-          case LONG:
-            byteBuffer.putLong((long) value);
-            break;
-          case FLOAT:
-            byteBuffer.putFloat((float) value);
-            break;
-          case DOUBLE:
-            byteBuffer.putDouble((double) value);
-            break;
-          case STRING:
-            byte[] stringBytes = (byte[]) _stringBytes[i];
-            byteBuffer.putInt(stringBytes.length);
-            byteBuffer.put(stringBytes);
-            break;
-          case BYTES:
-            byte[] bytes = (byte[]) value;
-            byteBuffer.putInt(bytes.length);
-            byteBuffer.put(bytes);
-            break;
-          default:
-            throw new IllegalStateException("Unsupported SV stored type: " + _storedTypes[i]);
-        }
-      } else {
-        Object[] multiValue = (Object[]) value;
-        byteBuffer.putInt(multiValue.length);
-
-        switch (_storedTypes[i]) {
-          case INT:
-            for (Object element : multiValue) {
-              byteBuffer.putInt((int) element);
-            }
-            break;
-          case LONG:
-            for (Object element : multiValue) {
-              byteBuffer.putLong((long) element);
-            }
-            break;
-          case FLOAT:
-            for (Object element : multiValue) {
-              byteBuffer.putFloat((float) element);
-            }
-            break;
-          case DOUBLE:
-            for (Object element : multiValue) {
-              byteBuffer.putDouble((double) element);
-            }
-            break;
-          case STRING:
-            byte[][] stringBytesArray = (byte[][]) _stringBytes[i];
-            for (byte[] stringBytes : stringBytesArray) {
-              byteBuffer.putInt(stringBytes.length);
-              byteBuffer.put(stringBytes);
-            }
-            break;
-          default:
-            throw new IllegalStateException("Unsupported MV stored type: " + _storedTypes[i]);
-        }
-      }
+      serializeField(row, byteBuffer, i);
     }
 
     // Serialize null fields if enabled
@@ -236,5 +172,84 @@ public class GenericRowSerializer {
     }
 
     return serializedBytes;
+  }
+
+  public void serializeField(GenericRow row, ByteBuffer byteBuffer, int fieldIndex) {
+    Object value = row.getValue(_fieldNames[fieldIndex]);
+
+    if (_isSingleValueFields[fieldIndex]) {
+      switch (_storedTypes[fieldIndex]) {
+        case INT:
+          byteBuffer.putInt((int) value);
+          break;
+        case LONG:
+          byteBuffer.putLong((long) value);
+          break;
+        case FLOAT:
+          byteBuffer.putFloat((float) value);
+          break;
+        case DOUBLE:
+          byteBuffer.putDouble((double) value);
+          break;
+        case STRING:
+          byte[] stringBytes = (byte[]) _stringBytes[fieldIndex];
+          if (stringBytes == null) {
+            stringBytes = ((String) value).getBytes(UTF_8);
+          }
+          byteBuffer.putInt(stringBytes.length);
+          byteBuffer.put(stringBytes);
+          break;
+        case BYTES:
+          byte[] bytes = (byte[]) value;
+          byteBuffer.putInt(bytes.length);
+          byteBuffer.put(bytes);
+          break;
+        default:
+          throw new IllegalStateException("Unsupported SV stored type: " + _storedTypes[fieldIndex]);
+      }
+    } else {
+      Object[] multiValue = (Object[]) value;
+      byteBuffer.putInt(multiValue.length);
+
+      switch (_storedTypes[fieldIndex]) {
+        case INT:
+          for (Object element : multiValue) {
+            byteBuffer.putInt((int) element);
+          }
+          break;
+        case LONG:
+          for (Object element : multiValue) {
+            byteBuffer.putLong((long) element);
+          }
+          break;
+        case FLOAT:
+          for (Object element : multiValue) {
+            byteBuffer.putFloat((float) element);
+          }
+          break;
+        case DOUBLE:
+          for (Object element : multiValue) {
+            byteBuffer.putDouble((double) element);
+          }
+          break;
+        case STRING:
+          byte[][] stringBytesArray = (byte[][]) _stringBytes[fieldIndex];
+          if (stringBytesArray == null) {
+            for (Object element : multiValue) {
+              byte[] stringBytes = ((String) element).getBytes(UTF_8);
+              byteBuffer.putInt(stringBytes.length);
+              byteBuffer.put(stringBytes);
+            }
+          } else {
+            for (byte[] stringBytes : stringBytesArray) {
+              byteBuffer.putInt(stringBytes.length);
+              byteBuffer.put(stringBytes);
+            }
+          }
+          break;
+        default:
+          throw new IllegalStateException("Unsupported MV stored type: " + _storedTypes[fieldIndex]);
+      }
+    }
   }
 }

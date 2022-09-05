@@ -43,10 +43,12 @@ public class SegmentProcessorConfig {
   private final MergeType _mergeType;
   private final Map<String, AggregationFunctionType> _aggregationTypes;
   private final SegmentConfig _segmentConfig;
+  private boolean _useExtractedSortFields;
 
   private SegmentProcessorConfig(TableConfig tableConfig, Schema schema, TimeHandlerConfig timeHandlerConfig,
       List<PartitionerConfig> partitionerConfigs, MergeType mergeType,
-      Map<String, AggregationFunctionType> aggregationTypes, SegmentConfig segmentConfig) {
+      Map<String, AggregationFunctionType> aggregationTypes, SegmentConfig segmentConfig,
+      boolean useExtractedSortFields) {
     _tableConfig = tableConfig;
     _schema = schema;
     _timeHandlerConfig = timeHandlerConfig;
@@ -54,6 +56,7 @@ public class SegmentProcessorConfig {
     _mergeType = mergeType;
     _aggregationTypes = aggregationTypes;
     _segmentConfig = segmentConfig;
+    _useExtractedSortFields = useExtractedSortFields;
   }
 
   /**
@@ -109,7 +112,12 @@ public class SegmentProcessorConfig {
   public String toString() {
     return "SegmentProcessorConfig{" + "_tableConfig=" + _tableConfig + ", _schema=" + _schema + ", _timeHandlerConfig="
         + _timeHandlerConfig + ", _partitionerConfigs=" + _partitionerConfigs + ", _mergeType=" + _mergeType
-        + ", _aggregationTypes=" + _aggregationTypes + ", _segmentConfig=" + _segmentConfig + '}';
+        + ", _aggregationTypes=" + _aggregationTypes + ", _segmentConfig=" + _segmentConfig
+        + ", _useExtractedSortFields=" + _useExtractedSortFields + '}';
+  }
+
+  public boolean useExtractedSortFields() {
+    return _useExtractedSortFields;
   }
 
   /**
@@ -123,6 +131,7 @@ public class SegmentProcessorConfig {
     private MergeType _mergeType;
     private Map<String, AggregationFunctionType> _aggregationTypes;
     private SegmentConfig _segmentConfig;
+    private boolean _useExtractedSortFields;
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -159,6 +168,11 @@ public class SegmentProcessorConfig {
       return this;
     }
 
+    public Builder setUseExtractedSortFields(boolean useExtractedSortFields) {
+      _useExtractedSortFields = useExtractedSortFields;
+      return this;
+    }
+
     public SegmentProcessorConfig build() {
       Preconditions.checkState(_tableConfig != null, "Must provide table config in SegmentProcessorConfig");
       Preconditions.checkState(_schema != null, "Must provide schema in SegmentProcessorConfig");
@@ -179,7 +193,7 @@ public class SegmentProcessorConfig {
         _segmentConfig = new SegmentConfig.Builder().build();
       }
       return new SegmentProcessorConfig(_tableConfig, _schema, _timeHandlerConfig, _partitionerConfigs, _mergeType,
-          _aggregationTypes, _segmentConfig);
+          _aggregationTypes, _segmentConfig, _useExtractedSortFields);
     }
   }
 }

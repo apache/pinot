@@ -93,6 +93,9 @@ public class MinionConstants {
     public static final String ROUND_BUCKET_TIME_PERIOD_KEY = "roundBucketTimePeriod";
     public static final String PARTITION_BUCKET_TIME_PERIOD_KEY = "partitionBucketTimePeriod";
 
+    // Sort config
+    public static final String USE_EXTRACTED_SORT_FIELDS_KEY = "useExtractedSortFields";
+
     // Merge config
     public static final String MERGE_TYPE_KEY = "mergeType";
     public static final String AGGREGATION_TYPE_KEY_SUFFIX = ".aggregationType";

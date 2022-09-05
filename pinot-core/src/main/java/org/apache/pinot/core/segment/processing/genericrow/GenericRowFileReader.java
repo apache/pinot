@@ -18,11 +18,16 @@
  */
 package org.apache.pinot.core.segment.processing.genericrow;
 
+import java.io.BufferedOutputStream;
 import java.io.Closeable;
+import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.List;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -38,8 +43,14 @@ public class GenericRowFileReader implements Closeable {
   private final GenericRowDeserializer _deserializer;
   private final int _numSortFields;
 
+  // Write fields used for sorting into a tmp file to improve data locality for sorting.
+  private PinotDataBuffer _sortFieldsOffsetBuffer;
+  private PinotDataBuffer _sortFieldsDataBuffer;
+  private File _sortFieldsOffsetFile;
+  private File _sortFieldsDataFile;
+
   public GenericRowFileReader(File offsetFile, File dataFile, List<FieldSpec> fieldSpecs, boolean includeNullFields,
-      int numSortFields)
+      int numSortFields, boolean useExtractedSortFields)
       throws IOException {
     long offsetFileLength = offsetFile.length();
     _numRows = (int) (offsetFileLength >>> 3); // offsetFileLength / Long.BYTES
@@ -49,6 +60,51 @@ public class GenericRowFileReader implements Closeable {
         .mapFile(dataFile, true, 0L, dataFile.length(), PinotDataBuffer.NATIVE_ORDER, "GenericRow data buffer");
     _deserializer = new GenericRowDeserializer(_dataBuffer, fieldSpecs, includeNullFields);
     _numSortFields = numSortFields;
+    // TODO: add support for multi sort fields.
+    if (_numSortFields == 1 && useExtractedSortFields) {
+      extractSortFields(fieldSpecs, offsetFile, dataFile);
+    }
+  }
+
+  private void extractSortFields(List<FieldSpec> fieldSpecs, File offsetFileFullRow, File dataFileFullRow)
+      throws IOException {
+    _sortFieldsOffsetFile = new File(offsetFileFullRow.getAbsoluteFile() + "_sort_fields");
+    _sortFieldsDataFile = new File(dataFileFullRow.getAbsoluteFile() + "_sort_fields");
+
+    try (DataOutputStream offsetStream = new DataOutputStream(
+        new BufferedOutputStream(new FileOutputStream(_sortFieldsOffsetFile)));
+        BufferedOutputStream dataStream = new BufferedOutputStream(new FileOutputStream(_sortFieldsDataFile))) {
+      GenericRowSerializer serializer = new GenericRowSerializer(fieldSpecs, false);
+      // Use GenericRow to retrieve the sort fields and write them into a temp file.
+      GenericRow rowBuffer = new GenericRow();
+      byte[] valBytes = new byte[1024];
+      ByteBuffer valBuffer = ByteBuffer.wrap(valBytes).order(PinotDataBuffer.NATIVE_ORDER);
+      long nextValueOffset = 0;
+      for (int rowId = 0; rowId < _numRows; rowId++) {
+        long rowOffset = _offsetBuffer.getLong((long) rowId << 3);
+        // The sort fields are placed at the first few places in fieldSpecs.
+        // For now, we only optimize when a single sort field is specified.
+        long nextColumnOffset = _deserializer.deserializeField(_dataBuffer, rowOffset, rowBuffer, 0);
+        int valueSize = (int) (nextColumnOffset - rowOffset);
+        if (valBytes.length < valueSize) {
+          valBytes = new byte[valueSize * 2];
+          valBuffer = ByteBuffer.wrap(valBytes).order(PinotDataBuffer.NATIVE_ORDER);
+        }
+        valBuffer.clear();
+        serializer.serializeField(rowBuffer, valBuffer, 0);
+
+        // Write the sort field and the offset into tmp files.
+        dataStream.write(valBytes, 0, valueSize);
+        offsetStream.writeLong(nextValueOffset);
+        nextValueOffset += valueSize;
+      }
+    }
+    _sortFieldsOffsetBuffer = PinotDataBuffer
+        .mapFile(_sortFieldsOffsetFile, true, 0L, _sortFieldsOffsetFile.length(), ByteOrder.BIG_ENDIAN,
+            "Sort fields offset buffer");
+    _sortFieldsDataBuffer = PinotDataBuffer
+        .mapFile(_sortFieldsDataFile, true, 0L, _sortFieldsDataFile.length(), PinotDataBuffer.NATIVE_ORDER,
+            "Sort fields data buffer");
   }
 
   /**
@@ -77,6 +133,13 @@ public class GenericRowFileReader implements Closeable {
    * Compares the rows at the given row ids. Only compare the values for the sort fields.
    */
   public int compare(int rowId1, int rowId2) {
+    // Sort with the extracted sort fields for better data locality.
+    if (_sortFieldsOffsetBuffer != null) {
+      long offset1 = _sortFieldsOffsetBuffer.getLong((long) rowId1 << 3); // rowId1 * Long.BYTES
+      long offset2 = _sortFieldsOffsetBuffer.getLong((long) rowId2 << 3); // rowId2 * Long.BYTES
+      return _deserializer.compareField(_sortFieldsDataBuffer, offset1, offset2, 0);
+    }
+    // By default continue to sort with the row oriented data file.
     long offset1 = _offsetBuffer.getLong((long) rowId1 << 3); // rowId1 * Long.BYTES
     long offset2 = _offsetBuffer.getLong((long) rowId2 << 3); // rowId2 * Long.BYTES
     return _deserializer.compare(offset1, offset2, _numSortFields);
@@ -94,5 +157,12 @@ public class GenericRowFileReader implements Closeable {
       throws IOException {
     _offsetBuffer.close();
     _dataBuffer.close();
+
+    if (_sortFieldsOffsetBuffer != null) {
+      _sortFieldsOffsetBuffer.close();
+      _sortFieldsDataBuffer.close();
+      FileUtils.deleteQuietly(_sortFieldsOffsetFile);
+      FileUtils.deleteQuietly(_sortFieldsDataFile);
+    }
   }
 }

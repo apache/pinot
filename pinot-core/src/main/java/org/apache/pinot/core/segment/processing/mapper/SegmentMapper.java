@@ -65,6 +65,7 @@ public class SegmentMapper {
   private final List<FieldSpec> _fieldSpecs;
   private final boolean _includeNullFields;
   private final int _numSortFields;
+  private final boolean _useExtractedSortFields;
 
   private final CompositeTransformer _recordTransformer;
   private final TimeHandler _timeHandler;
@@ -83,6 +84,7 @@ public class SegmentMapper {
         .getFieldSpecs(schema, processorConfig.getMergeType(), tableConfig.getIndexingConfig().getSortedColumn());
     _fieldSpecs = pair.getLeft();
     _numSortFields = pair.getRight();
+    _useExtractedSortFields = processorConfig.useExtractedSortFields();
     _includeNullFields = tableConfig.getIndexingConfig().isNullHandlingEnabled();
     _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
     _timeHandler = TimeHandlerFactory.getTimeHandler(processorConfig);
@@ -159,7 +161,8 @@ public class SegmentMapper {
     if (fileManager == null) {
       File partitionOutputDir = new File(_mapperOutputDir, partition);
       FileUtils.forceMkdir(partitionOutputDir);
-      fileManager = new GenericRowFileManager(partitionOutputDir, _fieldSpecs, _includeNullFields, _numSortFields);
+      fileManager = new GenericRowFileManager(partitionOutputDir, _fieldSpecs, _includeNullFields, _numSortFields,
+          _useExtractedSortFields);
       _partitionToFileManagerMap.put(partition, fileManager);
     }
 
