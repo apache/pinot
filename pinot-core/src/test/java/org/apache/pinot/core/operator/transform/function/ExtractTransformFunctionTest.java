@@ -35,11 +35,11 @@ public class ExtractTransformFunctionTest extends BaseTransformFunctionTest {
   public static Object[][] testCases() {
     return new Object[][]{
         //@formatter:off
-        {"year", (LongToIntFunction) DateTimeFunctions::year}, 
-        {"month", (LongToIntFunction) DateTimeFunctions::month}, 
-        {"day", (LongToIntFunction) DateTimeFunctions::dayOfMonth}, 
-        {"hour", (LongToIntFunction) DateTimeFunctions::hour}, 
-        {"minute", (LongToIntFunction) DateTimeFunctions::minute}, 
+        {"year", (LongToIntFunction) DateTimeFunctions::year},
+        {"month", (LongToIntFunction) DateTimeFunctions::month},
+        {"day", (LongToIntFunction) DateTimeFunctions::dayOfMonth},
+        {"hour", (LongToIntFunction) DateTimeFunctions::hour},
+        {"minute", (LongToIntFunction) DateTimeFunctions::minute},
         {"second", (LongToIntFunction) DateTimeFunctions::second},
         // TODO: Need to add timezone_hour and timezone_minute
 //      "timezone_hour",
@@ -50,7 +50,7 @@ public class ExtractTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test(dataProvider = "testCases")
   public void testExtractTransformFunction(String field, LongToIntFunction expected) {
-    // NOTE: functionality of ExtractTransformFunction is covered in ExtractTransformFunctionTest  
+    // NOTE: functionality of ExtractTransformFunction is covered in ExtractTransformFunctionTest
     // SELECT EXTRACT(YEAR FROM '2017-10-10')
 
     ExpressionContext expression =
