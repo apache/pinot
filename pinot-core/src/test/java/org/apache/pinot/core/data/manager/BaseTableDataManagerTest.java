@@ -141,7 +141,7 @@ public class BaseTableDataManagerTest {
     BaseTableDataManager tmgr = createTableManager();
     File defaultSegDir = tmgr.getSegmentDataDir(segName);
     assertFalse(defaultSegDir.exists());
-    tmgr.reloadSegment(segName, createIndexLoadingConfig("multidir", tableConfig), zkmd, llmd, null, false);
+    tmgr.reloadSegment(segName, createIndexLoadingConfig("tierBased", tableConfig), zkmd, llmd, null, false);
     assertTrue(defaultSegDir.exists());
     llmd = new SegmentMetadataImpl(defaultSegDir);
     assertEquals(llmd.getTotalDocs(), 5);
@@ -151,7 +151,7 @@ public class BaseTableDataManagerTest {
     when(llmd.getCrc()).thenReturn("0");
     tableConfig = createTableConfigWithTier(tierName, new File(TEMP_DIR, tierName));
     tmgr = createTableManager();
-    IndexLoadingConfig loadingCfg = createIndexLoadingConfig("multidir", tableConfig);
+    IndexLoadingConfig loadingCfg = createIndexLoadingConfig("tierBased", tableConfig);
     tmgr.reloadSegment(segName, loadingCfg, zkmd, llmd, null, false);
     File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg);
     assertTrue(segDirOnTier.exists());
@@ -209,7 +209,7 @@ public class BaseTableDataManagerTest {
 
     // No dataDir for coolTier, thus stay on default tier.
     BaseTableDataManager tmgr = createTableManager();
-    tmgr.reloadSegment(segName, createIndexLoadingConfig("multidir", tableConfig), zkmd, llmd, null, false);
+    tmgr.reloadSegment(segName, createIndexLoadingConfig("tierBased", tableConfig), zkmd, llmd, null, false);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
     llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
     assertEquals(llmd.getTotalDocs(), 5);
@@ -220,7 +220,7 @@ public class BaseTableDataManagerTest {
     when(llmd.getCrc()).thenReturn(segCrc);
     tableConfig = createTableConfigWithTier(tierName, new File(TEMP_DIR, tierName));
     tmgr = createTableManager();
-    IndexLoadingConfig loadingCfg = createIndexLoadingConfig("multidir", tableConfig);
+    IndexLoadingConfig loadingCfg = createIndexLoadingConfig("tierBased", tableConfig);
     tmgr.reloadSegment(segName, loadingCfg, zkmd, llmd, null, false);
     File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg);
     assertTrue(segDirOnTier.exists());
@@ -355,7 +355,7 @@ public class BaseTableDataManagerTest {
     BaseTableDataManager tmgr = createTableManager();
     File defaultSegDir = tmgr.getSegmentDataDir(segName);
     assertFalse(defaultSegDir.exists());
-    tmgr.addOrReplaceSegment(segName, createIndexLoadingConfig("multidir", tableConfig), zkmd, llmd);
+    tmgr.addOrReplaceSegment(segName, createIndexLoadingConfig("tierBased", tableConfig), zkmd, llmd);
     assertTrue(defaultSegDir.exists());
     llmd = new SegmentMetadataImpl(defaultSegDir);
     assertEquals(llmd.getTotalDocs(), 5);
@@ -365,7 +365,7 @@ public class BaseTableDataManagerTest {
     when(llmd.getCrc()).thenReturn("0");
     tableConfig = createTableConfigWithTier(tierName, new File(TEMP_DIR, tierName));
     tmgr = createTableManager();
-    IndexLoadingConfig loadingCfg = createIndexLoadingConfig("multidir", tableConfig);
+    IndexLoadingConfig loadingCfg = createIndexLoadingConfig("tierBased", tableConfig);
     tmgr.addOrReplaceSegment(segName, loadingCfg, zkmd, llmd);
     File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg);
     assertTrue(segDirOnTier.exists());
@@ -438,7 +438,7 @@ public class BaseTableDataManagerTest {
 
     // No dataDir for coolTier, thus stay on default tier.
     BaseTableDataManager tmgr = createTableManager();
-    tmgr.addOrReplaceSegment(segName, createIndexLoadingConfig("multidir", tableConfig), zkmd, null);
+    tmgr.addOrReplaceSegment(segName, createIndexLoadingConfig("tierBased", tableConfig), zkmd, null);
     assertTrue(tmgr.getSegmentDataDir(segName).exists());
     SegmentMetadataImpl llmd = new SegmentMetadataImpl(tmgr.getSegmentDataDir(segName));
     assertEquals(llmd.getTotalDocs(), 5);
@@ -446,7 +446,7 @@ public class BaseTableDataManagerTest {
 
     // Configured dataDir for coolTier, thus move to new dir.
     tableConfig = createTableConfigWithTier(tierName, new File(TEMP_DIR, tierName));
-    IndexLoadingConfig loadingCfg = createIndexLoadingConfig("multidir", tableConfig);
+    IndexLoadingConfig loadingCfg = createIndexLoadingConfig("tierBased", tableConfig);
     File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg);
     assertFalse(segDirOnTier.exists());
     // Move segDir to new tier to see if addOrReplaceSegment() can load segDir from new tier directly.

@@ -53,8 +53,7 @@ public final class TierConfigUtils {
 
   public static String getDataDirFromTierConfig(String tableNameWithType, String tierName, TableConfig tableConfig) {
     List<TierConfig> tierCfgs = tableConfig.getTierConfigsList();
-    Preconditions
-        .checkState(tierCfgs != null && !tierCfgs.isEmpty(), "No tierConfigs for table: %s", tableNameWithType);
+    Preconditions.checkState(CollectionUtils.isNotEmpty(tierCfgs), "No tierConfigs for table: %s", tableNameWithType);
     TierConfig tierCfg = null;
     for (TierConfig tc : tierCfgs) {
       if (tierName.equalsIgnoreCase(tc.getName())) {

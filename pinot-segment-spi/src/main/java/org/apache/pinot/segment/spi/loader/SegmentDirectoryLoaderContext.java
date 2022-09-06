@@ -85,10 +85,10 @@ public class SegmentDirectoryLoaderContext {
     private TableConfig _tableConfig;
     private Schema _schema;
     private String _instanceId;
+    private String _tableDataDir;
     private String _segmentName;
     private String _segmentCrc;
     private String _segmentTier;
-    private String _tableDataDir;
     private PinotConfiguration _segmentDirectoryConfigs;
 
     public Builder setTableConfig(TableConfig tableConfig) {
@@ -106,6 +106,11 @@ public class SegmentDirectoryLoaderContext {
       return this;
     }
 
+    public Builder setTableDataDir(String tableDataDir) {
+      _tableDataDir = tableDataDir;
+      return this;
+    }
+
     public Builder setSegmentName(String segmentName) {
       _segmentName = segmentName;
       return this;
@@ -118,11 +123,6 @@ public class SegmentDirectoryLoaderContext {
 
     public Builder setSegmentTier(String segmentTier) {
       _segmentTier = segmentTier;
-      return this;
-    }
-
-    public Builder setTableDataDir(String tableDataDir) {
-      _tableDataDir = tableDataDir;
       return this;
     }
 

@@ -37,9 +37,9 @@ import org.slf4j.LoggerFactory;
 /**
  * Implementation of {@link SegmentDirectoryLoader} that can move segments across data dirs configured as storage tiers.
  */
-@SegmentLoader(name = "multidir")
-public class MultiDirSegmentDirectoryLoader implements SegmentDirectoryLoader {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MultiDirSegmentDirectoryLoader.class);
+@SegmentLoader(name = "tierBased")
+public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TierBasedSegmentDirectoryLoader.class);
 
   /**
    * Creates and loads the {@link SegmentLocalFSDirectory} which is the default implementation of

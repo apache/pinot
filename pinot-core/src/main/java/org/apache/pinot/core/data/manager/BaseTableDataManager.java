@@ -224,7 +224,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema, true, _tableDataDir, null));
   }
 
   @Override
@@ -598,7 +598,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @VisibleForTesting
-  File getSegmentDataDir(String segmentName, String segmentTier, IndexLoadingConfig indexLoadingConfig) {
+  File getSegmentDataDir(String segmentName, @Nullable String segmentTier, IndexLoadingConfig indexLoadingConfig) {
     if (segmentTier == null) {
       return getSegmentDataDir(segmentName);
     }
@@ -614,6 +614,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
+  @Nullable
   private String getSegmentCurrentTier(String segmentName) {
     SegmentDataManager segment = _segmentDataManagerMap.get(segmentName);
     if (segment != null && segment.getSegment() instanceof ImmutableSegment) {
