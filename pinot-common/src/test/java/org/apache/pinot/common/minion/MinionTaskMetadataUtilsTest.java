@@ -92,7 +92,7 @@ public class MinionTaskMetadataUtilsTest {
     assertFalse(propertyStore.exists(OLD_MINION_METADATA_PATH, ACCESS_OPTION));
     assertFalse(propertyStore.exists(NEW_MINION_METADATA_PATH, ACCESS_OPTION));
 
-    //
+    // ZNode MINION_TASK_METADATA/TestTable_OFFLINE and its descendants will be removed
     propertyStore = new FakePropertyStore();
     propertyStore.set(NEW_MINION_METADATA_PATH, NEW_TASK_METADATA.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
     assertTrue(propertyStore.exists(NEW_MINION_METADATA_PATH, ACCESS_OPTION));
