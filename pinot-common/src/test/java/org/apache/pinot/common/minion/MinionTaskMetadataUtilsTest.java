@@ -91,6 +91,13 @@ public class MinionTaskMetadataUtilsTest {
     MinionTaskMetadataUtils.deleteTaskMetadata(propertyStore, TASK_TYPE, TABLE_NAME_WITH_TYPE);
     assertFalse(propertyStore.exists(OLD_MINION_METADATA_PATH, ACCESS_OPTION));
     assertFalse(propertyStore.exists(NEW_MINION_METADATA_PATH, ACCESS_OPTION));
+
+    //
+    propertyStore = new FakePropertyStore();
+    propertyStore.set(NEW_MINION_METADATA_PATH, NEW_TASK_METADATA.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
+    assertTrue(propertyStore.exists(NEW_MINION_METADATA_PATH, ACCESS_OPTION));
+    MinionTaskMetadataUtils.deleteTaskMetadata(propertyStore, TABLE_NAME_WITH_TYPE);
+    assertFalse(propertyStore.exists(NEW_MINION_METADATA_PATH, ACCESS_OPTION));
   }
 
   @Test

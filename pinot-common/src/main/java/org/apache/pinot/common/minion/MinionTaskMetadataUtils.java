@@ -36,7 +36,7 @@ public final class MinionTaskMetadataUtils {
   }
 
   /**
-   * Fetches the ZNRecord for the given minion task and tableName. Fetch from the new path
+   * Fetches the minion task metadata ZNRecord for the given minion task and tableName. Fetch from the new path
    * MINION_TASK_METADATA/${tableNameWthType}/{taskType} if it exists; otherwise, fetch from the old path
    * MINION_TASK_METADATA/${taskType}/${tableNameWthType}.
    */
@@ -63,7 +63,7 @@ public final class MinionTaskMetadataUtils {
   }
 
   /**
-   * Deletes the ZNRecord for the given minion task and tableName, from both the new path
+   * Deletes the minion task metadata ZNRecord for the given minion task and tableName, from both the new path
    * MINION_TASK_METADATA/${tableNameWthType}/${taskType} and the old path
    * MINION_TASK_METADATA/${taskType}/${tableNameWthType}.
    */
@@ -80,9 +80,20 @@ public final class MinionTaskMetadataUtils {
   }
 
   /**
+   * Deletes the minion task metadata ZNRecord for the given tableName, from
+   * MINION_TASK_METADATA/${tableNameWthType}
+   */
+  public static void deleteTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
+    String path = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(tableNameWithType);
+    if (!propertyStore.remove(path, AccessOption.PERSISTENT)) {
+      throw new ZkException("Failed to delete task metadata for table: " + tableNameWithType);
+    }
+  }
+
+  /**
    * Generic method for persisting {@link BaseTaskMetadata} to MINION_TASK_METADATA. The metadata will
    * be saved in the ZNode under the new path /MINION_TASK_METADATA/${tableNameWithType}/${taskType} if
-   * the old path already exists; otherwise, it will be saved in the ZNode under the old path
+   * it exists or the old path does not exist; otherwise, it will be saved in the ZNode under the old path
    * /MINION_TASK_METADATA/${taskType}/${tableNameWithType}.
    *
    * Will fail if expectedVersion does not match.
