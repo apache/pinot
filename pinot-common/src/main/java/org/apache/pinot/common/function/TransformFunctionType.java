@@ -65,7 +65,7 @@ public enum TransformFunctionType {
 
   AND("and"),
   OR("or"),
-  NOT("not"),
+  NOT("not"),   // NOT operator doesn't cover the transform for NOT IN and NOT LIKE
 
   CAST("cast"),
   CASE("case"),

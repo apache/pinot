@@ -42,6 +42,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
  *
  * Sample Usage:
  *    Not(booleanA)
+ *    Not booleanA
  */
 public class NotOperatorTransformFunction extends BaseTransformFunction {
   private TransformFunction _argument;

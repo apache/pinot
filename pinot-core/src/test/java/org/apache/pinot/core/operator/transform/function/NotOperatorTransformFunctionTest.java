@@ -53,6 +53,24 @@ public class NotOperatorTransformFunctionTest extends BaseTransformFunctionTest 
     testTransformFunction(func, notTrueExpectedIntValues);
   }
 
+  // Test that not operator also works for not literal
+  @Test
+  public void testNonLiteralSupport() {
+    ExpressionContext expr =
+        RequestContextUtils.getExpression(String.format("Not (%s != %d)", INT_SV_COLUMN, _intSVValues[0]));
+    TransformFunction func = TransformFunctionFactory.get(expr, _dataSourceMap);
+    Assert.assertEquals(func.getName(), "not");
+    int[] expectedIntValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (_intSVValues[i] == _intSVValues[0]) {
+        expectedIntValues[i] = 1;
+      } else {
+        expectedIntValues[i] = 0;
+      }
+    }
+    testTransformFunction(func, expectedIntValues);
+  }
+
   // Test illegal arguments for not transform.
   @Test
   public void testIllegalNotOperatorTransformFunction() {
