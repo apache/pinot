@@ -25,7 +25,6 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
 
 /**
@@ -45,6 +44,9 @@ import org.apache.pinot.spi.utils.ArrayCopyUtils;
  *    Not(booleanA)
  */
 public class NotOperatorTransformFunction extends BaseTransformFunction {
+  private TransformFunction _argument;
+  private int[] _results;
+
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     Preconditions.checkArgument(arguments.size() == 1, "Exact 1 argument1 is required for not transform function");
@@ -68,12 +70,12 @@ public class NotOperatorTransformFunction extends BaseTransformFunction {
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int numDocs = projectionBlock.getNumDocs();
-    if (_results == null || _results.length < numDocs) {
+    if (_results == null) {
       _results = new int[numDocs];
     }
-    ArrayCopyUtils.copy(_argument.transformToIntValuesSV(projectionBlock), _results, numDocs);
+    int[] intValues = _argument.transformToIntValuesSV(projectionBlock);
     for (int i = 0; i < numDocs; i++) {
-      _results[i] = getLogicalNegate(_results[i]);
+      _results[i] = getLogicalNegate(intValues[i]);
     }
     return _results;
   }
@@ -84,7 +86,4 @@ public class NotOperatorTransformFunction extends BaseTransformFunction {
     }
     return 0;
   }
-
-  private TransformFunction _argument;
-  private int[] _results;
 }
