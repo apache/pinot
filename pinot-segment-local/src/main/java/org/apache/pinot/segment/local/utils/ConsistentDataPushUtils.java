@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -128,16 +127,6 @@ public class ConsistentDataPushUtils {
       URI controllerUri = entry.getKey();
       URI startSegmentUri = entry.getValue();
       List<String> segmentsFrom = uriToSegmentsFrom.get(controllerUri);
-
-      if (!Collections.disjoint(segmentsFrom, segmentsTo)) {
-        String errorMsg =
-            String.format("Found same segment names when attempting to enable consistent push for table: %s",
-                rawTableName);
-        LOGGER.error("SegmentsFrom: {}", segmentsFrom);
-        LOGGER.error("SegmentsTo: {}", segmentsTo);
-        LOGGER.error(errorMsg);
-        throw new RuntimeException(errorMsg);
-      }
 
       StartReplaceSegmentsRequest startReplaceSegmentsRequest =
           new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo);

@@ -800,7 +800,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return tableTypeToSegments;
   }
 
-  public List<String> getSegmentNamesFromResponse(String tableType, String responseString)
+  private List<String> getSegmentNamesFromResponse(String tableType, String responseString)
       throws IOException {
     List<String> segments = new ArrayList<>();
     JsonNode responseJsonNode = JsonUtils.stringToJsonNode(responseString);
