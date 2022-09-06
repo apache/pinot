@@ -159,6 +159,7 @@ public class TransformFunctionFactory {
     // logical functions
     typeToImplementation.put(TransformFunctionType.AND, AndOperatorTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.OR, OrOperatorTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.NOT, NotOperatorTransformFunction.class);
 
     // geo functions
     // geo constructors
