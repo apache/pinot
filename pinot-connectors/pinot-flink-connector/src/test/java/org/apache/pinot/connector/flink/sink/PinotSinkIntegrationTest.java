@@ -142,7 +142,7 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
   private int getNumSegments()
       throws IOException {
     String jsonOutputStr = sendGetRequest(
-        _controllerRequestURLBuilder.forSegmentListAPIWithTableType(OFFLINE_TABLE_NAME, TableType.OFFLINE.toString()));
+        _controllerRequestURLBuilder.forSegmentListAPI(OFFLINE_TABLE_NAME, TableType.OFFLINE.toString()));
     JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
     return array.get(0).get("OFFLINE").size();
   }
@@ -150,7 +150,7 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
   private int getTotalNumDocs()
       throws IOException {
     String jsonOutputStr = sendGetRequest(
-        _controllerRequestURLBuilder.forSegmentListAPIWithTableType(OFFLINE_TABLE_NAME, TableType.OFFLINE.toString()));
+        _controllerRequestURLBuilder.forSegmentListAPI(OFFLINE_TABLE_NAME, TableType.OFFLINE.toString()));
     JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
     JsonNode segments = array.get(0).get("OFFLINE");
     int totalDocCount = 0;

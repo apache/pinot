@@ -341,8 +341,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
   private JsonNode getSegmentsList()
       throws IOException {
     return JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPIWithTableType(DEFAULT_TABLE_NAME,
-                TableType.OFFLINE.toString())))
+            _controllerRequestURLBuilder.forSegmentListAPI(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString())))
         .get(0).get("OFFLINE");
   }
 

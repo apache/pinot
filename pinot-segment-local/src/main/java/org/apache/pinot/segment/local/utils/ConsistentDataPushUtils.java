@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
@@ -30,7 +29,6 @@ import javax.ws.rs.core.Response;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
-import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
@@ -58,24 +56,17 @@ public class ConsistentDataPushUtils {
   public static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";
 
   /**
-   * Checks for enablement of consistent data push. If enabled, fetch the list of segments to be replaced, then
-   * invoke startReplaceSegments API and returns a map of controller URI to lineage entry IDs.
-   * If not, returns an empty hashmap.
+   * Fetch the list of segments to be replaced, then invoke startReplaceSegments API and returns a map of controller
+   * URI to lineage entry IDs.
    */
   public static Map<URI, String> preUpload(SegmentGenerationJobSpec spec, List<String> segmentsTo)
       throws Exception {
     String rawTableName = spec.getTableSpec().getTableName();
-    boolean consistentDataPushEnabled = consistentDataPushEnabled(spec);
-    LOGGER.info("Consistent data push is: {}", consistentDataPushEnabled ? "enabled" : "disabled");
-    Map<URI, String> uriToLineageEntryIdMap = null;
-    if (consistentDataPushEnabled) {
-      LOGGER.info("Start consistent push for table: " + rawTableName);
-      Map<URI, List<String>> uriToExistingOfflineSegments = getSegmentsToReplace(spec, rawTableName);
-      LOGGER.info("Existing segments for table {}: " + uriToExistingOfflineSegments, rawTableName);
-      LOGGER.info("New segments for table: {}: " + segmentsTo, rawTableName);
-      uriToLineageEntryIdMap = startReplaceSegments(spec, uriToExistingOfflineSegments, segmentsTo);
-    }
-    return uriToLineageEntryIdMap;
+    LOGGER.info("Start consistent push for table: " + rawTableName);
+    Map<URI, List<String>> uriToExistingOfflineSegments = getSegmentsToReplace(spec, rawTableName);
+    LOGGER.info("Existing segments for table {}: " + uriToExistingOfflineSegments, rawTableName);
+    LOGGER.info("New segments for table: {}: " + segmentsTo, rawTableName);
+    return startReplaceSegments(spec, uriToExistingOfflineSegments, segmentsTo);
   }
 
   /**
@@ -221,27 +212,22 @@ public class ConsistentDataPushUtils {
     }
   }
 
-  public static TableConfig getTableConfig(SegmentGenerationJobSpec spec) {
-    String rawTableName = spec.getTableSpec().getTableName();
-    TableConfig tableConfig =
-        SegmentGenerationUtils.getTableConfig(spec.getTableSpec().getTableConfigURI(), spec.getAuthToken());
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", rawTableName);
-    return tableConfig;
-  }
-
-  public static boolean consistentDataPushEnabled(SegmentGenerationJobSpec spec) {
-    TableConfig tableConfig = getTableConfig(spec);
+  public static boolean consistentDataPushEnabled(TableConfig tableConfig) {
     // Enable consistent data push only if "consistentDataPush" is set to true in batch ingestion config and the
     // table is REFRESH use case.
     // TODO: Remove the check for REFRESH when we support consistent push for APPEND table
-    return "REFRESH".equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig))
-        && IngestionConfigUtils.getBatchSegmentIngestionConsistentDataPushEnabled(tableConfig);
+    boolean consistentDataPushEnabled =
+        "REFRESH".equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig))
+            && IngestionConfigUtils.getBatchSegmentIngestionConsistentDataPushEnabled(tableConfig);
+    LOGGER.info("Consistent data push is: {}", consistentDataPushEnabled ? "enabled" : "disabled");
+    return consistentDataPushEnabled;
   }
 
   /**
    * Returns a map of controller URI to a list of existing OFFLINE segments.
    */
-  public static Map<URI, List<String>> getSegmentsToReplace(SegmentGenerationJobSpec spec, String rawTableName) {
+  public static Map<URI, List<String>> getSegmentsToReplace(SegmentGenerationJobSpec spec, String rawTableName)
+      throws Exception {
     Map<URI, List<String>> uriToOfflineSegments = new HashMap<>();
     for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
       URI controllerURI;
@@ -254,32 +240,27 @@ public class ConsistentDataPushUtils {
         uriToOfflineSegments.put(controllerURI, offlineSegments);
       } catch (URISyntaxException e) {
         throw new RuntimeException("Got invalid controller uri - '" + pinotClusterSpec.getControllerURI() + "'");
-      } catch (Exception e) {
-        e.printStackTrace();
       }
     }
     return uriToOfflineSegments;
   }
 
   /**
-   * If consistent data push is enabled, append current timestamp to existing configured segment name postfix, if
-   * configured, to make segment name unique.
+   * Append current timestamp to existing configured segment name postfix, if configured, to make segment name unique.
    */
   public static void configureSegmentPostfix(SegmentGenerationJobSpec spec) {
     SegmentNameGeneratorSpec segmentNameGeneratorSpec = spec.getSegmentNameGeneratorSpec();
-    if (consistentDataPushEnabled(spec)) {
-      if (segmentNameGeneratorSpec == null) {
-        segmentNameGeneratorSpec = new SegmentNameGeneratorSpec();
-      }
-      String existingPostfix = segmentNameGeneratorSpec.getConfigs().get(SEGMENT_NAME_POSTFIX);
-      String currentTimeStamp = Long.toString(System.currentTimeMillis());
-      String newSegmentPostfix =
-          existingPostfix == null ? currentTimeStamp : String.join("_", existingPostfix, currentTimeStamp);
-      LOGGER.info("Since consistent data push is enabled, appending current timestamp: {} to segment name postfix",
-          currentTimeStamp);
-      LOGGER.info("Segment postfix is now configured as: {}", newSegmentPostfix);
-      segmentNameGeneratorSpec.addConfig(SEGMENT_NAME_POSTFIX, newSegmentPostfix);
-      spec.setSegmentNameGeneratorSpec(segmentNameGeneratorSpec);
+    if (segmentNameGeneratorSpec == null) {
+      segmentNameGeneratorSpec = new SegmentNameGeneratorSpec();
     }
+    String existingPostfix = segmentNameGeneratorSpec.getConfigs().get(SEGMENT_NAME_POSTFIX);
+    String currentTimeStamp = Long.toString(System.currentTimeMillis());
+    String newSegmentPostfix =
+        existingPostfix == null ? currentTimeStamp : String.join("_", existingPostfix, currentTimeStamp);
+    LOGGER.info("Since consistent data push is enabled, appending current timestamp: {} to segment name postfix",
+        currentTimeStamp);
+    LOGGER.info("Segment postfix is now configured as: {}", newSegmentPostfix);
+    segmentNameGeneratorSpec.addConfig(SEGMENT_NAME_POSTFIX, newSegmentPostfix);
+    spec.setSegmentNameGeneratorSpec(segmentNameGeneratorSpec);
   }
 }

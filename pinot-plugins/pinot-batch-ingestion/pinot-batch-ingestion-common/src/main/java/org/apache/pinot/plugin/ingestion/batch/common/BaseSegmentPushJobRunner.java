@@ -24,8 +24,10 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -39,6 +41,7 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
   protected String[] _files;
   protected PinotFS _outputDirFS;
   protected URI _outputDirURI;
+  protected TableConfig _tableConfig;
   protected boolean _consistentPushEnabled;
 
   /**
@@ -62,7 +65,9 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
       throw new RuntimeException("Missing property 'tableConfigURI' in 'tableSpec'");
     }
 
-    _consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(_spec);
+    _tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken());
+
+    _consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(_tableConfig);
   }
 
   /**
@@ -116,7 +121,8 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
    * the consistent data push protocol.
    */
   @Override
-  public void run() {
+  public void run()
+      throws Exception {
     initFileSys();
     Map<URI, String> uriToLineageEntryIdMap = null;
     try {
@@ -134,7 +140,7 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
       if (_consistentPushEnabled) {
         ConsistentDataPushUtils.handleUploadException(_spec, uriToLineageEntryIdMap, e);
       }
-      throw new RuntimeException(e);
+      throw e;
     }
   }
 }

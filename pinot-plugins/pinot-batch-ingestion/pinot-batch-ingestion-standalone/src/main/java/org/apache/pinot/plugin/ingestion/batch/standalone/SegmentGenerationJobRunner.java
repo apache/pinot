@@ -71,6 +71,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
   private Schema _schema;
   private TableConfig _tableConfig;
   private AtomicReference<Exception> _failure;
+  private boolean _consistentPushEnabled;
 
   public SegmentGenerationJobRunner() {
   }
@@ -156,6 +157,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     }
     _tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken());
 
+    _consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(_tableConfig);
+
     final int jobParallelism = _spec.getSegmentCreationJobParallelism();
     int numThreads = JobUtils.getNumThreads(jobParallelism);
     LOGGER.info("Creating an executor service with {} threads(Job parallelism: {}, available cores: {}.)", numThreads,
@@ -174,7 +177,9 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     List<String> filteredFiles = SegmentGenerationUtils.listMatchedFilesWithRecursiveOption(_inputDirFS, _inputDirURI,
         _spec.getIncludeFileNamePattern(), _spec.getExcludeFileNamePattern(), _spec.isSearchRecursively());
 
-    ConsistentDataPushUtils.configureSegmentPostfix(_spec);
+    if (_consistentPushEnabled) {
+      ConsistentDataPushUtils.configureSegmentPostfix(_spec);
+    }
 
     File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());
     try {
