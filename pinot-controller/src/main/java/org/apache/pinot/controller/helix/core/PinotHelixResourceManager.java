@@ -133,7 +133,6 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
-import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.segment.local.utils.ReplicationUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.ConfigUtils;
@@ -1859,9 +1858,8 @@ public class PinotHelixResourceManager {
     LOGGER.info("Deleting table {}: Removed segment lineage", offlineTableName);
 
     // Remove task related metadata
-    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, MinionConstants.MergeRollupTask.TASK_TYPE,
-        offlineTableName);
-    LOGGER.info("Deleting table {}: Removed merge rollup task metadata", offlineTableName);
+    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, offlineTableName);
+    LOGGER.info("Deleting table {}: Removed all minion task metadata", offlineTableName);
 
     // Remove table config
     // this should always be the last step for deletion to avoid race condition in table re-create.
@@ -1922,13 +1920,8 @@ public class PinotHelixResourceManager {
     LOGGER.info("Deleting table {}: Removed segment lineage", realtimeTableName);
 
     // Remove task related metadata
-    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, MinionConstants.MergeRollupTask.TASK_TYPE,
-        realtimeTableName);
-    LOGGER.info("Deleting table {}: Removed merge rollup task metadata", realtimeTableName);
-
-    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE,
-        realtimeTableName);
-    LOGGER.info("Deleting table {}: Removed merge realtime to offline metadata", realtimeTableName);
+    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, realtimeTableName);
+    LOGGER.info("Deleting table {}: Removed all minion task metadata", realtimeTableName);
 
     // Remove groupId/partitionId mapping for HLC table
     if (instancesForTable != null) {
