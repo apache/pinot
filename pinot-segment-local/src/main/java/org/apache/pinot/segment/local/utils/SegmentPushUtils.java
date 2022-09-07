@@ -29,6 +29,7 @@ import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +49,6 @@ import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
@@ -373,34 +373,15 @@ public class SegmentPushUtils implements Serializable {
     }
   }
 
-  public static List<String> getSegmentNames(BatchConfigProperties.SegmentPushType pushMode,
-      Map<String, String> segmentsUriToTarPathMap) {
-    List<String> segmentNames = new ArrayList<>(segmentsUriToTarPathMap.size());
-    if (pushMode.equals(BatchConfigProperties.SegmentPushType.TAR) || pushMode.equals(
-        BatchConfigProperties.SegmentPushType.METADATA)) {
-      for (String tarFilePath : segmentsUriToTarPathMap.values()) {
-        File tarFile = new File(tarFilePath);
-        String fileName = tarFile.getName();
-        Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
-        String segmentName = getSegmentNameFromPath(fileName);
-        segmentNames.add(segmentName);
-      }
-    }
-    if (pushMode.equals(BatchConfigProperties.SegmentPushType.URI)) {
-      for (String segmentUri : segmentsUriToTarPathMap.keySet()) {
-        Preconditions.checkArgument(segmentUri.endsWith(Constants.TAR_GZ_FILE_EXT));
-        String segmentName = getSegmentNameFromPath(segmentUri);
-        segmentNames.add(segmentName);
-      }
+  public static List<String> getSegmentNames(Collection<String> tarFilePaths) {
+    List<String> segmentNames = new ArrayList<>(tarFilePaths.size());
+    for (String tarFilePath : tarFilePaths) {
+      File tarFile = new File(tarFilePath);
+      String fileName = tarFile.getName();
+      Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
+      String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
+      segmentNames.add(segmentName);
     }
     return segmentNames;
-  }
-
-  /**
-   * Obtain segment name given filePath by reading from after the last slash (if present) up to and before the tar
-   * extension.
-   */
-  public static String getSegmentNameFromPath(String filePath) {
-    return filePath.substring(filePath.lastIndexOf("/") + 1, filePath.length() - Constants.TAR_GZ_FILE_EXT.length());
   }
 }

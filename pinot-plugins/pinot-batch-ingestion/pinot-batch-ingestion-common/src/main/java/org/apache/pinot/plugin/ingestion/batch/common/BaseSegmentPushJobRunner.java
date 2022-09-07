@@ -66,7 +66,6 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
     }
 
     _tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken());
-
     _consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(_tableConfig);
   }
 
@@ -105,7 +104,9 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
    * @param segmentsUriToTarPathMap Map from segment URI to corresponding tar path. Either the URIs (keys), the
    *                                tarPaths (values), or both may be used depending on upload mode.
    */
-  public abstract List<String> getSegmentsToReplace(Map<String, String> segmentsUriToTarPathMap);
+  public List<String> getSegmentsToReplace(Map<String, String> segmentsUriToTarPathMap) {
+    return SegmentPushUtils.getSegmentNames(segmentsUriToTarPathMap.values());
+  }
 
   /**
    * Upload segments supplied in segmentsUriToTarPathMap.

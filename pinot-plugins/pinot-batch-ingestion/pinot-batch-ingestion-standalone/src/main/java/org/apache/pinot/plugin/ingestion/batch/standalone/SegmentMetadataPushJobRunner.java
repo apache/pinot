@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.standalone;
 
-import java.util.List;
 import java.util.Map;
 import org.apache.pinot.plugin.ingestion.batch.common.BaseSegmentPushJobRunner;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
-import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 
 
@@ -33,11 +31,6 @@ public class SegmentMetadataPushJobRunner extends BaseSegmentPushJobRunner {
 
   public SegmentMetadataPushJobRunner(SegmentGenerationJobSpec spec) {
     init(spec);
-  }
-
-  public List<String> getSegmentsToReplace(Map<String, String> segmentsUriToTarPathMap) {
-    return SegmentPushUtils.getSegmentNames(BatchConfigProperties.SegmentPushType.METADATA,
-        segmentsUriToTarPathMap);
   }
 
   public void uploadSegments(Map<String, String> segmentsUriToTarPathMap)

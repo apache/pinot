@@ -19,11 +19,9 @@
 package org.apache.pinot.plugin.ingestion.batch.standalone;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import org.apache.pinot.plugin.ingestion.batch.common.BaseSegmentPushJobRunner;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
-import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
@@ -35,10 +33,6 @@ public class SegmentTarPushJobRunner extends BaseSegmentPushJobRunner {
 
   public SegmentTarPushJobRunner(SegmentGenerationJobSpec spec) {
     init(spec);
-  }
-
-  public List<String> getSegmentsToReplace(Map<String, String> segmentsUriToTarPathMap) {
-    return SegmentPushUtils.getSegmentNames(BatchConfigProperties.SegmentPushType.TAR, segmentsUriToTarPathMap);
   }
 
   public void uploadSegments(Map<String, String> segmentsUriToTarPathMap)
