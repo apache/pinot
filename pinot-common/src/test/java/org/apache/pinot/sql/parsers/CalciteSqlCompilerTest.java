@@ -185,6 +185,38 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testExtract() {
+    {
+      // Case 1 -- Year and date format ('2017-06-15')
+      PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT EXTRACT(YEAR FROM '2017-06-15')");
+      Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
+      Assert.assertEquals(function.getOperands().get(0).getLiteral().getStringValue(), "YEAR");
+      Assert.assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "2017-06-15");
+    }
+    {
+      // Case 2 -- date format ('2017-06-15 09:34:21')
+      PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT EXTRACT(YEAR FROM '2017-06-15 09:34:21')");
+      Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
+      Assert.assertEquals(function.getOperands().get(0).getLiteral().getStringValue(), "YEAR");
+      Assert.assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "2017-06-15 09:34:21");
+    }
+    {
+      // Case 3 -- Month
+      PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT EXTRACT(MONTH FROM '2017-06-15')");
+      Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
+      Assert.assertEquals(function.getOperands().get(0).getLiteral().getStringValue(), "MONTH");
+      Assert.assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "2017-06-15");
+    }
+    {
+      // Case 4 -- Day
+      PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("SELECT EXTRACT(DAY FROM '2017-06-15')");
+      Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
+      Assert.assertEquals(function.getOperands().get(0).getLiteral().getStringValue(), "DAY");
+      Assert.assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "2017-06-15");
+    }
+  }
+
+  @Test
   public void testFilterClauses() {
     {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery("select * from vegetables where a > 1.5");
@@ -274,7 +306,7 @@ public class CalciteSqlCompilerTest {
 
     {
       PinotQuery pinotQuery =
-          CalciteSqlParser.compileToPinotQuery("select * from vegetable where startsWith(g, " + "'str')");
+          CalciteSqlParser.compileToPinotQuery("select * from vegetable where startsWith(g, 'str')");
       Function func = pinotQuery.getFilterExpression().getFunctionCall();
       Assert.assertEquals(func.getOperator(), FilterKind.EQUALS.name());
       Assert.assertEquals(func.getOperands().get(0).getFunctionCall().getOperator(), "startswith");
@@ -283,7 +315,7 @@ public class CalciteSqlCompilerTest {
 
     {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
-          "select * from vegetable where startsWith(g, " + "'str')=true and startsWith(f, 'str')");
+          "select * from vegetable where startsWith(g, 'str')=true and startsWith(f, 'str')");
       Function func = pinotQuery.getFilterExpression().getFunctionCall();
       Assert.assertEquals(func.getOperator(), FilterKind.AND.name());
       List<Expression> operands = func.getOperands();
@@ -302,7 +334,7 @@ public class CalciteSqlCompilerTest {
 
     {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
-          "select * from vegetable where (startsWith(g, " + "'str')=true and startsWith(f, 'str')) AND (e and d=true)");
+          "select * from vegetable where (startsWith(g, 'str')=true and startsWith(f, 'str')) AND (e and d=true)");
       Function func = pinotQuery.getFilterExpression().getFunctionCall();
       Assert.assertEquals(func.getOperator(), FilterKind.AND.name());
       List<Expression> operands = func.getOperands();
@@ -609,7 +641,7 @@ public class CalciteSqlCompilerTest {
       pinotQuery = CalciteSqlParser.compileToPinotQuery(
           "select concat(upper(playerName), lower(teamID), '-') playerTeam, "
               + "upper(league) leagueUpper, count(playerName) cnt from baseballStats group by playerTeam, lower"
-              + "(teamID), leagueUpper " + "having cnt > 1 order by cnt desc limit 10");
+              + "(teamID), leagueUpper having cnt > 1 order by cnt desc limit 10");
     } catch (SqlCompilationException e) {
       throw e;
     }
@@ -724,8 +756,7 @@ public class CalciteSqlCompilerTest {
       Assert.assertTrue(e.getCause().getMessage().contains("OPTION"));
     }
     try {
-      CalciteSqlParser.compileToPinotQuery(
-          "select * from vegetables where name <> 'Brussels OPTION (delicious=yes)");
+      CalciteSqlParser.compileToPinotQuery("select * from vegetables where name <> 'Brussels OPTION (delicious=yes)");
     } catch (SqlCompilationException e) {
       Assert.assertTrue(e.getCause() instanceof ParseException);
     }
@@ -770,24 +801,25 @@ public class CalciteSqlCompilerTest {
 
     // test invalid options
     try {
-      CalciteSqlParser.compileToPinotQuery("select * from vegetables SET delicious='yes', foo='1234' "
-          + "where name <> 'Brussels sprouts'");
+      CalciteSqlParser.compileToPinotQuery(
+          "select * from vegetables SET delicious='yes', foo='1234' where name <> 'Brussels sprouts'");
       Assert.fail("SQL should not be compiled");
     } catch (SqlCompilationException sce) {
       // expected.
     }
 
     try {
-      CalciteSqlParser.compileToPinotQuery("select * from vegetables where name <> 'Brussels sprouts'; "
-          + "SET (delicious='yes', foo=1234)");
+      CalciteSqlParser.compileToPinotQuery(
+          "select * from vegetables where name <> 'Brussels sprouts'; SET (delicious='yes', foo=1234)");
       Assert.fail("SQL should not be compiled");
     } catch (SqlCompilationException sce) {
       // expected.
     }
 
     try {
-      CalciteSqlParser.compileToPinotQuery("select * from vegetables where name <> 'Brussels sprouts'; "
-          + "SET (delicious='yes', foo=1234); select * from meat");
+      CalciteSqlParser.compileToPinotQuery(
+          "select * from vegetables where name <> 'Brussels sprouts'; SET (delicious='yes', foo=1234); select * from "
+              + "meat");
       Assert.fail("SQL should not be compiled");
     } catch (SqlCompilationException sce) {
       // expected.
@@ -2618,7 +2650,7 @@ public class CalciteSqlCompilerTest {
 
     // Query having multiple SQL statements
     Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(
-        "SELECT col1, count(*) FROM foo GROUP BY col1; SELECT col2," + "count(*) FROM foo GROUP BY col2"));
+        "SELECT col1, count(*) FROM foo GROUP BY col1; SELECT col2, count(*) FROM foo GROUP BY col2"));
 
     // Query having multiple SQL statements with trailing and leading whitespaces
     Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToPinotQuery(

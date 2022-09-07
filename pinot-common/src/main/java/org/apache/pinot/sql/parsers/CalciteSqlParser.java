@@ -675,6 +675,8 @@ public class CalciteSqlParser {
           return RequestUtils.getIdentifierExpression(((SqlIdentifier) node).getSimple());
         }
         return RequestUtils.getIdentifierExpression(node.toString());
+      case INTERVAL_QUALIFIER:
+        return RequestUtils.getLiteralExpression(node.toString());
       case LITERAL:
         return RequestUtils.getLiteralExpression((SqlLiteral) node);
       case AS:
