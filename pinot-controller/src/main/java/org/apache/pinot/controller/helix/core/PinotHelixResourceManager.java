@@ -1859,7 +1859,7 @@ public class PinotHelixResourceManager {
 
     // Remove task related metadata
     MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, offlineTableName);
-    LOGGER.info("Deleting table {}: Removed all task metadata", offlineTableName);
+    LOGGER.info("Deleting table {}: Removed all minion task metadata", offlineTableName);
 
     // Remove table config
     // this should always be the last step for deletion to avoid race condition in table re-create.
@@ -1921,7 +1921,7 @@ public class PinotHelixResourceManager {
 
     // Remove task related metadata
     MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, realtimeTableName);
-    LOGGER.info("Deleting table {}: Removed all task metadata", realtimeTableName);
+    LOGGER.info("Deleting table {}: Removed all minion task metadata", realtimeTableName);
 
     // Remove groupId/partitionId mapping for HLC table
     if (instancesForTable != null) {
