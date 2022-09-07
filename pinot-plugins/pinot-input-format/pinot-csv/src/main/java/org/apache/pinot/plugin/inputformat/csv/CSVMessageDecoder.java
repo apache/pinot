@@ -48,6 +48,7 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final String CONFIG_COMMENT_MARKER = "commentMarker";
   private static final String CONFIG_CSV_ESCAPE_CHARACTER = "escapeCharacter";
   private static final String CONFIG_CSV_MULTI_VALUE_DELIMITER = "multiValueDelimiter";
+  public static final String NULL_STRING_VALUE = "nullStringValue";
 
   private CSVFormat _format;
   private CSVRecordExtractor _recordExtractor;
@@ -109,6 +110,11 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
     String escapeChar = props.get(CONFIG_CSV_ESCAPE_CHARACTER);
     if (escapeChar != null) {
       format = format.withEscape(props.get(CONFIG_CSV_ESCAPE_CHARACTER).charAt(0));
+    }
+
+    String nullString = props.get(NULL_STRING_VALUE);
+    if (nullString != null) {
+      format = format.withNullString(nullString);
     }
 
     _format = format;
