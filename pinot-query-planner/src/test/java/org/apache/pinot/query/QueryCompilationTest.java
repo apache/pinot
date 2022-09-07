@@ -19,6 +19,7 @@
 package org.apache.pinot.query;
 
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -174,6 +175,36 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     Assert.assertEquals(tableScanMetadataList.size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().get(0).toString(), "Server_localhost_1");
+  }
+
+  // Test that plan query can be run as multi-thread.
+  @Test
+  public void testPlanQueryMultiThread()
+      throws Exception {
+    Runnable planQuery = () -> {
+      String query = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
+          + "WHERE a.col3 >= 0 AND a.col2 IN  ('a', 'b') AND b.col3 < 0";
+      QueryPlan queryPlan = _queryEnvironment.planQuery(query);
+      List<StageNode> intermediateStageRoots =
+          queryPlan.getStageMetadataMap().entrySet().stream().filter(e -> e.getValue().getScannedTables().size() == 0)
+              .map(e -> queryPlan.getQueryStageMap().get(e.getKey())).collect(Collectors.toList());
+      // Assert that no project of filter node for any intermediate stage because all should've been pushed down.
+      for (StageNode roots : intermediateStageRoots) {
+        assertNodeTypeNotIn(roots, ImmutableList.of(ProjectNode.class, FilterNode.class));
+      }
+    };
+    ArrayList<Thread> threads = new ArrayList<>();
+    final int numThreads = 10;
+    for (int i = 0; i < numThreads; i++) {
+      Thread thread = new Thread(planQuery);
+      threads.add(thread);
+    }
+    for (Thread t : threads) {
+      t.start();
+    }
+    for (Thread t : threads) {
+      t.join();
+    }
   }
 
   // --------------------------------------------------------------------------

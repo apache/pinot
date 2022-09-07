@@ -19,15 +19,50 @@
 package org.apache.pinot.query.context;
 
 import java.util.Map;
-
+import org.apache.calcite.plan.Contexts;
+import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.plan.hep.HepProgram;
+import org.apache.calcite.prepare.PlannerImpl;
+import org.apache.calcite.prepare.Prepare;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.validate.SqlValidator;
+import org.apache.calcite.tools.FrameworkConfig;
+import org.apache.pinot.query.planner.logical.LogicalPlanner;
+import org.apache.pinot.query.validate.Validator;
 
 /**
  * PlannerContext is an object that holds all contextual information during planning phase.
  *
- * TODO: currently the planner context is not used since we don't support option or query rewrite. This construct is
- * here as a placeholder for the parsed out options.
+ * TODO: currently we don't support option or query rewrite.
+ * It is used to hold per query context for query planning, which cannot be shared across queries.
  */
 public class PlannerContext {
+  public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
+      HepProgram hepProgram) {
+    _planner = new PlannerImpl(config);
+    _validator = new Validator(SqlStdOperatorTable.instance(), catalogReader, typeFactory);
+    _relOptPlanner = new LogicalPlanner(hepProgram, Contexts.EMPTY_CONTEXT);
+  }
+
+  public PlannerImpl getPlanner() {
+    return _planner;
+  }
+
+  public SqlValidator getValidator() {
+    return _validator;
+  }
+
+  public RelOptPlanner getRelOptPlanner() {
+    return _relOptPlanner;
+  }
+
+  private PlannerImpl _planner;
+
+  private SqlValidator _validator;
+
+  private RelOptPlanner _relOptPlanner;
+
   private Map<String, String> _options;
 
   public void setOptions(Map<String, String> options) {
