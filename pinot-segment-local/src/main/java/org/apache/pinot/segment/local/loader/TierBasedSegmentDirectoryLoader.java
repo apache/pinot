@@ -98,7 +98,7 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = loaderContext.getSegmentName();
     try {
-      String tierDataDir = TierConfigUtils.getDataDirFromTierConfig(tableNameWithType, segmentTier, tableConfig);
+      String tierDataDir = TierConfigUtils.getDataDirForTier(tableConfig, segmentTier);
       File tierTableDataDir = new File(tierDataDir, tableNameWithType);
       return new File(tierTableDataDir, segmentName);
     } catch (Exception e) {

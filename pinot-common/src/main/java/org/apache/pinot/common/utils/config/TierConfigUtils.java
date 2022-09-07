@@ -51,12 +51,13 @@ public final class TierConfigUtils {
     return CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList());
   }
 
-  public static String getDataDirFromTierConfig(String tableNameWithType, String tierName, TableConfig tableConfig) {
+  public static String getDataDirForTier(TableConfig tableConfig, String tierName) {
+    String tableNameWithType = tableConfig.getTableName();
     List<TierConfig> tierCfgs = tableConfig.getTierConfigsList();
     Preconditions.checkState(CollectionUtils.isNotEmpty(tierCfgs), "No tierConfigs for table: %s", tableNameWithType);
     TierConfig tierCfg = null;
     for (TierConfig tc : tierCfgs) {
-      if (tierName.equalsIgnoreCase(tc.getName())) {
+      if (tierName.equals(tc.getName())) {
         tierCfg = tc;
         break;
       }

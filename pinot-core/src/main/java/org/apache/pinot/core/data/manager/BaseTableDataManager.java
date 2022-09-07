@@ -603,8 +603,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return getSegmentDataDir(segmentName);
     }
     try {
-      String tierDataDir = TierConfigUtils
-          .getDataDirFromTierConfig(_tableNameWithType, segmentTier, indexLoadingConfig.getTableConfig());
+      String tierDataDir = TierConfigUtils.getDataDirForTier(indexLoadingConfig.getTableConfig(), segmentTier);
       File tierTableDataDir = new File(tierDataDir, _tableNameWithType);
       return new File(tierTableDataDir, segmentName);
     } catch (Exception e) {

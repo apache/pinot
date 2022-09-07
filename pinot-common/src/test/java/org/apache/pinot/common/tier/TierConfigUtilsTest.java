@@ -188,31 +188,31 @@ public class TierConfigUtilsTest {
   }
 
   @Test
-  public void testGetDataDirFromTierConfig() {
+  public void testGetDataDirForTier() {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
     try {
-      TierConfigUtils.getDataDirFromTierConfig("myTable", "tier1", tableConfig);
+      TierConfigUtils.getDataDirForTier(tableConfig, "tier1");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "No tierConfigs for table: myTable");
+      Assert.assertEquals(e.getMessage(), "No tierConfigs for table: myTable_OFFLINE");
     }
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(Lists
         .newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null, null))).build();
     try {
-      TierConfigUtils.getDataDirFromTierConfig("myTable", "tier1", tableConfig);
+      TierConfigUtils.getDataDirForTier(tableConfig, "tier1");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "No configs for tier: tier1 on table: myTable");
+      Assert.assertEquals(e.getMessage(), "No configs for tier: tier1 on table: myTable_OFFLINE");
     }
     try {
-      TierConfigUtils.getDataDirFromTierConfig("myTable", "myTier", tableConfig);
+      TierConfigUtils.getDataDirForTier(tableConfig, "myTier");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "No backend properties for tier: myTier on table: myTable");
+      Assert.assertEquals(e.getMessage(), "No backend properties for tier: myTier on table: myTable_OFFLINE");
     }
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTierConfigList(Lists
         .newArrayList(new TierConfig("myTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, "tag_OFFLINE", null,
             Collections.singletonMap("dataDir", "/foo/bar")))).build();
-    String dataDir = TierConfigUtils.getDataDirFromTierConfig("myTable", "myTier", tableConfig);
+    String dataDir = TierConfigUtils.getDataDirForTier(tableConfig, "myTier");
     Assert.assertEquals(dataDir, "/foo/bar");
   }
 }
