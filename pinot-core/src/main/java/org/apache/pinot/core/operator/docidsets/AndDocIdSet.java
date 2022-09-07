@@ -81,6 +81,8 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
       }
     }
 
+    // evaluate the bitmap and with the lowest number of matching docIds first, so that we limit the number of
+    // containers for comparison from the beginning, this will minimize the effort of and application
     bitmapBasedDocIdIterators.sort(Comparator.comparing(x -> x.getDocIds().getCardinality()));
 
     int numSortedDocIdIterators = sortedDocIdIterators.size();
