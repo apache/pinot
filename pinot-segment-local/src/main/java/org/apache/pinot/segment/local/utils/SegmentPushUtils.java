@@ -29,7 +29,6 @@ import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -371,17 +370,5 @@ public class SegmentPushUtils implements Serializable {
       FileUtils.deleteQuietly(tarFile);
       FileUtils.deleteQuietly(segmentMetadataDir);
     }
-  }
-
-  public static List<String> getSegmentNames(Collection<String> tarFilePaths) {
-    List<String> segmentNames = new ArrayList<>(tarFilePaths.size());
-    for (String tarFilePath : tarFilePaths) {
-      File tarFile = new File(tarFilePath);
-      String fileName = tarFile.getName();
-      Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
-      String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
-      segmentNames.add(segmentName);
-    }
-    return segmentNames;
   }
 }
