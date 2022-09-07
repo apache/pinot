@@ -1920,7 +1920,7 @@ public class PinotHelixResourceManager {
     SegmentLineageAccessHelper.deleteSegmentLineage(_propertyStore, realtimeTableName);
     LOGGER.info("Deleting table {}: Removed segment lineage", realtimeTableName);
 
-    // Remove all task metadata
+    // Remove task related metadata
     MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, realtimeTableName);
     LOGGER.info("Deleting table {}: Removed all task metadata", realtimeTableName);
 
