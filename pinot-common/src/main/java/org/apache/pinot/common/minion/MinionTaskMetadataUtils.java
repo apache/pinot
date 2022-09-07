@@ -92,6 +92,12 @@ public final class MinionTaskMetadataUtils {
       throw new ZkException("Failed to delete task metadata for table: " + tableNameWithType);
     }
     // delete the minion task metadata ZNRecord MINION_TASK_METADATA/<any task type>/${tableNameWthType}
+    // TODO: another way of finding old minion task metadata path is: (1) use reflection to find all task types,
+    //   similar to what TaskGeneratorRegistry.java does (2) construct possible old minion task metadata path
+    //   using those types.
+    //   The tradeoff is: (1) the current approach uses ZK as the source of truth, so we will not miss any ZNode
+    //   (2) the other approach will reduce ZK load if there are thousands of tables, because we need to talk to
+    //   the ZK to find all its direct children in the current approach.
     List<String> childNames =
         propertyStore.getChildNames(ZKMetadataProvider.getPropertyStorePathForMinionTaskMetadataPrefix(),
             AccessOption.PERSISTENT);
