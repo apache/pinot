@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import javax.net.ssl.SSLContext;
+import org.apache.pinot.client.utils.ConnectionUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -75,6 +76,18 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
   }
 
   public JsonAsyncHttpPinotClientTransportFactory withConnectionProperties(Properties properties) {
+    if (_headers == null || _headers.isEmpty()) {
+      _headers = ConnectionUtils.getHeadersFromProperties(properties);
+    }
+
+    if (_scheme == null) {
+      _scheme = properties.getProperty("scheme", CommonConstants.HTTP_PROTOCOL);
+    }
+
+    if (_sslContext == null && _scheme.contentEquals(CommonConstants.HTTPS_PROTOCOL)) {
+      _sslContext = ConnectionUtils.getSSLContextFromProperties(properties);
+    }
+
     _readTimeoutMs = Integer.parseInt(properties.getProperty("brokerReadTimeoutMs",
             DEFAULT_BROKER_READ_TIMEOUT_MS));
     _connectTimeoutMs = Integer.parseInt(properties.getProperty("brokerConnectTimeoutMs",
