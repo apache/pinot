@@ -46,9 +46,12 @@ import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class BrokerAdminApiApplication extends ResourceConfig {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerAdminApiApplication.class);
   private static final String RESOURCE_PACKAGE = "org.apache.pinot.broker.api.resources";
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
   public static final String BROKER_INSTANCE_ID = "brokerInstanceId";
@@ -100,7 +103,13 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     } catch (IOException e) {
       throw new RuntimeException("Failed to start http server", e);
     }
-    PinotReflectionUtils.runWithLock(this::setupSwagger);
+    PinotConfiguration brokerConf = (PinotConfiguration) getProperties().get(PINOT_CONFIGURATION);
+    if (brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_SWAGGER_BROKER_ENABLED,
+        CommonConstants.Broker.DEFAULT_SWAGGER_BROKER_ENABLED)) {
+      PinotReflectionUtils.runWithLock(this::setupSwagger);
+    } else {
+      LOGGER.info("Hiding Swagger UI for Broker, by {}", CommonConstants.Broker.CONFIG_OF_SWAGGER_BROKER_ENABLED);
+    }
   }
 
   private void setupSwagger() {

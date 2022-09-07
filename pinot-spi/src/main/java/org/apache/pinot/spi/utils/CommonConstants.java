@@ -263,6 +263,8 @@ public class CommonConstants {
     public static final boolean DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING = false;
 
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.broker.logger.root.dir";
+    public static final String CONFIG_OF_SWAGGER_BROKER_ENABLED = "pinot.broker.swagger.enabled";
+    public static final boolean DEFAULT_SWAGGER_BROKER_ENABLED = true;
 
     public static class Request {
       public static final String SQL = "sql";
