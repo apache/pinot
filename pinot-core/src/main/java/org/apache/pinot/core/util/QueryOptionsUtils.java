@@ -22,7 +22,8 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 
 
 /**
@@ -34,7 +35,7 @@ public class QueryOptionsUtils {
 
   @Nullable
   public static Long getTimeoutMs(Map<String, String> queryOptions) {
-    String timeoutMsString = queryOptions.get(Request.QueryOptionKey.TIMEOUT_MS);
+    String timeoutMsString = queryOptions.get(QueryOptionKey.TIMEOUT_MS);
     if (timeoutMsString != null) {
       long timeoutMs = Long.parseLong(timeoutMsString);
       Preconditions.checkState(timeoutMs > 0, "Query timeout must be positive, got: %s", timeoutMs);
@@ -45,56 +46,60 @@ public class QueryOptionsUtils {
   }
 
   public static boolean isSkipUpsert(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.SKIP_UPSERT));
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
   }
 
   public static boolean isSkipStarTree(Map<String, String> queryOptions) {
-    return "false".equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.USE_STAR_TREE));
+    return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_STAR_TREE));
   }
 
   public static boolean isRoutingForceHLC(Map<String, String> queryOptions) {
-    String routingOptions = queryOptions.get(Request.QueryOptionKey.ROUTING_OPTIONS);
-    return routingOptions != null && routingOptions.toUpperCase().contains(Request.QueryOptionValue.ROUTING_FORCE_HLC);
+    String routingOptions = queryOptions.get(QueryOptionKey.ROUTING_OPTIONS);
+    return routingOptions != null && routingOptions.toUpperCase().contains(QueryOptionValue.ROUTING_FORCE_HLC);
   }
 
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {
-    return "false".equalsIgnoreCase(queryOptions.get(Request.QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
+    return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
   }
 
   @Nullable
   public static Integer getNumReplicaGroupsToQuery(Map<String, String> queryOptions) {
-    String numReplicaGroupsToQuery = queryOptions.get(Request.QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
+    String numReplicaGroupsToQuery = queryOptions.get(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
     return numReplicaGroupsToQuery != null ? Integer.parseInt(numReplicaGroupsToQuery) : null;
   }
 
   public static boolean isExplainPlanVerbose(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.EXPLAIN_PLAN_VERBOSE));
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.EXPLAIN_PLAN_VERBOSE));
   }
 
   @Nullable
   public static Integer getMaxExecutionThreads(Map<String, String> queryOptions) {
-    String maxExecutionThreadsString = queryOptions.get(Request.QueryOptionKey.MAX_EXECUTION_THREADS);
+    String maxExecutionThreadsString = queryOptions.get(QueryOptionKey.MAX_EXECUTION_THREADS);
     return maxExecutionThreadsString != null ? Integer.parseInt(maxExecutionThreadsString) : null;
   }
 
   @Nullable
   public static Integer getMinSegmentGroupTrimSize(Map<String, String> queryOptions) {
-    String minSegmentGroupTrimSizeString = queryOptions.get(Request.QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE);
+    String minSegmentGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE);
     return minSegmentGroupTrimSizeString != null ? Integer.parseInt(minSegmentGroupTrimSizeString) : null;
   }
 
   @Nullable
   public static Integer getMinServerGroupTrimSize(Map<String, String> queryOptions) {
-    String minServerGroupTrimSizeString = queryOptions.get(Request.QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE);
+    String minServerGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE);
     return minServerGroupTrimSizeString != null ? Integer.parseInt(minServerGroupTrimSizeString) : null;
   }
 
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
-    boolean nullHandlingEnabled = Boolean.parseBoolean(queryOptions.get(Request.QueryOptionKey.ENABLE_NULL_HANDLING));
+    boolean nullHandlingEnabled = Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_NULL_HANDLING));
     if (nullHandlingEnabled) {
       Preconditions.checkState(DataTableFactory.getDataTableVersion() >= DataTableFactory.VERSION_4,
           "Null handling cannot be enabled for data table version smaller than 4");
     }
     return nullHandlingEnabled;
+  }
+
+  public static boolean isServerReturnFinalResult(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SERVER_RETURN_FINAL_RESULT));
   }
 }
