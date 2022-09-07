@@ -25,7 +25,6 @@ import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.zookeeper.data.Stat;
 
 
@@ -98,10 +97,8 @@ public final class MinionTaskMetadataUtils {
             AccessOption.PERSISTENT);
     if (childNames != null && !childNames.isEmpty()) {
       for (String child : childNames) {
-        // the child is a new path, skip it
-        if (child.endsWith(TableType.OFFLINE.toString()) || child.endsWith(TableType.REALTIME.toString())) {
-          continue;
-        }
+        // Even though some child names are not task types (e.g., in the new metadata path, the child name
+        // is a table name), it does not harm to try to delete the non-existent constructed path.
         String oldPath =
             ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadataDeprecated(child, tableNameWithType);
         if (!propertyStore.remove(oldPath, AccessOption.PERSISTENT)) {
