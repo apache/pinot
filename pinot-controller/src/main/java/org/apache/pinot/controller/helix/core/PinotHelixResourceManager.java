@@ -1859,15 +1859,6 @@ public class PinotHelixResourceManager {
     LOGGER.info("Deleting table {}: Removed segment lineage", offlineTableName);
 
     // Remove task related metadata
-    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, MinionConstants.MergeRollupTask.TASK_TYPE,
-        offlineTableName);
-    LOGGER.info("Deleting table {}: Removed merge rollup task metadata", offlineTableName);
-
-    // Remove all task metadata
-    // TODO: This only deletes the new ZNode MINION_TASK_METADATA/${offlineTableName} but not the old one
-    //  MINION_TASK_METADATA/<task type>/${offlineTableName}, so we keep the above logic of deleting task
-    //  metadata for specific task types. The above logic should be deleted once the old ZNode is not in
-    //  use any more.
     MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, offlineTableName);
     LOGGER.info("Deleting all task metadata for table {}", offlineTableName);
 
@@ -1929,20 +1920,7 @@ public class PinotHelixResourceManager {
     SegmentLineageAccessHelper.deleteSegmentLineage(_propertyStore, realtimeTableName);
     LOGGER.info("Deleting table {}: Removed segment lineage", realtimeTableName);
 
-    // Remove task related metadata
-    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, MinionConstants.MergeRollupTask.TASK_TYPE,
-        realtimeTableName);
-    LOGGER.info("Deleting table {}: Removed merge rollup task metadata", realtimeTableName);
-
-    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE,
-        realtimeTableName);
-    LOGGER.info("Deleting table {}: Removed merge realtime to offline metadata", realtimeTableName);
-
     // Remove all task metadata
-    // TODO: This only deletes the new ZNode MINION_TASK_METADATA/${offlineTableName} but not the old one
-    //  MINION_TASK_METADATA/<task type>/${offlineTableName}, so we keep the above logic of deleting task
-    //  metadata for specific task types. The above logic should be deleted once the old ZNode is not in
-    //  use any more.
     MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, realtimeTableName);
     LOGGER.info("Deleting all task metadata for table {}", realtimeTableName);
 

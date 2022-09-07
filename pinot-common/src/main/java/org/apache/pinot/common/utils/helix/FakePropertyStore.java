@@ -43,6 +43,15 @@ public class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
   }
 
   @Override
+  public List<String> getChildNames(String parentPath, int options) {
+    return _contents.keySet().stream()
+        .filter(e -> e.startsWith(parentPath))
+        .map(e -> e.replaceFirst(parentPath + "/", "").split("/")[0])
+        .distinct()
+        .collect(Collectors.toList());
+  }
+
+  @Override
   public boolean exists(String path, int options) {
     return _contents.containsKey(path);
   }

@@ -134,6 +134,10 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_SEGMENT_LINEAGE, tableNameWithType);
   }
 
+  public static String getPropertyStorePathForMinionTaskMetadataPrefix() {
+    return PROPERTYSTORE_MINION_TASK_METADATA_PREFIX;
+  }
+
   public static String constructPropertyStorePathForMinionTaskMetadata(String tableNameWithType, String taskType) {
     return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, tableNameWithType, taskType);
   }

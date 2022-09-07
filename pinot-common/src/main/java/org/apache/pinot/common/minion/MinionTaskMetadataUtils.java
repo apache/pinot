@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.common.minion;
 
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.zookeeper.data.Stat;
 
 
@@ -80,13 +82,32 @@ public final class MinionTaskMetadataUtils {
   }
 
   /**
-   * Deletes the minion task metadata ZNRecord for the given tableName, from
-   * MINION_TASK_METADATA/${tableNameWthType}
+   * Deletes the minion task metadata ZNRecord for the given tableName, from both the new path
+   * MINION_TASK_METADATA/${tableNameWthType} and the old path
+   * MINION_TASK_METADATA/<any task type>/${tableNameWthType}
    */
   public static void deleteTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
+    // delete the minion task metadata ZNRecord MINION_TASK_METADATA/${tableNameWthType}
     String path = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(tableNameWithType);
     if (!propertyStore.remove(path, AccessOption.PERSISTENT)) {
       throw new ZkException("Failed to delete task metadata for table: " + tableNameWithType);
+    }
+    // delete the minion task metadata ZNRecord MINION_TASK_METADATA/<any task type>/${tableNameWthType}
+    List<String> childNames =
+        propertyStore.getChildNames(ZKMetadataProvider.getPropertyStorePathForMinionTaskMetadataPrefix(),
+            AccessOption.PERSISTENT);
+    if (childNames != null && !childNames.isEmpty()) {
+      for (String child : childNames) {
+        // the child is a new path, skip it
+        if (child.endsWith(TableType.OFFLINE.toString()) || child.endsWith(TableType.REALTIME.toString())) {
+          continue;
+        }
+        String oldPath =
+            ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadataDeprecated(child, tableNameWithType);
+        if (!propertyStore.remove(oldPath, AccessOption.PERSISTENT)) {
+          throw new ZkException("Failed to delete task metadata: " + child + ", " + tableNameWithType);
+        }
+      }
     }
   }
 
