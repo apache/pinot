@@ -27,9 +27,14 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.plugin.ingestion.batch.common.BaseSegmentPushJobRunner;
 import org.apache.pinot.plugin.ingestion.batch.standalone.SegmentMetadataPushJobRunner;
+import org.apache.pinot.plugin.ingestion.batch.standalone.SegmentTarPushJobRunner;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
@@ -37,10 +42,13 @@ import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
@@ -81,10 +89,15 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     return null;
   }
 
+  @BeforeMethod
+  public void setUpTest()
+      throws IOException {
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     // Start Zk and Kafka
     startZk();
 
@@ -122,6 +135,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(DEFAULT_TABLE_NAME);
+    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(DEFAULT_TABLE_NAME));
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
     clusterSpec.setControllerURI(_controllerBaseApiUrl);
@@ -188,6 +202,135 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     testCountStar(numDocs);
   }
 
+  /**
+   * Runs both SegmentMetadataPushJobRunner and SegmentTarPushJobRunner while enabling consistent data push.
+   * Checks that segments are properly loaded and segment lineage entry were also in expected states.
+   */
+  @Test
+  public void testUploadAndQueryWithConsistentPush()
+      throws Exception {
+    // Create and upload the schema and table config
+    Schema schema = createSchema();
+    addSchema(schema);
+    TableConfig offlineTableConfig = createOfflineTableConfigWithConsistentPush();
+    addTableConfig(offlineTableConfig);
+
+    List<File> avroFiles = getAllAvroFiles();
+
+    String firstTimeStamp = Long.toString(System.currentTimeMillis());
+
+    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(0), offlineTableConfig, schema, firstTimeStamp,
+        _segmentDir, _tarDir);
+
+    // First test standalone metadata push job runner
+    BaseSegmentPushJobRunner runner = new SegmentMetadataPushJobRunner();
+    SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
+    PushJobSpec pushJobSpec = new PushJobSpec();
+    pushJobSpec.setCopyToDeepStoreForMetadataPush(true);
+    jobSpec.setPushJobSpec(pushJobSpec);
+    PinotFSSpec fsSpec = new PinotFSSpec();
+    fsSpec.setScheme("file");
+    fsSpec.setClassName("org.apache.pinot.spi.filesystem.LocalPinotFS");
+    jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
+    jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
+    TableSpec tableSpec = new TableSpec();
+    tableSpec.setTableName(DEFAULT_TABLE_NAME);
+    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(DEFAULT_TABLE_NAME));
+    jobSpec.setTableSpec(tableSpec);
+    PinotClusterSpec clusterSpec = new PinotClusterSpec();
+    clusterSpec.setControllerURI(_controllerBaseApiUrl);
+    jobSpec.setPinotClusterSpecs(new PinotClusterSpec[]{clusterSpec});
+
+    File dataDir = new File(_controllerConfig.getDataDir());
+    File dataDirSegments = new File(dataDir, DEFAULT_TABLE_NAME);
+
+    Assert.assertEquals(_tarDir.listFiles().length, 1);
+
+    runner.init(jobSpec);
+    runner.run();
+
+    // Segment should be seen in dataDir
+    Assert.assertTrue(dataDirSegments.exists());
+    Assert.assertEquals(dataDirSegments.listFiles().length, 1);
+    Assert.assertEquals(_tarDir.listFiles().length, 1);
+
+    // test segment loaded
+    JsonNode segmentsList = getSegmentsList();
+    Assert.assertEquals(segmentsList.size(), 1);
+    String firstSegmentName = segmentsList.get(0).asText();
+    Assert.assertTrue(firstSegmentName.endsWith(firstTimeStamp));
+    long numDocs = getNumDocs(firstSegmentName);
+    testCountStar(numDocs);
+
+    // Fetch segment lineage entry after running segment metadata push with consistent push enabled.
+    String segmentLineageResponse = ControllerTest.sendGetRequest(
+        ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl)
+            .forListAllSegmentLineages(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString()));
+    // Segment lineage should be in completed state.
+    Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"COMPLETED\""));
+    // SegmentsFrom should be empty as we started with a blank table.
+    Assert.assertTrue(segmentLineageResponse.contains("\"segmentsFrom\":[]"));
+    // SegmentsTo should contain uploaded segment.
+    Assert.assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"" + firstSegmentName + "\"]"));
+
+    // Clear segment and tar dir
+    for (File segment : _segmentDir.listFiles()) {
+      FileUtils.deleteQuietly(segment);
+    }
+    for (File tar : _tarDir.listFiles()) {
+      FileUtils.deleteQuietly(tar);
+    }
+
+    String secondTimeStamp = Long.toString(System.currentTimeMillis());
+
+    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(1), offlineTableConfig, schema, secondTimeStamp,
+        _segmentDir, _tarDir);
+    jobSpec.setPushJobSpec(new PushJobSpec());
+
+    // Now test standalone tar push job runner
+    runner = new SegmentTarPushJobRunner();
+
+    Assert.assertEquals(dataDirSegments.listFiles().length, 1);
+    Assert.assertEquals(_tarDir.listFiles().length, 1);
+
+    runner.init(jobSpec);
+    runner.run();
+
+    Assert.assertEquals(_tarDir.listFiles().length, 1);
+
+    // test segment loaded
+    segmentsList = getSegmentsList();
+    Assert.assertEquals(segmentsList.size(), 2);
+    String secondSegmentName = null;
+    for (JsonNode segment : segmentsList) {
+      if (segment.asText().endsWith(secondTimeStamp)) {
+        secondSegmentName = segment.asText();
+      }
+    }
+    Assert.assertNotNull(secondSegmentName);
+    numDocs = getNumDocs(secondSegmentName);
+    testCountStar(numDocs);
+
+    // Fetch segment lineage entry after running segment tar push with consistent push enabled.
+    segmentLineageResponse = ControllerTest.sendGetRequest(
+        ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl)
+            .forListAllSegmentLineages(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString()));
+    // Segment lineage should be in completed state.
+    Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"COMPLETED\""));
+    // SegmentsFrom should contain the previous segment
+    Assert.assertTrue(segmentLineageResponse.contains("\"segmentsFrom\":[\"" + firstSegmentName + "\"]"));
+    // SegmentsTo should contain uploaded segment.
+    Assert.assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"" + secondSegmentName + "\"]"));
+  }
+
+  protected TableConfig createOfflineTableConfigWithConsistentPush() {
+    TableConfig offlineTableConfig = createOfflineTableConfig();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH", "DAILY", true));
+    offlineTableConfig.setIngestionConfig(ingestionConfig);
+    return offlineTableConfig;
+  }
+
   private long getNumDocs(String segmentName)
       throws IOException {
     return JsonUtils.stringToJsonNode(
@@ -198,8 +341,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
   private JsonNode getSegmentsList()
       throws IOException {
     return JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPIWithTableType(DEFAULT_TABLE_NAME,
-                TableType.OFFLINE.toString())))
+            _controllerRequestURLBuilder.forSegmentListAPI(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString())))
         .get(0).get("OFFLINE");
   }
 
@@ -217,10 +359,15 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     }, 100L, 300_000, "Failed to load " + countStarResult + " documents", true);
   }
 
+  @AfterMethod
+  public void tearDownTest()
+      throws IOException {
+    dropOfflineTable(getTableName());
+  }
+
   @AfterClass
   public void tearDown()
       throws Exception {
-    dropOfflineTable(getTableName());
     stopServer();
     stopBroker();
     stopController();

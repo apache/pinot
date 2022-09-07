@@ -370,12 +370,27 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName + "?type=" + tableType);
   }
 
-  public String forSegmentListAPIWithTableType(String tableName, String tableType) {
-    return StringUtil.join("/", _baseUrl, "segments", tableName + "?type=" + tableType);
+  public String forSegmentListAPI(String tableName) {
+    return forSegmentListAPI(tableName, null, false);
   }
 
-  public String forSegmentListAPI(String tableName) {
-    return StringUtil.join("/", _baseUrl, "segments", tableName);
+  public String forSegmentListAPI(String tableName, String tableType) {
+    return forSegmentListAPI(tableName, tableType, false);
+  }
+
+  public String forSegmentListAPI(String tableName, @Nullable String tableType, boolean excludeReplacedSegments) {
+    String url = StringUtil.join("/", _baseUrl, "segments", tableName);
+    if (tableType != null) {
+      url += "?type=" + tableType;
+      if (excludeReplacedSegments) {
+        url += "&excludeReplacedSegments=" + excludeReplacedSegments;
+      }
+    } else {
+      if (excludeReplacedSegments) {
+        url += "?excludeReplacedSegments=" + excludeReplacedSegments;
+      }
+    }
+    return url;
   }
 
   public String forInstancePartitions(String tableName, @Nullable InstancePartitionsType instancePartitionsType) {

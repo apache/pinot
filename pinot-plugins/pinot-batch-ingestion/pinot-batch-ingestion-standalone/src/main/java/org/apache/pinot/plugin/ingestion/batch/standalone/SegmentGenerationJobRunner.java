@@ -39,6 +39,7 @@ import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationJobUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
+import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -70,6 +71,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
   private Schema _schema;
   private TableConfig _tableConfig;
   private AtomicReference<Exception> _failure;
+  private boolean _consistentPushEnabled;
 
   public SegmentGenerationJobRunner() {
   }
@@ -155,6 +157,8 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     }
     _tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken());
 
+    _consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(_tableConfig);
+
     final int jobParallelism = _spec.getSegmentCreationJobParallelism();
     int numThreads = JobUtils.getNumThreads(jobParallelism);
     LOGGER.info("Creating an executor service with {} threads(Job parallelism: {}, available cores: {}.)", numThreads,
@@ -172,6 +176,10 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     // Get list of files to process.
     List<String> filteredFiles = SegmentGenerationUtils.listMatchedFilesWithRecursiveOption(_inputDirFS, _inputDirURI,
         _spec.getIncludeFileNamePattern(), _spec.getExcludeFileNamePattern(), _spec.isSearchRecursively());
+
+    if (_consistentPushEnabled) {
+      ConsistentDataPushUtils.configureSegmentPostfix(_spec);
+    }
 
     File localTempDir = new File(FileUtils.getTempDirectory(), "pinot-" + UUID.randomUUID());
     try {
