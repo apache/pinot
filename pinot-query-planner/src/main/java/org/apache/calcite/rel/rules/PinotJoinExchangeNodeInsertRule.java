@@ -22,10 +22,8 @@ import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.hint.RelHint;
@@ -55,7 +53,7 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
     }
     if (call.rel(0) instanceof Join) {
       Join join = call.rel(0);
-      return !isExchange(join.getLeft()) && !isExchange(join.getRight());
+      return !PinotRuleUtils.isExchange(join.getLeft()) && !PinotRuleUtils.isExchange(join.getRight());
     }
     return false;
   }
@@ -91,13 +89,5 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
             ImmutableList.copyOf(join.getSystemFieldList()));
 
     call.transformTo(newJoinNode);
-  }
-
-  private static boolean isExchange(RelNode rel) {
-    RelNode reference = rel;
-    if (reference instanceof HepRelVertex) {
-      reference = ((HepRelVertex) reference).getCurrentRel();
-    }
-    return reference instanceof Exchange;
   }
 }

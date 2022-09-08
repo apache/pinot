@@ -28,11 +28,13 @@ import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexLiteral;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
@@ -40,6 +42,7 @@ import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.JoinNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
+import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 
@@ -72,9 +75,18 @@ public final class RelToStageConverter {
       return convertLogicalFilter((LogicalFilter) node, currentStageId);
     } else if (node instanceof LogicalAggregate) {
       return convertLogicalAggregate((LogicalAggregate) node, currentStageId);
+    } else if (node instanceof LogicalSort) {
+      return convertLogicalSort((LogicalSort) node, currentStageId);
     } else {
-      throw new UnsupportedOperationException("Unsupported logical plan node: " + node);
+        throw new UnsupportedOperationException("Unsupported logical plan node: " + node);
     }
+  }
+
+  private static StageNode convertLogicalSort(LogicalSort node, int currentStageId) {
+    int fetch = node.fetch == null ? -1 : ((RexLiteral) node.fetch).getValueAs(Integer.class);
+    int offset = node.offset == null ? -1 : ((RexLiteral) node.offset).getValueAs(Integer.class);
+    return new SortNode(currentStageId, node.getCollation().getFieldCollations(), fetch, offset,
+        toDataSchema(node.getRowType()));
   }
 
   private static StageNode convertLogicalAggregate(LogicalAggregate node, int currentStageId) {

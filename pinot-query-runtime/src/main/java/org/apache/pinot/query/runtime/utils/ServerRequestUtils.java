@@ -33,6 +33,7 @@ import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
 import org.apache.pinot.query.planner.stage.MailboxSendNode;
 import org.apache.pinot.query.planner.stage.ProjectNode;
+import org.apache.pinot.query.planner.stage.SortNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -46,7 +47,7 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
  * conversion step is needed so that the V2 query plan can be converted into a compatible format to run V1 executor.
  */
 public class ServerRequestUtils {
-  private static final int DEFAULT_LEAF_NODE_LIMIT = 1_000_000;
+  private static final int DEFAULT_LEAF_NODE_LIMIT = 10_000_000;
 
   private ServerRequestUtils() {
     // do not instantiate.
@@ -116,6 +117,17 @@ public class ServerRequestUtils {
       // set group-by list
       pinotQuery.setGroupByList(CalciteRexExpressionParser.convertGroupByList(
           ((AggregateNode) node).getGroupSet(), pinotQuery));
+    } else if (node instanceof SortNode) {
+      if (((SortNode) node).getCollationKeys().size() > 0) {
+        pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(((SortNode) node).getCollationKeys(),
+            ((SortNode) node).getCollationDirections(), pinotQuery));
+      }
+      if (((SortNode) node).getFetch() > 0) {
+        pinotQuery.setLimit(((SortNode) node).getFetch());
+      }
+      if (((SortNode) node).getOffset() > 0) {
+        pinotQuery.setOffset(((SortNode) node).getOffset());
+      }
     } else if (node instanceof MailboxSendNode) {
       // TODO: MailboxSendNode should be the root of the leaf stage. but ignore for now since it is handle seperately
       // in QueryRunner as a single step sender.
