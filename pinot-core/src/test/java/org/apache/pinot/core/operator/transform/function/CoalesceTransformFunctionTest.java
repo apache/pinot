@@ -51,7 +51,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class CoalesceTransformFunctionTest {
+public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
 
   private static final String ENABLE_NULL_SEGMENT_NAME = "testSegment1";
   private static final String DISABLE_NULL_SEGMENT_NAME = "testSegment2";
@@ -183,6 +183,20 @@ public class CoalesceTransformFunctionTest {
       throws Exception {
     ExpressionContext coalesceExpr =
         RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", _stringSVValues[0], STRING_SV_COLUMN));
+    Assert.assertThrows(RuntimeException.class, () -> {
+      TransformFunctionFactory.get(coalesceExpr, _enableNullDataSourceMap);
+    });
+    Assert.assertThrows(RuntimeException.class, () -> {
+      TransformFunctionFactory.get(coalesceExpr, _disableNullDataSourceMap);
+    });
+  }
+
+  // Test that wrong data type is illegal argument.
+  @Test
+  public void testIllegalArgType()
+      throws Exception {
+    ExpressionContext coalesceExpr =
+        RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", TIMESTAMP_COLUMN, STRING_SV_COLUMN));
     Assert.assertThrows(RuntimeException.class, () -> {
       TransformFunctionFactory.get(coalesceExpr, _enableNullDataSourceMap);
     });
