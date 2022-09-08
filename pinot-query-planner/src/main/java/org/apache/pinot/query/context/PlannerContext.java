@@ -31,13 +31,14 @@ import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.validate.Validator;
 
+
 /**
  * PlannerContext is an object that holds all contextual information during planning phase.
  *
  * TODO: currently we don't support option or query rewrite.
  * It is used to hold per query context for query planning, which cannot be shared across queries.
  */
-public class PlannerContext {
+public class PlannerContext implements AutoCloseable {
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
       HepProgram hepProgram) {
     _planner = new PlannerImpl(config);
@@ -71,5 +72,11 @@ public class PlannerContext {
 
   public Map<String, String> getOptions() {
     return _options;
+  }
+
+  @Override
+  public void close()
+      throws Exception {
+    _planner.close();
   }
 }
