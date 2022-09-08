@@ -88,8 +88,10 @@ public class WorkerManager {
 
   private RoutingTable getRoutingTable(String tableName) {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    // TODO: support both offline and realtime, now we hard code offline table.
-    String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    // TODO: support both offline and realtime, now default only query the OFFLINE table.
+    tableType = tableType == null ? TableType.OFFLINE : tableType;
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
     return _routingManager.getRoutingTable(CalciteSqlCompiler.compileToBrokerRequest(
         "SELECT * FROM " + tableNameWithType));
   }
