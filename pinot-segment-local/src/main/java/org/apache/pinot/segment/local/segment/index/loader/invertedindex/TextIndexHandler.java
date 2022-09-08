@@ -184,8 +184,8 @@ public class TextIndexHandler implements IndexHandler {
         try (Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata)) {
           // Create the text index if the dictionary length is 1 as this is for a default column (i.e. newly added
           // column). For existing columns it is not possible to create the text index without forward index
-          Preconditions.checkState(dictionary.length() == 1,
-              "Creating text index for forward index disabled default column, dictionary size must be 1");
+          Preconditions.checkState(dictionary.length() == 1, String.format("Creating text index for forward index "
+              + "disabled default column: %s, dictionary size must be 1", columnName));
           if (columnMetadata.isSingleValue()) {
             for (int docId = 0; docId < numDocs; docId++) {
               textIndexCreator.add(dictionary.getStringValue(0));

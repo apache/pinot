@@ -208,8 +208,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (forwardIndexDisabled) {
         Preconditions.checkState(dictEnabledColumn && invertedIndexColumns.contains(columnName)
             && !columnIndexCreationInfo.isSorted() && (!rangeIndexColumns.contains(columnName)
-                || rangeIndexVersion == BitSlicedRangeIndexCreator.VERSION), "Cannot disable forward index for column "
-            + "without dictionary and inverted index or which is sorted or which has range index with version < 2");
+                || rangeIndexVersion == BitSlicedRangeIndexCreator.VERSION), String.format("Cannot disable forward "
+            + "index for column: %s without dictionary and inverted index or which is sorted or which has range "
+            + "index with version < 2", columnName));
       }
 
       IndexCreationContext.Common context = IndexCreationContext.builder()

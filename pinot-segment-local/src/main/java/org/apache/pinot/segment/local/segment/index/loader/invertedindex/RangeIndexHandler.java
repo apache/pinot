@@ -156,8 +156,8 @@ public class RangeIndexHandler implements IndexHandler {
         try (Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata)) {
           // Create the range index if the dictionary length is 1 as this is for a default column (i.e. newly added
           // column). For existing columns it is not possible to create the range index without forward index
-          Preconditions.checkState(dictionary.length() == 1,
-              "Creating range index for forward index disabled default column, dictionary size must be 1");
+          Preconditions.checkState(dictionary.length() == 1, String.format("Creating range index for forward index "
+              + "disabled default column: %s, dictionary size must be 1", columnMetadata.getColumnName()));
           if (columnMetadata.isSingleValue()) {
             for (int i = 0; i < numDocs; i++) {
               rangeIndexCreator.add(0);

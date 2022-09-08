@@ -80,7 +80,7 @@ public interface IndexCreationContext {
     private boolean _hasDictionary = true;
     private Comparable<?> _minValue;
     private Comparable<?> _maxValue;
-    private boolean _forwardIndexDisabled = false;
+    private boolean _forwardIndexDisabled;
 
     public Builder withColumnIndexCreationInfo(ColumnIndexCreationInfo columnIndexCreationInfo) {
       return withLengthOfLongestEntry(columnIndexCreationInfo.getLengthOfLongestEntry())
