@@ -134,9 +134,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, -1);
 
     _instanceId = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ID);
-    if (_instanceId == null && _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY) != null) {
+    if (_instanceId == null) {
       _instanceId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY);
-    } else if (_instanceId == null) {
+    }
+    if (_instanceId == null) {
       _instanceId = Helix.PREFIX_OF_BROKER_INSTANCE + _hostname + "_" + _port;
     }
     // NOTE: Force all instances to have the same prefix in order to derive the instance type based on the instance id

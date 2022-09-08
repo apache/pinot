@@ -211,7 +211,7 @@ public class CommonConstants {
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
-    public static final String CONFIG_OF_BROKER_ID = "pinot.broker.id";
+    public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.broker.swagger.use.https";
     // Configuration to consider the broker ServiceStatus as being STARTED if the percent of resources (tables) that
@@ -527,7 +527,7 @@ public class CommonConstants {
 
   public static class Minion {
     public static final String CONFIG_OF_METRICS_PREFIX = "pinot.minion.";
-    public static final String CONFIG_OF_MINION_ID = "pinot.minion.id";
+    public static final String CONFIG_OF_MINION_ID = "pinot.minion.instance.id";
     public static final String METADATA_EVENT_OBSERVER_PREFIX = "metadata.event.notifier";
 
     // Config keys
