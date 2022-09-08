@@ -114,7 +114,7 @@ public class HelixBrokerStarterHostnamePortTest extends ControllerTest {
   @Test
   public void testInstanceIdPrecedence()
       throws Exception {
-    // Ensures that pinot.broker.id has higher precedence compared to instanceId
+    // Ensures that pinot.broker.instance.id has higher precedence compared to instanceId
     Map<String, Object> properties = new HashMap<>();
     properties.put(CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
     properties.put(CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
