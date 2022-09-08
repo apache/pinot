@@ -57,6 +57,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   public static final String BROKER_INSTANCE_ID = "brokerInstanceId";
 
   private final boolean _useHttps;
+  private final boolean _swaggerBrokerEnabled;
 
   private HttpServer _httpServer;
 
@@ -65,6 +66,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     packages(RESOURCE_PACKAGE);
     property(PINOT_CONFIGURATION, brokerConf);
     _useHttps = Boolean.parseBoolean(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_SWAGGER_USE_HTTPS));
+    _swaggerBrokerEnabled = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_SWAGGER_BROKER_ENABLED,
+        CommonConstants.Broker.DEFAULT_SWAGGER_BROKER_ENABLED);
     if (brokerConf.getProperty(CommonConstants.Broker.BROKER_SERVICE_AUTO_DISCOVERY, false)) {
       register(ServiceAutoDiscoveryFeature.class);
     }
@@ -103,9 +106,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     } catch (IOException e) {
       throw new RuntimeException("Failed to start http server", e);
     }
-    PinotConfiguration brokerConf = (PinotConfiguration) getProperties().get(PINOT_CONFIGURATION);
-    if (brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_SWAGGER_BROKER_ENABLED,
-        CommonConstants.Broker.DEFAULT_SWAGGER_BROKER_ENABLED)) {
+
+    if (_swaggerBrokerEnabled) {
       PinotReflectionUtils.runWithLock(this::setupSwagger);
     } else {
       LOGGER.info("Hiding Swagger UI for Broker, by {}", CommonConstants.Broker.CONFIG_OF_SWAGGER_BROKER_ENABLED);
