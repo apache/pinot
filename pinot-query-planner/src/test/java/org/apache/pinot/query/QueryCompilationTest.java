@@ -20,8 +20,11 @@ package org.apache.pinot.query;
 
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -153,22 +156,37 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   @Test
   public void testPlanQueryMultiThread()
       throws Exception {
-    Runnable planQuery = () -> {
-      String query = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
-          + "WHERE a.col3 >= 0 AND a.col2 IN  ('a', 'b') AND b.col3 < 0";
+    Map<String, ArrayList<QueryPlan>> queryPlans = new HashMap<>();
+    Lock lock = new ReentrantLock();
+    Runnable joinQuery = () -> {
+      String query = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2";
       QueryPlan queryPlan = _queryEnvironment.planQuery(query);
-      List<StageNode> intermediateStageRoots =
-          queryPlan.getStageMetadataMap().entrySet().stream().filter(e -> e.getValue().getScannedTables().size() == 0)
-              .map(e -> queryPlan.getQueryStageMap().get(e.getKey())).collect(Collectors.toList());
-      // Assert that no project of filter node for any intermediate stage because all should've been pushed down.
-      for (StageNode roots : intermediateStageRoots) {
-        assertNodeTypeNotIn(roots, ImmutableList.of(ProjectNode.class, FilterNode.class));
+      lock.lock();
+      if (!queryPlans.containsKey(queryPlan)) {
+        queryPlans.put(query, new ArrayList<>());
       }
+      queryPlans.get(query).add(queryPlan);
+      lock.unlock();
+    };
+    Runnable selectQuery = () -> {
+      String query = "SELECT * FROM a";
+      QueryPlan queryPlan = _queryEnvironment.planQuery(query);
+      lock.lock();
+      if (!queryPlans.containsKey(queryPlan)) {
+        queryPlans.put(query, new ArrayList<>());
+      }
+      queryPlans.get(query).add(queryPlan);
+      lock.unlock();
     };
     ArrayList<Thread> threads = new ArrayList<>();
     final int numThreads = 10;
     for (int i = 0; i < numThreads; i++) {
-      Thread thread = new Thread(planQuery);
+      Thread thread = null;
+      if (i % 2 == 0) {
+        thread = new Thread(joinQuery);
+      } else {
+        thread = new Thread(selectQuery);
+      }
       threads.add(thread);
     }
     for (Thread t : threads) {
@@ -176,6 +194,11 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
     for (Thread t : threads) {
       t.join();
+    }
+    for (ArrayList<QueryPlan> plans : queryPlans.values()) {
+      for (QueryPlan plan : plans) {
+        Assert.assertTrue(plan.equals(plans.get(0)));
+      }
     }
   }
 
@@ -190,8 +213,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
-  private static boolean isOneOf(List<Class<? extends AbstractStageNode>> allowedNodeTypes,
-      StageNode node) {
+  private static boolean isOneOf(List<Class<? extends AbstractStageNode>> allowedNodeTypes, StageNode node) {
     for (Class<? extends AbstractStageNode> allowedNodeType : allowedNodeTypes) {
       if (node.getClass() == allowedNodeType) {
         return true;
@@ -202,7 +224,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
   @DataProvider(name = "testQueryExceptionDataProvider")
   private Object[][] provideQueriesWithException() {
-    return new Object[][] {
+    return new Object[][]{
         // wrong table is being used after JOIN
         new Object[]{"SELECT b.col1 - a.col3 FROM a JOIN c ON a.col1 = c.col3", "Table 'b' not found"},
         // non-agg column not being grouped
@@ -212,24 +234,30 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
   @DataProvider(name = "testQueryPlanDataProvider")
   private Object[][] provideQueriesWithExplainedPlan() {
-    return new Object[][] {
-        new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a", "{\n"
-            + "  \"rels\": [\n" + "    {\n" + "      \"id\": \"0\",\n" + "      \"relOp\": \"LogicalTableScan\",\n"
-            + "      \"table\": [\n" + "        \"a\"\n" + "      ],\n" + "      \"inputs\": []\n" + "    },\n"
-            + "    {\n" + "      \"id\": \"1\",\n" + "      \"relOp\": \"LogicalProject\",\n" + "      \"fields\": [\n"
-            + "        \"col1\",\n" + "        \"col3\"\n" + "      ],\n" + "      \"exprs\": [\n" + "        {\n"
-            + "          \"input\": 2,\n" + "          \"name\": \"$2\"\n" + "        },\n" + "        {\n"
-            + "          \"input\": 1,\n" + "          \"name\": \"$1\"\n" + "        }\n" + "      ]\n" + "    }\n"
-            + "  ]\n" + "}"},
-        new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
-            "Execution Plan\n" + "digraph {\n" + "\"LogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
-                + "\"LogicalAggregate\\n\" -> \"LogicalExchange\\n\" [label=\"0\"]\n"
-                + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n" + "}\n"},
-        new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1", "Execution Plan\n"
-            + "LogicalProject(col1=[$0], col3=[$1])\n" + "  LogicalJoin(condition=[=($0, $2)], joinType=[inner])\n"
+    return new Object[][]{
+        new Object[]{
+            "EXPLAIN PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a",
+            "{\n" + "  \"rels\": [\n" + "    {\n" + "      \"id\": \"0\",\n"
+                + "      \"relOp\": \"LogicalTableScan\",\n" + "      \"table\": [\n" + "        \"a\"\n" + "      ],\n"
+                + "      \"inputs\": []\n" + "    },\n" + "    {\n" + "      \"id\": \"1\",\n"
+                + "      \"relOp\": \"LogicalProject\",\n" + "      \"fields\": [\n" + "        \"col1\",\n"
+                + "        \"col3\"\n" + "      ],\n" + "      \"exprs\": [\n" + "        {\n"
+                + "          \"input\": 2,\n" + "          \"name\": \"$2\"\n" + "        },\n" + "        {\n"
+                + "          \"input\": 1,\n" + "          \"name\": \"$1\"\n" + "        }\n" + "      ]\n" + "    }\n"
+                + "  ]\n" + "}"
+        }, new Object[]{
+        "EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
+        "Execution Plan\n" + "digraph {\n" + "\"LogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
+            + "\"LogicalAggregate\\n\" -> \"LogicalExchange\\n\" [label=\"0\"]\n"
+            + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n" + "}\n"
+    }, new Object[]{
+        "EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
+        "Execution Plan\n" + "LogicalProject(col1=[$0], col3=[$1])\n"
+            + "  LogicalJoin(condition=[=($0, $2)], joinType=[inner])\n"
             + "    LogicalExchange(distribution=[hash[0]])\n" + "      LogicalProject(col1=[$2])\n"
             + "        LogicalTableScan(table=[[a]])\n" + "    LogicalExchange(distribution=[hash[1]])\n"
-            + "      LogicalProject(col3=[$1], col1=[$2])\n" + "        LogicalTableScan(table=[[b]])\n"},
+            + "      LogicalProject(col3=[$1], col1=[$2])\n" + "        LogicalTableScan(table=[[b]])\n"
+    },
     };
   }
 }

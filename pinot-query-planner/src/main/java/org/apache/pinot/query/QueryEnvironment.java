@@ -118,8 +118,7 @@ public class QueryEnvironment {
    * @return a dispatchable query plan
    */
   public QueryPlan planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
-    try {
-      PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram);
+    try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelNode relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
       return toDispatchablePlan(relRoot, plannerContext);
@@ -140,9 +139,8 @@ public class QueryEnvironment {
    * @return the explained query plan.
    */
   public String explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
-    try {
+    try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
-      PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram);
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelNode relRoot = compileQuery(explain.getExplicandum(), plannerContext);
       SqlExplainFormat format = explain.getFormat() == null ? SqlExplainFormat.DOT : explain.getFormat();
