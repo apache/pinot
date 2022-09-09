@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.docidsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
@@ -86,7 +85,7 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
 
     // evaluate the bitmaps in the order of the lowest matching num docIds comes first, so that we minimize the number
     // of containers (range) for comparison from the beginning, as will minimize the effort of bitmap AND application
-    // bitmapBasedDocIdIterators.sort(Comparator.comparing(x -> x.getDocIds().getCardinality()));
+    bitmapBasedDocIdIterators.sort(Comparator.comparing(x -> x.getDocIds().getCardinality()));
 
     int numSortedDocIdIterators = sortedDocIdIterators.size();
     int numBitmapBasedDocIdIterators = bitmapBasedDocIdIterators.size();
