@@ -32,6 +32,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
@@ -98,8 +99,17 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
         .addSingleValueDimension("column8", FieldSpec.DataType.INT).addMetric("column9", FieldSpec.DataType.INT)
         .addMetric("column10", FieldSpec.DataType.INT)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "daysSinceEpoch"), null).build();
+    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // exception if start and end time in time column are not in acceptable
+    // range. For this test, we first need to fix the input avro data
+    // to have the time column values in allowed range. Until then, the check
+    // is explicitly disabled
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setSegmentTimeValueCheck(false);
+    ingestionConfig.setRowTimeValueCheck(false);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setNoDictionaryColumns(Arrays.asList("column5"))
-        .setTableName("testTable").setTimeColumnName("daysSinceEpoch").build();
+        .setTableName("testTable").setTimeColumnName("daysSinceEpoch")
+        .setIngestionConfig(ingestionConfig).build();
 
     // Create the segment generator config.
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
@@ -107,12 +117,6 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig.setInvertedIndexCreationColumns(Arrays.asList("column3", "column7", "column8", "column9"));
-    // The segment generation code in SegmentColumnarIndexCreator will throw
-    // exception if start and end time in time column are not in acceptable
-    // range. For this test, we first need to fix the input avro data
-    // to have the time column values in allowed range. Until then, the check
-    // is explicitly disabled
-    segmentGeneratorConfig.setSkipTimeValueCheck(true);
 
     // Build the index segment.
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();

@@ -47,6 +47,7 @@ import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -111,10 +112,10 @@ public class SegmentGeneratorConfig implements Serializable {
   private DateTimeFormatSpec _dateTimeFormatSpec = null;
   // Use on-heap or off-heap memory to generate index (currently only affect inverted index and star-tree v2)
   private boolean _onHeap = false;
-  private boolean _skipTimeValueCheck = false;
   private boolean _nullHandlingEnabled = false;
   private boolean _continueOnError = false;
-  private boolean _validateTimeValue = false;
+  private boolean _rowTimeValueCheck = true;
+  private boolean _segmentTimeValueCheck = true;
   private boolean _failOnEmptySegment = false;
   private boolean _optimizeDictionaryForMetrics = false;
   private double _noDictionarySizeRatioThreshold = DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
@@ -222,13 +223,17 @@ public class SegmentGeneratorConfig implements Serializable {
       extractH3IndexConfigsFromTableConfig(tableConfig);
       extractCompressionCodecConfigsFromTableConfig(tableConfig);
 
-      _fstTypeForFSTIndex = tableConfig.getIndexingConfig().getFSTIndexType();
-
+      _fstTypeForFSTIndex = indexingConfig.getFSTIndexType();
       _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
-      _continueOnError = indexingConfig.isContinueOnError();
-      _validateTimeValue = indexingConfig.isValidateTimeValue();
       _optimizeDictionaryForMetrics = indexingConfig.isOptimizeDictionaryForMetrics();
       _noDictionarySizeRatioThreshold = indexingConfig.getNoDictionarySizeRatioThreshold();
+    }
+
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig != null) {
+      _continueOnError = ingestionConfig.isContinueOnError();
+      _rowTimeValueCheck = ingestionConfig.isRowTimeValueCheck();
+      _segmentTimeValueCheck = ingestionConfig.isSegmentTimeValueCheck();
     }
   }
 
@@ -722,11 +727,11 @@ public class SegmentGeneratorConfig implements Serializable {
   }
 
   public boolean isSkipTimeValueCheck() {
-    return _skipTimeValueCheck;
+    return !_segmentTimeValueCheck;
   }
 
   public void setSkipTimeValueCheck(boolean skipTimeValueCheck) {
-    _skipTimeValueCheck = skipTimeValueCheck;
+    _segmentTimeValueCheck = !skipTimeValueCheck;
   }
 
   public Map<String, ChunkCompressionType> getRawIndexCompressionType() {
@@ -796,12 +801,20 @@ public class SegmentGeneratorConfig implements Serializable {
     _continueOnError = continueOnError;
   }
 
-  public boolean isValidateTimeValue() {
-    return _validateTimeValue;
+  public boolean isRowTimeValueCheck() {
+    return _rowTimeValueCheck;
   }
 
-  public void setValidateTimeValue(boolean validateTimeValue) {
-    _validateTimeValue = validateTimeValue;
+  public void setRowTimeValueCheck(boolean rowTimeValueCheck) {
+    _rowTimeValueCheck = rowTimeValueCheck;
+  }
+
+  public boolean isSegmentTimeValueCheck() {
+    return _segmentTimeValueCheck;
+  }
+
+  public void setSegmentTimeValueCheck(boolean segmentTimeValueCheck) {
+    _segmentTimeValueCheck = segmentTimeValueCheck;
   }
 
   public boolean isOptimizeDictionaryForMetrics() {

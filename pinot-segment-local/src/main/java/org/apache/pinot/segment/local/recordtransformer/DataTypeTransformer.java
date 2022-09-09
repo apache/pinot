@@ -51,7 +51,7 @@ public class DataTypeTransformer implements RecordTransformer {
 
   private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
   private final boolean _continueOnError;
-  private final boolean _validateTimeValues;
+  private final boolean _rowTimeValueCheck;
   private final String _timeColumnName;
   private final DateTimeFormatSpec _timeFormatSpec;
 
@@ -61,9 +61,13 @@ public class DataTypeTransformer implements RecordTransformer {
         _dataTypes.put(fieldSpec.getName(), PinotDataType.getPinotDataTypeForIngestion(fieldSpec));
       }
     }
-
-    _continueOnError = tableConfig.getIndexingConfig().isContinueOnError();
-    _validateTimeValues = tableConfig.getIndexingConfig().isValidateTimeValue();
+    if (tableConfig.getIngestionConfig() != null) {
+      _continueOnError = tableConfig.getIngestionConfig().isContinueOnError();
+      _rowTimeValueCheck = tableConfig.getIngestionConfig().isRowTimeValueCheck();
+    } else {
+      _continueOnError = false;
+      _rowTimeValueCheck = false;
+    }
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
 
     DateTimeFormatSpec timeColumnSpec = null;
@@ -86,7 +90,7 @@ public class DataTypeTransformer implements RecordTransformer {
           continue;
         }
 
-        if (_validateTimeValues && _timeFormatSpec != null && column.equals(_timeColumnName)) {
+        if (_rowTimeValueCheck && _timeFormatSpec != null && column.equals(_timeColumnName)) {
           long timeInMs = _timeFormatSpec.fromFormatToMillis(value.toString());
           if (!TimeUtils.timeValueInValidRange(timeInMs)) {
             if (_continueOnError) {

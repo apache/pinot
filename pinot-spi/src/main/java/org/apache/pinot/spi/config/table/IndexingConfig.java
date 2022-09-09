@@ -53,8 +53,6 @@ public class IndexingConfig extends BaseJsonConfig {
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _aggregateMetrics;
   private boolean _nullHandlingEnabled;
-  private boolean _continueOnError;
-  private boolean _validateTimeValue;
 
   /**
    * If `optimizeDictionaryForMetrics` enabled, dictionary is not created for the metric columns
@@ -283,22 +281,6 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
     _nullHandlingEnabled = nullHandlingEnabled;
-  }
-
-  public boolean isContinueOnError() {
-    return _continueOnError;
-  }
-
-  public void setContinueOnError(boolean continueOnError) {
-    _continueOnError = continueOnError;
-  }
-
-  public boolean isValidateTimeValue() {
-    return _validateTimeValue;
-  }
-
-  public void setValidateTimeValue(boolean validateTimeValue) {
-    _validateTimeValue = validateTimeValue;
   }
 
   public boolean isOptimizeDictionaryForMetrics() {
