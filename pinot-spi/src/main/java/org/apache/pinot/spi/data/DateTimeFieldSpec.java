@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 
 
 @SuppressWarnings("unused")
@@ -31,6 +32,7 @@ import org.apache.pinot.spi.utils.EqualityUtils;
 public final class DateTimeFieldSpec extends FieldSpec {
   private String _format;
   private String _granularity;
+  private String _sampleValue;
   private transient DateTimeFormatSpec _formatSpec;
   private transient DateTimeGranularitySpec _granularitySpec;
 
@@ -70,13 +72,19 @@ public final class DateTimeFieldSpec extends FieldSpec {
    *       2) if a time column is defined in hoursSinceEpoch (format=1:HOURS:EPOCH), and the data buckets are 1 hours,
    *          the granularity will be 1:HOURS
    */
-  public DateTimeFieldSpec(String name, DataType dataType, String format, String granularity) {
+  public DateTimeFieldSpec(String name, DataType dataType, String format, String granularity,
+      @Nullable String sampleValue) {
     super(name, dataType, true);
 
     _format = format;
     _granularity = granularity;
     _formatSpec = new DateTimeFormatSpec(format);
     _granularitySpec = new DateTimeGranularitySpec(granularity);
+    _sampleValue = sampleValue;
+  }
+
+  public DateTimeFieldSpec(String name, DataType dataType, String format, String granularity) {
+    this(name, dataType, format, granularity, null);
   }
 
   /**
@@ -86,7 +94,17 @@ public final class DateTimeFieldSpec extends FieldSpec {
    */
   public DateTimeFieldSpec(String name, DataType dataType, String format, String granularity,
       @Nullable Object defaultNullValue, @Nullable String transformFunction) {
-    this(name, dataType, format, granularity);
+    this(name, dataType, format, granularity, defaultNullValue, transformFunction, null);
+  }
+
+  /**
+   * Constructs a DateTimeFieldSpec with basic fields - name, dataType, format, granularity - and also with
+   * defaultNullValue and
+   * transformFunction
+   */
+  public DateTimeFieldSpec(String name, DataType dataType, String format, String granularity,
+      @Nullable Object defaultNullValue, @Nullable String transformFunction, @Nullable String sampleValue) {
+    this(name, dataType, format, granularity, sampleValue);
     setDefaultNullValue(defaultNullValue);
     setTransformFunction(transformFunction);
   }
@@ -119,6 +137,15 @@ public final class DateTimeFieldSpec extends FieldSpec {
       formatSpec = new DateTimeFormatSpec(_format);
       _formatSpec = formatSpec;
     }
+
+    if (_sampleValue != null) {
+      long sampleTimestampValue = _formatSpec.fromFormatToMillis(_sampleValue);
+      boolean isValidTimestamp = TimeUtils.isTimestampValid(String.valueOf(sampleTimestampValue));
+      Preconditions.checkState(isValidTimestamp,
+          "Incorrect date time format. "
+              + "Converted sample value {} for date-time field spec is not in valid time-range: {} and {}",
+          sampleTimestampValue, TimeUtils.VALID_MIN_TIME_MILLIS, TimeUtils.VALID_MAX_TIME_MILLIS);
+    }
     return formatSpec;
   }
 
@@ -129,6 +156,14 @@ public final class DateTimeFieldSpec extends FieldSpec {
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setGranularity(String granularity) {
     _granularity = granularity;
+  }
+
+  public String getSampleValue() {
+    return _sampleValue;
+  }
+
+  public void setSampleValue(String sampleValue) {
+    _sampleValue = sampleValue;
   }
 
   @JsonIgnore
