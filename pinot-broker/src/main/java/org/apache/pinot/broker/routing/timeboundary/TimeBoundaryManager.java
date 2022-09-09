@@ -63,6 +63,7 @@ public class TimeBoundaryManager {
   private final Map<String, Long> _endTimeMsMap = new HashMap<>();
 
   private volatile TimeBoundaryInfo _timeBoundaryInfo;
+  private volatile TimeBoundaryInfo _enforcedTimeBoundaryInfo;
 
   public TimeBoundaryManager(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     Preconditions.checkState(tableConfig.getTableType() == TableType.OFFLINE,
@@ -105,6 +106,13 @@ public class TimeBoundaryManager {
   @SuppressWarnings("unused")
   public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     // Bulk load time info for all online segments
+    if (idealState.getRecord().getSimpleField("TIMEBOUNDARY") != null) {
+      long timeBoundary = Long.parseLong(idealState.getRecord().getSimpleField("TIMEBOUNDARY"));
+      updateEnforcedTimeBoundaryInfo(timeBoundary);
+    } else {
+      _enforcedTimeBoundaryInfo = null;
+    }
+
     int numSegments = onlineSegments.size();
     List<String> segments = new ArrayList<>(numSegments);
     List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
@@ -157,6 +165,12 @@ public class TimeBoundaryManager {
     }
   }
 
+  private void updateEnforcedTimeBoundaryInfo(long maxEndTimeMs) {
+    String timeBoundary = _timeFormatSpec.fromMillisToFormat(maxEndTimeMs);
+    _enforcedTimeBoundaryInfo = new TimeBoundaryInfo(_timeColumn, timeBoundary);
+
+  }
+
   /**
    * Processes the segment assignment (ideal state or external view) change based on the given online segments (segments
    * with ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
@@ -167,6 +181,12 @@ public class TimeBoundaryManager {
   @SuppressWarnings("unused")
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
+    if (idealState.getRecord().getSimpleField("TIMEBOUNDARY") != null) {
+      long timeBoundary = Long.parseLong(idealState.getRecord().getSimpleField("TIMEBOUNDARY"));
+      updateEnforcedTimeBoundaryInfo(timeBoundary);
+    } else {
+      _enforcedTimeBoundaryInfo = null;
+    }
     for (String segment : onlineSegments) {
       // NOTE: Only update the segment end time when there are ONLINE instances in the external view to prevent moving
       //       the time boundary before the new segment is picked up by the servers
@@ -194,11 +214,12 @@ public class TimeBoundaryManager {
   public synchronized void refreshSegment(String segment) {
     _endTimeMsMap.put(segment, extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
         _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
-    updateTimeBoundaryInfo(getMaxEndTimeMs());
+      updateTimeBoundaryInfo(getMaxEndTimeMs());
   }
 
   @Nullable
   public TimeBoundaryInfo getTimeBoundaryInfo() {
-    return _timeBoundaryInfo;
+    TimeBoundaryInfo _enforcedTimeBoundary = _enforcedTimeBoundaryInfo;
+    return (_enforcedTimeBoundaryInfo != null) ? _enforcedTimeBoundaryInfo : _timeBoundaryInfo;
   }
 }
