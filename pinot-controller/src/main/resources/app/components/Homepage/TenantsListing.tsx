@@ -21,7 +21,7 @@ import React from 'react';
 import CustomizedTables from '../Table';
 
 const TenantsTable = ({tenantsData}) => {
-  
+
   return (
     <CustomizedTables
       title="Tenants"

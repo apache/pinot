@@ -19,10 +19,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { FormControlLabel, Grid, Switch, Tooltip } from '@material-ui/core';
+import { Button, FormControlLabel, Grid, Switch, Tooltip } from '@material-ui/core';
 import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
-import { TableData } from 'Models';
+import { TableData, TableSegmentJobs } from 'Models';
 import AppLoader from '../components/AppLoader';
 import CustomizedTables from '../components/Table';
 import TableToolbar from '../components/TableToolbar';
@@ -138,6 +138,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [actionType, setActionType] = useState(null);
   const [showReloadStatusModal, setShowReloadStatusModal] = useState(false);
   const [reloadStatusData, setReloadStatusData] = useState(null);
+  const [segmentsJobsData, setSegmentJobsData] = useState<TableSegmentJobs | null>(null);
   const [showRebalanceServerModal, setShowRebalanceServerModal] = useState(false);
   const [schemaJSONFormat, setSchemaJSONFormat] = useState(false);
 
@@ -255,7 +256,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     }
   };
 
-  const syncResponse = (result) => {
+  const syncResponse = (result) => { 
     if(result.status){
       dispatch({type: 'success', message: result.status, show: true});
       fetchTableData();
@@ -319,19 +320,23 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
 
   const reloadSegments = async () => {
     const result = await PinotMethodUtils.reloadAllSegmentsOp(tableName, tableType);
+    navigator.clipboard.writeText(/{"reloadJobId":"(.*?)"/g.exec(result.status)[1])
+
     syncResponse(result);
+    dispatch({type: 'success', message: result.status, show: true});
   };
 
   const handleReloadStatus = async () => {
-    const result = await PinotMethodUtils.reloadStatusOp(tableName, tableType);
-    if(result.error){
+    try{
+      setShowReloadStatusModal(true);
+      const [reloadStatusData, segmentJobsData] = await Promise.all([PinotMethodUtils.reloadStatusOp(tableName, tableType), PinotMethodUtils.fetchTableSegmentJobs(tableName)])
+      setReloadStatusData(reloadStatusData);
+      setSegmentJobsData(segmentJobsData);
+    } catch(error) {
       setShowReloadStatusModal(false);
-      dispatch({type: 'error', message: result.error, show: true});
+      dispatch({type: 'error', message: error, show: true});
       setShowReloadStatusModal(false);
-      return;
     }
-    setShowReloadStatusModal(true);
-    setReloadStatusData(result);
   };
 
   const handleRebalanceBrokers = () => {
@@ -566,7 +571,8 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         showReloadStatusModal &&
         <ReloadStatusOp
           hideModal={()=>{setShowReloadStatusModal(false); setReloadStatusData(null)}}
-          data={reloadStatusData}
+          reloadStatusData={reloadStatusData}
+          segmentJobsData={segmentsJobsData}
         />
       }
       {showRebalanceServerModal &&

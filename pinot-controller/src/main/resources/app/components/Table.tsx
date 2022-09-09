@@ -298,7 +298,7 @@ export default function CustomizedTables({
 
   const filterSearchResults = React.useCallback((str: string) => {
     if (str === '') {
-      setFinalData(finalData);
+      return;
     } else {
       const filteredRescords = data.records.filter((record) => {
         const searchFound = record.find(
@@ -322,9 +322,9 @@ export default function CustomizedTables({
     return () => {
       clearTimeout(timeoutId.current);
     };
-  }, [search, timeoutId, filterSearchResults]);
+  }, [search, timeoutId, filterSearchResults, data]);
 
-  React.useCallback(()=>{
+  React.useEffect(()=>{
     setFinalData(Utils.tableFormat(data));
   }, [data]);
 

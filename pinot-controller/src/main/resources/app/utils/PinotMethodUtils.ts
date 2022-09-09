@@ -57,6 +57,7 @@ import {
   getTenantTableDetails,
   getSegmentMetadata,
   reloadSegment,
+  getTableSegmentJobs,
   getClusterInfo,
   zookeeperGetList,
   zookeeperGetData,
@@ -859,6 +860,12 @@ const deleteSegmentOp = (tableName, segmentName) => {
   });
 };
 
+const fetchTableSegmentJobs = async (tableName: string) => {
+  const response = await getTableSegmentJobs(tableName);
+  
+  return response.data;
+}
+
 const updateTable = (tableName: string, table: string) => {
   return putTable(tableName, table).then((res)=>{
     return res.data;
@@ -1093,6 +1100,7 @@ export default {
   deleteInstance,
   getAllPeriodicTaskNames,
   getAllTaskTypes,
+  fetchTableSegmentJobs,
   getTaskTypeDebugData,
   getTableData,
   getTaskInfo,
