@@ -50,7 +50,7 @@ public class BenchmarkAndDocIdIterator {
       throws RunnerException {
     Options opt =
         new OptionsBuilder().include(BenchmarkAndDocIdIterator.class.getSimpleName()).warmupTime(TimeValue.seconds(5))
-            .warmupIterations(2).measurementTime(TimeValue.seconds(10)).measurementIterations(5).forks(1).build();
+            .warmupIterations(3).measurementTime(TimeValue.seconds(10)).measurementIterations(5).forks(1).build();
 
     new Runner(opt).run();
   }
