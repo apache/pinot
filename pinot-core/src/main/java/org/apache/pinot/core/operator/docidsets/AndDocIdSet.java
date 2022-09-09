@@ -21,6 +21,8 @@ package org.apache.pinot.core.operator.docidsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
@@ -29,6 +31,7 @@ import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import org.apache.pinot.core.util.SortedRangeIntersection;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
+import org.roaringbitmap.buffer.BufferFastAggregation;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -83,7 +86,7 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
 
     // evaluate the bitmaps in the order of the lowest matching num docIds comes first, so that we minimize the number
     // of containers (range) for comparison from the beginning, as will minimize the effort of bitmap AND application
-    bitmapBasedDocIdIterators.sort(Comparator.comparing(x -> x.getDocIds().getCardinality()));
+    // bitmapBasedDocIdIterators.sort(Comparator.comparing(x -> x.getDocIds().getCardinality()));
 
     int numSortedDocIdIterators = sortedDocIdIterators.size();
     int numBitmapBasedDocIdIterators = bitmapBasedDocIdIterators.size();
@@ -123,11 +126,9 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
         if (numBitmapBasedDocIdIterators == 1) {
           docIds = bitmapBasedDocIdIterators.get(0).getDocIds();
         } else {
-          MutableRoaringBitmap mutableDocIds = bitmapBasedDocIdIterators.get(0).getDocIds().toMutableRoaringBitmap();
-          for (int i = 1; i < numBitmapBasedDocIdIterators; i++) {
-            mutableDocIds.and(bitmapBasedDocIdIterators.get(i).getDocIds());
-          }
-          docIds = mutableDocIds;
+          List<ImmutableRoaringBitmap> bitmaps = bitmapBasedDocIdIterators.stream()
+                  .map(BitmapBasedDocIdIterator::getDocIds).collect(Collectors.toList());
+          docIds = BufferFastAggregation.and(bitmaps.iterator());
         }
       }
       for (ScanBasedDocIdIterator scanBasedDocIdIterator : scanBasedDocIdIterators) {
