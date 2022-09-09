@@ -148,6 +148,34 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  @Test
+  public void testQueryRoutingManagerCompilation() {
+    String query = "SELECT * FROM d_OFFLINE";
+    QueryPlan queryPlan = _queryEnvironment.planQuery(query);
+    List<StageMetadata> tableScanMetadataList = queryPlan.getStageMetadataMap().values().stream()
+        .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
+    Assert.assertEquals(tableScanMetadataList.size(), 1);
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 1);
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().get(0).toString(), "Server_localhost_1");
+    query = "SELECT * FROM d_REALTIME";
+    queryPlan = _queryEnvironment.planQuery(query);
+    tableScanMetadataList = queryPlan.getStageMetadataMap().values().stream()
+        .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
+    Assert.assertEquals(tableScanMetadataList.size(), 1);
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 1);
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().get(0).toString(), "Server_localhost_2");
+
+    // Default routing to OFFLINE table.
+    // TODO: change this test to assert actual time-boundary routing once we support this.
+    query = "SELECT * FROM d";
+    queryPlan = _queryEnvironment.planQuery(query);
+    tableScanMetadataList = queryPlan.getStageMetadataMap().values().stream()
+        .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
+    Assert.assertEquals(tableScanMetadataList.size(), 1);
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 1);
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().get(0).toString(), "Server_localhost_1");
+  }
+
   // --------------------------------------------------------------------------
   // Test Utils.
   // --------------------------------------------------------------------------
