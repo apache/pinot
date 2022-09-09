@@ -80,28 +80,28 @@ public class BenchmarkAndDocIdIterator {
 
     @Setup(Level.Trial)
     public void doSetup() {
-      MutableRoaringBitmap[] mutableRoaringBitmap = new MutableRoaringBitmap[NUM_FILTERS];
+      MutableRoaringBitmap mutableRoaringBitmap = new MutableRoaringBitmap();
       Random r = new Random();
       r.setSeed(42);
       for (int i = 0; i < NUM_FILTERS; i++) {
-        mutableRoaringBitmap[i] = new MutableRoaringBitmap();
+        mutableRoaringBitmap = new MutableRoaringBitmap();
         double selectedPortion = (NUM_FILTERS - i) / (2.0 * NUM_FILTERS);
         for (int j = 0; j < NUM_DOCS; j++) {
           if (r.nextDouble() < selectedPortion) {
-            mutableRoaringBitmap[i].add(j);
+            mutableRoaringBitmap.add(j);
           }
         }
-        _childOperators.add(new BitmapBasedFilterOperator(mutableRoaringBitmap[i].toImmutableRoaringBitmap(),
+        _childOperators.add(new BitmapBasedFilterOperator(mutableRoaringBitmap.toImmutableRoaringBitmap(),
             false, NUM_DOCS));
 
-        mutableRoaringBitmap[i] = new MutableRoaringBitmap();
-        selectedPortion = 0.5;
+        mutableRoaringBitmap = new MutableRoaringBitmap();
+        selectedPortion = 0.1;
         for (int j = 0; j < NUM_DOCS; j++) {
           if (r.nextDouble() < selectedPortion) {
-            mutableRoaringBitmap[i].add(j);
+            mutableRoaringBitmap.add(j);
           }
         }
-        _childOperatorsNoOrdering.add(new BitmapBasedFilterOperator(mutableRoaringBitmap[i].toImmutableRoaringBitmap(),
+        _childOperatorsNoOrdering.add(new BitmapBasedFilterOperator(mutableRoaringBitmap.toImmutableRoaringBitmap(),
             false, NUM_DOCS));
       }
     }
