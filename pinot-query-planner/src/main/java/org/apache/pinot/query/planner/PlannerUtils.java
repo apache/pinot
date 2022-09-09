@@ -44,22 +44,31 @@ public class PlannerUtils {
     // do not instantiate.
   }
 
-  public static List<List<Integer>> getJoinKeyFromConditions(RexCall joinCondition, int leftNodeOffset) {
+  public static List<List<Integer>> getJoinKeyFromConditions(RexCall joinCondition, int leftNodeOffset,
+      int rightNodeOffset) {
     switch (joinCondition.getOperator().getKind()) {
       case EQUALS:
         RexNode left = joinCondition.getOperands().get(0);
         RexNode right = joinCondition.getOperands().get(1);
+        int leftIndex = ((RexInputRef) left).getIndex();
+        int rightIndex = ((RexInputRef) right).getIndex();
+        if (left.hashCode() > right.hashCode()) {
+          // right condition is before left condition.
+          leftIndex -= rightNodeOffset;
+        } else {
+          rightIndex -= leftNodeOffset;
+        }
         Preconditions.checkState(left instanceof RexInputRef, "only reference supported");
         Preconditions.checkState(right instanceof RexInputRef, "only reference supported");
-        return Arrays.asList(Collections.singletonList(((RexInputRef) left).getIndex()),
-            Collections.singletonList(((RexInputRef) right).getIndex() - leftNodeOffset));
+        return Arrays.asList(Collections.singletonList(leftIndex), Collections.singletonList(rightIndex));
       case AND:
         List<List<Integer>> predicateColumns = new ArrayList<>(2);
         predicateColumns.add(new ArrayList<>());
         predicateColumns.add(new ArrayList<>());
         for (RexNode operand : joinCondition.getOperands()) {
           Preconditions.checkState(operand instanceof RexCall);
-          List<List<Integer>> subPredicate = getJoinKeyFromConditions((RexCall) operand, leftNodeOffset);
+          List<List<Integer>> subPredicate =
+              getJoinKeyFromConditions((RexCall) operand, leftNodeOffset, rightNodeOffset);
           predicateColumns.get(0).addAll(subPredicate.get(0));
           predicateColumns.get(1).addAll(subPredicate.get(1));
         }

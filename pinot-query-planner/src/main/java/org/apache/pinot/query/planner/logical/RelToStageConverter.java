@@ -104,8 +104,8 @@ public final class RelToStageConverter {
 
   private static StageNode convertLogicalTableScan(LogicalTableScan node, int currentStageId) {
     String tableName = node.getTable().getQualifiedName().get(0);
-    List<String> columnNames = node.getRowType().getFieldList().stream()
-        .map(RelDataTypeField::getName).collect(Collectors.toList());
+    List<String> columnNames =
+        node.getRowType().getFieldList().stream().map(RelDataTypeField::getName).collect(Collectors.toList());
     return new TableScanNode(currentStageId, toDataSchema(node.getRowType()), tableName, columnNames);
   }
 
@@ -115,8 +115,10 @@ public final class RelToStageConverter {
     RexCall joinCondition = (RexCall) node.getCondition();
 
     // Parse out all equality JOIN conditions
-    int leftNodeOffset = node.getLeft().getRowType().getFieldList().size();
-    List<List<Integer>> predicateColumns = PlannerUtils.getJoinKeyFromConditions(joinCondition, leftNodeOffset);
+    int leftNodeOffset = node.getLeft().getRowType().getFieldCount();
+    int rightNodeoffset = node.getRight().getRowType().getFieldCount();
+    List<List<Integer>> predicateColumns =
+        PlannerUtils.getJoinKeyFromConditions(joinCondition, leftNodeOffset, rightNodeoffset);
 
     FieldSelectionKeySelector leftFieldSelectionKeySelector = new FieldSelectionKeySelector(predicateColumns.get(0));
     FieldSelectionKeySelector rightFieldSelectionKeySelector = new FieldSelectionKeySelector(predicateColumns.get(1));

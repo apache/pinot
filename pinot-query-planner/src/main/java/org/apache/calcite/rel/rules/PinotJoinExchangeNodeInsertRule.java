@@ -74,12 +74,12 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       rightExchange = LogicalExchange.create(rightInput, RelDistributions.BROADCAST_DISTRIBUTED);
     } else { // if (hints.contains(PinotRelationalHints.USE_HASH_DISTRIBUTE)) {
       RexCall joinCondition = (RexCall) join.getCondition();
-      int leftNodeOffset = join.getLeft().getRowType().getFieldNames().size();
-      List<List<Integer>> conditions = PlannerUtils.getJoinKeyFromConditions(joinCondition, leftNodeOffset);
-      leftExchange = LogicalExchange.create(leftInput,
-          RelDistributions.hash(conditions.get(0)));
-      rightExchange = LogicalExchange.create(rightInput,
-          RelDistributions.hash(conditions.get(1)));
+      int leftNodeOffset = join.getLeft().getRowType().getFieldCount();
+      int rightNodeOffset = join.getRight().getRowType().getFieldCount();
+      List<List<Integer>> conditions =
+          PlannerUtils.getJoinKeyFromConditions(joinCondition, leftNodeOffset, rightNodeOffset);
+      leftExchange = LogicalExchange.create(leftInput, RelDistributions.hash(conditions.get(0)));
+      rightExchange = LogicalExchange.create(rightInput, RelDistributions.hash(conditions.get(1)));
     }
 
     RelNode newJoinNode =
