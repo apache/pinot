@@ -31,7 +31,7 @@
   </parent>
 
   <artifactId>pinot-java-client-jdk8</artifactId>
-  <name>Pinot Java Clien JDK 8</name>
+  <name>Pinot Java Client JDK 8</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
@@ -61,7 +61,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-common-jkd8</artifactId>
+      <artifactId>pinot-common-jdk8</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
