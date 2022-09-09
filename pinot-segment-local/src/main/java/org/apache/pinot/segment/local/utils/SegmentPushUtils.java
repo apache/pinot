@@ -44,7 +44,7 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
+import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -241,7 +241,7 @@ public class SegmentPushUtils implements Serializable {
       // segments stored in Pinot deep store do not have .tar.gz extension
       String segmentName = fileName.endsWith(Constants.TAR_GZ_FILE_EXT)
           ? fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length()) : fileName;
-      Preconditions.checkArgument(SegmentNameGenerator.isValidSegmentName(segmentName));
+      SegmentNameUtils.validatePartialOrFullSegmentName(segmentName);
       File segmentMetadataFile = generateSegmentMetadataFile(fileSystem, URI.create(tarFilePath));
       AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
       try {
