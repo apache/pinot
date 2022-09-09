@@ -850,7 +850,7 @@ public class PinotTableRestletResource {
   }
 
   @POST
-  @Path("table/{tableName}/setTimeBoundary")
+  @Path("table/{tableName}/queryTimeBoundary")
   @ApiOperation(value = "Set hybrid table query time boundary", notes = "Set hybrid table query time boundary")
   public SuccessResponse setQueryTimeBoundary(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName)
@@ -902,6 +902,32 @@ public class PinotTableRestletResource {
         HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), offlineTableName, is -> {
           assert is != null;
           is.getRecord().setSimpleField("TIMEBOUNDARY", String.valueOf(timeBoundaryFinal));
+          return is;
+        }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
+
+    return (idealState == null) ? new SuccessResponse("Could not update time boundary")
+        : new SuccessResponse("Time boundary updated succesfully");
+  }
+
+  @DELETE
+  @Path("table/{tableName}/queryTimeBoundary")
+  @ApiOperation(value = "Delete hybrid table query time boundary", notes = "Delete hybrid table query time boundary")
+  public SuccessResponse deleteEnforcedQueryTimeBoundary(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName)
+      throws Exception {
+    // Validate its a hybrid table
+    if (!_pinotHelixResourceManager.hasRealtimeTable(tableName) || !_pinotHelixResourceManager.hasOfflineTable(
+        tableName)) {
+      throw new ControllerApplicationException(LOGGER, "Table isn't a hybrid table", Response.Status.BAD_REQUEST);
+    }
+
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+
+    // Delete the timeBoundary in tableIdealState
+    IdealState idealState =
+        HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), offlineTableName, is -> {
+          assert is != null;
+          is.getRecord().getSimpleFields().remove("TIMEBOUNDARY");
           return is;
         }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
 
