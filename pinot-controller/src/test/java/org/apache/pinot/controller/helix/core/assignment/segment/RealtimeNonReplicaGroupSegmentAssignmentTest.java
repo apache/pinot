@@ -280,8 +280,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
         ImmutableMap.of(InstancePartitionsType.COMPLETED, _instancePartitionsMap.get(InstancePartitionsType.COMPLETED));
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
 
-    // CHECKSTYLE:OFF
-    // @formatter:off
+    //@formatter:off
     Map<String, List<String>> expectedUploadedSegmentToInstances = ImmutableMap.of(
         "uploadedSegment_0", ImmutableList.of("completedInstance_0", "completedInstance_1", "completedInstance_2"),
         "uploadedSegment_1", ImmutableList.of("completedInstance_3", "completedInstance_4", "completedInstance_5"),
@@ -289,6 +288,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
         "uploadedSegment_3", ImmutableList.of("completedInstance_9", "completedInstance_0", "completedInstance_1"),
         "uploadedSegment_4", ImmutableList.of("completedInstance_2", "completedInstance_3", "completedInstance_4")
     );
+    //@formatter:on
     expectedUploadedSegmentToInstances.forEach((segmentName, expectedInstances) -> {
       List<String> actualInstances =
           _segmentAssignment.assignSegment(segmentName, currentAssignment, onlyCompletedInstancePartitionMap);
