@@ -50,7 +50,7 @@ public class BenchmarkAndDocIdIterator {
       throws RunnerException {
     Options opt =
         new OptionsBuilder().include(BenchmarkAndDocIdIterator.class.getSimpleName()).warmupTime(TimeValue.seconds(5))
-            .warmupIterations(2).measurementTime(TimeValue.seconds(5)).measurementIterations(5).forks(1).build();
+            .warmupIterations(2).measurementTime(TimeValue.seconds(10)).measurementIterations(5).forks(1).build();
 
     new Runner(opt).run();
   }
@@ -59,7 +59,7 @@ public class BenchmarkAndDocIdIterator {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void benchAndFilterOperator(MyState myState) {
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 100; i++) {
       new AndFilterOperator(myState._childOperators).nextBlock().getBlockDocIdSet().iterator();
     }
   }
@@ -68,7 +68,7 @@ public class BenchmarkAndDocIdIterator {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void benchAndFilterOperatorReorderCost(MyState myState) {
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 100; i++) {
       new AndFilterOperator(myState._childOperatorsNoOrdering).nextBlock().getBlockDocIdSet().iterator();
     }
   }
