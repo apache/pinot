@@ -36,7 +36,7 @@ public class SegmentNameUtils {
    * @param partialOrFullSegmentName provide partial or full segment name
    */
   public static void validatePartialOrFullSegmentName(String partialOrFullSegmentName) {
-    if (!INVALID_SEGMENT_NAME_REGEX.matcher(partialOrFullSegmentName).matches()) {
+    if (INVALID_SEGMENT_NAME_REGEX.matcher(partialOrFullSegmentName).matches()) {
       throw new IllegalArgumentException("Invalid partial or full segment name: " + partialOrFullSegmentName);
     }
   }

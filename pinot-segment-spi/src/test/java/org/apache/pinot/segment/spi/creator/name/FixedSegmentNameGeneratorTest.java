@@ -34,7 +34,7 @@ public class FixedSegmentNameGeneratorTest {
       Assert.fail();
     } catch (IllegalArgumentException e) {
       // Expected
-      assertEquals(e.getMessage(), "Invalid segmentName: seg*01 for FixedSegmentNameGenerator");
+      assertEquals(e.getMessage(), "Invalid partial or full segment name: seg*01");
     }
   }
 }
