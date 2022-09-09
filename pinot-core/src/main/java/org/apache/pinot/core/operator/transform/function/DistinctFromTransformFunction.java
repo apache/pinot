@@ -20,6 +20,8 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -35,33 +37,49 @@ import org.roaringbitmap.RoaringBitmap;
  * This function only supports two arguments which are both column names.
  */
 public class DistinctFromTransformFunction extends BinaryOperatorTransformFunction {
-  // If _getDistinct is true, act as IsDistinctFrom transformation, otherwise act as IsNotDistinctFrom.
-  private boolean _getDistinct;
-
-  /**
-   * @param getDistinct is set to true for IsDistinctFrom, otherwise it is for IsNotDistinctFrom.
-   */
-  protected DistinctFromTransformFunction(boolean getDistinct) {
-    super(getDistinct ? TransformFunctionType.NOT_EQUALS : TransformFunctionType.EQUALS);
-    _getDistinct = getDistinct;
-  }
+  // If _distinctType is 1, act as IsDistinctFrom transformation, otherwise act as IsNotDistinctFrom.
+  // This value should only be 0 or 1.
+  private int _distinctType;
 
   /**
    * Returns a bit map of corresponding column.
-   * Returns an empty bitmap by default if null option is disabled.
+   * Returns null by default if null option is disabled.
    */
-  private static RoaringBitmap getNullBitMap(ProjectionBlock projectionBlock, TransformFunction transformFunction) {
+  private static @Nullable RoaringBitmap getNullBitMap(ProjectionBlock projectionBlock,
+      TransformFunction transformFunction) {
     String columnName = ((IdentifierTransformFunction) transformFunction).getColumnName();
     RoaringBitmap nullBitmap = projectionBlock.getBlockValueSet(columnName).getNullBitmap();
-    if (nullBitmap == null) {
-      return new RoaringBitmap();
-    }
     return nullBitmap;
+  }
+
+  /**
+   * Fill in results based on functions
+   * @param isDistinctNull return true if one field is null and the other field is not null
+   * @param isBothNull return true if both fields are null
+   * @param length length of the result
+   */
+  private void fillInDistinctNullValue(Function<Integer, Boolean> isDistinctNull, Function<Integer, Boolean> isBothNull,
+      int length) {
+    for (int i = 0; i < length; i++) {
+      if (isDistinctNull.apply(i)) {
+        _results[i] = _distinctType;
+      } else if (isBothNull.apply(i)) {
+        _results[i] = _distinctType ^ 1;
+      }
+    }
+  }
+
+  /**
+   * @param distinctType is set to true for IsDistinctFrom, otherwise it is for IsNotDistinctFrom.
+   */
+  protected DistinctFromTransformFunction(boolean distinctType) {
+    super(distinctType ? TransformFunctionType.NOT_EQUALS : TransformFunctionType.EQUALS);
+    _distinctType = distinctType ? 1 : 0;
   }
 
   @Override
   public String getName() {
-    if (_getDistinct) {
+    if (_distinctType == 1) {
       return TransformFunctionType.IS_DISTINCT_FROM.getName();
     }
     return TransformFunctionType.IS_NOT_DISTINCT_FROM.getName();
@@ -85,18 +103,21 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
     int length = projectionBlock.getNumDocs();
     _results = super.transformToIntValuesSV(projectionBlock);
-    RoaringBitmap letNull = getNullBitMap(projectionBlock, _leftTransformFunction);
+    RoaringBitmap leftNull = getNullBitMap(projectionBlock, _leftTransformFunction);
     RoaringBitmap rightNull = getNullBitMap(projectionBlock, _rightTransformFunction);
-    RoaringBitmap xorNull = RoaringBitmap.xor(letNull, rightNull);
-    for (int i = 0; i < length; i++) {
-      if (xorNull.contains(i)) {
-        // These are docs that are null one side and not null the other side.
-        _results[i] = _getDistinct ? 1 : 0;
-      } else if (rightNull.contains(i)) {
-        // If both values are null, mark they are not distinct.
-        _results[i] = _getDistinct ? 0 : 1;
-      }
+    if (leftNull == null && rightNull == null) {
+      return _results;
     }
+    if (leftNull == null) {
+      fillInDistinctNullValue(rightNull::contains, (Integer i) -> false, length);
+      return _results;
+    }
+    if (rightNull == null) {
+      fillInDistinctNullValue(leftNull::contains, (Integer i) -> false, length);
+      return _results;
+    }
+    RoaringBitmap xorNull = RoaringBitmap.xor(leftNull, rightNull);
+    fillInDistinctNullValue(xorNull::contains, rightNull::contains, length);
     return _results;
   }
 }
