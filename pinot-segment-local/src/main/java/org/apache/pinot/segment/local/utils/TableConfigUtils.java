@@ -877,24 +877,8 @@ public final class TableConfigUtils {
             break;
         }
 
-        // Validate the forward index disabled compatibility if enabled for this column
-        Map<String, String> fieldConfigProperties = fieldConfig.getProperties();
-        if (fieldConfigProperties != null) {
-          boolean forwardIndexDisabled = Boolean.parseBoolean(fieldConfigProperties
-              .getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED, FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
-          if (forwardIndexDisabled) {
-            Preconditions.checkState((noDictionaryColumns == null || !noDictionaryColumns.contains(columnName))
-                && (indexingConfigs.getInvertedIndexColumns() != null
-                    && indexingConfigs.getInvertedIndexColumns().contains(columnName))
-                && (indexingConfigs.getSortedColumn() == null
-                    || !indexingConfigs.getSortedColumn().contains(columnName))
-                && (indexingConfigs.getRangeIndexColumns() == null
-                    || !indexingConfigs.getRangeIndexColumns().contains(columnName)
-                    || indexingConfigs.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION),
-                "Forward index disabled columns must have dictionary and inverted index and must not be sorted or "
-                    + "have range index with version < 2");
-          }
-        }
+        // Validate the forward index disabled compatibility with other indexes if enabled for this column
+        validateForwardIndexDisabledIndexCompatibility(columnName, fieldConfig, indexingConfigs, noDictionaryColumns);
       }
 
       if (CollectionUtils.isNotEmpty(fieldConfig.getIndexTypes())) {
@@ -921,6 +905,41 @@ public final class TableConfigUtils {
         }
       }
     }
+  }
+
+  /**
+   * Validates the compatibility of the indexes if the column has the forward index disabled. Throws exceptions due to
+   * compatibility mismatch. The checks performed are:
+   *     - Validate dictionary is enabled.
+   *     - Validate inverted index is enabled.
+   *     - Validate that the column is not sorted.
+   *     - Validate that either no range index exists for column or the range index version is at least 2.
+   */
+  private static void validateForwardIndexDisabledIndexCompatibility(String columnName, FieldConfig fieldConfig,
+      IndexingConfig indexingConfigs, List<String> noDictionaryColumns) {
+    Map<String, String> fieldConfigProperties = fieldConfig.getProperties();
+    if (fieldConfigProperties == null) {
+      return;
+    }
+
+    boolean forwardIndexDisabled = Boolean.parseBoolean(fieldConfigProperties
+        .getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED, FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
+    if (!forwardIndexDisabled) {
+      return;
+    }
+
+    Preconditions.checkState(noDictionaryColumns == null || !noDictionaryColumns.contains(columnName),
+        String.format("Forward index disabled column %s must have dictionary enabled", columnName));
+    Preconditions.checkState(indexingConfigs.getInvertedIndexColumns() != null
+            && indexingConfigs.getInvertedIndexColumns().contains(columnName),
+        String.format("Forward index disabled column %s must have inverted index enabled", columnName));
+    Preconditions.checkState(indexingConfigs.getSortedColumn() == null
+            || !indexingConfigs.getSortedColumn().contains(columnName),
+        String.format("Forward index disabled column %s cannot be a sorted column", columnName));
+    Preconditions.checkState(indexingConfigs.getRangeIndexColumns() == null
+            || !indexingConfigs.getRangeIndexColumns().contains(columnName)
+            || indexingConfigs.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION,
+        String.format("Forward index disabled column %s cannot have a range index with version < 2", columnName));
   }
 
   private static void sanitize(TableConfig tableConfig) {

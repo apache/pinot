@@ -205,13 +205,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           "Cannot create inverted index for raw index column: %s", columnName);
 
       boolean forwardIndexDisabled = forwardIndexDisabledColumns.contains(columnName);
-      if (forwardIndexDisabled) {
-        Preconditions.checkState(dictEnabledColumn && invertedIndexColumns.contains(columnName)
-            && !columnIndexCreationInfo.isSorted() && (!rangeIndexColumns.contains(columnName)
-                || rangeIndexVersion == BitSlicedRangeIndexCreator.VERSION), String.format("Cannot disable forward "
-            + "index for column: %s without dictionary and inverted index or which is sorted or which has range "
-            + "index with version < 2", columnName));
-      }
+      validateForwardIndexDisabledIndexCompatibility(columnName, forwardIndexDisabled, dictEnabledColumn,
+          columnIndexCreationInfo, invertedIndexColumns, rangeIndexColumns, rangeIndexVersion);
 
       IndexCreationContext.Common context = IndexCreationContext.builder()
           .withIndexDir(_indexDir)
@@ -314,6 +309,40 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
       }
     }
+  }
+
+  /**
+   * Validates the compatibility of the indexes if the column has the forward index disabled. Throws exceptions due to
+   * compatibility mismatch. The checks performed are:
+   *     - Validate dictionary is enabled.
+   *     - Validate inverted index is enabled.
+   *     - Validate that the column is not sorted.
+   *     - Validate that either no range index exists for column or the range index version is at least 2.
+   *
+   * @param columnName Name of the column
+   * @param forwardIndexDisabled Whether the forward index is disabled for column or not
+   * @param dictEnabledColumn Whether the column is dictionary enabled or not
+   * @param columnIndexCreationInfo Column index creation info
+   * @param invertedIndexColumns Set of columns with inverted index enabled
+   * @param rangeIndexColumns Set of columns with range index enabled
+   * @param rangeIndexVersion Range index version
+   */
+  private void validateForwardIndexDisabledIndexCompatibility(String columnName, boolean forwardIndexDisabled,
+      boolean dictEnabledColumn, ColumnIndexCreationInfo columnIndexCreationInfo, Set<String> invertedIndexColumns,
+      Set<String> rangeIndexColumns, int rangeIndexVersion) {
+    if (!forwardIndexDisabled) {
+      return;
+    }
+
+    Preconditions.checkState(dictEnabledColumn,
+        String.format("Cannot disable forward index for column %s without dictionary", columnName));
+    Preconditions.checkState(invertedIndexColumns.contains(columnName),
+        String.format("Cannot disable forward index for column %s without inverted index enabled", columnName));
+    Preconditions.checkState(!columnIndexCreationInfo.isSorted(),
+        String.format("Cannot disable forward index for column %s which is sorted", columnName));
+    Preconditions.checkState(!rangeIndexColumns.contains(columnName)
+        || rangeIndexVersion == BitSlicedRangeIndexCreator.VERSION,
+        String.format("Cannot disable forward index for column %s which has range index with version < 2", columnName));
   }
 
   /**

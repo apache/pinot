@@ -76,6 +76,7 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
   public ForwardIndexCreator newForwardIndexCreator(IndexCreationContext.Forward context)
       throws Exception {
     if (!context.hasDictionary()) {
+      // Dictionary disabled columns
       boolean deriveNumDocsPerChunk =
           shouldDeriveNumDocsPerChunk(context.getFieldSpec().getName(), context.getColumnProperties());
       int writerVersion = getRawIndexWriterVersion(context.getFieldSpec().getName(), context.getColumnProperties());
@@ -90,13 +91,16 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
             context.getMaxRowLengthInBytes());
       }
     } else {
+      // Dictionary enabled columns
       if (context.forwardIndexDisabled()) {
+        // Forward index disabled columns
         if (context.getFieldSpec().isSingleValueField()) {
           return new SingleValueNoOpForwardIndexCreator();
         } else {
           return new MultiValueNoOpForwardIndexCreator();
         }
       } else {
+        // Forward index enabled columns
         if (context.getFieldSpec().isSingleValueField()) {
           if (context.isSorted()) {
             return new SingleValueSortedForwardIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),

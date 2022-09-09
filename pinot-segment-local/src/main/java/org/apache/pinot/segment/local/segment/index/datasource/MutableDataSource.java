@@ -109,12 +109,6 @@ public class MutableDataSource extends BaseDataSource {
       return _maxNumValuesPerMVEntry;
     }
 
-    @Override
-    public boolean forwardIndexDisabled() {
-      // Disabling the forward index is only supported for immutable segments.
-      return false;
-    }
-
     @Nullable
     @Override
     public Comparable getMinValue() {

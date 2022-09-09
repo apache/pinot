@@ -191,6 +191,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
       if (column.equals("column6") || column.equals("column7")) {
         assertTrue(metadata.hasDictionary());
         assertTrue(metadata.forwardIndexDisabled());
+        assertTrue(metadata.isSingleValue());
       } else {
         assertFalse(metadata.forwardIndexDisabled());
       }

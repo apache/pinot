@@ -51,7 +51,6 @@ public class ImmutableDataSource extends BaseDataSource {
     final Comparable _maxValue;
     final PartitionFunction _partitionFunction;
     final Set<Integer> _partitions;
-    final boolean _forwardIndexDisabled;
 
     ImmutableDataSourceMetadata(ColumnMetadata columnMetadata) {
       _fieldSpec = columnMetadata.getFieldSpec();
@@ -68,7 +67,6 @@ public class ImmutableDataSource extends BaseDataSource {
       _partitionFunction = columnMetadata.getPartitionFunction();
       _partitions = columnMetadata.getPartitions();
       _cardinality = columnMetadata.getCardinality();
-      _forwardIndexDisabled = columnMetadata.forwardIndexDisabled();
     }
 
     @Override
@@ -94,11 +92,6 @@ public class ImmutableDataSource extends BaseDataSource {
     @Override
     public int getMaxNumValuesPerMVEntry() {
       return _maxNumValuesPerMVEntry;
-    }
-
-    @Override
-    public boolean forwardIndexDisabled() {
-      return _forwardIndexDisabled;
     }
 
     @Nullable
