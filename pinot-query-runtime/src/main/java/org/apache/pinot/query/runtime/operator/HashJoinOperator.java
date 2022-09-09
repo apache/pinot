@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
@@ -48,6 +49,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
   private final HashMap<Integer, List<Object[]>> _broadcastHashTable;
   private final BaseOperator<TransferableBlock> _leftTableOperator;
   private final BaseOperator<TransferableBlock> _rightTableOperator;
+  private final JoinRelType _joinType;
   private final DataSchema _resultSchema;
   private final DataSchema _leftTableSchema;
   private final DataSchema _rightTableSchema;
@@ -59,7 +61,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
 
   public HashJoinOperator(BaseOperator<TransferableBlock> leftTableOperator, DataSchema leftSchema,
       BaseOperator<TransferableBlock> rightTableOperator, DataSchema rightSchema, DataSchema outputSchema,
-      List<JoinNode.JoinClause> criteria) {
+      List<JoinNode.JoinClause> criteria, JoinRelType joinType) {
     _leftKeySelector = criteria.get(0).getLeftJoinKeySelector();
     _rightKeySelector = criteria.get(0).getRightJoinKeySelector();
     _leftTableOperator = leftTableOperator;
@@ -67,6 +69,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     _resultSchema = outputSchema;
     _leftTableSchema = leftSchema;
     _rightTableSchema = rightSchema;
+    _joinType = joinType;
     _resultRowSize = _resultSchema.size();
     _isHashTableBuilt = false;
     _broadcastHashTable = new HashMap<>();
@@ -132,7 +135,7 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
           rows.add(joinRow(leftRow, rightRow));
         }
       }
-      return new TransferableBlock(rows, computeSchema(), BaseDataBlock.Type.ROW);
+      return new TransferableBlock(rows, _resultSchema, BaseDataBlock.Type.ROW);
     } else if (leftBlock.isErrorBlock()) {
       _upstreamErrorBlock = leftBlock;
       return _upstreamErrorBlock;
@@ -147,24 +150,11 @@ public class HashJoinOperator extends BaseOperator<TransferableBlock> {
     for (Object obj : leftRow) {
       resultRow[idx++] = obj;
     }
-    for (Object obj : rightRow) {
-      resultRow[idx++] = obj;
+    if (_joinType != JoinRelType.SEMI) {
+      for (Object obj : rightRow) {
+        resultRow[idx++] = obj;
+      }
     }
     return resultRow;
-  }
-
-  private DataSchema computeSchema() {
-    String[] columnNames = new String[_resultRowSize];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[_resultRowSize];
-    int idx = 0;
-    for (int index = 0; index < _leftTableSchema.size(); index++) {
-      columnNames[idx] = _leftTableSchema.getColumnName(index);
-      columnDataTypes[idx++] = _leftTableSchema.getColumnDataType(index);
-    }
-    for (int index = 0; index < _rightTableSchema.size(); index++) {
-      columnNames[idx] = _rightTableSchema.getColumnName(index);
-      columnDataTypes[idx++] = _rightTableSchema.getColumnDataType(index);
-    }
-    return new DataSchema(columnNames, columnDataTypes);
   }
 }
