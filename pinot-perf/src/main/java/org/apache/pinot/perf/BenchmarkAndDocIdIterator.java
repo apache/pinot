@@ -82,6 +82,7 @@ public class BenchmarkAndDocIdIterator {
     public void doSetup() {
       MutableRoaringBitmap[] mutableRoaringBitmap = new MutableRoaringBitmap[NUM_FILTERS];
       Random r = new Random();
+      r.setSeed(42);
       for (int i = 0; i < NUM_FILTERS; i++) {
         mutableRoaringBitmap[i] = new MutableRoaringBitmap();
         double selectedPortion = (NUM_FILTERS - i) / (2.0 * NUM_FILTERS);
@@ -92,7 +93,15 @@ public class BenchmarkAndDocIdIterator {
         }
         _childOperators.add(new BitmapBasedFilterOperator(mutableRoaringBitmap[i].toImmutableRoaringBitmap(),
             false, NUM_DOCS));
-        _childOperatorsNoOrdering.add(new BitmapBasedFilterOperator(mutableRoaringBitmap[0].toImmutableRoaringBitmap(),
+
+        mutableRoaringBitmap[i] = new MutableRoaringBitmap();
+        selectedPortion = 0.5;
+        for (int j = 0; j < NUM_DOCS; j++) {
+          if (r.nextDouble() < selectedPortion) {
+            mutableRoaringBitmap[i].add(j);
+          }
+        }
+        _childOperatorsNoOrdering.add(new BitmapBasedFilterOperator(mutableRoaringBitmap[i].toImmutableRoaringBitmap(),
             false, NUM_DOCS));
       }
     }
