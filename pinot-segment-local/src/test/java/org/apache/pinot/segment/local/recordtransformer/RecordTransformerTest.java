@@ -172,8 +172,10 @@ public class RecordTransformerTest {
       assertThrows(() -> transformer.transform(record));
     }
 
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setContinueOnError(true);
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setContinueOnError(true).setTableName("testTable").build();
+        new TableConfigBuilder(TableType.OFFLINE).setIngestionConfig(ingestionConfig).setTableName("testTable").build();
 
     RecordTransformer transformerWithDefaultNulls = new DataTypeTransformer(tableConfig, schema);
     GenericRow record1 = getRecord();
@@ -203,9 +205,11 @@ public class RecordTransformerTest {
     }
 
     // Invalid Timestamp and Validation enabled
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setRowTimeValueCheck(true);
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(timeCol)
-            .setValidateTimeValue(true)
+            .setIngestionConfig(ingestionConfig)
             .setTableName("testTable").build();
 
     RecordTransformer transformerWithValidation = new DataTypeTransformer(tableConfig, schema);
@@ -216,10 +220,12 @@ public class RecordTransformerTest {
     }
 
     // Invalid timestamp, validation enabled and ignoreErrors enabled
+    ingestionConfig = new IngestionConfig();
+    ingestionConfig.setRowTimeValueCheck(true);
+    ingestionConfig.setContinueOnError(true);
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(timeCol)
-            .setValidateTimeValue(true)
-            .setContinueOnError(true)
+            .setIngestionConfig(ingestionConfig)
             .setTableName("testTable").build();
 
     transformer = new DataTypeTransformer(tableConfig, schema);

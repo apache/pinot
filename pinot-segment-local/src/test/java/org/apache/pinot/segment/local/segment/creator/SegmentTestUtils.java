@@ -39,6 +39,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -72,8 +73,18 @@ public class SegmentTestUtils {
   public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro, File outputDir,
       String timeColumn, TimeUnit timeUnit, String tableName)
       throws IOException {
+    // The segment generation code in SegmentColumnarIndexCreator will throw
+    // exception if start and end time in time column are not in acceptable
+    // range. For this test, we first need to fix the input avro data
+    // to have the time column values in allowed range. Until then, the check
+    // is explicitly disabled
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setRowTimeValueCheck(false);
+    ingestionConfig.setSegmentTimeValueCheck(false);
     final SegmentGeneratorConfig segmentGenSpec =
-        new SegmentGeneratorConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build(),
+        new SegmentGeneratorConfig(
+            new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setIngestionConfig(ingestionConfig)
+                .build(),
             extractSchemaFromAvroWithoutTime(inputAvro));
     segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
     segmentGenSpec.setTimeColumnName(timeColumn);
