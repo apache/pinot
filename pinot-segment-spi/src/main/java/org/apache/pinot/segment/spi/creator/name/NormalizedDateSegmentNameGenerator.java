@@ -66,13 +66,14 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
     _segmentNamePrefix = segmentNamePrefix != null ? segmentNamePrefix.trim() : tableName;
     Preconditions
         .checkArgument(_segmentNamePrefix != null, "Missing segmentNamePrefix for NormalizedDateSegmentNameGenerator");
-    Preconditions.checkArgument(isValidSegmentName(_segmentNamePrefix),
+    Preconditions.checkArgument(SegmentNameGenerator.isValidSegmentName(_segmentNamePrefix),
         "Invalid segmentNamePrefix: %s for NormalizedDateSegmentNameGenerator", _segmentNamePrefix);
     _excludeSequenceId = excludeSequenceId;
     _appendPushType = "APPEND".equalsIgnoreCase(pushType);
     _segmentNamePostfix = segmentNamePostfix != null ? segmentNamePostfix.trim() : null;
     _appendUUIDToSegmentName = appendUUIDToSegmentName;
-    Preconditions.checkArgument(_segmentNamePostfix == null || isValidSegmentName(_segmentNamePostfix),
+    Preconditions.checkArgument(_segmentNamePostfix == null
+            || SegmentNameGenerator.isValidSegmentName(_segmentNamePostfix),
         "Invalid segmentNamePostfix: %s for NormalizedDateSegmentNameGenerator", _segmentNamePostfix);
 
     // Include time info for APPEND push type

@@ -32,8 +32,8 @@ public class FixedSegmentNameGenerator implements SegmentNameGenerator {
   public FixedSegmentNameGenerator(String segmentName) {
     Preconditions.checkArgument(segmentName != null, "Missing segmentName for FixedSegmentNameGenerator");
     Preconditions
-        .checkArgument(isValidSegmentName(segmentName), "Invalid segmentName: %s for FixedSegmentNameGenerator",
-            segmentName);
+        .checkArgument(SegmentNameGenerator.isValidSegmentName(segmentName),
+            "Invalid segmentName: %s for FixedSegmentNameGenerator", segmentName);
     _segmentName = segmentName;
   }
 
