@@ -67,7 +67,7 @@ public class BenchmarkAndDocIdIterator {
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public void benchAndFilterOperatorReorderCost(MyState myState) {
+  public void benchAndFilterOperatorDegenerate(MyState myState) {
     for (int i = 0; i < 100; i++) {
       new AndFilterOperator(myState._childOperatorsNoOrdering).nextBlock().getBlockDocIdSet().iterator();
     }
