@@ -24,9 +24,16 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * Forward index creator for dictionary-encoded multi-value column with forward index disabled. This is a no-op.
+ * Forward index creator for dictionary-encoded single and multi-value columns with forward index disabled.
+ * This is a no-op.
  */
-public class MultiValueNoOpForwardIndexCreator implements ForwardIndexCreator {
+public class NoOpForwardIndexCreator implements ForwardIndexCreator {
+  private final boolean _isSingleValue;
+
+  public NoOpForwardIndexCreator(boolean isSingleValue) {
+    _isSingleValue = isSingleValue;
+  }
+
   @Override
   public boolean isDictionaryEncoded() {
     return true;
@@ -34,12 +41,16 @@ public class MultiValueNoOpForwardIndexCreator implements ForwardIndexCreator {
 
   @Override
   public boolean isSingleValue() {
-    return false;
+    return _isSingleValue;
   }
 
   @Override
   public FieldSpec.DataType getValueType() {
     return FieldSpec.DataType.INT;
+  }
+
+  @Override
+  public void putDictId(int dictId) {
   }
 
   @Override

@@ -410,11 +410,11 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
           || brokerResponseNative.getProcessingExceptions().size() == 0);
       ResultTable resultTable = brokerResponseNative.getResultTable();
       assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
-      assertEquals(brokerResponseNative.getTotalDocs(), 120_000L);
-      assertEquals(brokerResponseNative.getNumDocsScanned(), 828L);
+      assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
+      assertEquals(brokerResponseNative.getNumDocsScanned(), 199_860L);
       assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
       assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
-      assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 948L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 199_980L);
       assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
       assertNotNull(brokerResponseNative.getProcessingExceptions());
       assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
@@ -426,14 +426,367 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       int previousColumn1 = Integer.MIN_VALUE;
       for (Object[] resultRow : resultRows) {
         assertEquals(resultRow.length, 4);
-        assertEquals((String) resultRow[1], "gFuH");
         assertTrue((Integer) resultRow[0] >= previousColumn1);
         previousColumn1 = (Integer) resultRow[0];
       }
 
       Object[] firstRow = resultRows.get(0);
-      // Column 11
-      assertEquals((String) firstRow[3], "P");
+      // Column 5
+      assertEquals((String) firstRow[1], "AKXcXcIqsqOJFsdwxZ");
+    }
+    {
+      // Selection query with supported filters (including forwardIndexDisabled column) and without columns with
+      // forwardIndexDisabled enabled on either segment
+      String query = "SELECT column1, column5, column9, column10 FROM testTable WHERE column6 NOT IN "
+          + "(1001, 2147483647) ORDER BY column1";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() == null
+          || brokerResponseNative.getProcessingExceptions().size() == 0);
+      ResultTable resultTable = brokerResponseNative.getResultTable();
+      assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+      assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
+      assertEquals(brokerResponseNative.getNumDocsScanned(), 174_552L);
+      assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+      assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 174_672L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+      assertNotNull(brokerResponseNative.getProcessingExceptions());
+      assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+      DataSchema dataSchema = new DataSchema(new String[]{"column1", "column5", "column9", "column10"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
+              DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
+      assertEquals(resultTable.getDataSchema(), dataSchema);
+      List<Object[]> resultRows = resultTable.getRows();
+      int previousColumn1 = Integer.MIN_VALUE;
+      for (Object[] resultRow : resultRows) {
+        assertEquals(resultRow.length, 4);
+        assertTrue((Integer) resultRow[0] >= previousColumn1);
+        previousColumn1 = (Integer) resultRow[0];
+      }
+
+      Object[] firstRow = resultRows.get(0);
+      // Column 5
+      assertEquals((String) firstRow[1], "EOFxevm");
+    }
+    {
+      // Query with literal only in SELECT
+      String query = "SELECT 'marvin' from testTable ORDER BY column1";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() == null
+          || brokerResponseNative.getProcessingExceptions().size() == 0);
+      ResultTable resultTable = brokerResponseNative.getResultTable();
+      assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+      assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
+      assertEquals(brokerResponseNative.getNumDocsScanned(), 400_000L);
+      assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+      assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 400_000L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+      assertNotNull(brokerResponseNative.getProcessingExceptions());
+      assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"'marvin'"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING}));
+      List<Object[]> resultRows = resultTable.getRows();
+      for (Object[] resultRow : resultRows) {
+        assertEquals(resultRow.length, 1);
+        assertEquals((String) resultRow[0], "marvin");
+      }
+    }
+    {
+      // Selection query with '<' filter on a forwardIndexDisabled column without range index available
+      String query = "SELECT column1, column5, column9, column10 FROM testTable WHERE column6 < 2147483647 AND "
+          + "column6 >= 1001 ORDER BY column1";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+    {
+      // Selection query with '>=' filter on a forwardIndexDisabled column without range index available
+      String query = "SELECT column1, column5, column9, column10 FROM testTable WHERE column7 > 201";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+    {
+      // Select query with a filter on a column which doesn't have forwardIndexDisabled enabled
+      String query = "SELECT column1, column5, column9 from testTable WHERE column9 < 3890167 ORDER BY column1";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() == null
+          || brokerResponseNative.getProcessingExceptions().size() == 0);
+      ResultTable resultTable = brokerResponseNative.getResultTable();
+      assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+      assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
+      assertEquals(brokerResponseNative.getNumDocsScanned(), 48L);
+      assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+      assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 128L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 400_000L);
+      assertNotNull(brokerResponseNative.getProcessingExceptions());
+      assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column5", "column9"},
+          new DataSchema.ColumnDataType[]{
+              DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT
+          }));
+      List<Object[]> resultRows = resultTable.getRows();
+      int previousColumn1Value = Integer.MIN_VALUE;
+      for (Object[] resultRow : resultRows) {
+        assertEquals(resultRow.length, 3);
+        assertTrue((Integer) resultRow[0] >= previousColumn1Value);
+        previousColumn1Value = (Integer) resultRow[0];
+        assertEquals(resultRow[2], 3890166);
+      }
+    }
+    {
+      // Transform function on a filter clause for forwardIndexDisabled column in transform
+      String query = "SELECT column1, column10 from testTable WHERE ARRAYLENGTH(column6) = 2";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+  }
+
+  @Test
+  public void testSelectWithDistinctQueries() {
+    {
+      // Select a mix of forwardIndexDisabled and non-forwardIndexDisabled columns with distinct
+      String query = "SELECT DISTINCT column1, column6, column9 FROM testTable LIMIT 10";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+  }
+
+  @Test
+  public void testSelectWithGroupByOrderByQueries() {
+    {
+      // Select a mix of forwardIndexDisabled and non-forwardIndexDisabled columns with group by order by
+      String query = "SELECT column1, column6 FROM testTable GROUP BY column1, column6 ORDER BY column1, column6 "
+          + " LIMIT 10";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+    {
+      // Select forwardIndexDisabled columns with group by order by
+      String query = "SELECT column7, column6 FROM testTable GROUP BY column7, column6 ORDER BY column7, column6 "
+          + " LIMIT 10";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+    {
+      // Select non-forwardIndexDisabled columns with group by order by
+      String query = "SELECT column1, column5 FROM testTable GROUP BY column1, column5 ORDER BY column1, column5 "
+          + " LIMIT 10";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() == null
+          || brokerResponseNative.getProcessingExceptions().size() == 0);
+      ResultTable resultTable = brokerResponseNative.getResultTable();
+      assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+      assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
+      assertEquals(brokerResponseNative.getNumDocsScanned(), 400000L);
+      assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+      assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 800000L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+      assertNotNull(brokerResponseNative.getProcessingExceptions());
+      assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column5"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING}));
+      List<Object[]> resultRows = resultTable.getRows();
+      int previousVal = -1;
+      for (Object[] resultRow : resultRows) {
+        assertEquals(resultRow.length, 2);
+        assertTrue((int) resultRow[0] > previousVal);
+        previousVal = (int) resultRow[0];
+      }
+    }
+    {
+      // Select forwardIndexDisabled columns using transform with group by order by
+      String query = "SELECT ARRAYLENGTH(column6) FROM testTable GROUP BY ARRAYLENGTH(column6) ORDER BY "
+          + "ARRAYLENGTH(column6) LIMIT 10";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+    {
+      // Test a select with a VALUEIN transform function with group by
+      String query = "SELECT VALUEIN(column6, '1001') from testTable WHERE column6 IN (1001) GROUP BY "
+          + "VALUEIN(column6, '1001') LIMIT 10";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+  }
+
+  @Test
+  public void testSelectWithAggregationQueries() {
+    {
+      // Allowed aggregation functions on forwardIndexDisabled columns
+      String query = "SELECT maxmv(column7), minmv(column6), minmaxrangemv(column6), distinctcountmv(column7), "
+          + "distinctcounthllmv(column6), distinctcountrawhllmv(column7) from testTable";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() == null
+          || brokerResponseNative.getProcessingExceptions().size() == 0);
+      ResultTable resultTable = brokerResponseNative.getResultTable();
+      assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
+      assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
+      assertEquals(brokerResponseNative.getNumDocsScanned(), 400_000L);
+      assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+      assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 0L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+      assertNotNull(brokerResponseNative.getProcessingExceptions());
+      assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"maxmv(column7)", "minmv(column6)",
+          "minmaxrangemv(column6)", "distinctcountmv(column7)", "distinctcounthllmv(column6)",
+          "distinctcountrawhllmv(column7)"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
+              DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG,
+              DataSchema.ColumnDataType.STRING}));
+      List<Object[]> resultRows = resultTable.getRows();
+      for (Object[] resultRow : resultRows) {
+        assertEquals(resultRow.length, 6);
+        assertEquals(resultRow[0], 2.147483647E9);
+        assertEquals(resultRow[1], 1001.0);
+        assertEquals(resultRow[2], 2.147482646E9);
+        assertEquals(resultRow[3], 359);
+        assertEquals(resultRow[4], 20039L);
+      }
+    }
+    {
+      // Not allowed aggregation functions on forwardIndexDisabled columns
+      String query = "SELECT summv(column7), avgmv(column6) from testTable";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+    {
+      // Allowed aggregation functions on forwardIndexDisabled columns with group by on non-forwardIndexDisabled
+      // column - this fails due to indexTable being null in `GroupByOrderByCombineOperator`.
+      String query = "SELECT column1, maxmv(column6) from testTable GROUP BY column1";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+    {
+      // Allowed aggregation functions on forwardIndexDisabled columns with group by order by on
+      // non-forwardIndexDisabled column - this fails due to indexTable being null in `GroupByOrderByCombineOperator`.
+      String query = "SELECT column1, maxmv(column6) from testTable GROUP BY column1 ORDER BY column1";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+    {
+      // Allowed aggregation functions on non-forwardIndexDisabled columns with group by on non-forwardIndexDisabled
+      // column but order by on allowed aggregation function on forwardIndexDisabled column
+      String query = "SELECT column1, max(column9) from testTable GROUP BY column1 ORDER BY minmv(column6)";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+    {
+      // Allowed aggregation functions on forwardIndexDisabled columns with a filter - results in trying to scan which
+      // fails
+      String query = "SELECT maxmv(column7), minmv(column6) from testTable WHERE column7 = 201";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+    {
+      // Allowed aggregation functions on forwardIndexDisabled columns with a filter - results in trying to scan which
+      // fails
+      String query = "SELECT max(column1), minmv(column6) from testTable WHERE column1 > 15935";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+    {
+      // Allowed aggregation functions on non-forwardIndexDisabled columns with a filter on a forwardIndexDisabled
+      // column
+      String query = "SELECT max(column1), sum(column9) from testTable WHERE column7 = 2147483647";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() == null
+          || brokerResponseNative.getProcessingExceptions().size() == 0);
+      ResultTable resultTable = brokerResponseNative.getResultTable();
+      assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
+      assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
+      assertEquals(brokerResponseNative.getNumDocsScanned(), 199_756L);
+      assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+      assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 399_512L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+      assertNotNull(brokerResponseNative.getProcessingExceptions());
+      assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"max(column1)", "sum(column9)"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE}));
+      List<Object[]> resultRows = resultTable.getRows();
+      for (Object[] resultRow : resultRows) {
+        assertEquals(resultRow.length, 2);
+        assertEquals(resultRow[0], 2.147313491E9);
+        assertEquals(resultRow[1], 1.38051889779548E14);
+      }
+    }
+    {
+      // Allowed aggregation functions on non-forwardIndexDisabled columns with a filter on a forwardIndexDisabled
+      // column and group by order by on non-forwardIndexDisabled column
+      String query = "SELECT column1, max(column1), sum(column9) from testTable WHERE column7 = 2147483647 GROUP BY "
+          + "column1 ORDER BY column1";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() == null
+          || brokerResponseNative.getProcessingExceptions().size() == 0);
+      ResultTable resultTable = brokerResponseNative.getResultTable();
+      assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
+      assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
+      assertEquals(brokerResponseNative.getNumDocsScanned(), 199_756L);
+      assertEquals(brokerResponseNative.getNumSegmentsProcessed(), 4L);
+      assertEquals(brokerResponseNative.getNumSegmentsMatched(), 4L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedPostFilter(), 399_512L);
+      assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
+      assertNotNull(brokerResponseNative.getProcessingExceptions());
+      assertEquals(brokerResponseNative.getProcessingExceptions().size(), 0);
+      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "max(column1)", "sum(column9)"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE,
+              DataSchema.ColumnDataType.DOUBLE}));
+      List<Object[]> resultRows = resultTable.getRows();
+      int previousVal = -1;
+      for (Object[] resultRow : resultRows) {
+        assertEquals(resultRow.length, 3);
+        assertTrue((int) resultRow[0] > previousVal);
+        previousVal = (int) resultRow[0];
+      }
+    }
+    {
+      // Allowed aggregation functions on non-forwardIndexDisabled columns with a filter on a forwardIndexDisabled
+      // column and group by on non-forwardIndexDisabled column order by on forwardIndexDisabled aggregation column -
+      // this fails due to indexTable being null in `GroupByOrderByCombineOperator`.
+      String query = "SELECT column1, max(column1), sum(column9) from testTable WHERE column7 = 201 GROUP BY "
+          + "column1 ORDER BY minmv(column6)";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+    {
+      // Transform inside aggregation involving a forwardIndexDisabled column
+      String query = "SELECT MAX(ARRAYLENGTH(column6)) from testTable LIMIT 10";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+    {
+      // Transform inside aggregation involving a forwardIndexDisabled column with group by
+      String query = "SELECT column1, MAX(ARRAYLENGTH(column6)) from testTable GROUP BY column1 LIMIT 10";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
+    }
+    {
+      // Transform inside aggregation involving a forwardIndexDisabled column with group by order by
+      String query = "SELECT column1, MAX(ARRAYLENGTH(column6)) from testTable GROUP BY column1 ORDER BY column1 "
+          + "DESC LIMIT 10";
+      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
+      assertTrue(brokerResponseNative.getProcessingExceptions() != null
+          && brokerResponseNative.getProcessingExceptions().size() > 0);
     }
   }
 }

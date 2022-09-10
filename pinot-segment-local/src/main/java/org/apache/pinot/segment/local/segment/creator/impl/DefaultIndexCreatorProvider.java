@@ -26,11 +26,10 @@ import java.util.Objects;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.bloom.OnHeapGuavaBloomFilterCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueNoOpForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.NoOpForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueNoOpForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
@@ -94,11 +93,7 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
       // Dictionary enabled columns
       if (context.forwardIndexDisabled()) {
         // Forward index disabled columns
-        if (context.getFieldSpec().isSingleValueField()) {
-          return new SingleValueNoOpForwardIndexCreator();
-        } else {
-          return new MultiValueNoOpForwardIndexCreator();
-        }
+        return new NoOpForwardIndexCreator(context.getFieldSpec().isSingleValueField());
       } else {
         // Forward index enabled columns
         if (context.getFieldSpec().isSingleValueField()) {

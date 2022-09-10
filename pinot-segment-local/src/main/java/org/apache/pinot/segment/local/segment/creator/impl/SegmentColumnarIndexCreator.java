@@ -206,7 +206,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
       boolean forwardIndexDisabled = forwardIndexDisabledColumns.contains(columnName);
       validateForwardIndexDisabledIndexCompatibility(columnName, forwardIndexDisabled, dictEnabledColumn,
-          columnIndexCreationInfo, invertedIndexColumns, rangeIndexColumns, rangeIndexVersion);
+          columnIndexCreationInfo, invertedIndexColumns, rangeIndexColumns, rangeIndexVersion, fieldSpec);
 
       IndexCreationContext.Common context = IndexCreationContext.builder()
           .withIndexDir(_indexDir)
@@ -317,7 +317,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    *     - Validate dictionary is enabled.
    *     - Validate inverted index is enabled.
    *     - Validate that the column is not sorted.
-   *     - Validate that either no range index exists for column or the range index version is at least 2.
+   *     - Validate that either no range index exists for column or the range index version is at least 2 and isn't a
+   *       multi-value column (since mulit-value defaults to index v1).
    *
    * @param columnName Name of the column
    * @param forwardIndexDisabled Whether the forward index is disabled for column or not
@@ -326,10 +327,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * @param invertedIndexColumns Set of columns with inverted index enabled
    * @param rangeIndexColumns Set of columns with range index enabled
    * @param rangeIndexVersion Range index version
+   * @param fieldSpec FieldSpec of column
    */
   private void validateForwardIndexDisabledIndexCompatibility(String columnName, boolean forwardIndexDisabled,
       boolean dictEnabledColumn, ColumnIndexCreationInfo columnIndexCreationInfo, Set<String> invertedIndexColumns,
-      Set<String> rangeIndexColumns, int rangeIndexVersion) {
+      Set<String> rangeIndexColumns, int rangeIndexVersion, FieldSpec fieldSpec) {
     if (!forwardIndexDisabled) {
       return;
     }
@@ -341,8 +343,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     Preconditions.checkState(!columnIndexCreationInfo.isSorted(),
         String.format("Cannot disable forward index for column %s which is sorted", columnName));
     Preconditions.checkState(!rangeIndexColumns.contains(columnName)
-        || rangeIndexVersion == BitSlicedRangeIndexCreator.VERSION,
-        String.format("Cannot disable forward index for column %s which has range index with version < 2", columnName));
+        || (fieldSpec.isSingleValueField() && rangeIndexVersion == BitSlicedRangeIndexCreator.VERSION), String.format(
+            "Cannot disable forward index for column %s which has range index with version < 2 or is multi-value",
+        columnName));
   }
 
   /**

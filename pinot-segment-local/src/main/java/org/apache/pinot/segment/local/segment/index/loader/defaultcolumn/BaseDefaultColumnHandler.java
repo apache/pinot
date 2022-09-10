@@ -401,15 +401,21 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   }
 
   /**
-   * Validate incompatible column index mixes such as:
-   * - To disable the forward index the inverted index must be enabled
-   * - No dictionary columns cannot disable the forward index
-   * - Sorted columns cannot disable the forward index
+   * Validates the compatibility of the indexes if the column has the forward index disabled. Throws exceptions due to
+   * compatibility mismatch. The checks performed are:
+   *     - Validate dictionary is enabled.
+   *     - Validate inverted index is enabled.
+   *     - Validate that the column is not sorted.
+   *     - Validate that either no range index exists for column or the range index version is at least 2 and isn't a
+   *       multi-value column (since mulit-value defaults to index v1).
    */
   protected void validateForwardIndexDisabledConfigsIfPresent(String column, boolean forwardIndexDisabled) {
+    if (!forwardIndexDisabled) {
+      return;
+    }
     ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-    if (forwardIndexDisabled) {
-      Preconditions.checkState(_indexLoadingConfig.getInvertedIndexColumns().contains(column),
+    FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+    Preconditions.checkState(_indexLoadingConfig.getInvertedIndexColumns().contains(column),
           "Inverted index must be enabled for forward index disabled columns");
       Preconditions.checkState(!_indexLoadingConfig.getSortedColumns().contains(column)
           && (columnMetadata == null || !columnMetadata.isSorted()),
@@ -417,9 +423,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       Preconditions.checkState(!_indexLoadingConfig.getNoDictionaryColumns().contains(column),
           "Dictionary disabled columns cannot disable the forward index");
       Preconditions.checkState(!_indexLoadingConfig.getRangeIndexColumns().contains(column)
-              || (_indexLoadingConfig.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION),
-          "Range index must be version 2 if forward index is disabled");
-    }
+              || (fieldSpec.isSingleValueField()
+              && (_indexLoadingConfig.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION)),
+          "Range index must be >= version 2 if forward index is disabled and cannot be a multi-value column");
   }
 
   /**
