@@ -20,11 +20,11 @@ package org.apache.pinot.query.planner;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
@@ -44,33 +44,23 @@ public class PlannerUtils {
     // do not instantiate.
   }
 
-  public static List<List<Integer>> getJoinKeyFromConditions(RexCall joinCondition, int leftNodeOffset,
-      int rightNodeOffset) {
+  public static List<List<Integer>> getJoinKeyFromConditions(RexCall joinCondition, JoinInfo joinInfo) {
+    List<List<Integer>> joinKeys = joinInfo.keys().stream().collect(Collectors.toCollection(ArrayList::new));
     switch (joinCondition.getOperator().getKind()) {
       case EQUALS:
         RexNode left = joinCondition.getOperands().get(0);
         RexNode right = joinCondition.getOperands().get(1);
-        int leftIndex = ((RexInputRef) left).getIndex();
-        int rightIndex = ((RexInputRef) right).getIndex();
-        if (left.hashCode() > right.hashCode()) {
-          // right condition is before left condition.
-          leftIndex -= rightNodeOffset;
-        } else {
-          rightIndex -= leftNodeOffset;
-        }
         Preconditions.checkState(left instanceof RexInputRef, "only reference supported");
         Preconditions.checkState(right instanceof RexInputRef, "only reference supported");
-        return Arrays.asList(Collections.singletonList(leftIndex), Collections.singletonList(rightIndex));
+        return joinKeys;
       case AND:
         List<List<Integer>> predicateColumns = new ArrayList<>(2);
         predicateColumns.add(new ArrayList<>());
         predicateColumns.add(new ArrayList<>());
         for (RexNode operand : joinCondition.getOperands()) {
           Preconditions.checkState(operand instanceof RexCall);
-          List<List<Integer>> subPredicate =
-              getJoinKeyFromConditions((RexCall) operand, leftNodeOffset, rightNodeOffset);
-          predicateColumns.get(0).addAll(subPredicate.get(0));
-          predicateColumns.get(1).addAll(subPredicate.get(1));
+          predicateColumns.get(0).addAll(joinKeys.get(0));
+          predicateColumns.get(1).addAll(joinKeys.get(1));
         }
         return predicateColumns;
       default:

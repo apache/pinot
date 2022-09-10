@@ -115,10 +115,8 @@ public final class RelToStageConverter {
     RexCall joinCondition = (RexCall) node.getCondition();
 
     // Parse out all equality JOIN conditions
-    int leftNodeOffset = node.getLeft().getRowType().getFieldCount();
-    int rightNodeoffset = node.getRight().getRowType().getFieldCount();
     List<List<Integer>> predicateColumns =
-        PlannerUtils.getJoinKeyFromConditions(joinCondition, leftNodeOffset, rightNodeoffset);
+        PlannerUtils.getJoinKeyFromConditions(joinCondition, node.analyzeCondition());
 
     FieldSelectionKeySelector leftFieldSelectionKeySelector = new FieldSelectionKeySelector(predicateColumns.get(0));
     FieldSelectionKeySelector rightFieldSelectionKeySelector = new FieldSelectionKeySelector(predicateColumns.get(1));
