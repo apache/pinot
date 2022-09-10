@@ -82,6 +82,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
         // thus the final JOIN result will be 15 x 1 = 15.
         new Object[]{"SELECT * FROM a JOIN b on a.col1 = b.col1", 15},
+        new Object[]{"SELECT * FROM a JOIN b USING (col1)", 15},
+
 
         // Query with function in JOIN keys, table A and B are both (1, 42, 1, 42, 1), with table A cycling 3 times.
         // Because:
