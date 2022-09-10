@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -44,6 +45,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.NullValueUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -52,24 +54,34 @@ import org.testng.annotations.Test;
 
 
 public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
-
   private static final String ENABLE_NULL_SEGMENT_NAME = "testSegment1";
   private static final String DISABLE_NULL_SEGMENT_NAME = "testSegment2";
   private static final Random RANDOM = new Random();
 
   private static final int NUM_ROWS = 1000;
-  private static final String INT_SV_COLUMN = "intSV";
-  private static final String STRING_SV_COLUMN = "StringSV";
+  private static final String INT_SV_COLUMN1 = "intSV1";
+  private static final String INT_SV_COLUMN2 = "intSV2";
+  private static final String STRING_SV_COLUMN1 = "StringSV1";
+  private static final String STRING_SV_COLUMN2 = "StringSV2";
+  private static final String BIG_DECIMAL_SV_COLUMN1 = "BigDecimalSV1";
+  private static final String BIG_DECIMAL_SV_COLUMN2 = "BigDecimalSV2";
+  private static final String LONG_SV_COLUMN1 = "LongSV1";
+  private static final String LONG_SV_COLUMN2 = "LongSV2";
+
   private final int[] _intSVValues = new int[NUM_ROWS];
   private final String[] _stringSVValues = new String[NUM_ROWS];
   private Map<String, DataSource> _enableNullDataSourceMap;
   private Map<String, DataSource> _disableNullDataSourceMap;
   private ProjectionBlock _enableNullProjectionBlock;
   private ProjectionBlock _disableNullProjectionBlock;
-
-  protected static final int INT_NULL_MOD = 3;
-
-  protected static final int STRING_NULL_MOD = 5;
+  // Mod decides whether the first column of the same type should be null.
+  private static final int NULL_MOD1 = 3;
+  // Mod decides whether the second column of the same type should be null.
+  private static final int NULL_MOD2 = 5;
+  // Difference between two same type numeric columns.
+  private static final int INT_VALUE_SHIFT = 2;
+  // Suffix for second string column.
+  private static final String SUFFIX = "column2";
 
   private static String getIndexDirPath(String segmentName) {
     return FileUtils.getTempDirectoryPath() + File.separator + segmentName;
@@ -100,12 +112,12 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
         new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
   }
 
-  private static boolean isIntNull(int i) {
-    return i % INT_NULL_MOD == 0;
+  private static boolean isColumn1Null(int i) {
+    return i % NULL_MOD1 == 0;
   }
 
-  private static boolean isStringNull(int i) {
-    return i % STRING_NULL_MOD == 0;
+  private static boolean isColumn2Null(int i) {
+    return i % NULL_MOD2 == 0;
   }
 
   @BeforeClass
@@ -122,59 +134,181 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
       Map<String, Object> map = new HashMap<>();
-      map.put(INT_SV_COLUMN, _intSVValues[i]);
-      map.put(STRING_SV_COLUMN, _stringSVValues[i]);
-      if (isIntNull(i)) {
-        map.put(INT_SV_COLUMN, null);
+      map.put(INT_SV_COLUMN1, _intSVValues[i]);
+      map.put(INT_SV_COLUMN2, _intSVValues[i] + INT_VALUE_SHIFT);
+      map.put(STRING_SV_COLUMN1, _stringSVValues[i]);
+      map.put(STRING_SV_COLUMN2, _stringSVValues[i] + SUFFIX);
+      map.put(BIG_DECIMAL_SV_COLUMN1, BigDecimal.valueOf(_intSVValues[i]));
+      map.put(BIG_DECIMAL_SV_COLUMN2, BigDecimal.valueOf(_intSVValues[i] + INT_VALUE_SHIFT));
+      map.put(LONG_SV_COLUMN1, _intSVValues[i]);
+      map.put(LONG_SV_COLUMN2, _intSVValues[i] + INT_VALUE_SHIFT);
+
+      if (isColumn1Null(i)) {
+        map.put(INT_SV_COLUMN1, null);
+        map.put(STRING_SV_COLUMN1, null);
+        map.put(BIG_DECIMAL_SV_COLUMN1, null);
+        map.put(LONG_SV_COLUMN1, null);
       }
-      if (isStringNull(i)) {
-        map.put(STRING_SV_COLUMN, null);
+      if (isColumn2Null(i)) {
+        map.put(INT_SV_COLUMN2, null);
+        map.put(STRING_SV_COLUMN2, null);
+        map.put(LONG_SV_COLUMN2, null);
+        map.put(BIG_DECIMAL_SV_COLUMN2, null);
       }
       GenericRow row = new GenericRow();
       row.init(map);
       rows.add(row);
     }
-
-    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(INT_SV_COLUMN, FieldSpec.DataType.INT)
-        .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(INT_SV_COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(INT_SV_COLUMN2, FieldSpec.DataType.INT)
+        .addSingleValueDimension(STRING_SV_COLUMN1, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_SV_COLUMN2, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(LONG_SV_COLUMN1, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(LONG_SV_COLUMN2, FieldSpec.DataType.LONG)
+        .addMetric(BIG_DECIMAL_SV_COLUMN1, FieldSpec.DataType.BIG_DECIMAL)
+        .addMetric(BIG_DECIMAL_SV_COLUMN2, FieldSpec.DataType.BIG_DECIMAL).build();
     _enableNullDataSourceMap = getDataSourceMap(schema, rows, ENABLE_NULL_SEGMENT_NAME);
     _enableNullProjectionBlock = getProjectionBlock(_enableNullDataSourceMap);
     _disableNullDataSourceMap = getDataSourceMap(schema, rows, DISABLE_NULL_SEGMENT_NAME);
     _disableNullProjectionBlock = getProjectionBlock(_disableNullDataSourceMap);
   }
 
-  protected void testTransformFunction(ExpressionContext expression, String[] expectedValues,
+  private static void testIntTransformFunction(ExpressionContext expression, int[] expectedValues,
       ProjectionBlock projectionBlock, Map<String, DataSource> dataSourceMap)
       throws Exception {
-    String[] stringValues =
-        TransformFunctionFactory.get(expression, dataSourceMap).transformToStringValuesSV(projectionBlock);
+    int[] actualValues =
+        TransformFunctionFactory.get(expression, dataSourceMap).transformToIntValuesSV(projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(stringValues[i], expectedValues[i]);
+      Assert.assertEquals(actualValues[i], expectedValues[i]);
     }
   }
 
-  // Test the Coalesce on String and Int columns where one or the other or both can be null.
+  private static void testStringTransformFunction(ExpressionContext expression, String[] expectedValues,
+      ProjectionBlock projectionBlock, Map<String, DataSource> dataSourceMap)
+      throws Exception {
+    String[] actualValues =
+        TransformFunctionFactory.get(expression, dataSourceMap).transformToStringValuesSV(projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(actualValues[i], expectedValues[i]);
+    }
+  }
+
+  private static void testLongTransformFunction(ExpressionContext expression, long[] expectedValues,
+      ProjectionBlock projectionBlock, Map<String, DataSource> dataSourceMap)
+      throws Exception {
+    long[] actualValues =
+        TransformFunctionFactory.get(expression, dataSourceMap).transformToLongValuesSV(projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(actualValues[i], expectedValues[i]);
+    }
+  }
+
+  private static void testBigDecimalTransformFunction(ExpressionContext expression, BigDecimal[] expectedValues,
+      ProjectionBlock projectionBlock, Map<String, DataSource> dataSourceMap)
+      throws Exception {
+    BigDecimal[] actualValues =
+        TransformFunctionFactory.get(expression, dataSourceMap).transformToBigDecimalValuesSV(projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(actualValues[i], expectedValues[i]);
+    }
+  }
+
+  // Test the Coalesce on two Int columns where one or the other or both can be null.
   @Test
-  public void testDistinctFromBothNull()
+  public void testCoalesceIntColumns()
       throws Exception {
     ExpressionContext coalesceExpr =
-        RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", INT_SV_COLUMN, STRING_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", INT_SV_COLUMN1, INT_SV_COLUMN2));
+    TransformFunction coalesceTransformFunction = TransformFunctionFactory.get(coalesceExpr, _enableNullDataSourceMap);
+    Assert.assertEquals(coalesceTransformFunction.getName(), "coalesce");
+    int[] expectedResults = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isColumn1Null(i) && isColumn2Null(i)) {
+        expectedResults[i] = (int) NullValueUtils.getDefaultNullValue(FieldSpec.DataType.INT);
+      } else if (isColumn1Null(i)) {
+        expectedResults[i] = _intSVValues[i] + INT_VALUE_SHIFT;
+      } else if (isColumn2Null(i)) {
+        expectedResults[i] = _intSVValues[i];
+      } else {
+        expectedResults[i] = _intSVValues[i];
+      }
+    }
+    testIntTransformFunction(coalesceExpr, expectedResults, _enableNullProjectionBlock, _enableNullDataSourceMap);
+    testIntTransformFunction(coalesceExpr, expectedResults, _disableNullProjectionBlock, _disableNullDataSourceMap);
+  }
+
+  // Test the Coalesce on two String columns where one or the other or both can be null.
+  @Test
+  public void testCoalesceStringColumns()
+      throws Exception {
+    ExpressionContext coalesceExpr =
+        RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", STRING_SV_COLUMN1, STRING_SV_COLUMN2));
     TransformFunction coalesceTransformFunction = TransformFunctionFactory.get(coalesceExpr, _enableNullDataSourceMap);
     Assert.assertEquals(coalesceTransformFunction.getName(), "coalesce");
     String[] expectedResults = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (isStringNull(i) && isIntNull(i)) {
-        expectedResults[i] = "null";
-      } else if (isStringNull(i)) {
-        expectedResults[i] = Integer.toString(_intSVValues[i]);
-      } else if (isIntNull(i)) {
+      if (isColumn1Null(i) && isColumn2Null(i)) {
+        expectedResults[i] = (String) NullValueUtils.getDefaultNullValue(FieldSpec.DataType.STRING);
+      } else if (isColumn1Null(i)) {
+        expectedResults[i] = _stringSVValues[i] + SUFFIX;
+      } else if (isColumn2Null(i)) {
         expectedResults[i] = _stringSVValues[i];
       } else {
-        expectedResults[i] = Integer.toString(_intSVValues[i]);
+        expectedResults[i] = _stringSVValues[i];
       }
     }
-    testTransformFunction(coalesceExpr, expectedResults, _enableNullProjectionBlock, _enableNullDataSourceMap);
-    testTransformFunction(coalesceExpr, expectedResults, _disableNullProjectionBlock, _disableNullDataSourceMap);
+    testStringTransformFunction(coalesceExpr, expectedResults, _enableNullProjectionBlock, _enableNullDataSourceMap);
+    testStringTransformFunction(coalesceExpr, expectedResults, _disableNullProjectionBlock, _disableNullDataSourceMap);
+  }
+
+  // Test the Coalesce on two big decimal columns where one or the other or both can be null.
+  @Test
+  public void testCoalesceBigDecimalColumns()
+      throws Exception {
+    ExpressionContext coalesceExpr = RequestContextUtils.getExpression(
+        String.format("COALESCE(%s,%s)", BIG_DECIMAL_SV_COLUMN1, BIG_DECIMAL_SV_COLUMN2));
+    TransformFunction coalesceTransformFunction = TransformFunctionFactory.get(coalesceExpr, _enableNullDataSourceMap);
+    Assert.assertEquals(coalesceTransformFunction.getName(), "coalesce");
+    BigDecimal[] expectedResults = new BigDecimal[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isColumn1Null(i) && isColumn2Null(i)) {
+        expectedResults[i] = (BigDecimal) NullValueUtils.getDefaultNullValue(FieldSpec.DataType.BIG_DECIMAL);
+      } else if (isColumn1Null(i)) {
+        expectedResults[i] = BigDecimal.valueOf(_intSVValues[i] + INT_VALUE_SHIFT);
+      } else if (isColumn2Null(i)) {
+        expectedResults[i] = BigDecimal.valueOf(_intSVValues[i]);
+      } else {
+        expectedResults[i] = BigDecimal.valueOf(_intSVValues[i]);
+      }
+    }
+    testBigDecimalTransformFunction(coalesceExpr, expectedResults, _enableNullProjectionBlock,
+        _enableNullDataSourceMap);
+    testBigDecimalTransformFunction(coalesceExpr, expectedResults, _disableNullProjectionBlock,
+        _disableNullDataSourceMap);
+  }
+
+  // Test the Coalesce on two long columns where one or the other or both can be null.
+  @Test
+  public void testCoalesceLongColumns()
+      throws Exception {
+    ExpressionContext coalesceExpr =
+        RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", LONG_SV_COLUMN1, LONG_SV_COLUMN2));
+    TransformFunction coalesceTransformFunction = TransformFunctionFactory.get(coalesceExpr, _enableNullDataSourceMap);
+    Assert.assertEquals(coalesceTransformFunction.getName(), "coalesce");
+    long[] expectedResults = new long[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isColumn1Null(i) && isColumn2Null(i)) {
+        expectedResults[i] = (long) NullValueUtils.getDefaultNullValue(FieldSpec.DataType.LONG);
+      } else if (isColumn1Null(i)) {
+        expectedResults[i] = _intSVValues[i] + INT_VALUE_SHIFT;
+      } else if (isColumn2Null(i)) {
+        expectedResults[i] = _intSVValues[i];
+      } else {
+        expectedResults[i] = _intSVValues[i];
+      }
+    }
+    testLongTransformFunction(coalesceExpr, expectedResults, _enableNullProjectionBlock, _enableNullDataSourceMap);
+    testLongTransformFunction(coalesceExpr, expectedResults, _disableNullProjectionBlock, _disableNullDataSourceMap);
   }
 
   // Test that non-column-names appear in one of the argument.
@@ -182,7 +316,7 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
   public void testIllegalColumnName()
       throws Exception {
     ExpressionContext coalesceExpr =
-        RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", _stringSVValues[0], STRING_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", _stringSVValues[0], STRING_SV_COLUMN1));
     Assert.assertThrows(RuntimeException.class, () -> {
       TransformFunctionFactory.get(coalesceExpr, _enableNullDataSourceMap);
     });
@@ -197,6 +331,20 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
       throws Exception {
     ExpressionContext coalesceExpr =
         RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", TIMESTAMP_COLUMN, STRING_SV_COLUMN));
+    Assert.assertThrows(RuntimeException.class, () -> {
+      TransformFunctionFactory.get(coalesceExpr, _enableNullDataSourceMap);
+    });
+    Assert.assertThrows(RuntimeException.class, () -> {
+      TransformFunctionFactory.get(coalesceExpr, _disableNullDataSourceMap);
+    });
+  }
+
+  // Test that all arguments have to be same type.
+  @Test
+  public void testDifferentArgumentType()
+      throws Exception {
+    ExpressionContext coalesceExpr =
+        RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", INT_SV_COLUMN1, STRING_SV_COLUMN1));
     Assert.assertThrows(RuntimeException.class, () -> {
       TransformFunctionFactory.get(coalesceExpr, _enableNullDataSourceMap);
     });

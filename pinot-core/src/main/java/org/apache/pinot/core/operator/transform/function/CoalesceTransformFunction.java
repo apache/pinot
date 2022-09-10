@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
@@ -26,6 +27,7 @@ import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.NullValueUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -34,7 +36,8 @@ import org.roaringbitmap.RoaringBitmap;
  *
  * The results are in String format for first non-null value in the argument list.
  * If all arguments are null, return a 'null' string.
- * Note: arguments have to be column names and numeric or string types.
+ * Note: arguments have to be column names and single type. The type can be either numeric or string.
+ * Number of arguments has to be greater than 0.
  *
  * Expected result:
  * Coalesce(nullColumn, columnA): columnA
@@ -46,8 +49,8 @@ import org.roaringbitmap.RoaringBitmap;
  *    Coalesce(columnA, columnB)
  */
 public class CoalesceTransformFunction extends BaseTransformFunction {
-  private String[] _results;
   private TransformFunction[] _transformFunctions;
+  private FieldSpec.DataType _dataType;
 
   /**
    * Returns a bit map of corresponding column.
@@ -65,6 +68,138 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     return roaringBitmaps;
   }
 
+  /**
+   * Get transform int results based on store type.
+   * @param projectionBlock
+   */
+  private int[] getIntTransformResults(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    int[] results = new int[length];
+    int width = _transformFunctions.length;
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
+    int[][] data = new int[width][length];
+    RoaringBitmap filledData = new RoaringBitmap();
+    for (int i = 0; i < length; i++) {
+      boolean hasNonNullValue = false;
+      for (int j = 0; j < width; j++) {
+        // Consider value as null only when null option is enabled.
+        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
+          continue;
+        }
+        if (!filledData.contains(j)) {
+          filledData.add(j);
+          data[j] = _transformFunctions[j].transformToIntValuesSV(projectionBlock);
+        }
+        hasNonNullValue = true;
+        results[i] = data[j][i];
+        break;
+      }
+      if (!hasNonNullValue) {
+        results[i] = (int) NullValueUtils.getDefaultNullValue(_dataType);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Get transform long results based on store type.
+   * @param projectionBlock
+   */
+  private long[] getLongTransformResults(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    long[] results = new long[length];
+    int width = _transformFunctions.length;
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
+    long[][] data = new long[width][length];
+    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
+    for (int i = 0; i < length; i++) {
+      boolean hasNonNullValue = false;
+      for (int j = 0; j < width; j++) {
+        // Consider value as null only when null option is enabled.
+        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
+          continue;
+        }
+        if (!filledData.contains(j)) {
+          filledData.add(j);
+          data[j] = _transformFunctions[j].transformToLongValuesSV(projectionBlock);
+        }
+        hasNonNullValue = true;
+        results[i] = data[j][i];
+        break;
+      }
+      if (!hasNonNullValue) {
+        results[i] = (long) NullValueUtils.getDefaultNullValue(_dataType);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Get transform BigDecimal results based on store type.
+   * @param projectionBlock
+   */
+  private BigDecimal[] getBigDecimalTransformResults(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    BigDecimal[] results = new BigDecimal[length];
+    int width = _transformFunctions.length;
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
+    BigDecimal[][] data = new BigDecimal[width][length];
+    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
+    for (int i = 0; i < length; i++) {
+      boolean hasNonNullValue = false;
+      for (int j = 0; j < width; j++) {
+        // Consider value as null only when null option is enabled.
+        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
+          continue;
+        }
+        if (!filledData.contains(j)) {
+          filledData.add(j);
+          data[j] = _transformFunctions[j].transformToBigDecimalValuesSV(projectionBlock);
+        }
+        hasNonNullValue = true;
+        results[i] = data[j][i];
+        break;
+      }
+      if (!hasNonNullValue) {
+        results[i] = (BigDecimal) NullValueUtils.getDefaultNullValue(_dataType);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Get transform String results based on store type.
+   * @param projectionBlock
+   */
+  private String[] getStringTransformResults(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    String[] results = new String[length];
+    int width = _transformFunctions.length;
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
+    String[][] data = new String[width][length];
+    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
+    for (int i = 0; i < length; i++) {
+      boolean hasNonNullValue = false;
+      for (int j = 0; j < width; j++) {
+        // Consider value as null only when null option is enabled.
+        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
+          continue;
+        }
+        if (!filledData.contains(j)) {
+          filledData.add(j);
+          data[j] = _transformFunctions[j].transformToStringValuesSV(projectionBlock);
+        }
+        hasNonNullValue = true;
+        results[i] = data[j][i];
+        break;
+      }
+      if (!hasNonNullValue) {
+        results[i] = (String) NullValueUtils.getDefaultNullValue(_dataType);
+      }
+    }
+    return results;
+  }
+
   @Override
   public String getName() {
     return TransformFunctionType.COALESCE.getName();
@@ -73,6 +208,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
     int argSize = arguments.size();
+    Preconditions.checkArgument(argSize > 0, "COALESCE needs to have at least one argument.");
     _transformFunctions = new TransformFunction[argSize];
     for (int i = 0; i < argSize; i++) {
       TransformFunction func = arguments.get(i);
@@ -81,44 +217,60 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
       FieldSpec.DataType dataType = func.getResultMetadata().getDataType().getStoredType();
       Preconditions.checkArgument(dataType.isNumeric() || dataType == FieldSpec.DataType.STRING,
           "Only numeric value and string are supported in COALESCE.");
+      if (_dataType == null) {
+        _dataType = dataType;
+      } else {
+        Preconditions.checkArgument(dataType.equals(_dataType), "Argument types have to be the same.");
+      }
       _transformFunctions[i] = func;
     }
   }
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    return STRING_SV_NO_DICTIONARY_METADATA;
+    switch (_dataType) {
+      case STRING:
+        return STRING_SV_NO_DICTIONARY_METADATA;
+      case INT:
+        return INT_SV_NO_DICTIONARY_METADATA;
+      case LONG:
+        return LONG_SV_NO_DICTIONARY_METADATA;
+      case BIG_DECIMAL:
+        return BIG_DECIMAL_SV_NO_DICTIONARY_METADATA;
+      default:
+        throw new RuntimeException("Coalesce only supports numerical and string data type");
+    }
   }
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_results == null || _results.length < length) {
-      _results = new String[length];
+    if (_dataType != FieldSpec.DataType.STRING) {
+      return super.transformToStringValuesSV(projectionBlock);
     }
+    return getStringTransformResults(projectionBlock);
+  }
 
-    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
-    int[] docIds = projectionBlock.getDocIds();
-    int width = _transformFunctions.length;
-    String[][] data = new String[width][length];
-    for (int i = 0; i < length; i++) {
-      for (int j = 0; j < width; j++) {
-        // Consider value as null when null option is disabled.
-        if (nullBitMaps[j] == null || nullBitMaps[j].contains(i)) {
-          continue;
-        }
-        if (data[j][i] == null) {
-          data[j] = _transformFunctions[j].transformToStringValuesSV(projectionBlock);
-        }
-        // TODO: Return result as a generic type.
-        _results[i] = data[j][i];
-        break;
-      }
-      // TODO: Differentiate between null string and null value.
-      if (_results[i] == null) {
-        _results[i] = "null";
-      }
+  @Override
+  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
+    if (_dataType != FieldSpec.DataType.INT) {
+      return super.transformToIntValuesSV(projectionBlock);
     }
-    return _results;
+    return getIntTransformResults(projectionBlock);
+  }
+
+  @Override
+  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
+    if (_dataType != FieldSpec.DataType.LONG) {
+      return super.transformToLongValuesSV(projectionBlock);
+    }
+    return getLongTransformResults(projectionBlock);
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
+    if (_dataType != FieldSpec.DataType.BIG_DECIMAL) {
+      return super.transformToBigDecimalValuesSV(projectionBlock);
+    }
+    return getBigDecimalTransformResults(projectionBlock);
   }
 }
