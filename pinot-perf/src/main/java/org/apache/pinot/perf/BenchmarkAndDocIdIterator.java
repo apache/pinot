@@ -80,7 +80,7 @@ public class BenchmarkAndDocIdIterator {
 
     @Setup(Level.Trial)
     public void doSetup() {
-      MutableRoaringBitmap mutableRoaringBitmap = new MutableRoaringBitmap();
+      MutableRoaringBitmap mutableRoaringBitmap;
       Random r = new Random();
       r.setSeed(42);
       for (int i = 0; i < NUM_FILTERS; i++) {
