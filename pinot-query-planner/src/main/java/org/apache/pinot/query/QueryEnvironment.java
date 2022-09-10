@@ -80,13 +80,16 @@ public class QueryEnvironment {
     _typeFactory = typeFactory;
     _rootSchema = rootSchema;
     _workerManager = workerManager;
-    _config = Frameworks.newConfigBuilder().traitDefs().build();
 
     // catalog
     Properties catalogReaderConfigProperties = new Properties();
     catalogReaderConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
     _catalogReader = new CalciteCatalogReader(_rootSchema, _rootSchema.path(null), _typeFactory,
         new CalciteConnectionConfigImpl(catalogReaderConfigProperties));
+
+    _config = Frameworks.newConfigBuilder().traitDefs()
+        .operatorTable(_catalogReader)
+        .defaultSchema(_rootSchema.plus()).build();
 
     // optimizer rules
     _logicalRuleSet = PinotQueryRuleSets.LOGICAL_OPT_RULES;

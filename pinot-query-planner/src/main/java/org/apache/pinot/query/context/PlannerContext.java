@@ -25,7 +25,6 @@ import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.prepare.PlannerImpl;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
@@ -50,7 +49,7 @@ public class PlannerContext implements AutoCloseable {
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
       HepProgram hepProgram) {
     _planner = new PlannerImpl(config);
-    _validator = new Validator(SqlStdOperatorTable.instance(), catalogReader, typeFactory);
+    _validator = new Validator(config.getOperatorTable(), catalogReader, typeFactory);
     _relOptPlanner = new LogicalPlanner(hepProgram, Contexts.EMPTY_CONTEXT);
   }
 
