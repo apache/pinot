@@ -18,30 +18,26 @@
  */
 package org.apache.pinot.segment.spi.creator.name;
 
-import com.google.common.base.Preconditions;
-import javax.annotation.Nullable;
+import java.util.regex.Pattern;
 
 
 /**
- * Fixed segment name generator which always returns the fixed segment name.
+ * Utils for segment names.
  */
-@SuppressWarnings("serial")
-public class FixedSegmentNameGenerator implements SegmentNameGenerator {
-  private final String _segmentName;
+public class SegmentNameUtils {
+  private static final Pattern INVALID_SEGMENT_NAME_REGEX = Pattern.compile(".*[\\\\/:\\*?\"<>|].*");
 
-  public FixedSegmentNameGenerator(String segmentName) {
-    Preconditions.checkArgument(segmentName != null, "Missing segmentName for FixedSegmentNameGenerator");
-    SegmentNameUtils.validatePartialOrFullSegmentName(segmentName);
-    _segmentName = segmentName;
+  private SegmentNameUtils() {
   }
 
-  @Override
-  public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
-    return _segmentName;
-  }
-
-  @Override
-  public String toString() {
-    return String.format("FixedSegmentNameGenerator: segmentName=%s", _segmentName);
+  /**
+   * A handy util to validate if segment name is valid.
+   *
+   * @param partialOrFullSegmentName provide partial or full segment name
+   */
+  public static void validatePartialOrFullSegmentName(String partialOrFullSegmentName) {
+    if (INVALID_SEGMENT_NAME_REGEX.matcher(partialOrFullSegmentName).matches()) {
+      throw new IllegalArgumentException("Invalid partial or full segment name: " + partialOrFullSegmentName);
+    }
   }
 }
