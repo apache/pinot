@@ -39,6 +39,14 @@ import org.apache.pinot.query.validate.Validator;
  * It is used to hold per query context for query planning, which cannot be shared across queries.
  */
 public class PlannerContext implements AutoCloseable {
+  private final PlannerImpl _planner;
+
+  private final SqlValidator _validator;
+
+  private final RelOptPlanner _relOptPlanner;
+
+  private Map<String, String> _options;
+
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
       HepProgram hepProgram) {
     _planner = new PlannerImpl(config);
@@ -57,14 +65,6 @@ public class PlannerContext implements AutoCloseable {
   public RelOptPlanner getRelOptPlanner() {
     return _relOptPlanner;
   }
-
-  private PlannerImpl _planner;
-
-  private SqlValidator _validator;
-
-  private RelOptPlanner _relOptPlanner;
-
-  private Map<String, String> _options;
 
   public void setOptions(Map<String, String> options) {
     _options = options;
