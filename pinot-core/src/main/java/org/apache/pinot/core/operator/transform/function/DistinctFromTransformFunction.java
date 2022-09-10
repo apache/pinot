@@ -45,29 +45,14 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
    * Returns a bit map of corresponding column.
    * Returns null by default if null option is disabled.
    */
-  private static @Nullable RoaringBitmap getNullBitMap(ProjectionBlock projectionBlock,
+  @Nullable
+  private static RoaringBitmap getNullBitMap(ProjectionBlock projectionBlock,
       TransformFunction transformFunction) {
     String columnName = ((IdentifierTransformFunction) transformFunction).getColumnName();
     RoaringBitmap nullBitmap = projectionBlock.getBlockValueSet(columnName).getNullBitmap();
     return nullBitmap;
   }
 
-  /**
-   * Fill in results based on functions
-   * @param isDistinctNull return true if one field is null and the other field is not null
-   * @param isBothNull return true if both fields are null
-   * @param length length of the result
-   */
-  private void fillInDistinctNullValue(Function<Integer, Boolean> isDistinctNull, Function<Integer, Boolean> isBothNull,
-      int length) {
-    for (int i = 0; i < length; i++) {
-      if (isDistinctNull.apply(i)) {
-        _results[i] = _distinctType;
-      } else if (isBothNull.apply(i)) {
-        _results[i] = _distinctType ^ 1;
-      }
-    }
-  }
 
   /**
    * @param distinctType is set to true for IsDistinctFrom, otherwise it is for IsNotDistinctFrom.
@@ -109,6 +94,7 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
       return _results;
     }
     if (leftNull == null) {
+
       fillInDistinctNullValue(rightNull::contains, (Integer i) -> false, length);
       return _results;
     }
