@@ -96,6 +96,7 @@ public interface RexExpression {
         return FieldSpec.DataType.FLOAT;
       case DOUBLE:
         return FieldSpec.DataType.DOUBLE;
+      case CHAR:
       case VARCHAR:
         return FieldSpec.DataType.STRING;
       case BOOLEAN:

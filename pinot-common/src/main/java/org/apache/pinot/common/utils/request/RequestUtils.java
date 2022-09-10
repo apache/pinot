@@ -168,9 +168,6 @@ public class RequestUtils {
     if (object instanceof byte[]) {
       return RequestUtils.getLiteralExpression((byte[]) object);
     }
-    if (object instanceof NlsString) {
-      return RequestUtils.getLiteralExpression(((NlsString) object).getValue());
-    }
     return RequestUtils.getLiteralExpression(object.toString());
   }
 

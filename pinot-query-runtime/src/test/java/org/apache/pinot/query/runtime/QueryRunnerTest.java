@@ -92,7 +92,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // Because:
         //   - MOD(a.col3, 2) will have 6 (42)s equal to 0 and 9 (1)s equals to 1
         //   - MOD(b.col3, 3) will have 2 (42)s equal to 0 and 3 (1)s equals to 1;
-        // final results are 6 * 2 + 9 * 3 = 27 rows
+        // final results are 6 * 2 + 9 * 3 = 39 rows
         new Object[]{"SELECT a.col1, a.col3, b.col3 FROM a JOIN b ON MOD(a.col3, 2) = MOD(b.col3, 3)", 39},
 
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
