@@ -33,6 +33,7 @@ import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
@@ -58,18 +59,18 @@ public class BenchmarkAndDocIdIterator {
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public void benchAndFilterOperator(MyState myState) {
+  public void benchAndFilterOperator(MyState myState, Blackhole bh) {
     for (int i = 0; i < 100; i++) {
-      new AndFilterOperator(myState._childOperators).nextBlock().getBlockDocIdSet().iterator();
+      bh.consume(new AndFilterOperator(myState._childOperators).nextBlock().getBlockDocIdSet().iterator());
     }
   }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public void benchAndFilterOperatorDegenerate(MyState myState) {
+  public void benchAndFilterOperatorDegenerate(MyState myState, Blackhole bh) {
     for (int i = 0; i < 100; i++) {
-      new AndFilterOperator(myState._childOperatorsNoOrdering).nextBlock().getBlockDocIdSet().iterator();
+      bh.consume(new AndFilterOperator(myState._childOperatorsNoOrdering).nextBlock().getBlockDocIdSet().iterator());
     }
   }
 
