@@ -19,8 +19,12 @@
 package org.apache.pinot.query;
 
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -174,6 +178,56 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     Assert.assertEquals(tableScanMetadataList.size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().get(0).toString(), "Server_localhost_1");
+  }
+
+  // Test that plan query can be run as multi-thread.
+  @Test
+  public void testPlanQueryMultiThread()
+      throws Exception {
+    Map<String, ArrayList<QueryPlan>> queryPlans = new HashMap<>();
+    Lock lock = new ReentrantLock();
+    Runnable joinQuery = () -> {
+      String query = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2";
+      QueryPlan queryPlan = _queryEnvironment.planQuery(query);
+      lock.lock();
+      if (!queryPlans.containsKey(queryPlan)) {
+        queryPlans.put(query, new ArrayList<>());
+      }
+      queryPlans.get(query).add(queryPlan);
+      lock.unlock();
+    };
+    Runnable selectQuery = () -> {
+      String query = "SELECT * FROM a";
+      QueryPlan queryPlan = _queryEnvironment.planQuery(query);
+      lock.lock();
+      if (!queryPlans.containsKey(queryPlan)) {
+        queryPlans.put(query, new ArrayList<>());
+      }
+      queryPlans.get(query).add(queryPlan);
+      lock.unlock();
+    };
+    ArrayList<Thread> threads = new ArrayList<>();
+    final int numThreads = 10;
+    for (int i = 0; i < numThreads; i++) {
+      Thread thread = null;
+      if (i % 2 == 0) {
+        thread = new Thread(joinQuery);
+      } else {
+        thread = new Thread(selectQuery);
+      }
+      threads.add(thread);
+    }
+    for (Thread t : threads) {
+      t.start();
+    }
+    for (Thread t : threads) {
+      t.join();
+    }
+    for (ArrayList<QueryPlan> plans : queryPlans.values()) {
+      for (QueryPlan plan : plans) {
+        Assert.assertTrue(plan.equals(plans.get(0)));
+      }
+    }
   }
 
   // --------------------------------------------------------------------------
