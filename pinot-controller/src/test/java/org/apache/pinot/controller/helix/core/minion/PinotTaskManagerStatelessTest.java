@@ -100,6 +100,10 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
         jgn -> jgn.size() == 1 && jgn.contains(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE),
         "JobGroupNames should have SegmentGenerationAndPushTask only");
     validateJob(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, "0 */10 * ? * * *", true, 10);
+
+    dropOfflineTable(RAW_TABLE_NAME);
+    waitForJobGroupNames(_controllerStarter.getTaskManager(), List::isEmpty, "JobGroupNames should be empty");
+    stopFakeInstances();
     stopController();
   }
 
@@ -267,8 +271,8 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     assertEquals(jobDetail.getKey().getGroup(), taskType);
     assertSame(jobDetail.getJobDataMap().get("PinotTaskManager"), taskManager);
     assertSame(jobDetail.getJobDataMap().get("LeadControllerManager"), _controllerStarter.getLeadControllerManager());
-    assertSame(jobDetail.getJobDataMap().get("SkipLateCronSchedule"), skipLateCronSchedule);
-    assertSame(jobDetail.getJobDataMap().get("MaxCronScheduleDelayInSeconds"), maxDelayInSeconds);
+    assertEquals(jobDetail.getJobDataMap().get("SkipLateCronSchedule"), skipLateCronSchedule);
+    assertEquals(jobDetail.getJobDataMap().get("MaxCronScheduleDelayInSeconds"), maxDelayInSeconds);
     // jobDetail and jobTrigger are not added atomically by the scheduler,
     // the jobDetail is added to an internal map firstly, and jobTrigger
     // is added to another internal map afterwards, so we check for the existence
