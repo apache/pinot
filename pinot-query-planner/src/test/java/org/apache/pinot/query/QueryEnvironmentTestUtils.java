@@ -54,9 +54,10 @@ public class QueryEnvironmentTestUtils {
   public static final Schema.SchemaBuilder SCHEMA_BUILDER;
   public static final Map<String, List<String>> SERVER1_SEGMENTS =
       ImmutableMap.of("a", Lists.newArrayList("a1", "a2"), "b", Lists.newArrayList("b1"), "c",
-          Lists.newArrayList("c1"));
+          Lists.newArrayList("c1"), "d_O", Lists.newArrayList("d1", "d2"));
   public static final Map<String, List<String>> SERVER2_SEGMENTS =
-      ImmutableMap.of("a", Lists.newArrayList("a3"), "c", Lists.newArrayList("c2", "c3"));
+      ImmutableMap.of("a", Lists.newArrayList("a3"), "c", Lists.newArrayList("c2", "c3"),
+          "d_R", Lists.newArrayList("d3", "d4"));
 
   static {
     SCHEMA_BUILDER = new Schema.SchemaBuilder().addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
@@ -71,10 +72,12 @@ public class QueryEnvironmentTestUtils {
 
   public static TableCache mockTableCache() {
     TableCache mock = mock(TableCache.class);
-    when(mock.getTableNameMap()).thenReturn(ImmutableMap.of("a", "a", "b", "b", "c", "c"));
+    when(mock.getTableNameMap()).thenReturn(ImmutableMap.of("a", "a", "b", "b", "c", "c",
+        "d_OFFLINE", "d", "d_REALTIME", "d"));
     when(mock.getSchema("a")).thenReturn(SCHEMA_BUILDER.setSchemaName("a").build());
     when(mock.getSchema("b")).thenReturn(SCHEMA_BUILDER.setSchemaName("b").build());
     when(mock.getSchema("c")).thenReturn(SCHEMA_BUILDER.setSchemaName("c").build());
+    when(mock.getSchema("d")).thenReturn(SCHEMA_BUILDER.setSchemaName("d").build());
     return mock;
   }
 
@@ -101,12 +104,21 @@ public class QueryEnvironmentTestUtils {
     RoutingTable rtC = mock(RoutingTable.class);
     when(rtC.getServerInstanceToSegmentsMap()).thenReturn(
         ImmutableMap.of(host1, SERVER1_SEGMENTS.get("c"), host2, SERVER2_SEGMENTS.get("c")));
-    Map<String, RoutingTable> mockRoutingTableMap = ImmutableMap.of("a", rtA, "b", rtB, "c", rtC);
+
+    // hybrid table
+    RoutingTable rtDOffline = mock(RoutingTable.class);
+    RoutingTable rtDRealtime = mock(RoutingTable.class);
+    when(rtDOffline.getServerInstanceToSegmentsMap()).thenReturn(ImmutableMap.of(host1, SERVER1_SEGMENTS.get("d_O")));
+    when(rtDRealtime.getServerInstanceToSegmentsMap()).thenReturn(ImmutableMap.of(host2, SERVER2_SEGMENTS.get("d_R")));
+    Map<String, RoutingTable> mockRoutingTableMap = ImmutableMap.of("a", rtA, "b", rtB, "c", rtC,
+        "d_OFFLINE", rtDOffline, "d_REALTIME", rtDRealtime);
+
     RoutingManager mock = mock(RoutingManager.class);
     when(mock.getRoutingTable(any())).thenAnswer(invocation -> {
       BrokerRequest brokerRequest = invocation.getArgument(0);
       String tableName = brokerRequest.getPinotQuery().getDataSource().getTableName();
-      return mockRoutingTableMap.get(TableNameBuilder.extractRawTableName(tableName));
+      return mockRoutingTableMap.getOrDefault(tableName,
+          mockRoutingTableMap.get(TableNameBuilder.extractRawTableName(tableName)));
     });
     when(mock.getEnabledServerInstanceMap()).thenReturn(ImmutableMap.of(server1, host1, server2, host2));
     return mock;
