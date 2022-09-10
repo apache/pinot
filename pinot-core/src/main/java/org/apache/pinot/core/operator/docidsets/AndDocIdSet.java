@@ -125,9 +125,11 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
         if (numBitmapBasedDocIdIterators == 1) {
           docIds = bitmapBasedDocIdIterators.get(0).getDocIds();
         } else {
-          List<ImmutableRoaringBitmap> bitmaps = bitmapBasedDocIdIterators.stream()
-                  .map(BitmapBasedDocIdIterator::getDocIds).collect(Collectors.toList());
-          docIds = BufferFastAggregation.and(bitmaps.iterator());
+          ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[numBitmapBasedDocIdIterators];
+          for (int i = 0; i < numBitmapBasedDocIdIterators; i++) {
+            bitmaps[i] = bitmapBasedDocIdIterators.get(i).getDocIds();
+          }
+          docIds = BufferFastAggregation.and(bitmaps);
         }
       }
       for (ScanBasedDocIdIterator scanBasedDocIdIterator : scanBasedDocIdIterators) {
