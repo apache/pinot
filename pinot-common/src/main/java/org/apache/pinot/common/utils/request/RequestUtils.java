@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
+import org.apache.calcite.util.NlsString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -166,6 +167,9 @@ public class RequestUtils {
     }
     if (object instanceof byte[]) {
       return RequestUtils.getLiteralExpression((byte[]) object);
+    }
+    if (object instanceof NlsString) {
+      return RequestUtils.getLiteralExpression(((NlsString) object).getValue());
     }
     return RequestUtils.getLiteralExpression(object.toString());
   }

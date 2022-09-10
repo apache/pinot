@@ -164,6 +164,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT a.col1, a.col3, b.col3 FROM a JOIN b ON a.col1 = b.col1 ORDER BY a.col3, b.col3 DESC", 15},
 
         // test customized function
+        new Object[]{"SELECT least(a.ts, b.ts) FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2", 15},
         new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 15},
     };
   }
