@@ -162,6 +162,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
         // Order-by
         new Object[]{"SELECT a.col1, a.col3, b.col3 FROM a JOIN b ON a.col1 = b.col1 ORDER BY a.col3, b.col3 DESC", 15},
+
+        // test customized function
+        new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 15},
     };
   }
 }

@@ -98,7 +98,9 @@ public class FunctionRegistry {
     registerFunction(method.getName(), method, nullableParameters);
 
     // Calcite ScalarFunctionImpl doesn't allow customized named functions. TODO: fix me.
-    FUNCTION_MAP.put(method.getName(), ScalarFunctionImpl.create(method));
+    if (method.getAnnotation(Deprecated.class) == null) {
+      FUNCTION_MAP.put(method.getName(), ScalarFunctionImpl.create(method));
+    }
   }
 
   /**
