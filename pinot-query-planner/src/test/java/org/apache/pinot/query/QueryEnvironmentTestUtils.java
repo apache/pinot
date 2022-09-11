@@ -60,7 +60,7 @@ public class QueryEnvironmentTestUtils {
           Lists.newArrayList("c1"), "d_O", Lists.newArrayList("d1"));
   public static final Map<String, List<String>> SERVER2_SEGMENTS =
       ImmutableMap.of("a", Lists.newArrayList("a3"), "c", Lists.newArrayList("c2", "c3"),
-          "d_R", Lists.newArrayList("d2", "d3"));
+          "d_R", Lists.newArrayList("d2"), "d_O", Lists.newArrayList("d3"));
 
   static {
     SCHEMA_BUILDER = new Schema.SchemaBuilder().addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
@@ -111,7 +111,8 @@ public class QueryEnvironmentTestUtils {
     // hybrid table
     RoutingTable rtDOffline = mock(RoutingTable.class);
     RoutingTable rtDRealtime = mock(RoutingTable.class);
-    when(rtDOffline.getServerInstanceToSegmentsMap()).thenReturn(ImmutableMap.of(host1, SERVER1_SEGMENTS.get("d_O")));
+    when(rtDOffline.getServerInstanceToSegmentsMap()).thenReturn(
+        ImmutableMap.of(host1, SERVER1_SEGMENTS.get("d_O"), host2, SERVER2_SEGMENTS.get("d_O")));
     when(rtDRealtime.getServerInstanceToSegmentsMap()).thenReturn(ImmutableMap.of(host2, SERVER2_SEGMENTS.get("d_R")));
     Map<String, RoutingTable> mockRoutingTableMap = ImmutableMap.of("a", rtA, "b", rtB, "c", rtC,
         "d_OFFLINE", rtDOffline, "d_REALTIME", rtDRealtime);
@@ -127,7 +128,7 @@ public class QueryEnvironmentTestUtils {
     when(mock.getTimeBoundaryInfo(anyString())).thenAnswer(invocation -> {
       String offlineTableName = invocation.getArgument(0);
       return "d_OFFLINE".equals(offlineTableName) ? new TimeBoundaryInfo("ts",
-          String.valueOf(TimeUnit.DAYS.convert(1, TimeUnit.DAYS))) : null;
+          String.valueOf(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1))) : null;
     });
     return mock;
   }

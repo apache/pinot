@@ -78,8 +78,8 @@ public class QueryRunnerTestBase {
     QueryServerEnclosure server1 = new QueryServerEnclosure(Lists.newArrayList("a", "b", "c", "d_O"),
         ImmutableMap.of("a", INDEX_DIR_S1_A, "b", INDEX_DIR_S1_B, "c", INDEX_DIR_S1_C, "d_O", INDEX_DIR_S1_D),
         QueryEnvironmentTestUtils.SERVER1_SEGMENTS);
-    QueryServerEnclosure server2 = new QueryServerEnclosure(Lists.newArrayList("a", "c", "d_R"),
-        ImmutableMap.of("a", INDEX_DIR_S2_A, "c", INDEX_DIR_S2_C, "d_R", INDEX_DIR_S1_D),
+    QueryServerEnclosure server2 = new QueryServerEnclosure(Lists.newArrayList("a", "c", "d_R", "d_O"),
+        ImmutableMap.of("a", INDEX_DIR_S2_A, "c", INDEX_DIR_S2_C, "d_R", INDEX_DIR_S2_D, "d_O", INDEX_DIR_S1_D),
         QueryEnvironmentTestUtils.SERVER2_SEGMENTS);
 
     _reducerGrpcPort = QueryEnvironmentTestUtils.getAvailablePort();
