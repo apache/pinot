@@ -18,14 +18,12 @@
  */
 package org.apache.pinot.spi.data;
 
-import com.google.common.base.Preconditions;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
@@ -61,7 +59,8 @@ public class DateTimeFormatPatternSpec {
   public DateTimeFormatPatternSpec(TimeFormat timeFormat, @Nullable String sdfPatternWithTz) {
     _timeFormat = timeFormat;
     if (timeFormat == TimeFormat.SIMPLE_DATE_FORMAT) {
-      Matcher m = sdfPatternWithTz != null ? SDF_PATTERN_WITH_TIMEZONE.matcher(sdfPatternWithTz) : SDF_PATTERN_WITH_TIMEZONE.matcher("");
+      Matcher m = sdfPatternWithTz != null ? SDF_PATTERN_WITH_TIMEZONE.matcher(sdfPatternWithTz)
+          : SDF_PATTERN_WITH_TIMEZONE.matcher("");
       if (m.find()) {
         _sdfPattern = m.group(SDF_PATTERN_GROUP).trim();
         String timeZone = m.group(TIME_ZONE_GROUP).trim();
@@ -77,9 +76,11 @@ public class DateTimeFormatPatternSpec {
       try {
         if (_sdfPattern == null) {
           LOGGER.warn("SIMPLE_DATE_FORMAT pattern was found to be null. Using ISODateTimeFormat as default");
-          _dateTimeFormatter = ISODateTimeFormat.dateOptionalTimeParser().withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
+          _dateTimeFormatter =
+              ISODateTimeFormat.dateOptionalTimeParser().withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
         } else {
-          _dateTimeFormatter = DateTimeFormat.forPattern(_sdfPattern).withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
+          _dateTimeFormatter =
+              DateTimeFormat.forPattern(_sdfPattern).withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
         }
       } catch (Exception e) {
         throw new IllegalArgumentException("Invalid SIMPLE_DATE_FORMAT pattern: " + _sdfPattern);
@@ -107,9 +108,11 @@ public class DateTimeFormatPatternSpec {
       try {
         if (_sdfPattern == null) {
           LOGGER.warn("SIMPLE_DATE_FORMAT pattern was found to be null. Using ISODateTimeFormat as default");
-          _dateTimeFormatter = ISODateTimeFormat.dateOptionalTimeParser().withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
+          _dateTimeFormatter =
+              ISODateTimeFormat.dateOptionalTimeParser().withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
         } else {
-          _dateTimeFormatter = DateTimeFormat.forPattern(_sdfPattern).withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
+          _dateTimeFormatter =
+              DateTimeFormat.forPattern(_sdfPattern).withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
         }
       } catch (Exception e) {
         throw new IllegalArgumentException("Invalid SIMPLE_DATE_FORMAT pattern: " + _sdfPattern);
