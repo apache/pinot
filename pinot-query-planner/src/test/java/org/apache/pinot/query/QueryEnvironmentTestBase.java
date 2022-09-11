@@ -45,6 +45,7 @@ public class QueryEnvironmentTestBase {
     return new Object[][] {
         new Object[]{"SELECT * FROM a ORDER BY col1 LIMIT 10"},
         new Object[]{"SELECT * FROM b ORDER BY col1, col2 DESC LIMIT 10"},
+        new Object[]{"SELECT * FROM d"},
         new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2"},
         new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0"},
         new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND a.col3 > b.col3"},

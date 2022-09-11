@@ -72,6 +72,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // No match filter
         new Object[]{"SELECT * FROM b WHERE col3 < 0", 0},
 
+        // Hybrid table
+        new Object[]{"SELECT * FROM d", 15},
+
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
         // thus the final JOIN result will be 15 x 1 = 15.
         // Next join with table C which has (5 on server1 and 10 on server2), since data is identical. each of the row

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.routing;
 
+import com.clearspring.analytics.util.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.StageMetadata;
@@ -58,11 +60,38 @@ public class WorkerManager {
 
   public void assignWorkerToStage(int stageId, StageMetadata stageMetadata) {
     List<String> scannedTables = stageMetadata.getScannedTables();
-    if (scannedTables.size() == 1) { // table scan stage, need to attach server as well as segment info.
-      RoutingTable routingTable = getRoutingTable(scannedTables.get(0));
-      Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
+    if (scannedTables.size() == 1) {
+      // table scan stage, need to attach server as well as segment info for each physical table type.
+      String logicalTableName = scannedTables.get(0);
+      Map<String, RoutingTable> routingTableMap = getRoutingTable(logicalTableName);
+      // acquire time boundary info if it is a hybrid table.
+      if (routingTableMap.size() > 1) {
+        TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(TableNameBuilder
+            .forType(TableType.OFFLINE).tableNameWithType(TableNameBuilder.extractRawTableName(logicalTableName)));
+        if (timeBoundaryInfo != null) {
+          stageMetadata.setTimeBoundaryInfo(timeBoundaryInfo);
+        } else {
+          // remove offline table routing if no time boundary info is acquired.
+          routingTableMap.remove(TableType.OFFLINE.name());
+        }
+      }
+
+      // extract all the instances associated to each table type
+      Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap = new HashMap<>();
+      for (Map.Entry<String, RoutingTable> routingEntry : routingTableMap.entrySet()) {
+        String tableType = routingEntry.getKey();
+        RoutingTable routingTable = routingEntry.getValue();
+        // for each server instance, attach all table types and their associated segment list.
+        for (Map.Entry<ServerInstance, List<String>> serverEntry
+            : routingTable.getServerInstanceToSegmentsMap().entrySet()) {
+          serverInstanceToSegmentsMap.putIfAbsent(serverEntry.getKey(), new HashMap<>());
+          Map<String, List<String>> tableTypeToSegmentListMap = serverInstanceToSegmentsMap.get(serverEntry.getKey());
+          Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue()) == null,
+              "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
+        }
+      }
       stageMetadata.setServerInstances(new ArrayList<>(serverInstanceToSegmentsMap.keySet()));
-      stageMetadata.setServerInstanceToSegmentsMap(new HashMap<>(serverInstanceToSegmentsMap));
+      stageMetadata.setServerInstanceToSegmentsMap(serverInstanceToSegmentsMap);
     } else if (PlannerUtils.isRootStage(stageId)) {
       // ROOT stage doesn't have a QueryServer as it is strictly only reducing results.
       // here we simply assign the worker instance with identical server/mailbox port number.
@@ -86,13 +115,29 @@ public class WorkerManager {
     return serverInstances;
   }
 
-  private RoutingTable getRoutingTable(String tableName) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    // TODO: support both offline and realtime, now default only query the OFFLINE table.
-    tableType = tableType == null ? TableType.OFFLINE : tableType;
-    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
-    return _routingManager.getRoutingTable(CalciteSqlCompiler.compileToBrokerRequest(
-        "SELECT * FROM " + tableNameWithType));
+  /**
+   * Acquire routing table for items listed in {@link org.apache.pinot.query.planner.stage.TableScanNode}.
+   *
+   * @param logicalTableName it can either be a hybrid table name or a physical table name with table type.
+   * @return keyed-map from table type(s) to routing table(s).
+   */
+  private Map<String, RoutingTable> getRoutingTable(String logicalTableName) {
+    String rawTableName = TableNameBuilder.extractRawTableName(logicalTableName);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(logicalTableName);
+    Map<String, RoutingTable> routingTableMap = new HashMap<>();
+    if (tableType == null) {
+      routingTableMap.put(TableType.OFFLINE.name(), getRoutingTable(rawTableName, TableType.OFFLINE));
+      routingTableMap.put(TableType.REALTIME.name(), getRoutingTable(rawTableName, TableType.REALTIME));
+    } else {
+      routingTableMap.put(tableType.name(), getRoutingTable(logicalTableName, tableType));
+    }
+    return routingTableMap;
+  }
+
+  private RoutingTable getRoutingTable(String tableName, TableType tableType) {
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(
+        TableNameBuilder.extractRawTableName(tableName));
+    return _routingManager.getRoutingTable(
+        CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + tableNameWithType));
   }
 }

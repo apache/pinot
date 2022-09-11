@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.TableScanNode;
@@ -45,12 +46,17 @@ public class StageMetadata implements Serializable {
   private List<ServerInstance> _serverInstances;
 
   // used for table scan stage.
-  private Map<ServerInstance, List<String>> _serverInstanceToSegmentsMap;
+  private Map<ServerInstance, Map<String, List<String>>> _serverInstanceToSegmentsMap;
+
+  // time boundary info
+  private TimeBoundaryInfo _timeBoundaryInfo;
+
 
   public StageMetadata() {
     _scannedTables = new ArrayList<>();
     _serverInstances = new ArrayList<>();
     _serverInstanceToSegmentsMap = new HashMap<>();
+    _timeBoundaryInfo = null;
   }
 
   public void attach(StageNode stageNode) {
@@ -67,11 +73,12 @@ public class StageMetadata implements Serializable {
   // attached physical plan context.
   // -----------------------------------------------
 
-  public Map<ServerInstance, List<String>> getServerInstanceToSegmentsMap() {
+  public Map<ServerInstance, Map<String, List<String>>> getServerInstanceToSegmentsMap() {
     return _serverInstanceToSegmentsMap;
   }
 
-  public void setServerInstanceToSegmentsMap(Map<ServerInstance, List<String>> serverInstanceToSegmentsMap) {
+  public void setServerInstanceToSegmentsMap(
+      Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap) {
     _serverInstanceToSegmentsMap = serverInstanceToSegmentsMap;
   }
 
@@ -81,5 +88,13 @@ public class StageMetadata implements Serializable {
 
   public void setServerInstances(List<ServerInstance> serverInstances) {
     _serverInstances = serverInstances;
+  }
+
+  public TimeBoundaryInfo getTimeBoundaryInfo() {
+    return _timeBoundaryInfo;
+  }
+
+  public void setTimeBoundaryInfo(TimeBoundaryInfo timeBoundaryInfo) {
+    _timeBoundaryInfo = timeBoundaryInfo;
   }
 }

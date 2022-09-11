@@ -35,7 +35,7 @@ import org.testng.annotations.Test;
 public class QueryRunnerExceptionTest extends QueryRunnerTestBase {
 
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
-  public void testSqlWithFinalRowCountChecker(String sql, String exeptionMsg) {
+  public void testSqlWithExceptionMsgChecker(String sql, String exceptionMsg) {
     QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
     Map<String, String> requestMetadataMap =
         ImmutableMap.of("REQUEST_ID", String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
@@ -61,7 +61,7 @@ public class QueryRunnerExceptionTest extends QueryRunnerTestBase {
       QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator);
     } catch (RuntimeException rte) {
       Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
-      Assert.assertTrue(rte.getMessage().contains(exeptionMsg));
+      Assert.assertTrue(rte.getMessage().contains(exceptionMsg));
     }
   }
 
