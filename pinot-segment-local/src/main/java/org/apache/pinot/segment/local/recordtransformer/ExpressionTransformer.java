@@ -132,6 +132,7 @@ public class ExpressionTransformer implements RecordTransformer {
             record.putValue(column, transformFunctionEvaluator.evaluate(record));
           } catch (Exception e) {
             record.putValue(column, null);
+            record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
           }
         } else {
           record.putValue(column, transformFunctionEvaluator.evaluate(record));

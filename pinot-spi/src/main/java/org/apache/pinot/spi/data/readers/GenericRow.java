@@ -69,6 +69,12 @@ public class GenericRow implements Serializable {
    */
   public static final String SKIP_RECORD_KEY = "$SKIP_RECORD_KEY$";
 
+  /**
+   * This key is used by transformers to indicate some error might have occurred while doing transform on a column
+   * and a default/null value has been put in place of actual value. Only used when continueOnError is set to true
+   */
+  public static final String INCOMPLETE_RECORD_KEY = "$INCOMPLETE_RECORD_KEY$";
+
   private final Map<String, Object> _fieldToValueMap = new HashMap<>();
   private final Set<String> _nullValueFields = new HashSet<>();
 

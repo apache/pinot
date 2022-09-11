@@ -354,7 +354,7 @@ public class ComplexTypeTransformerTest {
     //   "array":"[1,2]"
     // }
     transformer = new ComplexTypeTransformer(Arrays.asList(), ".",
-            ComplexTypeConfig.CollectionNotUnnestedToJson.ALL, new HashMap<>());
+            ComplexTypeConfig.CollectionNotUnnestedToJson.ALL, new HashMap<>(), null);
     genericRow = new GenericRow();
     array = new Object[]{1, 2};
     genericRow.putValue("array", array);
@@ -400,7 +400,7 @@ public class ComplexTypeTransformerTest {
     map.put("array1", array1);
     genericRow.putValue("t", map);
     transformer = new ComplexTypeTransformer(Arrays.asList(), ".",
-            ComplexTypeConfig.CollectionNotUnnestedToJson.NONE, new HashMap<>());
+            ComplexTypeConfig.CollectionNotUnnestedToJson.NONE, new HashMap<>(), null);
     transformer.transform(genericRow);
     Assert.assertTrue(ComplexTypeTransformer.isNonPrimitiveArray(genericRow.getValue("t.array1")));
   }
@@ -411,7 +411,7 @@ public class ComplexTypeTransformerTest {
     prefixesToRename.put("map1.", "");
     prefixesToRename.put("map2", "test");
     ComplexTypeTransformer transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
-            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename, null);
 
     GenericRow genericRow = new GenericRow();
     genericRow.putValue("a", 1L);
@@ -426,7 +426,7 @@ public class ComplexTypeTransformerTest {
     prefixesToRename = new HashMap<>();
     prefixesToRename.put("test.", "");
     transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
-            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename, null);
     genericRow = new GenericRow();
     genericRow.putValue("a", 1L);
     genericRow.putValue("test.a", 2L);
@@ -441,7 +441,7 @@ public class ComplexTypeTransformerTest {
     prefixesToRename = new HashMap<>();
     prefixesToRename.put("test", "");
     transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
-            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename, null);
     genericRow = new GenericRow();
     genericRow.putValue("a", 1L);
     genericRow.putValue("test", 2L);
@@ -455,7 +455,7 @@ public class ComplexTypeTransformerTest {
     // case where nothing gets renamed
     prefixesToRename = new HashMap<>();
     transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
-            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename, null);
     genericRow = new GenericRow();
     genericRow.putValue("a", 1L);
     genericRow.putValue("test", 2L);
@@ -470,7 +470,7 @@ public class ComplexTypeTransformerTest {
     prefixesToRename.put("map1.", "");
     prefixesToRename.put("map2", "test");
     ComplexTypeTransformer transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
-            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename);
+            DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename, null);
 
     // test flatten root-level tuples
     GenericRow genericRow = new GenericRow();

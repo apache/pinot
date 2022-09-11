@@ -147,6 +147,7 @@ public class DataTypeTransformer implements RecordTransformer {
         } else {
           LOGGER.debug("Caught exception while transforming data type for column: {}", column, e);
           record.putValue(column, null);
+          record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
         }
       }
     }
