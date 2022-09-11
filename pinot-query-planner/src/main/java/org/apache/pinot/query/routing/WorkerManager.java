@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.StageMetadata;
@@ -62,8 +63,20 @@ public class WorkerManager {
     if (scannedTables.size() == 1) {
       // table scan stage, need to attach server as well as segment info for each physical table type.
       Map<String, RoutingTable> routingTableMap = getRoutingTable(scannedTables.get(0));
-      Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap = new HashMap<>();
+      // acquire time boundary info if it is a hybrid table.
+      if (routingTableMap.size() > 1) {
+        TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(TableNameBuilder
+            .forType(TableType.OFFLINE).tableNameWithType(TableNameBuilder.extractRawTableName(scannedTables.get(0))));
+        if (timeBoundaryInfo != null) {
+          stageMetadata.setTimeBoundaryInfo(timeBoundaryInfo);
+        } else {
+          // remove offline table routing if no time boundary info is acquired.
+          routingTableMap.remove(TableType.OFFLINE.name());
+        }
+      }
+
       // extract all the instances associated to each table type
+      Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap = new HashMap<>();
       for (Map.Entry<String, RoutingTable> routingEntry : routingTableMap.entrySet()) {
         String tableType = routingEntry.getKey();
         RoutingTable routingTable = routingEntry.getValue();
@@ -75,11 +88,6 @@ public class WorkerManager {
           Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue()) == null,
               "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
         }
-      }
-      // acquire time boundary info if it is a hybrid table.
-      if (routingTableMap.size() > 1) {
-        stageMetadata.setTimeBoundaryInfo(_routingManager.getTimeBoundaryInfo(TableNameBuilder
-            .forType(TableType.OFFLINE).tableNameWithType(TableNameBuilder.extractRawTableName(scannedTables.get(0)))));
       }
       stageMetadata.setServerInstances(new ArrayList<>(serverInstanceToSegmentsMap.keySet()));
       stageMetadata.setServerInstanceToSegmentsMap(serverInstanceToSegmentsMap);

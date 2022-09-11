@@ -46,9 +46,11 @@ import static org.apache.pinot.core.query.selection.SelectionOperatorUtils.extra
 public class QueryRunnerTestBase {
   private static final File INDEX_DIR_S1_A = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server1_tableA");
   private static final File INDEX_DIR_S1_B = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server1_tableB");
-  private static final File INDEX_DIR_S2_A = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server2_tableA");
   private static final File INDEX_DIR_S1_C = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server1_tableC");
+  private static final File INDEX_DIR_S1_D = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server1_tableD");
+  private static final File INDEX_DIR_S2_A = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server2_tableA");
   private static final File INDEX_DIR_S2_C = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server2_tableC");
+  private static final File INDEX_DIR_S2_D = new File(FileUtils.getTempDirectory(), "QueryRunnerTest_server2_tableD");
 
   protected static final Random RANDOM_REQUEST_ID_GEN = new Random();
 
@@ -73,11 +75,12 @@ public class QueryRunnerTestBase {
   public void setUp()
       throws Exception {
     DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
-    QueryServerEnclosure server1 = new QueryServerEnclosure(Lists.newArrayList("a", "b", "c"),
-        ImmutableMap.of("a", INDEX_DIR_S1_A, "b", INDEX_DIR_S1_B, "c", INDEX_DIR_S1_C),
+    QueryServerEnclosure server1 = new QueryServerEnclosure(Lists.newArrayList("a", "b", "c", "d_O"),
+        ImmutableMap.of("a", INDEX_DIR_S1_A, "b", INDEX_DIR_S1_B, "c", INDEX_DIR_S1_C, "d_O", INDEX_DIR_S1_D),
         QueryEnvironmentTestUtils.SERVER1_SEGMENTS);
-    QueryServerEnclosure server2 = new QueryServerEnclosure(Lists.newArrayList("a", "c"),
-        ImmutableMap.of("a", INDEX_DIR_S2_A, "c", INDEX_DIR_S2_C), QueryEnvironmentTestUtils.SERVER2_SEGMENTS);
+    QueryServerEnclosure server2 = new QueryServerEnclosure(Lists.newArrayList("a", "c", "d_R"),
+        ImmutableMap.of("a", INDEX_DIR_S2_A, "c", INDEX_DIR_S2_C, "d_R", INDEX_DIR_S1_D),
+        QueryEnvironmentTestUtils.SERVER2_SEGMENTS);
 
     _reducerGrpcPort = QueryEnvironmentTestUtils.getAvailablePort();
     _reducerHostname = String.format("Broker_%s", QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME);

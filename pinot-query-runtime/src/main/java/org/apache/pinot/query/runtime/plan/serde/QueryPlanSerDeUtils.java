@@ -97,7 +97,7 @@ public class QueryPlanSerDeUtils {
       stageMetadata.getServerInstanceToSegmentsMap().put(stringToInstance(instanceEntry.getKey()), tableToSegmentMap);
     }
     // time boundary info
-    if (workerStageMetadata.getTimeColumn() != null) {
+    if (!workerStageMetadata.getTimeColumn().isEmpty()) {
       stageMetadata.setTimeBoundaryInfo(new TimeBoundaryInfo(workerStageMetadata.getTimeColumn(),
           workerStageMetadata.getTimeValue()));
     }

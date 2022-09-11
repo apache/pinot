@@ -24,12 +24,14 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.planner.QueryPlan;
@@ -42,6 +44,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -54,10 +57,10 @@ public class QueryEnvironmentTestUtils {
   public static final Schema.SchemaBuilder SCHEMA_BUILDER;
   public static final Map<String, List<String>> SERVER1_SEGMENTS =
       ImmutableMap.of("a", Lists.newArrayList("a1", "a2"), "b", Lists.newArrayList("b1"), "c",
-          Lists.newArrayList("c1"), "d_O", Lists.newArrayList("d1", "d2"));
+          Lists.newArrayList("c1"), "d_O", Lists.newArrayList("d1"));
   public static final Map<String, List<String>> SERVER2_SEGMENTS =
       ImmutableMap.of("a", Lists.newArrayList("a3"), "c", Lists.newArrayList("c2", "c3"),
-          "d_R", Lists.newArrayList("d3", "d4"));
+          "d_R", Lists.newArrayList("d2", "d3"));
 
   static {
     SCHEMA_BUILDER = new Schema.SchemaBuilder().addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
@@ -72,7 +75,7 @@ public class QueryEnvironmentTestUtils {
 
   public static TableCache mockTableCache() {
     TableCache mock = mock(TableCache.class);
-    when(mock.getTableNameMap()).thenReturn(ImmutableMap.of("a", "a", "b", "b", "c", "c",
+    when(mock.getTableNameMap()).thenReturn(ImmutableMap.of("a_REALTIME", "a", "b_REALTIME", "b", "c_REALTIME", "c",
         "d_OFFLINE", "d", "d_REALTIME", "d"));
     when(mock.getSchema("a")).thenReturn(SCHEMA_BUILDER.setSchemaName("a").build());
     when(mock.getSchema("b")).thenReturn(SCHEMA_BUILDER.setSchemaName("b").build());
@@ -121,6 +124,11 @@ public class QueryEnvironmentTestUtils {
           mockRoutingTableMap.get(TableNameBuilder.extractRawTableName(tableName)));
     });
     when(mock.getEnabledServerInstanceMap()).thenReturn(ImmutableMap.of(server1, host1, server2, host2));
+    when(mock.getTimeBoundaryInfo(anyString())).thenAnswer(invocation -> {
+      String offlineTableName = invocation.getArgument(0);
+      return "d_OFFLINE".equals(offlineTableName) ? new TimeBoundaryInfo("ts",
+          String.valueOf(TimeUnit.DAYS.convert(1, TimeUnit.DAYS))) : null;
+    });
     return mock;
   }
 
