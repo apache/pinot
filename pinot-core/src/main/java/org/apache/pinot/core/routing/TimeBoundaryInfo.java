@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.routing.timeboundary;
+package org.apache.pinot.core.routing;
 
 public class TimeBoundaryInfo {
   private final String _timeColumn;
