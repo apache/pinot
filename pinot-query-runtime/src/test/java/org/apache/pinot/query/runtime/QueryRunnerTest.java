@@ -141,9 +141,14 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
             + " WHERE a.col3 >= 0 GROUP BY a.col1, a.col2", 5},
 
         // GROUP BY after JOIN
-        // only 3 GROUP BY key exist because b.col2 cycles between "foo", "bar", "alice".
+        //   - optimizable transport for GROUP BY key after JOIN, using SINGLETON exchange
+        //     only 3 GROUP BY key exist because b.col2 cycles between "foo", "bar", "alice".
         new Object[]{"SELECT a.col1, SUM(b.col3), COUNT(*), SUM(2) FROM a JOIN b ON a.col1 = b.col2 "
             + " WHERE a.col3 >= 0 GROUP BY a.col1", 3},
+        //   - non-optimizable transport for GROUP BY key after JOIN, using HASH exchange
+        //     only 2 GROUP BY key exist for b.col3.
+        new Object[]{"SELECT b.col3, SUM(a.col3) FROM a JOIN b"
+            + " on a.col1 = b.col1 AND a.col2 = b.col2 GROUP BY b.col3", 2},
 
         // Sub-query
         new Object[]{"SELECT b.col1, b.col3, i.maxVal FROM b JOIN "
@@ -164,8 +169,11 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT a.col1, a.col3, b.col3 FROM a JOIN b ON a.col1 = b.col1 ORDER BY a.col3, b.col3 DESC", 15},
 
         // test customized function
-        new Object[]{"SELECT least(a.ts, b.ts) FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2", 15},
+        //   - on leaf stage
         new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 15},
+        //   - on intermediate stage
+        new Object[]{"SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
+            + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
     };
   }
 }

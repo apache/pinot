@@ -215,10 +215,10 @@ public class StagePlanner {
         int leftIndex = leftJoinKeySelector.getColumnIndices().get(i);
         int rightIndex = rightJoinKeySelector.getColumnIndices().get(i);
         if (leftPartitionKeys.contains(leftIndex)) {
-          newPartitionKeys.add(i);
+          newPartitionKeys.add(leftIndex);
         }
         if (rightPartitionKeys.contains(rightIndex)) {
-          newPartitionKeys.add(leftDataSchemaSize + i);
+          newPartitionKeys.add(leftDataSchemaSize + rightIndex);
         }
       }
       node.setPartitionKeys(newPartitionKeys);
