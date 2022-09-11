@@ -62,11 +62,12 @@ public class WorkerManager {
     List<String> scannedTables = stageMetadata.getScannedTables();
     if (scannedTables.size() == 1) {
       // table scan stage, need to attach server as well as segment info for each physical table type.
-      Map<String, RoutingTable> routingTableMap = getRoutingTable(scannedTables.get(0));
+      String logicalTableName = scannedTables.get(0);
+      Map<String, RoutingTable> routingTableMap = getRoutingTable(logicalTableName);
       // acquire time boundary info if it is a hybrid table.
       if (routingTableMap.size() > 1) {
         TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(TableNameBuilder
-            .forType(TableType.OFFLINE).tableNameWithType(TableNameBuilder.extractRawTableName(scannedTables.get(0))));
+            .forType(TableType.OFFLINE).tableNameWithType(TableNameBuilder.extractRawTableName(logicalTableName)));
         if (timeBoundaryInfo != null) {
           stageMetadata.setTimeBoundaryInfo(timeBoundaryInfo);
         } else {
@@ -114,15 +115,21 @@ public class WorkerManager {
     return serverInstances;
   }
 
-  private Map<String, RoutingTable> getRoutingTable(String tableName) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+  /**
+   * Acquire routing table for items listed in {@link org.apache.pinot.query.planner.stage.TableScanNode}.
+   *
+   * @param logicalTableName it can either be a hybrid table name or a physical table name with table type.
+   * @return keyed-map from table type(s) to routing table(s).
+   */
+  private Map<String, RoutingTable> getRoutingTable(String logicalTableName) {
+    String rawTableName = TableNameBuilder.extractRawTableName(logicalTableName);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(logicalTableName);
     Map<String, RoutingTable> routingTableMap = new HashMap<>();
     if (tableType == null) {
       routingTableMap.put(TableType.OFFLINE.name(), getRoutingTable(rawTableName, TableType.OFFLINE));
       routingTableMap.put(TableType.REALTIME.name(), getRoutingTable(rawTableName, TableType.REALTIME));
     } else {
-      routingTableMap.put(tableType.name(), getRoutingTable(tableName, tableType));
+      routingTableMap.put(tableType.name(), getRoutingTable(logicalTableName, tableType));
     }
     return routingTableMap;
   }

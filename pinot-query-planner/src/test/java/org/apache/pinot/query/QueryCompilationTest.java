@@ -159,8 +159,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     List<StageMetadata> tableScanMetadataList = queryPlan.getStageMetadataMap().values().stream()
         .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
-    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 1);
-    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().get(0).toString(), "Server_localhost_1");
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 2);
+
     query = "SELECT * FROM d_REALTIME";
     queryPlan = _queryEnvironment.planQuery(query);
     tableScanMetadataList = queryPlan.getStageMetadataMap().values().stream()
