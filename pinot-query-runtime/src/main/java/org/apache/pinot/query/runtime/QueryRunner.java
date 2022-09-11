@@ -173,8 +173,7 @@ public class QueryRunner {
     private LeafStageTransferableBlockOperator(List<BaseDataBlock> baseDataBlocks, DataSchema dataSchema) {
       _baseDataBlocks = baseDataBlocks;
       _dataSchema = dataSchema;
-      Optional<BaseDataBlock> errBlock = baseDataBlocks.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst();
-      _errorBlock = !errBlock.isEmpty() ? errBlock.get() : null;
+      _errorBlock = baseDataBlocks.stream().filter(e -> !e.getExceptions().isEmpty()).findFirst().orElse(null);
       _currentIndex = 0;
     }
 
