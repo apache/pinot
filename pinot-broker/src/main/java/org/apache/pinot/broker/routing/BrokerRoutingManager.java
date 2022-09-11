@@ -596,6 +596,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
    * <p>NOTE: Time boundary info is only available for the offline part of the hybrid table.
    */
   @Nullable
+  @Override
   public TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName) {
     RoutingEntry routingEntry = _routingEntryMap.get(offlineTableName);
     if (routingEntry == null) {

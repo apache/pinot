@@ -59,4 +59,12 @@ public interface RoutingManager {
    * @return true if the route table exists.
    */
   boolean routingExists(String tableNameWithType);
+
+  /**
+   * Acquire the time boundary info. Useful for hybrid logical table queries that needs to split between
+   * realtime and offline.
+   * @param offlineTableName offline table name
+   * @return time boundary info.
+   */
+  TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName);
 }
