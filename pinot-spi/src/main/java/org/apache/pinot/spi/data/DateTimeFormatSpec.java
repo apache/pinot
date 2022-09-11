@@ -21,6 +21,7 @@ package org.apache.pinot.spi.data;
 import com.google.common.base.Preconditions;
 import java.sql.Timestamp;
 import java.util.Objects;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -29,6 +30,7 @@ import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.TimestampUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.ISODateTimeFormat;
 
 
 /**
@@ -113,10 +115,7 @@ public class DateTimeFormatSpec {
         case SIMPLE_DATE_FORMAT:
           _size = 1;
           _unitSpec = DateTimeFormatUnitSpec.MILLISECONDS;
-          Preconditions.checkArgument(tokens.length == COLON_FORMAT_MAX_TOKENS,
-              "Invalid SIMPLE_DATE_FORMAT format: %s, must be of format "
-                  + "'<size>:<timeUnit>:SIMPLE_DATE_FORMAT:<patternWithTz>'", format);
-          String patternStr = tokens[COLON_FORMAT_PATTERN_POSITION];
+          String patternStr = tokens.length > COLON_FORMAT_PATTERN_POSITION ? tokens[COLON_FORMAT_PATTERN_POSITION] : null;
           try {
             _patternSpec = new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, patternStr);
           } catch (Exception e) {
@@ -174,9 +173,6 @@ public class DateTimeFormatSpec {
         case SIMPLE_DATE_FORMAT:
           _size = 1;
           _unitSpec = DateTimeFormatUnitSpec.MILLISECONDS;
-          Preconditions.checkArgument(tokens.length > PIPE_FORMAT_PATTERN_POSITION,
-              "Invalid SIMPLE_DATE_FORMAT format: %s, must be of format 'SIMPLE_DATE_FORMAT|<pattern>(|<timeZone>)'",
-              format);
           if (tokens.length > PIPE_FORMAT_TIME_ZONE_POSITION) {
             try {
               _patternSpec =
@@ -189,8 +185,9 @@ public class DateTimeFormatSpec {
             }
           } else {
             try {
+              String pattern = tokens.length > PIPE_FORMAT_PATTERN_POSITION ? tokens[PIPE_FORMAT_PATTERN_POSITION] : null;
               _patternSpec =
-                  new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, tokens[PIPE_FORMAT_PATTERN_POSITION]);
+                  new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, pattern);
             } catch (Exception e) {
               throw new IllegalArgumentException(String.format("Invalid SIMPLE_DATE_FORMAT pattern: %s in format: %s",
                   tokens[PIPE_FORMAT_PATTERN_POSITION], format));
@@ -277,7 +274,11 @@ public class DateTimeFormatSpec {
       case TIMESTAMP:
         return new Timestamp(timeMs).toString();
       case SIMPLE_DATE_FORMAT:
-        return _patternSpec.getDateTimeFormatter().print(timeMs);
+          if(_patternSpec.getSdfPattern() != null) {
+            return _patternSpec.getDateTimeFormatter().print(timeMs);
+          } else {
+            return ISODateTimeFormat.dateTimeNoMillis().withZone(DateTimeFormatPatternSpec.DEFAULT_DATE_TIME_ZONE).withLocale(DateTimeFormatPatternSpec.DEFAULT_LOCALE).print(timeMs);
+          }
       default:
         throw new IllegalStateException("Unsupported time format: " + _patternSpec.getTimeFormat());
     }
