@@ -168,6 +168,7 @@ public class CalciteRexExpressionParser {
         return compileAndExpression(rexCall, pinotQuery);
       case OR:
         return compileOrExpression(rexCall, pinotQuery);
+      case IN:
       case COUNT:
       case OTHER:
       case OTHER_FUNCTION:

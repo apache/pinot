@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import com.google.common.collect.Range;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.type.RelDataType;
@@ -28,8 +31,9 @@ import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.NlsString;
+import org.apache.calcite.util.Sarg;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -50,10 +54,12 @@ public interface RexExpression {
     } else if (rexNode instanceof RexLiteral) {
       RexLiteral rexLiteral = ((RexLiteral) rexNode);
       FieldSpec.DataType dataType = toDataType(rexLiteral.getType());
-      return new RexExpression.Literal(dataType, rexLiteral.getTypeName(),
-          toRexValue(dataType, rexLiteral.getValue()));
+      return new RexExpression.Literal(dataType, toRexValue(dataType, rexLiteral.getValue()));
     } else if (rexNode instanceof RexCall) {
       RexCall rexCall = (RexCall) rexNode;
+      if (rexCall.getKind().equals(SqlKind.SEARCH)) {
+        return handleSearch(rexCall);
+      }
       List<RexExpression> operands = rexCall.getOperands().stream().map(RexExpression::toRexExpression)
           .collect(Collectors.toList());
       return new RexExpression.FunctionCall(rexCall.getKind(), toDataType(rexCall.getType()),
@@ -107,6 +113,33 @@ public interface RexExpression {
     }
   }
 
+  // POC Code. Will clean-up later.
+  static RexExpression handleSearch(RexCall rexCall) {
+    List<RexNode> operands = rexCall.getOperands();
+    RexInputRef rexInputRef = (RexInputRef) operands.get(0);
+    RexLiteral rexLiteral = (RexLiteral) operands.get(1);
+    FieldSpec.DataType dataType = toDataType(rexLiteral.getType());
+    Sarg sarg = rexLiteral.getValueAs(Sarg.class);
+    if (sarg.isPoints()) {
+      return new FunctionCall(SqlKind.IN, dataType, SqlKind.IN.name(), convertRanges(rexInputRef,
+          sarg.rangeSet.asRanges(), dataType));
+    } else if (sarg.isComplementedPoints()) {
+      return new FunctionCall(SqlKind.NOT_IN, dataType, SqlKind.NOT_IN.name(), convertRanges(rexInputRef,
+          sarg.rangeSet.complement().asRanges(), dataType));
+    } else {
+      throw new NotImplementedException("Range is not implemented yet");
+    }
+  }
+
+  static List<RexExpression> convertRanges(RexInputRef rexInputRef, Set<Range> ranges, FieldSpec.DataType dataType) {
+    List<RexExpression> result = new ArrayList<>(ranges.size() + 1);
+    result.add(toRexExpression(rexInputRef));
+    for (Range range : ranges) {
+      result.add(new Literal(dataType, toRexValue(dataType, range.lowerEndpoint())));
+    }
+    return result;
+  }
+
   class InputRef implements RexExpression {
     @ProtoProperties
     private SqlKind _sqlKind;
@@ -147,7 +180,7 @@ public interface RexExpression {
     public Literal() {
     }
 
-    public Literal(FieldSpec.DataType dataType, SqlTypeName sqlTypeName, @Nullable Object value) {
+    public Literal(FieldSpec.DataType dataType, @Nullable Object value) {
       _sqlKind = SqlKind.LITERAL;
       _dataType = dataType;
       _value = value;

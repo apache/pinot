@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
@@ -98,8 +97,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private RexExpression toAggregationFunctionOperand(RexExpression rexExpression) {
     List<RexExpression> functionOperands = ((RexExpression.FunctionCall) rexExpression).getFunctionOperands();
     Preconditions.checkState(functionOperands.size() < 2);
-    return functionOperands.size() > 0 ? functionOperands.get(0)
-        : new RexExpression.Literal(FieldSpec.DataType.INT, SqlTypeName.INTEGER, 1);
+    return functionOperands.size() > 0 ? functionOperands.get(0) : new RexExpression.Literal(FieldSpec.DataType.INT, 1);
   }
 
   @Override
