@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
@@ -36,7 +37,6 @@ import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.stage.AggregateNode;
 import org.apache.pinot.query.planner.stage.FilterNode;
@@ -115,11 +115,10 @@ public final class RelToStageConverter {
     RexCall joinCondition = (RexCall) node.getCondition();
 
     // Parse out all equality JOIN conditions
-    List<List<Integer>> predicateColumns =
-        PlannerUtils.getJoinKeyFromConditions(joinCondition, node.analyzeCondition());
-
-    FieldSelectionKeySelector leftFieldSelectionKeySelector = new FieldSelectionKeySelector(predicateColumns.get(0));
-    FieldSelectionKeySelector rightFieldSelectionKeySelector = new FieldSelectionKeySelector(predicateColumns.get(1));
+    JoinInfo joinInfo = node.analyzeCondition();
+    FieldSelectionKeySelector leftFieldSelectionKeySelector = new FieldSelectionKeySelector(joinInfo.leftKeys);
+    FieldSelectionKeySelector rightFieldSelectionKeySelector = new FieldSelectionKeySelector(joinInfo.rightKeys);
+    Preconditions.checkState(joinInfo.nonEquiConditions.isEmpty());
     return new JoinNode(currentStageId, toDataSchema(node.getRowType()), joinType, Collections.singletonList(
         new JoinNode.JoinClause(leftFieldSelectionKeySelector, rightFieldSelectionKeySelector)));
   }
