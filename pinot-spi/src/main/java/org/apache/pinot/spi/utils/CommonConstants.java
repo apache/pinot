@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.utils;
 
 import java.io.File;
+import javax.swing.plaf.PanelUI;
 
 
 public class CommonConstants {
@@ -820,5 +821,9 @@ public class CommonConstants {
       public static final String LOWER_UNBOUNDED = LOWER_EXCLUSIVE + UNBOUNDED + DELIMITER;
       public static final String UPPER_UNBOUNDED = DELIMITER + UNBOUNDED + UPPER_EXCLUSIVE;
     }
+  }
+
+  public static class IdealState {
+    public static final String QUERY_TIME_BOUNDARY = "query.time.boundary";
   }
 }

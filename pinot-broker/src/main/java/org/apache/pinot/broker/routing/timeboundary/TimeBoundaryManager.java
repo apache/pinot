@@ -106,8 +106,9 @@ public class TimeBoundaryManager {
   @SuppressWarnings("unused")
   public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     // Bulk load time info for all online segments
-    if (idealState.getRecord().getSimpleField("TIMEBOUNDARY") != null) {
-      long timeBoundary = Long.parseLong(idealState.getRecord().getSimpleField("TIMEBOUNDARY"));
+    String enforcedTimeBoundary = idealState.getRecord().getSimpleField(CommonConstants.IdealState.QUERY_TIME_BOUNDARY);
+    if (enforcedTimeBoundary != null) {
+      long timeBoundary = Long.parseLong(idealState.getRecord().getSimpleField(CommonConstants.IdealState.QUERY_TIME_BOUNDARY));
       updateEnforcedTimeBoundaryInfo(timeBoundary);
     } else {
       _enforcedTimeBoundaryInfo = null;
@@ -181,12 +182,14 @@ public class TimeBoundaryManager {
   @SuppressWarnings("unused")
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
-    if (idealState.getRecord().getSimpleField("TIMEBOUNDARY") != null) {
+    String enforcedTimeBoundary = idealState.getRecord().getSimpleField(CommonConstants.IdealState.QUERY_TIME_BOUNDARY);
+    if (enforcedTimeBoundary != null) {
       long timeBoundary = Long.parseLong(idealState.getRecord().getSimpleField("TIMEBOUNDARY"));
       updateEnforcedTimeBoundaryInfo(timeBoundary);
     } else {
       _enforcedTimeBoundaryInfo = null;
     }
+
     for (String segment : onlineSegments) {
       // NOTE: Only update the segment end time when there are ONLINE instances in the external view to prevent moving
       //       the time boundary before the new segment is picked up by the servers
@@ -219,7 +222,7 @@ public class TimeBoundaryManager {
 
   @Nullable
   public TimeBoundaryInfo getTimeBoundaryInfo() {
-    TimeBoundaryInfo _enforcedTimeBoundary = _enforcedTimeBoundaryInfo;
-    return (_enforcedTimeBoundaryInfo != null) ? _enforcedTimeBoundaryInfo : _timeBoundaryInfo;
+    TimeBoundaryInfo enforcedTimeBoundary = _enforcedTimeBoundaryInfo;
+    return (enforcedTimeBoundary != null) ? enforcedTimeBoundary : _timeBoundaryInfo;
   }
 }

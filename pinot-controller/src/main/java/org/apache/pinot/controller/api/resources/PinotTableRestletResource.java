@@ -850,9 +850,10 @@ public class PinotTableRestletResource {
   }
 
   @POST
-  @Path("table/{tableName}/queryTimeBoundary")
-  @ApiOperation(value = "Set hybrid table query time boundary", notes = "Set hybrid table query time boundary")
-  public SuccessResponse setQueryTimeBoundary(
+  @Path("table/{tableName}/enforceQueryTimeBoundary")
+  @ApiOperation(value = "Set hybrid table query time boundary based on offline segments' metadata",
+      notes = "Set hybrid table query time boundary based on offline segments' metadata")
+  public SuccessResponse setEnforcedQueryTimeBoundary(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName)
       throws Exception {
     // Validate its a hybrid table
@@ -884,7 +885,7 @@ public class PinotTableRestletResource {
           Response.Status.SERVICE_UNAVAILABLE);
     }
 
-    long timeBoundary = -1;
+    Long timeBoundary = null;
     // Validate all responses
     for (String response : serviceResponse._httpResponses.values()) {
       TableSegmentValidationInfo tableSegmentValidationInfo =
@@ -893,24 +894,34 @@ public class PinotTableRestletResource {
         throw new ControllerApplicationException(LOGGER, "Table segment validation failed",
             Response.Status.INTERNAL_SERVER_ERROR);
       }
-      timeBoundary = Math.max(timeBoundary, tableSegmentValidationInfo.getMaxTimestamp());
+      timeBoundary = Math.max((timeBoundary == null) ? -1 : timeBoundary, tableSegmentValidationInfo.getMaxTimestamp());
     }
-    final long timeBoundaryFinal = timeBoundary;
+
+    if (timeBoundary == null) {
+      throw new ControllerApplicationException(LOGGER, "Could not validate table segment status",
+          Response.Status.SERVICE_UNAVAILABLE);
+    }
+
+    final String timeBoundaryFinal = String.valueOf(timeBoundary);
 
     // Set the timeBoundary in tableIdealState
     IdealState idealState =
         HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), offlineTableName, is -> {
           assert is != null;
-          is.getRecord().setSimpleField("TIMEBOUNDARY", String.valueOf(timeBoundaryFinal));
+          is.getRecord().setSimpleField(CommonConstants.IdealState.QUERY_TIME_BOUNDARY, timeBoundaryFinal);
           return is;
         }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
 
-    return (idealState == null) ? new SuccessResponse("Could not update time boundary")
-        : new SuccessResponse("Time boundary updated succesfully");
+    if (idealState == null) {
+      throw new ControllerApplicationException(LOGGER, "Could not update time boundary",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+
+    return new SuccessResponse("Time boundary updated successfully to " + timeBoundaryFinal);
   }
 
   @DELETE
-  @Path("table/{tableName}/queryTimeBoundary")
+  @Path("table/{tableName}/enforceQueryTimeBoundary")
   @ApiOperation(value = "Delete hybrid table query time boundary", notes = "Delete hybrid table query time boundary")
   public SuccessResponse deleteEnforcedQueryTimeBoundary(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName)
@@ -927,12 +938,15 @@ public class PinotTableRestletResource {
     IdealState idealState =
         HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), offlineTableName, is -> {
           assert is != null;
-          is.getRecord().getSimpleFields().remove("TIMEBOUNDARY");
+          is.getRecord().getSimpleFields().remove(CommonConstants.IdealState.QUERY_TIME_BOUNDARY);
           return is;
         }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
 
-    return (idealState == null) ? new SuccessResponse("Could not update time boundary")
-        : new SuccessResponse("Time boundary updated succesfully");
+    if (idealState == null) {
+      throw new ControllerApplicationException(LOGGER, "Could not update time boundary",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return new SuccessResponse("Time boundary removed succesfully");
   }
 
   /**
