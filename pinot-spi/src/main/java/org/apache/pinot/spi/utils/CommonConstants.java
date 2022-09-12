@@ -19,8 +19,6 @@
 package org.apache.pinot.spi.utils;
 
 import java.io.File;
-import javax.swing.plaf.PanelUI;
-
 
 public class CommonConstants {
   private CommonConstants() {

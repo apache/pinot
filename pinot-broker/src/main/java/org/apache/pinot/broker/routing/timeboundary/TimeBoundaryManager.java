@@ -108,7 +108,7 @@ public class TimeBoundaryManager {
     // Bulk load time info for all online segments
     String enforcedTimeBoundary = idealState.getRecord().getSimpleField(CommonConstants.IdealState.QUERY_TIME_BOUNDARY);
     if (enforcedTimeBoundary != null) {
-      long timeBoundary = Long.parseLong(idealState.getRecord().getSimpleField(CommonConstants.IdealState.QUERY_TIME_BOUNDARY));
+      long timeBoundary = Long.parseLong(enforcedTimeBoundary);
       updateEnforcedTimeBoundaryInfo(timeBoundary);
     } else {
       _enforcedTimeBoundaryInfo = null;
@@ -169,7 +169,6 @@ public class TimeBoundaryManager {
   private void updateEnforcedTimeBoundaryInfo(long maxEndTimeMs) {
     String timeBoundary = _timeFormatSpec.fromMillisToFormat(maxEndTimeMs);
     _enforcedTimeBoundaryInfo = new TimeBoundaryInfo(_timeColumn, timeBoundary);
-
   }
 
   /**
@@ -184,7 +183,7 @@ public class TimeBoundaryManager {
       Set<String> onlineSegments) {
     String enforcedTimeBoundary = idealState.getRecord().getSimpleField(CommonConstants.IdealState.QUERY_TIME_BOUNDARY);
     if (enforcedTimeBoundary != null) {
-      long timeBoundary = Long.parseLong(idealState.getRecord().getSimpleField("TIMEBOUNDARY"));
+      long timeBoundary = Long.parseLong(enforcedTimeBoundary);
       updateEnforcedTimeBoundaryInfo(timeBoundary);
     } else {
       _enforcedTimeBoundaryInfo = null;
@@ -217,7 +216,7 @@ public class TimeBoundaryManager {
   public synchronized void refreshSegment(String segment) {
     _endTimeMsMap.put(segment, extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
         _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
-      updateTimeBoundaryInfo(getMaxEndTimeMs());
+    updateTimeBoundaryInfo(getMaxEndTimeMs());
   }
 
   @Nullable
