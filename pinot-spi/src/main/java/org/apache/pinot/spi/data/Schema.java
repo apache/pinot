@@ -690,7 +690,9 @@ public final class Schema implements Serializable {
 
   /**
    * Check whether the current schema is backward compatible with oldSchema.
-   * Backward compatibility requires all columns and fieldSpec in oldSchema should be retained.
+   * Backward compatibility requires
+   * (1) all columns in oldSchema should be retained.
+   * (2) only DefaultNullValue and Max length can be overriden, other fields should be retained.
    *
    * @param oldSchema old schema
    */
@@ -703,7 +705,23 @@ public final class Schema implements Serializable {
       }
       FieldSpec oldSchemaFieldSpec = entry.getValue();
       FieldSpec fieldSpec = getFieldSpecFor(oldSchemaColumnName);
-      if (!fieldSpec.equals(oldSchemaFieldSpec)) {
+
+      if (EqualityUtils.isSameReference(fieldSpec, oldSchemaFieldSpec)) {
+        continue;
+      }
+
+      if ((fieldSpec == null && oldSchemaFieldSpec != null) || (fieldSpec != null && oldSchemaFieldSpec == null)) {
+        return false;
+      }
+
+      boolean isBackward = EqualityUtils.isEqual(fieldSpec.getName(), oldSchemaFieldSpec.getName())
+              && EqualityUtils.isEqual(fieldSpec.getDataType(), oldSchemaFieldSpec.getDataType())
+              && EqualityUtils.isEqual(fieldSpec.isSingleValueField(), oldSchemaFieldSpec.isSingleValueField())
+              && EqualityUtils.isEqual(fieldSpec.getTransformFunction(), oldSchemaFieldSpec.getTransformFunction())
+              && EqualityUtils.
+              isEqual(fieldSpec.getVirtualColumnProvider(), oldSchemaFieldSpec.getVirtualColumnProvider());
+
+      if (!isBackward) {
         return false;
       }
     }

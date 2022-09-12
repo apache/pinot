@@ -212,7 +212,7 @@ public class TableConfigsRestletResource {
       }
 
       try {
-        _pinotHelixResourceManager.addSchema(schema, false);
+        _pinotHelixResourceManager.addSchema(schema, false, false);
         LOGGER.info("Added schema: {}", schema.getSchemaName());
         if (offlineTableConfig != null) {
           _pinotHelixResourceManager.addTable(offlineTableConfig);
