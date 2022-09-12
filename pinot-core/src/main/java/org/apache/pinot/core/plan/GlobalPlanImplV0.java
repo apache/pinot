@@ -50,6 +50,9 @@ public class GlobalPlanImplV0 implements Plan {
     InstanceResponseOperator instanceResponseOperator = _instanceResponsePlanNode.run();
     long endTime1 = System.currentTimeMillis();
     LOGGER.debug("InstanceResponsePlanNode.run() took: {}ms", endTime1 - startTime);
+    if (endTime1 > _instanceResponsePlanNode._queryContext.getEndTimeMs()) {
+      throw new RuntimeException("Timeout after plan generation");
+    }
     InstanceResponseBlock instanceResponseBlock = instanceResponseOperator.nextBlock();
     long endTime2 = System.currentTimeMillis();
     LOGGER.debug("InstanceResponseOperator.nextBlock() took: {}ms", endTime2 - endTime1);
