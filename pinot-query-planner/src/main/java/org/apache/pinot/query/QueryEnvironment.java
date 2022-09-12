@@ -19,6 +19,7 @@
 package org.apache.pinot.query;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
@@ -42,6 +43,8 @@ import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.util.ChainedSqlOperatorTable;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.FrameworkConfig;
@@ -80,13 +83,16 @@ public class QueryEnvironment {
     _typeFactory = typeFactory;
     _rootSchema = rootSchema;
     _workerManager = workerManager;
-    _config = Frameworks.newConfigBuilder().traitDefs().build();
 
     // catalog
     Properties catalogReaderConfigProperties = new Properties();
     catalogReaderConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
     _catalogReader = new CalciteCatalogReader(_rootSchema, _rootSchema.path(null), _typeFactory,
         new CalciteConnectionConfigImpl(catalogReaderConfigProperties));
+
+    _config = Frameworks.newConfigBuilder().traitDefs()
+        .operatorTable(new ChainedSqlOperatorTable(Arrays.asList(SqlStdOperatorTable.instance(), _catalogReader)))
+        .defaultSchema(_rootSchema.plus()).build();
 
     // optimizer rules
     _logicalRuleSet = PinotQueryRuleSets.LOGICAL_OPT_RULES;
