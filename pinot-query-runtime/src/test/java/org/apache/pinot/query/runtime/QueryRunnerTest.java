@@ -174,6 +174,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         //   - on intermediate stage
         new Object[]{"SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
             + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
+
+        // DISTINCT
+        new Object[]{"SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 "
+            + " WHERE b.col3 > 0 GROUP BY a.col2, a.col3", 6},
     };
   }
 }
