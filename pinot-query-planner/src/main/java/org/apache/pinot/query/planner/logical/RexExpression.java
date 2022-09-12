@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -56,10 +57,27 @@ public interface RexExpression {
       RexCall rexCall = (RexCall) rexNode;
       List<RexExpression> operands = rexCall.getOperands().stream().map(RexExpression::toRexExpression)
           .collect(Collectors.toList());
-      return new RexExpression.FunctionCall(rexCall.getKind(), toDataType(rexCall.getType()),
-          rexCall.getOperator().getName(), operands);
+      return toRexExpression(rexCall, operands);
     } else {
       throw new IllegalArgumentException("Unsupported RexNode type with SqlKind: " + rexNode.getKind());
+    }
+  }
+
+  static RexExpression toRexExpression(RexCall rexCall, List<RexExpression> operands) {
+    switch (rexCall.getKind()) {
+      case CAST:
+        // CAST function name is being rewritten into "cast<TargetSqlType>",
+        // CAST result type has already been converted into the CAST RexCall, so we assert single operand.
+        Preconditions.checkState(operands.size() == 1, "CAST takes exactly 2 arguments");
+        RelDataType castType = rexCall.getType();
+        // add the 2nd argument as the source type info.
+        operands.add(new Literal(FieldSpec.DataType.STRING, rexCall.getOperands().get(0).getType().getSqlTypeName(),
+            toDataType(rexCall.getOperands().get(0).getType()).name()));
+        return new RexExpression.FunctionCall(rexCall.getKind(), toDataType(rexCall.getType()),
+            "cast" + toDataType(castType).name(), operands);
+      default:
+        return new RexExpression.FunctionCall(rexCall.getKind(), toDataType(rexCall.getType()),
+            rexCall.getOperator().getName(), operands);
     }
   }
 
