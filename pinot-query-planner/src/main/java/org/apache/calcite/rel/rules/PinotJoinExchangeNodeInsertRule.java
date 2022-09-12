@@ -25,7 +25,6 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
-import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.rel.logical.LogicalJoin;
@@ -40,7 +39,7 @@ import org.apache.pinot.query.planner.hints.PinotRelationalHints;
  */
 public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
   public static final PinotJoinExchangeNodeInsertRule INSTANCE =
-      new PinotJoinExchangeNodeInsertRule(RelFactories.LOGICAL_BUILDER);
+      new PinotJoinExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
   public PinotJoinExchangeNodeInsertRule(RelBuilderFactory factory) {
     super(operand(LogicalJoin.class, any()), factory, null);
