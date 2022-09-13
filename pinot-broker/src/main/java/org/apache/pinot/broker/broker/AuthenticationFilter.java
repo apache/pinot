@@ -69,7 +69,6 @@ public class AuthenticationFilter implements ContainerRequestFilter {
 
     Method endpointMethod = _resourceInfo.getResourceMethod();
     AccessControl accessControl = _accessControlFactory.create();
-    String endpointUrl = request.getRequestURI().substring(request.getContextPath().length()); // extract path only
     UriInfo uriInfo = requestContext.getUriInfo();
 
     // exclude public/unprotected paths
