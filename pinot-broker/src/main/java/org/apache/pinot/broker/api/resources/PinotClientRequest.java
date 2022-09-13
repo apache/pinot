@@ -52,6 +52,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
+import org.apache.pinot.broker.api.ManualAuthorization;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -104,6 +105,7 @@ public class PinotClientRequest {
       @ApiResponse(code = 200, message = "Query response"),
       @ApiResponse(code = 500, message = "Internal Server Error")
   })
+  @ManualAuthorization
   public void processSqlQueryGet(@ApiParam(value = "Query", required = true) @QueryParam("sql") String query,
       @ApiParam(value = "Trace enabled") @QueryParam(Request.TRACE) String traceEnabled,
       @ApiParam(value = "Debug options") @QueryParam(Request.DEBUG_OPTIONS) String debugOptions,
@@ -135,6 +137,7 @@ public class PinotClientRequest {
       @ApiResponse(code = 200, message = "Query response"),
       @ApiResponse(code = 500, message = "Internal Server Error")
   })
+  @ManualAuthorization
   public void processSqlQueryPost(String query, @Suspended AsyncResponse asyncResponse,
       @Context org.glassfish.grizzly.http.server.Request requestContext) {
     try {
@@ -162,6 +165,7 @@ public class PinotClientRequest {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
       @ApiResponse(code = 404, message = "Query not found on the requested broker")
   })
+  @ManualAuthorization
   public String cancelQuery(
       @ApiParam(value = "QueryId as assigned by the broker", required = true) @PathParam("queryId") long queryId,
       @ApiParam(value = "Timeout for servers to respond the cancel request") @QueryParam("timeoutMs")
@@ -195,6 +199,7 @@ public class PinotClientRequest {
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
   })
+  @ManualAuthorization
   public Map<Long, String> getRunningQueries() {
     try {
       return _requestHandler.getRunningQueries();
