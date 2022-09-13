@@ -155,6 +155,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
             + "  (SELECT a.col2 AS joinKey, MAX(a.col3) AS maxVal FROM a GROUP BY a.col2) AS i "
             + "  ON b.col1 = i.joinKey", 3},
 
+        // Sub-query with IN clause to SEMI JOIN.
+        new Object[]{"SELECT b.col1, b.col3 FROM b WHERE b.col1 IN "
+            + "(SELECT DISTINCT a.col2 FROM a WHERE a.col2 != 'foo')", 9},
+
         // Aggregate query with HAVING clause, "foo" and "bar" occurred 6/2 times each and "alice" occurred 3/1 times
         // numbers are cycle in (1, 42, 1, 42, 1), and (foo, bar, alice, foo, bar)
         // - COUNT(*) < 5 matches "alice" (3 times)
@@ -180,6 +184,11 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT a.col1, a.col2, AVG(a.col3) FROM a GROUP BY a.col1, a.col2", 5},
         //   - explicit CAST
         new Object[]{"SELECT a.col1, dateTrunc('DAY', CAST(SUM(a.col3) AS BIGINT)) FROM a GROUP BY a.col1", 5},
+
+        // Test DISTINCT
+        //   - distinct value done via GROUP BY with empty expr aggregation list.
+        new Object[]{"SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 "
+            + " WHERE b.col3 > 0 GROUP BY a.col2, a.col3", 5},
     };
   }
 }

@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
@@ -196,8 +197,13 @@ public abstract class BaseQueriesTest {
     // Server side
     serverQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     Plan plan = planMaker.makeInstancePlan(getIndexSegments(), serverQueryContext, EXECUTOR_SERVICE, null);
-    DataTable instanceResponse =
-        queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan) : plan.execute();
+    DataTable instanceResponse;
+    try {
+      instanceResponse =
+          queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan) : plan.execute();
+    } catch (TimeoutException e) {
+      throw new RuntimeException(e);
+    }
 
     // Broker side
     // Use 2 Threads for 2 data-tables
@@ -264,10 +270,20 @@ public abstract class BaseQueriesTest {
     Plan plan1 = planMaker.makeInstancePlan(instances.get(0), serverQueryContext, EXECUTOR_SERVICE, null);
     Plan plan2 = planMaker.makeInstancePlan(instances.get(1), serverQueryContext, EXECUTOR_SERVICE, null);
 
-    DataTable instanceResponse1 =
-        queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan1) : plan1.execute();
-    DataTable instanceResponse2 =
-        queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan2) : plan2.execute();
+    DataTable instanceResponse1;
+    try {
+      instanceResponse1 =
+          queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan1) : plan1.execute();
+    } catch (TimeoutException e) {
+      throw new RuntimeException(e);
+    }
+    DataTable instanceResponse2;
+    try {
+      instanceResponse2 =
+          queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan2) : plan2.execute();
+    } catch (TimeoutException e) {
+      throw new RuntimeException(e);
+    }
 
     // Broker side
     // Use 2 Threads for 2 data-tables
