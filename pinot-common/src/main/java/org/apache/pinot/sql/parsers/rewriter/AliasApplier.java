@@ -89,6 +89,7 @@ public class AliasApplier implements QueryRewriter {
         expression.setType(aliasExpression.getType());
         expression.setIdentifier(aliasExpression.getIdentifier());
         expression.setFunctionCall(aliasExpression.getFunctionCall());
+        System.out.println("liuyao set literal:" + aliasExpression.getLiteral().getSetField() + " " + aliasExpression.getLiteral().getFieldValue());
         expression.setLiteral(aliasExpression.getLiteral());
       }
       return;

@@ -64,12 +64,16 @@ public class RequestContextUtils {
    * Converts the given Thrift {@link Expression} into an {@link ExpressionContext}.
    */
   public static ExpressionContext getExpression(Expression thriftExpression) {
+    System.out.println("liuyao get expression");
     switch (thriftExpression.getType()) {
       case LITERAL:
+        System.out.println("liuyao: literal type:" + thriftExpression.getLiteral().getFieldValue().getClass());
         return ExpressionContext.forLiteral(thriftExpression.getLiteral().getFieldValue().toString());
       case IDENTIFIER:
+        System.out.println("liuyao get identifier");
         return ExpressionContext.forIdentifier(thriftExpression.getIdentifier().getName());
       case FUNCTION:
+        System.out.println("liuyao get function");
         return ExpressionContext.forFunction(getFunction(thriftExpression.getFunctionCall()));
       default:
         throw new IllegalStateException();

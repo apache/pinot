@@ -27,7 +27,7 @@ import java.util.Set;
  * The {@code FunctionContext} class represents the function in the expression.
  * <p>Pinot currently supports 2 types of functions: Aggregation (e.g. SUM, MAX) and Transform (e.g. ADD, SUB).
  */
-public class FunctionContext {
+public class FunctionContext extends ExpressionContext {
   public enum Type {
     AGGREGATION, TRANSFORM
   }
