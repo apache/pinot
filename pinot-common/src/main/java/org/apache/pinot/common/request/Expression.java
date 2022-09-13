@@ -236,6 +236,13 @@ public class Expression implements org.apache.thrift.TBase<Expression, Expressio
 
   @org.apache.thrift.annotation.Nullable
   public Literal getLiteral() {
+    if(this.literal == null || this.literal.getFieldValue() == null){
+      System.out.println("liuyao getLiteral:null");
+    } else {
+      Literal._Fields type = this.literal.getSetField();
+      System.out.println("liuyao type:" + type);
+      System.out.println("liuyao getLiteral:" + this.literal.getFieldValue().getClass() + " value:" + this.literal.getFieldValue().toString());
+    }
     return this.literal;
   }
 

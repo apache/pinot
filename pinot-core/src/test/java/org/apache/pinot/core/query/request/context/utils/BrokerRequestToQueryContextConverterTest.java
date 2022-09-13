@@ -56,6 +56,12 @@ public class BrokerRequestToQueryContextConverterTest {
   }
 
   @Test
+  public void testLiteral(){
+    String query = "SELECT DISTINCT foo, bar, foobar FROM testTable ORDER BY bar DESC, foo LIMIT 15";
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+
+  }
+  @Test
   public void testHardcodedQueries() {
     // Select *
     {
