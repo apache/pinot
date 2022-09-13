@@ -315,7 +315,7 @@ public class TransformFunctionFactory {
       case IDENTIFIER:
         String columnName = expression.getIdentifier();
         return new IdentifierTransformFunction(columnName, dataSourceMap.get(columnName));
-      case LITERAL_CONTEXT:
+      case LITERAL:
         return queryContext == null ? new LiteralTransformFunction(expression.getLiteralContext())
             : queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, expression.getLiteralContext(),
                 LiteralTransformFunction::new);

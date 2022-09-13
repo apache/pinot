@@ -164,7 +164,7 @@ public class AggregationFunctionFactory {
             if (arguments.size() == 3) {
               ExpressionContext timeCol = arguments.get(1);
               ExpressionContext dataType = arguments.get(2);
-              if (dataType.getType() != ExpressionContext.Type.LITERAL_CONTEXT) {
+              if (dataType.getType() != ExpressionContext.Type.LITERAL) {
                 throw new IllegalArgumentException("Third argument of firstWithTime Function should be literal."
                     + " The function can be used as firstWithTime(dataColumn, timeColumn, 'dataType')");
               }
@@ -194,7 +194,7 @@ public class AggregationFunctionFactory {
             if (arguments.size() == 3) {
               ExpressionContext timeCol = arguments.get(1);
               ExpressionContext dataType = arguments.get(2);
-              if (dataType.getType() != ExpressionContext.Type.LITERAL_CONTEXT) {
+              if (dataType.getType() != ExpressionContext.Type.LITERAL) {
                 throw new IllegalArgumentException("Third argument of lastWithTime Function should be literal."
                     + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
               }

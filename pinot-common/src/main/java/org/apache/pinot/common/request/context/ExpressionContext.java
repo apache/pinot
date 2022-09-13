@@ -34,21 +34,21 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public class ExpressionContext {
   public enum Type {
-    IDENTIFIER, FUNCTION, LITERAL_CONTEXT
+    LITERAL, IDENTIFIER, FUNCTION,
   }
 
   private final Type _type;
   private final String _value;
   private final FunctionContext _function;
-  // Only set when the _type is LITERAL_CONTEXT
+  // Only set when the _type is LITERAL
   @Nullable
   private final LiteralContext _literal;
 
   public static ExpressionContext forLiteralContext(Literal literal){
-    return new ExpressionContext(Type.LITERAL_CONTEXT, null, null, new LiteralContext(literal));
+    return new ExpressionContext(Type.LITERAL, null, null, new LiteralContext(literal));
   }
   public static ExpressionContext forLiteralContext(FieldSpec.DataType type, Object val){
-    return new ExpressionContext(Type.LITERAL_CONTEXT, null, null, new LiteralContext(type, val));
+    return new ExpressionContext(Type.LITERAL, null, null, new LiteralContext(type, val));
   }
 
   public static ExpressionContext forIdentifier(String identifier) {
@@ -66,7 +66,7 @@ public class ExpressionContext {
     _literal = literal;
   }
 
-  // TODO: Deprecate the usage of literal string.
+  @Deprecated
   public String getLiteralString() {
     if (_literal == null || _literal.getValue() == null) {
       return "";
@@ -122,7 +122,7 @@ public class ExpressionContext {
     if (_type == Type.FUNCTION) {
       return hash + _function.hashCode();
     }
-    if (_type == Type.LITERAL_CONTEXT) {
+    if (_type == Type.LITERAL) {
       return hash + _literal.hashCode();
     }
     return hash + 31 * _value.hashCode();
@@ -131,7 +131,7 @@ public class ExpressionContext {
   @Override
   public String toString() {
     switch (_type) {
-      case LITERAL_CONTEXT:
+      case LITERAL:
         return _literal.toString();
       case IDENTIFIER:
         return _value;

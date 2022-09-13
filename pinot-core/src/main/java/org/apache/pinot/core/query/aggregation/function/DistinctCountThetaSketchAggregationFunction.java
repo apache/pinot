@@ -99,7 +99,7 @@ public class DistinctCountThetaSketchAggregationFunction
     int numArguments = arguments.size();
     if (numArguments > 1) {
       ExpressionContext paramsExpression = arguments.get(1);
-      Preconditions.checkArgument(paramsExpression.getType() == ExpressionContext.Type.LITERAL_CONTEXT,
+      Preconditions.checkArgument(paramsExpression.getType() == ExpressionContext.Type.LITERAL,
           "Second argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (parameters)");
       Parameters parameters = new Parameters(paramsExpression.getLiteralString());
       int nominalEntries = parameters.getNominalEntries();
@@ -127,7 +127,7 @@ public class DistinctCountThetaSketchAggregationFunction
       _filterEvaluators = new ArrayList<>(numArguments - 3);
       for (int i = 2; i < numArguments - 1; i++) {
         ExpressionContext filterExpression = arguments.get(i);
-        Preconditions.checkArgument(filterExpression.getType() == ExpressionContext.Type.LITERAL_CONTEXT,
+        Preconditions.checkArgument(filterExpression.getType() == ExpressionContext.Type.LITERAL,
             "Third to second last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal "
                 + "(filter expression)");
         FilterContext filter =
@@ -140,7 +140,7 @@ public class DistinctCountThetaSketchAggregationFunction
 
       // Process the post-aggregation expression
       ExpressionContext postAggregationExpression = arguments.get(numArguments - 1);
-      Preconditions.checkArgument(postAggregationExpression.getType() == ExpressionContext.Type.LITERAL_CONTEXT,
+      Preconditions.checkArgument(postAggregationExpression.getType() == ExpressionContext.Type.LITERAL,
           "Last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (post-aggregation "
               + "expression)");
       Expression expr = CalciteSqlParser.compileToExpression(postAggregationExpression.getLiteralString());
@@ -1052,7 +1052,7 @@ public class DistinctCountThetaSketchAggregationFunction
    * Returns whether the post-aggregation expression contains the default sketch ($0).
    */
   private static boolean validatePostAggregationExpression(ExpressionContext expression, int numFilters) {
-    Preconditions.checkArgument(expression.getType() != ExpressionContext.Type.LITERAL_CONTEXT,
+    Preconditions.checkArgument(expression.getType() != ExpressionContext.Type.LITERAL,
         "Post-aggregation expression should not contain literal expression: %s", expression.toString());
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
       int sketchId = extractSketchId(expression.getIdentifier());
