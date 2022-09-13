@@ -54,5 +54,13 @@ public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   public abstract ConsumerState getConsumerState();
 
+  /**
+   * @return Timestamp at which the last record was indexed
+   */
   public abstract long getLastConsumedTimestamp();
+
+  /**
+   * @return Map of the partition to its lag information.
+   */
+  public abstract Map<String, ? extends ConsumerLagInfo> getPartitionLagInfo();
 }
