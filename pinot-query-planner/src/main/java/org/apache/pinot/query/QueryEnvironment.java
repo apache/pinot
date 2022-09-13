@@ -92,7 +92,12 @@ public class QueryEnvironment {
 
     _config = Frameworks.newConfigBuilder().traitDefs()
         .operatorTable(new ChainedSqlOperatorTable(Arrays.asList(SqlStdOperatorTable.instance(), _catalogReader)))
-        .defaultSchema(_rootSchema.plus()).build();
+        .defaultSchema(_rootSchema.plus())
+        .sqlToRelConverterConfig(SqlToRelConverter.config()
+            .withHintStrategyTable(getHintStrategyTable())
+            .addRelBuilderConfigTransform(c -> c.withPushJoinCondition(true))
+            .addRelBuilderConfigTransform(c -> c.withAggregateUnique(true)))
+        .build();
 
     // optimizer rules
     _logicalRuleSet = PinotQueryRuleSets.LOGICAL_OPT_RULES;
@@ -191,8 +196,7 @@ public class QueryEnvironment {
     RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
     SqlToRelConverter sqlToRelConverter =
         new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
-            StandardConvertletTable.INSTANCE,
-            SqlToRelConverter.config().withHintStrategyTable(getHintStrategyTable(plannerContext)));
+            StandardConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
     return sqlToRelConverter.convertQuery(parsed, false, true);
   }
 
@@ -218,8 +222,7 @@ public class QueryEnvironment {
   // utils
   // --------------------------------------------------------------------------
 
-  // TODO: add hint strategy table based on plannerContext.
-  private HintStrategyTable getHintStrategyTable(PlannerContext plannerContext) {
+  private HintStrategyTable getHintStrategyTable() {
     return HintStrategyTable.builder().build();
   }
 }
