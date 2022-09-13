@@ -18,16 +18,8 @@
  */
 package org.apache.pinot.query.planner;
 
-import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rex.RexCall;
-import org.apache.calcite.rex.RexInputRef;
-import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.slf4j.Logger;
@@ -42,31 +34,6 @@ public class PlannerUtils {
 
   private PlannerUtils() {
     // do not instantiate.
-  }
-
-  public static List<List<Integer>> getJoinKeyFromConditions(RexCall joinCondition, int leftNodeOffset) {
-    switch (joinCondition.getOperator().getKind()) {
-      case EQUALS:
-        RexNode left = joinCondition.getOperands().get(0);
-        RexNode right = joinCondition.getOperands().get(1);
-        Preconditions.checkState(left instanceof RexInputRef, "only reference supported");
-        Preconditions.checkState(right instanceof RexInputRef, "only reference supported");
-        return Arrays.asList(Collections.singletonList(((RexInputRef) left).getIndex()),
-            Collections.singletonList(((RexInputRef) right).getIndex() - leftNodeOffset));
-      case AND:
-        List<List<Integer>> predicateColumns = new ArrayList<>(2);
-        predicateColumns.add(new ArrayList<>());
-        predicateColumns.add(new ArrayList<>());
-        for (RexNode operand : joinCondition.getOperands()) {
-          Preconditions.checkState(operand instanceof RexCall);
-          List<List<Integer>> subPredicate = getJoinKeyFromConditions((RexCall) operand, leftNodeOffset);
-          predicateColumns.get(0).addAll(subPredicate.get(0));
-          predicateColumns.get(1).addAll(subPredicate.get(1));
-        }
-        return predicateColumns;
-      default:
-        throw new UnsupportedOperationException("Only equality JOIN conditions are supported.");
-    }
   }
 
   public static boolean isRootStage(int stageId) {

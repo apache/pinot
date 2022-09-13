@@ -25,12 +25,11 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
+import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.rel.logical.LogicalJoin;
-import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.tools.RelBuilderFactory;
-import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.hints.PinotRelationalHints;
 
 
@@ -73,13 +72,9 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       leftExchange = LogicalExchange.create(leftInput, RelDistributions.RANDOM_DISTRIBUTED);
       rightExchange = LogicalExchange.create(rightInput, RelDistributions.BROADCAST_DISTRIBUTED);
     } else { // if (hints.contains(PinotRelationalHints.USE_HASH_DISTRIBUTE)) {
-      RexCall joinCondition = (RexCall) join.getCondition();
-      int leftNodeOffset = join.getLeft().getRowType().getFieldNames().size();
-      List<List<Integer>> conditions = PlannerUtils.getJoinKeyFromConditions(joinCondition, leftNodeOffset);
-      leftExchange = LogicalExchange.create(leftInput,
-          RelDistributions.hash(conditions.get(0)));
-      rightExchange = LogicalExchange.create(rightInput,
-          RelDistributions.hash(conditions.get(1)));
+      JoinInfo joinInfo = join.analyzeCondition();
+      leftExchange = LogicalExchange.create(leftInput, RelDistributions.hash(joinInfo.leftKeys));
+      rightExchange = LogicalExchange.create(rightInput, RelDistributions.hash(joinInfo.rightKeys));
     }
 
     RelNode newJoinNode =
