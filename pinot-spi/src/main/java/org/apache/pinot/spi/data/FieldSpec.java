@@ -536,4 +536,19 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     // Sort fieldspecs based on their name
     return _name.compareTo(otherSpec._name);
   }
+
+  /***
+   * Return true if it is backward compatible with the old FieldSpec.
+   * Backward compatibility requires
+   * all other fields except DefaultNullValue and Max Length should be retained.
+   *
+   * @param oldFieldSpec
+   * @return
+   */
+  public boolean isBackwardCompatibleWith(FieldSpec oldFieldSpec) {
+
+    return EqualityUtils.isEqual(_name, oldFieldSpec._name)
+            && EqualityUtils.isEqual(_dataType, oldFieldSpec._dataType)
+            && EqualityUtils.isEqual(_isSingleValueField, oldFieldSpec._isSingleValueField);
+  }
 }

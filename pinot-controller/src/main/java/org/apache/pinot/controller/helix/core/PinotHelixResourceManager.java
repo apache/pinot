@@ -1311,16 +1311,15 @@ public class PinotHelixResourceManager {
       LOGGER.info("New schema: {} is the same as the existing schema, not updating it", schemaName);
       return;
     }
-    if (force) {
-      ZKMetadataProvider.setSchema(_propertyStore, schema);
-      LOGGER.info(
-              "[WARNING] updated schema: {} with force mode = true, it could break the existing schema", schemaName);
-      return;
-    }
-    if (!schema.isBackwardCompatibleWith(oldSchema)) {
-      // TODO: Add the reason of the incompatibility
-      throw new SchemaBackwardIncompatibleException(
-          String.format("New schema: %s is not backward-compatible with the existing schema", schemaName));
+    boolean isBackwardCompatible = schema.isBackwardCompatibleWith(oldSchema);
+    if (!isBackwardCompatible) {
+      if (force) {
+        LOGGER.warn("Force updated schema: {} which is backward incompatible with the existing schema", oldSchema);
+      } else {
+        // TODO: Add the reason of the incompatibility
+        throw new SchemaBackwardIncompatibleException(
+                String.format("New schema: %s is not backward-compatible with the existing schema", schemaName));
+      }
     }
     ZKMetadataProvider.setSchema(_propertyStore, schema);
     LOGGER.info("Updated schema: {}", schemaName);

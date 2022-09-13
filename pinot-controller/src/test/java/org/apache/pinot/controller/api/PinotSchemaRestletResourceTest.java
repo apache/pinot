@@ -119,10 +119,6 @@ public class PinotSchemaRestletResourceTest {
     // Change the column data type from STRING to BOOLEAN
     newColumnFieldSpec.setDataType(DataType.BOOLEAN);
 
-    // Update the schema with addSchema api and override on
-    resp = ControllerTest.sendMultipartPutRequest(addSchemaUrl, schema.toSingleLineJsonString());
-    Assert.assertEquals(resp.getStatusCode(), 400);
-
     // Update the schema with addSchema api and override on, force on
     resp = ControllerTest.sendMultipartPutRequest(addSchemaUrl + "?force=true", schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 200);
