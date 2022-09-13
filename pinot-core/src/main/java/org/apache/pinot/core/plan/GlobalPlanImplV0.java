@@ -53,7 +53,7 @@ public class GlobalPlanImplV0 implements Plan {
     long endTime1 = System.currentTimeMillis();
     LOGGER.debug("InstanceResponsePlanNode.run() took: {}ms", endTime1 - startTime);
     if (endTime1 > _instanceResponsePlanNode._queryContext.getEndTimeMs()) {
-      throw new TimeoutException("Timeout after plan generation");
+      throw new TimeoutException("Query timed out while generating physical execution plan");
     }
     InstanceResponseBlock instanceResponseBlock = instanceResponseOperator.nextBlock();
     long endTime2 = System.currentTimeMillis();
