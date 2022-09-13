@@ -83,16 +83,16 @@ abstract class BaseGapfillProcessor {
 
     List<ExpressionContext> args = _gapFillSelection.getFunction().getArguments();
 
-    _dateTimeFormatter = new DateTimeFormatSpec(args.get(1).getLiteral());
-    _gapfillDateTimeGranularity = new DateTimeGranularitySpec(args.get(4).getLiteral());
-    if (args.get(5).getLiteral() == null) {
+    _dateTimeFormatter = new DateTimeFormatSpec(args.get(1).getLiteralString());
+    _gapfillDateTimeGranularity = new DateTimeGranularitySpec(args.get(4).getLiteralString());
+    if (args.get(5).getLiteralString() == null) {
       _postGapfillDateTimeGranularity = _gapfillDateTimeGranularity;
     } else {
-      _postGapfillDateTimeGranularity = new DateTimeGranularitySpec(args.get(5).getLiteral());
+      _postGapfillDateTimeGranularity = new DateTimeGranularitySpec(args.get(5).getLiteralString());
     }
-    String start = args.get(2).getLiteral();
+    String start = args.get(2).getLiteralString();
     _startMs = truncate(_dateTimeFormatter.fromFormatToMillis(start));
-    String end = args.get(3).getLiteral();
+    String end = args.get(3).getLiteralString();
     _endMs = truncate(_dateTimeFormatter.fromFormatToMillis(end));
     _gapfillTimeBucketSize = _gapfillDateTimeGranularity.granularityToMillis();
     _postGapfillTimeBucketSize = _postGapfillDateTimeGranularity.granularityToMillis();
