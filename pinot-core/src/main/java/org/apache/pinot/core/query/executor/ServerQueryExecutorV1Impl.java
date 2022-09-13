@@ -74,6 +74,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
@@ -604,9 +605,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       Preconditions.checkState(arguments.size() == 2,
           "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
       ExpressionContext subqueryExpression = arguments.get(1);
-      Preconditions.checkState(subqueryExpression.getType() == ExpressionContext.Type.LITERAL,
+      Preconditions.checkState(subqueryExpression.getType() == ExpressionContext.Type.LITERAL_CONTEXT,
           "Second argument of IN_PARTITIONED_SUBQUERY must be a literal (subquery)");
-      QueryContext subquery = QueryContextConverterUtils.getQueryContext(subqueryExpression.getLiteral());
+      QueryContext subquery = QueryContextConverterUtils.getQueryContext(subqueryExpression.getLiteralString());
       // Subquery should be an ID_SET aggregation only query
       //noinspection rawtypes
       AggregationFunction[] aggregationFunctions = subquery.getAggregationFunctions();
@@ -614,7 +615,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
               && aggregationFunctions[0].getType() == AggregationFunctionType.IDSET
               && subquery.getGroupByExpressions() == null,
           "Subquery in IN_PARTITIONED_SUBQUERY should be an ID_SET aggregation only query, found: %s",
-          subqueryExpression.getLiteral());
+          subqueryExpression.toString());
       // Execute the subquery
       subquery.setEndTimeMs(endTimeMs);
       // Make a clone of indexSegments because the method might modify the list
@@ -624,7 +625,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       String serializedIdSet = idSet.toBase64String();
       // Rewrite the expression
       function.setFunctionName(TransformFunctionType.INIDSET.name());
-      arguments.set(1, ExpressionContext.forLiteral(serializedIdSet));
+      arguments.set(1, ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, serializedIdSet));
     } else {
       for (ExpressionContext argument : arguments) {
         handleSubquery(argument, indexSegments, timerContext, executorService, endTimeMs);

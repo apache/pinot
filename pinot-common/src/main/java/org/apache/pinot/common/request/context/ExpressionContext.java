@@ -20,6 +20,9 @@ package org.apache.pinot.common.request.context;
 
 import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -31,37 +34,53 @@ import java.util.Set;
  */
 public class ExpressionContext {
   public enum Type {
-    LITERAL, IDENTIFIER, FUNCTION
+    IDENTIFIER, FUNCTION, LITERAL_CONTEXT
   }
 
   private final Type _type;
   private final String _value;
   private final FunctionContext _function;
+  // Only set when the _type is LITERAL_CONTEXT
+  @Nullable
+  private final LiteralContext _literal;
 
-  public static ExpressionContext forLiteral(String literal) {
-    return new ExpressionContext(Type.LITERAL, literal, null);
+  public static ExpressionContext forLiteralContext(Literal literal){
+    return new ExpressionContext(Type.LITERAL_CONTEXT, null, null, new LiteralContext(literal));
+  }
+  public static ExpressionContext forLiteralContext(FieldSpec.DataType type, Object val){
+    return new ExpressionContext(Type.LITERAL_CONTEXT, null, null, new LiteralContext(type, val));
   }
 
   public static ExpressionContext forIdentifier(String identifier) {
-    return new ExpressionContext(Type.IDENTIFIER, identifier, null);
+    return new ExpressionContext(Type.IDENTIFIER, identifier, null, null);
   }
 
   public static ExpressionContext forFunction(FunctionContext function) {
-    return new ExpressionContext(Type.FUNCTION, null, function);
+    return new ExpressionContext(Type.FUNCTION, null, function, null);
   }
 
-  private ExpressionContext(Type type, String value, FunctionContext function) {
+  private ExpressionContext(Type type, String value, FunctionContext function, LiteralContext literal) {
     _type = type;
     _value = value;
     _function = function;
+    _literal = literal;
+  }
+
+  // TODO: Deprecate the usage of literal string.
+  public String getLiteralString() {
+    if (_literal == null || _literal.getValue() == null) {
+      return "";
+    }
+    return _literal.getValue().toString();
   }
 
   public Type getType() {
     return _type;
   }
 
-  public String getLiteral() {
-    return _value;
+  @Nullable
+  public LiteralContext getLiteralContext(){
+    return _literal;
   }
 
   public String getIdentifier() {
@@ -94,7 +113,7 @@ public class ExpressionContext {
       return false;
     }
     ExpressionContext that = (ExpressionContext) o;
-    return _type == that._type && Objects.equals(_value, that._value) && Objects.equals(_function, that._function);
+    return _type.equals(that._type) && Objects.equals(_value, that._value) && Objects.equals(_function, that._function) && Objects.equals(_literal, that._literal);
   }
 
   @Override
@@ -103,14 +122,17 @@ public class ExpressionContext {
     if (_type == Type.FUNCTION) {
       return hash + _function.hashCode();
     }
+    if (_type == Type.LITERAL_CONTEXT) {
+      return hash + _literal.hashCode();
+    }
     return hash + 31 * _value.hashCode();
   }
 
   @Override
   public String toString() {
     switch (_type) {
-      case LITERAL:
-        return '\'' + _value + '\'';
+      case LITERAL_CONTEXT:
+        return _literal.toString();
       case IDENTIFIER:
         return _value;
       case FUNCTION:

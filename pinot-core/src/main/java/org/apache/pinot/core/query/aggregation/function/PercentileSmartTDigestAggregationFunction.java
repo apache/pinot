@@ -60,14 +60,14 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
   public PercentileSmartTDigestAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
     try {
-      _percentile = Double.parseDouble(arguments.get(1).getLiteral());
+      _percentile = Double.parseDouble(arguments.get(1).getLiteralString());
     } catch (Exception e) {
       throw new IllegalArgumentException(
           "Second argument of PERCENTILE_SMART_TDIGEST aggregation function must be a double literal (percentile)");
     }
     Preconditions.checkArgument(_percentile >= 0 && _percentile <= 100, "Invalid percentile: %s", _percentile);
     if (arguments.size() > 2) {
-      Parameters parameters = new Parameters(arguments.get(2).getLiteral());
+      Parameters parameters = new Parameters(arguments.get(2).getLiteralString());
       _compression = parameters._compression;
       _threshold = parameters._threshold;
     } else {

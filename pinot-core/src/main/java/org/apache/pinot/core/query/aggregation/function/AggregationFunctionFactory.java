@@ -101,7 +101,7 @@ public class AggregationFunctionFactory {
         } else if (numArguments == 2) {
           // Double arguments percentile (e.g. percentile(foo, 99), percentileTDigest(bar, 95), etc.) where the
           // second argument is a decimal number from 0.0 to 100.0.
-          double percentile = parsePercentileToDouble(arguments.get(1).getLiteral());
+          double percentile = parsePercentileToDouble(arguments.get(1).getLiteralString());
           if (remainingFunctionName.isEmpty()) {
             // Percentile
             return new PercentileAggregationFunction(firstArgument, percentile);
@@ -164,12 +164,12 @@ public class AggregationFunctionFactory {
             if (arguments.size() == 3) {
               ExpressionContext timeCol = arguments.get(1);
               ExpressionContext dataType = arguments.get(2);
-              if (dataType.getType() != ExpressionContext.Type.LITERAL) {
+              if (dataType.getType() != ExpressionContext.Type.LITERAL_CONTEXT) {
                 throw new IllegalArgumentException("Third argument of firstWithTime Function should be literal."
                     + " The function can be used as firstWithTime(dataColumn, timeColumn, 'dataType')");
               }
               FieldSpec.DataType fieldDataType
-                  = FieldSpec.DataType.valueOf(dataType.getLiteral().toUpperCase());
+                  = FieldSpec.DataType.valueOf(dataType.getLiteralString().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:
@@ -194,11 +194,11 @@ public class AggregationFunctionFactory {
             if (arguments.size() == 3) {
               ExpressionContext timeCol = arguments.get(1);
               ExpressionContext dataType = arguments.get(2);
-              if (dataType.getType() != ExpressionContext.Type.LITERAL) {
+              if (dataType.getType() != ExpressionContext.Type.LITERAL_CONTEXT) {
                 throw new IllegalArgumentException("Third argument of lastWithTime Function should be literal."
                     + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
               }
-              FieldSpec.DataType fieldDataType = FieldSpec.DataType.valueOf(dataType.getLiteral().toUpperCase());
+              FieldSpec.DataType fieldDataType = FieldSpec.DataType.valueOf(dataType.getLiteralString().toUpperCase());
               switch (fieldDataType) {
                 case BOOLEAN:
                 case INT:

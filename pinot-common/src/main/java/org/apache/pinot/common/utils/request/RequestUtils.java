@@ -21,14 +21,10 @@ package org.apache.pinot.common.utils.request;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
-import java.sql.Types;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
-import org.apache.calcite.sql.type.ExtraSqlTypes;
-import org.apache.calcite.sql.type.SqlTypeFamily;
-import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -120,12 +116,13 @@ public class RequestUtils {
       }
     } else {
       // TODO: Support null literal and other types.
-      switch(node.getTypeName()){
+      switch (node.getTypeName()) {
         case BOOLEAN:
           literal.setBoolValue(node.booleanValue());
           break;
         default:
           literal.setStringValue(StringUtils.replace(node.toValue(), "''", "'"));
+          break;
       }
     }
     expression.setLiteral(literal);
@@ -179,8 +176,8 @@ public class RequestUtils {
     if (object instanceof byte[]) {
       return RequestUtils.getLiteralExpression((byte[]) object);
     }
-    if(object instanceof Boolean){
-      return RequestUtils.getLiteralExpression((Boolean) object);
+    if (object instanceof Boolean) {
+      return RequestUtils.getLiteralExpression(((Boolean) object).booleanValue());
     }
     return RequestUtils.getLiteralExpression(object.toString());
   }

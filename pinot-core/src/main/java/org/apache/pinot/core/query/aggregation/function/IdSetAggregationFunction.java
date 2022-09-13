@@ -76,13 +76,13 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
       _fpp = IdSets.DEFAULT_FPP;
     } else {
       ExpressionContext parametersExpression = arguments.get(1);
-      Preconditions.checkArgument(parametersExpression.getType() == ExpressionContext.Type.LITERAL,
+      Preconditions.checkArgument(parametersExpression.getType() == ExpressionContext.Type.LITERAL_CONTEXT,
           "Second argument of IdSet must be literal (parameters)");
 
       int sizeThresholdInBytes = IdSets.DEFAULT_SIZE_THRESHOLD_IN_BYTES;
       int expectedInsertions = IdSets.DEFAULT_EXPECTED_INSERTIONS;
       double fpp = IdSets.DEFAULT_FPP;
-      String parametersString = parametersExpression.getLiteral();
+      String parametersString = parametersExpression.getLiteralString();
       StringUtils.deleteWhitespace(parametersString);
       String[] keyValuePairs = StringUtils.split(parametersString, PARAMETER_DELIMITER);
       for (String keyValuePair : keyValuePairs) {

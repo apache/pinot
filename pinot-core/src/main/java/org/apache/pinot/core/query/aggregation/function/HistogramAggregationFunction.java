@@ -67,9 +67,9 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
       _upper = _bucketEdges[_bucketEdges.length - 1];
     } else {
       _isEqualLength = true;
-      _lower = Double.parseDouble(arguments.get(1).getLiteral());
-      _upper = Double.parseDouble(arguments.get(2).getLiteral());
-      int numBins = Integer.parseInt(arguments.get(3).getLiteral());
+      _lower = Double.parseDouble(arguments.get(1).getLiteralString());
+      _upper = Double.parseDouble(arguments.get(2).getLiteralString());
+      int numBins = Integer.parseInt(arguments.get(3).getLiteralString());
       Preconditions.checkArgument(_upper > _lower,
           "The right most edge must be greater than left most edge, given %s and %s", _lower, _upper);
       Preconditions.checkArgument(numBins > 0, "The number of bins must be greater than zero, given %s", numBins);
@@ -96,7 +96,7 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
     Preconditions.checkArgument(len > 1, "The number of bin edges must be greater than 1");
     double[] ret = new double[len];
     for (int i = 0; i < len; i++) {
-      ret[i] = Double.parseDouble(arrayStr.get(i).getLiteral());
+      ret[i] = Double.parseDouble(arrayStr.get(i).getLiteralString());
       if (i > 0) {
         Preconditions.checkState(ret[i] > ret[i - 1], "The bin edges must be strictly increasing");
       }

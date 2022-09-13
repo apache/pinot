@@ -123,8 +123,8 @@ public class TableResizer {
    * Helper method to construct a OrderByValueExtractor based on the given expression.
    */
   private OrderByValueExtractor getOrderByValueExtractor(ExpressionContext expression) {
-    if (expression.getType() == ExpressionContext.Type.LITERAL) {
-      return new LiteralExtractor(expression.getLiteral());
+    if (expression.getType() == ExpressionContext.Type.LITERAL_CONTEXT) {
+      return new LiteralExtractor(expression.getLiteralString());
     }
     Integer groupByExpressionIndex = _groupByExpressionIndexMap.get(expression);
     if (groupByExpressionIndex != null) {

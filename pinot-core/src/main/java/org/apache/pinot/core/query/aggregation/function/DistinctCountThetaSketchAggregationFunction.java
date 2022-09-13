@@ -34,6 +34,7 @@ import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Union;
 import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.datasketches.theta.UpdateSketchBuilder;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -98,9 +99,9 @@ public class DistinctCountThetaSketchAggregationFunction
     int numArguments = arguments.size();
     if (numArguments > 1) {
       ExpressionContext paramsExpression = arguments.get(1);
-      Preconditions.checkArgument(paramsExpression.getType() == ExpressionContext.Type.LITERAL,
+      Preconditions.checkArgument(paramsExpression.getType() == ExpressionContext.Type.LITERAL_CONTEXT,
           "Second argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (parameters)");
-      Parameters parameters = new Parameters(paramsExpression.getLiteral());
+      Parameters parameters = new Parameters(paramsExpression.getLiteralString());
       int nominalEntries = parameters.getNominalEntries();
       _updateSketchBuilder.setNominalEntries(nominalEntries);
       _setOperationBuilder.setNominalEntries(nominalEntries);
@@ -126,11 +127,11 @@ public class DistinctCountThetaSketchAggregationFunction
       _filterEvaluators = new ArrayList<>(numArguments - 3);
       for (int i = 2; i < numArguments - 1; i++) {
         ExpressionContext filterExpression = arguments.get(i);
-        Preconditions.checkArgument(filterExpression.getType() == ExpressionContext.Type.LITERAL,
+        Preconditions.checkArgument(filterExpression.getType() == ExpressionContext.Type.LITERAL_CONTEXT,
             "Third to second last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal "
                 + "(filter expression)");
         FilterContext filter =
-            RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterExpression.getLiteral()));
+            RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterExpression.getLiteralString()));
         // NOTE: Collect expressions before constructing the FilterInfo so that expressionIndexMap always include the
         //       expressions in the filter.
         collectExpressions(filter, _inputExpressions, expressionIndexMap);
@@ -139,11 +140,12 @@ public class DistinctCountThetaSketchAggregationFunction
 
       // Process the post-aggregation expression
       ExpressionContext postAggregationExpression = arguments.get(numArguments - 1);
-      Preconditions.checkArgument(postAggregationExpression.getType() == ExpressionContext.Type.LITERAL,
+      Preconditions.checkArgument(postAggregationExpression.getType() == ExpressionContext.Type.LITERAL_CONTEXT,
           "Last argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (post-aggregation "
               + "expression)");
-      _postAggregationExpression = RequestContextUtils.getExpression(
-          CalciteSqlParser.compileToExpression(postAggregationExpression.getLiteral()));
+      Expression expr = CalciteSqlParser.compileToExpression(postAggregationExpression.getLiteralString());
+      _postAggregationExpression = RequestContextUtils.getExpression(expr);
+
 
       // Validate the post-aggregation expression
       _includeDefaultSketch = validatePostAggregationExpression(_postAggregationExpression, _filterEvaluators.size());
@@ -1050,9 +1052,8 @@ public class DistinctCountThetaSketchAggregationFunction
    * Returns whether the post-aggregation expression contains the default sketch ($0).
    */
   private static boolean validatePostAggregationExpression(ExpressionContext expression, int numFilters) {
-    Preconditions.checkArgument(expression.getType() != ExpressionContext.Type.LITERAL,
-        "Post-aggregation expression should not contain literal expression: %s", expression.getLiteral());
-
+    Preconditions.checkArgument(expression.getType() != ExpressionContext.Type.LITERAL_CONTEXT,
+        "Post-aggregation expression should not contain literal expression: %s", expression.toString());
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
       int sketchId = extractSketchId(expression.getIdentifier());
       Preconditions.checkArgument(sketchId <= numFilters, "Sketch id: %s exceeds number of filters: %s", sketchId,

@@ -64,16 +64,12 @@ public class RequestContextUtils {
    * Converts the given Thrift {@link Expression} into an {@link ExpressionContext}.
    */
   public static ExpressionContext getExpression(Expression thriftExpression) {
-    System.out.println("liuyao get expression");
     switch (thriftExpression.getType()) {
       case LITERAL:
-        System.out.println("liuyao: literal type:" + thriftExpression.getLiteral().getFieldValue().getClass());
-        return ExpressionContext.forLiteral(thriftExpression.getLiteral().getFieldValue().toString());
+        return ExpressionContext.forLiteralContext(thriftExpression.getLiteral());
       case IDENTIFIER:
-        System.out.println("liuyao get identifier");
         return ExpressionContext.forIdentifier(thriftExpression.getIdentifier().getName());
       case FUNCTION:
-        System.out.println("liuyao get function");
         return ExpressionContext.forFunction(getFunction(thriftExpression.getFunctionCall()));
       default:
         throw new IllegalStateException();
@@ -252,7 +248,7 @@ public class RequestContextUtils {
       case IDENTIFIER:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new EqPredicate(filterExpression, getStringValue(RequestUtils.getLiteralExpression(true))));
-      case LITERAL:
+      case LITERAL_CONTEXT:
         // TODO: Handle literals
         throw new IllegalStateException();
       default:
@@ -356,10 +352,10 @@ public class RequestContextUtils {
   }
 
   private static String getStringValue(ExpressionContext expressionContext) {
-    if (expressionContext.getType() != ExpressionContext.Type.LITERAL) {
+    if(expressionContext.getType() != ExpressionContext.Type.LITERAL_CONTEXT){
       throw new BadQueryRequestException(
           "Pinot does not support column or function on the right-hand side of the predicate");
     }
-    return expressionContext.getLiteral();
+    return expressionContext.getLiteralString();
   }
 }

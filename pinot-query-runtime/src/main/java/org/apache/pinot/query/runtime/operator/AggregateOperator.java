@@ -206,7 +206,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
             ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
       // COUNT(*) is rewritten to SUM(1)
       case "COUNT":
-        return new SumAggregationFunction(ExpressionContext.forLiteral("1"));
+        return new SumAggregationFunction(ExpressionContext.forLiteralContext(FieldSpec.DataType.INT, 1));
       default:
         throw new IllegalStateException(
             "Unexpected value: " + ((RexExpression.FunctionCall) aggCall).getFunctionName());

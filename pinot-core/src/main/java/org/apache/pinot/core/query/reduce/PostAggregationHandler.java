@@ -106,9 +106,9 @@ public class PostAggregationHandler implements ValueExtractorFactory {
    */
   @Override
   public ValueExtractor getValueExtractor(ExpressionContext expression) {
-    if (expression.getType() == ExpressionContext.Type.LITERAL) {
+    if (expression.getType() == ExpressionContext.Type.LITERAL_CONTEXT) {
       // Literal
-      return new LiteralValueExtractor(expression.getLiteral());
+      return new LiteralValueExtractor(expression.getLiteralString());
     }
     if (_numGroupByExpressions > 0) {
       Integer groupByExpressionIndex = _groupByExpressionIndexMap.get(expression);
