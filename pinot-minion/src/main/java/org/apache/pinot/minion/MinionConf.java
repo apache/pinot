@@ -58,7 +58,8 @@ public class MinionConf extends PinotConfiguration {
   }
 
   public String getInstanceId() {
-    return getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY);
+    String instanceId = getProperty(CommonConstants.Minion.CONFIG_OF_MINION_ID);
+    return instanceId != null ? instanceId : getProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY);
   }
 
   public int getEndReplaceSegmentsTimeoutMs() {

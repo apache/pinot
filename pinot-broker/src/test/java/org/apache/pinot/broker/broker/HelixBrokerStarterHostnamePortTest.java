@@ -30,6 +30,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_BROKER_HOSTNAME;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_BROKER_ID;
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER;
@@ -102,6 +103,33 @@ public class HelixBrokerStarterHostnamePortTest extends ControllerTest {
 
     String instanceId = brokerStarter.getInstanceId();
     assertEquals(instanceId, "Broker_myHost_1234");
+    InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, instanceId);
+    assertEquals(instanceConfig.getInstanceName(), instanceId);
+    assertEquals(instanceConfig.getHostName(), "myHost");
+    assertEquals(instanceConfig.getPort(), "1234");
+
+    brokerStarter.stop();
+  }
+
+  @Test
+  public void testInstanceIdPrecedence()
+      throws Exception {
+    // Ensures that pinot.broker.instance.id has higher precedence compared to instanceId
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    properties.put(CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+    properties.put(CONFIG_OF_BROKER_ID, "Broker_morePrecedence");
+    properties.put(INSTANCE_ID_KEY, "Broker_lessPrecedence");
+    properties.put(CONFIG_OF_BROKER_HOSTNAME, "myHost");
+    properties.put(KEY_OF_BROKER_QUERY_PORT, 1234);
+    properties.put(CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
+
+    HelixBrokerStarter brokerStarter = new HelixBrokerStarter();
+    brokerStarter.init(new PinotConfiguration(properties));
+    brokerStarter.start();
+
+    String instanceId = brokerStarter.getInstanceId();
+    assertEquals(instanceId, "Broker_morePrecedence");
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, instanceId);
     assertEquals(instanceConfig.getInstanceName(), instanceId);
     assertEquals(instanceConfig.getHostName(), "myHost");
