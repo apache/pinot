@@ -183,7 +183,14 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
             + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
 
-        // Distinct value done via GROUP BY with empty expr aggregation list.
+        // Test CAST
+        //   - implicit CAST
+        new Object[]{"SELECT a.col1, a.col2, AVG(a.col3) FROM a GROUP BY a.col1, a.col2", 5},
+        //   - explicit CAST
+        new Object[]{"SELECT a.col1, dateTrunc('DAY', CAST(SUM(a.col3) AS BIGINT)) FROM a GROUP BY a.col1", 5},
+
+        // Test DISTINCT
+        //   - distinct value done via GROUP BY with empty expr aggregation list.
         new Object[]{"SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 "
             + " WHERE b.col3 > 0 GROUP BY a.col2, a.col3", 5},
     };

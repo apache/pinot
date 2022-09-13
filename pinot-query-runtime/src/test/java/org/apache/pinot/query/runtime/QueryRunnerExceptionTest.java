@@ -68,9 +68,10 @@ public class QueryRunnerExceptionTest extends QueryRunnerTestBase {
   @DataProvider(name = "testDataWithSqlExecutionExceptions")
   private Object[][] provideTestSqlWithExecutionException() {
     return new Object[][] {
-        // default planner will auto-cast string column to numeric on JOIN condition, so exception is:
-        // "error while invoking cast function", because the cast cannot be done.
-        new Object[]{"SELECT a.col2 - b.col3 FROM a JOIN b ON a.col1 = b.col1", "transform function: cast"},
+        // Function with incorrect argument signature should throw runtime exception
+        new Object[]{"SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1",
+            "ArithmeticFunctions.least(double,double) with arguments"},
+        // Function that tries to cast String to Number should throw runtime exception
         new Object[]{"SELECT a.col2, b.col1 FROM a JOIN b ON a.col1 = b.col3", "transform function: cast"},
     };
   }
