@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -27,6 +28,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.logical.LogicalExchange;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.StageMetadata;
@@ -41,6 +43,9 @@ import org.apache.pinot.query.planner.stage.ProjectNode;
 import org.apache.pinot.query.planner.stage.StageNode;
 import org.apache.pinot.query.planner.stage.TableScanNode;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 
 
 /**
@@ -54,11 +59,13 @@ public class StagePlanner {
 
   private Map<Integer, StageNode> _queryStageMap;
   private Map<Integer, StageMetadata> _stageMetadataMap;
+  private TableCache _tableCache;
   private int _stageIdCounter;
 
-  public StagePlanner(PlannerContext plannerContext, WorkerManager workerManager) {
+  public StagePlanner(PlannerContext plannerContext, WorkerManager workerManager, TableCache tableCache) {
     _plannerContext = plannerContext;
     _workerManager = workerManager;
+    _tableCache = tableCache;
   }
 
   /**
@@ -165,13 +172,13 @@ public class StagePlanner {
     return false;
   }
 
-  private static void updateStageMetadata(int stageId, StageNode node, Map<Integer, StageMetadata> stageMetadataMap) {
+  private void updateStageMetadata(int stageId, StageNode node, Map<Integer, StageMetadata> stageMetadataMap) {
     updatePartitionKeys(node);
     StageMetadata stageMetadata = stageMetadataMap.computeIfAbsent(stageId, (id) -> new StageMetadata());
     stageMetadata.attach(node);
   }
 
-  private static void updatePartitionKeys(StageNode node) {
+  private void updatePartitionKeys(StageNode node) {
     if (node instanceof ProjectNode) {
       // any input reference directly carry over should still be a partition key.
       Set<Integer> previousPartitionKeys = node.getInputs().get(0).getPartitionKeys();
@@ -223,7 +230,25 @@ public class StagePlanner {
       }
       node.setPartitionKeys(newPartitionKeys);
     } else if (node instanceof TableScanNode) {
-      // TODO: add table partition in table config as partition keys. we dont have that information yet.
+      TableScanNode tableScanNode = (TableScanNode) node;
+      TableConfig tableConfig =
+          _tableCache.getTableConfig(tableScanNode.getTableName());
+      Preconditions.checkNotNull(tableConfig, "table config is null");
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      if (indexingConfig != null && indexingConfig.getSegmentPartitionConfig() != null) {
+        Map<String, ColumnPartitionConfig> columnPartitionMap =
+            indexingConfig.getSegmentPartitionConfig().getColumnPartitionMap();
+        if (columnPartitionMap != null) {
+          Set<String> partitionColumns = columnPartitionMap.keySet();
+          Set<Integer> newPartitionKeys = new HashSet<>();
+          for (int i = 0; i < tableScanNode.getTableScanColumns().size(); i++) {
+            if (partitionColumns.contains(tableScanNode.getTableScanColumns().get(i))) {
+              newPartitionKeys.add(i);
+            }
+          }
+          tableScanNode.setPartitionKeys(newPartitionKeys);
+        }
+      }
     } else if (node instanceof MailboxReceiveNode) {
       // hash distribution key is partition key.
       FieldSelectionKeySelector keySelector = (FieldSelectionKeySelector)

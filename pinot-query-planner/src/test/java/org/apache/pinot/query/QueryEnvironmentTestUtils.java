@@ -88,7 +88,7 @@ public class QueryEnvironmentTestUtils {
     RoutingManager routingManager = QueryEnvironmentTestUtils.getMockRoutingManager(port1, port2);
     return new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(QueryEnvironmentTestUtils.mockTableCache())),
-        new WorkerManager("localhost", reducerPort, routingManager));
+        new WorkerManager("localhost", reducerPort, routingManager), QueryEnvironmentTestUtils.mockTableCache());
   }
 
   public static RoutingManager getMockRoutingManager(int port1, int port2) {

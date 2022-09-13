@@ -37,7 +37,7 @@ public class QueryEnvironmentTestBase {
     RoutingManager routingManager = QueryEnvironmentTestUtils.getMockRoutingManager(1, 2);
     _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(QueryEnvironmentTestUtils.mockTableCache())),
-        new WorkerManager("localhost", 3, routingManager));
+        new WorkerManager("localhost", 3, routingManager), QueryEnvironmentTestUtils.mockTableCache());
   }
 
   @DataProvider(name = "testQueryDataProvider")
