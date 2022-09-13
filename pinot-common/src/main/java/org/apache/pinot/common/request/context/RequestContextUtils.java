@@ -248,7 +248,7 @@ public class RequestContextUtils {
       case IDENTIFIER:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new EqPredicate(filterExpression, getStringValue(RequestUtils.getLiteralExpression(true))));
-      case LITERAL_CONTEXT:
+      case LITERAL:
         // TODO: Handle literals
         throw new IllegalStateException();
       default:
@@ -352,7 +352,7 @@ public class RequestContextUtils {
   }
 
   private static String getStringValue(ExpressionContext expressionContext) {
-    if(expressionContext.getType() != ExpressionContext.Type.LITERAL_CONTEXT){
+    if(expressionContext.getType() != ExpressionContext.Type.LITERAL){
       throw new BadQueryRequestException(
           "Pinot does not support column or function on the right-hand side of the predicate");
     }

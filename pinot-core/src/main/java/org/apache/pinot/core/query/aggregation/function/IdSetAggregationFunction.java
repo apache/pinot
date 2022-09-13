@@ -76,7 +76,7 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
       _fpp = IdSets.DEFAULT_FPP;
     } else {
       ExpressionContext parametersExpression = arguments.get(1);
-      Preconditions.checkArgument(parametersExpression.getType() == ExpressionContext.Type.LITERAL_CONTEXT,
+      Preconditions.checkArgument(parametersExpression.getType() == ExpressionContext.Type.LITERAL,
           "Second argument of IdSet must be literal (parameters)");
 
       int sizeThresholdInBytes = IdSets.DEFAULT_SIZE_THRESHOLD_IN_BYTES;

@@ -612,7 +612,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       Preconditions.checkArgument(arguments.size() == 2,
           "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
       ExpressionContext subqueryExpression = arguments.get(1);
-      Preconditions.checkState(subqueryExpression.getType() == ExpressionContext.Type.LITERAL_CONTEXT,
+      Preconditions.checkState(subqueryExpression.getType() == ExpressionContext.Type.LITERAL,
           "Second argument of IN_PARTITIONED_SUBQUERY must be a literal (subquery)");
       QueryContext subquery = QueryContextConverterUtils.getQueryContext(subqueryExpression.getLiteralString());
       // Subquery should be an ID_SET aggregation only query

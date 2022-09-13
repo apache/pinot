@@ -138,7 +138,7 @@ public class FilterPlanNode implements PlanNode {
     for (ExpressionContext argument : arguments) {
       if (argument.getType() == ExpressionContext.Type.IDENTIFIER) {
         columnName = argument.getIdentifier();
-      } else if (argument.getType() == ExpressionContext.Type.LITERAL_CONTEXT) {
+      } else if (argument.getType() == ExpressionContext.Type.LITERAL) {
         findLiteral = true;
       }
     }
@@ -170,14 +170,14 @@ public class FilterPlanNode implements PlanNode {
     // TODO: handle nested geography/geometry conversion functions
     if (functionName.equals("stwithin")) {
       if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER
-          && arguments.get(1).getType() == ExpressionContext.Type.LITERAL_CONTEXT) {
+          && arguments.get(1).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(0).getIdentifier();
         return _indexSegment.getDataSource(columnName).getH3Index() != null;
       }
       return false;
     } else {
       if (arguments.get(1).getType() == ExpressionContext.Type.IDENTIFIER
-          && arguments.get(0).getType() == ExpressionContext.Type.LITERAL_CONTEXT) {
+          && arguments.get(0).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(1).getIdentifier();
         return _indexSegment.getDataSource(columnName).getH3Index() != null;
       }

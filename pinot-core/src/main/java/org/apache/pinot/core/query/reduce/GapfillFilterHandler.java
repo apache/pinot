@@ -65,7 +65,7 @@ public class GapfillFilterHandler implements ValueExtractorFactory {
   @Override
   public ValueExtractor getValueExtractor(ExpressionContext expression) {
     expression = GapfillUtils.stripGapfill(expression);
-    if (expression.getType() == ExpressionContext.Type.LITERAL_CONTEXT) {
+    if (expression.getType() == ExpressionContext.Type.LITERAL) {
       // Literal
       return new LiteralValueExtractor(expression.getLiteralString());
     }
