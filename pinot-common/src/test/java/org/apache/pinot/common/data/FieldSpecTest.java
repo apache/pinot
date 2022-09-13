@@ -155,6 +155,18 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "null");
 
+    // Multi-value dimension field with default null value.
+    fieldSpec1 = new DimensionFieldSpec();
+    fieldSpec1.setName("mvDimension");
+    fieldSpec1.setDataType(BIG_DECIMAL);
+    fieldSpec1.setSingleValueField(false);
+    fieldSpec1.setDefaultNullValue(BigDecimal.ZERO);
+    fieldSpec2 = new DimensionFieldSpec("mvDimension", BIG_DECIMAL, false, BigDecimal.ZERO);
+    Assert.assertEquals(fieldSpec1, fieldSpec2);
+    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
+    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
+    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), BigDecimal.ZERO);
+
     // Metric field with default null value.
     fieldSpec1 = new MetricFieldSpec();
     fieldSpec1.setName("metric");
@@ -269,12 +281,12 @@ public class FieldSpecTest {
     entries.add(new Object[]{name, dataType, "-1:HOURS:EPOCH", granularity, true, null});
     entries.add(new Object[]{name, dataType, "0.1:HOURS:EPOCH", granularity, true, null});
     entries.add(new Object[]{
-        name, dataType, "1:HOURS:EPOCH", granularity, false,
-        new DateTimeFieldSpec(name, dataType, "1:HOURS:EPOCH", granularity)
+        name, dataType, "1:HOURS:EPOCH", granularity, false, new DateTimeFieldSpec(name, dataType, "1:HOURS:EPOCH",
+        granularity)
     });
     entries.add(new Object[]{
-        name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity, false,
-        new DateTimeFieldSpec(name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity)
+        name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity, false, new DateTimeFieldSpec(name, dataType,
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity)
     });
 
     return entries.toArray(new Object[entries.size()][]);
@@ -304,8 +316,8 @@ public class FieldSpecTest {
 
     // Multi-value dimension field with default null value.
     dimensionFields = new String[]{
-        "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false",
-        "\"defaultNullValue\":\"default\""
+        "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false", "\"defaultNullValue"
+        + "\":\"default\""
     };
     dimensionFieldSpec1 = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
     dimensionFieldSpec2 = new DimensionFieldSpec("dimension", STRING, false, "default");
@@ -343,8 +355,8 @@ public class FieldSpecTest {
 
     // Multi-value dimension field with default null value.
     dimensionFields = new String[]{
-        "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false",
-        "\"defaultNullValue\":\"default\""
+        "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false", "\"defaultNullValue"
+        + "\":\"default\""
     };
     first = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
     second = JsonUtils.stringToObject(first.toJsonObject().toString(), DimensionFieldSpec.class);
@@ -354,8 +366,9 @@ public class FieldSpecTest {
     String[] timeFields = {
         "\"incomingGranularitySpec\":{\"timeUnitSize\":1, \"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\","
             + "\"name\":\"incomingTime\"}",
-        "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\"," + "\"name\":\"outgoingTime\"}",
-        "\"defaultNullValue\":-1", "\"transformFunction\":\"toEpochDays" + "(millis)\""
+        "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\","
+            + "\"name\":\"outgoingTime\"}", "\"defaultNullValue\":-1",
+        "\"transformFunction\":\"toEpochDays" + "(millis)\""
     };
     first = JsonUtils.stringToObject(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
     second = JsonUtils.stringToObject(first.toJsonObject().toString(), TimeFieldSpec.class);

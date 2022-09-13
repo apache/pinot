@@ -50,6 +50,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
   public static final Float DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
   public static final Double DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
+  public static final BigDecimal DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL = BigDecimal.ZERO;
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN = 0;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP = 0L;
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
@@ -228,6 +229,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT;
             case DOUBLE:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE;
+            case BIG_DECIMAL:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL;
             case BOOLEAN:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN;
             case TIMESTAMP:
@@ -343,11 +346,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     FieldSpec that = (FieldSpec) o;
-    return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
-        .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
-        .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
-        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
-        && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider);
+    return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType)
+        && EqualityUtils.isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils.isEqual(
+        getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils.isEqual(_maxLength,
+        that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction) && EqualityUtils.isEqual(
+        _virtualColumnProvider, that._virtualColumnProvider);
   }
 
   @Override
