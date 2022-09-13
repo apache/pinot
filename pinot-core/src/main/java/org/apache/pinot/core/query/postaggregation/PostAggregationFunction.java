@@ -37,7 +37,7 @@ public class PostAggregationFunction {
 
   public PostAggregationFunction(String functionName, ColumnDataType[] argumentTypes) {
     int numArguments = argumentTypes.length;
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, argumentTypes);
     if (functionInfo == null) {
       if (FunctionRegistry.containsFunction(functionName)) {
         throw new IllegalArgumentException(

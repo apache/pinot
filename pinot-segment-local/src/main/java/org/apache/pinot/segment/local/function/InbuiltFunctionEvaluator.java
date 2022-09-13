@@ -78,7 +78,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
             Preconditions.checkState(numArguments == 1, "NOT function expects 1 argument, got: %s", numArguments);
             return new NotExecutionNode(childNodes[0]);
           default:
-            FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+            FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(function);
             if (functionInfo == null) {
               if (FunctionRegistry.containsFunction(functionName)) {
                 throw new IllegalStateException(

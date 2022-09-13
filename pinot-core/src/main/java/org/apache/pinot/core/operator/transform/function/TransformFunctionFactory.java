@@ -289,7 +289,7 @@ public class TransformFunctionFactory {
           }
         } else {
           // Scalar function
-          FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+          FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(function);
           if (functionInfo == null) {
             if (FunctionRegistry.containsFunction(functionName)) {
               throw new BadQueryRequestException(

@@ -127,6 +127,19 @@ public class FunctionUtils {
     put(Object.class, ColumnDataType.OBJECT);
   }};
 
+  private static final Map<ColumnDataType, DataType> DATA_TYPE_COLUMN_MAP = new HashMap<ColumnDataType, DataType>() {{
+    put(ColumnDataType.INT, DataType.INT);
+    put(ColumnDataType.LONG, DataType.LONG);
+    put(ColumnDataType.FLOAT, DataType.FLOAT);
+    put(ColumnDataType.DOUBLE, DataType.DOUBLE);
+    put(ColumnDataType.BIG_DECIMAL, DataType.BIG_DECIMAL);
+    put(ColumnDataType.BOOLEAN, DataType.BOOLEAN);
+    put(ColumnDataType.TIMESTAMP, DataType.TIMESTAMP);
+    put(ColumnDataType.STRING, DataType.STRING);
+    put(ColumnDataType.BYTES, DataType.BYTES);
+    // TODO: figure out the rest of type mapping.
+  }};
+
   /**
    * Returns the corresponding PinotDataType for the given parameter class, or {@code null} if there is no one matching.
    */
@@ -157,5 +170,13 @@ public class FunctionUtils {
   @Nullable
   public static ColumnDataType getColumnDataType(Class<?> clazz) {
     return COLUMN_DATA_TYPE_MAP.get(clazz);
+  }
+
+  /**
+   * Returns the corresponding DataType for the ColumnDataType, or {@code null} if there is no one matching.
+   */
+  @Nullable
+  public static DataType getDataType(ColumnDataType columnType) {
+    return DATA_TYPE_COLUMN_MAP.get(columnType);
   }
 }

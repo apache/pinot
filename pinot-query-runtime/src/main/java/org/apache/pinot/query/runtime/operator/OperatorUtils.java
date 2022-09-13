@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class OperatorUtils {
@@ -63,5 +67,13 @@ public class OperatorUtils {
   public static String canonicalizeFunctionName(String functionName) {
     functionName = OPERATOR_TOKEN_MAPPING.getOrDefault(functionName, functionName);
     return functionName;
+  }
+
+  public static List<FieldSpec.DataType> getParamTypes(List<RexExpression> operandExpressions) {
+    List<FieldSpec.DataType> args = new ArrayList<>();
+    for (RexExpression exp : operandExpressions) {
+      args.add(exp.getDataType());
+    }
+    return args;
   }
 }

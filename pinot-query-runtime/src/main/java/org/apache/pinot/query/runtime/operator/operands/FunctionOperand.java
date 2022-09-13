@@ -44,7 +44,7 @@ public class FunctionOperand extends TransformOperand {
     }
     FunctionInfo functionInfo =
         FunctionRegistry.getFunctionInfo(OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName()),
-            operandExpressions.size());
+            OperatorUtils.getParamTypes(operandExpressions));
     Preconditions.checkNotNull(functionInfo, "Cannot find function with Name: " + functionCall.getFunctionName());
     _functionInvoker = new FunctionInvoker(functionInfo);
     _resultName = computeColumnName(functionCall.getFunctionName(), _childOperandList);

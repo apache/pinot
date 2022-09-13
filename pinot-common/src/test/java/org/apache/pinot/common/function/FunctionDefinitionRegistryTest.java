@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.common.function;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class FunctionDefinitionRegistryTest {
@@ -64,12 +64,46 @@ public class FunctionDefinitionRegistryTest {
     return null;
   }
 
+  @ScalarFunction(names = {"testFunc2"})
+  public static String testScalarFunction2(long randomArg1, Long randomArg2) {
+    return null;
+  }
+
+  // Test that function matches with parameter counts
   @Test
-  public void testScalarFunctionNames() {
-    assertNotNull(FunctionRegistry.getFunctionInfo("testFunc1", 2));
-    assertNotNull(FunctionRegistry.getFunctionInfo("testFunc2", 2));
-    assertNull(FunctionRegistry.getFunctionInfo("testScalarFunction", 2));
-    assertNull(FunctionRegistry.getFunctionInfo("testFunc1", 1));
-    assertNull(FunctionRegistry.getFunctionInfo("testFunc2", 1));
+  public void testScalarFunctionNamesMatch() {
+    List<FieldSpec.DataType> funcArgs1 = new ArrayList<>();
+    funcArgs1.add(FieldSpec.DataType.LONG);
+    funcArgs1.add(FieldSpec.DataType.INT);
+    assertNotNull(FunctionRegistry.getFunctionInfo("testFunc1", funcArgs1));
+    assertNotNull(FunctionRegistry.getFunctionInfo("testFunc2", funcArgs1));
+    assertNull(FunctionRegistry.getFunctionInfo("testScalarFunction", funcArgs1));
+    List<FieldSpec.DataType> funcArgs2 = new ArrayList<>();
+    funcArgs2.add(FieldSpec.DataType.LONG);
+    assertNull(FunctionRegistry.getFunctionInfo("testFunc1", funcArgs2));
+    assertNull(FunctionRegistry.getFunctionInfo("testFunc2", funcArgs2));
+  }
+
+  // Test that function register can do type matching
+  @Test
+  public void testScalarFunctionTypeMatch() {
+    List<FieldSpec.DataType> funcArgs3 = new ArrayList<>();
+    funcArgs3.add(FieldSpec.DataType.LONG);
+    funcArgs3.add(FieldSpec.DataType.LONG);
+    FunctionInfo func2LongLong = FunctionRegistry.getFunctionInfo("testFunc2", funcArgs3);
+    assertNotNull(func2LongLong);
+    Class[] paramTypes = func2LongLong.getMethod().getParameterTypes();
+    assertEquals(paramTypes.length, 2);
+    assertEquals(paramTypes[0].getTypeName(), "long");
+    assertEquals(paramTypes[1].getTypeName(), "java.lang.Long");
+    List<FieldSpec.DataType> funcArgs1 = new ArrayList<>();
+    funcArgs1.add(FieldSpec.DataType.LONG);
+    funcArgs1.add(FieldSpec.DataType.STRING);
+    FunctionInfo func2LongString = FunctionRegistry.getFunctionInfo("testFunc2", funcArgs1);
+    assertNotNull(func2LongString);
+    Class[] paramTypes2 = func2LongString.getMethod().getParameterTypes();
+    assertEquals(paramTypes2.length, 2);
+    assertEquals(paramTypes2[0].getTypeName(), "long");
+    assertEquals(paramTypes2[1].getTypeName(), "java.lang.String");
   }
 }
