@@ -202,8 +202,7 @@ public abstract class BaseQueriesTest {
       instanceResponse =
           queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan) : plan.execute();
     } catch (TimeoutException e) {
-      e.printStackTrace();
-      return null;
+      throw new RuntimeException(e);
     }
 
     // Broker side
@@ -276,16 +275,14 @@ public abstract class BaseQueriesTest {
       instanceResponse1 =
           queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan1) : plan1.execute();
     } catch (TimeoutException e) {
-      e.printStackTrace();
-      return null;
+      throw new RuntimeException(e);
     }
     DataTable instanceResponse2;
     try {
       instanceResponse2 =
           queryContext.isExplain() ? ServerQueryExecutorV1Impl.processExplainPlanQueries(plan2) : plan2.execute();
     } catch (TimeoutException e) {
-      e.printStackTrace();
-      return null;
+      throw new RuntimeException(e);
     }
 
     // Broker side
