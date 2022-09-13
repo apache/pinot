@@ -67,8 +67,14 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
   private static final String BIG_DECIMAL_SV_COLUMN2 = "BigDecimalSV2";
   private static final String LONG_SV_COLUMN1 = "LongSV1";
   private static final String LONG_SV_COLUMN2 = "LongSV2";
+  private static final String DOUBLE_SV_COLUMN1 = "DoubleSV1";
+  private static final String DOUBLE_SV_COLUMN2 = "DoubleSV2";
 
+  private static final String FLOAT_SV_COLUMN1 = "FloatSV1";
+  private static final String FLOAT_SV_COLUMN2 = "FLoatSV2";
   private final int[] _intSVValues = new int[NUM_ROWS];
+  private final double[] _doubleValues = new double[NUM_ROWS];
+  private final float[] _floatValues = new float[NUM_ROWS];
   private final String[] _stringSVValues = new String[NUM_ROWS];
   private Map<String, DataSource> _enableNullDataSourceMap;
   private Map<String, DataSource> _disableNullDataSourceMap;
@@ -80,6 +86,9 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
   private static final int NULL_MOD2 = 5;
   // Difference between two same type numeric columns.
   private static final int INT_VALUE_SHIFT = 2;
+  private static final double DOUBLE_VALUE_SHIFT = 0.1;
+  private static final float FLOAT_VALUE_SHIFT = 0.1f;
+
   // Suffix for second string column.
   private static final String SUFFIX = "column2";
 
@@ -129,6 +138,8 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
     FileUtils.deleteQuietly(new File(getIndexDirPath(ENABLE_NULL_SEGMENT_NAME)));
     for (int i = 0; i < NUM_ROWS; i++) {
       _intSVValues[i] = RANDOM.nextInt();
+      _doubleValues[i] = RANDOM.nextDouble();
+      _floatValues[i] = RANDOM.nextFloat();
       _stringSVValues[i] = "a" + RANDOM.nextInt();
     }
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
@@ -136,6 +147,10 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
       Map<String, Object> map = new HashMap<>();
       map.put(INT_SV_COLUMN1, _intSVValues[i]);
       map.put(INT_SV_COLUMN2, _intSVValues[i] + INT_VALUE_SHIFT);
+      map.put(DOUBLE_SV_COLUMN1, _doubleValues[i]);
+      map.put(DOUBLE_SV_COLUMN2, _doubleValues[i] + DOUBLE_VALUE_SHIFT);
+      map.put(FLOAT_SV_COLUMN1, _floatValues[i]);
+      map.put(FLOAT_SV_COLUMN2, _floatValues[i] + FLOAT_VALUE_SHIFT);
       map.put(STRING_SV_COLUMN1, _stringSVValues[i]);
       map.put(STRING_SV_COLUMN2, _stringSVValues[i] + SUFFIX);
       map.put(BIG_DECIMAL_SV_COLUMN1, BigDecimal.valueOf(_intSVValues[i]));
@@ -148,12 +163,16 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
         map.put(STRING_SV_COLUMN1, null);
         map.put(BIG_DECIMAL_SV_COLUMN1, null);
         map.put(LONG_SV_COLUMN1, null);
+        map.put(DOUBLE_SV_COLUMN1, null);
+        map.put(FLOAT_SV_COLUMN1, null);
       }
       if (isColumn2Null(i)) {
         map.put(INT_SV_COLUMN2, null);
         map.put(STRING_SV_COLUMN2, null);
         map.put(LONG_SV_COLUMN2, null);
         map.put(BIG_DECIMAL_SV_COLUMN2, null);
+        map.put(DOUBLE_SV_COLUMN2, null);
+        map.put(FLOAT_SV_COLUMN2, null);
       }
       GenericRow row = new GenericRow();
       row.init(map);
@@ -165,6 +184,10 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
         .addSingleValueDimension(STRING_SV_COLUMN2, FieldSpec.DataType.STRING)
         .addSingleValueDimension(LONG_SV_COLUMN1, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LONG_SV_COLUMN2, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(DOUBLE_SV_COLUMN1, FieldSpec.DataType.DOUBLE)
+        .addSingleValueDimension(DOUBLE_SV_COLUMN2, FieldSpec.DataType.DOUBLE)
+        .addSingleValueDimension(FLOAT_SV_COLUMN1, FieldSpec.DataType.FLOAT)
+        .addSingleValueDimension(FLOAT_SV_COLUMN2, FieldSpec.DataType.FLOAT)
         .addMetric(BIG_DECIMAL_SV_COLUMN1, FieldSpec.DataType.BIG_DECIMAL)
         .addMetric(BIG_DECIMAL_SV_COLUMN2, FieldSpec.DataType.BIG_DECIMAL).build();
     _enableNullDataSourceMap = getDataSourceMap(schema, rows, ENABLE_NULL_SEGMENT_NAME);
@@ -198,6 +221,26 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
       throws Exception {
     long[] actualValues =
         TransformFunctionFactory.get(expression, dataSourceMap).transformToLongValuesSV(projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(actualValues[i], expectedValues[i]);
+    }
+  }
+
+  private static void testDoubleTransformFunction(ExpressionContext expression, double[] expectedValues,
+      ProjectionBlock projectionBlock, Map<String, DataSource> dataSourceMap)
+      throws Exception {
+    double[] actualValues =
+        TransformFunctionFactory.get(expression, dataSourceMap).transformToDoubleValuesSV(projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(actualValues[i], expectedValues[i]);
+    }
+  }
+
+  private static void testFloatTransformFunction(ExpressionContext expression, float[] expectedValues,
+      ProjectionBlock projectionBlock, Map<String, DataSource> dataSourceMap)
+      throws Exception {
+    float[] actualValues =
+        TransformFunctionFactory.get(expression, dataSourceMap).transformToFloatValuesSV(projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(actualValues[i], expectedValues[i]);
     }
@@ -309,6 +352,54 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testLongTransformFunction(coalesceExpr, expectedResults, _enableNullProjectionBlock, _enableNullDataSourceMap);
     testLongTransformFunction(coalesceExpr, expectedResults, _disableNullProjectionBlock, _disableNullDataSourceMap);
+  }
+
+  // Test the Coalesce on two double columns where one or the other or both can be null.
+  @Test
+  public void testCoalesceDoubleColumns()
+      throws Exception {
+    ExpressionContext coalesceExpr =
+        RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", DOUBLE_SV_COLUMN1, DOUBLE_SV_COLUMN2));
+    TransformFunction coalesceTransformFunction = TransformFunctionFactory.get(coalesceExpr, _enableNullDataSourceMap);
+    Assert.assertEquals(coalesceTransformFunction.getName(), "coalesce");
+    double[] expectedResults = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isColumn1Null(i) && isColumn2Null(i)) {
+        expectedResults[i] = (double) NullValueUtils.getDefaultNullValue(FieldSpec.DataType.DOUBLE);
+      } else if (isColumn1Null(i)) {
+        expectedResults[i] = _doubleValues[i] + DOUBLE_VALUE_SHIFT;
+      } else if (isColumn2Null(i)) {
+        expectedResults[i] = _doubleValues[i];
+      } else {
+        expectedResults[i] = _doubleValues[i];
+      }
+    }
+    testDoubleTransformFunction(coalesceExpr, expectedResults, _enableNullProjectionBlock, _enableNullDataSourceMap);
+    testDoubleTransformFunction(coalesceExpr, expectedResults, _disableNullProjectionBlock, _disableNullDataSourceMap);
+  }
+
+  // Test the Coalesce on two float columns where one or the other or both can be null.
+  @Test
+  public void testCoalesceFloatColumns()
+      throws Exception {
+    ExpressionContext coalesceExpr =
+        RequestContextUtils.getExpression(String.format("COALESCE(%s,%s)", FLOAT_SV_COLUMN1, FLOAT_SV_COLUMN2));
+    TransformFunction coalesceTransformFunction = TransformFunctionFactory.get(coalesceExpr, _enableNullDataSourceMap);
+    Assert.assertEquals(coalesceTransformFunction.getName(), "coalesce");
+    float[] expectedResults = new float[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isColumn1Null(i) && isColumn2Null(i)) {
+        expectedResults[i] = (float) NullValueUtils.getDefaultNullValue(FieldSpec.DataType.FLOAT);
+      } else if (isColumn1Null(i)) {
+        expectedResults[i] = _floatValues[i] + FLOAT_VALUE_SHIFT;
+      } else if (isColumn2Null(i)) {
+        expectedResults[i] = _floatValues[i];
+      } else {
+        expectedResults[i] = _floatValues[i];
+      }
+    }
+    testFloatTransformFunction(coalesceExpr, expectedResults, _enableNullProjectionBlock, _enableNullDataSourceMap);
+    testFloatTransformFunction(coalesceExpr, expectedResults, _disableNullProjectionBlock, _disableNullDataSourceMap);
   }
 
   // Test that non-column-names appear in one of the argument.

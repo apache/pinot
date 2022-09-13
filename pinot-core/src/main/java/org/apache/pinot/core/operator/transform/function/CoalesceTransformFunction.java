@@ -135,6 +135,72 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
   }
 
   /**
+   * Get transform double results based on store type.
+   * @param projectionBlock
+   */
+  private double[] getDoublelTransformResults(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    double[] results = new double[length];
+    int width = _transformFunctions.length;
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
+    double[][] data = new double[width][length];
+    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
+    for (int i = 0; i < length; i++) {
+      boolean hasNonNullValue = false;
+      for (int j = 0; j < width; j++) {
+        // Consider value as null only when null option is enabled.
+        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
+          continue;
+        }
+        if (!filledData.contains(j)) {
+          filledData.add(j);
+          data[j] = _transformFunctions[j].transformToDoubleValuesSV(projectionBlock);
+        }
+        hasNonNullValue = true;
+        results[i] = data[j][i];
+        break;
+      }
+      if (!hasNonNullValue) {
+        results[i] = (double) NullValueUtils.getDefaultNullValue(_dataType);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Get transform float results based on store type.
+   * @param projectionBlock
+   */
+  private float[] getFloatTransformResults(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    float[] results = new float[length];
+    int width = _transformFunctions.length;
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
+    float[][] data = new float[width][length];
+    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
+    for (int i = 0; i < length; i++) {
+      boolean hasNonNullValue = false;
+      for (int j = 0; j < width; j++) {
+        // Consider value as null only when null option is enabled.
+        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
+          continue;
+        }
+        if (!filledData.contains(j)) {
+          filledData.add(j);
+          data[j] = _transformFunctions[j].transformToFloatValuesSV(projectionBlock);
+        }
+        hasNonNullValue = true;
+        results[i] = data[j][i];
+        break;
+      }
+      if (!hasNonNullValue) {
+        results[i] = (float) NullValueUtils.getDefaultNullValue(_dataType);
+      }
+    }
+    return results;
+  }
+
+  /**
    * Get transform BigDecimal results based on store type.
    * @param projectionBlock
    */
@@ -166,6 +232,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     }
     return results;
   }
+
 
   /**
    * Get transform String results based on store type.
@@ -215,8 +282,6 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
       Preconditions.checkArgument(func instanceof IdentifierTransformFunction,
           "Only column names are supported in COALESCE.");
       FieldSpec.DataType dataType = func.getResultMetadata().getDataType().getStoredType();
-      Preconditions.checkArgument(dataType.isNumeric() || dataType == FieldSpec.DataType.STRING,
-          "Only numeric value and string are supported in COALESCE.");
       if (_dataType == null) {
         _dataType = dataType;
       } else {
@@ -237,6 +302,10 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         return LONG_SV_NO_DICTIONARY_METADATA;
       case BIG_DECIMAL:
         return BIG_DECIMAL_SV_NO_DICTIONARY_METADATA;
+      case FLOAT:
+        return FLOAT_SV_NO_DICTIONARY_METADATA;
+      case DOUBLE:
+        return DOUBLE_SV_NO_DICTIONARY_METADATA;
       default:
         throw new RuntimeException("Coalesce only supports numerical and string data type");
     }
@@ -272,5 +341,21 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
       return super.transformToBigDecimalValuesSV(projectionBlock);
     }
     return getBigDecimalTransformResults(projectionBlock);
+  }
+
+  @Override
+  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
+    if (_dataType != FieldSpec.DataType.DOUBLE) {
+      return super.transformToDoubleValuesSV(projectionBlock);
+    }
+    return getDoublelTransformResults(projectionBlock);
+  }
+
+  @Override
+  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
+    if (_dataType != FieldSpec.DataType.FLOAT) {
+      return super.transformToFloatValuesSV(projectionBlock);
+    }
+    return getFloatTransformResults(projectionBlock);
   }
 }
