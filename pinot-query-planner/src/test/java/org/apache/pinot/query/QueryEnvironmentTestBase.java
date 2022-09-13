@@ -67,6 +67,7 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT dateTrunc('DAY', a.ts + b.ts) FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2"},
         new Object[]{"SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 "
             + " WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"},
+        new Object[]{"SELECT a.col1, SUM(a.col3) OVER (PARTITION BY a.col2) FROM a"},
     };
   }
 }

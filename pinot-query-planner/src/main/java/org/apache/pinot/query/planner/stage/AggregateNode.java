@@ -38,13 +38,10 @@ public class AggregateNode extends AbstractStageNode {
     super(stageId);
   }
 
-  public AggregateNode(int stageId, DataSchema dataSchema, List<AggregateCall> aggCalls, ImmutableBitSet groupSet) {
+  public AggregateNode(int stageId, DataSchema dataSchema, List<AggregateCall> aggCalls, List<RexExpression> groupSet) {
     super(stageId, dataSchema);
     _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
-    _groupSet = new ArrayList<>(groupSet.cardinality());
-    for (Integer integer : groupSet) {
-      _groupSet.add(new RexExpression.InputRef(integer));
-    }
+    _groupSet = groupSet;
   }
 
   public List<RexExpression> getAggCalls() {

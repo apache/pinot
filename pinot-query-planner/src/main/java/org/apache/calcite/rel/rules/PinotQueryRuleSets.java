@@ -84,6 +84,9 @@ public class PinotQueryRuleSets {
           // projection to SEMI JOIN.
           CoreRules.PROJECT_TO_SEMI_JOIN,
 
+          // convert OVER aggregate to logical WINDOW
+          CoreRules.PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW,
+
           // prune empty results rules
           PruneEmptyRules.AGGREGATE_INSTANCE, PruneEmptyRules.FILTER_INSTANCE, PruneEmptyRules.JOIN_LEFT_INSTANCE,
           PruneEmptyRules.JOIN_RIGHT_INSTANCE, PruneEmptyRules.PROJECT_INSTANCE, PruneEmptyRules.SORT_INSTANCE,
