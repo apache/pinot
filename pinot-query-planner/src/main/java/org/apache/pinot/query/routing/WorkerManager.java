@@ -64,6 +64,9 @@ public class WorkerManager {
       // table scan stage, need to attach server as well as segment info for each physical table type.
       String logicalTableName = scannedTables.get(0);
       Map<String, RoutingTable> routingTableMap = getRoutingTable(logicalTableName);
+      if (routingTableMap.size() == 0) {
+        throw new IllegalArgumentException("Unable to find routing entries for table: " + logicalTableName);
+      }
       // acquire time boundary info if it is a hybrid table.
       if (routingTableMap.size() > 1) {
         TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(TableNameBuilder
@@ -125,11 +128,21 @@ public class WorkerManager {
     String rawTableName = TableNameBuilder.extractRawTableName(logicalTableName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(logicalTableName);
     Map<String, RoutingTable> routingTableMap = new HashMap<>();
+    RoutingTable routingTable;
     if (tableType == null) {
-      routingTableMap.put(TableType.OFFLINE.name(), getRoutingTable(rawTableName, TableType.OFFLINE));
-      routingTableMap.put(TableType.REALTIME.name(), getRoutingTable(rawTableName, TableType.REALTIME));
+      routingTable = getRoutingTable(rawTableName, TableType.OFFLINE);
+      if (routingTable != null) {
+        routingTableMap.put(TableType.OFFLINE.name(), routingTable);
+      }
+      routingTable = getRoutingTable(rawTableName, TableType.REALTIME);
+      if (routingTable != null) {
+        routingTableMap.put(TableType.REALTIME.name(), routingTable);
+      }
     } else {
-      routingTableMap.put(tableType.name(), getRoutingTable(logicalTableName, tableType));
+      routingTable = getRoutingTable(logicalTableName, tableType);
+      if (routingTable != null) {
+        routingTableMap.put(tableType.name(), routingTable);
+      }
     }
     return routingTableMap;
   }

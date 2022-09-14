@@ -75,7 +75,7 @@ public class QueryEnvironmentTestUtils {
 
   public static TableCache mockTableCache() {
     TableCache mock = mock(TableCache.class);
-    when(mock.getTableNameMap()).thenReturn(ImmutableMap.of("a_REALTIME", "a", "b_REALTIME", "b", "c_REALTIME", "c",
+    when(mock.getTableNameMap()).thenReturn(ImmutableMap.of("a_REALTIME", "a", "b_REALTIME", "b", "c_OFFLINE", "c",
         "d_OFFLINE", "d", "d_REALTIME", "d"));
     when(mock.getSchema("a")).thenReturn(SCHEMA_BUILDER.setSchemaName("a").build());
     when(mock.getSchema("b")).thenReturn(SCHEMA_BUILDER.setSchemaName("b").build());
