@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.planner.logical;
 
-import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -61,22 +60,14 @@ public interface RexExpression {
   }
 
   static RexExpression toRexExpression(RexCall rexCall) {
-    List<RexExpression> operands;
     switch (rexCall.getKind()) {
       case CAST:
-        // CAST is being rewritten into "rexCall.CAST<targetType>(inputValue)",
-        //   - e.g. result type has already been converted into the CAST RexCall, so we assert single operand.
-        operands = rexCall.getOperands().stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
-        Preconditions.checkState(operands.size() == 1, "CAST takes exactly 2 arguments");
-        RelDataType castType = rexCall.getType();
-        // add the 2nd argument as the source type info.
-        operands.add(new Literal(FieldSpec.DataType.STRING,
-            toPinotDataType(rexCall.getOperands().get(0).getType()).name()));
-        return new RexExpression.FunctionCall(rexCall.getKind(), toDataType(rexCall.getType()), "CAST", operands);
+        return RexExpressionUtils.handleCast(rexCall);
       case SEARCH:
         return RexExpressionUtils.handleSearch(rexCall);
       default:
-        operands = rexCall.getOperands().stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
+        List<RexExpression> operands =
+            rexCall.getOperands().stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
         return new RexExpression.FunctionCall(rexCall.getKind(), toDataType(rexCall.getType()),
             rexCall.getOperator().getName(), operands);
     }

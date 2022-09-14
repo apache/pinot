@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Range;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
@@ -35,6 +38,20 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class RexExpressionUtils {
 
   private RexExpressionUtils() {
+  }
+
+  static RexExpression handleCast(RexCall rexCall) {
+    // CAST is being rewritten into "rexCall.CAST<targetType>(inputValue)",
+    //   - e.g. result type has already been converted into the CAST RexCall, so we assert single operand.
+    List<RexExpression> operands =
+        rexCall.getOperands().stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
+    Preconditions.checkState(operands.size() == 1, "CAST takes exactly 2 arguments");
+    RelDataType castType = rexCall.getType();
+    // add the 2nd argument as the source type info.
+    operands.add(new RexExpression.Literal(FieldSpec.DataType.STRING,
+        RexExpression.toPinotDataType(rexCall.getOperands().get(0).getType()).name()));
+    return new RexExpression.FunctionCall(rexCall.getKind(), RexExpression.toDataType(rexCall.getType()), "CAST",
+        operands);
   }
 
   // TODO: Add support for range filter expressions (e.g. a > 0 and a < 30)
