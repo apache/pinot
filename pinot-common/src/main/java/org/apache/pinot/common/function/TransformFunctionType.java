@@ -64,6 +64,9 @@ public enum TransformFunctionType {
   IS_NOT_NULL("is_not_null"),
   COALESCE("coalesce"),
 
+  IS_DISTINCT_FROM("is_distinct_from"),
+  IS_NOT_DISTINCT_FROM("is_not_distinct_from"),
+
   AND("and"),
   OR("or"),
   NOT("not"),   // NOT operator doesn't cover the transform for NOT IN and NOT LIKE

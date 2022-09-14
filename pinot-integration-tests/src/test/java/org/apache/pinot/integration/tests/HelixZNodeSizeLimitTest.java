@@ -22,8 +22,6 @@ package org.apache.pinot.integration.tests;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -38,6 +36,7 @@ import org.testng.annotations.Test;
  * large IdealStates
  */
 public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
+
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -47,12 +46,6 @@ public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
     // src/main/java/org/apache/helix/zookeeper/zkclient/ZkClient.java#L105
     // The below line gets executed before ZkClient.WRITE_SIZE_LIMIT is created
     System.setProperty(ZkSystemPropertyKeys.JUTE_MAXBUFFER, "4000000");
-
-    // Set log level to ERROR, as there are too many warning messages printed if warn level is used like below:
-    //   20:07:11.616 WARN [TopStateHandoffReportStage] [HelixController-pipeline-default-HelixZNodeSizeLimitTest
-    //   -(b90d2ed3_DEFAULT)] Event b90d2ed3_DEFAULT : Cannot confirm top state missing start time.
-    //   Use the current system time as the start time.
-    Configurator.setAllLevels("", Level.ERROR);
 
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
@@ -72,9 +65,6 @@ public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
     stopBroker();
     stopController();
     stopZk();
-
-    // Reset log level back to warn.
-    Configurator.setAllLevels("", Level.WARN);
   }
 
   @Test
