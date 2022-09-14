@@ -75,7 +75,6 @@ public class DateTimeFormatSpecTest {
     assertEquals(new DateTimeFormatSpec("SIMPLE_DATE_FORMAT|yyyy-MM-dd|CST"), dateTimeFormatSpec);
 
     assertThrows(IllegalArgumentException.class, () -> new DateTimeFormatSpec("1:DAY"));
-    assertThrows(IllegalArgumentException.class, () -> new DateTimeFormatSpec("EPOCH"));
 
     assertThrows(IllegalArgumentException.class, () -> new DateTimeFormatSpec("one:DAYS:EPOCH"));
     assertThrows(IllegalArgumentException.class, () -> new DateTimeFormatSpec("EPOCH|DAYS|one"));

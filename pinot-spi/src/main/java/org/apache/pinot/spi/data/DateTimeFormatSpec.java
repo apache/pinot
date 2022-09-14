@@ -155,10 +155,9 @@ public class DateTimeFormatSpec {
           } else {
             _size = 1;
           }
-          Preconditions.checkArgument(tokens.length > PIPE_FORMAT_TIME_UNIT_POSITION,
-              "Invalid EPOCH format: %s, must be of format 'EPOCH|<timeUnit>(|<size>)'", format);
           try {
-            _unitSpec = new DateTimeFormatUnitSpec(tokens[PIPE_FORMAT_TIME_UNIT_POSITION]);
+            _unitSpec = tokens.length > PIPE_FORMAT_TIME_UNIT_POSITION ? new DateTimeFormatUnitSpec(
+                tokens[PIPE_FORMAT_TIME_UNIT_POSITION]) : DateTimeFormatUnitSpec.MILLISECONDS;
           } catch (Exception e) {
             throw new IllegalArgumentException(
                 String.format("Invalid time unit: %s in format: %s", tokens[PIPE_FORMAT_TIME_UNIT_POSITION], format));

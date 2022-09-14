@@ -317,6 +317,9 @@ public class DateTimeFormatSpecTest {
             DateTimeZone.UTC});
 
     entries.add(
+        new Object[]{"EPOCH", 1, TimeUnit.MILLISECONDS, DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC});
+
+    entries.add(
         new Object[]{"EPOCH|HOURS|1", 1, TimeUnit.HOURS, DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC});
 
     entries.add(new Object[]{
