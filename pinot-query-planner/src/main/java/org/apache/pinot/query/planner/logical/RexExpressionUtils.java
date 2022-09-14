@@ -33,6 +33,10 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class RexExpressionUtils {
+
+  private RexExpressionUtils() {
+  }
+
   // TODO: Add support for range filter expressions (e.g. a > 0 and a < 30)
   static RexExpression handleSearch(RexCall rexCall) {
     List<RexNode> operands = rexCall.getOperands();
