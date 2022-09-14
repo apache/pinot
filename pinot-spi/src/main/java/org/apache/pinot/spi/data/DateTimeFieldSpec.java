@@ -32,7 +32,7 @@ import org.apache.pinot.spi.utils.TimeUtils;
 public final class DateTimeFieldSpec extends FieldSpec {
   private String _format;
   private String _granularity;
-  private String _sampleValue;
+  private Object _sampleValue;
   private transient DateTimeFormatSpec _formatSpec;
   private transient DateTimeGranularitySpec _granularitySpec;
 
@@ -73,7 +73,7 @@ public final class DateTimeFieldSpec extends FieldSpec {
    *          the granularity will be 1:HOURS
    */
   public DateTimeFieldSpec(String name, DataType dataType, String format, String granularity,
-      @Nullable String sampleValue) {
+      @Nullable Object sampleValue) {
     super(name, dataType, true);
 
     _format = format;
@@ -138,14 +138,6 @@ public final class DateTimeFieldSpec extends FieldSpec {
       _formatSpec = formatSpec;
     }
 
-    if (_sampleValue != null) {
-      long sampleTimestampValue = _formatSpec.fromFormatToMillis(_sampleValue);
-      boolean isValidTimestamp = TimeUtils.isTimestampValid(String.valueOf(sampleTimestampValue));
-      Preconditions.checkState(isValidTimestamp,
-          "Incorrect date time format. "
-              + "Converted sample value {} for date-time field spec is not in valid time-range: {} and {}",
-          sampleTimestampValue, TimeUtils.VALID_MIN_TIME_MILLIS, TimeUtils.VALID_MAX_TIME_MILLIS);
-    }
     return formatSpec;
   }
 
@@ -158,7 +150,7 @@ public final class DateTimeFieldSpec extends FieldSpec {
     _granularity = granularity;
   }
 
-  public String getSampleValue() {
+  public Object getSampleValue() {
     return _sampleValue;
   }
 
