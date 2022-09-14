@@ -22,14 +22,20 @@
 <Configuration>
   <Appenders>
     <Console name="console" target="SYSTEM_OUT">
-      <PatternLayout>
-        <pattern>%d{HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</pattern>
-      </PatternLayout>
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n"/>
     </Console>
   </Appenders>
   <Loggers>
-    <AsyncRoot level="warn" additivity="false">
+    <!--Turn off the logger for KafkaConfluentSchemaRegistryAvroMessageDecoder because we intentionally inject
+     tombstones in KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest which can flood the log
+     -->
+    <Logger name="org.apache.pinot.plugin.inputformat.avro.confluent.KafkaConfluentSchemaRegistryAvroMessageDecoder"
+            level="off" additivity="false"/>
+    <Logger name="org.apache.pinot" level="warn" additivity="false">
       <AppenderRef ref="console"/>
-    </AsyncRoot>
+    </Logger>
+    <Root level="error">
+      <AppenderRef ref="console"/>
+    </Root>
   </Loggers>
 </Configuration>

@@ -30,31 +30,45 @@ import static org.testng.Assert.*;
 
 public class LoggerUtilsTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(LoggerUtilsTest.class);
+  private static final String ROOT = "root";
+  private static final String PINOT = "org.apache.pinot";
 
   @Test
   public void testGetAllLoggers() {
     List<String> allLoggers = LoggerUtils.getAllLoggers();
-    assertEquals(allLoggers.size(), 1);
-    assertEquals(allLoggers.get(0), "root");
+    assertEquals(allLoggers.size(), 2);
+    assertEquals(allLoggers.get(0), ROOT);
+    assertEquals(allLoggers.get(1), PINOT);
   }
 
   @Test
   public void testGetLoggerInfo() {
-    Map<String, String> rootLoggerInfo = LoggerUtils.getLoggerInfo("root");
-    assertEquals(rootLoggerInfo.get("name"), "root");
-    assertEquals(rootLoggerInfo.get("level"), "WARN");
+    Map<String, String> rootLoggerInfo = LoggerUtils.getLoggerInfo(ROOT);
+    assertNotNull(rootLoggerInfo);
+    assertEquals(rootLoggerInfo.get("name"), ROOT);
+    assertEquals(rootLoggerInfo.get("level"), "ERROR");
     assertNull(rootLoggerInfo.get("filter"));
+
+    Map<String, String> pinotLoggerInfo = LoggerUtils.getLoggerInfo(PINOT);
+    assertNotNull(pinotLoggerInfo);
+    assertEquals(pinotLoggerInfo.get("name"), PINOT);
+    assertEquals(pinotLoggerInfo.get("level"), "WARN");
+    assertNull(pinotLoggerInfo.get("filter"));
 
     assertNull(LoggerUtils.getLoggerInfo("notExistLogger"));
   }
 
   @Test
   public void testChangeLoggerLevel() {
-    assertEquals(LoggerUtils.getLoggerInfo("root").get("level"), "WARN");
-    for (String level : ImmutableList.of("WARN", "INFO", "DEBUG", "ERROR", "WARN")) {
-      LoggerUtils.setLoggerLevel("root", level);
+    Map<String, String> pinotLoggerInfo = LoggerUtils.getLoggerInfo(PINOT);
+    assertNotNull(pinotLoggerInfo);
+    assertEquals(pinotLoggerInfo.get("level"), "WARN");
+    for (String level : ImmutableList.of("TRACE", "DEBUG", "INFO", "ERROR", "WARN")) {
+      LoggerUtils.setLoggerLevel(PINOT, level);
       checkLogLevel(level);
-      assertEquals(LoggerUtils.getLoggerInfo("root").get("level"), level);
+      pinotLoggerInfo = LoggerUtils.getLoggerInfo(PINOT);
+      assertNotNull(pinotLoggerInfo);
+      assertEquals(pinotLoggerInfo.get("level"), level);
     }
   }
 
@@ -67,7 +81,7 @@ public class LoggerUtilsTest {
       assertEquals(e.getMessage(), "Logger - notExistLogger not found");
     }
     try {
-      LoggerUtils.setLoggerLevel("root", "NotALevel");
+      LoggerUtils.setLoggerLevel(ROOT, "NotALevel");
       fail("Shouldn't reach here");
     } catch (RuntimeException e) {
       assertEquals(e.getMessage(), "Unrecognized logger level - NotALevel");
