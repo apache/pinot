@@ -41,6 +41,8 @@ public class TaskExecutorFactoryRegistry {
 
   private final Map<String, PinotTaskExecutorFactory> _taskExecutorFactoryRegistry = new HashMap<>();
 
+  private final MinionConf _minionConf;
+
   /**
    * Registers the task executor factories via reflection.
    * NOTE: In order to plugin a class using reflection, the class should include ".plugin.minion.tasks." in its class
@@ -62,9 +64,14 @@ public class TaskExecutorFactoryRegistry {
         }
       }
     }
+    _minionConf = minionConf;
     LOGGER.info("Initialized TaskExecutorFactoryRegistry with {} task executor factories: {} in {}ms",
         _taskExecutorFactoryRegistry.size(), _taskExecutorFactoryRegistry.keySet(),
         System.currentTimeMillis() - startTimeMs);
+  }
+
+  public MinionConf getMinionConf() {
+    return _minionConf;
   }
 
   public static Set<Class<?>> getTaskExecutorFactoryClasses() {

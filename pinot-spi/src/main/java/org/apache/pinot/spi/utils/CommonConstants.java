@@ -583,6 +583,7 @@ public class CommonConstants {
     public static final String MINION_TLS_PREFIX = "pinot.minion.tls";
     public static final String CONFIG_OF_MINION_QUERY_REWRITER_CLASS_NAMES = "pinot.minion.query.rewriter.class.names";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.minion.logger.root.dir";
+    public static final String CONFIG_OF_SEPARATE_TASK_LOGS = "pinot.minion.separate.task.logs";
   }
 
   public static class ControllerJob {
