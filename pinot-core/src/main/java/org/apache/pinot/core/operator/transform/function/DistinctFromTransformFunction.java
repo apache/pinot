@@ -37,9 +37,12 @@ import org.roaringbitmap.RoaringBitmap;
  * This function only supports two arguments which are both column names.
  */
 public class DistinctFromTransformFunction extends BinaryOperatorTransformFunction {
-  // If _distinctType is 1, act as IsDistinctFrom transformation, otherwise act as IsNotDistinctFrom.
-  // This value should only be 0 or 1.
-  private final int _distinctType;
+  // Result value to save when two values are distinct.
+  // 1 for isDistinct, 0 for isNotDistinct
+  private final int _distinctResult;
+  // Result value to save when two values are not distinct.
+  // 0 for isDistinct, 1 for isNotDistinct
+  private final int _notDistinctResult;
 
   /**
    * Returns a bit map of corresponding column.
@@ -59,16 +62,17 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
   }
 
   /**
-   * @param distinctType is set to true for IsDistinctFrom, otherwise it is for IsNotDistinctFrom.
+   * @param distinct is set to true for IsDistinctFrom, otherwise it is for IsNotDistinctFrom.
    */
-  protected DistinctFromTransformFunction(boolean distinctType) {
-    super(distinctType ? TransformFunctionType.NOT_EQUALS : TransformFunctionType.EQUALS);
-    _distinctType = distinctType ? 1 : 0;
+  protected DistinctFromTransformFunction(boolean distinct) {
+    super(distinct ? TransformFunctionType.NOT_EQUALS : TransformFunctionType.EQUALS);
+    _distinctResult = distinct ? 1 : 0;
+    _notDistinctResult = distinct ? 0 : 1;
   }
 
   @Override
   public String getName() {
-    if (_distinctType == 1) {
+    if (_distinctResult == 1) {
       return TransformFunctionType.IS_DISTINCT_FROM.getName();
     }
     return TransformFunctionType.IS_NOT_DISTINCT_FROM.getName();
@@ -100,25 +104,21 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
     // Left side is not null.
     if (isEmpty(leftNull)) {
       // Mark right null rows as distinct.
-      rightNull.forEach((IntConsumer) i -> _results[i] = _distinctType);
+      rightNull.forEach((IntConsumer) i -> _results[i] = _distinctResult);
       return _results;
     }
     // Right side is not null.
     if (isEmpty(rightNull)) {
       // Mark left null rows as distinct.
-      leftNull.forEach((IntConsumer) i -> _results[i] = _distinctType);
+      leftNull.forEach((IntConsumer) i -> _results[i] = _distinctResult);
       return _results;
     }
     RoaringBitmap xorNull = RoaringBitmap.xor(leftNull, rightNull);
     // For rows that with one null and one not null, mark them as distinct
-    xorNull.forEach((IntConsumer) i -> _results[i] = _distinctType);
+    xorNull.forEach((IntConsumer) i -> _results[i] = _distinctResult);
+    RoaringBitmap andNull = RoaringBitmap.and(leftNull, rightNull);
     // For rows that are both null, mark them as not distinct.
-    final int notDistinctVal = _distinctType ^ 1;
-    rightNull.forEach((IntConsumer) i -> {
-      if (!xorNull.contains(i)) {
-        _results[i] = notDistinctVal;
-      }
-    });
+    andNull.forEach((IntConsumer) i -> _results[i] = _notDistinctResult);
     return _results;
   }
 }
