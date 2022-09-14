@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Range;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
 import org.apache.commons.lang3.NotImplementedException;
+import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -62,10 +64,47 @@ public interface RexExpression {
       }
       List<RexExpression> operands = rexCall.getOperands().stream().map(RexExpression::toRexExpression)
           .collect(Collectors.toList());
-      return new RexExpression.FunctionCall(rexCall.getKind(), toDataType(rexCall.getType()),
-          rexCall.getOperator().getName(), operands);
+      return toRexExpression(rexCall, operands);
     } else {
       throw new IllegalArgumentException("Unsupported RexNode type with SqlKind: " + rexNode.getKind());
+    }
+  }
+
+  static RexExpression toRexExpression(RexCall rexCall, List<RexExpression> operands) {
+    switch (rexCall.getKind()) {
+      case CAST:
+        // CAST is being rewritten into "rexCall.CAST<targetType>(inputValue)",
+        //   - e.g. result type has already been converted into the CAST RexCall, so we assert single operand.
+        Preconditions.checkState(operands.size() == 1, "CAST takes exactly 2 arguments");
+        RelDataType castType = rexCall.getType();
+        // add the 2nd argument as the source type info.
+        operands.add(new Literal(FieldSpec.DataType.STRING, rexCall.getOperands().get(0).getType().getSqlTypeName(),
+            toPinotDataType(rexCall.getOperands().get(0).getType()).name()));
+        return new RexExpression.FunctionCall(rexCall.getKind(), toDataType(rexCall.getType()), "CAST", operands);
+      default:
+        return new RexExpression.FunctionCall(rexCall.getKind(), toDataType(rexCall.getType()),
+            rexCall.getOperator().getName(), operands);
+    }
+  }
+
+  static PinotDataType toPinotDataType(RelDataType type) {
+    switch (type.getSqlTypeName()) {
+      case INTEGER:
+        return PinotDataType.INTEGER;
+      case BIGINT:
+        return PinotDataType.LONG;
+      case FLOAT:
+        return PinotDataType.FLOAT;
+      case DOUBLE:
+        return PinotDataType.DOUBLE;
+      case CHAR:
+      case VARCHAR:
+        return PinotDataType.STRING;
+      case BOOLEAN:
+        return PinotDataType.BOOLEAN;
+      default:
+        // TODO: do not assume byte type.
+        return PinotDataType.BYTES;
     }
   }
 

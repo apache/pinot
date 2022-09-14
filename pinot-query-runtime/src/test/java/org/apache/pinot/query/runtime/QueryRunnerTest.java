@@ -72,27 +72,36 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // No match filter
         new Object[]{"SELECT * FROM b WHERE col3 < 0", 0},
 
+        // Hybrid table
+        new Object[]{"SELECT * FROM d", 15},
+
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
         // thus the final JOIN result will be 15 x 1 = 15.
         // Next join with table C which has (5 on server1 and 10 on server2), since data is identical. each of the row
         // of the A JOIN B will have identical value of col3 as table C.col3 has. Since the values are cycling between
         // (1, 42, 1, 42, 1). we will have 9 1s, and 6 42s, total result count will be 9 * 9 + 6 * 6 = 117
         new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col3 = c.col3", 117},
+        // Reverse the order of join condition and join table order.
+        new Object[]{"SELECT * FROM a JOIN b ON b.col1 = a.col1 JOIN c ON c.col3 = a.col3", 117},
 
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
         // thus the final JOIN result will be 15 x 1 = 15.
         new Object[]{"SELECT * FROM a JOIN b on a.col1 = b.col1", 15},
+        new Object[]{"SELECT * FROM a JOIN b USING (col1)", 15},
+
 
         // Query with function in JOIN keys, table A and B are both (1, 42, 1, 42, 1), with table A cycling 3 times.
         // Because:
         //   - MOD(a.col3, 2) will have 6 (42)s equal to 0 and 9 (1)s equals to 1
         //   - MOD(b.col3, 3) will have 2 (42)s equal to 0 and 3 (1)s equals to 1;
-        // final results are 6 * 2 + 9 * 3 = 27 rows
+        // final results are 6 * 2 + 9 * 3 = 39 rows
         new Object[]{"SELECT a.col1, a.col3, b.col3 FROM a JOIN b ON MOD(a.col3, 2) = MOD(b.col3, 3)", 39},
 
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
         // thus the final JOIN result will be 15 x 1 = 15.
         new Object[]{"SELECT * FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2", 15},
+        // Reverse the order of join condition and join table order.
+        new Object[]{"SELECT * FROM a JOIN b on b.col1 = a.col1 AND b.col2 = a.col2", 15},
 
         // Specifically table A has 15 rows (10 on server1 and 5 on server2) and table B has 5 rows (all on server1),
         // but only 1 out of 5 rows from table A will be selected out; and all in table B will be selected.
@@ -142,14 +151,23 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
             + " WHERE a.col3 >= 0 GROUP BY a.col1, a.col2", 5},
 
         // GROUP BY after JOIN
-        // only 3 GROUP BY key exist because b.col2 cycles between "foo", "bar", "alice".
+        //   - optimizable transport for GROUP BY key after JOIN, using SINGLETON exchange
+        //     only 3 GROUP BY key exist because b.col2 cycles between "foo", "bar", "alice".
         new Object[]{"SELECT a.col1, SUM(b.col3), COUNT(*), SUM(2) FROM a JOIN b ON a.col1 = b.col2 "
             + " WHERE a.col3 >= 0 GROUP BY a.col1", 3},
+        //   - non-optimizable transport for GROUP BY key after JOIN, using HASH exchange
+        //     only 2 GROUP BY key exist for b.col3.
+        new Object[]{"SELECT b.col3, SUM(a.col3) FROM a JOIN b"
+            + " on a.col1 = b.col1 AND a.col2 = b.col2 GROUP BY b.col3", 2},
 
         // Sub-query
         new Object[]{"SELECT b.col1, b.col3, i.maxVal FROM b JOIN "
             + "  (SELECT a.col2 AS joinKey, MAX(a.col3) AS maxVal FROM a GROUP BY a.col2) AS i "
             + "  ON b.col1 = i.joinKey", 3},
+
+        // Sub-query with IN clause to SEMI JOIN.
+        new Object[]{"SELECT b.col1, b.col3 FROM b WHERE b.col1 IN "
+            + "(SELECT DISTINCT a.col2 FROM a WHERE a.col2 != 'foo')", 9},
 
         // Aggregate query with HAVING clause, "foo" and "bar" occurred 6/2 times each and "alice" occurred 3/1 times
         // numbers are cycle in (1, 42, 1, 42, 1), and (foo, bar, alice, foo, bar)
@@ -163,6 +181,24 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
         // Order-by
         new Object[]{"SELECT a.col1, a.col3, b.col3 FROM a JOIN b ON a.col1 = b.col1 ORDER BY a.col3, b.col3 DESC", 15},
+
+        // test customized function
+        //   - on leaf stage
+        new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 15},
+        //   - on intermediate stage
+        new Object[]{"SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
+            + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
+
+        // Test CAST
+        //   - implicit CAST
+        new Object[]{"SELECT a.col1, a.col2, AVG(a.col3) FROM a GROUP BY a.col1, a.col2", 5},
+        //   - explicit CAST
+        new Object[]{"SELECT a.col1, dateTrunc('DAY', CAST(SUM(a.col3) AS BIGINT)) FROM a GROUP BY a.col1", 5},
+
+        // Test DISTINCT
+        //   - distinct value done via GROUP BY with empty expr aggregation list.
+        new Object[]{"SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 "
+            + " WHERE b.col3 > 0 GROUP BY a.col2, a.col3", 5},
     };
   }
 }

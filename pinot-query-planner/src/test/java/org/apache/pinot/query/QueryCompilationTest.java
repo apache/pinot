@@ -122,7 +122,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         // table scan stages; for tableA it should have 2 hosts, for tableB it should have only 1
         Assert.assertEquals(
             e.getValue().getServerInstances().stream().map(ServerInstance::toString).collect(Collectors.toList()),
-            tables.get(0).equals("a") ? ImmutableList.of("Server_localhost_1", "Server_localhost_2")
+            tables.get(0).equals("a") ? ImmutableList.of("Server_localhost_2", "Server_localhost_1")
                 : ImmutableList.of("Server_localhost_1"));
       } else if (!PlannerUtils.isRootStage(e.getKey())) {
         // join stage should have both servers used.
@@ -141,7 +141,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   @Test
   public void testQueryProjectFilterPushDownForJoin() {
     String query = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
-        + "WHERE a.col3 >= 0 AND a.col2 IN  ('a', 'b') AND b.col3 < 0";
+        + "WHERE a.col3 >= 0 AND a.col2 IN ('b') AND b.col3 < 0";
     QueryPlan queryPlan = _queryEnvironment.planQuery(query);
     List<StageNode> intermediateStageRoots =
         queryPlan.getStageMetadataMap().entrySet().stream().filter(e -> e.getValue().getScannedTables().size() == 0)
@@ -159,8 +159,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     List<StageMetadata> tableScanMetadataList = queryPlan.getStageMetadataMap().values().stream()
         .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
-    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 1);
-    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().get(0).toString(), "Server_localhost_1");
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 2);
+
     query = "SELECT * FROM d_REALTIME";
     queryPlan = _queryEnvironment.planQuery(query);
     tableScanMetadataList = queryPlan.getStageMetadataMap().values().stream()
@@ -169,15 +169,12 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 1);
     Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().get(0).toString(), "Server_localhost_2");
 
-    // Default routing to OFFLINE table.
-    // TODO: change this test to assert actual time-boundary routing once we support this.
     query = "SELECT * FROM d";
     queryPlan = _queryEnvironment.planQuery(query);
     tableScanMetadataList = queryPlan.getStageMetadataMap().values().stream()
         .filter(stageMetadata -> stageMetadata.getScannedTables().size() != 0).collect(Collectors.toList());
     Assert.assertEquals(tableScanMetadataList.size(), 1);
-    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 1);
-    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().get(0).toString(), "Server_localhost_1");
+    Assert.assertEquals(tableScanMetadataList.get(0).getServerInstances().size(), 2);
   }
 
   // Test that plan query can be run as multi-thread.

@@ -18,12 +18,21 @@
  */
 package org.apache.calcite.rel.rules;
 
+import org.apache.calcite.plan.Contexts;
 import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
+import org.apache.calcite.rel.core.RelFactories;
+import org.apache.calcite.tools.RelBuilder;
+import org.apache.calcite.tools.RelBuilderFactory;
 
 
 public class PinotRuleUtils {
+  private static final RelBuilder.Config DEFAULT_CONFIG =
+      RelBuilder.Config.DEFAULT.withAggregateUnique(true).withPushJoinCondition(true);
+
+  public static final RelBuilderFactory PINOT_REL_FACTORY =
+      RelBuilder.proto(Contexts.of(RelFactories.DEFAULT_STRUCT, DEFAULT_CONFIG));
 
   private PinotRuleUtils() {
     // do not instantiate.

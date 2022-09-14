@@ -16,22 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.routing.timeboundary;
+package org.apache.pinot.segment.spi.creator.name;
 
-public class TimeBoundaryInfo {
-  private final String _timeColumn;
-  private final String _timeValue;
+import java.util.regex.Pattern;
 
-  public TimeBoundaryInfo(String timeColumn, String timeValue) {
-    _timeColumn = timeColumn;
-    _timeValue = timeValue;
+
+/**
+ * Utils for segment names.
+ */
+public class SegmentNameUtils {
+  private static final Pattern INVALID_SEGMENT_NAME_REGEX = Pattern.compile(".*[\\\\/:\\*?\"<>|].*");
+
+  private SegmentNameUtils() {
   }
 
-  public String getTimeColumn() {
-    return _timeColumn;
-  }
-
-  public String getTimeValue() {
-    return _timeValue;
+  /**
+   * A handy util to validate if segment name is valid.
+   *
+   * @param partialOrFullSegmentName provide partial or full segment name
+   */
+  public static void validatePartialOrFullSegmentName(String partialOrFullSegmentName) {
+    if (INVALID_SEGMENT_NAME_REGEX.matcher(partialOrFullSegmentName).matches()) {
+      throw new IllegalArgumentException("Invalid partial or full segment name: " + partialOrFullSegmentName);
+    }
   }
 }

@@ -81,6 +81,9 @@ public class PinotQueryRuleSets {
           // remove unnecessary sort rule
           CoreRules.SORT_REMOVE,
 
+          // projection to SEMI JOIN.
+          CoreRules.PROJECT_TO_SEMI_JOIN,
+
           // prune empty results rules
           PruneEmptyRules.AGGREGATE_INSTANCE, PruneEmptyRules.FILTER_INSTANCE, PruneEmptyRules.JOIN_LEFT_INSTANCE,
           PruneEmptyRules.JOIN_RIGHT_INSTANCE, PruneEmptyRules.PROJECT_INSTANCE, PruneEmptyRules.SORT_INSTANCE,

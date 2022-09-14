@@ -25,7 +25,6 @@ import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
-import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.rel.logical.LogicalSort;
@@ -37,7 +36,7 @@ import org.apache.calcite.tools.RelBuilderFactory;
  */
 public class PinotSortExchangeNodeInsertRule extends RelOptRule {
   public static final PinotSortExchangeNodeInsertRule INSTANCE =
-      new PinotSortExchangeNodeInsertRule(RelFactories.LOGICAL_BUILDER);
+      new PinotSortExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
   public PinotSortExchangeNodeInsertRule(RelBuilderFactory factory) {
     super(operand(LogicalSort.class, any()), factory, null);

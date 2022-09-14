@@ -16,23 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.plan;
+package org.apache.pinot.core.routing;
 
-import java.util.concurrent.TimeoutException;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.spi.annotations.InterfaceAudience;
+public class TimeBoundaryInfo {
+  private final String _timeColumn;
+  private final String _timeValue;
 
+  public TimeBoundaryInfo(String timeColumn, String timeValue) {
+    _timeColumn = timeColumn;
+    _timeValue = timeValue;
+  }
 
-/**
- * Instance level query plan.
- */
-@InterfaceAudience.Private
-public interface Plan {
+  public String getTimeColumn() {
+    return _timeColumn;
+  }
 
-  /** Get plan node */
-  PlanNode getPlanNode();
-
-  /** Execute the query plan and get the instance response. */
-  DataTable execute()
-      throws TimeoutException;
+  public String getTimeValue() {
+    return _timeValue;
+  }
 }

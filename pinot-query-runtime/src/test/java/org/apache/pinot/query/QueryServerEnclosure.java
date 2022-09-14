@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -144,7 +145,8 @@ public class QueryServerEnclosure {
       row.putValue("col1", STRING_FIELD_LIST[i % STRING_FIELD_LIST.length]);
       row.putValue("col2", STRING_FIELD_LIST[i % (STRING_FIELD_LIST.length - 2)]);
       row.putValue("col3", INT_FIELD_LIST[i % INT_FIELD_LIST.length]);
-      row.putValue("ts", System.currentTimeMillis());
+      row.putValue("ts", tableName.endsWith("_O")
+          ? System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2) : System.currentTimeMillis());
       rows.add(row);
     }
 

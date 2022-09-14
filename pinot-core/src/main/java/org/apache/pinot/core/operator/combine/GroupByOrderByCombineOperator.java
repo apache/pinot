@@ -129,9 +129,10 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator<GroupByRe
    * Executes query on one segment in a worker thread and merges the results into the indexed table.
    */
   @Override
-  protected void processSegments(int taskIndex) {
-    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
-      Operator operator = _operators.get(operatorIndex);
+  protected void processSegments() {
+    int operatorId;
+    while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
+      Operator operator = _operators.get(operatorId);
       try {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
