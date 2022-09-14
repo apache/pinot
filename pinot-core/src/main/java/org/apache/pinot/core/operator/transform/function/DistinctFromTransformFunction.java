@@ -64,7 +64,11 @@ public class DistinctFromTransformFunction extends BinaryOperatorTransformFuncti
   /**
    * @param distinct is set to true for IsDistinctFrom, otherwise it is for IsNotDistinctFrom.
    */
-d
+  protected DistinctFromTransformFunction(boolean distinct) {
+    super(distinct ? TransformFunctionType.NOT_EQUALS : TransformFunctionType.EQUALS);
+    _distinctResult = distinct ? 1 : 0;
+    _notDistinctResult = distinct ? 0 : 1;
+  }
 
   @Override
   public String getName() {
