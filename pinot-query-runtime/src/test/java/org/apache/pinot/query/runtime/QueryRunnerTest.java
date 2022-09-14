@@ -115,6 +115,12 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
             + " WHERE a.col1 IN ('foo', 'bar', 'alice') AND b.col2 NOT IN ('foo', 'alice')", 3},
 
+        // Same as above but with single argument IN clauses. Left side of the join returns 3 rows, and the right side
+        // returns 5 rows. Only key where join succeeds is col1=foo, and since table B has only 1 row with that value,
+        // the number of rows should be 3.
+        new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
+            + " WHERE a.col1 IN ('foo') AND b.col2 NOT IN ('')", 3},
+
         // Projection pushdown
         new Object[]{"SELECT a.col1, a.col3 + a.col3 FROM a WHERE a.col3 >= 0 AND a.col2 = 'alice'", 3},
 
