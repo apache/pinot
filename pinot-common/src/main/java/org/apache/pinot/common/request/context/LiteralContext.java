@@ -35,18 +35,17 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class LiteralContext {
   // TODO: Support all of the types for sql.
   private FieldSpec.DataType _type;
-  @Nullable
   private Object _value;
 
   private static FieldSpec.DataType convertThriftTypeToDataType(Literal._Fields fields) {
     switch (fields) {
-      case BOOL_VALUE:
-        return FieldSpec.DataType.BOOLEAN;
       case SHORT_VALUE:
       case INT_VALUE:
         return FieldSpec.DataType.INT;
       case LONG_VALUE:
         return FieldSpec.DataType.LONG;
+      case BOOL_VALUE:
+        return FieldSpec.DataType.BOOLEAN;
       case DOUBLE_VALUE:
         return FieldSpec.DataType.DOUBLE;
       case STRING_VALUE:
@@ -58,18 +57,18 @@ public class LiteralContext {
 
   private static Class<?> convertDataTypeToJavaType(FieldSpec.DataType dataType) {
     switch (dataType) {
-      case FLOAT:
-        return Float.class;
-      case STRING:
-        return String.class;
-      case DOUBLE:
-        return Double.class;
       case INT:
         return Integer.class;
-      case BOOLEAN:
-        return Boolean.class;
       case LONG:
         return Long.class;
+      case BOOLEAN:
+        return Boolean.class;
+      case FLOAT:
+        return Float.class;
+      case DOUBLE:
+        return Double.class;
+      case STRING:
+        return String.class;
       default:
         throw new UnsupportedOperationException("Unsupported dataType:" + dataType);
     }
@@ -113,10 +112,7 @@ public class LiteralContext {
       return false;
     }
     LiteralContext that = (LiteralContext) o;
-    boolean typeEql = _type.equals(that._type);
-    boolean valEql = Objects.equals(_value, that._value);
-
-    return typeEql && valEql;
+    return _type.equals(that._type) && Objects.equals(_value, that._value);
   }
 
   @Override

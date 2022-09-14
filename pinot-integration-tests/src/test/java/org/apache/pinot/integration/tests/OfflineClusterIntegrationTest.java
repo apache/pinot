@@ -2801,7 +2801,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testBooleanLiteralsFunc()
       throws Exception {
     // Test boolean equal true case.
-    String sqlQuery = "SELECT (true = true) = true FROM mytable";
+    String sqlQuery = "SELECT (true = true) = true FROM mytable where true = true";
     JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
     JsonNode rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
