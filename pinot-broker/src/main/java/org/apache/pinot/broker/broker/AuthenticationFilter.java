@@ -89,7 +89,7 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     HttpRequesterIdentity httpRequestIdentity = HttpRequesterIdentity.fromRequest(request);
 
     if (!accessControl.hasAccess(httpRequestIdentity)) {
-      throw new WebApplicationException("Failed access control check for " + httpRequestIdentity.getEndpointUrl(),
+      throw new WebApplicationException("Failed access check for " + httpRequestIdentity.getEndpointUrl(),
           Response.Status.FORBIDDEN);
     }
   }
