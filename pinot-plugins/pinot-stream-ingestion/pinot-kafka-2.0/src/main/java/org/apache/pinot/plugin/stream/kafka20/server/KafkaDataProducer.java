@@ -18,10 +18,16 @@
  */
 package org.apache.pinot.plugin.stream.kafka20.server;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.internals.RecordHeader;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +71,20 @@ public class KafkaDataProducer implements StreamDataProducer {
   @Override
   public void produce(String topic, byte[] key, byte[] payload) {
     _producer.send(new ProducerRecord<>(topic, key, payload));
+    _producer.flush();
+  }
+
+  @Override
+  public void produce(String topic, byte[] key, byte[] payload, GenericRow headers) {
+    List<Header> headerList = new ArrayList<>();
+
+    if (headers != null) {
+      Map<String, Object> fieldToValueMap = headers.getFieldToValueMap();
+      for (Map.Entry<String, Object> entry : fieldToValueMap.entrySet()) {
+        headerList.add(new RecordHeader(entry.getKey(), (byte[]) entry.getValue()));
+      }
+    }
+    _producer.send(new ProducerRecord<>(topic, null, key, payload, headerList));
     _producer.flush();
   }
 

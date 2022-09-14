@@ -548,8 +548,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       RowMetadata msgMetadata = messagesAndOffsets.getMetadataAtIndex(index);
 
       GenericRow decodedRow = _messageDecoder
-          .decode(messagesAndOffsets.getMessageAtIndex(index), messagesAndOffsets.getMessageOffsetAtIndex(index),
+          .decode(messagesAndOffsets.getMessageAtIndex(index),
+              messagesAndOffsets.getMessageOffsetAtIndex(index),
               messagesAndOffsets.getMessageLengthAtIndex(index), reuse);
+      if (msgMetadata != null && msgMetadata.getHeaders() != null) {
+        for (Map.Entry<String, Object> entrySet : msgMetadata.getHeaders().getFieldToValueMap().entrySet()) {
+          decodedRow.putValue("header$" + entrySet.getKey(), entrySet.getValue());
+        }
+      }
       if (decodedRow != null) {
         try {
           _transformPipeline.processRow(decodedRow, reusedResult);

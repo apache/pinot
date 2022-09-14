@@ -19,6 +19,9 @@
 package org.apache.pinot.plugin.stream.kafka20;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.Headers;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
@@ -26,7 +29,25 @@ import org.apache.pinot.spi.stream.StreamMessageMetadata;
 @FunctionalInterface
 public interface RowMetadataExtractor {
   static RowMetadataExtractor build(boolean populateMetadata) {
-    return populateMetadata ? record -> new StreamMessageMetadata(record.timestamp()) : record -> null;
+    return record -> {
+      if (!populateMetadata) {
+        return null;
+      } else {
+        StreamMessageMetadata streamMessageMetadata = new StreamMessageMetadata(record.timestamp());
+        Headers headers = record.headers();
+        if (headers != null) {
+          GenericRow headerGenericRow = new GenericRow();
+          if (headers != null) {
+            Header[] headersArray = headers.toArray();
+            for (Header header : headersArray) {
+              headerGenericRow.putValue(header.key(), header.value());
+            }
+          }
+          streamMessageMetadata.setHeaders(headerGenericRow);
+        }
+        return streamMessageMetadata;
+      }
+    };
   }
 
   RowMetadata extract(ConsumerRecord<?, ?> consumerRecord);

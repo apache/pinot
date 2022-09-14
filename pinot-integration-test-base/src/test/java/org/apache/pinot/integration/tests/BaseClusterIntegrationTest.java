@@ -131,7 +131,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected boolean useLlc() {
-    return false;
+    return true;
   }
 
   protected boolean useKafkaTransaction() {
@@ -336,6 +336,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
               KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST),
           "localhost:" + _kafkaStarters.get(0).getPort());
+      streamConfigMap
+          .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.METADATA_POPULATE),
+              "true");
       if (useKafkaTransaction()) {
         streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
                 KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL),

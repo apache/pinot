@@ -385,6 +385,45 @@ public class StringFunctions {
   }
 
   /**
+   * @param bytes
+   * @param charsetName encoding
+   * @return bytearray to string
+   * returns null on exception
+   */
+  @ScalarFunction
+  public static String fromBytes(byte[] bytes, String charsetName) {
+    try {
+      return new String(bytes, charsetName);
+    } catch (UnsupportedEncodingException e) {
+      return null;
+    }
+  }
+
+  /**
+   * @param input
+   * @param charsetName encoding
+   * @return bytearray to string
+   * returns null on exception
+   */
+  @ScalarFunction
+  public static byte[] toBytes(String input, String charsetName) {
+    try {
+      return input.getBytes(charsetName);
+    } catch (UnsupportedEncodingException e) {
+      return null;
+    }
+  }
+
+  /**
+   * @param bytes
+   * @return bytearray to string
+   */
+  @ScalarFunction
+  public static String fromUtf8(byte[] bytes) {
+    return new String(bytes);
+  }
+
+  /**
    * @see StandardCharsets#UTF_8#encode(String)
    * @param input
    * @return bytes
@@ -556,7 +595,7 @@ public class StringFunctions {
   @ScalarFunction
   public static String encodeUrl(String input)
       throws UnsupportedEncodingException {
-      return URLEncoder.encode(input, StandardCharsets.UTF_8.toString());
+    return URLEncoder.encode(input, StandardCharsets.UTF_8.toString());
   }
 
   /**
