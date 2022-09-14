@@ -50,7 +50,8 @@ import org.roaringbitmap.RoaringBitmap;
  */
 public class CoalesceTransformFunction extends BaseTransformFunction {
   private TransformFunction[] _transformFunctions;
-  private FieldSpec.DataType _dataType;
+  private FieldSpec.DataType _storedType;
+  private TransformResultMetadata _resultMetadata;
 
   /**
    * Returns a bit map of corresponding column.
@@ -95,7 +96,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        results[i] = (int) NullValueUtils.getDefaultNullValue(_dataType);
+        results[i] = (int) NullValueUtils.getDefaultNullValue(_storedType);
       }
     }
     return results;
@@ -128,40 +129,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        results[i] = (long) NullValueUtils.getDefaultNullValue(_dataType);
-      }
-    }
-    return results;
-  }
-
-  /**
-   * Get transform double results based on store type.
-   * @param projectionBlock
-   */
-  private double[] getDoublelTransformResults(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    double[] results = new double[length];
-    int width = _transformFunctions.length;
-    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
-    double[][] data = new double[width][length];
-    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
-    for (int i = 0; i < length; i++) {
-      boolean hasNonNullValue = false;
-      for (int j = 0; j < width; j++) {
-        // Consider value as null only when null option is enabled.
-        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
-          continue;
-        }
-        if (!filledData.contains(j)) {
-          filledData.add(j);
-          data[j] = _transformFunctions[j].transformToDoubleValuesSV(projectionBlock);
-        }
-        hasNonNullValue = true;
-        results[i] = data[j][i];
-        break;
-      }
-      if (!hasNonNullValue) {
-        results[i] = (double) NullValueUtils.getDefaultNullValue(_dataType);
+        results[i] = (long) NullValueUtils.getDefaultNullValue(_storedType);
       }
     }
     return results;
@@ -194,7 +162,40 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        results[i] = (float) NullValueUtils.getDefaultNullValue(_dataType);
+        results[i] = (float) NullValueUtils.getDefaultNullValue(_storedType);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Get transform double results based on store type.
+   * @param projectionBlock
+   */
+  private double[] getDoublelTransformResults(ProjectionBlock projectionBlock) {
+    int length = projectionBlock.getNumDocs();
+    double[] results = new double[length];
+    int width = _transformFunctions.length;
+    RoaringBitmap[] nullBitMaps = getNullBitMaps(projectionBlock, _transformFunctions);
+    double[][] data = new double[width][length];
+    RoaringBitmap filledData = new RoaringBitmap(); // indicates whether certain column has be filled in data.
+    for (int i = 0; i < length; i++) {
+      boolean hasNonNullValue = false;
+      for (int j = 0; j < width; j++) {
+        // Consider value as null only when null option is enabled.
+        if (nullBitMaps[j] != null && nullBitMaps[j].contains(i)) {
+          continue;
+        }
+        if (!filledData.contains(j)) {
+          filledData.add(j);
+          data[j] = _transformFunctions[j].transformToDoubleValuesSV(projectionBlock);
+        }
+        hasNonNullValue = true;
+        results[i] = data[j][i];
+        break;
+      }
+      if (!hasNonNullValue) {
+        results[i] = (double) NullValueUtils.getDefaultNullValue(_storedType);
       }
     }
     return results;
@@ -227,7 +228,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        results[i] = (BigDecimal) NullValueUtils.getDefaultNullValue(_dataType);
+        results[i] = (BigDecimal) NullValueUtils.getDefaultNullValue(_storedType);
       }
     }
     return results;
@@ -261,7 +262,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        results[i] = (String) NullValueUtils.getDefaultNullValue(_dataType);
+        results[i] = (String) NullValueUtils.getDefaultNullValue(_storedType);
       }
     }
     return results;
@@ -281,39 +282,46 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
       TransformFunction func = arguments.get(i);
       Preconditions.checkArgument(func instanceof IdentifierTransformFunction,
           "Only column names are supported in COALESCE.");
-      FieldSpec.DataType dataType = func.getResultMetadata().getDataType().getStoredType();
-      if (_dataType == null) {
-        _dataType = dataType;
+      FieldSpec.DataType storedType = func.getResultMetadata().getDataType().getStoredType();
+      if (_storedType == null) {
+        _storedType = storedType;
       } else {
-        Preconditions.checkArgument(dataType.equals(_dataType), "Argument types have to be the same.");
+        Preconditions.checkArgument(storedType.equals(_storedType), "Argument types have to be the same.");
       }
       _transformFunctions[i] = func;
+    }
+    switch (_storedType) {
+      case INT:
+        _resultMetadata = INT_SV_NO_DICTIONARY_METADATA;
+        break;
+      case LONG:
+        _resultMetadata = LONG_SV_NO_DICTIONARY_METADATA;
+        break;
+      case FLOAT:
+        _resultMetadata = FLOAT_SV_NO_DICTIONARY_METADATA;
+        break;
+      case DOUBLE:
+        _resultMetadata = DOUBLE_SV_NO_DICTIONARY_METADATA;
+        break;
+      case BIG_DECIMAL:
+        _resultMetadata = BIG_DECIMAL_SV_NO_DICTIONARY_METADATA;
+        break;
+      case STRING:
+        _resultMetadata = STRING_SV_NO_DICTIONARY_METADATA;
+        break;
+      default:
+        throw new UnsupportedOperationException("Coalesce only supports numerical and string data type");
     }
   }
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    switch (_dataType) {
-      case STRING:
-        return STRING_SV_NO_DICTIONARY_METADATA;
-      case INT:
-        return INT_SV_NO_DICTIONARY_METADATA;
-      case LONG:
-        return LONG_SV_NO_DICTIONARY_METADATA;
-      case BIG_DECIMAL:
-        return BIG_DECIMAL_SV_NO_DICTIONARY_METADATA;
-      case FLOAT:
-        return FLOAT_SV_NO_DICTIONARY_METADATA;
-      case DOUBLE:
-        return DOUBLE_SV_NO_DICTIONARY_METADATA;
-      default:
-        throw new RuntimeException("Coalesce only supports numerical and string data type");
-    }
+    return _resultMetadata;
   }
 
   @Override
   public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    if (_dataType != FieldSpec.DataType.STRING) {
+    if (_storedType != FieldSpec.DataType.STRING) {
       return super.transformToStringValuesSV(projectionBlock);
     }
     return getStringTransformResults(projectionBlock);
@@ -321,7 +329,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    if (_dataType != FieldSpec.DataType.INT) {
+    if (_storedType != FieldSpec.DataType.INT) {
       return super.transformToIntValuesSV(projectionBlock);
     }
     return getIntTransformResults(projectionBlock);
@@ -329,7 +337,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    if (_dataType != FieldSpec.DataType.LONG) {
+    if (_storedType != FieldSpec.DataType.LONG) {
       return super.transformToLongValuesSV(projectionBlock);
     }
     return getLongTransformResults(projectionBlock);
@@ -337,7 +345,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    if (_dataType != FieldSpec.DataType.BIG_DECIMAL) {
+    if (_storedType != FieldSpec.DataType.BIG_DECIMAL) {
       return super.transformToBigDecimalValuesSV(projectionBlock);
     }
     return getBigDecimalTransformResults(projectionBlock);
@@ -345,7 +353,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    if (_dataType != FieldSpec.DataType.DOUBLE) {
+    if (_storedType != FieldSpec.DataType.DOUBLE) {
       return super.transformToDoubleValuesSV(projectionBlock);
     }
     return getDoublelTransformResults(projectionBlock);
@@ -353,7 +361,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
 
   @Override
   public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    if (_dataType != FieldSpec.DataType.FLOAT) {
+    if (_storedType != FieldSpec.DataType.FLOAT) {
       return super.transformToFloatValuesSV(projectionBlock);
     }
     return getFloatTransformResults(projectionBlock);
