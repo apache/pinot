@@ -38,15 +38,15 @@ public class ExpressionContext {
   }
 
   private final Type _type;
-  private final String _value;
+  private final String _identifier;
   private final FunctionContext _function;
   // Only set when the _type is LITERAL
-  @Nullable
   private final LiteralContext _literal;
 
   public static ExpressionContext forLiteralContext(Literal literal){
     return new ExpressionContext(Type.LITERAL, null, null, new LiteralContext(literal));
   }
+  
   public static ExpressionContext forLiteralContext(FieldSpec.DataType type, Object val){
     return new ExpressionContext(Type.LITERAL, null, null, new LiteralContext(type, val));
   }
@@ -61,7 +61,7 @@ public class ExpressionContext {
 
   private ExpressionContext(Type type, String value, FunctionContext function, LiteralContext literal) {
     _type = type;
-    _value = value;
+    _identifier = value;
     _function = function;
     _literal = literal;
   }
@@ -69,7 +69,7 @@ public class ExpressionContext {
   @Deprecated
   public String getLiteralString() {
     if (_literal == null || _literal.getValue() == null) {
-      return "";
+      return null;
     }
     return _literal.getValue().toString();
   }
@@ -78,13 +78,13 @@ public class ExpressionContext {
     return _type;
   }
 
-  @Nullable
-  public LiteralContext getLiteralContext(){
+  // Please check the _type of this context is Literal before calling get, otherwise it may return null.
+  public LiteralContext getLiteral(){
     return _literal;
   }
 
   public String getIdentifier() {
-    return _value;
+    return _identifier;
   }
 
   public FunctionContext getFunction() {
@@ -96,8 +96,8 @@ public class ExpressionContext {
    */
   public void getColumns(Set<String> columns) {
     if (_type == Type.IDENTIFIER) {
-      if (!_value.equals("*")) {
-        columns.add(_value);
+      if (!_identifier.equals("*")) {
+        columns.add(_identifier);
       }
     } else if (_type == Type.FUNCTION) {
       _function.getColumns(columns);
@@ -113,7 +113,7 @@ public class ExpressionContext {
       return false;
     }
     ExpressionContext that = (ExpressionContext) o;
-    return _type.equals(that._type) && Objects.equals(_value, that._value) && Objects.equals(_function, that._function) && Objects.equals(_literal, that._literal);
+    return _type.equals(that._type) && Objects.equals(_identifier, that._identifier) && Objects.equals(_function, that._function) && Objects.equals(_literal, that._literal);
   }
 
   @Override
@@ -125,7 +125,7 @@ public class ExpressionContext {
     if (_type == Type.LITERAL) {
       return hash + _literal.hashCode();
     }
-    return hash + 31 * _value.hashCode();
+    return hash + 31 * _identifier.hashCode();
   }
 
   @Override
@@ -134,7 +134,7 @@ public class ExpressionContext {
       case LITERAL:
         return _literal.toString();
       case IDENTIFIER:
-        return _value;
+        return _identifier;
       case FUNCTION:
         return _function.toString();
       default:

@@ -319,8 +319,8 @@ public class TransformFunctionFactory {
         String columnName = expression.getIdentifier();
         return new IdentifierTransformFunction(columnName, dataSourceMap.get(columnName));
       case LITERAL:
-        return queryContext == null ? new LiteralTransformFunction(expression.getLiteralContext())
-            : queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, expression.getLiteralContext(),
+        return queryContext == null ? new LiteralTransformFunction(expression.getLiteral())
+            : queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, expression.getLiteral(),
                 LiteralTransformFunction::new);
       default:
         throw new IllegalStateException();
