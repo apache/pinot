@@ -179,11 +179,11 @@ public class ComplexTypeTransformer implements RecordTransformer {
       }
       renamePrefixes(record);
     } catch (Exception e) {
-      if (_continueOnError) {
-        record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
-        LOGGER.debug("Caught exception while transforming complex types for record: {}", record.toString(), e);
-      } else {
+      if (!_continueOnError) {
         throw new RuntimeException("Caught exception while transforming complex types", e);
+      } else {
+        LOGGER.debug("Caught exception while transforming complex types for record: {}", record.toString(), e);
+        record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
       }
     }
     return record;

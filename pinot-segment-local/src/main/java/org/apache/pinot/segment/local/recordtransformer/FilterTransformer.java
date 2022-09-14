@@ -50,22 +50,22 @@ public class FilterTransformer implements RecordTransformer {
   @Override
   public GenericRow transform(GenericRow record) {
     if (_evaluator != null) {
-        try {
-          Object result = _evaluator.evaluate(record);
-          if (Boolean.TRUE.equals(result)) {
-            record.putValue(GenericRow.SKIP_RECORD_KEY, true);
-          }
-        } catch (Exception e) {
-          if (_continueOnError) {
-            record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
-            LOGGER.debug("Caught exception while executing filter function: {} for record: {}", _filterFunction,
-                record.toString(), e);
-          } else {
-            throw new RuntimeException(
-                String.format("Caught exception while executing filter function: %s for record: %s", _filterFunction,
-                    record.toString()), e);
-          }
+      try {
+        Object result = _evaluator.evaluate(record);
+        if (Boolean.TRUE.equals(result)) {
+          record.putValue(GenericRow.SKIP_RECORD_KEY, true);
         }
+      } catch (Exception e) {
+        if (!_continueOnError) {
+          throw new RuntimeException(
+              String.format("Caught exception while executing filter function: %s for record: %s", _filterFunction,
+                  record.toString()), e);
+        } else {
+          LOGGER.debug("Caught exception while executing filter function: {} for record: {}", _filterFunction,
+              record.toString(), e);
+          record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+        }
+      }
     }
     return record;
   }
