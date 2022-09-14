@@ -48,7 +48,7 @@ import org.glassfish.grizzly.http.server.Request;
 @javax.ws.rs.ext.Provider
 public class AuthenticationFilter implements ContainerRequestFilter {
   private static final Set<String> UNPROTECTED_PATHS =
-      new HashSet<>(Arrays.asList("", "help", "health"));
+      new HashSet<>(Arrays.asList("", "help", "health", "help#"));
 
   @Inject
   Provider<Request> _requestProvider;
