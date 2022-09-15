@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
+import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
@@ -145,6 +146,8 @@ public class MutableColumnStatistics implements ColumnStatistics {
 
     // Iterate over all data to figure out whether or not it's in sorted order
     MutableForwardIndex mutableForwardIndex = (MutableForwardIndex) _dataSource.getForwardIndex();
+    Preconditions.checkState(mutableForwardIndex != null,
+        String.format("Forward index should not be null for column: %s", dataSourceMetadata.getFieldSpec().getName()));
     int numDocs = dataSourceMetadata.getNumDocs();
     // Iterate with the sorted order if provided
     if (_sortedDocIdIterationOrder != null) {

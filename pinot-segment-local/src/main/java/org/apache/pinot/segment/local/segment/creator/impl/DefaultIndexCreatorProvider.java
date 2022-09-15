@@ -91,8 +91,9 @@ public final class DefaultIndexCreatorProvider implements IndexCreatorProvider {
       }
     } else {
       // Dictionary enabled columns
-      if (context.forwardIndexDisabled()) {
-        // Forward index disabled columns
+      if (context.forwardIndexDisabled() && !context.isSorted()) {
+        // Forward index disabled columns which aren't sorted
+        // Sorted columns treat this option as a no-op
         return new NoOpForwardIndexCreator(context.getFieldSpec().isSingleValueField());
       } else {
         // Forward index enabled columns

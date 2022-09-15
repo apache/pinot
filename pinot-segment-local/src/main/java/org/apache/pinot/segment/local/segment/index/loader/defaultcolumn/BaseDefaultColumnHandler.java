@@ -225,15 +225,19 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       if (columnMetadata != null) {
         // Column exists in the segment, check if we need to update the value.
 
-        // Check that forward index disabled isn't enabled / disabled on an existing column.
-        // TODO: Add support for reloading segments when forward index disabled flag is enabled or disabled
-        if (columnMetadata.forwardIndexDisabled() != _indexLoadingConfig
-            .getForwardIndexDisabledColumns().contains(column)) {
-          String failureMessage = "Forward index disabled flag: " + columnMetadata.forwardIndexDisabled()
-              + " for column: " + column + " does not match forward index disabled flag: "
-              + _indexLoadingConfig.getForwardIndexDisabledColumns().contains(column)
-              + " in the TableConfig, updating this flag is not supported at the moment.";
-          throw new RuntimeException(failureMessage);
+        if (_segmentWriter != null) {
+          // Check that forward index disabled isn't enabled / disabled on an existing column.
+          // TODO: Add support for reloading segments when forward index disabled flag is enabled or disabled
+          boolean forwardIndexDisabled = !_segmentWriter.hasIndexFor(column, ColumnIndexType.FORWARD_INDEX);
+          if (forwardIndexDisabled != _indexLoadingConfig.getForwardIndexDisabledColumns()
+              .contains(column)) {
+            String failureMessage =
+                "Forward index disabled in segment: " + forwardIndexDisabled + " for column: " + column
+                    + " does not match forward index disabled flag: "
+                    + _indexLoadingConfig.getForwardIndexDisabledColumns().contains(column) + " in the TableConfig, "
+                    + "updating this flag is not supported at the moment.";
+            throw new RuntimeException(failureMessage);
+          }
         }
 
         // Only check for auto-generated column.
@@ -405,7 +409,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * compatibility mismatch. The checks performed are:
    *     - Validate dictionary is enabled.
    *     - Validate inverted index is enabled.
-   *     - Validate that the column is not sorted.
    *     - Validate that either no range index exists for column or the range index version is at least 2 and isn't a
    *       multi-value column (since mulit-value defaults to index v1).
    */
@@ -417,9 +420,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
     Preconditions.checkState(_indexLoadingConfig.getInvertedIndexColumns().contains(column),
           "Inverted index must be enabled for forward index disabled columns");
-      Preconditions.checkState(!_indexLoadingConfig.getSortedColumns().contains(column)
-          && (columnMetadata == null || !columnMetadata.isSorted()),
-          "Sorted columns cannot disable the forward index");
       Preconditions.checkState(!_indexLoadingConfig.getNoDictionaryColumns().contains(column),
           "Dictionary disabled columns cannot disable the forward index");
       Preconditions.checkState(!_indexLoadingConfig.getRangeIndexColumns().contains(column)
@@ -432,15 +432,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * Check and return whether the forward index is disabled for a given column
    */
   protected boolean isForwardIndexDisabled(String column) {
-    ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
-    boolean forwardIndexDisabled;
-    if (columnMetadata != null) {
-      forwardIndexDisabled = columnMetadata.forwardIndexDisabled();
-    } else {
-      forwardIndexDisabled = _indexLoadingConfig.getForwardIndexDisabledColumns() != null
-          && _indexLoadingConfig.getForwardIndexDisabledColumns().contains(column);
-    }
-    return forwardIndexDisabled;
+    return _indexLoadingConfig.getForwardIndexDisabledColumns() != null
+        && _indexLoadingConfig.getForwardIndexDisabledColumns().contains(column);
   }
 
   /**
@@ -539,7 +532,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Add the column metadata information to the metadata properties.
     SegmentColumnarIndexCreator.addColumnMetadataInfo(_segmentProperties, column, columnIndexCreationInfo, totalDocs,
-        fieldSpec, true/*hasDictionary*/, dictionaryElementSize, forwardIndexDisabled);
+        fieldSpec, true/*hasDictionary*/, dictionaryElementSize);
   }
 
   /**
@@ -774,7 +767,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
         // Add the column metadata
         SegmentColumnarIndexCreator.addColumnMetadataInfo(_segmentProperties, column, indexCreationInfo, numDocs,
-            fieldSpec, true, dictionaryCreator.getNumBytesPerEntry(), false);
+            fieldSpec, true, dictionaryCreator.getNumBytesPerEntry());
       }
     } finally {
       for (ValueReader valueReader : valueReaders) {

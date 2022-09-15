@@ -180,7 +180,8 @@ public class TextIndexHandler implements IndexHandler {
     try (TextIndexCreator textIndexCreator = indexCreatorProvider.newTextIndexCreator(
         IndexCreationContext.builder().withColumnMetadata(columnMetadata).withIndexDir(segmentDirectory).build()
             .forTextIndex(_fstType, true))) {
-      if (columnMetadata.forwardIndexDisabled()) {
+      boolean forwardIndexDisabled = !segmentWriter.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
+      if (forwardIndexDisabled) {
         try (Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata)) {
           // Create the text index if the dictionary length is 1 as this is for a default column (i.e. newly added
           // column). For existing columns it is not possible to create the text index without forward index

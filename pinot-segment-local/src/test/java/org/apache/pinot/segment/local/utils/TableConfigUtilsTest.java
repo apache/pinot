@@ -949,9 +949,8 @@ public class TableConfigUtilsTest {
           FieldConfig.IndexType.INVERTED, null, null, null, fieldConfigProperties);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail for conflicting myCol2 with forward index disabled but is sorted");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Forward index disabled column myCol2 cannot be a sorted column");
+      Assert.fail("Should not fail for myCol2 with forward index disabled but is sorted, this is a no-op");
     }
   }
 

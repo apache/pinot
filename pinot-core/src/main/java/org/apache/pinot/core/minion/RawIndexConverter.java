@@ -204,6 +204,11 @@ public class RawIndexConverter {
     // Create the raw index
     DataSource dataSource = _originalImmutableSegment.getDataSource(columnName);
     ForwardIndexReader reader = dataSource.getForwardIndex();
+    if (reader == null) {
+      throw new UnsupportedOperationException(
+          String.format("Forward index disabled for column: %s, raw index conversion operation unsupported!",
+              dataSource.getDataSourceMetadata().getFieldSpec().getName()));
+    }
     Dictionary dictionary = dataSource.getDictionary();
     assert dictionary != null;
     DataType storedType = dictionary.getValueType();

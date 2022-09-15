@@ -35,6 +35,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriver
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -506,11 +507,10 @@ public class LoaderTest {
     forwardIndexDisabledColumns.add(NO_FORWARD_INDEX_COL_NAME);
     indexLoadingConfig.setForwardIndexDisabledColumns(forwardIndexDisabledColumns);
     indexLoadingConfig.setReadMode(ReadMode.mmap);
-    IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
+    ImmutableSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v3
     Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
-    Assert.assertTrue(indexSegment.getSegmentMetadata().getColumnMetadataFor(NO_FORWARD_INDEX_COL_NAME)
-        .forwardIndexDisabled());
+    Assert.assertNull(indexSegment.getForwardIndex(NO_FORWARD_INDEX_COL_NAME));
     Assert.assertTrue(indexSegment.getSegmentMetadata().getColumnMetadataFor(NO_FORWARD_INDEX_COL_NAME)
         .hasDictionary());
     // no change/conversion should have happened in indexDir
@@ -526,8 +526,7 @@ public class LoaderTest {
     indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v3
     Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
-    Assert.assertTrue(indexSegment.getSegmentMetadata().getColumnMetadataFor(NO_FORWARD_INDEX_COL_NAME)
-        .forwardIndexDisabled());
+    Assert.assertNull(indexSegment.getForwardIndex(NO_FORWARD_INDEX_COL_NAME));
     Assert.assertTrue(indexSegment.getSegmentMetadata().getColumnMetadataFor(NO_FORWARD_INDEX_COL_NAME)
         .hasDictionary());
     // no change/conversion should have happened in indexDir
@@ -561,8 +560,7 @@ public class LoaderTest {
     indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v1
     Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
-    Assert.assertTrue(indexSegment.getSegmentMetadata().getColumnMetadataFor(NO_FORWARD_INDEX_COL_NAME)
-        .forwardIndexDisabled());
+    Assert.assertNull(indexSegment.getForwardIndex(NO_FORWARD_INDEX_COL_NAME));
     Assert.assertTrue(indexSegment.getSegmentMetadata().getColumnMetadataFor(NO_FORWARD_INDEX_COL_NAME)
         .hasDictionary());
     // no change/conversion should have happened in indexDir
@@ -577,8 +575,7 @@ public class LoaderTest {
     indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v1
     Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
-    Assert.assertTrue(indexSegment.getSegmentMetadata().getColumnMetadataFor(NO_FORWARD_INDEX_COL_NAME)
-        .forwardIndexDisabled());
+    Assert.assertNull(indexSegment.getForwardIndex(NO_FORWARD_INDEX_COL_NAME));
     Assert.assertTrue(indexSegment.getSegmentMetadata().getColumnMetadataFor(NO_FORWARD_INDEX_COL_NAME)
         .hasDictionary());
     // no change/conversion should have happened in indexDir
@@ -593,8 +590,7 @@ public class LoaderTest {
     indexSegment = ImmutableSegmentLoader.load(_indexDir, indexLoadingConfig);
     // check that loaded segment version is v3
     Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
-    Assert.assertTrue(indexSegment.getSegmentMetadata().getColumnMetadataFor(NO_FORWARD_INDEX_COL_NAME)
-        .forwardIndexDisabled());
+    Assert.assertNull(indexSegment.getForwardIndex(NO_FORWARD_INDEX_COL_NAME));
     Assert.assertTrue(indexSegment.getSegmentMetadata().getColumnMetadataFor(NO_FORWARD_INDEX_COL_NAME)
         .hasDictionary());
     // the index dir should exist in v3 format due to conversion

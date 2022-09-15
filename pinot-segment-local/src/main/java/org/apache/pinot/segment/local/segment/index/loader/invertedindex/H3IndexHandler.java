@@ -160,7 +160,8 @@ public class H3IndexHandler implements IndexHandler {
         GeoSpatialIndexCreator h3IndexCreator = indexCreatorProvider.newGeoSpatialIndexCreator(
             IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata)
                 .build().forGeospatialIndex(_h3Configs.get(columnName)))) {
-      if (columnMetadata.forwardIndexDisabled()) {
+      boolean forwardIndexDisabled = !segmentWriter.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
+      if (forwardIndexDisabled) {
         // Create the h3 index if the dictionary length is 1 as this is for a default column (i.e. newly added
         // column). For existing columns it is not possible to create the h3 index without forward index
         Preconditions.checkState(dictionary.length() == 1, String.format("Creating h3 index for forward index "

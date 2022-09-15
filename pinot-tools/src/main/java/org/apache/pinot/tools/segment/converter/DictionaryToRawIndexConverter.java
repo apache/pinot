@@ -20,6 +20,7 @@ package org.apache.pinot.tools.segment.converter;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
@@ -296,6 +297,10 @@ public class DictionaryToRawIndexConverter {
       throws IOException {
     DataSource dataSource = segment.getDataSource(column);
     ForwardIndexReader reader = dataSource.getForwardIndex();
+    if (reader == null) {
+      throw new UnsupportedEncodingException(String.format("Forward index is disabled for column %s, cannot convert!",
+          column));
+    }
     Dictionary dictionary = dataSource.getDictionary();
 
     if (dictionary == null) {

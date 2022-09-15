@@ -134,7 +134,8 @@ public class InvertedIndexHandler implements IndexHandler {
     try (DictionaryBasedInvertedIndexCreator creator = indexCreatorProvider.newInvertedIndexCreator(
         IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata).build()
             .forInvertedIndex())) {
-      if (columnMetadata.forwardIndexDisabled()) {
+      boolean forwardIndexDisabled = !segmentWriter.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
+      if (forwardIndexDisabled) {
         try (Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata)) {
           // Create the inverted index if the dictionary length is 1 as this is for a default column (i.e. newly added
           // column). For existing columns it is not possible to create the inverted index without forward index

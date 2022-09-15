@@ -160,11 +160,12 @@ public class JsonIndexHandler implements IndexHandler {
         JsonIndexCreator jsonIndexCreator = indexCreatorProvider.newJsonIndexCreator(
             IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata).build()
                 .forJsonIndex(_jsonIndexConfigs.get(columnName)))) {
-      if (columnMetadata.forwardIndexDisabled()) {
+      boolean forwardIndexDisabled = !segmentWriter.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
+      if (forwardIndexDisabled) {
         // Create the json index if the dictionary length is 1 as this is for a default column (i.e. newly added
         // column). For existing columns it is not possible to create the json index without forward index
         Preconditions.checkState(dictionary.length() == 1, String.format("Creating json index for forward index "
-            + "disabled default column: %s, dictionary size must be 1", columnMetadata.getColumnName()));
+            + "disabled default column: %s, dictionary size must be 1", columnName));
         for (int i = 0; i < numDocs; i++) {
           jsonIndexCreator.add(dictionary.getStringValue(0));
         }

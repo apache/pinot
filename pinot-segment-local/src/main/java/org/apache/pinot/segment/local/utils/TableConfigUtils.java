@@ -913,7 +913,6 @@ public final class TableConfigUtils {
    * compatibility mismatch. The checks performed are:
    *     - Validate dictionary is enabled.
    *     - Validate inverted index is enabled.
-   *     - Validate that the column is not sorted.
    *     - Validate that either no range index exists for column or the range index version is at least 2 and isn't a
    *       multi-value column (since mulit-value defaults to index v1).
    */
@@ -936,9 +935,6 @@ public final class TableConfigUtils {
     Preconditions.checkState(indexingConfigs.getInvertedIndexColumns() != null
             && indexingConfigs.getInvertedIndexColumns().contains(columnName),
         String.format("Forward index disabled column %s must have inverted index enabled", columnName));
-    Preconditions.checkState(indexingConfigs.getSortedColumn() == null
-            || !indexingConfigs.getSortedColumn().contains(columnName),
-        String.format("Forward index disabled column %s cannot be a sorted column", columnName));
     Preconditions.checkState(indexingConfigs.getRangeIndexColumns() == null
             || !indexingConfigs.getRangeIndexColumns().contains(columnName)
             || (fieldSpec.isSingleValueField()

@@ -54,6 +54,8 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -184,10 +186,10 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
     columnMetadataMap1.forEach((column, metadata) -> {
       if (column.equals("column6") || column.equals("column7")) {
         assertTrue(metadata.hasDictionary());
-        assertTrue(metadata.forwardIndexDisabled());
         assertFalse(metadata.isSingleValue());
+        assertNull(immutableSegment.getForwardIndex(column));
       } else {
-        assertFalse(metadata.forwardIndexDisabled());
+        assertNotNull(immutableSegment.getForwardIndex(column));
       }
     });
 
@@ -219,14 +221,10 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
   @Test
   public void testSelectStarQueries() {
     // Select * without any filters
-    BrokerResponseNative brokerResponseNative = getBrokerResponse(SELECT_STAR_QUERY);
-    assertTrue(brokerResponseNative.getProcessingExceptions() != null
-        && brokerResponseNative.getProcessingExceptions().size() > 0);
+    assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(SELECT_STAR_QUERY));
 
     // Select * with filters
-    brokerResponseNative = getBrokerResponse(SELECT_STAR_QUERY + FILTER);
-    assertTrue(brokerResponseNative.getProcessingExceptions() != null
-        && brokerResponseNative.getProcessingExceptions().size() > 0);
+    assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(SELECT_STAR_QUERY + FILTER));
   }
 
   @Test
@@ -234,30 +232,22 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
     {
       // Selection query without filters including a column with forwardIndexDisabled enabled on both segments
       String query = "SELECT column1, column5, column6, column9, column10 FROM testTable";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Selection query without filters including a column with forwardIndexDisabled enabled on one segment
       String query = "SELECT column1, column5, column7, column9, column10 FROM testTable";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Selection query with filters including a column with forwardIndexDisabled enabled on both segments
       String query = "SELECT column1, column5, column6, column9, column10 FROM testTable WHERE column6 = 1001";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Selection query with filters including a column with forwardIndexDisabled enabled on one segment
       String query = "SELECT column1, column5, column7, column9, column10 FROM testTable WHERE column7 = 2147483647";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Selection query without filters and without columns with forwardIndexDisabled enabled on either segment
@@ -295,9 +285,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
     {
       // Transform function on a selection clause with a forwardIndexDisabled column in transform
       String query = "SELECT ARRAYLENGTH(column6) from testTable";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Selection query with filters (not including forwardIndexDisabled column) and without columns with
@@ -547,13 +535,9 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testSelectWithDistinctQueries() {
-    {
-      // Select a mix of forwardIndexDisabled and non-forwardIndexDisabled columns with distinct
-      String query = "SELECT DISTINCT column1, column6, column9 FROM testTable LIMIT 10";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
-    }
+    // Select a mix of forwardIndexDisabled and non-forwardIndexDisabled columns with distinct
+    String query = "SELECT DISTINCT column1, column6, column9 FROM testTable LIMIT 10";
+    assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
   }
 
   @Test
@@ -562,17 +546,13 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       // Select a mix of forwardIndexDisabled and non-forwardIndexDisabled columns with group by order by
       String query = "SELECT column1, column6 FROM testTable GROUP BY column1, column6 ORDER BY column1, column6 "
           + " LIMIT 10";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Select forwardIndexDisabled columns with group by order by
       String query = "SELECT column7, column6 FROM testTable GROUP BY column7, column6 ORDER BY column7, column6 "
           + " LIMIT 10";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Select non-forwardIndexDisabled columns with group by order by
@@ -605,17 +585,13 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       // Select forwardIndexDisabled columns using transform with group by order by
       String query = "SELECT ARRAYLENGTH(column6) FROM testTable GROUP BY ARRAYLENGTH(column6) ORDER BY "
           + "ARRAYLENGTH(column6) LIMIT 10";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Test a select with a VALUEIN transform function with group by
       String query = "SELECT VALUEIN(column6, '1001') from testTable WHERE column6 IN (1001) GROUP BY "
           + "VALUEIN(column6, '1001') LIMIT 10";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
   }
 
@@ -657,49 +633,37 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
     {
       // Not allowed aggregation functions on forwardIndexDisabled columns
       String query = "SELECT summv(column7), avgmv(column6) from testTable";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Allowed aggregation functions on forwardIndexDisabled columns with group by on non-forwardIndexDisabled
       // column - this fails due to indexTable being null in `GroupByOrderByCombineOperator`.
       String query = "SELECT column1, maxmv(column6) from testTable GROUP BY column1";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Allowed aggregation functions on forwardIndexDisabled columns with group by order by on
       // non-forwardIndexDisabled column - this fails due to indexTable being null in `GroupByOrderByCombineOperator`.
       String query = "SELECT column1, maxmv(column6) from testTable GROUP BY column1 ORDER BY column1";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Allowed aggregation functions on non-forwardIndexDisabled columns with group by on non-forwardIndexDisabled
       // column but order by on allowed aggregation function on forwardIndexDisabled column
       String query = "SELECT column1, max(column9) from testTable GROUP BY column1 ORDER BY minmv(column6)";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Allowed aggregation functions on forwardIndexDisabled columns with a filter - results in trying to scan which
       // fails
       String query = "SELECT maxmv(column7), minmv(column6) from testTable WHERE column7 = 201";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Allowed aggregation functions on forwardIndexDisabled columns with a filter - results in trying to scan which
       // fails
       String query = "SELECT max(column1), minmv(column6) from testTable WHERE column1 > 15935";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Allowed aggregation functions on non-forwardIndexDisabled columns with a filter on a forwardIndexDisabled
@@ -762,31 +726,23 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       // this fails due to indexTable being null in `GroupByOrderByCombineOperator`.
       String query = "SELECT column1, max(column1), sum(column9) from testTable WHERE column7 = 201 GROUP BY "
           + "column1 ORDER BY minmv(column6)";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Transform inside aggregation involving a forwardIndexDisabled column
       String query = "SELECT MAX(ARRAYLENGTH(column6)) from testTable LIMIT 10";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Transform inside aggregation involving a forwardIndexDisabled column with group by
       String query = "SELECT column1, MAX(ARRAYLENGTH(column6)) from testTable GROUP BY column1 LIMIT 10";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Transform inside aggregation involving a forwardIndexDisabled column with group by order by
       String query = "SELECT column1, MAX(ARRAYLENGTH(column6)) from testTable GROUP BY column1 ORDER BY column1 "
           + "DESC LIMIT 10";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
   }
 }

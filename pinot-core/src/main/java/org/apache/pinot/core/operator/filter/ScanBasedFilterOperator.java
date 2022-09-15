@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.docidsets.SVScanDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 
 
 public class ScanBasedFilterOperator extends BaseFilterOperator {
@@ -48,6 +49,12 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
   @Override
   protected FilterBlock getNextBlock() {
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
+    ForwardIndexReader<?> forwardIndexReader = _dataSource.getForwardIndex();
+    if (forwardIndexReader == null) {
+      throw new UnsupportedOperationException(
+          String.format("Forward index disabled for column: %s, creating ScanDocIdSet unsupported!",
+              _dataSource.getDataSourceMetadata().getFieldSpec().getName()));
+    }
     if (dataSourceMetadata.isSingleValue()) {
       return new FilterBlock(new SVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, _nullHandlingEnabled));
     } else {

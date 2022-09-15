@@ -151,13 +151,15 @@ public class RangeIndexHandler implements IndexHandler {
       RangeIndexCreatorProvider indexCreatorProvider)
       throws IOException {
     int numDocs = columnMetadata.getTotalDocs();
+    String columnName = columnMetadata.getColumnName();
     try (CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata, indexCreatorProvider)) {
-      if (columnMetadata.forwardIndexDisabled()) {
+      boolean forwardIndexDisabled = !segmentWriter.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
+      if (forwardIndexDisabled) {
         try (Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata)) {
           // Create the range index if the dictionary length is 1 as this is for a default column (i.e. newly added
           // column). For existing columns it is not possible to create the range index without forward index
           Preconditions.checkState(dictionary.length() == 1, String.format("Creating range index for forward index "
-              + "disabled default column: %s, dictionary size must be 1", columnMetadata.getColumnName()));
+              + "disabled default column: %s, dictionary size must be 1", columnName));
           if (columnMetadata.isSingleValue()) {
             for (int i = 0; i < numDocs; i++) {
               rangeIndexCreator.add(0);

@@ -31,8 +31,6 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVFo
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBytePower2ChunkSVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.NoOpMVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.NoOpSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReaderV4;
@@ -81,24 +79,16 @@ public class DefaultIndexReaderProvider implements IndexReaderProvider {
   public ForwardIndexReader<?> newForwardIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata columnMetadata)
       throws IOException {
     if (columnMetadata.hasDictionary()) {
-      if (columnMetadata.forwardIndexDisabled()) {
-        if (columnMetadata.isSingleValue()) {
-          return new NoOpSVForwardIndexReader();
+      if (columnMetadata.isSingleValue()) {
+        if (columnMetadata.isSorted()) {
+          return new SortedIndexReaderImpl(dataBuffer, columnMetadata.getCardinality());
         } else {
-          return new NoOpMVForwardIndexReader();
+          return new FixedBitSVForwardIndexReaderV2(dataBuffer, columnMetadata.getTotalDocs(),
+              columnMetadata.getBitsPerElement());
         }
       } else {
-        if (columnMetadata.isSingleValue()) {
-          if (columnMetadata.isSorted()) {
-            return new SortedIndexReaderImpl(dataBuffer, columnMetadata.getCardinality());
-          } else {
-            return new FixedBitSVForwardIndexReaderV2(dataBuffer, columnMetadata.getTotalDocs(),
-                columnMetadata.getBitsPerElement());
-          }
-        } else {
-          return new FixedBitMVForwardIndexReader(dataBuffer, columnMetadata.getTotalDocs(),
-              columnMetadata.getTotalNumberOfEntries(), columnMetadata.getBitsPerElement());
-        }
+        return new FixedBitMVForwardIndexReader(dataBuffer, columnMetadata.getTotalDocs(),
+            columnMetadata.getTotalNumberOfEntries(), columnMetadata.getBitsPerElement());
       }
     } else {
       FieldSpec.DataType storedType = columnMetadata.getDataType().getStoredType();
