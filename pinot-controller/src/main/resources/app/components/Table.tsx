@@ -292,6 +292,14 @@ export default function CustomizedTables({
     setPage(newPage);
   };
 
+  React.useEffect(() => {
+    if(isPagination) {
+      return;
+    }
+
+    setRowsPerPage(data?.records?.length);
+  }, [])
+
   const [search, setSearch] = React.useState<string>('');
 
   const timeoutId = React.useRef<NodeJS.Timeout>();
