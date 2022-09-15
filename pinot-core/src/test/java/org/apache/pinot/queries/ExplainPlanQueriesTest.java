@@ -193,6 +193,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     List<String> jsonIndexColumns = Arrays.asList(COL1_JSON_INDEX);
     indexingConfig.setJsonIndexColumns(jsonIndexColumns);
 
+    List<String> textIndexColumns = Arrays.asList(COL1_TEXT_INDEX);
+
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(segmentName);
@@ -206,7 +208,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     indexLoadingConfig.setTableConfig(TABLE_CONFIG);
     indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(invertedIndexColumns));
     indexLoadingConfig.setRangeIndexColumns(new HashSet<>(rangeIndexColumns));
-    indexLoadingConfig.setJsonIndexColumns(new HashSet<String>(jsonIndexColumns));
+    indexLoadingConfig.setJsonIndexColumns(new HashSet<>(jsonIndexColumns));
+    indexLoadingConfig.setTextIndexColumns(new HashSet<>(textIndexColumns));
     indexLoadingConfig.setReadMode(ReadMode.mmap);
 
     _segmentNames.add(segmentName);

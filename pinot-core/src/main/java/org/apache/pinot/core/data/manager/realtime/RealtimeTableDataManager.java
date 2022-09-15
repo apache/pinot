@@ -57,13 +57,14 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
-import org.apache.pinot.segment.local.upsert.PartialUpsertHandler;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -187,26 +188,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           _tableUpsertMetadataManager);
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-
-      List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
-      Preconditions.checkState(!CollectionUtils.isEmpty(primaryKeyColumns),
-          "Primary key columns must be configured for upsert");
-
-      String comparisonColumn = upsertConfig.getComparisonColumn();
-      if (comparisonColumn == null) {
-        comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
-      }
-
-      PartialUpsertHandler partialUpsertHandler = null;
-      if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
-        assert upsertConfig.getPartialUpsertStrategies() != null;
-        partialUpsertHandler = new PartialUpsertHandler(schema, upsertConfig.getPartialUpsertStrategies(),
-            upsertConfig.getDefaultPartialUpsertStrategy(), comparisonColumn);
-      }
-
-      _tableUpsertMetadataManager =
-          new TableUpsertMetadataManager(_tableNameWithType, primaryKeyColumns, comparisonColumn,
-              upsertConfig.getHashFunction(), partialUpsertHandler, _serverMetrics);
+      _tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(tableConfig, schema, this, _serverMetrics);
     }
   }
 
@@ -217,6 +199,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   protected void doShutdown() {
     _segmentAsyncExecutorService.shutdown();
+    if (_tableUpsertMetadataManager != null) {
+      try {
+        _tableUpsertMetadataManager.close();
+      } catch (IOException e) {
+        _logger.warn("Cannot close upsert metadata manager properly for table: {}", _tableNameWithType, e);
+      }
+    }
     for (SegmentDataManager segmentDataManager : _segmentDataManagerMap.values()) {
       segmentDataManager.destroy();
     }
@@ -263,7 +252,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   public boolean isPartialUpsertEnabled() {
-    return _tableUpsertMetadataManager != null && _tableUpsertMetadataManager.isPartialUpsertEnabled();
+    return _tableUpsertMetadataManager != null
+        && _tableUpsertMetadataManager.getUpsertMode() == UpsertConfig.Mode.PARTIAL;
   }
 
   /*
@@ -364,6 +354,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           }
         }
       }
+
+      schema = SegmentGeneratorConfig.updateSchemaWithTimestampIndexes(schema,
+          SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(tableConfig));
 
       segmentDataManager =
           new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),

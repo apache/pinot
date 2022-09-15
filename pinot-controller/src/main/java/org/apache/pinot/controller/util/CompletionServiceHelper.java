@@ -25,10 +25,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
+import javax.annotation.Nullable;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.pinot.common.http.MultiGetRequest;
+import org.apache.pinot.common.http.MultiHttpRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +55,11 @@ public class CompletionServiceHelper {
     _endpointsToServers = endpointsToServers;
   }
 
+  public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
+      boolean multiRequestPerServer, int timeoutMs) {
+    return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, null, timeoutMs);
+  }
+
   /**
    * This method makes a MultiGet call to all given URLs.
    * @param serverURLs server urls to send GET request.
@@ -62,17 +68,18 @@ public class CompletionServiceHelper {
    *                              If multiRequestPerServer is set as false, return as long as one of the requests get
    *                              response; If multiRequestPerServer is set as true, wait until all requests
    *                              get response.
+   * @param requestHeaders Headers to be set when making the http calls.
    * @param timeoutMs timeout in milliseconds to wait per request.
    * @return CompletionServiceResponse Map of the endpoint(server instance, or full request path if
    * multiRequestPerServer is true) to the response from that endpoint.
    */
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
-      boolean multiRequestPerServer, int timeoutMs) {
+      boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs) {
     CompletionServiceResponse completionServiceResponse = new CompletionServiceResponse();
 
     // TODO: use some service other than completion service so that we know which server encounters the error
     CompletionService<GetMethod> completionService =
-        new MultiGetRequest(_executor, _httpConnectionManager).execute(serverURLs, timeoutMs);
+        new MultiHttpRequest(_executor, _httpConnectionManager).execute(serverURLs, requestHeaders, timeoutMs);
     for (int i = 0; i < serverURLs.size(); i++) {
       GetMethod getMethod = null;
       try {

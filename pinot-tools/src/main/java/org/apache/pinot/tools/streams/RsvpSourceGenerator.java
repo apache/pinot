@@ -19,6 +19,7 @@
 
 package org.apache.pinot.tools.streams;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
 import java.time.LocalDateTime;
@@ -29,6 +30,7 @@ import java.util.Properties;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.joda.time.DateTime;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -47,20 +49,65 @@ public class RsvpSourceGenerator implements PinotSourceDataGenerator {
   }
 
   public RSVP createMessage() {
-    String eventId = Math.abs(ThreadLocalRandom.current().nextLong()) + "";
+    String eventId = Math.abs(ThreadLocalRandom.current().nextLong(100)) + "";
     ObjectNode json = JsonUtils.newObjectNode();
-    json.put("venue_name", "venue_name" + ThreadLocalRandom.current().nextInt());
-    json.put("event_name", "event_name" + ThreadLocalRandom.current().nextInt());
+    ObjectNode eventJson = JsonUtils.newObjectNode();
+    json.set("event", eventJson);
+    ObjectNode groupJson = JsonUtils.newObjectNode();
+    json.set("group", groupJson);
+    ObjectNode venueJson = JsonUtils.newObjectNode();
+    json.set("venue", venueJson);
+
+    String venueName = "venue_name" + ThreadLocalRandom.current().nextInt();
+    venueJson.put("venue_name", venueName);
+    json.put("venue_name", venueName);
+
+    String eventName = "event_name" + ThreadLocalRandom.current().nextInt();
+    eventJson.put("event_name", eventName);
+    json.put("event_name", eventName);
+
     json.put("event_id", eventId);
     json.put("event_time", DATE_TIME_FORMATTER.format(LocalDateTime.now().plusDays(10)));
-    json.put("group_city", "group_city" + ThreadLocalRandom.current().nextInt(1000));
-    json.put("group_country", "group_country" + ThreadLocalRandom.current().nextInt(100));
-    json.put("group_id", Math.abs(ThreadLocalRandom.current().nextLong()));
-    json.put("group_name", "group_name" + ThreadLocalRandom.current().nextInt());
-    json.put("group_lat", ThreadLocalRandom.current().nextDouble(-90.0, 90.0));
-    json.put("group_lon", ThreadLocalRandom.current().nextDouble(180.0));
-    json.put("mtime", DATE_TIME_FORMATTER.format(LocalDateTime.now()));
-    json.put("rsvp_count", 1);
+
+    ArrayNode groupTopicsJson = JsonUtils.newArrayNode();
+    groupJson.set("group_topics", groupTopicsJson);
+    for (int i = 0; i < ThreadLocalRandom.current().nextInt(5) + 1; i++) {
+      ObjectNode groupTopicJson = JsonUtils.newObjectNode();
+      groupTopicJson.put("topic_name", "topic_name" + ThreadLocalRandom.current().nextInt(10));
+      groupTopicJson.put("urlkey", "http://group-url-" + ThreadLocalRandom.current().nextInt(1000));
+      groupTopicsJson.add(groupTopicJson);
+    }
+
+    String groupCity = "group_city" + ThreadLocalRandom.current().nextInt(1000);
+    groupJson.put("group_city", groupCity);
+    json.put("group_city", groupCity);
+
+    String groupCountry = "group_country" + ThreadLocalRandom.current().nextInt(100);
+    groupJson.put("group_country", groupCountry);
+    json.put("group_country", groupCountry);
+
+    long groupId = Math.abs(ThreadLocalRandom.current().nextLong());
+    groupJson.put("group_id", groupId);
+    json.put("group_id", groupId);
+
+    String groupName = "group_name" + ThreadLocalRandom.current().nextInt();
+    groupJson.put("group_name", groupName);
+    json.put("group_name", groupName);
+
+    double groupLat = ThreadLocalRandom.current().nextDouble(-90.0, 90.0);
+    groupJson.put("group_lat", groupLat);
+    json.put("group_lat", groupLat);
+
+    double groupLon = ThreadLocalRandom.current().nextDouble(-90.0, 90.0);
+    groupJson.put("group_lon", groupLon);
+    json.put("group_lon", groupLon);
+
+    json.put("mtime", DateTime.now().getMillis());
+
+    json.put("rsvp_id", ThreadLocalRandom.current().nextLong(100));
+    json.put("guests", ThreadLocalRandom.current().nextInt(100));
+
+    json.put("rsvp_count", ThreadLocalRandom.current().nextInt(10) + 1);
     return new RSVP(eventId, eventId, json);
   }
 
@@ -90,6 +137,7 @@ public class RsvpSourceGenerator implements PinotSourceDataGenerator {
   public void close()
       throws Exception {
   }
+
   public enum KeyColumn {
     NONE,
     EVENT_ID,

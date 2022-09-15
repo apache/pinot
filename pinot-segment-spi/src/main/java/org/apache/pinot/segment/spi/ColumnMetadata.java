@@ -67,6 +67,10 @@ public interface ColumnMetadata {
 
   Comparable getMaxValue();
 
+  default boolean isMinMaxValueInvalid() {
+    return false;
+  }
+
   @JsonProperty
   boolean hasDictionary();
 

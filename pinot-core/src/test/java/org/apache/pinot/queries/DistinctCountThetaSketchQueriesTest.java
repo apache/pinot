@@ -31,7 +31,8 @@ import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.datasketches.theta.UpdateSketchBuilder;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -164,10 +165,10 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
 
     // Inner segment
     AggregationOperator aggregationOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         11 * NUM_RECORDS, NUM_RECORDS);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 11);
     for (int i = 0; i < 11; i++) {
@@ -208,7 +209,7 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
 
       // Inner segment
       AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
-      IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+      GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
       QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
           11 * NUM_RECORDS, NUM_RECORDS);
       AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
@@ -272,10 +273,10 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
 
     // Inner segment
     AggregationOperator aggregationOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         8 * NUM_RECORDS, NUM_RECORDS);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
     List<Sketch> sketches = (List<Sketch>) aggregationResult.get(0);

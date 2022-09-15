@@ -38,12 +38,6 @@ public class MailboxSendNode extends AbstractStageNode {
   }
 
   public MailboxSendNode(int stageId, DataSchema dataSchema, int receiverStageId,
-      RelDistribution.Type exchangeType) {
-    // When exchangeType is not HASH_DISTRIBUTE, no partitionKeySelector is needed.
-    this(stageId, dataSchema, receiverStageId, exchangeType, null);
-  }
-
-  public MailboxSendNode(int stageId, DataSchema dataSchema, int receiverStageId,
       RelDistribution.Type exchangeType, @Nullable KeySelector<Object[], Object[]> partitionKeySelector) {
     super(stageId, dataSchema);
     _receiverStageId = receiverStageId;

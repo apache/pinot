@@ -49,6 +49,7 @@ import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -63,6 +64,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -418,6 +420,22 @@ public class TableRebalancer {
     String tableNameWithType = tableConfig.getTableName();
     if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
       if (reassignInstances) {
+        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+        boolean hasPreConfiguredInstancePartitions = TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig,
+            instancePartitionsType);
+        if (hasPreConfiguredInstancePartitions) {
+          String referenceInstancePartitionsName = tableConfig.getInstancePartitionsMap().get(instancePartitionsType);
+          InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitionsWithRename(
+              _helixManager.getHelixPropertyStore(), referenceInstancePartitionsName,
+              instancePartitionsType.getInstancePartitionsName(rawTableName));
+          if (!dryRun) {
+            LOGGER.info("Persisting instance partitions: {} (referencing {})", instancePartitions,
+                referenceInstancePartitionsName);
+            InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(),
+                instancePartitions);
+          }
+          return instancePartitions;
+        }
         InstancePartitions existingInstancePartitions =
             InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
                 InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,

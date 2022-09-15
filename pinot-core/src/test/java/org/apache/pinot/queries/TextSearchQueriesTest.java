@@ -55,7 +55,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.BaseOperator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
@@ -1656,8 +1656,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       List<Object[]> expectedResults)
       throws Exception {
     SelectionOnlyOperator operator = getOperator(query);
-    IntermediateResultsBlock operatorResult = operator.nextBlock();
-    List<Object[]> resultset = (List<Object[]>) operatorResult.getSelectionResult();
+    List<Object[]> resultset = (List<Object[]>) operator.nextBlock().getRows();
     assertNotNull(resultset);
     assertEquals(resultset.size(), expectedResultSize);
     if (compareGrepOutput) {
@@ -1697,9 +1696,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   }
 
   private void testTextSearchAggregationQueryHelper(String query, int expectedCount) {
-    BaseOperator<IntermediateResultsBlock> operator = getOperator(query);
-    IntermediateResultsBlock operatorResult = operator.nextBlock();
-    long count = (Long) operatorResult.getAggregationResult().get(0);
+    BaseOperator<AggregationResultsBlock> operator = getOperator(query);
+    long count = (Long) operator.nextBlock().getResults().get(0);
     assertEquals(expectedCount, count);
   }
 

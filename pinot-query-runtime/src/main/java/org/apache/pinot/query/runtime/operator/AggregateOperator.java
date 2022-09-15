@@ -32,7 +32,6 @@ import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.MaxAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.MinAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.SumAggregationFunction;
@@ -40,6 +39,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -54,6 +54,7 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
 
   private final AggregationFunction[] _aggregationFunctions;
   private final int[] _aggregationFunctionInputRefs;
+  private final Object[] _aggregationFunctionLiterals;
   private final DataSchema _resultSchema;
   private final Map<Integer, Object>[] _groupByResultHolders;
   private final Map<Integer, Object[]> _groupByKeyHolder;
@@ -73,10 +74,18 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
 
     _aggregationFunctions = new AggregationFunction[_aggCalls.size()];
     _aggregationFunctionInputRefs = new int[_aggCalls.size()];
+    _aggregationFunctionLiterals = new Object[_aggCalls.size()];
     _groupByResultHolders = new Map[_aggCalls.size()];
     _groupByKeyHolder = new HashMap<Integer, Object[]>();
     for (int i = 0; i < aggCalls.size(); i++) {
-      _aggregationFunctionInputRefs[i] = toAggregationFunctionRefIndex(aggCalls.get(i));
+      // agg function operand should either be a InputRef or a Literal
+      RexExpression rexExpression = toAggregationFunctionOperand(aggCalls.get(i));
+      if (rexExpression instanceof RexExpression.InputRef) {
+        _aggregationFunctionInputRefs[i] = ((RexExpression.InputRef) rexExpression).getIndex();
+      } else {
+        _aggregationFunctionInputRefs[i] = -1;
+        _aggregationFunctionLiterals[i] = ((RexExpression.Literal) rexExpression).getValue();
+      }
       _aggregationFunctions[i] = toAggregationFunction(aggCalls.get(i), _aggregationFunctionInputRefs[i]);
       _groupByResultHolders[i] = new HashMap<Integer, Object>();
     }
@@ -85,10 +94,10 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
     _isCumulativeBlockConstructed = false;
   }
 
-  private int toAggregationFunctionRefIndex(RexExpression rexExpression) {
+  private RexExpression toAggregationFunctionOperand(RexExpression rexExpression) {
     List<RexExpression> functionOperands = ((RexExpression.FunctionCall) rexExpression).getFunctionOperands();
     Preconditions.checkState(functionOperands.size() < 2);
-    return functionOperands.size() == 0 ? 0 : ((RexExpression.InputRef) functionOperands.get(0)).getIndex();
+    return functionOperands.size() > 0 ? functionOperands.get(0) : new RexExpression.Literal(FieldSpec.DataType.INT, 1);
   }
 
   @Override
@@ -156,10 +165,12 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
           for (int i = 0; i < _aggregationFunctions.length; i++) {
             Object currentRes = _groupByResultHolders[i].get(keyHashCode);
             if (currentRes == null) {
-              _groupByResultHolders[i].put(keyHashCode, row[_aggregationFunctionInputRefs[i]]);
+              _groupByResultHolders[i].put(keyHashCode, _aggregationFunctionInputRefs[i] == -1
+                  ? _aggregationFunctionLiterals[i] : row[_aggregationFunctionInputRefs[i]]);
             } else {
               _groupByResultHolders[i].put(keyHashCode,
-                  merge(_aggCalls.get(i), currentRes, row[_aggregationFunctionInputRefs[i]]));
+                  merge(_aggCalls.get(i), currentRes, _aggregationFunctionInputRefs[i] == -1
+                      ? _aggregationFunctionLiterals[i] : row[_aggregationFunctionInputRefs[i]]));
             }
           }
         }
@@ -174,15 +185,13 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
 
   private AggregationFunction toAggregationFunction(RexExpression aggCall, int aggregationFunctionInputRef) {
     Preconditions.checkState(aggCall instanceof RexExpression.FunctionCall);
+    // TODO(Rong Rong): query options are not supported by the new engine at this moment.
     switch (((RexExpression.FunctionCall) aggCall).getFunctionName()) {
       case "$SUM":
       case "$SUM0":
       case "SUM":
         return new SumAggregationFunction(
             ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
-      case "$COUNT":
-      case "COUNT":
-        return new CountAggregationFunction();
       case "$MIN":
       case "$MIN0":
       case "MIN":
@@ -193,6 +202,9 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       case "MAX":
         return new MaxAggregationFunction(
             ExpressionContext.forIdentifier(String.valueOf(aggregationFunctionInputRef)));
+      // COUNT(*) is rewritten to SUM(1)
+      case "COUNT":
+        return new SumAggregationFunction(ExpressionContext.forLiteral("1"));
       default:
         throw new IllegalStateException(
             "Unexpected value: " + ((RexExpression.FunctionCall) aggCall).getFunctionName());
@@ -206,9 +218,6 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       case "$SUM":
       case "$SUM0":
         return ((Number) left).doubleValue() + ((Number) right).doubleValue();
-      case "COUNT":
-      case "$COUNT":
-        return ((Number) left).longValue() + ((Number) right).longValue();
       case "MIN":
       case "$MIN":
       case "$MIN0":
@@ -217,6 +226,9 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
       case "$MAX":
       case "$MAX0":
         return Math.max(((Number) left).doubleValue(), ((Number) right).doubleValue());
+      // COUNT(*) doesn't need to parse right object.
+      case "COUNT":
+        return ((Number) left).doubleValue() + 1;
       default:
         throw new IllegalStateException(
             "Unexpected value: " + ((RexExpression.FunctionCall) aggCall).getFunctionName());

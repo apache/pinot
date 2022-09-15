@@ -51,6 +51,11 @@ public class ArithmeticFunctions {
   }
 
   @ScalarFunction
+  public static double divide(double a, double b, double defaultValue) {
+    return (b == 0) ? defaultValue : a / b;
+  }
+
+  @ScalarFunction
   public static double mod(double a, double b) {
     return a % b;
   }

@@ -40,12 +40,9 @@ import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
 import org.glassfish.jersey.server.ResourceConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class ControllerAdminApiApplication extends ResourceConfig {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerAdminApiApplication.class);
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
 
   private final String _controllerResourcePackages;
@@ -86,9 +83,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     } catch (IOException e) {
       throw new RuntimeException("Failed to start http server", e);
     }
-    synchronized (PinotReflectionUtils.getReflectionLock()) {
-      setupSwagger(_httpServer);
-    }
+    PinotReflectionUtils.runWithLock(this::setupSwagger);
 
     ClassLoader classLoader = ControllerAdminApiApplication.class.getClassLoader();
 
@@ -105,12 +100,13 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/js/"), "/js/");
   }
 
-  private void setupSwagger(HttpServer httpServer) {
+  private void setupSwagger() {
     BeanConfig beanConfig = new BeanConfig();
     beanConfig.setTitle("Pinot Controller API");
     beanConfig.setDescription("APIs for accessing Pinot Controller information");
     beanConfig.setContact("https://github.com/apache/pinot");
     beanConfig.setVersion("1.0");
+    beanConfig.setExpandSuperTypes(false);
     if (_useHttps) {
       beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL});
     } else {
@@ -123,12 +119,12 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     ClassLoader loader = this.getClass().getClassLoader();
     CLStaticHttpHandler apiStaticHttpHandler = new CLStaticHttpHandler(loader, "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/api/");
-    httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/help/");
+    _httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/api/");
+    _httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/help/");
 
     URL swaggerDistLocation = loader.getResource("META-INF/resources/webjars/swagger-ui/3.23.11/");
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
-    httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
+    _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
 
   public void stop() {

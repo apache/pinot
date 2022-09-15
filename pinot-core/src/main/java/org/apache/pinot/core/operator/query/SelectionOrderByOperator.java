@@ -38,8 +38,8 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.ProjectionOperator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -47,6 +47,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -69,7 +70,7 @@ import org.roaringbitmap.RoaringBitmap;
  *   </li>
  * </ul>
  */
-public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
+public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock> {
 
   private static final String EXPLAIN_NAME = "SELECT_ORDERBY";
 
@@ -86,8 +87,6 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
   private int _numDocsScanned = 0;
   private long _numEntriesScannedPostFilter = 0;
-
-  private boolean _queryHasMVSelectionOrderBy = false;
 
   public SelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, TransformOperator transformOperator, boolean allOrderByColsPreSorted) {
@@ -131,7 +130,10 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
       if (_orderByExpressionMetadata[i].isSingleValue()) {
         valueIndexList.add(i);
       } else {
-        _queryHasMVSelectionOrderBy = true;
+        // MV columns should not be part of the selection order by only list
+        throw new BadQueryRequestException(
+            String.format("MV expression: %s should not be included in the ORDER-BY clause",
+                _orderByExpressions.get(i)));
       }
     }
 
@@ -239,20 +241,17 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
   }
 
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
-    IntermediateResultsBlock resultsBlock;
+  protected SelectionResultsBlock getNextBlock() {
     if (_allOrderByColsPreSorted) {
-      resultsBlock = computeAllPreSorted();
+      return computeAllPreSorted();
     } else if (_expressions.size() == _orderByExpressions.size()) {
-      resultsBlock = computeAllOrdered();
+      return computeAllOrdered();
     } else {
-      resultsBlock = computePartiallyOrdered();
+      return computePartiallyOrdered();
     }
-    resultsBlock.setQueryHasMVSelectionOrderBy(_queryHasMVSelectionOrderBy);
-    return resultsBlock;
   }
 
-  private IntermediateResultsBlock computeAllPreSorted() {
+  private SelectionResultsBlock computeAllPreSorted() {
     int numExpressions = _expressions.size();
 
     // Fetch all the expressions and insert them into the priority queue
@@ -300,13 +299,13 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
 
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new IntermediateResultsBlock(dataSchema, _rows, _nullHandlingEnabled);
+    return new SelectionResultsBlock(dataSchema, _rows);
   }
 
   /**
    * Helper method to compute the result when all the output expressions are ordered.
    */
-  private IntermediateResultsBlock computeAllOrdered() {
+  private SelectionResultsBlock computeAllOrdered() {
     int numExpressions = _expressions.size();
 
     // Fetch all the expressions and insert them into the priority queue
@@ -355,13 +354,13 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new IntermediateResultsBlock(dataSchema, _rows, _nullHandlingEnabled);
+    return new SelectionResultsBlock(dataSchema, _rows);
   }
 
   /**
    * Helper method to compute the result when not all the output expressions are ordered.
    */
-  private IntermediateResultsBlock computePartiallyOrdered() {
+  private SelectionResultsBlock computePartiallyOrdered() {
     int numExpressions = _expressions.size();
     int numOrderByExpressions = _orderByExpressions.size();
 
@@ -474,9 +473,8 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new IntermediateResultsBlock(dataSchema, _rows, _nullHandlingEnabled);
+    return new SelectionResultsBlock(dataSchema, _rows);
   }
-
 
   @Override
   public List<Operator> getChildOperators() {

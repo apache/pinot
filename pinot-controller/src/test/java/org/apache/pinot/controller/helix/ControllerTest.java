@@ -60,7 +60,7 @@ import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
-import org.apache.pinot.controller.api.AccessControlTest;
+import org.apache.pinot.controller.api.access.AllowAllAccessFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -895,8 +895,7 @@ public class ControllerTest {
     Map<String, Object> properties = getDefaultControllerConfiguration();
 
     // TODO: move these test specific configs into respective test classes.
-    // Used in AccessControlTest
-    properties.put(ControllerConf.ACCESS_CONTROL_FACTORY_CLASS, AccessControlTest.DenyAllAccessFactory.class.getName());
+    properties.put(ControllerConf.ACCESS_CONTROL_FACTORY_CLASS, AllowAllAccessFactory.class.getName());
 
     // Used in PinotTableRestletResourceTest
     properties.put(ControllerConf.TABLE_MIN_REPLICAS, MIN_NUM_REPLICAS);

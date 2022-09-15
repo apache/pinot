@@ -108,6 +108,7 @@ public class TableConfigBuilder {
   private RoutingConfig _routingConfig;
   private QueryConfig _queryConfig;
   private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
+  private Map<InstancePartitionsType, String> _instancePartitionsMap;
   private List<FieldConfig> _fieldConfigList;
 
   private UpsertConfig _upsertConfig;
@@ -374,6 +375,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setInstancePartitionsMap(Map<InstancePartitionsType, String> instancePartitionsMap) {
+    _instancePartitionsMap = instancePartitionsMap;
+    return this;
+  }
+
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -426,6 +432,6 @@ public class TableConfigBuilder {
     return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
         _fieldConfigList, _upsertConfig, _dedupConfig, _ingestionConfig, _tierConfigList, _isDimTable,
-        _tunerConfigList);
+        _tunerConfigList, _instancePartitionsMap);
   }
 }

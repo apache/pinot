@@ -21,6 +21,7 @@ package org.apache.pinot.core.common;
 import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -32,7 +33,7 @@ import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BytesUtils;
 
@@ -66,10 +67,11 @@ public class DataFetcher {
     for (Map.Entry<String, DataSource> entry : dataSourceMap.entrySet()) {
       String column = entry.getKey();
       DataSource dataSource = entry.getValue();
-      ColumnValueReader columnValueReader =
-          new ColumnValueReader(dataSource.getForwardIndex(), dataSource.getDictionary());
-      _columnValueReaderMap.put(column, columnValueReader);
       DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+      ColumnValueReader columnValueReader =
+          new ColumnValueReader(dataSource.getForwardIndex(), dataSource.getDictionary(),
+              dataSourceMetadata.getDataType());
+      _columnValueReaderMap.put(column, columnValueReader);
       if (!dataSourceMetadata.isSingleValue()) {
         maxNumValuesPerMVEntry = Math.max(maxNumValuesPerMVEntry, dataSourceMetadata.getMaxNumValuesPerMVEntry());
       }
@@ -427,16 +429,16 @@ public class DataFetcher {
   private class ColumnValueReader implements Closeable {
     final ForwardIndexReader _reader;
     final Dictionary _dictionary;
-    final FieldSpec.DataType _dataType;
+    final DataType _dataType;
     final boolean _singleValue;
 
     boolean _readerContextCreated;
     ForwardIndexReaderContext _readerContext;
 
-    ColumnValueReader(ForwardIndexReader reader, @Nullable Dictionary dictionary) {
+    ColumnValueReader(ForwardIndexReader reader, @Nullable Dictionary dictionary, DataType dataType) {
       _reader = reader;
       _dictionary = dictionary;
-      _dataType = reader.getStoredType();
+      _dataType = dataType;
       _singleValue = reader.isSingleValue();
     }
 
@@ -550,9 +552,19 @@ public class DataFetcher {
       if (_dictionary != null) {
         int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
-        _dictionary.readStringValues(dictIdBuffer, length, valueBuffer);
+        if (_dataType == DataType.BOOLEAN) {
+          for (int i = 0; i < length; i++) {
+            valueBuffer[i] = Boolean.toString(_dictionary.getIntValue(dictIdBuffer[i]) == 1);
+          }
+        } else if (_dataType == DataType.TIMESTAMP) {
+          for (int i = 0; i < length; i++) {
+            valueBuffer[i] = new Timestamp(_dictionary.getLongValue(dictIdBuffer[i])).toString();
+          }
+        } else {
+          _dictionary.readStringValues(dictIdBuffer, length, valueBuffer);
+        }
       } else {
-        switch (_reader.getStoredType()) {
+        switch (_dataType) {
           case INT:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = Integer.toString(_reader.getInt(docIds[i], readerContext));
@@ -573,7 +585,23 @@ public class DataFetcher {
               valueBuffer[i] = Double.toString(_reader.getDouble(docIds[i], readerContext));
             }
             break;
+          case BIG_DECIMAL:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = _reader.getBigDecimal(docIds[i], readerContext).toPlainString();
+            }
+            break;
+          case BOOLEAN:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = Boolean.toString(_reader.getInt(docIds[i], readerContext) == 1);
+            }
+            break;
+          case TIMESTAMP:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = new Timestamp(_reader.getLong(docIds[i], readerContext)).toString();
+            }
+            break;
           case STRING:
+          case JSON:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = _reader.getString(docIds[i], readerContext);
             }
@@ -622,23 +650,25 @@ public class DataFetcher {
 
     void readDictIdsMV(int[] docIds, int length, int[][] dictIdsBuffer) {
       Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
       for (int i = 0; i < length; i++) {
-        int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
+        int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
         dictIdsBuffer[i] = Arrays.copyOfRange(_reusableMVDictIds, 0, numValues);
       }
     }
 
     void readIntValuesMV(int[] docIds, int length, int[][] valuesBuffer) {
       Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
         for (int i = 0; i < length; i++) {
-          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
+          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
           int[] values = new int[numValues];
           _dictionary.readIntValues(_reusableMVDictIds, numValues, values);
           valuesBuffer[i] = values;
         }
       } else {
-        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, getReaderContext());
+        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, readerContext);
       }
     }
 
@@ -650,15 +680,16 @@ public class DataFetcher {
 
     void readLongValuesMV(int[] docIds, int length, long[][] valuesBuffer) {
       Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
         for (int i = 0; i < length; i++) {
-          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
+          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
           long[] values = new long[numValues];
           _dictionary.readLongValues(_reusableMVDictIds, numValues, values);
           valuesBuffer[i] = values;
         }
       } else {
-        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, getReaderContext());
+        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, readerContext);
       }
     }
 
@@ -670,15 +701,16 @@ public class DataFetcher {
 
     void readFloatValuesMV(int[] docIds, int length, float[][] valuesBuffer) {
       Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
         for (int i = 0; i < length; i++) {
-          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
+          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
           float[] values = new float[numValues];
           _dictionary.readFloatValues(_reusableMVDictIds, numValues, values);
           valuesBuffer[i] = values;
         }
       } else {
-        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, getReaderContext());
+        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, readerContext);
       }
     }
 
@@ -690,15 +722,16 @@ public class DataFetcher {
 
     void readDoubleValuesMV(int[] docIds, int length, double[][] valuesBuffer) {
       Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
         for (int i = 0; i < length; i++) {
-          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
+          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
           double[] values = new double[numValues];
           _dictionary.readDoubleValues(_reusableMVDictIds, numValues, values);
           valuesBuffer[i] = values;
         }
       } else {
-        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, getReaderContext());
+        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, readerContext);
       }
     }
 
@@ -710,15 +743,62 @@ public class DataFetcher {
 
     void readStringValuesMV(int[] docIds, int length, String[][] valuesBuffer) {
       Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
-        for (int i = 0; i < length; i++) {
-          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
-          String[] values = new String[numValues];
-          _dictionary.readStringValues(_reusableMVDictIds, numValues, values);
-          valuesBuffer[i] = values;
+        if (_dataType == DataType.BOOLEAN) {
+          for (int i = 0; i < length; i++) {
+            int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
+            int[] intValues = new int[numValues];
+            _dictionary.readIntValues(_reusableMVDictIds, numValues, intValues);
+            String[] values = new String[numValues];
+            for (int j = 0; j < numValues; j++) {
+              values[i] = Boolean.toString(intValues[i] == 1);
+            }
+            valuesBuffer[i] = values;
+          }
+        } else if (_dataType == DataType.TIMESTAMP) {
+          for (int i = 0; i < length; i++) {
+            int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
+            long[] longValues = new long[numValues];
+            _dictionary.readLongValues(_reusableMVDictIds, numValues, longValues);
+            String[] values = new String[numValues];
+            for (int j = 0; j < numValues; j++) {
+              values[i] = new Timestamp(longValues[i]).toString();
+            }
+            valuesBuffer[i] = values;
+          }
+        } else {
+          for (int i = 0; i < length; i++) {
+            int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
+            String[] values = new String[numValues];
+            _dictionary.readStringValues(_reusableMVDictIds, numValues, values);
+            valuesBuffer[i] = values;
+          }
         }
       } else {
-        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, getReaderContext());
+        if (_dataType == DataType.BOOLEAN) {
+          int[] intValueBuffer = new int[_maxNumValuesPerMVEntry];
+          for (int i = 0; i < length; i++) {
+            int numValues = _reader.getIntMV(docIds[i], intValueBuffer, readerContext);
+            String[] values = new String[numValues];
+            for (int j = 0; j < numValues; j++) {
+              values[i] = Boolean.toString(intValueBuffer[i] == 1);
+            }
+            valuesBuffer[i] = values;
+          }
+        } else if (_dataType == DataType.TIMESTAMP) {
+          long[] longValueBuffer = new long[_maxNumValuesPerMVEntry];
+          for (int i = 0; i < length; i++) {
+            int numValues = _reader.getLongMV(docIds[i], longValueBuffer, readerContext);
+            String[] values = new String[numValues];
+            for (int j = 0; j < numValues; j++) {
+              values[i] = new Timestamp(longValueBuffer[i]).toString();
+            }
+            valuesBuffer[i] = values;
+          }
+        } else {
+          _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, readerContext);
+        }
       }
     }
 

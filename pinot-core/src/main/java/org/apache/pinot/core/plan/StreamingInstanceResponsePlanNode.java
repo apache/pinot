@@ -20,7 +20,6 @@ package org.apache.pinot.core.plan;
 
 import io.grpc.stub.StreamObserver;
 import java.util.List;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.core.operator.InstanceResponseOperator;
 import org.apache.pinot.core.operator.StreamingInstanceResponseOperator;
@@ -33,15 +32,15 @@ public class StreamingInstanceResponsePlanNode extends InstanceResponsePlanNode 
   private final StreamObserver<Server.ServerResponse> _streamObserver;
 
   public StreamingInstanceResponsePlanNode(CombinePlanNode combinePlanNode, List<IndexSegment> indexSegments,
-      List<FetchContext> fetchContexts, StreamObserver<Server.ServerResponse> streamObserver,
-      QueryContext queryContext, ServerMetrics serverMetrics) {
-    super(combinePlanNode, indexSegments, fetchContexts, queryContext, serverMetrics);
+      List<FetchContext> fetchContexts, QueryContext queryContext,
+      StreamObserver<Server.ServerResponse> streamObserver) {
+    super(combinePlanNode, indexSegments, fetchContexts, queryContext);
     _streamObserver = streamObserver;
   }
 
   @Override
   public InstanceResponseOperator run() {
     return new StreamingInstanceResponseOperator(_combinePlanNode.run(), _indexSegments, _fetchContexts,
-        _streamObserver, _queryContext, _serverMetrics);
+        _streamObserver, _queryContext);
   }
 }

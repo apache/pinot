@@ -28,6 +28,7 @@ import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class SelectionOnlyStreamingReducer implements StreamingReducer {
@@ -50,16 +51,37 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
     // get dataSchema
     _dataSchema = _dataSchema == null ? dataTable.getDataSchema() : _dataSchema;
     // TODO: For data table map with more than one data tables, remove conflicting data tables
-    reduceWithoutOrdering(dataTable, _queryContext.getLimit());
+    reduceWithoutOrdering(dataTable, _queryContext.getLimit(), _queryContext.isNullHandlingEnabled());
   }
 
-  private void reduceWithoutOrdering(DataTable dataTable, int limit) {
+  private void reduceWithoutOrdering(DataTable dataTable, int limit, boolean nullHandlingEnabled) {
+    int numColumns = dataTable.getDataSchema().size();
     int numRows = dataTable.getNumberOfRows();
-    for (int rowId = 0; rowId < numRows; rowId++) {
-      if (_rows.size() < limit) {
-        _rows.add(SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId));
-      } else {
-        break;
+    if (nullHandlingEnabled) {
+      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];;
+      for (int coldId = 0; coldId < numColumns; coldId++) {
+        nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
+      }
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        if (_rows.size() < limit) {
+          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+          for (int colId = 0; colId < numColumns; colId++) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+              row[colId] = null;
+            }
+          }
+          _rows.add(row);
+        } else {
+          break;
+        }
+      }
+    } else {
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        if (_rows.size() < limit) {
+          _rows.add(SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId));
+        } else {
+          break;
+        }
       }
     }
   }

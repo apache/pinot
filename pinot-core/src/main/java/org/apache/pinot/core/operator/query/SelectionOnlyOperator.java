@@ -28,8 +28,8 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -38,7 +38,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock> {
+public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
 
   private static final String EXPLAIN_NAME = "SELECT";
 
@@ -92,7 +92,7 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
   }
 
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
+  protected SelectionResultsBlock getNextBlock() {
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       int numExpressions = _expressions.size();
@@ -126,9 +126,8 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
       }
     }
 
-    return new IntermediateResultsBlock(_dataSchema, _rows, _nullHandlingEnabled);
+    return new SelectionResultsBlock(_dataSchema, _rows);
   }
-
 
   @Override
   public List<Operator> getChildOperators() {

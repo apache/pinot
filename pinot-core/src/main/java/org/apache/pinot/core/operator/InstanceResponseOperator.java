@@ -21,41 +21,34 @@ package org.apache.pinot.core.operator;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock> {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(InstanceResponseOperator.class);
   private static final String EXPLAIN_NAME = "INSTANCE_RESPONSE";
 
-  private final BaseCombineOperator _combineOperator;
+  private final BaseCombineOperator<?> _combineOperator;
   private final List<IndexSegment> _indexSegments;
   private final List<FetchContext> _fetchContexts;
   private final int _fetchContextSize;
   private final QueryContext _queryContext;
-  private final ServerMetrics _serverMetrics;
 
-  public InstanceResponseOperator(BaseCombineOperator combinedOperator, List<IndexSegment> indexSegments,
-      List<FetchContext> fetchContexts, QueryContext queryContext, ServerMetrics serverMetrics) {
-    _combineOperator = combinedOperator;
+  public InstanceResponseOperator(BaseCombineOperator<?> combineOperator, List<IndexSegment> indexSegments,
+      List<FetchContext> fetchContexts, QueryContext queryContext) {
+    _combineOperator = combineOperator;
     _indexSegments = indexSegments;
     _fetchContexts = fetchContexts;
     _fetchContextSize = fetchContexts.size();
     _queryContext = queryContext;
-    _serverMetrics = serverMetrics;
   }
 
   /*
@@ -85,15 +78,12 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
   @Override
   protected InstanceResponseBlock getNextBlock() {
-    IntermediateResultsBlock intermediateResultsBlock;
-    InstanceResponseBlock instanceResponseBlock;
-
     if (ThreadTimer.isThreadCpuTimeMeasurementEnabled()) {
       long startWallClockTimeNs = System.nanoTime();
 
       ThreadTimer mainThreadTimer = new ThreadTimer();
-      intermediateResultsBlock = getCombinedResults();
-      instanceResponseBlock = new InstanceResponseBlock(intermediateResultsBlock);
+      BaseResultsBlock resultsBlock = getCombinedResults();
+      InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(getDataTable(resultsBlock));
       long mainThreadCpuTimeNs = mainThreadTimer.getThreadTimeNs();
 
       long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
@@ -102,8 +92,8 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
        * we will have to change the wallClockTime computation accordingly. Right now everything under
        * InstanceResponseOperator is the one that is instrumented with threadCpuTime.
        */
-      long multipleThreadCpuTimeNs = intermediateResultsBlock.getExecutionThreadCpuTimeNs();
-      int numServerThreads = intermediateResultsBlock.getNumServerThreads();
+      long multipleThreadCpuTimeNs = resultsBlock.getExecutionThreadCpuTimeNs();
+      int numServerThreads = resultsBlock.getNumServerThreads();
       long systemActivitiesCpuTimeNs =
           calSystemActivitiesCpuTimeNs(totalWallClockTimeNs, multipleThreadCpuTimeNs, mainThreadCpuTimeNs,
               numServerThreads);
@@ -111,38 +101,29 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
       long threadCpuTimeNs = mainThreadCpuTimeNs + multipleThreadCpuTimeNs;
       Map<String, String> responseMetaData = instanceResponseBlock.getInstanceResponseDataTable().getMetadata();
       responseMetaData.put(MetadataKey.THREAD_CPU_TIME_NS.getName(), String.valueOf(threadCpuTimeNs));
-      responseMetaData
-          .put(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(), String.valueOf(systemActivitiesCpuTimeNs));
+      responseMetaData.put(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(),
+          String.valueOf(systemActivitiesCpuTimeNs));
+
+      return instanceResponseBlock;
     } else {
-      intermediateResultsBlock = getCombinedResults();
-      instanceResponseBlock = new InstanceResponseBlock(intermediateResultsBlock);
+      return new InstanceResponseBlock(getDataTable(getCombinedResults()));
     }
-
-    // TODO: Remove this once the SelectionOrderByOperator is modified to throw an exception to catch cases where
-    //       an MV column (identifier or via transform) is present on the order-by list
-    logAndEmitMetricForQueryHasMVSelectionOrderBy(intermediateResultsBlock);
-    return instanceResponseBlock;
   }
 
-  private void logAndEmitMetricForQueryHasMVSelectionOrderBy(IntermediateResultsBlock intermediateResultsBlock) {
-    if (!intermediateResultsBlock.isQueryHasMVSelectionOrderBy()) {
-      return;
-    }
-
-    String tableName = _queryContext.getTableName();
-    if (_serverMetrics != null) {
-      _serverMetrics.addMeteredTableValue(tableName, ServerMeter.QUERY_HAS_MV_SELECTION_ORDER_BY, 1);
-    }
-    LOGGER.warn("Table {} has MV column in ORDER BY. Expressions: {}", tableName,
-        _queryContext.getOrderByExpressions());
-  }
-
-  private IntermediateResultsBlock getCombinedResults() {
+  private BaseResultsBlock getCombinedResults() {
     try {
       prefetchAll();
       return _combineOperator.nextBlock();
     } finally {
       releaseAll();
+    }
+  }
+
+  private DataTable getDataTable(BaseResultsBlock resultsBlock) {
+    try {
+      return resultsBlock.getDataTable(_queryContext);
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while building data table", e);
     }
   }
 
@@ -157,7 +138,6 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
       _indexSegments.get(i).release(_fetchContexts.get(i));
     }
   }
-
 
   @Override
   public String toExplainString() {

@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -223,8 +222,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   public void testInnerSegmentAggregation()
       throws Exception {
     AggregationOperator aggregationOperator = getOperator(getAggregationQuery());
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 5);
 
@@ -385,8 +383,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   public void testInnerSegmentGroupBySV()
       throws Exception {
     AggregationGroupByOrderByOperator groupByOperator = getOperator(getGroupBySVQuery());
-    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
-    AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
+    AggregationGroupByResult groupByResult = groupByOperator.nextBlock().getAggregationGroupByResult();
     assertNotNull(groupByResult);
 
     Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
@@ -555,8 +552,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   public void testInnerSegmentGroupByMV()
       throws Exception {
     AggregationGroupByOrderByOperator groupByOperator = getOperator(getGroupByMVQuery());
-    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
-    AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
+    AggregationGroupByResult groupByResult = groupByOperator.nextBlock().getAggregationGroupByResult();
     assertNotNull(groupByResult);
 
     // Avg

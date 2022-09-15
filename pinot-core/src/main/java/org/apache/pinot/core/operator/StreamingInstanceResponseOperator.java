@@ -22,7 +22,6 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.List;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
@@ -38,10 +37,10 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
 
   private final StreamObserver<Server.ServerResponse> _streamObserver;
 
-  public StreamingInstanceResponseOperator(BaseCombineOperator combinedOperator, List<IndexSegment> indexSegments,
+  public StreamingInstanceResponseOperator(BaseCombineOperator<?> combinedOperator, List<IndexSegment> indexSegments,
       List<FetchContext> fetchContexts, StreamObserver<Server.ServerResponse> streamObserver,
-      QueryContext queryContext, ServerMetrics serverMetrics) {
-    super(combinedOperator, indexSegments, fetchContexts, queryContext, serverMetrics);
+      QueryContext queryContext) {
+    super(combinedOperator, indexSegments, fetchContexts, queryContext);
     _streamObserver = streamObserver;
   }
 
@@ -52,8 +51,7 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
     DataTable metadataOnlyDataTable;
     try {
       metadataOnlyDataTable = instanceResponseDataTable.toMetadataOnlyDataTable();
-      _streamObserver.onNext(StreamingResponseUtils.getDataResponse(
-          instanceResponseDataTable.toDataOnlyDataTable()));
+      _streamObserver.onNext(StreamingResponseUtils.getDataResponse(instanceResponseDataTable.toDataOnlyDataTable()));
     } catch (IOException e) {
       // when exception occurs in streaming, we return an error-only metadata block.
       metadataOnlyDataTable = DataTableFactory.getEmptyDataTable();

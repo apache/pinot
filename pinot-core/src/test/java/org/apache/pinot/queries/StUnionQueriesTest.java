@@ -36,7 +36,8 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.geospatial.transform.function.ScalarFunctions;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -157,10 +158,10 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     // Inner segment
     Operator operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
-    IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
+    AggregationResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), NUM_RECORDS, 0, NUM_RECORDS,
         NUM_RECORDS);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
     assertEquals(aggregationResult.get(0), _intermediateResult);
@@ -187,10 +188,10 @@ public class StUnionQueriesTest extends BaseQueriesTest {
 
     // Inner segment
     AggregationOperator aggregationOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS, NUM_RECORDS);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 8);
     for (Object value : aggregationResult) {
@@ -238,9 +239,9 @@ public class StUnionQueriesTest extends BaseQueriesTest {
     // Inner segment
     Operator operator = getOperator(query);
     assertTrue(operator instanceof AggregationOperator);
-    IntermediateResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
+    AggregationResultsBlock resultsBlock = ((AggregationOperator) operator).nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(operator.getExecutionStatistics(), 0, 0, 0, NUM_RECORDS);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
     assertEquals(aggregationResult.get(0), GeometryUtils.EMPTY_POINT);
@@ -257,7 +258,7 @@ public class StUnionQueriesTest extends BaseQueriesTest {
 
     // Inner segment
     AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+    GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         2 * NUM_RECORDS, NUM_RECORDS);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();

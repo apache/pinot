@@ -92,6 +92,11 @@ public class CSVRecordReader implements RecordReader {
       Character commentMarker = config.getCommentMarker();
       format = format.withCommentMarker(commentMarker);
       format = format.withEscape(config.getEscapeCharacter());
+      String nullString = config.getNullStringValue();
+      if (nullString != null) {
+        format = format.withNullString(nullString);
+      }
+
       _format = format;
       if (config.isMultiValueDelimiterEnabled()) {
         multiValueDelimiter = config.getMultiValueDelimiter();

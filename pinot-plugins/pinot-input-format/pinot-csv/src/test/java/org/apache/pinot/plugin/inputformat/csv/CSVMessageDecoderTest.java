@@ -29,6 +29,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 public class CSVMessageDecoderTest {
@@ -127,6 +128,27 @@ public class CSVMessageDecoderTest {
     assertEquals(destination.getValue("age"), "18");
     assertEquals(destination.getValue("gender"), "F");
     assertEquals(destination.getValue("subjects"), "mat;hs");
+  }
+
+  @Test
+  public void testNullString()
+      throws Exception {
+    Map<String, String> decoderProps = getStandardDecoderProps();
+    decoderProps.put("header", "name;age;gender;subjects");
+    decoderProps.put("delimiter", ";");
+    decoderProps.put("nullStringValue", "null");
+    CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
+    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "");
+    String incomingRecord = "Alice;null;F;null";
+    GenericRow destination = new GenericRow();
+    messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
+    assertNotNull(destination.getValue("name"));
+    assertNull(destination.getValue("age"));
+    assertNotNull(destination.getValue("gender"));
+    assertNull(destination.getValue("subjects"));
+
+    assertEquals(destination.getValue("name"), "Alice");
+    assertEquals(destination.getValue("gender"), "F");
   }
 
   @Test

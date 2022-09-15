@@ -19,8 +19,11 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -29,6 +32,71 @@ import static org.testng.Assert.assertEquals;
 
 
 public class CastTransformFunctionTest extends BaseTransformFunctionTest {
+
+  @Test
+  public void testCastTransformFunctionMV() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("CAST(%s AS LONG)", STRING_LONG_MV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CastTransformFunction);
+    assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
+    long[][] expectedLongValues = new long[NUM_ROWS][];
+    ArrayCopyUtils.copy(_stringLongFormatMVValues, expectedLongValues, NUM_ROWS);
+    testCastTransformFunctionMV(transformFunction, expectedLongValues);
+
+    expression = RequestContextUtils.getExpression(
+        String.format("CAST(CAST(CAST(%s AS LONG) as DOUBLE) as INT)", STRING_LONG_MV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CastTransformFunction);
+    assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
+    long[][] innerLongValues = new long[NUM_ROWS][];
+    ArrayCopyUtils.copy(_stringLongFormatMVValues, innerLongValues, NUM_ROWS);
+    double[][] innerDoubleValues = new double[NUM_ROWS][];
+    ArrayCopyUtils.copy(innerLongValues, innerDoubleValues, NUM_ROWS);
+    int[][] expectedIntValues = new int[NUM_ROWS][];
+    ArrayCopyUtils.copy(innerDoubleValues, expectedIntValues, NUM_ROWS);
+    testCastTransformFunctionMV(transformFunction, expectedIntValues);
+
+    expression =
+        RequestContextUtils.getExpression(String.format("CAST(CAST(%s AS INT) as FLOAT)", FLOAT_MV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CastTransformFunction);
+    assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
+    int[][] innerLayerInt = new int[NUM_ROWS][];
+    ArrayCopyUtils.copy(_floatMVValues, innerLayerInt, NUM_ROWS);
+    float[][] expectedFloatValues = new float[NUM_ROWS][];
+    ArrayCopyUtils.copy(innerLayerInt, expectedFloatValues, NUM_ROWS);
+    testCastTransformFunctionMV(transformFunction, expectedFloatValues);
+
+    expression = RequestContextUtils.getExpression(
+        String.format("CAST(CAST(CAST(%s AS FLOAT) as INT) as STRING)", INT_MV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CastTransformFunction);
+    assertEquals(transformFunction.getName(), CastTransformFunction.FUNCTION_NAME);
+    float[][] innerFloatValues = new float[NUM_ROWS][];
+    ArrayCopyUtils.copy(_intMVValues, innerFloatValues, NUM_ROWS);
+    innerLayerInt = new int[NUM_ROWS][];
+    ArrayCopyUtils.copy(innerFloatValues, innerLayerInt, NUM_ROWS);
+    String[][] expectedStringValues = new String[NUM_ROWS][];
+    ArrayCopyUtils.copy(innerLayerInt, expectedStringValues, NUM_ROWS);
+    testCastTransformFunctionMV(transformFunction, expectedStringValues);
+
+    expression = RequestContextUtils.getExpression(String.format("arrayMax(cAst(%s AS INT))", DOUBLE_MV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    FieldSpec.DataType resultDataType = transformFunction.getResultMetadata().getDataType();
+    Assert.assertEquals(resultDataType, FieldSpec.DataType.INT);
+
+    // checks that arraySum triggers transformToDoubleMV in cast function which correctly cast to INT
+    expression = RequestContextUtils.getExpression(String.format("arraySum(cAst(%s AS INT))", DOUBLE_MV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    int[][] afterCast = new int[NUM_ROWS][];
+    ArrayCopyUtils.copy(_doubleMVValues, afterCast, NUM_ROWS);
+    double[] expectedArraySums = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedArraySums[i] = Arrays.stream(afterCast[i]).sum();
+    }
+    testTransformFunction(transformFunction, expectedArraySums);
+  }
 
   @Test
   public void testCastTransformFunction() {
@@ -129,5 +197,95 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedBigDecimalValues);
     assertEquals(expectedBigDecimalValues, bigDecimalScalarValues);
+  }
+
+  private void testCastTransformFunctionMV(TransformFunction transformFunction, int[][] expectedValues) {
+    int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
+    long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
+    float[][] floatMVValues = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubleMVValues = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    String[][] stringMVValues = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int rowLen = expectedValues[i].length;
+      for (int j = 0; j < rowLen; j++) {
+        Assert.assertEquals(intMVValues[i][j], expectedValues[i][j]);
+        Assert.assertEquals(longMVValues[i][j], (long) expectedValues[i][j]);
+        Assert.assertEquals(floatMVValues[i][j], (float) expectedValues[i][j]);
+        Assert.assertEquals(doubleMVValues[i][j], (double) expectedValues[i][j]);
+        Assert.assertEquals(stringMVValues[i][j], Integer.toString(expectedValues[i][j]));
+      }
+    }
+  }
+
+  private void testCastTransformFunctionMV(TransformFunction transformFunction, long[][] expectedValues) {
+    int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
+    long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
+    float[][] floatMVValues = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubleMVValues = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    String[][] stringMVValues = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int rowLen = expectedValues[i].length;
+      for (int j = 0; j < rowLen; j++) {
+        Assert.assertEquals(intMVValues[i][j], (int) expectedValues[i][j]);
+        Assert.assertEquals(longMVValues[i][j], expectedValues[i][j]);
+        Assert.assertEquals(floatMVValues[i][j], (float) expectedValues[i][j]);
+        Assert.assertEquals(doubleMVValues[i][j], (double) expectedValues[i][j]);
+        Assert.assertEquals(stringMVValues[i][j], Long.toString(expectedValues[i][j]));
+      }
+    }
+  }
+
+  private void testCastTransformFunctionMV(TransformFunction transformFunction, float[][] expectedValues) {
+    int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
+    long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
+    float[][] floatMVValues = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubleMVValues = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    String[][] stringMVValues = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int rowLen = expectedValues[i].length;
+      for (int j = 0; j < rowLen; j++) {
+        Assert.assertEquals(intMVValues[i][j], (int) expectedValues[i][j]);
+        Assert.assertEquals(longMVValues[i][j], (long) expectedValues[i][j]);
+        Assert.assertEquals(floatMVValues[i][j], expectedValues[i][j]);
+        Assert.assertEquals(doubleMVValues[i][j], (double) expectedValues[i][j]);
+        Assert.assertEquals(stringMVValues[i][j], Float.toString(expectedValues[i][j]));
+      }
+    }
+  }
+
+  private void testCastTransformFunctionMV(TransformFunction transformFunction, double[][] expectedValues) {
+    int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
+    long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
+    float[][] floatMVValues = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubleMVValues = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    String[][] stringMVValues = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int rowLen = expectedValues[i].length;
+      for (int j = 0; j < rowLen; j++) {
+        Assert.assertEquals(intMVValues[i][j], (int) expectedValues[i][j]);
+        Assert.assertEquals(longMVValues[i][j], (long) expectedValues[i][j]);
+        Assert.assertEquals(floatMVValues[i][j], (float) expectedValues[i][j]);
+        Assert.assertEquals(doubleMVValues[i][j], expectedValues[i][j]);
+        Assert.assertEquals(stringMVValues[i][j], Double.toString(expectedValues[i][j]));
+      }
+    }
+  }
+
+  private void testCastTransformFunctionMV(TransformFunction transformFunction, String[][] expectedValues) {
+    int[][] intMVValues = transformFunction.transformToIntValuesMV(_projectionBlock);
+    long[][] longMVValues = transformFunction.transformToLongValuesMV(_projectionBlock);
+    float[][] floatMVValues = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubleMVValues = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    String[][] stringMVValues = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int rowLen = expectedValues[i].length;
+      for (int j = 0; j < rowLen; j++) {
+        Assert.assertEquals(intMVValues[i][j], Integer.parseInt(expectedValues[i][j]));
+        Assert.assertEquals(longMVValues[i][j], Long.parseLong(expectedValues[i][j]));
+        Assert.assertEquals(floatMVValues[i][j], Float.parseFloat(expectedValues[i][j]));
+        Assert.assertEquals(doubleMVValues[i][j], Double.parseDouble(expectedValues[i][j]));
+        Assert.assertEquals(stringMVValues[i][j], expectedValues[i][j]);
+      }
+    }
   }
 }

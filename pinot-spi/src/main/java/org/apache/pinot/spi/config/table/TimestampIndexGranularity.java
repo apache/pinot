@@ -52,7 +52,7 @@ public enum TimestampIndexGranularity {
   }
 
   public static boolean isValidTimeGranularity(String granularity) {
-    return VALID_VALUES.contains(granularity.toUpperCase());
+    return VALID_VALUES.contains(granularity);
   }
 
   public static Set<String> extractTimestampIndexGranularityColumnNames(TableConfig tableConfig) {

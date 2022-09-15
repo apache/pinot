@@ -192,6 +192,7 @@ public class SparkSegmentGenerationJobRunnerTest {
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
     jobSpec.setJobType("SegmentCreation");
     jobSpec.setInputDirURI(inputDir.toURI().toString());
+    jobSpec.setSearchRecursively(true);
     jobSpec.setOutputDirURI(outputDir.toURI().toString());
     jobSpec.setOverwriteOutput(true);
 

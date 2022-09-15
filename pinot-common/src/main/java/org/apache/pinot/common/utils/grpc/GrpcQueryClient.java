@@ -18,24 +18,22 @@
  */
 package org.apache.pinot.common.utils.grpc;
 
-import com.google.common.collect.ImmutableMap;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslProvider;
+import java.util.Collections;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
-import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.proto.PinotQueryServerGrpc;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.TlsUtils;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,10 +46,10 @@ public class GrpcQueryClient {
   private final PinotQueryServerGrpc.PinotQueryServerBlockingStub _blockingStub;
 
   public GrpcQueryClient(String host, int port) {
-    this(host, port, new Config());
+    this(host, port, new GrpcConfig(Collections.emptyMap()));
   }
 
-  public GrpcQueryClient(String host, int port, Config config) {
+  public GrpcQueryClient(String host, int port, GrpcConfig config) {
     if (config.isUsePlainText()) {
       _managedChannel =
           ManagedChannelBuilder.forAddress(host, port).maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
@@ -97,57 +95,6 @@ public class GrpcQueryClient {
       } catch (Exception e) {
         LOGGER.error("Unexpected exception while waiting for channel termination", e);
       }
-    }
-  }
-
-  public static class Config {
-    public static final String GRPC_TLS_PREFIX = "tls";
-    public static final String CONFIG_USE_PLAIN_TEXT = "usePlainText";
-    public static final String CONFIG_MAX_INBOUND_MESSAGE_BYTES_SIZE = "maxInboundMessageSizeBytes";
-    // Default max message size to 128MB
-    public static final int DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE = 128 * 1024 * 1024;
-
-    private final int _maxInboundMessageSizeBytes;
-    private final boolean _usePlainText;
-    private final TlsConfig _tlsConfig;
-    private final PinotConfiguration _pinotConfig;
-
-    public Config() {
-      this(DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE, true);
-    }
-
-    public Config(int maxInboundMessageSizeBytes, boolean usePlainText) {
-      this(ImmutableMap.of(CONFIG_MAX_INBOUND_MESSAGE_BYTES_SIZE, maxInboundMessageSizeBytes, CONFIG_USE_PLAIN_TEXT,
-          usePlainText));
-    }
-
-    public Config(Map<String, Object> configMap) {
-      _pinotConfig = new PinotConfiguration(configMap);
-      _maxInboundMessageSizeBytes =
-          _pinotConfig.getProperty(CONFIG_MAX_INBOUND_MESSAGE_BYTES_SIZE, DEFAULT_MAX_INBOUND_MESSAGE_BYTES_SIZE);
-      _usePlainText = Boolean.valueOf(configMap.get(CONFIG_USE_PLAIN_TEXT).toString());
-      _tlsConfig = TlsUtils.extractTlsConfig(_pinotConfig, GRPC_TLS_PREFIX);
-    }
-
-    // Allow get customized configs.
-    public Object get(String key) {
-      return _pinotConfig.getProperty(key);
-    }
-
-    public int getMaxInboundMessageSizeBytes() {
-      return _maxInboundMessageSizeBytes;
-    }
-
-    public boolean isUsePlainText() {
-      return _usePlainText;
-    }
-
-    public TlsConfig getTlsConfig() {
-      return _tlsConfig;
-    }
-
-    public PinotConfiguration getPinotConfig() {
-      return _pinotConfig;
     }
   }
 }

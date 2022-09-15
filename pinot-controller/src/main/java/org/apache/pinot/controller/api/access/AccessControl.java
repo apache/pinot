@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.access;
 
+import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
@@ -40,7 +41,9 @@ public interface AccessControl {
    * @return Whether the client has data access to the table
    */
   @Deprecated
-  boolean hasDataAccess(HttpHeaders httpHeaders, String tableName);
+  default boolean hasDataAccess(HttpHeaders httpHeaders, String tableName) {
+    return hasAccess(tableName, AccessType.READ, httpHeaders, null);
+  }
 
   /**
    * Return whether the client has permission to the given table
@@ -51,7 +54,8 @@ public interface AccessControl {
    * @param endpointUrl the request url for which this access control is called
    * @return whether the client has permission
    */
-  default boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
+  default boolean hasAccess(@Nullable String tableName, AccessType accessType, HttpHeaders httpHeaders,
+      @Nullable String endpointUrl) {
     return true;
   }
 
@@ -63,12 +67,8 @@ public interface AccessControl {
    * @param endpointUrl the request url for which this access control is called
    * @return whether the client has permission
    */
-  default boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-    return true;
-  }
-
-  default boolean hasAccess(HttpHeaders httpHeaders) {
-    return true;
+  default boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, @Nullable String endpointUrl) {
+    return hasAccess(null, accessType, httpHeaders, endpointUrl);
   }
 
   /**

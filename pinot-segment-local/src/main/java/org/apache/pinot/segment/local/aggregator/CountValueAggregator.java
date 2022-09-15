@@ -22,7 +22,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public class CountValueAggregator implements ValueAggregator<Void, Long> {
+public class CountValueAggregator implements ValueAggregator<Object, Long> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.LONG;
 
   @Override
@@ -36,12 +36,12 @@ public class CountValueAggregator implements ValueAggregator<Void, Long> {
   }
 
   @Override
-  public Long getInitialAggregatedValue(Void rawValue) {
+  public Long getInitialAggregatedValue(Object rawValue) {
     return 1L;
   }
 
   @Override
-  public Long applyRawValue(Long value, Void rawValue) {
+  public Long applyRawValue(Long value, Object rawValue) {
     return value + 1;
   }
 

@@ -20,7 +20,9 @@ package org.apache.pinot.client;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import javax.net.ssl.SSLContext;
+import org.apache.pinot.client.utils.ConnectionUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -28,15 +30,27 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * Pinot client transport factory for JSON encoded BrokerResults through HTTP.
  */
 public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTransportFactory {
+
+  private static final String DEFAULT_BROKER_READ_TIMEOUT_MS = "60000";
+  private static final String DEFAULT_BROKER_CONNECT_TIMEOUT_MS = "2000";
+  private static final String DEFAULT_BROKER_HANDSHAKE_TIMEOUT_MS = "2000";
+  private static final String DEFAULT_BROKER_TLS_V10_ENABLED = "false";
+
   private Map<String, String> _headers = new HashMap<>();
   private String _scheme = CommonConstants.HTTP_PROTOCOL;
   private SSLContext _sslContext = null;
+  private boolean _tlsV10Enabled = false;
+  private int _readTimeoutMs = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT_MS);
+  private int _connectTimeoutMs = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT_MS);
+  private int _handshakeTimeoutMs = Integer.parseInt(DEFAULT_BROKER_HANDSHAKE_TIMEOUT_MS);
 
   @Override
   public PinotClientTransport buildTransport() {
-    return new JsonAsyncHttpPinotClientTransport(_headers, _scheme, _sslContext);
+    ConnectionTimeouts connectionTimeouts = ConnectionTimeouts.create(_readTimeoutMs, _connectTimeoutMs,
+            _handshakeTimeoutMs);
+    TlsProtocols tlsProtocols = TlsProtocols.defaultProtocols(_tlsV10Enabled);
+    return new JsonAsyncHttpPinotClientTransport(_headers, _scheme, _sslContext, connectionTimeouts, tlsProtocols);
   }
-
   public Map<String, String> getHeaders() {
     return _headers;
   }
@@ -59,5 +73,31 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
 
   public void setSslContext(SSLContext sslContext) {
     _sslContext = sslContext;
+  }
+
+  public JsonAsyncHttpPinotClientTransportFactory withConnectionProperties(Properties properties) {
+    if (_headers == null || _headers.isEmpty()) {
+      _headers = ConnectionUtils.getHeadersFromProperties(properties);
+    }
+
+    if (_scheme == null) {
+      _scheme = properties.getProperty("scheme", CommonConstants.HTTP_PROTOCOL);
+    }
+
+    if (_sslContext == null && _scheme.contentEquals(CommonConstants.HTTPS_PROTOCOL)) {
+      _sslContext = ConnectionUtils.getSSLContextFromProperties(properties);
+    }
+
+    _readTimeoutMs = Integer.parseInt(properties.getProperty("brokerReadTimeoutMs",
+            DEFAULT_BROKER_READ_TIMEOUT_MS));
+    _connectTimeoutMs = Integer.parseInt(properties.getProperty("brokerConnectTimeoutMs",
+            DEFAULT_BROKER_CONNECT_TIMEOUT_MS));
+    _handshakeTimeoutMs = Integer.parseInt(properties.getProperty("brokerHandshakeTimeoutMs",
+            DEFAULT_BROKER_HANDSHAKE_TIMEOUT_MS));
+    _tlsV10Enabled = Boolean.parseBoolean(properties.getProperty("brokerTlsV10Enabled",
+            DEFAULT_BROKER_TLS_V10_ENABLED))
+            || Boolean.parseBoolean(System.getProperties().getProperty("broker.tlsV10Enabled",
+            DEFAULT_BROKER_TLS_V10_ENABLED));
+    return this;
   }
 }

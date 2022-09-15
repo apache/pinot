@@ -26,8 +26,8 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
@@ -41,7 +41,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
  * FilteredAggregationOperator will come into execution.
  */
 @SuppressWarnings("rawtypes")
-public class FilteredAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
+public class FilteredAggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE_FILTERED";
 
   private final AggregationFunction[] _aggregationFunctions;
@@ -62,7 +62,7 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
   }
 
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
+  protected AggregationResultsBlock getNextBlock() {
     int numAggregations = _aggregationFunctions.length;
     Object[] result = new Object[numAggregations];
     IdentityHashMap<AggregationFunction, Integer> resultIndexMap = new IdentityHashMap<>(numAggregations);
@@ -89,7 +89,7 @@ public class FilteredAggregationOperator extends BaseOperator<IntermediateResult
       _numEntriesScannedInFilter += transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * transformOperator.getNumColumnsProjected();
     }
-    return new IntermediateResultsBlock(_aggregationFunctions, Arrays.asList(result));
+    return new AggregationResultsBlock(_aggregationFunctions, Arrays.asList(result));
   }
 
   @Override

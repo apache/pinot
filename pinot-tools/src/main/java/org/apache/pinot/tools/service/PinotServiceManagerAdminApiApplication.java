@@ -58,9 +58,7 @@ public class PinotServiceManagerAdminApiApplication extends ResourceConfig {
     Preconditions.checkArgument(httpPort > 0);
     _baseUri = URI.create("http://0.0.0.0:" + httpPort + "/");
     _httpServer = GrizzlyHttpServerFactory.createHttpServer(_baseUri, this);
-    synchronized (PinotReflectionUtils.getReflectionLock()) {
-      setupSwagger();
-    }
+    PinotReflectionUtils.runWithLock(this::setupSwagger);
   }
 
   private void setupSwagger() {
@@ -73,7 +71,7 @@ public class PinotServiceManagerAdminApiApplication extends ResourceConfig {
     beanConfig.setBasePath(_baseUri.getPath());
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
-
+    beanConfig.setExpandSuperTypes(false);
     HttpHandler httpHandler =
         new CLStaticHttpHandler(PinotServiceManagerAdminApiApplication.class.getClassLoader(), "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility

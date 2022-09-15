@@ -278,6 +278,12 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   }
 
   @Test
+  public void testReset()
+      throws Exception {
+    super.testReset(TableType.REALTIME);
+  }
+
+  @Test
   @Override
   public void testHardcodedServerPartitionedSqlQueries()
       throws Exception {

@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.server.starter;
 
+import com.google.common.base.Preconditions;
+import io.netty.channel.ChannelHandler;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -33,10 +36,13 @@ import org.apache.pinot.core.operator.transform.function.TransformFunctionFactor
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.query.scheduler.QuerySchedulerFactory;
+import org.apache.pinot.core.transport.ChannelHandlerFactory;
+import org.apache.pinot.core.transport.InstanceRequestHandler;
 import org.apache.pinot.core.transport.QueryServer;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
+import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.worker.WorkerQueryServer;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -65,6 +71,7 @@ public class ServerInstance {
   private final AccessControl _accessControl;
 
   private final WorkerQueryServer _workerQueryServer;
+  private ChannelHandler _instanceRequestHandler;
 
   private boolean _dataManagerStarted = false;
   private boolean _queryServerStarted = false;
@@ -102,8 +109,9 @@ public class ServerInstance {
         TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
     NettyConfig nettyConfig =
         NettyConfig.extractNettyConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_NETTY_PREFIX);
-    accessControlFactory.init(
-        serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL), helixManager);
+    accessControlFactory
+        .init(serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL),
+            helixManager);
     _accessControl = accessControlFactory.create();
 
     if (serverConf.isMultiStageServerEnabled()) {
@@ -116,7 +124,10 @@ public class ServerInstance {
     if (serverConf.isNettyServerEnabled()) {
       int nettyPort = serverConf.getNettyPort();
       LOGGER.info("Initializing Netty query server on port: {}", nettyPort);
-      _nettyQueryServer = new QueryServer(nettyPort, _queryScheduler, _serverMetrics, nettyConfig);
+      _instanceRequestHandler = ChannelHandlerFactory
+          .getInstanceRequestHandler(helixManager.getInstanceName(), serverConf.getPinotConfig(), _queryScheduler,
+              _serverMetrics, new AllowAllAccessFactory().create());
+      _nettyQueryServer = new QueryServer(nettyPort, nettyConfig, _instanceRequestHandler);
     } else {
       _nettyQueryServer = null;
     }
@@ -124,17 +135,20 @@ public class ServerInstance {
     if (serverConf.isNettyTlsServerEnabled()) {
       int nettySecPort = serverConf.getNettyTlsPort();
       LOGGER.info("Initializing TLS-secured Netty query server on port: {}", nettySecPort);
-      _nettyTlsQueryServer =
-          new QueryServer(nettySecPort, _queryScheduler, _serverMetrics, nettyConfig, tlsConfig, _accessControl);
+      _instanceRequestHandler = ChannelHandlerFactory
+          .getInstanceRequestHandler(helixManager.getInstanceName(), serverConf.getPinotConfig(), _queryScheduler,
+              _serverMetrics, _accessControl);
+      _nettyTlsQueryServer = new QueryServer(nettySecPort, nettyConfig, tlsConfig, _instanceRequestHandler);
     } else {
       _nettyTlsQueryServer = null;
     }
     if (serverConf.isEnableGrpcServer()) {
       int grpcPort = serverConf.getGrpcPort();
       LOGGER.info("Initializing gRPC query server on port: {}", grpcPort);
-      _grpcQueryServer = new GrpcQueryServer(grpcPort,
-          serverConf.isGrpcTlsServerEnabled() ? TlsUtils.extractTlsConfig(serverConf.getPinotConfig(),
-              CommonConstants.Server.SERVER_GRPCTLS_PREFIX) : null, _queryExecutor, _serverMetrics, _accessControl);
+      _grpcQueryServer = new GrpcQueryServer(grpcPort, GrpcConfig.buildGrpcQueryConfig(serverConf.getPinotConfig()),
+          serverConf.isGrpcTlsServerEnabled() ? TlsUtils
+              .extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_GRPCTLS_PREFIX) : null,
+          _queryExecutor, _serverMetrics, _accessControl);
     } else {
       _grpcQueryServer = null;
     }
@@ -256,5 +270,11 @@ public class ServerInstance {
 
   public long getLatestQueryTime() {
     return _latestQueryTime.get();
+  }
+
+  public InstanceRequestHandler getInstanceRequestHandler() {
+    Preconditions.checkState(_instanceRequestHandler instanceof InstanceRequestHandler,
+        "Unexpected type of instance request handler");
+    return (InstanceRequestHandler) _instanceRequestHandler;
   }
 }

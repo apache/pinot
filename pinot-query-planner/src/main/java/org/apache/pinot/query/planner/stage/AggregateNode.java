@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.stage;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.core.AggregateCall;
@@ -43,9 +42,8 @@ public class AggregateNode extends AbstractStageNode {
     super(stageId, dataSchema);
     _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
     _groupSet = new ArrayList<>(groupSet.cardinality());
-    Iterator<Integer> groupSetIt = groupSet.iterator();
-    while (groupSetIt.hasNext()) {
-      _groupSet.add(new RexExpression.InputRef(groupSetIt.next()));
+    for (Integer integer : groupSet) {
+      _groupSet.add(new RexExpression.InputRef(integer));
     }
   }
 

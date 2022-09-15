@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -48,12 +50,17 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
-  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs) {
+  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs,
+      @Nullable NullValueVectorReader nullValueReader) {
     _predicateEvaluator = predicateEvaluator;
     _reader = reader;
     _readerContext = reader.createContext();
     _numDocs = numDocs;
-    _valueMatcher = getValueMatcher();
+    ImmutableRoaringBitmap nullBitmap = nullValueReader != null ? nullValueReader.getNullBitmap() : null;
+    if (nullBitmap != null && nullBitmap.isEmpty()) {
+      nullBitmap = null;
+    }
+    _valueMatcher = getValueMatcher(nullBitmap);
   }
 
   @Override
@@ -122,25 +129,25 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     return _numEntriesScanned;
   }
 
-  private ValueMatcher getValueMatcher() {
+  private ValueMatcher getValueMatcher(@Nullable ImmutableRoaringBitmap nullBitmap) {
     if (_reader.isDictionaryEncoded()) {
-      return new DictIdMatcher();
+      return nullBitmap == null ? new DictIdMatcher() : new DictIdMatcherAndNullHandler(nullBitmap);
     } else {
       switch (_reader.getStoredType()) {
         case INT:
-          return new IntMatcher();
+          return nullBitmap == null ? new IntMatcher() : new IntMatcherAndNullHandler(nullBitmap);
         case LONG:
-          return new LongMatcher();
+          return nullBitmap == null ? new LongMatcher() : new LongMatcherAndNullHandler(nullBitmap);
         case FLOAT:
-          return new FloatMatcher();
+          return nullBitmap == null ? new FloatMatcher() : new FloatMatcherAndNullHandler(nullBitmap);
         case DOUBLE:
-          return new DoubleMatcher();
+          return nullBitmap == null ? new DoubleMatcher() : new DoubleMatcherAndNullHandler(nullBitmap);
         case BIG_DECIMAL:
-          return new BigDecimalMatcher();
+          return nullBitmap == null ? new BigDecimalMatcher() : new BigDecimalMatcherAndNullHandler(nullBitmap);
         case STRING:
-          return new StringMatcher();
+          return nullBitmap == null ? new StringMatcher() : new StringMatcherAndNullHandler(nullBitmap);
         case BYTES:
-          return new BytesMatcher();
+          return nullBitmap == null ? new BytesMatcher() : new BytesMatcherAndNullHandler(nullBitmap);
         default:
           throw new UnsupportedOperationException();
       }
@@ -172,6 +179,57 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
   }
 
+  private static class MatcherUtils {
+    public static int removeNullDocs(int[] docIds, int[] values, int limit, ImmutableRoaringBitmap nullBitmap) {
+      assert !nullBitmap.isEmpty();
+      int copyToIdx = 0;
+      for (int i = 0; i < limit; i++) {
+        if (!nullBitmap.contains(docIds[i])) {
+          // Compact non-null entries into the prefix of the docIds and values arrays.
+          docIds[copyToIdx] = docIds[i];
+          values[copyToIdx++] = values[i];
+        }
+      }
+      return copyToIdx;
+    }
+
+    public static int removeNullDocs(int[] docIds, long[] values, int limit, ImmutableRoaringBitmap nullBitmap) {
+      assert !nullBitmap.isEmpty();
+      int copyToIdx = 0;
+      for (int i = 0; i < limit; i++) {
+        if (!nullBitmap.contains(docIds[i])) {
+          docIds[copyToIdx] = docIds[i];
+          values[copyToIdx++] = values[i];
+        }
+      }
+      return copyToIdx;
+    }
+
+    public static int removeNullDocs(int[] docIds, float[] values, int limit, ImmutableRoaringBitmap nullBitmap) {
+      assert !nullBitmap.isEmpty();
+      int copyToIdx = 0;
+      for (int i = 0; i < limit; i++) {
+        if (!nullBitmap.contains(docIds[i])) {
+          docIds[copyToIdx] = docIds[i];
+          values[copyToIdx++] = values[i];
+        }
+      }
+      return copyToIdx;
+    }
+
+    public static int removeNullDocs(int[] docIds, double[] values, int limit, ImmutableRoaringBitmap nullBitmap) {
+      assert !nullBitmap.isEmpty();
+      int copyToIdx = 0;
+      for (int i = 0; i < limit; i++) {
+        if (!nullBitmap.contains(docIds[i])) {
+          docIds[copyToIdx] = docIds[i];
+          values[copyToIdx++] = values[i];
+        }
+      }
+      return copyToIdx;
+    }
+  }
+
   private class DictIdMatcher implements ValueMatcher {
 
     private final int[] _buffer = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
@@ -185,6 +243,34 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     public int matchValues(int limit, int[] docIds) {
       _reader.readDictIds(docIds, limit, _buffer, _readerContext);
       return _predicateEvaluator.applySV(limit, docIds, _buffer);
+    }
+  }
+
+  private class DictIdMatcherAndNullHandler implements ValueMatcher {
+
+    private final int[] _buffer = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
+    private final ImmutableRoaringBitmap _nullBitmap;
+
+    public DictIdMatcherAndNullHandler(ImmutableRoaringBitmap nullBitmap) {
+      _nullBitmap = nullBitmap;
+    }
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      // Any comparison (equality, inequality, or membership) with null results in false (similar to Presto) even if
+      // the compared with value is null, and comparison is equality.
+      // To consider nulls, use: IS NULL, or IS NOT NULL operators.
+      if (_nullBitmap.contains(docId)) {
+        return false;
+      }
+      return _predicateEvaluator.applySV(_reader.getDictId(docId, _readerContext));
+    }
+
+    @Override
+    public int matchValues(int limit, int[] docIds) {
+      _reader.readDictIds(docIds, limit, _buffer, _readerContext);
+      int newLimit = MatcherUtils.removeNullDocs(docIds, _buffer, limit, _nullBitmap);
+      return _predicateEvaluator.applySV(newLimit, docIds, _buffer);
     }
   }
 
@@ -204,6 +290,31 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
   }
 
+  private class IntMatcherAndNullHandler implements ValueMatcher {
+
+    private final ImmutableRoaringBitmap _nullBitmap;
+    private final int[] _buffer = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
+
+    public IntMatcherAndNullHandler(ImmutableRoaringBitmap nullBitmap) {
+      _nullBitmap = nullBitmap;
+    }
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      if (_nullBitmap.contains(docId)) {
+        return false;
+      }
+      return _predicateEvaluator.applySV(_reader.getInt(docId, _readerContext));
+    }
+
+    @Override
+    public int matchValues(int limit, int[] docIds) {
+      _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
+      int newLimit = MatcherUtils.removeNullDocs(docIds, _buffer, limit, _nullBitmap);
+      return _predicateEvaluator.applySV(newLimit, docIds, _buffer);
+    }
+  }
+
   private class LongMatcher implements ValueMatcher {
 
     private final long[] _buffer = new long[OPTIMAL_ITERATOR_BATCH_SIZE];
@@ -217,6 +328,31 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     public int matchValues(int limit, int[] docIds) {
       _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
       return _predicateEvaluator.applySV(limit, docIds, _buffer);
+    }
+  }
+
+  private class LongMatcherAndNullHandler implements ValueMatcher {
+
+    private final ImmutableRoaringBitmap _nullBitmap;
+    private final long[] _buffer = new long[OPTIMAL_ITERATOR_BATCH_SIZE];
+
+    public LongMatcherAndNullHandler(ImmutableRoaringBitmap nullBitmap) {
+      _nullBitmap = nullBitmap;
+    }
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      if (_nullBitmap.contains(docId)) {
+        return false;
+      }
+      return _predicateEvaluator.applySV(_reader.getLong(docId, _readerContext));
+    }
+
+    @Override
+    public int matchValues(int limit, int[] docIds) {
+      _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
+      int newLimit = MatcherUtils.removeNullDocs(docIds, _buffer, limit, _nullBitmap);
+      return _predicateEvaluator.applySV(newLimit, docIds, _buffer);
     }
   }
 
@@ -236,6 +372,31 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
   }
 
+  private class FloatMatcherAndNullHandler implements ValueMatcher {
+
+    private final ImmutableRoaringBitmap _nullBitmap;
+    private final float[] _buffer = new float[OPTIMAL_ITERATOR_BATCH_SIZE];
+
+    public FloatMatcherAndNullHandler(ImmutableRoaringBitmap nullBitmap) {
+      _nullBitmap = nullBitmap;
+    }
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      if (_nullBitmap.contains(docId)) {
+        return false;
+      }
+      return _predicateEvaluator.applySV(_reader.getFloat(docId, _readerContext));
+    }
+
+    @Override
+    public int matchValues(int limit, int[] docIds) {
+      _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
+      int newLimit = MatcherUtils.removeNullDocs(docIds, _buffer, limit, _nullBitmap);
+      return _predicateEvaluator.applySV(newLimit, docIds, _buffer);
+    }
+  }
+
   private class DoubleMatcher implements ValueMatcher {
 
     private final double[] _buffer = new double[OPTIMAL_ITERATOR_BATCH_SIZE];
@@ -252,10 +413,52 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
   }
 
+  private class DoubleMatcherAndNullHandler implements ValueMatcher {
+
+    private final ImmutableRoaringBitmap _nullBitmap;
+    private final double[] _buffer = new double[OPTIMAL_ITERATOR_BATCH_SIZE];
+
+    public DoubleMatcherAndNullHandler(ImmutableRoaringBitmap nullBitmap) {
+      _nullBitmap = nullBitmap;
+    }
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      if (_nullBitmap.contains(docId)) {
+        return false;
+      }
+      return _predicateEvaluator.applySV(_reader.getDouble(docId, _readerContext));
+    }
+
+    @Override
+    public int matchValues(int limit, int[] docIds) {
+      _reader.readValuesSV(docIds, limit, _buffer, _readerContext);
+      int newLimit = MatcherUtils.removeNullDocs(docIds, _buffer, limit, _nullBitmap);
+      return _predicateEvaluator.applySV(newLimit, docIds, _buffer);
+    }
+  }
+
   private class BigDecimalMatcher implements ValueMatcher {
 
     @Override
     public boolean doesValueMatch(int docId) {
+      return _predicateEvaluator.applySV(_reader.getBigDecimal(docId, _readerContext));
+    }
+  }
+
+  private class BigDecimalMatcherAndNullHandler implements ValueMatcher {
+
+    private final ImmutableRoaringBitmap _nullBitmap;
+
+    public BigDecimalMatcherAndNullHandler(ImmutableRoaringBitmap nullBitmap) {
+      _nullBitmap = nullBitmap;
+    }
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      if (_nullBitmap.contains(docId)) {
+        return false;
+      }
       return _predicateEvaluator.applySV(_reader.getBigDecimal(docId, _readerContext));
     }
   }
@@ -268,10 +471,44 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
   }
 
+  private class StringMatcherAndNullHandler implements ValueMatcher {
+
+    private final ImmutableRoaringBitmap _nullBitmap;
+
+    public StringMatcherAndNullHandler(ImmutableRoaringBitmap nullBitmap) {
+      _nullBitmap = nullBitmap;
+    }
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      if (_nullBitmap.contains(docId)) {
+        return false;
+      }
+      return _predicateEvaluator.applySV(_reader.getString(docId, _readerContext));
+    }
+  }
+
   private class BytesMatcher implements ValueMatcher {
 
     @Override
     public boolean doesValueMatch(int docId) {
+      return _predicateEvaluator.applySV(_reader.getBytes(docId, _readerContext));
+    }
+  }
+
+  private class BytesMatcherAndNullHandler implements ValueMatcher {
+
+    private final ImmutableRoaringBitmap _nullBitmap;
+
+    public BytesMatcherAndNullHandler(ImmutableRoaringBitmap nullBitmap) {
+      _nullBitmap = nullBitmap;
+    }
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      if (_nullBitmap.contains(docId)) {
+        return false;
+      }
       return _predicateEvaluator.applySV(_reader.getBytes(docId, _readerContext));
     }
   }

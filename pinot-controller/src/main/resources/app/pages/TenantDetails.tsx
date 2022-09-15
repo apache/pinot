@@ -497,10 +497,9 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             </SimpleAccordion>
           </div>
           <CustomizedTables
-            title="Segments"
+            title={"Segments - " + segmentList.records.length}
             data={segmentList}
-            isPagination={false}
-            noOfRows={segmentList.records.length}
+            isPagination={true}
             baseURL={
               tenantName && `/tenants/${tenantName}/table/${tableName}/` ||
               instanceName && `/instance/${instanceName}/table/${tableName}/` ||
@@ -547,7 +546,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
           </div>
           }
           <CustomizedTables
-            title="Instance Count"
+            title={"Instance Count - " + instanceCountData.records.length}
             data={instanceCountData}
             isPagination={false}
             noOfRows={instanceCountData.records.length}

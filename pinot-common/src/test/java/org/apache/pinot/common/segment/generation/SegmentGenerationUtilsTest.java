@@ -19,10 +19,18 @@
 
 package org.apache.pinot.common.segment.generation;
 
+import com.google.common.collect.Lists;
+import java.io.File;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
+import java.nio.file.Files;
+import java.util.List;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -123,5 +131,115 @@ public class SegmentGenerationUtilsTest {
   private void validateFileURI(URI directoryURI)
       throws URISyntaxException {
     validateFileURI(directoryURI, directoryURI.toString());
+  }
+
+  // Test that we search files recursively when recursiveSearch option is set to true.
+  @Test
+  public void testMatchFilesRecursiveSearchOnRecursiveInputFilePattern()
+      throws Exception {
+    File testDir = makeTestDir();
+    File inputDir = new File(testDir, "input");
+    File inputSubDir1 = new File(inputDir, "2009");
+    inputSubDir1.mkdirs();
+
+    File inputFile1 = new File(inputDir, "input.csv");
+    FileUtils.writeLines(inputFile1, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+
+    File inputFile2 = new File(inputSubDir1, "input.csv");
+    FileUtils.writeLines(inputFile2, Lists.newArrayList("col1,col2", "value3,3", "value4,4"));
+    URI inputDirURI = new URI(inputDir.getAbsolutePath());
+    if (inputDirURI.getScheme() == null) {
+      inputDirURI = new File(inputDir.getAbsolutePath()).toURI();
+    }
+    PinotFS inputDirFS = PinotFSFactory.create(inputDirURI.getScheme());
+    String includePattern = "glob:" + inputDir.getAbsolutePath() + "/**.csv";
+    List<String> files =
+        SegmentGenerationUtils.listMatchedFilesWithRecursiveOption(inputDirFS, inputDirURI, includePattern, null, true);
+    Assert.assertEquals(files.size(), 2);
+  }
+
+  // Test that we don't search files recursively when recursiveSearch option is set to false.
+  @Test
+  public void testMatchFilesRecursiveSearchOnNonRecursiveInputFilePattern()
+      throws Exception {
+    File testDir = makeTestDir();
+    File inputDir = new File(testDir, "dir");
+    File inputSubDir1 = new File(inputDir, "2009");
+    inputSubDir1.mkdirs();
+
+    File inputFile1 = new File(inputDir, "input.csv");
+    FileUtils.writeLines(inputFile1, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+
+    File inputFile2 = new File(inputSubDir1, "input.csv");
+    FileUtils.writeLines(inputFile2, Lists.newArrayList("col1,col2", "value3,3", "value4,4"));
+    URI inputDirURI = new URI(inputDir.getAbsolutePath());
+    if (inputDirURI.getScheme() == null) {
+      inputDirURI = new File(inputDir.getAbsolutePath()).toURI();
+    }
+    PinotFS inputDirFS = PinotFSFactory.create(inputDirURI.getScheme());
+    String includePattern = "glob:" + inputDir.getAbsolutePath() + "/*.csv";
+
+    List<String> files =
+        SegmentGenerationUtils.listMatchedFilesWithRecursiveOption(inputDirFS, inputDirURI, includePattern, null,
+            false);
+    Assert.assertEquals(files.size(), 1);
+  }
+
+  // Test that we exclude files that match exclude pattern.
+  @Test
+  public void testMatchFilesRecursiveSearchExcludeFilePattern()
+      throws Exception {
+    File testDir = makeTestDir();
+    File inputDir = new File(testDir, "dir");
+    File inputSubDir1 = new File(inputDir, "2009");
+    inputSubDir1.mkdirs();
+
+    File inputFile1 = new File(inputDir, "input1.csv");
+    FileUtils.writeLines(inputFile1, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+
+    File inputFile2 = new File(inputSubDir1, "input2.csv");
+    FileUtils.writeLines(inputFile2, Lists.newArrayList("col1,col2", "value3,3", "value4,4"));
+    URI inputDirURI = new URI(inputDir.getAbsolutePath());
+    if (inputDirURI.getScheme() == null) {
+      inputDirURI = new File(inputDir.getAbsolutePath()).toURI();
+    }
+    PinotFS inputDirFS = PinotFSFactory.create(inputDirURI.getScheme());
+    String includePattern = "glob:" + inputDir.getAbsolutePath() + "/**.csv";
+    String excludePattern = "glob:" + inputDir.getAbsolutePath() + "/2009/input2.csv";
+
+    List<String> files =
+        SegmentGenerationUtils.listMatchedFilesWithRecursiveOption(inputDirFS, inputDirURI, includePattern,
+            excludePattern, true);
+    Assert.assertEquals(files.size(), 1);
+  }
+
+  // Test that we throw an exception when there is no file matching.
+  @Test
+  public void testEmptyMatchFiles()
+      throws Exception {
+    File testDir = makeTestDir();
+    File inputDir = new File(testDir, "dir");
+    File inputSubDir1 = new File(inputDir, "2009");
+    inputSubDir1.mkdirs();
+
+    File inputFile1 = new File(inputDir, "input1.csv");
+    FileUtils.writeLines(inputFile1, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+
+    File inputFile2 = new File(inputSubDir1, "input2.csv");
+    FileUtils.writeLines(inputFile2, Lists.newArrayList("col1,col2", "value3,3", "value4,4"));
+    URI inputDirURI = new File(inputDir.getAbsolutePath()).toURI();
+    PinotFS inputDirFS = PinotFSFactory.create(inputDirURI.getScheme());
+    String includePattern = "glob:" + inputDir.getAbsolutePath() + "/**.json";
+    Assert.assertThrows(RuntimeException.class, () -> {
+      SegmentGenerationUtils.listMatchedFilesWithRecursiveOption(inputDirFS, inputDirURI, includePattern, null, true);
+    });
+  }
+
+  private File makeTestDir()
+      throws IOException {
+    File testDir = Files.createTempDirectory("testSegmentGeneration-").toFile();
+    testDir.delete();
+    testDir.mkdirs();
+    return testDir;
   }
 }

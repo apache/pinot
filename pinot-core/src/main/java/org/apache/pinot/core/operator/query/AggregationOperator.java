@@ -23,8 +23,8 @@ import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
@@ -36,7 +36,7 @@ import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
  * The <code>AggregationOperator</code> class provides the operator for aggregation only query on a single segment.
  */
 @SuppressWarnings("rawtypes")
-public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> {
+public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE";
 
   private final AggregationFunction[] _aggregationFunctions;
@@ -55,7 +55,7 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   }
 
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
+  protected AggregationResultsBlock getNextBlock() {
     // Perform aggregation on all the transform blocks
     AggregationExecutor aggregationExecutor;
     if (_useStarTree) {
@@ -70,7 +70,7 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
     }
 
     // Build intermediate result block based on aggregation result from the executor
-    return new IntermediateResultsBlock(_aggregationFunctions, aggregationExecutor.getResult());
+    return new AggregationResultsBlock(_aggregationFunctions, aggregationExecutor.getResult());
   }
 
   @Override

@@ -56,6 +56,7 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
+import org.apache.pinot.controller.api.access.ManualAuthorization;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
@@ -99,7 +100,6 @@ public class TableConfigsRestletResource {
 
   @Inject
   AccessControlFactory _accessControlFactory;
-  AccessControlUtils _accessControlUtils = new AccessControlUtils();
 
   /**
    * List all {@link TableConfigs}, where each is a group of the offline table config, realtime table config and
@@ -161,6 +161,7 @@ public class TableConfigsRestletResource {
   @Path("/tableConfigs")
   @ApiOperation(value = "Add the TableConfigs using the tableConfigsStr json",
       notes = "Add the TableConfigs using the tableConfigsStr json")
+  @ManualAuthorization // performed after parsing table configs
   public ConfigSuccessResponse addConfig(
       String tableConfigsStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
@@ -186,6 +187,7 @@ public class TableConfigsRestletResource {
           Response.Status.BAD_REQUEST);
     }
 
+    // validate permission
     TableConfig offlineTableConfig = tableConfigs.getOffline();
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();
     Schema schema = tableConfigs.getSchema();
@@ -193,18 +195,18 @@ public class TableConfigsRestletResource {
     try {
       String endpointUrl = request.getRequestURL().toString();
       AccessControl accessControl = _accessControlFactory.create();
-      _accessControlUtils
+      AccessControlUtils
           .validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl, accessControl);
 
       if (offlineTableConfig != null) {
         tuneConfig(offlineTableConfig, schema);
-        _accessControlUtils
+        AccessControlUtils
             .validatePermission(offlineTableConfig.getTableName(), AccessType.CREATE, httpHeaders, endpointUrl,
                 accessControl);
       }
       if (realtimeTableConfig != null) {
         tuneConfig(realtimeTableConfig, schema);
-        _accessControlUtils
+        AccessControlUtils
             .validatePermission(realtimeTableConfig.getTableName(), AccessType.CREATE, httpHeaders, endpointUrl,
                 accessControl);
       }
@@ -377,9 +379,11 @@ public class TableConfigsRestletResource {
   @Path("/tableConfigs/validate")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Validate the TableConfigs", notes = "Validate the TableConfigs")
+  @ManualAuthorization // performed after parsing TableConfigs
   public String validateConfig(String tableConfigsStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
-      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip) {
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
+      @Context Request request) {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
     TableConfigs tableConfigs;
     try {
@@ -390,6 +394,30 @@ public class TableConfigsRestletResource {
       throw new ControllerApplicationException(LOGGER,
           String.format("Invalid TableConfigs json string: %s", tableConfigsStr), Response.Status.BAD_REQUEST, e);
     }
+
+    // validate permission
+    String endpointUrl = request.getRequestURL().toString();
+    AccessControl accessControl = _accessControlFactory.create();
+    Schema schema = tableConfigs.getSchema();
+    TableConfig offlineTableConfig = tableConfigs.getOffline();
+    TableConfig realtimeTableConfig = tableConfigs.getRealtime();
+
+    AccessControlUtils
+        .validatePermission(schema.getSchemaName(), AccessType.READ, httpHeaders, endpointUrl, accessControl);
+
+    if (offlineTableConfig != null) {
+      tuneConfig(offlineTableConfig, schema);
+      AccessControlUtils
+          .validatePermission(offlineTableConfig.getTableName(), AccessType.READ, httpHeaders, endpointUrl,
+              accessControl);
+    }
+    if (realtimeTableConfig != null) {
+      tuneConfig(realtimeTableConfig, schema);
+      AccessControlUtils
+          .validatePermission(realtimeTableConfig.getTableName(), AccessType.READ, httpHeaders, endpointUrl,
+              accessControl);
+    }
+
     TableConfigs validatedTableConfigs = validateConfig(tableConfigs, typesToSkip);
     ObjectNode response = JsonUtils.objectToJsonNode(validatedTableConfigs).deepCopy();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(tableConfigsAndUnrecognizedProps.getRight()));

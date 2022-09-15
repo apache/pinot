@@ -77,7 +77,9 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
 
   @Override
   public void setValueForKey(int groupKey, double newValue) {
-    throw new UnsupportedOperationException();
+    if (groupKey != GroupKeyGenerator.INVALID_ID) {
+      _resultArray[groupKey] = newValue;
+    }
   }
 
   @SuppressWarnings("unchecked")

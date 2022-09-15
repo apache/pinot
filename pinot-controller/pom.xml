@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.11.0-SNAPSHOT</version>
+    <version>0.12.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-controller</artifactId>
@@ -33,6 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
+    <npm.script>build</npm.script>
   </properties>
   <dependencies>
     <dependency>
@@ -244,7 +245,7 @@
             </configuration>
           </execution>
           <execution>
-            <id>npm run-script build</id>
+            <id>npm run-script ${npm.script}</id>
             <goals>
               <goal>npm</goal>
             </goals>
@@ -253,7 +254,7 @@
             <configuration>
               <!-- optional: if not specified, it will run gulp's default task
                   (and you can remove this whole <configuration> section.) -->
-              <arguments>run-script build</arguments>
+              <arguments>run-script ${npm.script}</arguments>
               <!--arguments>build</arguments-->
             </configuration>
           </execution>

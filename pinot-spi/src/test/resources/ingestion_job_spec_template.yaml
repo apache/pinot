@@ -26,6 +26,7 @@ executionFrameworkSpec:
 jobType: SegmentCreationAndTarPush
 
 inputDirURI: 'file:///path/to/input/${ year }/${ month }/${ day }'
+searchRecursively: false
 # includeFileNamePattern: include file name pattern, supported glob pattern.
 # Sample usage:
 #   'glob:*.avro' will include all avro files just under the inputDirURI, not sub directories;

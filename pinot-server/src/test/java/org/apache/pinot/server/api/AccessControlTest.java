@@ -31,6 +31,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.server.access.AccessControl;
@@ -53,6 +54,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class AccessControlTest {
@@ -71,6 +73,7 @@ public class AccessControlTest {
     // Mock the instance data manager
     // Mock the server instance
     ServerInstance serverInstance = mock(ServerInstance.class);
+    when(serverInstance.getServerMetrics()).thenReturn(mock(ServerMetrics.class));
 
     PinotConfiguration serverConf = DefaultHelixStarterServerConfig.loadDefaultServerConf();
     String hostname = serverConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,

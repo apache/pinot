@@ -40,7 +40,7 @@ public class HavingFilterHandlerTest {
           new DataSchema(new String[]{"d1", "count(*)"}, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
       PostAggregationHandler postAggregationHandler = new PostAggregationHandler(queryContext, dataSchema);
       HavingFilterHandler havingFilterHandler =
-          new HavingFilterHandler(queryContext.getHavingFilter(), postAggregationHandler);
+          new HavingFilterHandler(queryContext.getHavingFilter(), postAggregationHandler, false);
       assertFalse(havingFilterHandler.isMatch(new Object[]{1, 5L}));
       assertTrue(havingFilterHandler.isMatch(new Object[]{2, 10L}));
       assertFalse(havingFilterHandler.isMatch(new Object[]{3, 3L}));
@@ -55,7 +55,7 @@ public class HavingFilterHandlerTest {
           new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
       PostAggregationHandler postAggregationHandler = new PostAggregationHandler(queryContext, dataSchema);
       HavingFilterHandler havingFilterHandler =
-          new HavingFilterHandler(queryContext.getHavingFilter(), postAggregationHandler);
+          new HavingFilterHandler(queryContext.getHavingFilter(), postAggregationHandler, false);
       assertFalse(havingFilterHandler.isMatch(new Object[]{1, 15.5, 13.0}));
       assertTrue(havingFilterHandler.isMatch(new Object[]{2, 15.0, 3.0}));
       assertFalse(havingFilterHandler.isMatch(new Object[]{3, 20.0, 7.5}));
@@ -69,7 +69,7 @@ public class HavingFilterHandlerTest {
           new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
       PostAggregationHandler postAggregationHandler = new PostAggregationHandler(queryContext, dataSchema);
       HavingFilterHandler havingFilterHandler =
-          new HavingFilterHandler(queryContext.getHavingFilter(), postAggregationHandler);
+          new HavingFilterHandler(queryContext.getHavingFilter(), postAggregationHandler, false);
       assertFalse(havingFilterHandler.isMatch(new Object[]{1, 15.5, 13.0}));
       assertTrue(havingFilterHandler.isMatch(new Object[]{2, 15.0, 3.0}));
       assertFalse(havingFilterHandler.isMatch(new Object[]{3, 20.0, 10.0}));
@@ -87,7 +87,7 @@ public class HavingFilterHandlerTest {
           });
       PostAggregationHandler postAggregationHandler = new PostAggregationHandler(queryContext, dataSchema);
       HavingFilterHandler havingFilterHandler =
-          new HavingFilterHandler(queryContext.getHavingFilter(), postAggregationHandler);
+          new HavingFilterHandler(queryContext.getHavingFilter(), postAggregationHandler, false);
       assertTrue(havingFilterHandler.isMatch(new Object[]{11, 11L, 10.5f, 10.5, "11", new byte[]{17}, 5}));
       assertFalse(havingFilterHandler.isMatch(new Object[]{10, 11L, 10.5f, 10.5, "11", new byte[]{17}, 5}));
       assertFalse(havingFilterHandler.isMatch(new Object[]{11, 10L, 10.5f, 10.5, "11", new byte[]{17}, 5}));

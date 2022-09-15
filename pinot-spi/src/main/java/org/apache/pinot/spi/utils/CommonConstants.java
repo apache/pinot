@@ -37,6 +37,7 @@ public class CommonConstants {
 
   public static final String TABLE_NAME = "tableName";
 
+  public static final String UNKNOWN = "unknown";
   public static final String CONFIG_OF_METRICS_FACTORY_CLASS_NAME = "factory.className";
   public static final String DEFAULT_METRICS_FACTORY_CLASS_NAME =
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
@@ -135,6 +136,7 @@ public class CommonConstants {
     }
 
     public static class Instance {
+      @Deprecated
       public static final String INSTANCE_ID_KEY = "instanceId";
       public static final String DATA_DIR_KEY = "dataDir";
       public static final String ADMIN_PORT_KEY = "adminPort";
@@ -205,10 +207,11 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
     public static final String CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND =
         "pinot.broker.query.log.maxRatePerSecond";
+    public static final String CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION = "pinot.broker.enable.query.cancellation";
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
-    public static final String CONFIG_OF_BROKER_ID = "pinot.broker.id";
+    public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.broker.swagger.use.https";
     // Configuration to consider the broker ServiceStatus as being STARTED if the percent of resources (tables) that
@@ -254,6 +257,16 @@ public class CommonConstants {
 
     public static final String CONTROLLER_URL = "pinot.broker.controller.url";
 
+    public static final String CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING =
+        "pinot.broker.request.client.ip.logging";
+
+    // TODO: Support populating clientIp for GrpcRequestIdentity.
+    public static final boolean DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING = false;
+
+    public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.broker.logger.root.dir";
+    public static final String CONFIG_OF_SWAGGER_BROKER_ENABLED = "pinot.broker.swagger.enabled";
+    public static final boolean DEFAULT_SWAGGER_BROKER_ENABLED = true;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String TRACE = "trace";
@@ -273,6 +286,7 @@ public class CommonConstants {
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
+        public static final String SERVER_RETURN_FINAL_RESULT = "serverReturnFinalResult";
 
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated
@@ -328,6 +342,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_TIMEOUT = "pinot.server.query.executor.timeout";
     public static final String CONFIG_OF_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
     public static final String CONFIG_OF_SERVER_QUERY_REWRITER_CLASS_NAMES = "pinot.server.query.rewriter.class.names";
+    public static final String CONFIG_OF_ENABLE_QUERY_CANCELLATION = "pinot.server.enable.query.cancellation";
     public static final String CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS = "pinot.server.requestHandlerFactory.class";
     public static final String CONFIG_OF_NETTY_SERVER_ENABLED = "pinot.server.netty.enabled";
     public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
@@ -377,6 +392,15 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_REALTIME_OFFSET_BASED_CONSUMPTION_STATUS_CHECKER =
         "pinot.server.starter.enableRealtimeOffsetBasedConsumptionStatusChecker";
     public static final boolean DEFAULT_ENABLE_REALTIME_OFFSET_BASED_CONSUMPTION_STATUS_CHECKER = false;
+
+    public static final String CONFIG_OF_ENABLE_REALTIME_FRESHNESS_BASED_CONSUMPTION_STATUS_CHECKER =
+        "pinot.server.starter.enableRealtimeFreshnessBasedConsumptionStatusChecker";
+    public static final boolean DEFAULT_ENABLE_REALTIME_FRESHNESS_BASED_CONSUMPTION_STATUS_CHECKER = false;
+    public static final String CONFIG_OF_STARTUP_REALTIME_MIN_FRESHNESS_MS =
+        "pinot.server.starter.realtimeMinFreshnessMs";
+    // Use 10 seconds by default so high volume stream are able to catch up.
+    // This is also the default in the case a user misconfigures this by setting to <= 0.
+    public static final int DEFAULT_STARTUP_REALTIME_MIN_FRESHNESS_MS = 10000;
 
     public static final String DEFAULT_READ_MODE = "mmap";
     // Whether to reload consuming segment on scheme update
@@ -435,6 +459,7 @@ public class CommonConstants {
 
     // The complete config key is pinot.server.instance.segment.store.uri
     public static final String CONFIG_OF_SEGMENT_STORE_URI = "segment.store.uri";
+    public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.server.logger.root.dir";
 
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
@@ -514,10 +539,12 @@ public class CommonConstants {
         "pinot.controller.query.rewriter.class.names";
     //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
     public static final String CONTROLLER_SERVICE_AUTO_DISCOVERY = "pinot.controller.service.auto.discovery";
+    public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.controller.logger.root.dir";
   }
 
   public static class Minion {
     public static final String CONFIG_OF_METRICS_PREFIX = "pinot.minion.";
+    public static final String CONFIG_OF_MINION_ID = "pinot.minion.instance.id";
     public static final String METADATA_EVENT_OBSERVER_PREFIX = "metadata.event.notifier";
 
     // Config keys
@@ -555,6 +582,24 @@ public class CommonConstants {
     public static final String CONFIG_TASK_AUTH_NAMESPACE = "task.auth";
     public static final String MINION_TLS_PREFIX = "pinot.minion.tls";
     public static final String CONFIG_OF_MINION_QUERY_REWRITER_CLASS_NAMES = "pinot.minion.query.rewriter.class.names";
+    public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.minion.logger.root.dir";
+  }
+
+  public static class ControllerJob {
+    /**
+     * Controller job ZK props
+     */
+    public static final String JOB_TYPE = "jobType";
+    public static final String TABLE_NAME_WITH_TYPE = "tableName";
+    public static final String JOB_ID = "jobId";
+    public static final String SUBMISSION_TIME_MS = "submissionTimeMs";
+    public static final String MESSAGE_COUNT = "messageCount";
+
+    public static final Integer MAXIMUM_CONTROLLER_JOBS_IN_ZK = 100;
+    /**
+     * Segment reload job ZK props
+     */
+    public static final String SEGMENT_RELOAD_JOB_SEGMENT_NAME = "segmentName";
   }
 
   public static class Segment {

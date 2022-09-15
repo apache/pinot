@@ -24,14 +24,14 @@ import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 
 
 @SuppressWarnings("rawtypes")
-public class FastFilteredCountOperator extends BaseOperator<IntermediateResultsBlock> {
+public class FastFilteredCountOperator extends BaseOperator<AggregationResultsBlock> {
 
   private static final String EXPLAIN_NAME = "FAST_FILTERED_COUNT";
 
@@ -60,12 +60,12 @@ public class FastFilteredCountOperator extends BaseOperator<IntermediateResultsB
   }
 
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
+  protected AggregationResultsBlock getNextBlock() {
     long count = _filterOperator.getNumMatchingDocs();
     List<Object> aggregates = new ArrayList<>(1);
     aggregates.add(count);
     _docsCounted += count;
-    return new IntermediateResultsBlock(_aggregationFunctions, aggregates);
+    return new AggregationResultsBlock(_aggregationFunctions, aggregates);
   }
 
   @Override

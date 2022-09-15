@@ -36,10 +36,12 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
@@ -56,6 +58,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,8 +70,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final int _reducerPort;
 
   private final MailboxService<Mailbox.MailboxContent> _mailboxService;
-  private QueryEnvironment _queryEnvironment;
-  private QueryDispatcher _queryDispatcher;
+  private final QueryEnvironment _queryEnvironment;
+  private final QueryDispatcher _queryDispatcher;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
@@ -90,15 +93,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
         new WorkerManager(_reducerHostname, _reducerPort, routingManager));
     _queryDispatcher = new QueryDispatcher();
-    _mailboxService = new GrpcMailboxService(_reducerHostname, _reducerPort);
+    _mailboxService = new GrpcMailboxService(_reducerHostname, _reducerPort, config);
 
     // TODO: move this to a startUp() function.
     _mailboxService.start();
   }
 
   @Override
-  public BrokerResponseNative handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
-      RequestContext requestContext)
+  public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
     requestContext.setBrokerId(_brokerId);
@@ -118,23 +121,34 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     JsonNode sql = request.get(CommonConstants.Broker.Request.SQL);
     if (sql == null) {
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
-    } else {
-      return handleSQLRequest(requestId, request.get(CommonConstants.Broker.Request.SQL).asText(), request,
-          requesterIdentity, requestContext);
     }
+    String query = sql.asText();
+    requestContext.setQuery(query);
+    return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
   }
 
-  private BrokerResponseNative handleSQLRequest(long requestId, String query, JsonNode request,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
+  private BrokerResponseNative handleRequest(long requestId, String query,
+      @Nullable SqlNodeAndOptions sqlNodeAndOptions, JsonNode request, @Nullable RequesterIdentity requesterIdentity,
+      RequestContext requestContext)
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
-    requestContext.setQuery(query);
 
-    // Compile the request
-    long compilationStartTimeNs = System.nanoTime();
+    long compilationStartTimeNs;
     QueryPlan queryPlan;
     try {
-      queryPlan = _queryEnvironment.planQuery(query);
+      // Parse the request
+      sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions : RequestUtils.parseQuery(query, request);
+      // Compile the request
+      compilationStartTimeNs = System.nanoTime();
+      switch (sqlNodeAndOptions.getSqlNode().getKind()) {
+        case EXPLAIN:
+          String plan = _queryEnvironment.explainQuery(query, sqlNodeAndOptions);
+          return constructMultistageExplainPlan(query, plan);
+        case SELECT:
+        default:
+          queryPlan = _queryEnvironment.planQuery(query, sqlNodeAndOptions);
+          break;
+      }
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
@@ -154,11 +168,22 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     long executionEndTimeNs = System.nanoTime();
 
     // Set total query processing time
-    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(executionEndTimeNs - compilationStartTimeNs);
+    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(sqlNodeAndOptions.getParseTimeNs()
+        + (executionEndTimeNs - compilationStartTimeNs));
     brokerResponse.setTimeUsedMs(totalTimeMs);
     brokerResponse.setResultTable(toResultTable(queryResults));
     requestContext.setQueryProcessingTime(totalTimeMs);
     augmentStatistics(requestContext, brokerResponse);
+    return brokerResponse;
+  }
+
+  private BrokerResponseNative constructMultistageExplainPlan(String sql, String plan) {
+    BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
+    List<Object[]> rows = new ArrayList<>();
+    rows.add(new Object[]{sql, plan});
+    DataSchema multistageExplainResultSchema = new DataSchema(new String[]{"SQL", "PLAN"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
+    brokerResponse.setResultTable(new ResultTable(multistageExplainResultSchema, rows));
     return brokerResponse;
   }
 

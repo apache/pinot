@@ -54,6 +54,8 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.ManualAuthorization;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -87,6 +89,7 @@ public class PinotQueryResource {
 
   @POST
   @Path("sql")
+  @ManualAuthorization // performed by broker
   public String handlePostSql(String requestJsonStr, @Context HttpHeaders httpHeaders) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
@@ -100,7 +103,7 @@ public class PinotQueryResource {
         queryOptions = requestJson.get("queryOptions").asText();
       }
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
-      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -113,7 +116,7 @@ public class PinotQueryResource {
       @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
-      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -121,18 +124,25 @@ public class PinotQueryResource {
   }
 
   private String executeSqlQuery(@Context HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
-      String queryOptions)
+      @Nullable String queryOptions, String endpointUrl)
       throws Exception {
-    if (queryOptions != null && queryOptions.contains(QueryOptionKey.USE_MULTISTAGE_ENGINE)) {
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
+    Map<String, String> options = sqlNodeAndOptions.getOptions();
+    if (queryOptions != null) {
+      Map<String, String> optionsFromString = RequestUtils.getOptionsFromString(queryOptions);
+      sqlNodeAndOptions.setExtraOptions(optionsFromString);
+    }
+
+    // Determine which engine to used based on query options.
+    if (Boolean.parseBoolean(options.get(QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
       if (_controllerConf.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED,
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
-        return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders);
+        return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, endpointUrl);
       } else {
         throw new UnsupportedOperationException("V2 Multi-Stage query engine not enabled. "
             + "Please see https://docs.pinot.apache.org/ for instruction to enable V2 engine.");
       }
     } else {
-      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
       PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
       switch (sqlType) {
         case DQL:
@@ -149,12 +159,13 @@ public class PinotQueryResource {
     }
   }
 
-  private String getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders) {
+  private String getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders,
+      String endpointUrl) {
 
     // Validate data access
     // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(httpHeaders)) {
+    if (!accessControl.hasAccess(null, AccessType.READ, httpHeaders, endpointUrl)) {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 

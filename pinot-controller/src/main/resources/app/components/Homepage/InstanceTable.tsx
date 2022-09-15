@@ -29,7 +29,7 @@ type Props = {
   clusterName: string
 };
 
-const InstaceTable = ({ name, instances, clusterName }: Props) => {
+const InstanceTable = ({ name, instances, clusterName }: Props) => {
 
   const [fetching, setFetching] = useState(true);
   const [tableData, setTableData] = useState<TableData>({
@@ -70,4 +70,4 @@ const InstaceTable = ({ name, instances, clusterName }: Props) => {
   );
 };
 
-export default InstaceTable;
+export default InstanceTable;

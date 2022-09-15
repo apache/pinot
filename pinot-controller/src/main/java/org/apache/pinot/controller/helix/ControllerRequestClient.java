@@ -140,6 +140,26 @@ public class ControllerRequestClient {
     }
   }
 
+  public void resetTable(String tableNameWithType, String targetInstance)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
+          _controllerRequestURLBuilder.forTableReset(tableNameWithType, targetInstance)).toURI(), null));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public void resetSegment(String tableNameWithType, String segmentName, String targetInstance)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
+          _controllerRequestURLBuilder.forSegmentReset(tableNameWithType, segmentName, targetInstance)).toURI(), null));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
   public void reloadTable(String tableName, TableType tableType, boolean forceDownload)
       throws IOException {
     try {

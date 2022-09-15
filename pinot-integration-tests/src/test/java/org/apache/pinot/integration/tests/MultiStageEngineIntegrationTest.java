@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -105,15 +104,16 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTest 
         sendPostRequest(_brokerBaseApiUrl + "/query/sql",
             "{\"queryOptions\":\"useMultistageEngine=true\", \"sql\":\"" + sql + "\"}"));
     Assert.assertTrue(multiStageResponse.has("resultTable"));
-    ArrayNode jsonNode = (ArrayNode) multiStageResponse.get("resultTable").get("rows");
+    JsonNode jsonNode = multiStageResponse.get("resultTable");
     // TODO: assert actual result data payload.
-    Assert.assertEquals(jsonNode.size(), expectedNumOfRows);
-    Assert.assertEquals(jsonNode.get(0).size(), expectedNumOfColumns);
+    Assert.assertEquals(jsonNode.get("rows").size(), expectedNumOfRows);
+    Assert.assertEquals(jsonNode.get("dataSchema").get("columnNames").size(), expectedNumOfColumns);
   }
 
   @DataProvider
   public Object[][] multiStageQueryEngineSqlTestSet() {
     return new Object[][] {
+        new Object[]{"SELECT * FROM mytable_OFFLINE WHERE ArrDelay>10000", 0, 73},
         new Object[]{"SELECT COUNT(*) FROM mytable_OFFLINE WHERE Carrier='AA'", 1, 1},
         new Object[]{"SELECT * FROM mytable_OFFLINE WHERE ArrDelay>1000", 2, 73},
         new Object[]{"SELECT CarrierDelay, ArrDelay FROM mytable_OFFLINE"

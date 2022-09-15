@@ -30,7 +30,7 @@ public class ObjectAggregationResultHolder implements AggregationResultHolder {
    */
   @Override
   public void setValue(double value) {
-    throw new RuntimeException("Method 'setValue' (with double value) not supported for class " + getClass().getName());
+    _value = value;
   }
 
   /**

@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -149,11 +149,11 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
               "SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) BETWEEN 100 AND "
                   + "50")) {
         AggregationOperator aggregationOperator = getOperator(query);
-        IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+        AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
         // Expect 0 entries scanned in filter
         QueriesTestUtils
             .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 0, 0, NUM_RECORDS);
-        List<Object> aggregationResult = resultsBlock.getAggregationResult();
+        List<Object> aggregationResult = resultsBlock.getResults();
         Assert.assertNotNull(aggregationResult);
         Assert.assertEquals((long) aggregationResult.get(0), 0);
       }
@@ -163,12 +163,12 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
     {
       String query = "SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) > -1";
       AggregationOperator aggregationOperator = getOperator(query);
-      IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+      AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
       // Expect 0 entries scanned in filter
       QueriesTestUtils
           .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0, 0,
               NUM_RECORDS);
-      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      List<Object> aggregationResult = resultsBlock.getResults();
       Assert.assertNotNull(aggregationResult);
       Assert.assertEquals((long) aggregationResult.get(0), NUM_RECORDS);
     }
@@ -217,12 +217,12 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
     {
       String query = "SELECT COUNT(*) FROM testTable WHERE ST_Distance(h3Column, ST_Point(-122, 37.5, 1)) < 10000000";
       AggregationOperator aggregationOperator = getOperator(query);
-      IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+      AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
       // Expect 10000 entries scanned in filter
       QueriesTestUtils
           .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, NUM_RECORDS,
               0, NUM_RECORDS);
-      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      List<Object> aggregationResult = resultsBlock.getResults();
       Assert.assertNotNull(aggregationResult);
       Assert.assertEquals((long) aggregationResult.get(0), NUM_RECORDS);
     }
@@ -253,12 +253,12 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
           + "             122.0001268 -37.4993506,  \n"
           + "             122.0008564 -37.5004316))'), h3Column_geometry) = 1";
       AggregationOperator aggregationOperator = getOperator(query);
-      IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+      AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
       // Expect 0 entries scanned in filter
       QueriesTestUtils
           .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 0, 0,
               NUM_RECORDS);
-      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      List<Object> aggregationResult = resultsBlock.getResults();
       Assert.assertNotNull(aggregationResult);
       Assert.assertEquals((long) aggregationResult.get(0), 0);
     }
@@ -289,12 +289,12 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
           + "             122.0001268 -37.4993506,  \n"
           + "             122.0008564 -37.5004316))')) = 1";
       AggregationOperator aggregationOperator = getOperator(query);
-      IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+      AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
       // Expect 0 entries scanned in filter
       QueriesTestUtils
           .testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 0, 0,
               NUM_RECORDS);
-      List<Object> aggregationResult = resultsBlock.getAggregationResult();
+      List<Object> aggregationResult = resultsBlock.getResults();
       Assert.assertNotNull(aggregationResult);
       Assert.assertEquals((long) aggregationResult.get(0), 0);
     }
@@ -314,9 +314,9 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
         + "             -122.0001268 37.4993506,  \n"
         + "             -122.0008564 37.5004316))'), h3Column_geometry) = 1";
     AggregationOperator aggregationOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 1, 1, 0, 1);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = resultsBlock.getResults();
     Assert.assertNotNull(aggregationResult);
     Assert.assertEquals((long) aggregationResult.get(0), 1);
   }
@@ -335,9 +335,9 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
         + "             -122.0001268 37.4993506,  \n"
         + "             -122.0008564 37.5004316))')) = 1";
     AggregationOperator aggregationOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 1, 1, 0, 1);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = resultsBlock.getResults();
     Assert.assertNotNull(aggregationResult);
     Assert.assertEquals((long) aggregationResult.get(0), 1);
   }
@@ -356,9 +356,9 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
         + "             -122.0001268 37.4993506,  \n"
         + "             -122.0008564 37.5004316))'), h3Column_geometry) = 1";
     AggregationOperator aggregationOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 1, 0, 1);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = resultsBlock.getResults();
     Assert.assertNotNull(aggregationResult);
     Assert.assertEquals((long) aggregationResult.get(0), 0);
   }
@@ -377,9 +377,9 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
         + "             -122.0001268 37.4993506,  \n"
         + "             -122.0008564 37.5004316))')) = 1";
     AggregationOperator aggregationOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 1, 0, 1);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = resultsBlock.getResults();
     Assert.assertNotNull(aggregationResult);
     Assert.assertEquals((long) aggregationResult.get(0), 0);
   }
@@ -405,9 +405,9 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
         + "             -122.0008564 37.5004316))'), h3Column_geometry) = 0";
 
     AggregationOperator aggregationOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 2, 0, 1);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = resultsBlock.getResults();
     Assert.assertNotNull(aggregationResult);
     Assert.assertEquals((long) aggregationResult.get(0), 0);
   }
@@ -427,12 +427,12 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
   private void validateQueryResult(String h3IndexQuery, String nonH3IndexQuery) {
     AggregationOperator h3IndexOperator = getOperator(h3IndexQuery);
     AggregationOperator nonH3IndexOperator = getOperator(nonH3IndexQuery);
-    IntermediateResultsBlock h3IndexResultsBlock = h3IndexOperator.nextBlock();
-    IntermediateResultsBlock nonH3IndexResultsBlock = nonH3IndexOperator.nextBlock();
+    AggregationResultsBlock h3IndexResultsBlock = h3IndexOperator.nextBlock();
+    AggregationResultsBlock nonH3IndexResultsBlock = nonH3IndexOperator.nextBlock();
     // Expect less than 10000 entries scanned in filter
     Assert.assertTrue(h3IndexOperator.getExecutionStatistics().getNumEntriesScannedInFilter() < NUM_RECORDS);
     Assert.assertEquals(nonH3IndexOperator.getExecutionStatistics().getNumEntriesScannedInFilter(), NUM_RECORDS);
-    Assert.assertEquals(h3IndexResultsBlock.getAggregationResult(), nonH3IndexResultsBlock.getAggregationResult());
+    Assert.assertEquals(h3IndexResultsBlock.getResults(), nonH3IndexResultsBlock.getResults());
   }
 
   @AfterClass

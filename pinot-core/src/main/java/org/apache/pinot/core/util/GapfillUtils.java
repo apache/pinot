@@ -304,15 +304,18 @@ public class GapfillUtils {
       }
     }
 
-    for (Expression orderBy : strippedPinotQuery.getOrderByList()) {
-      if (orderBy.getType() != ExpressionType.FUNCTION) {
-        continue;
-      }
-      if (orderBy.getFunctionCall().getOperands().get(0).getType() == ExpressionType.FUNCTION && GAP_FILL.equals(
-          orderBy.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator())) {
-        orderBy.getFunctionCall().getOperands()
-            .set(0, orderBy.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0));
-        break;
+    List<Expression> orderByList = strippedPinotQuery.getOrderByList();
+    if (orderByList != null) {
+      for (Expression orderBy : orderByList) {
+        if (orderBy.getType() != ExpressionType.FUNCTION) {
+          continue;
+        }
+        if (orderBy.getFunctionCall().getOperands().get(0).getType() == ExpressionType.FUNCTION && GAP_FILL.equals(
+            orderBy.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator())) {
+          orderBy.getFunctionCall().getOperands()
+              .set(0, orderBy.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0));
+          break;
+        }
       }
     }
 

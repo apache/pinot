@@ -38,7 +38,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordReader;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -250,10 +250,10 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   /** Verify that we can query the JSON column that ingested ComplexType data from an AVRO file (see setUp). */
   @Test
   public void testSimpleSelectOnJsonColumn() {
-    Operator operator =
+    Operator<SelectionResultsBlock> operator =
         getOperator("select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM " + "testTable limit 100");
-    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
-    Collection<Object[]> rows = block.getSelectionResult();
+    SelectionResultsBlock block = operator.nextBlock();
+    Collection<Object[]> rows = block.getRows();
     Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
     Assert.assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
     Assert.assertEquals(block.getDataSchema().getColumnDataType(2), DataSchema.ColumnDataType.JSON);
@@ -275,10 +275,10 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   /** Verify simple path expression query on ingested Avro file. */
   @Test
   public void testJsonPathSelectOnJsonColumn() {
-    Operator operator = getOperator(
+    Operator<SelectionResultsBlock> operator = getOperator(
         "select intColumn, json_extract_scalar(jsonColumn1, '$.name', " + "'STRING', 'null') FROM testTable");
-    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
-    Collection<Object[]> rows = block.getSelectionResult();
+    SelectionResultsBlock block = operator.nextBlock();
+    Collection<Object[]> rows = block.getRows();
     Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
     Assert.assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
 
@@ -296,10 +296,11 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   /** Verify simple path expression query on ingested Avro file. */
   @Test
   public void testStringValueSelectOnJsonColumn() {
-    Operator operator = getOperator("SELECT json_extract_scalar(jsonColumn1, '$', 'STRING') FROM "
-        + "testTable WHERE JSON_MATCH(jsonColumn1, '\"$\" = ''test''')");
-    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
-    Collection<Object[]> rows = block.getSelectionResult();
+    Operator<SelectionResultsBlock> operator = getOperator(
+        "SELECT json_extract_scalar(jsonColumn1, '$', 'STRING') FROM "
+            + "testTable WHERE JSON_MATCH(jsonColumn1, '\"$\" = ''test''')");
+    SelectionResultsBlock block = operator.nextBlock();
+    Collection<Object[]> rows = block.getRows();
     Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.STRING);
 
     List<String> expecteds = Arrays.asList("[test]");
@@ -315,9 +316,9 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   /** Verify that ingestion from avro FIXED type field (jsonColumn3) to Pinot JSON column worked fine. */
   @Test
   public void testSimpleSelectOnFixedJsonColumn() {
-    Operator operator = getOperator("select jsonColumn3 FROM testTable");
-    IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
-    Collection<Object[]> rows = block.getSelectionResult();
+    Operator<SelectionResultsBlock> operator = getOperator("select jsonColumn3 FROM testTable");
+    SelectionResultsBlock block = operator.nextBlock();
+    Collection<Object[]> rows = block.getRows();
     Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.JSON);
 
     List<String> expecteds =

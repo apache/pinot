@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.minion;
 
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.HelixPropertyStore;
@@ -36,7 +37,7 @@ public final class MinionTaskMetadataUtils {
   }
 
   /**
-   * Fetches the ZNRecord for the given minion task and tableName. Fetch from the new path
+   * Fetches the minion task metadata ZNRecord for the given minion task and tableName. Fetch from the new path
    * MINION_TASK_METADATA/${tableNameWthType}/{taskType} if it exists; otherwise, fetch from the old path
    * MINION_TASK_METADATA/${taskType}/${tableNameWthType}.
    */
@@ -63,7 +64,7 @@ public final class MinionTaskMetadataUtils {
   }
 
   /**
-   * Deletes the ZNRecord for the given minion task and tableName, from both the new path
+   * Deletes the minion task metadata ZNRecord for the given minion task and tableName, from both the new path
    * MINION_TASK_METADATA/${tableNameWthType}/${taskType} and the old path
    * MINION_TASK_METADATA/${taskType}/${tableNameWthType}.
    */
@@ -80,9 +81,43 @@ public final class MinionTaskMetadataUtils {
   }
 
   /**
+   * Deletes the minion task metadata ZNRecord for the given tableName, from both the new path
+   * MINION_TASK_METADATA/${tableNameWthType} and the old path
+   * MINION_TASK_METADATA/<any task type>/${tableNameWthType}
+   */
+  public static void deleteTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
+    // delete the minion task metadata ZNRecord MINION_TASK_METADATA/${tableNameWthType}
+    String path = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(tableNameWithType);
+    if (!propertyStore.remove(path, AccessOption.PERSISTENT)) {
+      throw new ZkException("Failed to delete task metadata for table: " + tableNameWithType);
+    }
+    // delete the minion task metadata ZNRecord MINION_TASK_METADATA/<any task type>/${tableNameWthType}
+    // TODO: another way of finding old minion task metadata path is: (1) use reflection to find all task types,
+    //   similar to what TaskGeneratorRegistry.java does (2) construct possible old minion task metadata path
+    //   using those types.
+    //   The tradeoff is: (1) the current approach uses ZK as the source of truth, so we will not miss any ZNode
+    //   (2) the other approach will reduce ZK load if there are thousands of tables, because we need to talk to
+    //   the ZK to find all its direct children in the current approach.
+    List<String> childNames =
+        propertyStore.getChildNames(ZKMetadataProvider.getPropertyStorePathForMinionTaskMetadataPrefix(),
+            AccessOption.PERSISTENT);
+    if (childNames != null && !childNames.isEmpty()) {
+      for (String child : childNames) {
+        // Even though some child names are not task types (e.g., in the new metadata path, the child name
+        // is a table name), it does not harm to try to delete the non-existent constructed path.
+        String oldPath =
+            ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadataDeprecated(child, tableNameWithType);
+        if (!propertyStore.remove(oldPath, AccessOption.PERSISTENT)) {
+          throw new ZkException("Failed to delete task metadata: " + child + ", " + tableNameWithType);
+        }
+      }
+    }
+  }
+
+  /**
    * Generic method for persisting {@link BaseTaskMetadata} to MINION_TASK_METADATA. The metadata will
    * be saved in the ZNode under the new path /MINION_TASK_METADATA/${tableNameWithType}/${taskType} if
-   * the old path already exists; otherwise, it will be saved in the ZNode under the old path
+   * it exists or the old path does not exist; otherwise, it will be saved in the ZNode under the old path
    * /MINION_TASK_METADATA/${taskType}/${tableNameWithType}.
    *
    * Will fail if expectedVersion does not match.

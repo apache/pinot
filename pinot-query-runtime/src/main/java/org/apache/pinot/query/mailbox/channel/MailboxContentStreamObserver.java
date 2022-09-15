@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.query.mailbox.channel;
 
+import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
+import java.io.IOException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.mailbox.GrpcReceivingMailbox;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +48,7 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
   private final boolean _isEnabledFeedback;
 
   private final AtomicBoolean _isCompleted = new AtomicBoolean(false);
+  private String _mailboxId;
   private ArrayBlockingQueue<Mailbox.MailboxContent> _receivingBuffer;
 
   public MailboxContentStreamObserver(GrpcMailboxService mailboxService,
@@ -80,30 +84,40 @@ public class MailboxContentStreamObserver implements StreamObserver<Mailbox.Mail
 
   @Override
   public void onNext(Mailbox.MailboxContent mailboxContent) {
-    GrpcReceivingMailbox receivingMailbox =
-        (GrpcReceivingMailbox) _mailboxService.getReceivingMailbox(mailboxContent.getMailboxId());
+    _mailboxId = mailboxContent.getMailboxId();
+    GrpcReceivingMailbox receivingMailbox = (GrpcReceivingMailbox) _mailboxService.getReceivingMailbox(_mailboxId);
     receivingMailbox.init(this);
-    // when the receiving end receives a message put it in the mailbox queue.
-    _receivingBuffer.offer(mailboxContent);
-    if (_isEnabledFeedback) {
-      // TODO: this has race conditions with onCompleted() because sender blindly closes connection channels once
-      // it has finished sending all the data packets.
-      int remainingCapacity = _receivingBuffer.remainingCapacity() - 1;
-      Mailbox.MailboxStatus.Builder builder =
-          Mailbox.MailboxStatus.newBuilder().setMailboxId(mailboxContent.getMailboxId())
-              .putMetadata(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY, String.valueOf(remainingCapacity));
-      if (mailboxContent.getMetadataMap().get(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY) != null) {
-        builder.putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true");
+    if (!mailboxContent.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY)) {
+      // when the receiving end receives a message put it in the mailbox queue.
+      _receivingBuffer.offer(mailboxContent);
+      if (_isEnabledFeedback) {
+        // TODO: this has race conditions with onCompleted() because sender blindly closes connection channels once
+        // it has finished sending all the data packets.
+        int remainingCapacity = _receivingBuffer.remainingCapacity() - 1;
+        Mailbox.MailboxStatus.Builder builder =
+            Mailbox.MailboxStatus.newBuilder().setMailboxId(mailboxContent.getMailboxId())
+                .putMetadata(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY, String.valueOf(remainingCapacity));
+        if (mailboxContent.getMetadataMap().get(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY) != null) {
+          builder.putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true");
+        }
+        Mailbox.MailboxStatus status = builder.build();
+        // returns the buffer available size to sender for rate controller / throttling.
+        _responseObserver.onNext(status);
       }
-      Mailbox.MailboxStatus status = builder.build();
-      // returns the buffer available size to sender for rate controller / throttling.
-      _responseObserver.onNext(status);
     }
   }
 
   @Override
   public void onError(Throwable e) {
-    throw new RuntimeException(e);
+    try {
+      _receivingBuffer.offer(Mailbox.MailboxContent.newBuilder()
+          .setPayload(ByteString.copyFrom(
+              TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(e)).toBytes()))
+          .putMetadata(ChannelUtils.MAILBOX_METADATA_END_OF_STREAM_KEY, "true").build());
+      throw new RuntimeException(e);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Unable to encode exception for cascade reporting: " + e, ioe);
+    }
   }
 
   @Override

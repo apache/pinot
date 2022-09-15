@@ -47,6 +47,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String ROUTING_CONFIG_KEY = "routing";
   public static final String QUERY_CONFIG_KEY = "query";
   public static final String INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY = "instanceAssignmentConfigMap";
+  public static final String INSTANCE_PARTITIONS_MAP_CONFIG_KEY = "instancePartitionsMap";
   public static final String FIELD_CONFIG_LIST_KEY = "fieldConfigList";
   public static final String UPSERT_CONFIG_KEY = "upsertConfig";
   public static final String DEDUP_CONFIG_KEY = "dedupConfig";
@@ -84,6 +85,10 @@ public class TableConfig extends BaseJsonConfig {
   private RoutingConfig _routingConfig;
   private QueryConfig _queryConfig;
   private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
+
+  @JsonPropertyDescription(value = "Point to an existing instance partitions")
+  private Map<InstancePartitionsType, String> _instancePartitionsMap;
+
   private List<FieldConfig> _fieldConfigList;
 
   @JsonPropertyDescription(value = "upsert related config")
@@ -121,7 +126,9 @@ public class TableConfig extends BaseJsonConfig {
       @JsonProperty(INGESTION_CONFIG_KEY) @Nullable IngestionConfig ingestionConfig,
       @JsonProperty(TIER_CONFIGS_LIST_KEY) @Nullable List<TierConfig> tierConfigsList,
       @JsonProperty(IS_DIM_TABLE_KEY) boolean dimTable,
-      @JsonProperty(TUNER_CONFIG_LIST_KEY) @Nullable List<TunerConfig> tunerConfigList) {
+      @JsonProperty(TUNER_CONFIG_LIST_KEY) @Nullable List<TunerConfig> tunerConfigList,
+      @JsonProperty(INSTANCE_PARTITIONS_MAP_CONFIG_KEY) @Nullable
+          Map<InstancePartitionsType, String> instancePartitionsMap) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
     Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
         "'tableName' cannot contain double underscore ('__')");
@@ -150,6 +157,7 @@ public class TableConfig extends BaseJsonConfig {
     _tierConfigsList = tierConfigsList;
     _dimTable = dimTable;
     _tunerConfigList = tunerConfigList;
+    _instancePartitionsMap = instancePartitionsMap;
   }
 
   @JsonProperty(TABLE_NAME_KEY)
@@ -252,6 +260,15 @@ public class TableConfig extends BaseJsonConfig {
   public void setInstanceAssignmentConfigMap(
       Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
+  }
+
+  @JsonProperty(INSTANCE_PARTITIONS_MAP_CONFIG_KEY)
+  public Map<InstancePartitionsType, String> getInstancePartitionsMap() {
+    return _instancePartitionsMap;
+  }
+
+  public void setInstancePartitionsMap(Map<InstancePartitionsType, String> instancePartitionsMap) {
+    _instancePartitionsMap = instancePartitionsMap;
   }
 
   @JsonProperty(FIELD_CONFIG_LIST_KEY)

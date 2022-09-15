@@ -29,7 +29,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -43,14 +43,12 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-
 public class SegmentColumnarIndexCreatorTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentColumnarIndexCreatorTest");
   private static final File CONFIG_FILE = new File(TEMP_DIR, "config");
   private static final String PROPERTY_KEY = "testKey";
   private static final String COLUMN_NAME = "testColumn";
-  private static final String COLUMN_PROPERTY_KEY_PREFIX =
-      V1Constants.MetadataKeys.Column.COLUMN_PROPS_KEY_PREFIX + COLUMN_NAME + ".";
+  private static final String COLUMN_PROPERTY_KEY_PREFIX = Column.COLUMN_PROPS_KEY_PREFIX + COLUMN_NAME + ".";
   private static final int NUM_ROUNDS = 1000;
 
   @BeforeClass
@@ -173,6 +171,24 @@ public class SegmentColumnarIndexCreatorTest {
     } finally {
       FileUtils.deleteQuietly(new File(indexDirPath));
     }
+  }
+
+  @Test
+  public void testAddMinMaxValueInvalid() {
+    PropertiesConfiguration props = new PropertiesConfiguration();
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "bar", "foo");
+    Assert.assertFalse(Boolean.parseBoolean(
+        String.valueOf(props.getProperty(Column.getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
+
+    props = new PropertiesConfiguration();
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", ",bar", "foo");
+    Assert.assertTrue(Boolean.parseBoolean(
+        String.valueOf(props.getProperty(Column.getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
+
+    props = new PropertiesConfiguration();
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "bar", "  ");
+    Assert.assertTrue(Boolean.parseBoolean(
+        String.valueOf(props.getProperty(Column.getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
   }
 
   @AfterClass

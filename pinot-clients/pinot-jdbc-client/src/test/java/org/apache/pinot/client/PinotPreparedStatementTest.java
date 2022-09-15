@@ -37,6 +37,7 @@ public class PinotPreparedStatementTest {
       "SELECT * FROM dummy WHERE current_date = ? and updated_at = ? and created_at = ?";
   public static final String SINGLE_STRING_QUERY = "SELECT * FROM dummy WHERE value = ?";
   private DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
+
   private DummyPinotControllerTransport _dummyPinotControllerTransport = new DummyPinotControllerTransport();
   private final String _mockQuery = "select * from mockTable";
 

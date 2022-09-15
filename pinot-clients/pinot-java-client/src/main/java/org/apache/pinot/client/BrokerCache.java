@@ -20,21 +20,28 @@ package org.apache.pinot.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
+import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.JdkSslContext;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
+import javax.net.ssl.SSLContext;
+import org.apache.pinot.client.utils.ConnectionUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.BoundRequestBuilder;
+import org.asynchttpclient.DefaultAsyncHttpClientConfig;
 import org.asynchttpclient.Dsl;
 import org.asynchttpclient.Response;
 
@@ -70,20 +77,60 @@ public class BrokerCache {
   private static final TypeReference<Map<String, List<BrokerInstance>>> RESPONSE_TYPE_REF =
       new TypeReference<Map<String, List<BrokerInstance>>>() {
       };
+  private static final String DEFAULT_CONTROLLER_READ_TIMEOUT_MS = "60000";
+  private static final String DEFAULT_CONTROLLER_CONNECT_TIMEOUT_MS = "2000";
+  private static final String DEFAULT_CONTROLLER_HANDSHAKE_TIMEOUT_MS = "2000";
+  private static final String DEFAULT_CONTROLLER_TLS_V10_ENABLED = "false";
+  private static final String SCHEME = "scheme";
+
   private final Random _random = new Random();
   private final AsyncHttpClient _client;
   private final String _address;
+  private final Map<String, String> _headers;
+  private final Properties _properties;
   private volatile BrokerData _brokerData;
 
-  public BrokerCache(String scheme, String controllerHost, int controllerPort) {
-    _client = Dsl.asyncHttpClient();
+  public BrokerCache(Properties properties, String controllerUrl) {
+    String scheme = properties.getProperty(SCHEME, CommonConstants.HTTP_PROTOCOL);
+    DefaultAsyncHttpClientConfig.Builder builder = Dsl.config();
+    if (scheme.contentEquals(CommonConstants.HTTPS_PROTOCOL)) {
+      SSLContext sslContext = ConnectionUtils.getSSLContextFromProperties(properties);
+      builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
+    }
+
+    int readTimeoutMs = Integer.parseInt(properties.getProperty("controllerReadTimeoutMs",
+        DEFAULT_CONTROLLER_READ_TIMEOUT_MS));
+    int connectTimeoutMs = Integer.parseInt(properties.getProperty("controllerConnectTimeoutMs",
+        DEFAULT_CONTROLLER_CONNECT_TIMEOUT_MS));
+    int handshakeTimeoutMs = Integer.parseInt(properties.getProperty("controllerHandshakeTimeoutMs",
+        DEFAULT_CONTROLLER_HANDSHAKE_TIMEOUT_MS));
+    boolean tlsV10Enabled = Boolean.parseBoolean(properties.getProperty("controllerTlsV10Enabled",
+        DEFAULT_CONTROLLER_TLS_V10_ENABLED))
+        || Boolean.parseBoolean(System.getProperties().getProperty("controller.tlsV10Enabled",
+        DEFAULT_CONTROLLER_TLS_V10_ENABLED));
+
+    TlsProtocols tlsProtocols = TlsProtocols.defaultProtocols(tlsV10Enabled);
+    builder.setReadTimeout(readTimeoutMs)
+        .setConnectTimeout(connectTimeoutMs)
+        .setHandshakeTimeout(handshakeTimeoutMs)
+        .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua_broker_cache"))
+        .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
+
+    _client = Dsl.asyncHttpClient(builder.build());
     ControllerRequestURLBuilder controllerRequestURLBuilder =
-        ControllerRequestURLBuilder.baseUrl(scheme + "://" + controllerHost + ":" + controllerPort);
+        ControllerRequestURLBuilder.baseUrl(scheme + "://" + controllerUrl);
     _address = controllerRequestURLBuilder.forLiveBrokerTablesGet();
+    _headers = ConnectionUtils.getHeadersFromProperties(properties);
+    _properties = properties;
   }
 
   private Map<String, List<BrokerInstance>> getTableToBrokersData() throws Exception {
     BoundRequestBuilder getRequest = _client.prepareGet(_address);
+
+    if (_headers != null) {
+      _headers.forEach((k, v) -> getRequest.addHeader(k, v));
+    }
+
     Future<Response> responseFuture = getRequest.addHeader("accept", "application/json").execute();
     Response response = responseFuture.get();
     String responseBody = response.getResponseBody(StandardCharsets.UTF_8);

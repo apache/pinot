@@ -33,7 +33,8 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -165,10 +166,10 @@ public class ModeQueriesTest extends BaseQueriesTest {
   public void testAggregationOnly(String query, Double expectedResult) {
     // Inner segment
     AggregationOperator aggregationOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         4 * NUM_RECORDS, NUM_RECORDS);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = resultsBlock.getResults();
 
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.get(0), _values);
@@ -233,7 +234,7 @@ public class ModeQueriesTest extends BaseQueriesTest {
   public void testAggregationGroupBy(String query) {
     // Inner segment
     AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+    GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         4 * NUM_RECORDS, NUM_RECORDS);
     AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
@@ -305,7 +306,7 @@ public class ModeQueriesTest extends BaseQueriesTest {
   public void testAggregationGroupByMV(String query) {
     // Inner segment
     AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+    GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         5 * NUM_RECORDS, NUM_RECORDS);
     AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();

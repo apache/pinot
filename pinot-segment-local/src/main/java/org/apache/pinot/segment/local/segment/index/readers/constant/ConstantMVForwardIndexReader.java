@@ -43,6 +43,11 @@ public final class ConstantMVForwardIndexReader implements ForwardIndexReader<Fo
     return DataType.INT;
   }
 
+  /*
+   * Asserting on dictIdBuffer being non-empty is done on purpose here as this reader is used in the query hot path and
+   * it would be prohibitively expensive.
+   * It is always assumed that the dictIdBuffer is set correctly based on the maxNumberOfMultiValues column metadata.
+   */
   @Override
   public int getDictIdMV(int docId, int[] dictIdBuffer, ForwardIndexReaderContext context) {
     dictIdBuffer[0] = 0;

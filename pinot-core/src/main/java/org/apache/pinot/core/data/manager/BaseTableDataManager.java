@@ -122,7 +122,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _indexDir = new File(_tableDataDir);
     if (!_indexDir.exists()) {
       Preconditions.checkState(_indexDir.mkdirs(),
-          "Unable to create index directory at %s. Check that the user has permissions on this directory.", _indexDir);
+          "Unable to create index directory at %s. "
+              + "Please check for available space and write-permissions for this directory.",
+          _indexDir);
     }
     _resourceTmpDir = new File(_indexDir, "tmp");
     // This is meant to cleanup temp resources from TableDataManager. But other code using this same
@@ -130,7 +132,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     FileUtils.deleteQuietly(_resourceTmpDir);
     if (!_resourceTmpDir.exists()) {
       Preconditions.checkState(_resourceTmpDir.mkdirs(),
-          "Unable to create temp resources directory at %s. Check that the user has permissions on this directory.",
+          "Unable to create temp resources directory at %s. "
+              + "Please check for available space and write-permissions for this directory.",
           _resourceTmpDir);
     }
     _errorCache = errorCache;
@@ -139,7 +142,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _isStreamSegmentDownloadUntar = tableDataManagerParams.isStreamSegmentDownloadUntar();
     if (_isStreamSegmentDownloadUntar) {
       LOGGER.info("Using streamed download-untar for segment download! "
-              + "The rate limit interval for streamed download-untar is {} ms",
+              + "The rate limit interval for streamed download-untar is {} bytes/s",
           _streamSegmentDownloadUntarRateLimitBytesPerSec);
     }
     int maxParallelSegmentDownloads = tableDataManagerParams.getMaxParallelSegmentDownloads();

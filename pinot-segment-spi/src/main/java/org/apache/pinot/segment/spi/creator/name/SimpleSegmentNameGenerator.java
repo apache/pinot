@@ -48,10 +48,10 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
   public SimpleSegmentNameGenerator(String segmentNamePrefix, @Nullable String segmentNamePostfix,
       boolean appendUUIDToSegmentName) {
     Preconditions.checkArgument(segmentNamePrefix != null, "Missing segmentNamePrefix for SimpleSegmentNameGenerator");
-    Preconditions.checkArgument(isValidSegmentName(segmentNamePrefix),
-        "Invalid segmentNamePrefix: %s for SimpleSegmentNameGenerator", segmentNamePrefix);
-    Preconditions.checkArgument(segmentNamePostfix == null || isValidSegmentName(segmentNamePostfix),
-        "Invalid segmentNamePostfix: %s for SimpleSegmentNameGenerator", segmentNamePostfix);
+    SegmentNameUtils.validatePartialOrFullSegmentName(segmentNamePrefix);
+    if (segmentNamePostfix != null) {
+      SegmentNameUtils.validatePartialOrFullSegmentName(segmentNamePostfix);
+    }
     _segmentNamePrefix = segmentNamePrefix;
     _segmentNamePostfix = segmentNamePostfix;
     _appendUUIDToSegmentName = appendUUIDToSegmentName;
@@ -59,10 +59,12 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
 
   @Override
   public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
-    Preconditions.checkArgument(minTimeValue == null || isValidSegmentName(minTimeValue.toString()),
-        "Invalid minTimeValue: %s for SimpleSegmentNameGenerator", minTimeValue);
-    Preconditions.checkArgument(maxTimeValue == null || isValidSegmentName(maxTimeValue.toString()),
-        "Invalid maxTimeValue: %s for SimpleSegmentNameGenerator", maxTimeValue);
+    if (minTimeValue != null) {
+      SegmentNameUtils.validatePartialOrFullSegmentName(minTimeValue.toString());
+    }
+    if (maxTimeValue != null) {
+      SegmentNameUtils.validatePartialOrFullSegmentName(maxTimeValue.toString());
+    }
 
     return JOINER.join(_segmentNamePrefix, minTimeValue, maxTimeValue, _segmentNamePostfix,
         sequenceId >= 0 ? sequenceId : null, _appendUUIDToSegmentName ? UUID.randomUUID() : null);

@@ -25,6 +25,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.QuickStartBase;
 import org.apache.pinot.tools.Quickstart;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
@@ -42,11 +43,6 @@ public class AirlineDataStream {
   private StreamDataProducer _producer;
   private PinotRealtimeSource _pinotStream;
 
-  public AirlineDataStream(Schema pinotSchema, TableConfig tableConfig, File avroFile)
-      throws Exception {
-    this(pinotSchema, tableConfig, avroFile, getDefaultKafkaProducer());
-  }
-
   public AirlineDataStream(Schema pinotSchema, TableConfig tableConfig, File avroFile, StreamDataProducer producer)
       throws IOException {
     _pinotSchema = pinotSchema;
@@ -61,6 +57,13 @@ public class AirlineDataStream {
     QuickStartBase.printStatus(Quickstart.Color.YELLOW,
         "***** Offine data has max time as 16101, realtime will start consuming from time 16102 and increment time "
             + "every 60 events (which is approximately 60 seconds) *****");
+  }
+
+  public AirlineDataStream(File baseDir)
+      throws Exception {
+    this(Schema.fromFile(new File(baseDir, "airlineStats_schema.json")),
+        JsonUtils.fileToObject(new File(baseDir, "airlineStats_realtime_table_config.json"), TableConfig.class),
+        new File(baseDir, "rawdata/airlineStats_data.avro"), getDefaultKafkaProducer());
   }
 
   public static StreamDataProducer getDefaultKafkaProducer()

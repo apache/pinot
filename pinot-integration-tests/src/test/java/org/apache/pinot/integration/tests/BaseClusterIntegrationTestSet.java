@@ -23,14 +23,19 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.Message;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -38,6 +43,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -531,6 +537,42 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }, 60_000L, errorMessage);
   }
 
+  public void testReset(TableType tableType)
+      throws Exception {
+    String rawTableName = getTableName();
+
+    // reset the table.
+    resetTable(rawTableName, tableType, null);
+
+    // wait for all live messages clear the queue.
+    List<String> instances = _helixResourceManager.getServerInstancesForTable(rawTableName, tableType);
+    PropertyKey.Builder keyBuilder = _helixDataAccessor.keyBuilder();
+    TestUtils.waitForCondition(aVoid -> {
+      int liveMessageCount = 0;
+      for (String instanceName : instances) {
+        List<Message> messages = _helixDataAccessor.getChildValues(keyBuilder.messages(instanceName), true);
+        liveMessageCount += messages.size();
+      }
+      return liveMessageCount == 0;
+    }, 30_000L, "Failed to wait for all segment reset messages clear helix state transition!");
+
+    // Check that all segment states come back to ONLINE.
+    TestUtils.waitForCondition(aVoid -> {
+      // check external view and wait for everything to come back online
+      ExternalView externalView = _helixAdmin.getResourceExternalView(getHelixClusterName(),
+          TableNameBuilder.forType(tableType).tableNameWithType(rawTableName));
+      for (Map<String, String> externalViewStateMap : externalView.getRecord().getMapFields().values()) {
+        for (String state : externalViewStateMap.values()) {
+          if (!CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(state)
+              && !CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING.equals(state)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }, 30_000L, "Failed to wait for all segments come back online");
+  }
+
   /**
    * TODO: Support removing new added columns for MutableSegment and remove the new added columns before running the
    *       next test. Use this to replace {@link OfflineClusterIntegrationTest#testDefaultColumns()}.
@@ -593,6 +635,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     JsonNode resultTable = queryResponse.get("resultTable");
     assertEquals(resultTable.get("dataSchema").get("columnNames").size(), schema.size());
     assertEquals(resultTable.get("rows").size(), 10);
+
+    // Test aggregation query to include querying all segemnts (including realtime)
+    String aggregationQuery = "SELECT SUMMV(NewIntMVDimension) FROM " + rawTableName;
+    queryResponse = postQuery(aggregationQuery);
+    assertEquals(queryResponse.get("exceptions").size(), 0);
 
     // Test filter on all new added columns
     String countStarQuery = "SELECT COUNT(*) FROM " + rawTableName

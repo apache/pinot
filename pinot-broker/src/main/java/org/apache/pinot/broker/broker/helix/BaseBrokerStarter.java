@@ -133,14 +133,16 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _port = _listenerConfigs.get(0).getPort();
     _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, -1);
 
-    _instanceId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY);
-    if (_instanceId != null) {
-      // NOTE: Force all instances to have the same prefix in order to derive the instance type based on the instance id
-      Preconditions.checkState(InstanceTypeUtils.isBroker(_instanceId), "Instance id must have prefix '%s', got '%s'",
-          Helix.PREFIX_OF_BROKER_INSTANCE, _instanceId);
-    } else {
+    _instanceId = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ID);
+    if (_instanceId == null) {
+      _instanceId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY);
+    }
+    if (_instanceId == null) {
       _instanceId = Helix.PREFIX_OF_BROKER_INSTANCE + _hostname + "_" + _port;
     }
+    // NOTE: Force all instances to have the same prefix in order to derive the instance type based on the instance id
+    Preconditions.checkState(InstanceTypeUtils.isBroker(_instanceId), "Instance id must have prefix '%s', got '%s'",
+        Helix.PREFIX_OF_BROKER_INSTANCE, _instanceId);
 
     _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _instanceId);
   }
@@ -273,7 +275,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       }
     }
 
-    MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
+    BrokerRequestHandler multiStageBrokerRequestHandler = null;
     if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
       // multi-stage request handler uses both Netty and GRPC ports.
       // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.
@@ -284,7 +286,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
 
     _brokerRequestHandler = new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler,
-        multiStageBrokerRequestHandler);
+        multiStageBrokerRequestHandler, _brokerMetrics);
     _brokerRequestHandler.start();
     String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
     if (controllerUrl != null) {

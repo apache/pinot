@@ -91,6 +91,32 @@ public class MinionTaskMetadataUtilsTest {
     MinionTaskMetadataUtils.deleteTaskMetadata(propertyStore, TASK_TYPE, TABLE_NAME_WITH_TYPE);
     assertFalse(propertyStore.exists(OLD_MINION_METADATA_PATH, ACCESS_OPTION));
     assertFalse(propertyStore.exists(NEW_MINION_METADATA_PATH, ACCESS_OPTION));
+
+    // 1. ZNode MINION_TASK_METADATA/TestTable_OFFLINE and its descendants will be removed
+    // 2. ZNode MINION_TASK_METADATA/<any task type>/TestTable_OFFLINE will also be removed
+    String anotherTable = "anotherTable_OFFLINE";
+    String anotherOldMinionMetadataPath =
+        ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadataDeprecated(TASK_TYPE, anotherTable);
+    DummyTaskMetadata anotherOldTaskMetadata = new DummyTaskMetadata(anotherTable, 20);
+    String anotherNewMinionMetadataPath =
+        ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(anotherTable, TASK_TYPE);
+    DummyTaskMetadata anotherNewTaskMetadata = new DummyTaskMetadata(anotherTable, 200);
+    propertyStore = new FakePropertyStore();
+    propertyStore.set(OLD_MINION_METADATA_PATH, OLD_TASK_METADATA.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
+    propertyStore.set(NEW_MINION_METADATA_PATH, NEW_TASK_METADATA.toZNRecord(), EXPECTED_VERSION, ACCESS_OPTION);
+    propertyStore.set(anotherOldMinionMetadataPath, anotherOldTaskMetadata.toZNRecord(),
+        EXPECTED_VERSION, ACCESS_OPTION);
+    propertyStore.set(anotherNewMinionMetadataPath, anotherNewTaskMetadata.toZNRecord(),
+        EXPECTED_VERSION, ACCESS_OPTION);
+    assertTrue(propertyStore.exists(OLD_MINION_METADATA_PATH, ACCESS_OPTION));
+    assertTrue(propertyStore.exists(NEW_MINION_METADATA_PATH, ACCESS_OPTION));
+    assertTrue(propertyStore.exists(anotherOldMinionMetadataPath, ACCESS_OPTION));
+    assertTrue(propertyStore.exists(anotherNewMinionMetadataPath, ACCESS_OPTION));
+    MinionTaskMetadataUtils.deleteTaskMetadata(propertyStore, TABLE_NAME_WITH_TYPE);
+    assertFalse(propertyStore.exists(OLD_MINION_METADATA_PATH, ACCESS_OPTION));
+    assertFalse(propertyStore.exists(NEW_MINION_METADATA_PATH, ACCESS_OPTION));
+    assertTrue(propertyStore.exists(anotherOldMinionMetadataPath, ACCESS_OPTION));
+    assertTrue(propertyStore.exists(anotherNewMinionMetadataPath, ACCESS_OPTION));
   }
 
   @Test

@@ -26,10 +26,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import static org.testng.Assert.assertEquals;
 
 
-public class CountStarTreeV2Test extends BaseStarTreeV2Test<Void, Long> {
+public class CountStarTreeV2Test extends BaseStarTreeV2Test<Object, Long> {
 
   @Override
-  ValueAggregator<Void, Long> getValueAggregator() {
+  ValueAggregator<Object, Long> getValueAggregator() {
     return new CountValueAggregator();
   }
 

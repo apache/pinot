@@ -18,10 +18,10 @@
  */
 
 import React, { useEffect, useState, useContext } from 'react';
-import { get } from 'lodash';
+import { get, keys, last } from 'lodash';
 import moment from 'moment';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
-import { Grid, makeStyles } from '@material-ui/core';
+import { Grid, makeStyles, Box } from '@material-ui/core';
 import { NotificationContext } from '../components/Notification/NotificationContext';
 import SimpleAccordion from '../components/SimpleAccordion';
 import CustomButton from '../components/CustomButton';
@@ -83,6 +83,7 @@ const TaskQueueTable = (props) => {
   const [fetching, setFetching] = useState(true);
   const [jobDetail, setJobDetail] = useState({});
   const [tableDetail, setTableDetail] = useState({});
+  const [mostRecentErrorRunMessage, setMostRecentErrorRunMessage] = useState('');
   const scheduleAdhocModal = useScheduleAdhocModal();
   const minionMetadata = useMinionMetadata({ taskType, tableName });
   const taskListing = useTaskListing({ taskType, tableName });
@@ -91,6 +92,10 @@ const TaskQueueTable = (props) => {
     setFetching(true);
     const detail = await PinotMethodUtils.getScheduleJobDetail(tableName, taskType);
     const tableDetailRes = await PinotMethodUtils.getTableDetails(tableName);
+    const taskGeneratorDebugData = await PinotMethodUtils.getTaskGeneratorDebugData(tableName, taskType);
+    const mostRecentErrorRunMessagesTS = get(taskGeneratorDebugData, 'data.0.mostRecentErrorRunMessages', {});
+    const mostRecentErrorRunMessagesTSLastTime = last(keys(mostRecentErrorRunMessagesTS).sort());
+    setMostRecentErrorRunMessage(get(mostRecentErrorRunMessagesTS, mostRecentErrorRunMessagesTSLastTime, ''));
     setTableDetail(tableDetailRes);
     setJobDetail(detail);
     setFetching(false);
@@ -197,7 +202,9 @@ const TaskQueueTable = (props) => {
               headerTitle="Scheduling Errors"
               showSearchBox={false}
             >
-              
+              <Box p={3} style={{ overflow: 'auto' }}>
+                {mostRecentErrorRunMessage}
+              </Box>
             </SimpleAccordion>
           </div>
         </Grid>

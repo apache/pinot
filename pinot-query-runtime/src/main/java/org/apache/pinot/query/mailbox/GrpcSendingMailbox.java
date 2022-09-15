@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
+import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusStreamObserver;
 
 /**
@@ -48,6 +49,11 @@ public class GrpcSendingMailbox implements SendingMailbox<MailboxContent> {
     PinotMailboxGrpc.PinotMailboxStub stub = PinotMailboxGrpc.newStub(channel);
     _statusStreamObserver = new MailboxStatusStreamObserver();
     _statusStreamObserver.init(stub.open(_statusStreamObserver));
+    // send a begin-of-stream message.
+    _statusStreamObserver.send(MailboxContent.newBuilder()
+        .setMailboxId(_mailboxId)
+        .putMetadata(ChannelUtils.MAILBOX_METADATA_BEGIN_OF_STREAM_KEY, "true")
+        .build());
     _initialized.set(true);
   }
 

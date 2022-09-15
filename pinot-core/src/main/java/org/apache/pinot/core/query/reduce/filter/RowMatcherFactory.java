@@ -31,18 +31,19 @@ public class RowMatcherFactory {
   /**
    * Helper method to construct a RowMatcher based on the given filter.
    */
-  public static RowMatcher getRowMatcher(FilterContext filter, ValueExtractorFactory valueExtractorFactory) {
+  public static RowMatcher getRowMatcher(FilterContext filter, ValueExtractorFactory valueExtractorFactory,
+      boolean nullHandlingEnabled) {
     switch (filter.getType()) {
       case AND:
-        return new AndRowMatcher(filter.getChildren(), valueExtractorFactory);
+        return new AndRowMatcher(filter.getChildren(), valueExtractorFactory, nullHandlingEnabled);
       case OR:
-        return new OrRowMatcher(filter.getChildren(), valueExtractorFactory);
+        return new OrRowMatcher(filter.getChildren(), valueExtractorFactory, nullHandlingEnabled);
       case NOT:
         assert filter.getChildren().size() == 1;
-        return new NotRowMatcher(filter.getChildren().get(0), valueExtractorFactory);
+        return new NotRowMatcher(filter.getChildren().get(0), valueExtractorFactory, nullHandlingEnabled);
       case PREDICATE:
         return new PredicateRowMatcher(filter.getPredicate(),
-            valueExtractorFactory.getValueExtractor(filter.getPredicate().getLhs()));
+            valueExtractorFactory.getValueExtractor(filter.getPredicate().getLhs()), nullHandlingEnabled);
       default:
         throw new IllegalStateException();
     }

@@ -147,17 +147,17 @@ public class AggregationFunctionFactory {
       } else {
         switch (AggregationFunctionType.valueOf(upperCaseFunctionName)) {
           case COUNT:
-            return new CountAggregationFunction();
+            return new CountAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
           case MIN:
-            return new MinAggregationFunction(firstArgument);
+            return new MinAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
           case MAX:
-            return new MaxAggregationFunction(firstArgument);
+            return new MaxAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
           case SUM:
-            return new SumAggregationFunction(firstArgument);
+            return new SumAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
           case SUMPRECISION:
-            return new SumPrecisionAggregationFunction(arguments);
+            return new SumPrecisionAggregationFunction(arguments, queryContext.isNullHandlingEnabled());
           case AVG:
-            return new AvgAggregationFunction(firstArgument);
+            return new AvgAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
           case MODE:
             return new ModeAggregationFunction(arguments);
           case FIRSTWITHTIME:
@@ -268,6 +268,10 @@ public class AggregationFunctionFactory {
             return new StUnionAggregationFunction(firstArgument);
           case HISTOGRAM:
             return new HistogramAggregationFunction(arguments);
+          case COVARPOP:
+            return new CovarianceAggregationFunction(arguments, false);
+          case COVARSAMP:
+            return new CovarianceAggregationFunction(arguments, true);
           default:
             throw new IllegalArgumentException();
         }

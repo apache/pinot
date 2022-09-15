@@ -24,12 +24,16 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.query.utils.idset.Roaring64NavigableMapIdSet;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -48,6 +52,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class CastQueriesTest extends BaseQueriesTest {
@@ -55,17 +60,23 @@ public class CastQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "CastQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
+  private static final Random RANDOM = new Random();
 
   private static final int NUM_RECORDS = 1000;
   private static final int BUCKET_SIZE = 8;
+  private static final int NUM_ENTRY_MV = 2;
   private static final String CLASSIFICATION_COLUMN = "class";
   private static final String X_COL = "x";
   private static final String Y_COL = "y";
+  private static final String STRING_MV_COL = "stringMvCol";
+
+  private long[][] _expectedLongValues = new long[NUM_RECORDS][];
 
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
       .addSingleValueDimension(X_COL, FieldSpec.DataType.DOUBLE)
       .addSingleValueDimension(Y_COL, FieldSpec.DataType.DOUBLE)
       .addSingleValueDimension(CLASSIFICATION_COLUMN, FieldSpec.DataType.STRING)
+      .addMultiValueDimension(STRING_MV_COL, FieldSpec.DataType.STRING)
       .build();
 
   private static final TableConfig TABLE_CONFIG =
@@ -100,6 +111,14 @@ public class CastQueriesTest extends BaseQueriesTest {
       record.putValue(X_COL, 0.5);
       record.putValue(Y_COL, 0.25);
       record.putValue(CLASSIFICATION_COLUMN, "" + (i % BUCKET_SIZE));
+      String[] mvCol = new String[NUM_ENTRY_MV];
+      _expectedLongValues[i] = new long[NUM_ENTRY_MV];
+      for (int j = 0; j < mvCol.length; j++) {
+        long longVal = RANDOM.nextLong();
+        _expectedLongValues[i][j] = longVal;
+        mvCol[j] = String.valueOf(longVal);
+      }
+      record.putValue(STRING_MV_COL, mvCol);
       records.add(record);
     }
 
@@ -123,11 +142,34 @@ public class CastQueriesTest extends BaseQueriesTest {
         + "cast(sum(" + Y_COL + ") as int) "
         + "from " + RAW_TABLE_NAME;
     AggregationOperator aggregationOperator = getOperator(query);
-    List<Object> aggregationResult = aggregationOperator.nextBlock().getAggregationResult();
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 2);
     assertEquals(((Number) aggregationResult.get(0)).intValue(), NUM_RECORDS / 2);
     assertEquals(((Number) aggregationResult.get(1)).intValue(), NUM_RECORDS / 4);
+  }
+
+  @Test
+  public void testCastMV() {
+    String query = String.format("select cast(%s as LONG) as col1 from %s limit 100", STRING_MV_COL, RAW_TABLE_NAME);
+    SelectionResultsBlock block = ((SelectionOnlyOperator) getOperator(query)).nextBlock();
+    List<Object[]> results = (List<Object[]>) block.getRows();
+    for (int i = 0; i < 100; i++) {
+      Object[] row = results.get(i);
+      long[] cast = (long[]) row[0];
+      assertEquals(cast, _expectedLongValues[i]);
+    }
+
+    query = String.format("select id_set(cast(%s as LONG)) as col1 from %s limit 100", STRING_MV_COL, RAW_TABLE_NAME);
+    AggregationResultsBlock aggregationResultsBlock = ((AggregationOperator) getOperator(query)).nextBlock();
+    List<Object> aggregationResultsBlockResults = aggregationResultsBlock.getResults();
+    assertTrue(aggregationResultsBlockResults.get(0) instanceof Roaring64NavigableMapIdSet);
+    Roaring64NavigableMapIdSet idSet = (Roaring64NavigableMapIdSet) aggregationResultsBlockResults.get(0);
+    for (int i = 0; i < NUM_RECORDS; i++) {
+      for (int j = 0; j < NUM_ENTRY_MV; j++) {
+        assertTrue(idSet.contains(_expectedLongValues[i][j]));
+      }
+    }
   }
 
   @Test
@@ -155,7 +197,7 @@ public class CastQueriesTest extends BaseQueriesTest {
         + " from " + RAW_TABLE_NAME
         + " where " + CLASSIFICATION_COLUMN + " = cast(0 as string) limit " + NUM_RECORDS;
     SelectionOnlyOperator selectionOperator = getOperator(query);
-    Collection<Object[]> result = selectionOperator.nextBlock().getSelectionResult();
+    Collection<Object[]> result = selectionOperator.nextBlock().getRows();
     assertNotNull(result);
     assertEquals(result.size(), NUM_RECORDS / BUCKET_SIZE);
     for (Object[] row : result) {

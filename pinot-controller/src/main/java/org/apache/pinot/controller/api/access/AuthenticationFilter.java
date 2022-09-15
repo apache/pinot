@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Optional;
 import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Provider;
@@ -49,6 +48,9 @@ import org.glassfish.grizzly.http.server.Request;
 public class AuthenticationFilter implements ContainerRequestFilter {
   private static final Set<String> UNPROTECTED_PATHS =
       new HashSet<>(Arrays.asList("", "help", "auth/info", "auth/verify", "health"));
+  private static final String KEY_TABLE_NAME = "tableName";
+  private static final String KEY_TABLE_NAME_WITH_TYPE = "tableNameWithType";
+  private static final String KEY_SCHEMA_NAME = "schemaName";
 
   @Inject
   Provider<Request> _requestProvider;
@@ -65,9 +67,10 @@ public class AuthenticationFilter implements ContainerRequestFilter {
   @Override
   public void filter(ContainerRequestContext requestContext)
       throws IOException {
+    Request request = _requestProvider.get();
     Method endpointMethod = _resourceInfo.getResourceMethod();
     AccessControl accessControl = _accessControlFactory.create();
-    String endpointUrl = _requestProvider.get().getRequestURL().toString();
+    String endpointUrl = request.getRequestURI().substring(request.getContextPath().length()); // extract path only
     UriInfo uriInfo = requestContext.getUriInfo();
 
     // exclude public/unprotected paths
@@ -80,55 +83,61 @@ public class AuthenticationFilter implements ContainerRequestFilter {
       return;
     }
 
+    // check if the method's authorization is disabled (i.e. performed manually within method)
+    if (endpointMethod.isAnnotationPresent(ManualAuthorization.class)) {
+      return;
+    }
+
     // Note that table name is extracted from "path parameters" or "query parameters" if it's defined as one of the
     // followings:
     //     - "tableName",
     //     - "tableNameWithType", or
     //     - "schemaName"
     // If table name is not available, it means the endpoint is not a table-level endpoint.
-    Optional<String> tableName = extractTableName(uriInfo.getPathParameters(), uriInfo.getQueryParameters());
+    String tableName = extractTableName(uriInfo.getPathParameters(), uriInfo.getQueryParameters());
     AccessType accessType = extractAccessType(endpointMethod);
-    new AccessControlUtils().validatePermission(tableName, accessType, _httpHeaders, endpointUrl, accessControl);
+    AccessControlUtils.validatePermission(tableName, accessType, _httpHeaders, endpointUrl, accessControl);
   }
 
   @VisibleForTesting
   AccessType extractAccessType(Method endpointMethod) {
-    // default access type
-    AccessType accessType = AccessType.READ;
     if (endpointMethod.isAnnotationPresent(Authenticate.class)) {
-      accessType = endpointMethod.getAnnotation(Authenticate.class).value();
+      return endpointMethod.getAnnotation(Authenticate.class).value();
     } else {
       // heuristically infer access type via javax.ws.rs annotations
       if (endpointMethod.getAnnotation(POST.class) != null) {
-        accessType = AccessType.CREATE;
+        return AccessType.CREATE;
       } else if (endpointMethod.getAnnotation(PUT.class) != null) {
-        accessType = AccessType.UPDATE;
+        return AccessType.UPDATE;
       } else if (endpointMethod.getAnnotation(DELETE.class) != null) {
-        accessType = AccessType.DELETE;
+        return AccessType.DELETE;
       }
     }
-    return accessType;
+
+    return AccessType.READ;
   }
 
   @VisibleForTesting
-  Optional<String> extractTableName(MultivaluedMap<String, String> pathParameters,
+  static String extractTableName(MultivaluedMap<String, String> pathParameters,
       MultivaluedMap<String, String> queryParameters) {
-    Optional<String> tableName = extractTableName(pathParameters);
-    if (tableName.isPresent()) {
+    String tableName = extractTableName(pathParameters);
+    if (tableName != null) {
       return tableName;
     }
     return extractTableName(queryParameters);
   }
 
-  private Optional<String> extractTableName(MultivaluedMap<String, String> mmap) {
-    String tableName = mmap.getFirst("tableName");
-    if (tableName == null) {
-      tableName = mmap.getFirst("tableNameWithType");
-      if (tableName == null) {
-        tableName = mmap.getFirst("schemaName");
-      }
+  private static String extractTableName(MultivaluedMap<String, String> mmap) {
+    if (mmap.containsKey(KEY_TABLE_NAME)) {
+      return mmap.getFirst(KEY_TABLE_NAME);
     }
-    return Optional.ofNullable(tableName);
+    if (mmap.containsKey(KEY_TABLE_NAME_WITH_TYPE)) {
+      return mmap.getFirst(KEY_TABLE_NAME_WITH_TYPE);
+    }
+    if (mmap.containsKey(KEY_SCHEMA_NAME)) {
+      return mmap.getFirst(KEY_SCHEMA_NAME);
+    }
+    return null;
   }
 
   private static boolean isBaseFile(String path) {

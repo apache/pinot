@@ -53,6 +53,7 @@ public class QueryException {
   public static final int ACCESS_DENIED_ERROR_CODE = 180;
   public static final int TABLE_DOES_NOT_EXIST_ERROR_CODE = 190;
   public static final int QUERY_EXECUTION_ERROR_CODE = 200;
+  public static final int QUERY_CANCELLATION_ERROR_CODE = 205;
   // TODO: Handle these errors in broker
   public static final int SERVER_SHUTTING_DOWN_ERROR_CODE = 210;
   public static final int SERVER_OUT_OF_CAPACITY_ERROR_CODE = 211;
@@ -90,6 +91,8 @@ public class QueryException {
   public static final ProcessingException TABLE_DOES_NOT_EXIST_ERROR =
       new ProcessingException(TABLE_DOES_NOT_EXIST_ERROR_CODE);
   public static final ProcessingException QUERY_EXECUTION_ERROR = new ProcessingException(QUERY_EXECUTION_ERROR_CODE);
+  public static final ProcessingException QUERY_CANCELLATION_ERROR =
+      new ProcessingException(QUERY_CANCELLATION_ERROR_CODE);
   public static final ProcessingException SERVER_SCHEDULER_DOWN_ERROR =
       new ProcessingException(SERVER_SHUTTING_DOWN_ERROR_CODE);
   public static final ProcessingException SERVER_OUT_OF_CAPACITY_ERROR =
@@ -132,6 +135,7 @@ public class QueryException {
     COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR.setMessage("CombineSegmentPlanTimeoutError");
     TABLE_DOES_NOT_EXIST_ERROR.setMessage("TableDoesNotExistError");
     QUERY_EXECUTION_ERROR.setMessage("QueryExecutionError");
+    QUERY_CANCELLATION_ERROR.setMessage("QueryCancellationError");
     SERVER_SCHEDULER_DOWN_ERROR.setMessage("ServerShuttingDown");
     SERVER_OUT_OF_CAPACITY_ERROR.setMessage("ServerOutOfCapacity");
     SERVER_TABLE_MISSING_ERROR.setMessage("ServerTableMissing");

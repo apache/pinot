@@ -100,6 +100,23 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Test
+  public void testFileMetadataParsing()
+      throws IOException {
+    final ParquetRecordReader parquetRecordReader = new ParquetRecordReader();
+    File avroParquetFile = new File(getClass().getClassLoader().getResource("data-avro.parquet").getFile());
+    parquetRecordReader.init(avroParquetFile, null, null);
+    // Should be avro since file metadata has avro schema
+    Assert.assertTrue(parquetRecordReader.useAvroParquetRecordReader());
+
+
+    final ParquetRecordReader parquetRecordReader2 = new ParquetRecordReader();
+    File nativeParquetFile = new File(getClass().getClassLoader().getResource("users.parquet").getFile());
+    parquetRecordReader.init(nativeParquetFile, null, null);
+    // Should be native since file metadata does not have avro schema
+    Assert.assertFalse(parquetRecordReader.useAvroParquetRecordReader());
+  }
+
+  @Test
   public void testComparison()
       throws IOException {
     testComparison(_dataFile, SAMPLE_RECORDS_SIZE);
@@ -116,10 +133,12 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
   private void testComparison(File dataFile, int totalRecords)
       throws IOException {
     final ParquetRecordReader avroRecordReader = new ParquetRecordReader();
-    avroRecordReader.init(dataFile, null, null);
+    ParquetRecordReaderConfig avroRecordReaderConfig = new ParquetRecordReaderConfig();
+    avroRecordReaderConfig.setUseParquetAvroRecordReader(true);
+    avroRecordReader.init(dataFile, null, avroRecordReaderConfig);
     final ParquetRecordReader nativeRecordReader = new ParquetRecordReader();
     ParquetRecordReaderConfig parquetRecordReaderConfig = new ParquetRecordReaderConfig();
-    parquetRecordReaderConfig.setUseParquetAvroRecordReader(false);
+    parquetRecordReaderConfig.setUseParquetNativeRecordReader(true);
     nativeRecordReader.init(dataFile, null, parquetRecordReaderConfig);
     Assert.assertTrue(avroRecordReader.useAvroParquetRecordReader());
     Assert.assertFalse(nativeRecordReader.useAvroParquetRecordReader());

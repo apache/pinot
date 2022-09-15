@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
 import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
@@ -45,14 +46,11 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -63,6 +61,7 @@ import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.segment.local.customobject.CovarianceTuple;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
 import org.apache.pinot.segment.local.customobject.FloatLongPair;
 import org.apache.pinot.segment.local.customobject.IntLongPair;
@@ -121,6 +120,7 @@ public class ObjectSerDeUtils {
     FloatLongPair(29),
     DoubleLongPair(30),
     StringLongPair(31),
+    CovarianceTuple(32),
     Null(100);
     private final int _value;
 
@@ -204,6 +204,8 @@ public class ObjectSerDeUtils {
         return ObjectType.DoubleLongPair;
       } else if (value instanceof StringLongPair) {
         return ObjectType.StringLongPair;
+      } else if (value instanceof CovarianceTuple) {
+        return ObjectType.CovarianceTuple;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -449,6 +451,23 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<CovarianceTuple> COVARIANCE_TUPLE_OBJECT_SER_DE = new ObjectSerDe<CovarianceTuple>() {
+    @Override
+    public byte[] serialize(CovarianceTuple covarianceTuple) {
+      return covarianceTuple.toBytes();
+    }
+
+    @Override
+    public CovarianceTuple deserialize(byte[] bytes) {
+      return CovarianceTuple.fromBytes(bytes);
+    }
+
+    @Override
+    public CovarianceTuple deserialize(ByteBuffer byteBuffer) {
+      return CovarianceTuple.fromByteBuffer(byteBuffer);
+    }
+  };
+
   public static final ObjectSerDe<HyperLogLog> HYPER_LOG_LOG_SER_DE = new ObjectSerDe<HyperLogLog>() {
 
     @Override
@@ -540,39 +559,39 @@ public class ObjectSerDeUtils {
         return new byte[Integer.BYTES];
       }
 
-      // No need to close these 2 streams
-      ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-      DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-
-      try {
-        // Write the size of the map
-        dataOutputStream.writeInt(size);
-
-        // Write the serialized key-value pairs
-        Iterator<Map.Entry<Object, Object>> iterator = map.entrySet().iterator();
-        // First write the key type and value type
-        Map.Entry<Object, Object> firstEntry = iterator.next();
-        Object firstKey = firstEntry.getKey();
-        Object firstValue = firstEntry.getValue();
-        int keyTypeValue = ObjectType.getObjectType(firstKey).getValue();
-        int valueTypeValue = ObjectType.getObjectType(firstValue).getValue();
-        dataOutputStream.writeInt(keyTypeValue);
-        dataOutputStream.writeInt(valueTypeValue);
-        // Then write each key-value pair
-        for (Map.Entry<Object, Object> entry : map.entrySet()) {
-          byte[] keyBytes = ObjectSerDeUtils.serialize(entry.getKey(), keyTypeValue);
-          dataOutputStream.writeInt(keyBytes.length);
-          dataOutputStream.write(keyBytes);
-
-          byte[] valueBytes = ObjectSerDeUtils.serialize(entry.getValue(), valueTypeValue);
-          dataOutputStream.writeInt(valueBytes.length);
-          dataOutputStream.write(valueBytes);
-        }
-      } catch (IOException e) {
-        throw new RuntimeException("Caught exception while serializing Map", e);
+      // Besides the value bytes, we store: size, key type, value type, length for each key, length for each value
+      long bufferSize = (3 + 2 * (long) size) * Integer.BYTES;
+      byte[][] keyBytesArray = new byte[size][];
+      byte[][] valueBytesArray = new byte[size][];
+      Map.Entry<Object, Object> firstEntry = map.entrySet().iterator().next();
+      int keyTypeValue = ObjectType.getObjectType(firstEntry.getKey()).getValue();
+      int valueTypeValue = ObjectType.getObjectType(firstEntry.getValue()).getValue();
+      ObjectSerDe keySerDe = SER_DES[keyTypeValue];
+      ObjectSerDe valueSerDe = SER_DES[valueTypeValue];
+      int index = 0;
+      for (Map.Entry<Object, Object> entry : map.entrySet()) {
+        byte[] keyBytes = keySerDe.serialize(entry.getKey());
+        bufferSize += keyBytes.length;
+        keyBytesArray[index] = keyBytes;
+        byte[] valueBytes = valueSerDe.serialize(entry.getValue());
+        bufferSize += valueBytes.length;
+        valueBytesArray[index++] = valueBytes;
       }
-
-      return byteArrayOutputStream.toByteArray();
+      Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+      byte[] bytes = new byte[(int) bufferSize];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      byteBuffer.putInt(keyTypeValue);
+      byteBuffer.putInt(valueTypeValue);
+      for (int i = 0; i < index; i++) {
+        byte[] keyBytes = keyBytesArray[i];
+        byteBuffer.putInt(keyBytes.length);
+        byteBuffer.put(keyBytes);
+        byte[] valueBytes = valueBytesArray[i];
+        byteBuffer.putInt(valueBytes.length);
+        byteBuffer.put(valueBytes);
+      }
+      return bytes;
     }
 
     @Override
@@ -736,20 +755,24 @@ public class ObjectSerDeUtils {
     @Override
     public byte[] serialize(Set<String> stringSet) {
       int size = stringSet.size();
-      // NOTE: No need to close the ByteArrayOutputStream.
-      ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-      DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-      try {
-        dataOutputStream.writeInt(size);
-        for (String value : stringSet) {
-          byte[] bytes = value.getBytes(UTF_8);
-          dataOutputStream.writeInt(bytes.length);
-          dataOutputStream.write(bytes);
-        }
-      } catch (IOException e) {
-        throw new RuntimeException("Caught exception while serializing Set<String>", e);
+      // Besides the value bytes, we store: size, length for each value
+      long bufferSize = (1 + (long) size) * Integer.BYTES;
+      byte[][] valueBytesArray = new byte[size][];
+      int index = 0;
+      for (String value : stringSet) {
+        byte[] valueBytes = value.getBytes(UTF_8);
+        bufferSize += valueBytes.length;
+        valueBytesArray[index++] = valueBytes;
       }
-      return byteArrayOutputStream.toByteArray();
+      Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+      byte[] bytes = new byte[(int) bufferSize];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      for (byte[] valueBytes : valueBytesArray) {
+        byteBuffer.putInt(valueBytes.length);
+        byteBuffer.put(valueBytes);
+      }
+      return bytes;
     }
 
     @Override
@@ -776,20 +799,21 @@ public class ObjectSerDeUtils {
     @Override
     public byte[] serialize(Set<ByteArray> bytesSet) {
       int size = bytesSet.size();
-      // NOTE: No need to close the ByteArrayOutputStream.
-      ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-      DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-      try {
-        dataOutputStream.writeInt(size);
-        for (ByteArray value : bytesSet) {
-          byte[] bytes = value.getBytes();
-          dataOutputStream.writeInt(bytes.length);
-          dataOutputStream.write(bytes);
-        }
-      } catch (IOException e) {
-        throw new RuntimeException("Caught exception while serializing Set<ByteArray>", e);
+      // Besides the value bytes, we store: size, length for each value
+      long bufferSize = (1 + (long) size) * Integer.BYTES;
+      for (ByteArray value : bytesSet) {
+        bufferSize += value.length();
       }
-      return byteArrayOutputStream.toByteArray();
+      Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+      byte[] bytes = new byte[(int) bufferSize];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      for (ByteArray value : bytesSet) {
+        byte[] valueBytes = value.getBytes();
+        byteBuffer.putInt(valueBytes.length);
+        byteBuffer.put(valueBytes);
+      }
+      return bytes;
     }
 
     @Override
@@ -941,30 +965,27 @@ public class ObjectSerDeUtils {
         return new byte[Integer.BYTES];
       }
 
-      // No need to close these 2 streams (close() is no-op)
-      ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-      DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-
-      try {
-        // Write the size of the list
-        dataOutputStream.writeInt(size);
-
-        // Write the value type
-        Object firstValue = list.get(0);
-        int valueType = ObjectType.getObjectType(firstValue).getValue();
-        dataOutputStream.writeInt(valueType);
-
-        // Write the serialized values
-        for (Object value : list) {
-          byte[] bytes = ObjectSerDeUtils.serialize(value, valueType);
-          dataOutputStream.writeInt(bytes.length);
-          dataOutputStream.write(bytes);
-        }
-      } catch (IOException e) {
-        throw new RuntimeException("Caught exception while serializing List", e);
+      // Besides the value bytes, we store: size, value type, length for each value
+      long bufferSize = (2 + (long) size) * Integer.BYTES;
+      byte[][] valueBytesArray = new byte[size][];
+      int valueType = ObjectType.getObjectType(list.get(0)).getValue();
+      ObjectSerDe serDe = SER_DES[valueType];
+      int index = 0;
+      for (Object value : list) {
+        byte[] valueBytes = serDe.serialize(value);
+        bufferSize += valueBytes.length;
+        valueBytesArray[index++] = valueBytes;
       }
-
-      return byteArrayOutputStream.toByteArray();
+      Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+      byte[] bytes = new byte[(int) bufferSize];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      byteBuffer.putInt(valueType);
+      for (byte[] valueBytes : valueBytesArray) {
+        byteBuffer.putInt(valueBytes.length);
+        byteBuffer.put(valueBytes);
+      }
+      return bytes;
     }
 
     @Override
@@ -1171,7 +1192,8 @@ public class ObjectSerDeUtils {
       LONG_LONG_PAIR_SER_DE,
       FLOAT_LONG_PAIR_SER_DE,
       DOUBLE_LONG_PAIR_SER_DE,
-      STRING_LONG_PAIR_SER_DE
+      STRING_LONG_PAIR_SER_DE,
+      COVARIANCE_TUPLE_OBJECT_SER_DE
   };
   //@formatter:on
 

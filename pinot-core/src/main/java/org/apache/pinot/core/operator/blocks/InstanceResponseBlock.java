@@ -24,28 +24,13 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.BlockDocIdValueSet;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * InstanceResponseBlock is just a holder to get InstanceResponse from InstanceResponseBlock.
- *
- *
  */
 public class InstanceResponseBlock implements Block {
-  private static final Logger LOGGER = LoggerFactory.getLogger(InstanceResponseBlock.class);
-
-  private DataTable _instanceResponseDataTable;
-
-  public InstanceResponseBlock(IntermediateResultsBlock intermediateResultsBlock) {
-    try {
-      _instanceResponseDataTable = intermediateResultsBlock.getDataTable();
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while building data table.", e);
-      throw new RuntimeException("Caught exception while building data table.", e);
-    }
-  }
+  private final DataTable _instanceResponseDataTable;
 
   public InstanceResponseBlock(DataTable dataTable) {
     _instanceResponseDataTable = dataTable;

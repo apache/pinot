@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -204,8 +203,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
 
   private void runAndVerifyInnerSegmentQuery(String query, double expectedSum, int expectedCount) {
     AggregationOperator aggregationOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
     AvgPair avgPair = (AvgPair) aggregationResult.get(0);
@@ -231,8 +229,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
 
   private void verifyDateTruncationResult(String query, Object[] expectedGroupKey) {
     AggregationGroupByOrderByOperator groupByOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    AggregationGroupByResult aggregationGroupByResult = groupByOperator.nextBlock().getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
     List<GroupKeyGenerator.GroupKey> groupKeys = ImmutableList.copyOf(aggregationGroupByResult.getGroupKeyIterator());
     assertEquals(groupKeys.size(), 1);

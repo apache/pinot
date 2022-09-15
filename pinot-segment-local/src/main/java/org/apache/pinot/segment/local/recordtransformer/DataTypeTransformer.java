@@ -27,10 +27,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.TimeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -40,14 +47,37 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 @SuppressWarnings("rawtypes")
 public class DataTypeTransformer implements RecordTransformer {
-  private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
+  private static final Logger LOGGER = LoggerFactory.getLogger(DataTypeTransformer.class);
 
-  public DataTypeTransformer(Schema schema) {
+  private final Map<String, PinotDataType> _dataTypes = new HashMap<>();
+  private final boolean _continueOnError;
+  private final boolean _rowTimeValueCheck;
+  private final String _timeColumnName;
+  private final DateTimeFormatSpec _timeFormatSpec;
+
+  public DataTypeTransformer(TableConfig tableConfig, Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
         _dataTypes.put(fieldSpec.getName(), PinotDataType.getPinotDataTypeForIngestion(fieldSpec));
       }
     }
+    if (tableConfig.getIngestionConfig() != null) {
+      _continueOnError = tableConfig.getIngestionConfig().isContinueOnError();
+      _rowTimeValueCheck = tableConfig.getIngestionConfig().isRowTimeValueCheck();
+    } else {
+      _continueOnError = false;
+      _rowTimeValueCheck = false;
+    }
+    _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+
+    DateTimeFormatSpec timeColumnSpec = null;
+    if (StringUtils.isNotEmpty(_timeColumnName)) {
+      DateTimeFieldSpec dateTimeFieldSpec = schema.getSpecForTimeColumn(_timeColumnName);
+      Preconditions.checkState(dateTimeFieldSpec != null, "Failed to find spec for time column: %s from schema: %s",
+          _timeColumnName, schema.getSchemaName());
+      timeColumnSpec = dateTimeFieldSpec.getFormatSpec();
+    }
+    _timeFormatSpec = timeColumnSpec;
   }
 
   @Override
@@ -59,6 +89,23 @@ public class DataTypeTransformer implements RecordTransformer {
         if (value == null) {
           continue;
         }
+
+        if (_rowTimeValueCheck && _timeFormatSpec != null && column.equals(_timeColumnName)) {
+          long timeInMs = _timeFormatSpec.fromFormatToMillis(value.toString());
+          if (!TimeUtils.timeValueInValidRange(timeInMs)) {
+            if (_continueOnError) {
+              LOGGER.debug("Time value {} is not in valid range for column: {}, must be between: {}", timeInMs,
+                  _timeColumnName, TimeUtils.VALID_TIME_INTERVAL);
+              record.putValue(column, null);
+              continue;
+            } else {
+              throw new RuntimeException(
+                  String.format("Time value %s is not in valid range for column: %s, must be between: %s", timeInMs,
+                      _timeColumnName, TimeUtils.VALID_TIME_INTERVAL));
+            }
+          }
+        }
+
         PinotDataType dest = entry.getValue();
         if (dest != PinotDataType.JSON) {
           value = standardize(column, value, dest.isSingleValue());
@@ -95,7 +142,12 @@ public class DataTypeTransformer implements RecordTransformer {
 
         record.putValue(column, value);
       } catch (Exception e) {
-        throw new RuntimeException("Caught exception while transforming data type for column: " + column, e);
+        if (!_continueOnError) {
+          throw new RuntimeException("Caught exception while transforming data type for column: " + column, e);
+        } else {
+          LOGGER.debug("Caught exception while transforming data type for column: {}", column, e);
+          record.putValue(column, null);
+        }
       }
     }
     return record;

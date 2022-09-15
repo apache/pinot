@@ -47,7 +47,6 @@ import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPrunerFactory;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelectorFactory;
-import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -56,6 +55,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -75,7 +75,7 @@ import org.slf4j.LoggerFactory;
  * <ul>
  *   <li>{@link #buildRouting(String)}: Builds/rebuilds the routing for a table</li>
  *   <li>{@link #removeRouting(String)}: Removes the routing for a table</li>
- *   <li>{@link #refreshSegment(String, String): Refreshes the metadata for a segment}</li>
+ *   <li>{@link #refreshSegment(String, String)}: Refreshes the metadata for a segment</li>
  *   <li>{@link #routingExists(String)}: Returns whether the routing exists for a table</li>
  *   <li>{@link #getRoutingTable(BrokerRequest)}: Returns the routing table for a query</li>
  *   <li>{@link #getTimeBoundaryInfo(String)}: Returns the time boundary info for a table</li>
@@ -596,6 +596,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
    * <p>NOTE: Time boundary info is only available for the offline part of the hybrid table.
    */
   @Nullable
+  @Override
   public TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName) {
     RoutingEntry routingEntry = _routingEntryMap.get(offlineTableName);
     if (routingEntry == null) {

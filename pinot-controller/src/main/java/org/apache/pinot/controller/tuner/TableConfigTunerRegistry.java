@@ -19,25 +19,17 @@
 package org.apache.pinot.controller.tuner;
 
 import com.google.common.base.Preconditions;
-import java.net.URL;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import org.reflections.Reflections;
-import org.reflections.scanners.ResourcesScanner;
-import org.reflections.scanners.SubTypesScanner;
-import org.reflections.scanners.TypeAnnotationsScanner;
-import org.reflections.util.ClasspathHelper;
-import org.reflections.util.ConfigurationBuilder;
-import org.reflections.util.FilterBuilder;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Helper class to dynamically register all annotated {@link Tuner} methods
+ * Helper class to dynamically register all annotated {@link Tuner} classes.
  */
 public class TableConfigTunerRegistry {
   private TableConfigTunerRegistry() {
@@ -63,16 +55,9 @@ public class TableConfigTunerRegistry {
     }
     long startTime = System.currentTimeMillis();
 
-    List<URL> urls = new ArrayList<>();
-    for (String pack : packages) {
-      urls.addAll(ClasspathHelper.forPackage(pack));
-    }
-
-    Reflections reflections = new Reflections(
-        new ConfigurationBuilder().setUrls(urls).filterInputsBy(new FilterBuilder.Include(".*\\.tuner\\..*"))
-            .setScanners(new ResourcesScanner(), new TypeAnnotationsScanner(), new SubTypesScanner()));
-    Set<Class<?>> classes = reflections.getTypesAnnotatedWith(Tuner.class);
-    classes.forEach(tunerClass -> {
+    Set<Class<?>> tunerClasses =
+        PinotReflectionUtils.getClassesThroughReflection(packages, ".*\\.tuner\\..*", Tuner.class);
+    for (Class<?> tunerClass : tunerClasses) {
       Tuner tunerAnnotation = tunerClass.getAnnotation(Tuner.class);
       if (tunerAnnotation.enabled()) {
         if (tunerAnnotation.name().isEmpty()) {
@@ -88,7 +73,7 @@ public class TableConfigTunerRegistry {
           }
         }
       }
-    });
+    }
 
     _init = true;
     LOGGER.info("Initialized TableConfigTunerRegistry with {} tuners: {} in {} ms", CONFIG_TUNER_MAP.size(),

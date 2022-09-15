@@ -19,7 +19,10 @@
 package org.apache.pinot.query.planner.stage;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.serde.ProtoSerializable;
@@ -31,6 +34,7 @@ public abstract class AbstractStageNode implements StageNode, ProtoSerializable 
   protected final int _stageId;
   protected final List<StageNode> _inputs;
   protected DataSchema _dataSchema;
+  protected Set<Integer> _partitionedKeys;
 
   public AbstractStageNode(int stageId) {
     this(stageId, null);
@@ -40,6 +44,7 @@ public abstract class AbstractStageNode implements StageNode, ProtoSerializable 
     _stageId = stageId;
     _dataSchema = dataSchema;
     _inputs = new ArrayList<>();
+    _partitionedKeys = new HashSet<>();
   }
 
   @Override
@@ -62,8 +67,19 @@ public abstract class AbstractStageNode implements StageNode, ProtoSerializable 
     return _dataSchema;
   }
 
+  @Override
   public void setDataSchema(DataSchema dataSchema) {
     _dataSchema = dataSchema;
+  }
+
+  @Override
+  public Set<Integer> getPartitionKeys() {
+    return _partitionedKeys;
+  }
+
+  @Override
+  public void setPartitionKeys(Collection<Integer> partitionedKeys) {
+    _partitionedKeys.addAll(partitionedKeys);
   }
 
   @Override

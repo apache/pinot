@@ -30,7 +30,8 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOrderByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
@@ -161,8 +162,8 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   public void testInnerSegmentAggregation() {
     // For inner segment case, percentile does not affect the intermediate result
     AggregationOperator aggregationOperator = getOperator(getAggregationQuery(0));
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 6);
     DoubleList doubleList0 = (DoubleList) aggregationResult.get(0);
@@ -194,7 +195,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   public void testInnerSegmentGroupBy() {
     // For inner segment case, percentile does not affect the intermediate result
     AggregationGroupByOrderByOperator groupByOperator = getOperator(getGroupByQuery(0));
-    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+    GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(groupByResult);
     Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
@@ -257,8 +258,8 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     // Inner segment
     // For inner segment case, percentile does not affect the intermediate result
     AggregationOperator aggregationOperator = getOperator(getSmartTDigestQuery(0));
-    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 4);
     DoubleList doubleList0 = (DoubleList) aggregationResult.get(0);

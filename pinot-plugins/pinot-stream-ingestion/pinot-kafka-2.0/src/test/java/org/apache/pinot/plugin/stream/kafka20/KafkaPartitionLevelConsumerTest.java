@@ -236,6 +236,11 @@ public class KafkaPartitionLevelConsumerTest {
           new KafkaStreamMetadataProvider(clientId, streamConfig, partition);
       Assert.assertEquals(new LongMsgOffset(0).compareTo(kafkaStreamMetadataProvider.fetchStreamPartitionOffset(
           new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest(), 10000)), 0);
+      Assert.assertEquals(new LongMsgOffset(0).compareTo(kafkaStreamMetadataProvider.fetchStreamPartitionOffset(
+          new OffsetCriteria.OffsetCriteriaBuilder().withOffsetAsPeriod("2d"), 10000)), 0);
+      Assert.assertEquals(new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION)
+          .compareTo(kafkaStreamMetadataProvider.fetchStreamPartitionOffset(new OffsetCriteria.OffsetCriteriaBuilder()
+              .withOffsetAsTimestamp(Instant.now().toString()), 10000)), 0);
       Assert.assertEquals(new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION).compareTo(
           kafkaStreamMetadataProvider.fetchStreamPartitionOffset(
               new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest(), 10000)), 0);

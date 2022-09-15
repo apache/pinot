@@ -76,23 +76,23 @@ public class DefaultNullValueVirtualColumnProviderTest {
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(MV_INT, 1)),
         new ColumnMetadataImpl.Builder().setFieldSpec(MV_INT).setTotalDocs(1).setCardinality(1).setSorted(false)
-            .setHasDictionary(true).build());
+            .setHasDictionary(true).setMaxNumberOfMultiValues(1).build());
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(MV_LONG, 1)),
         new ColumnMetadataImpl.Builder().setFieldSpec(MV_LONG).setTotalDocs(1).setCardinality(1).setSorted(false)
-            .setHasDictionary(true).build());
+            .setHasDictionary(true).setMaxNumberOfMultiValues(1).build());
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(MV_FLOAT, 1)),
         new ColumnMetadataImpl.Builder().setFieldSpec(MV_FLOAT).setTotalDocs(1).setCardinality(1).setSorted(false)
-            .setHasDictionary(true).build());
+            .setHasDictionary(true).setMaxNumberOfMultiValues(1).build());
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(MV_DOUBLE, 1)),
         new ColumnMetadataImpl.Builder().setFieldSpec(MV_DOUBLE).setTotalDocs(1).setCardinality(1).setSorted(false)
-            .setHasDictionary(true).build());
+            .setHasDictionary(true).setMaxNumberOfMultiValues(1).build());
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(MV_STRING, 1)),
         new ColumnMetadataImpl.Builder().setFieldSpec(MV_STRING).setTotalDocs(1).setCardinality(1).setSorted(false)
-            .setHasDictionary(true).build());
+            .setHasDictionary(true).setMaxNumberOfMultiValues(1).build());
   }
 
   @Test

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.List;
+import org.apache.pinot.common.utils.LoggerFileServer;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -59,6 +60,10 @@ public class MinionAdminApiApplication extends ResourceConfig {
       protected void configure() {
         // TODO: Add bindings as needed in future.
         bind(instanceId).named(MINION_INSTANCE_ID);
+        String loggerRootDir = minionConf.getProperty(CommonConstants.Minion.CONFIG_OF_LOGGER_ROOT_DIR);
+        if (loggerRootDir != null) {
+          bind(new LoggerFileServer(loggerRootDir)).to(LoggerFileServer.class);
+        }
       }
     });
 
@@ -74,9 +79,7 @@ public class MinionAdminApiApplication extends ResourceConfig {
     } catch (IOException e) {
       throw new RuntimeException("Failed to start http server", e);
     }
-    synchronized (PinotReflectionUtils.getReflectionLock()) {
-      setupSwagger();
-    }
+    PinotReflectionUtils.runWithLock(this::setupSwagger);
   }
 
   private void setupSwagger() {
@@ -85,6 +88,7 @@ public class MinionAdminApiApplication extends ResourceConfig {
     beanConfig.setDescription("APIs for accessing Pinot Minion information");
     beanConfig.setContact("https://github.com/apache/pinot");
     beanConfig.setVersion("1.0");
+    beanConfig.setExpandSuperTypes(false);
     if (_useHttps) {
       beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL});
     } else {

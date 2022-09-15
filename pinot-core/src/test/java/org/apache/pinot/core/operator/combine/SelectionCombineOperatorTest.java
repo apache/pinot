@@ -21,13 +21,15 @@ package org.apache.pinot.core.operator.combine;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.plan.CombinePlanNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
@@ -35,9 +37,14 @@ import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -51,6 +58,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -66,6 +76,8 @@ public class SelectionCombineOperatorTest {
 
   // Create (MAX_NUM_THREADS_PER_QUERY * 2) segments so that each thread needs to process 2 segments
   private static final int NUM_SEGMENTS = CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY * 2;
+  private static final int NUM_CONSUMING_SEGMENTS = NUM_SEGMENTS / 2;
+  private static final String REALTIME_TABLE_NAME = RAW_TABLE_NAME + "_REALTIME";
   private static final int NUM_RECORDS_PER_SEGMENT = 100;
 
   private static final String INT_COLUMN = "intColumn";
@@ -84,12 +96,41 @@ public class SelectionCombineOperatorTest {
       throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
     _indexSegments = new ArrayList<>(NUM_SEGMENTS);
-    for (int i = 0; i < NUM_SEGMENTS; i++) {
-      _indexSegments.add(createSegment(i));
+    for (int i = 0; i < NUM_SEGMENTS / 2; i++) {
+      _indexSegments.add(createOfflineSegment(i));
+    }
+
+    for (int i = NUM_CONSUMING_SEGMENTS; i < NUM_SEGMENTS; i++) {
+      _indexSegments.add(createRealtimeSegment(i));
     }
   }
 
-  private IndexSegment createSegment(int index)
+  private IndexSegment createRealtimeSegment(int index)
+      throws Exception {
+    RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
+    when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
+    when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
+
+    String segmentName = SEGMENT_NAME_PREFIX + index;
+
+    RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder()
+        .setTableNameWithType(REALTIME_TABLE_NAME).setSegmentName(segmentName).setSchema(SCHEMA).setCapacity(100000)
+        .setAvgNumMultiValues(2).setNoDictionaryColumns(Collections.emptySet())
+        .setJsonIndexColumns(Collections.emptySet()).setVarLengthDictionaryColumns(Collections.emptySet())
+        .setInvertedIndexColumns(Collections.emptySet()).setSegmentZKMetadata(new SegmentZKMetadata(segmentName))
+        .setMemoryManager(new DirectMemoryManager(segmentName)).setStatsHistory(statsHistory).setAggregateMetrics(false)
+        .setNullHandlingEnabled(true).setIngestionAggregationConfigs(Collections.emptyList()).build();
+    MutableSegment mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfig, null);
+    int baseValue = index * NUM_RECORDS_PER_SEGMENT / 2;
+    for (int i = 0; i < NUM_RECORDS_PER_SEGMENT; i++) {
+      GenericRow record = new GenericRow();
+      record.putValue(INT_COLUMN, baseValue + i);
+      mutableSegmentImpl.index(record, null);
+    }
+    return mutableSegmentImpl;
+  }
+
+  private IndexSegment createOfflineSegment(int index)
       throws Exception {
     int baseValue = index * NUM_RECORDS_PER_SEGMENT / 2;
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS_PER_SEGMENT);
@@ -114,26 +155,26 @@ public class SelectionCombineOperatorTest {
 
   @Test
   public void testSelectionLimit0() {
-    IntermediateResultsBlock combineResult = getCombineResult("SELECT * FROM testTable LIMIT 0");
+    SelectionResultsBlock combineResult = getCombineResult("SELECT * FROM testTable LIMIT 0");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
-    assertNotNull(combineResult.getSelectionResult());
-    assertTrue(combineResult.getSelectionResult().isEmpty());
+    assertTrue(combineResult.getRows().isEmpty());
     assertEquals(combineResult.getNumDocsScanned(), 0);
     assertEquals(combineResult.getNumEntriesScannedInFilter(), 0);
     assertEquals(combineResult.getNumEntriesScannedPostFilter(), 0);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
     assertEquals(combineResult.getNumSegmentsMatched(), 0);
+    assertEquals(combineResult.getNumConsumingSegmentsProcessed(), 0);
+    assertEquals(combineResult.getNumConsumingSegmentsMatched(), 0);
     assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
   }
 
   @Test
   public void testSelectionOnly() {
-    IntermediateResultsBlock combineResult = getCombineResult("SELECT * FROM testTable");
+    SelectionResultsBlock combineResult = getCombineResult("SELECT * FROM testTable");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
-    assertNotNull(combineResult.getSelectionResult());
-    assertEquals(combineResult.getSelectionResult().size(), 10);
+    assertEquals(combineResult.getRows().size(), 10);
     // Should early-terminate after processing the result of the first segment. Each thread should process at most 1
     // segment.
     long numDocsScanned = combineResult.getNumDocsScanned();
@@ -141,15 +182,31 @@ public class SelectionCombineOperatorTest {
     assertEquals(combineResult.getNumEntriesScannedInFilter(), 0);
     assertEquals(combineResult.getNumEntriesScannedPostFilter(), numDocsScanned);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
+    assertEquals(combineResult.getNumConsumingSegmentsProcessed(), NUM_CONSUMING_SEGMENTS);
     int numSegmentsMatched = combineResult.getNumSegmentsMatched();
     assertTrue(numSegmentsMatched >= 1 && numSegmentsMatched <= CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY);
+    // The check below depends on the order of segment processing. When segments# <= 10 (the value of
+    // CombinePlanNode.TARGET_NUM_PLANS_PER_THREAD to be specific), the segments are processed in the order as they
+    // are prepared, which is OFFLINE segments followed by RT segments and this case makes the value here equal to 0.
+    // But when segments# > 10, the segments are processed in a different order and some RT segments can be processed
+    // ahead of the other OFFLINE segments, but no more than CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY for sure
+    // as each thread only processes one segment.
+    int numConsumingSegmentsMatched = combineResult.getNumConsumingSegmentsMatched();
+    if (NUM_SEGMENTS <= 10) {
+      assertEquals(numConsumingSegmentsMatched, 0, "numSegments: " + NUM_SEGMENTS);
+    } else {
+      assertTrue(numConsumingSegmentsMatched >= 0
+          && numConsumingSegmentsMatched <= CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY, String
+          .format("numConsumingSegmentsMatched: %d, maxThreadsPerQuery: %d, numSegments: %d",
+              combineResult.getNumConsumingSegmentsMatched(), CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY,
+              NUM_SEGMENTS));
+    }
     assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
 
     combineResult = getCombineResult("SELECT * FROM testTable LIMIT 10000");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
-    assertNotNull(combineResult.getSelectionResult());
-    assertEquals(combineResult.getSelectionResult().size(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
+    assertEquals(combineResult.getRows().size(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
     // Should not early-terminate
     numDocsScanned = combineResult.getNumDocsScanned();
     assertEquals(numDocsScanned, NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
@@ -157,15 +214,17 @@ public class SelectionCombineOperatorTest {
     assertEquals(combineResult.getNumEntriesScannedPostFilter(), numDocsScanned);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
     assertEquals(combineResult.getNumSegmentsMatched(), NUM_SEGMENTS);
+    assertEquals(combineResult.getNumConsumingSegmentsProcessed(), NUM_CONSUMING_SEGMENTS);
+    assertEquals(combineResult.getNumConsumingSegmentsMatched(), NUM_CONSUMING_SEGMENTS);
     assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
   }
 
   @Test
   public void testSelectionOrderBy() {
-    IntermediateResultsBlock combineResult = getCombineResult("SELECT * FROM testTable ORDER BY intColumn");
+    SelectionResultsBlock combineResult = getCombineResult("SELECT * FROM testTable ORDER BY intColumn");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
-    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) combineResult.getSelectionResult();
+    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) combineResult.getRows();
     assertNotNull(selectionResult);
     assertEquals(selectionResult.size(), 10);
     int expectedValue = 9;
@@ -180,6 +239,8 @@ public class SelectionCombineOperatorTest {
     assertEquals(combineResult.getNumEntriesScannedInFilter(), 0);
     assertEquals(combineResult.getNumEntriesScannedPostFilter(), numDocsScanned);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
+    assertEquals(combineResult.getNumConsumingSegmentsProcessed(), NUM_CONSUMING_SEGMENTS);
+    assertEquals(combineResult.getNumConsumingSegmentsMatched(), 0);
     int numSegmentsMatched = combineResult.getNumSegmentsMatched();
     assertTrue(numSegmentsMatched >= 1 && numSegmentsMatched <= CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY);
     assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
@@ -187,7 +248,7 @@ public class SelectionCombineOperatorTest {
     combineResult = getCombineResult("SELECT * FROM testTable ORDER BY intColumn DESC");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
-    selectionResult = (PriorityQueue<Object[]>) combineResult.getSelectionResult();
+    selectionResult = (PriorityQueue<Object[]>) combineResult.getRows();
     assertNotNull(selectionResult);
     assertEquals(selectionResult.size(), 10);
     expectedValue = NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT / 2 + 40;
@@ -202,6 +263,8 @@ public class SelectionCombineOperatorTest {
     assertEquals(combineResult.getNumEntriesScannedInFilter(), 0);
     assertEquals(combineResult.getNumEntriesScannedPostFilter(), numDocsScanned);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
+    assertEquals(combineResult.getNumConsumingSegmentsProcessed(), NUM_CONSUMING_SEGMENTS);
+    assertEquals(combineResult.getNumConsumingSegmentsMatched(), NUM_CONSUMING_SEGMENTS);
     numSegmentsMatched = combineResult.getNumSegmentsMatched();
     assertTrue(numSegmentsMatched >= 1 && numSegmentsMatched <= CombineOperatorUtils.MAX_NUM_THREADS_PER_QUERY);
     assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
@@ -209,7 +272,7 @@ public class SelectionCombineOperatorTest {
     combineResult = getCombineResult("SELECT * FROM testTable ORDER BY intColumn DESC LIMIT 10000");
     assertEquals(combineResult.getDataSchema(),
         new DataSchema(new String[]{INT_COLUMN}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
-    selectionResult = (PriorityQueue<Object[]>) combineResult.getSelectionResult();
+    selectionResult = (PriorityQueue<Object[]>) combineResult.getRows();
     assertNotNull(selectionResult);
     assertEquals(selectionResult.size(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
     // Should not early-terminate
@@ -219,10 +282,12 @@ public class SelectionCombineOperatorTest {
     assertEquals(combineResult.getNumEntriesScannedPostFilter(), numDocsScanned);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
     assertEquals(combineResult.getNumSegmentsMatched(), NUM_SEGMENTS);
+    assertEquals(combineResult.getNumConsumingSegmentsProcessed(), NUM_CONSUMING_SEGMENTS);
+    assertEquals(combineResult.getNumConsumingSegmentsMatched(), NUM_CONSUMING_SEGMENTS);
     assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
   }
 
-  private IntermediateResultsBlock getCombineResult(String query) {
+  private SelectionResultsBlock getCombineResult(String query) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     List<PlanNode> planNodes = new ArrayList<>(NUM_SEGMENTS);
     for (IndexSegment indexSegment : _indexSegments) {
@@ -230,7 +295,7 @@ public class SelectionCombineOperatorTest {
     }
     queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, EXECUTOR, null);
-    return combinePlanNode.run().nextBlock();
+    return (SelectionResultsBlock) combinePlanNode.run().nextBlock();
   }
 
   @AfterClass

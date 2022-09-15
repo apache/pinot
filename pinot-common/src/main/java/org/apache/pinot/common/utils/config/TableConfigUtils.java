@@ -158,9 +158,16 @@ public class TableConfigUtils {
       });
     }
 
+    Map<InstancePartitionsType, String> instancePartitionsMap = null;
+    String instancePartitionsMapString = simpleFields.get(TableConfig.INSTANCE_PARTITIONS_MAP_CONFIG_KEY);
+    if (instancePartitionsMapString != null) {
+      instancePartitionsMap = JsonUtils.stringToObject(instancePartitionsMapString,
+          new TypeReference<Map<InstancePartitionsType, String>>() { });
+    }
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
-        dedupConfig, ingestionConfig, tierConfigList, isDimTable, tunerConfigList);
+        dedupConfig, ingestionConfig, tierConfigList, isDimTable, tunerConfigList, instancePartitionsMap);
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -222,6 +229,10 @@ public class TableConfigUtils {
     List<TunerConfig> tunerConfigList = tableConfig.getTunerConfigsList();
     if (tunerConfigList != null) {
       simpleFields.put(TableConfig.TUNER_CONFIG_LIST_KEY, JsonUtils.objectToString(tunerConfigList));
+    }
+    if (tableConfig.getInstancePartitionsMap() != null) {
+      simpleFields.put(TableConfig.INSTANCE_PARTITIONS_MAP_CONFIG_KEY,
+          JsonUtils.objectToString(tableConfig.getInstancePartitionsMap()));
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());
@@ -293,5 +304,21 @@ public class TableConfigUtils {
     indexingConfig.setStreamConfigs(null);
     validationConfig.setSegmentPushFrequency(null);
     validationConfig.setSegmentPushType(null);
+  }
+
+  /**
+   * Returns true if the table has pre-configured instance partitions for any type (OFFLINE/CONSUMING/COMPLETED).
+   */
+  public static boolean hasPreConfiguredInstancePartitions(TableConfig tableConfig) {
+    return MapUtils.isNotEmpty(tableConfig.getInstancePartitionsMap());
+  }
+
+  /**
+   * Returns true if the table has pre-configured instance partitions for the given type.
+   */
+  public static boolean hasPreConfiguredInstancePartitions(TableConfig tableConfig,
+      InstancePartitionsType instancePartitionsType) {
+    return hasPreConfiguredInstancePartitions(tableConfig)
+        && tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType);
   }
 }

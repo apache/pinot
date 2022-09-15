@@ -28,7 +28,7 @@ const Instances = ({instances, clusterName}) => {
     <>
       {
         map(order, (key) => {
-          const value = get(instances, key, '');
+          const value = get(instances, key, []);
           return <InstanceTable key={key} name={`${key}s`} instances={value} clusterName={clusterName} />;
         })
       }

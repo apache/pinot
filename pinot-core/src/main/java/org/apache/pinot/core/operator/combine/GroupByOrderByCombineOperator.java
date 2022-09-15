@@ -39,12 +39,15 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,8 +58,10 @@ import org.slf4j.LoggerFactory;
  *   all threads
  */
 @SuppressWarnings("rawtypes")
-public class GroupByOrderByCombineOperator extends BaseCombineOperator {
+public class GroupByOrderByCombineOperator extends BaseCombineOperator<GroupByResultsBlock> {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
+  public static final int MAX_GROUP_BY_KEYS_MERGED_PER_INTERRUPTION_CHECK = 10_000;
+
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByOrderByCombineOperator.class);
 
   private static final String EXPLAIN_NAME = "COMBINE_GROUPBY_ORDERBY";
@@ -80,7 +85,8 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     int minTrimSize = queryContext.getMinServerGroupTrimSize();
     if (minTrimSize > 0) {
       int limit = queryContext.getLimit();
-      if (queryContext.getOrderByExpressions() != null || queryContext.getHavingFilter() != null) {
+      if ((!queryContext.isServerReturnFinalResult() && queryContext.getOrderByExpressions() != null)
+          || queryContext.getHavingFilter() != null) {
         _trimSize = GroupByUtils.getTableCapacity(limit, minTrimSize);
       } else {
         // TODO: Keeping only 'LIMIT' groups can cause inaccurate result because the groups are randomly selected
@@ -114,7 +120,6 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
     return queryContext;
   }
 
-
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
@@ -124,14 +129,15 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
    * Executes query on one segment in a worker thread and merges the results into the indexed table.
    */
   @Override
-  protected void processSegments(int taskIndex) {
-    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
-      Operator operator = _operators.get(operatorIndex);
+  protected void processSegments() {
+    int operatorId;
+    while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
+      Operator operator = _operators.get(operatorId);
       try {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
-        IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) operator.nextBlock();
+        GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
         if (_indexedTable == null) {
           synchronized (this) {
             if (_indexedTable == null) {
@@ -165,6 +171,8 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
         // Merge aggregation group-by result.
         // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
         Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
+        // Count the number of merged keys
+        int mergedKeys = 0;
         // For now, only GroupBy OrderBy query has pre-constructed intermediate records
         if (intermediateRecords == null) {
           // Merge aggregation group-by result.
@@ -181,12 +189,16 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
                 values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
               }
               _indexedTable.upsert(new Key(keys), new Record(values));
+              mergedKeys++;
+              checkMergePhaseInterruption(mergedKeys);
             }
           }
         } else {
           for (IntermediateRecord intermediateResult : intermediateRecords) {
             //TODO: change upsert api so that it accepts intermediateRecord directly
             _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
+            mergedKeys++;
+            checkMergePhaseInterruption(mergedKeys);
           }
         }
       } finally {
@@ -194,6 +206,13 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
+    }
+  }
+
+  // Check for thread interruption, every time after merging 10_000 keys
+  private void checkMergePhaseInterruption(int mergedKeys) {
+    if (mergedKeys % MAX_GROUP_BY_KEYS_MERGED_PER_INTERRUPTION_CHECK == 0 && Thread.interrupted()) {
+      throw new EarlyTerminationException();
     }
   }
 
@@ -221,7 +240,7 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
    * </ul>
    */
   @Override
-  protected IntermediateResultsBlock mergeResults()
+  protected BaseResultsBlock mergeResults()
       throws Exception {
     long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
     boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
@@ -231,13 +250,16 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
           String.format("Timed out while combining group-by order-by results after %dms, queryContext = %s", timeoutMs,
               _queryContext);
       LOGGER.error(errorMessage);
-      return new IntermediateResultsBlock(new TimeoutException(errorMessage));
+      return new ExceptionResultsBlock(new TimeoutException(errorMessage));
     }
 
     IndexedTable indexedTable = _indexedTable;
-    indexedTable.finish(false);
-    IntermediateResultsBlock mergedBlock = new IntermediateResultsBlock(
-        indexedTable, _queryContext.isNullHandlingEnabled());
+    if (!_queryContext.isServerReturnFinalResult()) {
+      indexedTable.finish(false);
+    } else {
+      indexedTable.finish(true, true);
+    }
+    GroupByResultsBlock mergedBlock = new GroupByResultsBlock(indexedTable);
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
     mergedBlock.setNumResizes(indexedTable.getNumResizes());
     mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
@@ -251,6 +273,6 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator {
   }
 
   @Override
-  protected void mergeResultsBlocks(IntermediateResultsBlock mergedBlock, IntermediateResultsBlock blockToMerge) {
+  protected void mergeResultsBlocks(GroupByResultsBlock mergedBlock, GroupByResultsBlock blockToMerge) {
   }
 }

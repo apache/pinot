@@ -21,13 +21,7 @@ package org.apache.pinot.segment.spi.loader;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import org.reflections.Reflections;
-import org.reflections.scanners.ResourcesScanner;
-import org.reflections.scanners.SubTypesScanner;
-import org.reflections.scanners.TypeAnnotationsScanner;
-import org.reflections.util.ClasspathHelper;
-import org.reflections.util.ConfigurationBuilder;
-import org.reflections.util.FilterBuilder;
+import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,12 +40,10 @@ public class SegmentDirectoryLoaderRegistry {
   static {
     long startTime = System.currentTimeMillis();
 
-    Reflections reflections = new Reflections(
-        new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage("org.apache.pinot.segment"))
-            .filterInputsBy(new FilterBuilder.Include(".*\\.loader\\..*"))
-            .setScanners(new ResourcesScanner(), new TypeAnnotationsScanner(), new SubTypesScanner()));
-    Set<Class<?>> classes = reflections.getTypesAnnotatedWith(SegmentLoader.class);
-    classes.forEach(loaderClass -> {
+    Set<Class<?>> loaderClasses =
+        PinotReflectionUtils.getClassesThroughReflection("org.apache.pinot.segment", ".*\\.loader\\..*",
+            SegmentLoader.class);
+    for (Class<?> loaderClass : loaderClasses) {
       SegmentLoader segmentLoaderAnnotation = loaderClass.getAnnotation(SegmentLoader.class);
       if (segmentLoaderAnnotation.enabled()) {
         if (segmentLoaderAnnotation.name().isEmpty()) {
@@ -69,7 +61,7 @@ public class SegmentDirectoryLoaderRegistry {
           }
         }
       }
-    });
+    }
 
     LOGGER.info("Initialized SegmentDirectoryLoaderRegistry with {} segmentDirectoryLoaders: {} in {} ms",
         SEGMENT_DIRECTORY_LOADER_MAP.size(), SEGMENT_DIRECTORY_LOADER_MAP.keySet(),

@@ -20,17 +20,33 @@ package org.apache.pinot.client.controller;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import javax.net.ssl.SSLContext;
+import org.apache.pinot.client.ConnectionTimeouts;
+import org.apache.pinot.client.TlsProtocols;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class PinotControllerTransportFactory {
+  private static final String DEFAULT_CONTROLLER_READ_TIMEOUT_MS = "60000";
+  private static final String DEFAULT_CONTROLLER_CONNECT_TIMEOUT_MS = "2000";
+  private static final String DEFAULT_CONTROLLER_HANDSHAKE_TIMEOUT_MS = "2000";
+  private static final String DEFAULT_CONTROLLER_TLS_V10_ENABLED = "false";
+
   private Map<String, String> _headers = new HashMap<>();
   private String _scheme = CommonConstants.HTTP_PROTOCOL;
   private SSLContext _sslContext = null;
 
+  private boolean _tlsV10Enabled = false;
+  private int _readTimeoutMs = Integer.parseInt(DEFAULT_CONTROLLER_READ_TIMEOUT_MS);
+  private int _connectTimeoutMs = Integer.parseInt(DEFAULT_CONTROLLER_CONNECT_TIMEOUT_MS);
+  private int _handshakeTimeoutMs = Integer.parseInt(DEFAULT_CONTROLLER_HANDSHAKE_TIMEOUT_MS);
+
   public PinotControllerTransport buildTransport() {
-    return new PinotControllerTransport(_headers, _scheme, _sslContext);
+    ConnectionTimeouts connectionTimeouts = ConnectionTimeouts.create(_readTimeoutMs, _connectTimeoutMs,
+            _handshakeTimeoutMs);
+    TlsProtocols tlsProtocols = TlsProtocols.defaultProtocols(_tlsV10Enabled);
+    return new PinotControllerTransport(_headers, _scheme, _sslContext, connectionTimeouts, tlsProtocols);
   }
 
   public Map<String, String> getHeaders() {
@@ -55,5 +71,19 @@ public class PinotControllerTransportFactory {
 
   public void setSslContext(SSLContext sslContext) {
     _sslContext = sslContext;
+  }
+
+  public PinotControllerTransportFactory withConnectionProperties(Properties properties) {
+    _readTimeoutMs = Integer.parseInt(properties.getProperty("controllerReadTimeoutMs",
+            DEFAULT_CONTROLLER_READ_TIMEOUT_MS));
+    _connectTimeoutMs = Integer.parseInt(properties.getProperty("controllerConnectTimeoutMs",
+            DEFAULT_CONTROLLER_CONNECT_TIMEOUT_MS));
+    _handshakeTimeoutMs = Integer.parseInt(properties.getProperty("controllerHandshakeTimeoutMs",
+            DEFAULT_CONTROLLER_HANDSHAKE_TIMEOUT_MS));
+    _tlsV10Enabled = Boolean.parseBoolean(properties.getProperty("controllerTlsV10Enabled",
+            DEFAULT_CONTROLLER_TLS_V10_ENABLED))
+            || Boolean.parseBoolean(System.getProperties().getProperty("controller.tlsV10Enabled",
+            DEFAULT_CONTROLLER_TLS_V10_ENABLED));
+    return this;
   }
 }

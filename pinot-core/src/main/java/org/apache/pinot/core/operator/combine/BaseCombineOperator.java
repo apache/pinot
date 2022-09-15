@@ -26,17 +26,20 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.BaseOperator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,8 +51,8 @@ import org.slf4j.LoggerFactory;
  * the results blocks from the processed segments. It can early-terminate the query to save the system resources if it
  * detects that the merged results can already satisfy the query, or the query is already errored out or timed out.
  */
-@SuppressWarnings("rawtypes")
-public abstract class BaseCombineOperator extends BaseOperator<IntermediateResultsBlock> {
+@SuppressWarnings({"rawtypes", "unchecked"})
+public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends BaseOperator<BaseResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseCombineOperator.class);
 
   protected final List<Operator> _operators;
@@ -58,8 +61,10 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   protected final ExecutorService _executorService;
   protected final int _numTasks;
   protected final Future[] _futures;
-  // Use a _blockingQueue to store the intermediate results blocks
-  protected final BlockingQueue<IntermediateResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
+  // Use an AtomicInteger to track the next operator to execute
+  protected final AtomicInteger _nextOperatorId = new AtomicInteger();
+  // Use a BlockingQueue to store the intermediate results blocks
+  protected final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
   protected final AtomicLong _totalWorkerThreadCpuTimeNs = new AtomicLong(0);
 
   protected BaseCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
@@ -76,7 +81,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   }
 
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
+  protected BaseResultsBlock getNextBlock() {
     // Use a Phaser to ensure all the Futures are done (not scheduled, finished or interrupted) before the main thread
     // returns. We need to ensure this because the main thread holds the reference to the segments. If a segment is
     // deleted/refreshed, the segment will be released after the main thread returns, which would lead to undefined
@@ -84,7 +89,6 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     Phaser phaser = new Phaser(1);
     Tracing.activeRecording().setNumTasks(_numTasks);
     for (int i = 0; i < _numTasks; i++) {
-      int taskIndex = i;
       _futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
@@ -98,7 +102,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
             return;
           }
           try {
-            processSegments(taskIndex);
+            processSegments();
           } catch (EarlyTerminationException e) {
             // Early-terminated by interruption (canceled by the main thread)
           } catch (Exception e) {
@@ -115,12 +119,14 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
       });
     }
 
-    IntermediateResultsBlock mergedBlock;
+    BaseResultsBlock mergedBlock;
     try {
       mergedBlock = mergeResults();
+    } catch (InterruptedException e) {
+      throw new QueryCancelledException("Cancelled while merging results blocks", e);
     } catch (Exception e) {
       LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
-      mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
+      mergedBlock = new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
     } finally {
       // Cancel all ongoing jobs
       for (Future future : _futures) {
@@ -147,15 +153,16 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   /**
    * Executes query on one or more segments in a worker thread.
    */
-  protected void processSegments(int taskIndex) {
-    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
-      Operator operator = _operators.get(operatorIndex);
-      IntermediateResultsBlock resultsBlock;
+  protected void processSegments() {
+    int operatorId;
+    while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
+      Operator operator = _operators.get(operatorId);
+      T resultsBlock;
       try {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
-        resultsBlock = (IntermediateResultsBlock) operator.nextBlock();
+        resultsBlock = (T) operator.nextBlock();
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
@@ -172,14 +179,14 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   }
 
   /**
-   * Invoked when {@link #processSegments(int)} throws exception.
+   * Invoked when {@link #processSegments()} throws exception.
    */
   protected void onException(Exception e) {
-    _blockingQueue.offer(new IntermediateResultsBlock(e));
+    _blockingQueue.offer(new ExceptionResultsBlock(e));
   }
 
   /**
-   * Invoked when {@link #processSegments(int)} is finished (called in the finally block).
+   * Invoked when {@link #processSegments()} is finished (called in the finally block).
    */
   protected void onFinish() {
   }
@@ -187,20 +194,21 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
   /**
    * Merges the results from the worker threads into a results block.
    */
-  protected IntermediateResultsBlock mergeResults()
+  protected BaseResultsBlock mergeResults()
       throws Exception {
-    IntermediateResultsBlock mergedBlock = null;
+    T mergedBlock = null;
     int numBlocksMerged = 0;
     long endTimeMs = _queryContext.getEndTimeMs();
     while (numBlocksMerged < _numOperators) {
-      IntermediateResultsBlock blockToMerge =
-          _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+      // Timeout has reached, shouldn't continue to process. `_blockingQueue.poll` will continue to return blocks even
+      // if negative timeout is provided; therefore an extra check is needed
+      long waitTimeMs = endTimeMs - System.currentTimeMillis();
+      if (waitTimeMs <= 0) {
+        return getTimeoutResultsBlock(numBlocksMerged);
+      }
+      BaseResultsBlock blockToMerge = _blockingQueue.poll(waitTimeMs, TimeUnit.MILLISECONDS);
       if (blockToMerge == null) {
-        // Query times out, skip merging the remaining results blocks
-        LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
-            _queryContext);
-        return new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR,
-            new TimeoutException("Timed out while polling results block")));
+        return getTimeoutResultsBlock(numBlocksMerged);
       }
       if (blockToMerge.getProcessingExceptions() != null) {
         // Caught exception while processing segment, skip merging the remaining results blocks and directly return the
@@ -208,9 +216,9 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
         return blockToMerge;
       }
       if (mergedBlock == null) {
-        mergedBlock = blockToMerge;
+        mergedBlock = (T) blockToMerge;
       } else {
-        mergeResultsBlocks(mergedBlock, blockToMerge);
+        mergeResultsBlocks(mergedBlock, (T) blockToMerge);
       }
       numBlocksMerged++;
       if (isQuerySatisfied(mergedBlock)) {
@@ -221,10 +229,17 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
     return mergedBlock;
   }
 
+  private ExceptionResultsBlock getTimeoutResultsBlock(int numBlocksMerged) {
+    LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
+        _queryContext);
+    return new ExceptionResultsBlock(QueryException.EXECUTION_TIMEOUT_ERROR,
+        new TimeoutException("Timed out while polling results block"));
+  }
+
   /**
    * Can be overridden for early termination.
    */
-  protected boolean isQuerySatisfied(IntermediateResultsBlock resultsBlock) {
+  protected boolean isQuerySatisfied(T resultsBlock) {
     return false;
   }
 
@@ -233,8 +248,7 @@ public abstract class BaseCombineOperator extends BaseOperator<IntermediateResul
    * <p>NOTE: {@code blockToMerge} should contain the result for a segment without any exception. The errored segment
    * result is already handled.
    */
-  protected abstract void mergeResultsBlocks(IntermediateResultsBlock mergedBlock,
-      IntermediateResultsBlock blockToMerge);
+  protected abstract void mergeResultsBlocks(T mergedBlock, T blockToMerge);
 
   @Override
   public List<Operator> getChildOperators() {

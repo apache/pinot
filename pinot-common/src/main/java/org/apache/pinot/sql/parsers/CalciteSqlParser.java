@@ -107,6 +107,8 @@ public class CalciteSqlParser {
 
   public static SqlNodeAndOptions compileToSqlNodeAndOptions(String sql)
       throws SqlCompilationException {
+    long parseStartTimeNs = System.nanoTime();
+
     // Remove the comments from the query
     sql = removeComments(sql);
 
@@ -123,18 +125,20 @@ public class CalciteSqlParser {
       SqlParserImpl sqlParser = newSqlParser(inStream);
       SqlNodeList sqlNodeList = sqlParser.SqlStmtsEof();
       // Extract OPTION statements from sql.
-      SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
+      SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sql, sqlNodeList);
       // add legacy OPTIONS keyword-based options
       if (options.size() > 0) {
         sqlNodeAndOptions.setExtraOptions(extractOptionsMap(options));
       }
+      sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parseStartTimeNs);
       return sqlNodeAndOptions;
     } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
     }
   }
 
-  public static SqlNodeAndOptions extractSqlNodeAndOptions(SqlNodeList sqlNodeList) {
+  @VisibleForTesting
+  static SqlNodeAndOptions extractSqlNodeAndOptions(String sql, SqlNodeList sqlNodeList) {
     PinotSqlType sqlType = null;
     SqlNode statementNode = null;
     Map<String, String> options = new HashMap<>();
@@ -171,8 +175,10 @@ public class CalciteSqlParser {
 
   public static PinotQuery compileToPinotQuery(String sql)
       throws SqlCompilationException {
-    SqlNodeAndOptions sqlNodeAndOptions = compileToSqlNodeAndOptions(sql);
+    return compileToPinotQuery(compileToSqlNodeAndOptions(sql));
+  }
 
+  public static PinotQuery compileToPinotQuery(SqlNodeAndOptions sqlNodeAndOptions) {
     // Compile Sql without OPTION statements.
     PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode());
 
@@ -669,6 +675,8 @@ public class CalciteSqlParser {
           return RequestUtils.getIdentifierExpression(((SqlIdentifier) node).getSimple());
         }
         return RequestUtils.getIdentifierExpression(node.toString());
+      case INTERVAL_QUALIFIER:
+        return RequestUtils.getLiteralExpression(node.toString());
       case LITERAL:
         return RequestUtils.getLiteralExpression((SqlLiteral) node);
       case AS:

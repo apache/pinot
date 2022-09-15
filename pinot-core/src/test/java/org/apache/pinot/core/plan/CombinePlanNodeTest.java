@@ -21,21 +21,25 @@ package org.apache.pinot.core.plan;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class CombinePlanNodeTest {
-  private final QueryContext _queryContext =
-      QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
+  private final QueryContext _queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
   private final ExecutorService _executorService = Executors.newFixedThreadPool(10);
 
   /**
@@ -111,5 +115,51 @@ public class CombinePlanNodeTest {
     }
     // Fail.
     Assert.fail();
+  }
+
+  @Test
+  public void testCancelPlanNode() {
+    CountDownLatch ready = new CountDownLatch(20);
+    List<PlanNode> planNodes = new ArrayList<>();
+    for (int i = 0; i < 20; i++) {
+      planNodes.add(() -> {
+        ready.countDown();
+        return null;
+      });
+    }
+    // This planNode will keep the planning running and wait to be cancelled.
+    CountDownLatch hold = new CountDownLatch(1);
+    planNodes.add(() -> {
+      try {
+        hold.await();
+        return null;
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    });
+    _queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService, null);
+    AtomicReference<Exception> exp = new AtomicReference<>();
+    ExecutorService combineExecutor = Executors.newSingleThreadExecutor();
+    try {
+      Future<?> future = combineExecutor.submit(() -> {
+        try {
+          return combinePlanNode.run();
+        } catch (Exception e) {
+          exp.set(e);
+          throw e;
+        }
+      });
+      ready.await();
+      // At this point, the combinePlanNode is or will be waiting on future.get() for all sub planNodes, and the
+      // waiting can be cancelled as below.
+      future.cancel(true);
+    } catch (Exception e) {
+      Assert.fail();
+    } finally {
+      combineExecutor.shutdownNow();
+    }
+    TestUtils.waitForCondition((aVoid) -> exp.get() instanceof QueryCancelledException, 10_000,
+        "Should have been cancelled");
   }
 }

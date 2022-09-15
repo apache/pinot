@@ -33,7 +33,7 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountRawHLLAggregationFunction;
@@ -60,7 +60,7 @@ import org.apache.pinot.spi.utils.ByteArray;
  * is no dictionary.
  */
 @SuppressWarnings("rawtypes")
-public class NonScanBasedAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
+public class NonScanBasedAggregationOperator extends BaseOperator<AggregationResultsBlock> {
 
   private static final String EXPLAIN_NAME = "AGGREGATE_NO_SCAN";
 
@@ -76,7 +76,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<IntermediateRe
   }
 
   @Override
-  protected IntermediateResultsBlock getNextBlock() {
+  protected AggregationResultsBlock getNextBlock() {
     List<Object> aggregationResults = new ArrayList<>(_aggregationFunctions.length);
     for (int i = 0; i < _aggregationFunctions.length; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
@@ -128,7 +128,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<IntermediateRe
     }
 
     // Build intermediate result block based on aggregation result from the executor.
-    return new IntermediateResultsBlock(_aggregationFunctions, aggregationResults);
+    return new AggregationResultsBlock(_aggregationFunctions, aggregationResults);
   }
 
   private static Double getMinValue(DataSource dataSource) {

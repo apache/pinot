@@ -27,7 +27,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.apache.pinot.core.query.request.context.ThreadTimer;
@@ -49,7 +49,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
 
     // Test query without filter
     EmptySelectionOperator emptySelectionOperator = getOperator(SELECT_STAR_QUERY + limit);
-    IntermediateResultsBlock resultsBlock = emptySelectionOperator.nextBlock();
+    SelectionResultsBlock resultsBlock = emptySelectionOperator.nextBlock();
     ExecutionStatistics executionStatistics = emptySelectionOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 0L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
@@ -62,7 +62,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertTrue(columnIndexMap.containsKey("column11"));
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column11")), ColumnDataType.STRING);
-    assertTrue(resultsBlock.getSelectionResult().isEmpty());
+    assertTrue(resultsBlock.getRows().isEmpty());
 
     // Test query with filter
     emptySelectionOperator = getOperator(SELECT_STAR_QUERY + FILTER + limit);
@@ -80,7 +80,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertTrue(columnIndexMap.containsKey("column11"));
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column11")), ColumnDataType.STRING);
-    assertTrue(resultsBlock.getSelectionResult().isEmpty());
+    assertTrue(resultsBlock.getRows().isEmpty());
   }
 
   @Test
@@ -89,7 +89,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
         + "dateTimeConvert(daysSinceEpoch, '1:DAYS:EPOCH', '1:MILLISECONDS:EPOCH', '1:MILLISECONDS') > ago('P1D') "
         + "ORDER BY daysSinceEpoch LIMIT 10";
     SelectionOrderByOperator selectionOrderByOperator = getOperator(query);
-    IntermediateResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
     verifySelectionOrderByAgoFunctionResult(resultsBlock);
 
     query = "SELECT daysSinceEpoch from testTable WHERE fromEpochDays(daysSinceEpoch) > ago('P1D') "
@@ -99,7 +99,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     verifySelectionOrderByAgoFunctionResult(resultsBlock);
   }
 
-  private void verifySelectionOrderByAgoFunctionResult(IntermediateResultsBlock resultsBlock) {
+  private void verifySelectionOrderByAgoFunctionResult(SelectionResultsBlock resultsBlock) {
     DataSchema selectionDataSchema = resultsBlock.getDataSchema();
     Map<String, Integer> columnIndexMap = computeColumnNameToIndexMap(selectionDataSchema);
     assertEquals(selectionDataSchema.size(), 1);
@@ -107,7 +107,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertTrue(columnIndexMap.containsKey("daysSinceEpoch"));
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("daysSinceEpoch")), ColumnDataType.INT);
 
-    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     for (Object[] row : selectionResult) {
       assertEquals(row.length, 1);
@@ -118,8 +118,8 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
   @Test
   public void testSelectStar() {
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOnlyOperator = getOperator(SELECT_STAR_QUERY);
-    IntermediateResultsBlock resultsBlock = selectionOnlyOperator.nextBlock();
+    BaseOperator<SelectionResultsBlock> selectionOnlyOperator = getOperator(SELECT_STAR_QUERY);
+    SelectionResultsBlock resultsBlock = selectionOnlyOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
@@ -133,7 +133,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertTrue(columnIndexMap.containsKey("column11"));
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column11")), ColumnDataType.STRING);
-    List<Object[]> selectionResult = (List<Object[]>) resultsBlock.getSelectionResult();
+    List<Object[]> selectionResult = (List<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     Object[] firstRow = selectionResult.get(0);
     assertEquals(firstRow.length, 11);
@@ -156,7 +156,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertTrue(columnIndexMap.containsKey("column11"));
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column11")), ColumnDataType.STRING);
-    selectionResult = (List<Object[]>) resultsBlock.getSelectionResult();
+    selectionResult = (List<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     firstRow = selectionResult.get(0);
     assertEquals(firstRow.length, 11);
@@ -167,8 +167,8 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
   @Test
   public void testSelectionOnly() {
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOnlyOperator = getOperator(SELECTION_QUERY);
-    IntermediateResultsBlock resultsBlock = selectionOnlyOperator.nextBlock();
+    BaseOperator<SelectionResultsBlock> selectionOnlyOperator = getOperator(SELECTION_QUERY);
+    SelectionResultsBlock resultsBlock = selectionOnlyOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
@@ -182,7 +182,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertTrue(columnIndexMap.containsKey("column11"));
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column11")), ColumnDataType.STRING);
-    List<Object[]> selectionResult = (List<Object[]>) resultsBlock.getSelectionResult();
+    List<Object[]> selectionResult = (List<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     Object[] firstRow = selectionResult.get(0);
     assertEquals(firstRow.length, 3);
@@ -204,7 +204,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertTrue(columnIndexMap.containsKey("column11"));
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column11")), ColumnDataType.STRING);
-    selectionResult = (List<Object[]>) resultsBlock.getSelectionResult();
+    selectionResult = (List<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     firstRow = selectionResult.get(0);
     assertEquals(firstRow.length, 3);
@@ -215,8 +215,8 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
   @Test
   public void testSelectionOrderBy() {
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOrderByOperator = getOperator(SELECTION_QUERY + ORDER_BY);
-    IntermediateResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(SELECTION_QUERY + ORDER_BY);
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
@@ -231,7 +231,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertTrue(columnIndexMap.containsKey("column1"));
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")), ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), ColumnDataType.INT);
-    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     Object[] lastRow = selectionResult.peek();
     assertEquals(lastRow.length, 4);
@@ -255,7 +255,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertTrue(columnIndexMap.containsKey("column1"));
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")), ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), ColumnDataType.INT);
-    selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+    selectionResult = (PriorityQueue<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     lastRow = selectionResult.peek();
     assertEquals(lastRow.length, 4);
@@ -266,8 +266,8 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
   @Test
   public void testSelectStarOrderBy() {
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOrderByOperator = getOperator(SELECT_STAR_QUERY + ORDER_BY);
-    IntermediateResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(SELECT_STAR_QUERY + ORDER_BY);
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
@@ -283,7 +283,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertTrue(columnIndexMap.containsKey("column1"));
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")), ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), ColumnDataType.INT);
-    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     Object[] lastRow = selectionResult.peek();
     assertEquals(lastRow.length, 11);
@@ -308,7 +308,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertTrue(columnIndexMap.containsKey("column1"));
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")), ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), ColumnDataType.INT);
-    selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+    selectionResult = (PriorityQueue<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     lastRow = selectionResult.peek();
     assertEquals(lastRow.length, 11);
@@ -321,8 +321,8 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     String orderBy = " ORDER BY column5";
 
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOrderByOperator = getOperator(SELECT_STAR_QUERY + orderBy);
-    IntermediateResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(SELECT_STAR_QUERY + orderBy);
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
@@ -336,7 +336,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertEquals(selectionDataSchema.size(), 11);
     assertTrue(columnIndexMap.containsKey("column5"));
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column5")), ColumnDataType.STRING);
-    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     Object[] lastRow = selectionResult.peek();
     assertEquals(lastRow.length, 11);
@@ -358,7 +358,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertEquals(selectionDataSchema.size(), 11);
     assertTrue(columnIndexMap.containsKey("column5"));
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column5")), ColumnDataType.STRING);
-    selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+    selectionResult = (PriorityQueue<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 10);
     lastRow = selectionResult.peek();
     assertEquals(lastRow.length, 11);
@@ -370,8 +370,8 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     String limit = " LIMIT 5000, 7000";
 
     // Test query without filter
-    BaseOperator<IntermediateResultsBlock> selectionOrderByOperator = getOperator(SELECT_STAR_QUERY + ORDER_BY + limit);
-    IntermediateResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(SELECT_STAR_QUERY + ORDER_BY + limit);
+    SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
     assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
@@ -387,7 +387,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertTrue(columnIndexMap.containsKey("column1"));
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")), ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), ColumnDataType.INT);
-    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+    PriorityQueue<Object[]> selectionResult = (PriorityQueue<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 12000);
     Object[] lastRow = selectionResult.peek();
     assertEquals(lastRow.length, 11);
@@ -412,7 +412,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     assertTrue(columnIndexMap.containsKey("column1"));
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column6")), ColumnDataType.INT);
     assertEquals(selectionDataSchema.getColumnDataType(columnIndexMap.get("column1")), ColumnDataType.INT);
-    selectionResult = (PriorityQueue<Object[]>) resultsBlock.getSelectionResult();
+    selectionResult = (PriorityQueue<Object[]>) resultsBlock.getRows();
     assertEquals(selectionResult.size(), 6129);
     lastRow = selectionResult.peek();
     assertEquals(lastRow.length, 11);
