@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,7 +58,6 @@ import org.apache.pinot.core.util.SegmentRefreshSemaphore;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
-import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -353,10 +353,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.info("Skip reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
       return true;
     }
-    LOGGER.info("Reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
-    Preconditions.checkState(schema != null, "Failed to find schema for table: {}", tableNameWithType);
-    MutableSegmentImpl mutableSegment = (MutableSegmentImpl) segment;
-    mutableSegment.addExtraColumns(schema);
+    LOGGER.info("Reloading REALTIME consuming segment: {} in table: {} using force commit", segmentName,
+        tableNameWithType);
+    Preconditions.checkState(schema != null, "Failed to find schema for table: {}",
+        tableNameWithType);
+    forceCommit(tableNameWithType, ImmutableSet.of(segmentName));
     return true;
   }
 
