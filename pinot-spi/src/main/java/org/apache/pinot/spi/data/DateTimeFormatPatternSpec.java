@@ -59,23 +59,27 @@ public class DateTimeFormatPatternSpec {
   public DateTimeFormatPatternSpec(TimeFormat timeFormat, @Nullable String sdfPatternWithTz) {
     _timeFormat = timeFormat;
     if (timeFormat == TimeFormat.SIMPLE_DATE_FORMAT) {
-      Matcher m = sdfPatternWithTz != null ? SDF_PATTERN_WITH_TIMEZONE.matcher(sdfPatternWithTz)
-          : SDF_PATTERN_WITH_TIMEZONE.matcher("");
-      if (m.find()) {
-        _sdfPattern = m.group(SDF_PATTERN_GROUP).trim();
-        String timeZone = m.group(TIME_ZONE_GROUP).trim();
-        try {
-          _dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timeZone));
-        } catch (Exception e) {
-          throw new IllegalArgumentException("Invalid time zone: " + timeZone);
+      if (sdfPatternWithTz != null) {
+        Matcher m = SDF_PATTERN_WITH_TIMEZONE.matcher(sdfPatternWithTz);
+        if (m.find()) {
+          _sdfPattern = m.group(SDF_PATTERN_GROUP).trim();
+          String timeZone = m.group(TIME_ZONE_GROUP).trim();
+          try {
+            _dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timeZone));
+          } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid time zone: " + timeZone);
+          }
+        } else {
+          _sdfPattern = sdfPatternWithTz;
+          _dateTimeZone = DEFAULT_DATE_TIME_ZONE;
         }
       } else {
-        _sdfPattern = sdfPatternWithTz;
+        _sdfPattern = null;
         _dateTimeZone = DEFAULT_DATE_TIME_ZONE;
       }
       try {
         if (_sdfPattern == null) {
-          LOGGER.warn("SIMPLE_DATE_FORMAT pattern was found to be null. Using ISODateTimeFormat as default");
+          LOGGER.debug("SIMPLE_DATE_FORMAT pattern was found to be null. Using ISODateTimeFormat as default");
           _dateTimeFormatter =
               ISODateTimeFormat.dateOptionalTimeParser().withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
         } else {
@@ -107,7 +111,7 @@ public class DateTimeFormatPatternSpec {
       }
       try {
         if (_sdfPattern == null) {
-          LOGGER.warn("SIMPLE_DATE_FORMAT pattern was found to be null. Using ISODateTimeFormat as default");
+          LOGGER.debug("SIMPLE_DATE_FORMAT pattern was found to be null. Using ISODateTimeFormat as default");
           _dateTimeFormatter =
               ISODateTimeFormat.dateOptionalTimeParser().withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
         } else {
