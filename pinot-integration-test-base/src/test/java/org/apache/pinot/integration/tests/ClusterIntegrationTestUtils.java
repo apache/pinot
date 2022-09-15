@@ -84,7 +84,8 @@ public class ClusterIntegrationTestUtils {
 
   // Comparison limit
   public static final int MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE = 5;
-  public static final int MAX_NUM_ROWS_TO_COMPARE = 10000;
+  // TODO: Deprecate the usage of MAX_NUM_ROWS_TO_COMPARE to compare all results.
+  public static final int MAX_NUM_ROWS_TO_COMPARE = Integer.MAX_VALUE;
   public static final int H2_MULTI_VALUE_SUFFIX_LENGTH = 5;
 
   private static final Random RANDOM = new Random();
