@@ -21,7 +21,9 @@ package org.apache.pinot.spi.stream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
@@ -87,4 +89,14 @@ public interface StreamMetadataProvider extends Closeable {
     }
     return newPartitionGroupMetadataList;
   }
+
+  default Map<String, PartitionLagState> getCurrentPartitionLagState(
+      Map<String, ConsumerPartitionState> currentPartitionStateMap) {
+    Map<String, PartitionLagState> result = new HashMap<>();
+    PartitionLagState unknownLagState = new UnknownLagState();
+    currentPartitionStateMap.forEach((k, v) -> result.put(k, unknownLagState));
+    return result;
+  }
+
+  class UnknownLagState extends PartitionLagState { }
 }

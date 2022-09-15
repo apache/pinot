@@ -35,6 +35,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -88,6 +89,8 @@ import org.apache.pinot.server.starter.helix.AdminApiApplication;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -496,7 +499,6 @@ public class TablesResource {
   public List<SegmentConsumerInfo> getConsumingSegmentsInfo(
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
           String realtimeTableName) {
-
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
     if (TableType.OFFLINE == tableType) {
       throw new WebApplicationException("Cannot get consuming segment info for OFFLINE table: " + realtimeTableName);
@@ -512,10 +514,15 @@ public class TablesResource {
         if (segmentDataManager instanceof RealtimeSegmentDataManager) {
           RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
           String segmentName = segmentDataManager.getSegmentName();
+          ConsumerPartitionState partitionState = realtimeSegmentDataManager.getConsumerPartitionState();
+          String partitionId = String.valueOf(partitionState.getPartitionId());
+          PartitionLagState lagState = realtimeSegmentDataManager.getPartitionToLagState(partitionState);
           segmentConsumerInfoList.add(
               new SegmentConsumerInfo(segmentName, realtimeSegmentDataManager.getConsumerState().toString(),
                   realtimeSegmentDataManager.getLastConsumedTimestamp(),
-                  realtimeSegmentDataManager.getPartitionToCurrentOffset()));
+                  realtimeSegmentDataManager.getPartitionToCurrentOffset(),
+                  Collections.singletonMap(partitionId, partitionState.getUpstreamLatestOffset().toString()),
+                  Collections.singletonMap(partitionId, lagState.getOffsetLag())));
         }
       }
     } catch (Exception e) {

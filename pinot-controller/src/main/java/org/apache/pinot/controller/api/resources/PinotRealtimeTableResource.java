@@ -150,8 +150,9 @@ public class PinotRealtimeTableResource {
     }
   }
 
+  // TODO: remove consumingSegmentsInfo from SegmentRestletResource
   @GET
-  @Path("/tables/{tableName}/consumingSegmentsInfo")
+  @Path("/tables/{tableName}/consumingSegmentsInfo2")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Returns state of consuming segments", notes = "Gets the status of consumers from all servers")
   @ApiResponses(value = {
@@ -159,7 +160,7 @@ public class PinotRealtimeTableResource {
       @ApiResponse(code = 404, message = "Table not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap getConsumingSegmentsInfo(
+  public ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap getConsumingSegmentsInfo2(
       @ApiParam(value = "Realtime table name with or without type", required = true,
           example = "myTable | myTable_REALTIME") @PathParam("tableName") String realtimeTableName) {
     try {

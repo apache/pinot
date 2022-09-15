@@ -71,11 +71,13 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
+import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.RowMetadata;
@@ -817,6 +819,22 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   @Override
   public long getLastConsumedTimestamp() {
     return _lastLogTime;
+  }
+
+  @Override
+  public ConsumerPartitionState getConsumerPartitionState() {
+    return new ConsumerPartitionState(String.valueOf(_partitionGroupId), getCurrentOffset(),
+        getLastConsumedTimestamp(), fetchLatestStreamOffset(5_000));
+  }
+
+  @Override
+  public PartitionLagState getPartitionToLagState(ConsumerPartitionState consumerPartitionState) {
+    if (_streamMetadataProvider == null) {
+      _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
+    }
+    String partitionGroupId = String.valueOf(_partitionGroupId);
+    return _streamMetadataProvider.getCurrentPartitionLagState(
+        Collections.singletonMap(partitionGroupId, consumerPartitionState)).get(partitionGroupId);
   }
 
   public StreamPartitionMsgOffset getCurrentOffset() {

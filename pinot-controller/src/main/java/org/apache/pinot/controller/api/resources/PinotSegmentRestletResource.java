@@ -636,8 +636,9 @@ public class PinotSegmentRestletResource {
       singleSegmentName = controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME);
       serverToSegments = new HashMap<>();
       List<String> segmentList = Arrays.asList(singleSegmentName);
-      _pinotHelixResourceManager.getServers(tableNameWithType, singleSegmentName).forEach(server ->
-          serverToSegments.put(server, segmentList));
+      _pinotHelixResourceManager.getServers(tableNameWithType, singleSegmentName).forEach(server -> {
+        serverToSegments.put(server, segmentList);
+      });
     } else {
       serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
     }

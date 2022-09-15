@@ -26,6 +26,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +50,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -135,10 +137,15 @@ public class DebugResource {
     if (tableType == TableType.REALTIME) {
       RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
       String segmentName = segmentDataManager.getSegmentName();
+      ConsumerPartitionState partitionState = realtimeSegmentDataManager.getConsumerPartitionState();
       segmentConsumerInfo =
           new SegmentConsumerInfo(segmentName, realtimeSegmentDataManager.getConsumerState().toString(),
               realtimeSegmentDataManager.getLastConsumedTimestamp(),
-              realtimeSegmentDataManager.getPartitionToCurrentOffset());
+              realtimeSegmentDataManager.getPartitionToCurrentOffset(),
+              Collections.singletonMap(partitionState.getPartitionId(),
+                  partitionState.getUpstreamLatestOffset().toString()),
+              Collections.singletonMap(partitionState.getPartitionId(),
+                  realtimeSegmentDataManager.getPartitionToLagState(partitionState).getOffsetLag()));
     }
     return segmentConsumerInfo;
   }
