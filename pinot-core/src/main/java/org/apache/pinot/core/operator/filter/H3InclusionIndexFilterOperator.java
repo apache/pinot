@@ -72,7 +72,7 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
 
     if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
       _h3IndexReader = segment.getDataSource(arguments.get(0).getIdentifier()).getH3Index();
-      _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getLiteralString()));
+      _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getIdentifier()));
     } else {
       _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifier()).getH3Index();
       _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(0).getLiteralString()));

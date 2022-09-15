@@ -101,6 +101,7 @@ public class AggregationFunctionFactory {
         } else if (numArguments == 2) {
           // Double arguments percentile (e.g. percentile(foo, 99), percentileTDigest(bar, 95), etc.) where the
           // second argument is a decimal number from 0.0 to 100.0.
+          // Have to use literal string because we need to cast int to double here.
           double percentile = parsePercentileToDouble(arguments.get(1).getLiteralString());
           if (remainingFunctionName.isEmpty()) {
             // Percentile

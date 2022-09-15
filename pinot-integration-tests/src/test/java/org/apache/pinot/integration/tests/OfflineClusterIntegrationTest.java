@@ -1688,7 +1688,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode resultTable = response.get("resultTable");
     JsonNode dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"timeconvert(DaysSinceEpoch,STRING('DAYS'),STRING('SECONDS'))\",\"count(*)\"]");
+        "[\"timeconvert(DaysSinceEpoch,'DAYS','SECONDS')\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"LONG\",\"LONG\"]");
     JsonNode rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
@@ -1703,8 +1703,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"datetimeconvert(DaysSinceEpoch,STRING('1:DAYS:EPOCH'),STRING('1:HOURS:EPOCH'),STRING('1:HOURS'))\","
-            + "\"count(*)\"]");
+        "[\"datetimeconvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"LONG\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
@@ -1719,7 +1718,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"add(DaysSinceEpoch,DaysSinceEpoch,LONG('15'))\",\"count(*)\"]");
+        "[\"add(DaysSinceEpoch,DaysSinceEpoch,'15')\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
@@ -1733,7 +1732,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnNames").toString(), "[\"sub(DaysSinceEpoch,LONG('25'))\",\"count(*)\"]");
+    assertEquals(dataSchema.get("columnNames").toString(), "[\"sub(DaysSinceEpoch,'25')\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
@@ -1747,8 +1746,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"mult(DaysSinceEpoch,LONG('24'),LONG('3600'))\",\"count(*)\"]");
+    assertEquals(dataSchema.get("columnNames").toString(), "[\"mult(DaysSinceEpoch,'24','3600')\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
@@ -1762,7 +1760,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnNames").toString(), "[\"div(DaysSinceEpoch,LONG('2'))\",\"count(*)\"]");
+    assertEquals(dataSchema.get("columnNames").toString(), "[\"div(DaysSinceEpoch,'2')\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
@@ -1791,7 +1789,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"arraylength(valuein(DivAirports,STRING('DFW'),STRING('ORD')))\",\"count(*)\"]");
+        "[\"arraylength(valuein(DivAirports,'DFW','ORD'))\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 3);
@@ -1813,8 +1811,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"valuein(DivAirports,STRING('DFW'),STRING('ORD'))\",\"count(*)\"]");
+    assertEquals(dataSchema.get("columnNames").toString(), "[\"valuein(DivAirports,'DFW','ORD')\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 2);
@@ -1835,8 +1832,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode response = postQuery(query);
     JsonNode resultTable = response.get("resultTable");
     JsonNode dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"max(timeconvert(DaysSinceEpoch,STRING('DAYS'),STRING('SECONDS')))\"]");
+    assertEquals(dataSchema.get("columnNames").toString(), "[\"max(timeconvert(DaysSinceEpoch,'DAYS','SECONDS'))\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\"]");
     JsonNode rows = resultTable.get("rows");
     assertEquals(rows.size(), 1);
@@ -1848,7 +1844,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnNames").toString(), "[\"min(div(DaysSinceEpoch,LONG('2')))\"]");
+    assertEquals(dataSchema.get("columnNames").toString(), "[\"min(div(DaysSinceEpoch,'2'))\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\"]");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 1);
@@ -1865,7 +1861,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode resultTable = response.get("resultTable");
     JsonNode dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"DaysSinceEpoch\",\"timeconvert(DaysSinceEpoch,STRING('DAYS'),STRING('SECONDS'))\"]");
+        "[\"DaysSinceEpoch\",\"timeconvert(DaysSinceEpoch,'DAYS','SECONDS')\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"LONG\"]");
     JsonNode rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 10);
@@ -1881,7 +1877,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"DaysSinceEpoch\",\"timeconvert(DaysSinceEpoch,STRING('DAYS'),STRING('SECONDS'))\"]");
+        "[\"DaysSinceEpoch\",\"timeconvert(DaysSinceEpoch,'DAYS','SECONDS')\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"LONG\"]");
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 10000);
@@ -1900,7 +1896,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"DaysSinceEpoch\",\"timeconvert(DaysSinceEpoch,STRING('DAYS'),STRING('SECONDS'))\"]");
+        "[\"DaysSinceEpoch\",\"timeconvert(DaysSinceEpoch,'DAYS','SECONDS')\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"LONG\"]");
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 10000);

@@ -1408,7 +1408,7 @@ public class MutableSegmentImpl implements MutableSegment {
           AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
 
       columnNameToAggregator.put(config.getColumnName(),
-          Pair.of(argument.getLiteralString(), ValueAggregatorFactory.getValueAggregator(functionType)));
+          Pair.of(argument.getIdentifier(), ValueAggregatorFactory.getValueAggregator(functionType)));
     }
 
     return columnNameToAggregator;

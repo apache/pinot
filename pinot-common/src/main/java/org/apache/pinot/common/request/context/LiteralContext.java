@@ -120,6 +120,7 @@ public class LiteralContext {
     if (_value == null) {
       return '\'' + "" + '\'';
     }
-    return _type.toString() + "(" + '\'' + _value.toString() + '\'' + ")";
+    // TODO: print out the type.
+    return '\'' + _value.toString() + '\'';
   }
 }
