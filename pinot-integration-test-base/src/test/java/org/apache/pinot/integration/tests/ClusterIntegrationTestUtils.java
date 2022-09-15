@@ -84,8 +84,7 @@ public class ClusterIntegrationTestUtils {
 
   // Comparison limit
   public static final int MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE = 5;
-  // TODO: Deprecate the usage of MAX_NUM_ROWS_TO_COMPARE to compare all results.
-  public static final int MAX_NUM_ROWS_TO_COMPARE = Integer.MAX_VALUE;
+  public static final int MAX_NUM_ROWS_TO_COMPARE = 10000;
   public static final int H2_MULTI_VALUE_SUFFIX_LENGTH = 5;
 
   private static final Random RANDOM = new Random();
@@ -678,9 +677,10 @@ public class ClusterIntegrationTestUtils {
 
       for (int columnIndex = 1; columnIndex <= numColumns; columnIndex++) { // h2 result set is 1-based
         String columnName = h2MetaData.getColumnName(columnIndex);
-
+        String columnDataType = h2MetaData.getColumnTypeName(columnIndex);
         // Handle null result and convert boolean value to lower case
         String columnValue = h2ResultSet.getString(columnIndex);
+        columnValue = removeTrailingZeroForNumber(columnValue, columnDataType);
         if (columnValue == null) {
           columnValue = "null";
         } else {
@@ -702,8 +702,6 @@ public class ClusterIntegrationTestUtils {
           multiValue.add(columnValue);
         } else {
           // Single-value column
-          String columnDataType = h2MetaData.getColumnTypeName(columnIndex);
-          columnValue = removeTrailingZeroForNumber(columnValue, columnDataType);
           reusableExpectedValueMap.put(columnName, columnValue);
           reusableColumnOrder.add(columnName);
         }
