@@ -109,6 +109,23 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
             + " WHERE a.col3 >= 0 AND a.col2 = 'alice' AND b.col3 >= 0", 3},
 
+        // Join query with IN and Not-IN clause. Table A's side of join will return 9 rows and Table B's side will
+        // return 2 rows. Join will be only on col1=bar and since A will return 3 rows with that value and B will return
+        // 1 row, the final output will have 3 rows.
+        new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
+            + " WHERE a.col1 IN ('foo', 'bar', 'alice') AND b.col2 NOT IN ('foo', 'alice')", 3},
+
+        // Same query as above but written using OR/AND instead of IN.
+        new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
+            + " WHERE (a.col1 = 'foo' OR a.col1 = 'bar' OR a.col1 = 'alice') AND b.col2 != 'foo'"
+            + " AND b.col2 != 'alice'", 3},
+
+        // Same as above but with single argument IN clauses. Left side of the join returns 3 rows, and the right side
+        // returns 5 rows. Only key where join succeeds is col1=foo, and since table B has only 1 row with that value,
+        // the number of rows should be 3.
+        new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
+            + " WHERE a.col1 IN ('foo') AND b.col2 NOT IN ('')", 3},
+
         // Projection pushdown
         new Object[]{"SELECT a.col1, a.col3 + a.col3 FROM a WHERE a.col3 >= 0 AND a.col2 = 'alice'", 3},
 
