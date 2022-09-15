@@ -38,7 +38,7 @@ public class OperatorUtils {
     OPERATOR_TOKEN_MAPPING.put("!=", "NE2");
     OPERATOR_TOKEN_MAPPING.put("+", "PLUS");
     OPERATOR_TOKEN_MAPPING.put("-", "MINUS");
-    OPERATOR_TOKEN_MAPPING.put("*", "STAR");
+    OPERATOR_TOKEN_MAPPING.put("*", "TIMES");
     OPERATOR_TOKEN_MAPPING.put("/", "DIVIDE");
     OPERATOR_TOKEN_MAPPING.put("%", "PERCENT_REMAINDER");
     OPERATOR_TOKEN_MAPPING.put("||", "CONCAT");

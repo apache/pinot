@@ -80,21 +80,22 @@ public class QueryServerEnclosure {
   private final int _queryRunnerPort;
   private final Map<String, Object> _runnerConfig = new HashMap<>();
   private final Map<String, List<ImmutableSegment>> _segmentMap = new HashMap<>();
+  private final Map<String, List<GenericRow>> _rowsMap = new HashMap<>();
   private final InstanceDataManager _instanceDataManager;
   private final Map<String, TableDataManager> _tableDataManagers = new HashMap<>();
   private final Map<String, File> _indexDirs;
 
   private QueryRunner _queryRunner;
 
-  public QueryServerEnclosure(List<String> tables, Map<String, File> indexDirs, Map<String, List<String>> segments) {
+  public QueryServerEnclosure(Map<String, File> indexDirs, Map<String, List<String>> segments) {
     _indexDirs = indexDirs;
     try {
-      for (int i = 0; i < tables.size(); i++) {
-        String tableName = tables.get(i);
-        File indexDir = indexDirs.get(tableName);
+      for (Map.Entry<String, List<String>> entry : segments.entrySet()) {
+        String tableName = entry.getKey();
+        File indexDir = indexDirs.get(entry.getKey());
         FileUtils.deleteQuietly(indexDir);
         List<ImmutableSegment> segmentList = new ArrayList<>();
-        for (String segmentName : segments.get(tableName)) {
+        for (String segmentName : entry.getValue()) {
           segmentList.add(buildSegment(indexDir, tableName, segmentName));
         }
         _segmentMap.put(tableName, segmentList);
@@ -112,11 +113,11 @@ public class QueryServerEnclosure {
     }
   }
 
-  public ServerMetrics mockServiceMetrics() {
+  private ServerMetrics mockServiceMetrics() {
     return mock(ServerMetrics.class);
   }
 
-  public InstanceDataManager mockInstanceDataManager() {
+  private InstanceDataManager mockInstanceDataManager() {
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     for (Map.Entry<String, List<ImmutableSegment>> e : _segmentMap.entrySet()) {
       TableDataManager tableDataManager = mockTableDataManager(e.getValue());
@@ -129,7 +130,7 @@ public class QueryServerEnclosure {
     return instanceDataManager;
   }
 
-  public TableDataManager mockTableDataManager(List<ImmutableSegment> segmentList) {
+  private TableDataManager mockTableDataManager(List<ImmutableSegment> segmentList) {
     List<SegmentDataManager> tableSegmentDataManagers =
         segmentList.stream().map(ImmutableSegmentDataManager::new).collect(Collectors.toList());
     TableDataManager tableDataManager = mock(TableDataManager.class);
@@ -137,8 +138,7 @@ public class QueryServerEnclosure {
     return tableDataManager;
   }
 
-  public ImmutableSegment buildSegment(File indexDir, String tableName, String segmentName)
-      throws Exception {
+  private static List<GenericRow> buildRows(String tableName) {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = new GenericRow();
@@ -149,6 +149,14 @@ public class QueryServerEnclosure {
           ? System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2) : System.currentTimeMillis());
       rows.add(row);
     }
+    return rows;
+  }
+
+  private ImmutableSegment buildSegment(File indexDir, String tableName, String segmentName)
+      throws Exception {
+    List<GenericRow> rows = buildRows(tableName);
+    _rowsMap.putIfAbsent(tableName, new ArrayList<>());
+    _rowsMap.get(tableName).addAll(rows);
 
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setTimeColumnName("ts").build();
@@ -164,6 +172,10 @@ public class QueryServerEnclosure {
     }
     driver.build();
     return ImmutableSegmentLoader.load(new File(indexDir, segmentName), ReadMode.mmap);
+  }
+
+  public Map<String, List<GenericRow>> getRowsMap() {
+    return _rowsMap;
   }
 
   public int getPort() {

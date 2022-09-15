@@ -83,8 +83,8 @@ public final class RelToStageConverter {
   }
 
   private static StageNode convertLogicalSort(LogicalSort node, int currentStageId) {
-    int fetch = node.fetch == null ? -1 : ((RexLiteral) node.fetch).getValueAs(Integer.class);
-    int offset = node.offset == null ? -1 : ((RexLiteral) node.offset).getValueAs(Integer.class);
+    int fetch = node.fetch == null ? 0 : ((RexLiteral) node.fetch).getValueAs(Integer.class);
+    int offset = node.offset == null ? 0 : ((RexLiteral) node.offset).getValueAs(Integer.class);
     return new SortNode(currentStageId, node.getCollation().getFieldCollations(), fetch, offset,
         toDataSchema(node.getRowType()));
   }
