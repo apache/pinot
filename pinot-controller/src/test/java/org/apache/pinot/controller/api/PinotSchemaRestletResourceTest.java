@@ -120,7 +120,7 @@ public class PinotSchemaRestletResourceTest {
     newColumnFieldSpec.setDataType(DataType.BOOLEAN);
 
     // Update the schema with addSchema api and override on, force on
-    resp = ControllerTest.sendMultipartPutRequest(addSchemaUrl + "?force=true", schema.toSingleLineJsonString());
+    resp = ControllerTest.sendMultipartPostRequest(addSchemaUrl + "?force=true", schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 200);
 
     // Change another column max length from default 512 to 2000
@@ -129,12 +129,12 @@ public class PinotSchemaRestletResourceTest {
     newColumnFieldSpec2.setDefaultNullValue("0");
 
     // Update the schema with addSchema api and override on
-    resp = ControllerTest.sendMultipartPutRequest(addSchemaUrl, schema.toSingleLineJsonString());
+    resp = ControllerTest.sendMultipartPostRequest(addSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 200);
 
     // Get the schema and verify the default null value and max length have been changed
     remoteSchema = Schema.fromString(ControllerTest.sendGetRequest(getSchemaUrl));
-    Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec.getName()).getMaxLength(), 2000);
+    Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getMaxLength(), 2000);
     Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getDefaultNullValue(), "0");
 
     // Change another column max length from 1000
@@ -148,7 +148,7 @@ public class PinotSchemaRestletResourceTest {
 
     // Get the schema and verify the default null value and max length have been changed
     remoteSchema = Schema.fromString(ControllerTest.sendGetRequest(getSchemaUrl));
-    Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec.getName()).getMaxLength(), 1000);
+    Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getMaxLength(), 1000);
     Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getDefaultNullValue(), "1");
 
     // Add a new BOOLEAN column
