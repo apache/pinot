@@ -552,9 +552,7 @@ public class ForwardIndexDisabledSingleValueQueriesTest extends BaseQueriesTest 
     {
       // Selection query with '>=' filter on a forwardIndexDisabled column without range index available
       String query = "SELECT column1, column5, column9, column11 FROM testTable WHERE column7 >= 676000";
-      BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() != null
-          && brokerResponseNative.getProcessingExceptions().size() > 0);
+      assertThrows(UnsupportedOperationException.class, () -> getBrokerResponse(query));
     }
     {
       // Select query with a filter on a column which doesn't have forwardIndexDisabled enabled

@@ -380,8 +380,13 @@ public class IndexLoadingConfig {
    * For tests only.
    */
   @VisibleForTesting
-  public void setSortedColumns(List<String> sortedColumns) {
-    _sortedColumns = sortedColumns;
+  public void setSortedColumns(String sortedColumn) {
+    if (sortedColumn != null) {
+      _sortedColumns = new ArrayList<>();
+      _sortedColumns.add(sortedColumn);
+    } else {
+      _sortedColumns = Collections.emptyList();
+    }
   }
 
   public Set<String> getInvertedIndexColumns() {
