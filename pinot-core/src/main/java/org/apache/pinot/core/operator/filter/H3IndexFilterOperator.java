@@ -68,7 +68,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
       _h3IndexReader = segment.getDataSource(arguments.get(0).getIdentifier()).getH3Index();
       coordinate =
-          GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getIdentifier())).getCoordinate();
+          GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getLiteralString())).getCoordinate();
     } else {
       _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifier()).getH3Index();
       coordinate =

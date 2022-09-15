@@ -180,12 +180,12 @@ public class BrokerRequestToQueryContextConverterTest {
                   new FunctionContext(FunctionContext.Type.TRANSFORM, "add",
                       Arrays.asList(ExpressionContext.forIdentifier("bar"),
                           ExpressionContext.forLiteralContext(FieldSpec.DataType.LONG, Long.valueOf(123)))))))));
-      assertEquals(selectExpressions.get(0).toString(), "add(foo,add(bar,LONG('123')))");
+      assertEquals(selectExpressions.get(0).toString(), "add(foo,add(bar,'123'))");
       assertEquals(selectExpressions.get(1), ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
               Arrays.asList(ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "456"),
                   ExpressionContext.forIdentifier("foobar")))));
-      assertEquals(selectExpressions.get(1).toString(), "sub(STRING('456'),foobar)");
+      assertEquals(selectExpressions.get(1).toString(), "sub('456',foobar)");
       assertEquals(getAliasCount(queryContext.getAliasList()), 0);
       assertNull(queryContext.getFilter());
       assertNull(queryContext.getGroupByExpressions());
@@ -196,7 +196,7 @@ public class BrokerRequestToQueryContextConverterTest {
           new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
               Arrays.asList(ExpressionContext.forLiteralContext(FieldSpec.DataType.LONG, Long.valueOf(456)),
                   ExpressionContext.forIdentifier("foobar")))), true));
-      assertEquals(orderByExpressions.get(0).toString(), "sub(LONG('456'),foobar) ASC");
+      assertEquals(orderByExpressions.get(0).toString(), "sub('456',foobar) ASC");
       assertNull(queryContext.getHavingFilter());
       assertEquals(queryContext.getLimit(), 20);
       assertEquals(queryContext.getOffset(), 30);
@@ -214,7 +214,7 @@ public class BrokerRequestToQueryContextConverterTest {
       List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
       assertEquals(selectExpressions.size(), 1);
       assertEquals(selectExpressions.get(0), ExpressionContext.forLiteralContext(FieldSpec.DataType.BOOLEAN, true));
-      assertEquals(selectExpressions.get(0).toString(), "BOOLEAN('true')");
+      assertEquals(selectExpressions.get(0).toString(), "'true'");
     }
 
     // Aggregation group-by with transform, order-by

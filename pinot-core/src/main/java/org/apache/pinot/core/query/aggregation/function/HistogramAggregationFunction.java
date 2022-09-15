@@ -96,7 +96,12 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
     Preconditions.checkArgument(len > 1, "The number of bin edges must be greater than 1");
     double[] ret = new double[len];
     for (int i = 0; i < len; i++) {
-      ret[i] = Double.parseDouble(arrayStr.get(i).getLiteralString());
+      // TODO: Represent infinity as literal instead of identifier
+      if (arrayStr.get(i).getType() == ExpressionContext.Type.IDENTIFIER) {
+        ret[i] = Double.parseDouble(arrayStr.get(i).getIdentifier());
+      } else {
+        ret[i] = Double.parseDouble(arrayStr.get(i).getLiteralString());
+      }
       if (i > 0) {
         Preconditions.checkState(ret[i] > ret[i - 1], "The bin edges must be strictly increasing");
       }
