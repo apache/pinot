@@ -47,6 +47,7 @@ import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 
 /**
@@ -85,6 +86,8 @@ public class TaskFactoryRegistry {
                   .addPhaseTiming(taskType, MinionQueryPhase.TASK_QUEUEING, jobDequeueTimeMs - jobInQueueTimeMs,
                       TimeUnit.MILLISECONDS);
               try {
+                // Set taskId in MDC so that one may config logger to route task logs to separate file.
+                MDC.put("taskId", _taskConfig.getId());
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, 1L);
                 return runInternal();
               } finally {
@@ -93,6 +96,8 @@ public class TaskFactoryRegistry {
                 _minionMetrics
                     .addPhaseTiming(taskType, MinionQueryPhase.TASK_EXECUTION, executionTimeMs, TimeUnit.MILLISECONDS);
                 LOGGER.info("Task: {} completed in: {}ms", _taskConfig.getId(), executionTimeMs);
+                // Clear taskId from MDC to reset it.
+                MDC.remove("taskId");
               }
             }
 
