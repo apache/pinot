@@ -61,6 +61,7 @@ import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -765,6 +766,28 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               "Invalid segment start/end time: %s (in millis: %s/%s) for time column: %s, must be between: %s",
               timeInterval, timeInterval.getStartMillis(), timeInterval.getEndMillis(), timeColumnName,
               TimeUtils.VALID_TIME_INTERVAL);
+        } else {
+          Interval timeInterval =
+              new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime), DateTimeZone.UTC);
+          long now = System.currentTimeMillis();
+          if (!TimeUtils.isValidTimeInterval(timeInterval)) {
+            startTime = now;
+            endTime = now;
+          }
+          SegmentsValidationAndRetentionConfig validationConfig = _config.getTableConfig().getValidationConfig();
+          String retentionTimeUnitConfig = validationConfig.getRetentionTimeUnit();
+          String retentionTimeValueConfig = validationConfig.getRetentionTimeValue();
+          try {
+            TimeUnit retentionTimeUnit = TimeUnit.valueOf(retentionTimeUnitConfig.toUpperCase());
+            long retentionTimeValue = Long.parseLong(retentionTimeValueConfig);
+            long retentionTimeMs = retentionTimeUnit.toMillis(retentionTimeValue);
+            if (endTime <= (now - retentionTimeMs)) {
+              endTime = now;
+            }
+          } catch (Exception e) {
+            LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", retentionTimeUnitConfig,
+                retentionTimeValueConfig, _config.getTableName());
+          }
         }
 
         properties.setProperty(SEGMENT_START_TIME, startTime);
