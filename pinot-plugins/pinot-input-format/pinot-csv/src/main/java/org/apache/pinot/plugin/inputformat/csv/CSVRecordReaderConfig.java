@@ -38,7 +38,7 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
   private String _nullStringValue;
   private boolean _skipHeader;
   private boolean _ignoreEmptyLines = true;
-  private boolean _ignoreSurroundingSpace = true;
+  private boolean _ignoreSurroundingSpaces = true;
   private Character _quoteCharacter = '"';
   private String _quoteMode;
   private String _recordSeparator;
@@ -124,12 +124,12 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
     _ignoreEmptyLines = ignoreEmptyLines;
   }
 
-  public boolean isIgnoreSurroundingSpace() {
-    return _ignoreSurroundingSpace;
+  public boolean isIgnoreSurroundingSpaces() {
+    return _ignoreSurroundingSpaces;
   }
 
-  public void setIgnoreSurroundingSpace(boolean ignoreSurroundingSpace) {
-    _ignoreSurroundingSpace = ignoreSurroundingSpace;
+  public void setIgnoreSurroundingSpaces(boolean ignoreSurroundingSpaces) {
+    _ignoreSurroundingSpaces = ignoreSurroundingSpaces;
   }
 
   public Character getQuoteCharacter() {

@@ -52,7 +52,7 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
   public static final String NULL_STRING_VALUE = "nullStringValue";
   public static final String SKIP_HEADER = "skipHeader";
   public static final String IGNORE_EMPTY_LINES = "ignoreEmptyLines";
-  public static final String IGNORE_SURROUNDING_SPACE = "ignoreSurroundingSpace";
+  public static final String IGNORE_SURROUNDING_SPACES = "ignoreSurroundingSpaces";
   public static final String QUOTE_CHARACTER = "quoteCharacter";
   public static final String QUOTE_MODE = "quoteMode";
   public static final String RECORD_SEPARATOR = "recordSeparator";
@@ -134,9 +134,9 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
       format = format.withIgnoreEmptyLines(Boolean.parseBoolean(ignoreEmptyLines));
     }
 
-    String ignoreSurroundingSpace = props.get(IGNORE_SURROUNDING_SPACE);
-    if (ignoreSurroundingSpace != null) {
-      format = format.withIgnoreSurroundingSpaces(Boolean.parseBoolean(ignoreSurroundingSpace));
+    String ignoreSurroundingSpaces = props.get(IGNORE_SURROUNDING_SPACES);
+    if (ignoreSurroundingSpaces != null) {
+      format = format.withIgnoreSurroundingSpaces(Boolean.parseBoolean(ignoreSurroundingSpaces));
     }
 
     String quoteCharacter = props.get(QUOTE_CHARACTER);

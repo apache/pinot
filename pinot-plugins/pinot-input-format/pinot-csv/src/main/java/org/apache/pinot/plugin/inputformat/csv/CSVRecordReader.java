@@ -94,7 +94,7 @@ public class CSVRecordReader implements RecordReader {
       format = format.withCommentMarker(config.getCommentMarker());
       format = format.withEscape(config.getEscapeCharacter());
       format = format.withIgnoreEmptyLines(config.isIgnoreEmptyLines());
-      format = format.withIgnoreSurroundingSpaces(config.isIgnoreSurroundingSpace());
+      format = format.withIgnoreSurroundingSpaces(config.isIgnoreSurroundingSpaces());
       format = format.withSkipHeaderRecord(config.isSkipHeader());
       format = format.withQuote(config.getQuoteCharacter());
 
@@ -115,7 +115,6 @@ public class CSVRecordReader implements RecordReader {
       if (config.isMultiValueDelimiterEnabled()) {
         multiValueDelimiter = config.getMultiValueDelimiter();
       }
-
     }
     _recordExtractor = new CSVRecordExtractor();
 
