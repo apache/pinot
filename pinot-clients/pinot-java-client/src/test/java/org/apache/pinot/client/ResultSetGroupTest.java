@@ -33,6 +33,7 @@ import org.testng.annotations.Test;
  */
 public class ResultSetGroupTest {
   private final DummyJsonTransport _dummyJsonTransport = new DummyJsonTransport();
+  private final String _mockQuery = "select * from mockTable";
 
   @Test
   public void testDeserializeSelectionResultSet() {
@@ -130,7 +131,7 @@ public class ResultSetGroupTest {
   private ResultSetGroup getResultSet(String resourceName) {
     _dummyJsonTransport._resource = resourceName;
     Connection connection = ConnectionFactory.fromHostList(Collections.singletonList("dummy"), _dummyJsonTransport);
-    return connection.execute("dummy");
+    return connection.execute(_mockQuery);
   }
 
   private ResultSetGroup getResultSetSkipError(String resourceName) {
@@ -139,7 +140,7 @@ public class ResultSetGroupTest {
     props.setProperty("failOnExceptions", "false");
     Connection connection =
         ConnectionFactory.fromHostList(props, Collections.singletonList("dummy"), _dummyJsonTransport);
-    return connection.execute("dummy");
+    return connection.execute(_mockQuery);
   }
 
   static class DummyJsonTransport implements PinotClientTransport {

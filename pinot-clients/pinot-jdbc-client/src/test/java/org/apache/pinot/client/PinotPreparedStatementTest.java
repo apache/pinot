@@ -33,10 +33,12 @@ import org.testng.annotations.Test;
 public class PinotPreparedStatementTest {
   public static final String QUERY =
       "SELECT * FROM dummy WHERE name = ? and age = ? and score = ? and ts = ? and eligible = ? and sub_score = ?";
-  public static final String DATE_QUERY = "SELECT * FROM dummy WHERE date = ? and updated_at = ? and created_at = ?";
+  public static final String DATE_QUERY =
+      "SELECT * FROM dummy WHERE current_date = ? and updated_at = ? and created_at = ?";
   public static final String SINGLE_STRING_QUERY = "SELECT * FROM dummy WHERE value = ?";
   private DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
   private DummyPinotControllerTransport _dummyPinotControllerTransport = new DummyPinotControllerTransport();
+  private final String _mockQuery = "select * from mockTable";
 
   @Test
   public void testSetAndClearValues()
@@ -94,8 +96,8 @@ public class PinotPreparedStatementTest {
     String lastExecutedQuery = _dummyPinotClientTransport.getLastQuery();
 
     Assert.assertEquals(lastExecutedQuery.substring(0, lastExecutedQuery.indexOf("LIMIT")).trim(), String
-        .format("SELECT * FROM dummy WHERE date = '%s' and updated_at = '%s' and created_at = '%s'", expectedDate,
-            expectedTime, expectedTime));
+        .format("SELECT * FROM dummy WHERE current_date = '%s' and updated_at = '%s' and created_at = '%s'",
+            expectedDate, expectedTime, expectedTime));
   }
 
   @Test

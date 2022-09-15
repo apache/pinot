@@ -38,6 +38,7 @@ import org.testng.annotations.Test;
 public class PinotResultSetTest {
   public static final String TEST_RESULT_SET_RESOURCE = "result_table.json";
   private DummyJsonTransport _dummyJsonTransport = new DummyJsonTransport();
+  private final String _mockQuery = "select * from mockTable";
 
   @Test
   public void testFetchValues()
@@ -163,7 +164,7 @@ public class PinotResultSetTest {
   private ResultSetGroup getResultSet(String resourceName) {
     _dummyJsonTransport._resource = resourceName;
     Connection connection = ConnectionFactory.fromHostList(Collections.singletonList("dummy"), _dummyJsonTransport);
-    return connection.execute("dummy");
+    return connection.execute(_mockQuery);
   }
 
   class DummyJsonTransport implements PinotClientTransport {
