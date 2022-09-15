@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -65,7 +66,8 @@ public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
    * @return Per-partition consumer's status, which typically includes last consumed message timestamp,
    * latest available upstream offset etc
    */
-  public abstract ConsumerPartitionState getConsumerPartitionState();
+  public abstract Map<String, ConsumerPartitionState> getConsumerPartitionState();
 
-  public abstract PartitionLagState getPartitionToLagState(ConsumerPartitionState consumerPartitionState);
+  public abstract Map<String, PartitionLagState> getPartitionToLagState(
+      List<ConsumerPartitionState> consumerPartitionState);
 }

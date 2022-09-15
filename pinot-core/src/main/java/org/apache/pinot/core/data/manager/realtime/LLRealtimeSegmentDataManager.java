@@ -34,6 +34,8 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
@@ -822,19 +824,21 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @Override
-  public ConsumerPartitionState getConsumerPartitionState() {
-    return new ConsumerPartitionState(String.valueOf(_partitionGroupId), getCurrentOffset(),
-        getLastConsumedTimestamp(), fetchLatestStreamOffset(5_000));
+  public Map<String, ConsumerPartitionState> getConsumerPartitionState() {
+    String partitionGroupId = String.valueOf(_partitionGroupId);
+    return Collections.singletonMap(partitionGroupId, new ConsumerPartitionState(partitionGroupId, getCurrentOffset(),
+        getLastConsumedTimestamp(), fetchLatestStreamOffset(5_000)));
   }
 
   @Override
-  public PartitionLagState getPartitionToLagState(ConsumerPartitionState consumerPartitionState) {
+  public Map<String, PartitionLagState> getPartitionToLagState(List<ConsumerPartitionState> consumerPartitionState) {
     if (_streamMetadataProvider == null) {
       _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
     }
-    String partitionGroupId = String.valueOf(_partitionGroupId);
+    ;
     return _streamMetadataProvider.getCurrentPartitionLagState(
-        Collections.singletonMap(partitionGroupId, consumerPartitionState)).get(partitionGroupId);
+        consumerPartitionState.stream().collect(
+            Collectors.toMap(ConsumerPartitionState::getPartitionId, Function.identity())));
   }
 
   public StreamPartitionMsgOffset getCurrentOffset() {

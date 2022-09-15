@@ -26,11 +26,11 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -51,6 +51,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -136,16 +137,21 @@ public class DebugResource {
     SegmentConsumerInfo segmentConsumerInfo = null;
     if (tableType == TableType.REALTIME) {
       RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-      String segmentName = segmentDataManager.getSegmentName();
-      ConsumerPartitionState partitionState = realtimeSegmentDataManager.getConsumerPartitionState();
+      Map<String, ConsumerPartitionState> partitionStateMap = realtimeSegmentDataManager.getConsumerPartitionState();
+      Map<String, PartitionLagState> partitionLagStateMap = realtimeSegmentDataManager.getPartitionToLagState(
+          new ArrayList<>(partitionStateMap.values()));
       segmentConsumerInfo =
-          new SegmentConsumerInfo(segmentName, realtimeSegmentDataManager.getConsumerState().toString(),
+          new SegmentConsumerInfo(
+              segmentDataManager.getSegmentName(),
+              realtimeSegmentDataManager.getConsumerState().toString(),
               realtimeSegmentDataManager.getLastConsumedTimestamp(),
               realtimeSegmentDataManager.getPartitionToCurrentOffset(),
-              Collections.singletonMap(partitionState.getPartitionId(),
-                  partitionState.getUpstreamLatestOffset().toString()),
-              Collections.singletonMap(partitionState.getPartitionId(),
-                  realtimeSegmentDataManager.getPartitionToLagState(partitionState).getOffsetLag()));
+              partitionStateMap.entrySet().stream().collect(
+                  Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())
+              ),
+              partitionLagStateMap.entrySet().stream().collect(
+                  Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getOffsetLag())
+              ));
     }
     return segmentConsumerInfo;
   }

@@ -35,13 +35,13 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.DefaultValue;
@@ -513,16 +513,22 @@ public class TablesResource {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager instanceof RealtimeSegmentDataManager) {
           RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-          String segmentName = segmentDataManager.getSegmentName();
-          ConsumerPartitionState partitionState = realtimeSegmentDataManager.getConsumerPartitionState();
-          String partitionId = String.valueOf(partitionState.getPartitionId());
-          PartitionLagState lagState = realtimeSegmentDataManager.getPartitionToLagState(partitionState);
+          Map<String, ConsumerPartitionState> partitionStateMap = realtimeSegmentDataManager.getConsumerPartitionState();
+          Map<String, PartitionLagState> partitionLagStateMap = realtimeSegmentDataManager.getPartitionToLagState(
+              new ArrayList<>(partitionStateMap.values()));
           segmentConsumerInfoList.add(
-              new SegmentConsumerInfo(segmentName, realtimeSegmentDataManager.getConsumerState().toString(),
+              new SegmentConsumerInfo(segmentDataManager.getSegmentName(),
+                  realtimeSegmentDataManager.getConsumerState().toString(),
                   realtimeSegmentDataManager.getLastConsumedTimestamp(),
                   realtimeSegmentDataManager.getPartitionToCurrentOffset(),
-                  Collections.singletonMap(partitionId, partitionState.getUpstreamLatestOffset().toString()),
-                  Collections.singletonMap(partitionId, lagState.getOffsetLag())));
+                  partitionStateMap.entrySet().stream().collect(
+                      Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())
+                  ),
+                  partitionLagStateMap.entrySet().stream().collect(
+                      Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getOffsetLag())
+                  ))
+          );
+
         }
       }
     } catch (Exception e) {

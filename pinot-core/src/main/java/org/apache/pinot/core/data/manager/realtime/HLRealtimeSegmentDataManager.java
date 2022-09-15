@@ -427,12 +427,12 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @Override
-  public ConsumerPartitionState getConsumerPartitionState() {
+  public Map<String, ConsumerPartitionState> getConsumerPartitionState() {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public PartitionLagState getPartitionToLagState(ConsumerPartitionState perPartitionState) {
+  public Map<String, PartitionLagState> getPartitionToLagState(List<ConsumerPartitionState> consumerPartitionState) {
     throw new UnsupportedOperationException();
   }
 
