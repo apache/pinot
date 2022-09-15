@@ -65,6 +65,8 @@ public interface RexExpression {
         return RexExpressionUtils.handleCast(rexCall);
       case SEARCH:
         return RexExpressionUtils.handleSearch(rexCall);
+      case CASE:
+        return RexExpressionUtils.handleCase(rexCall);
       default:
         List<RexExpression> operands =
             rexCall.getOperands().stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
