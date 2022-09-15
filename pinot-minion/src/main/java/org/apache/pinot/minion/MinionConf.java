@@ -75,8 +75,4 @@ public class MinionConf extends PinotConfiguration {
         .orElseGet(() -> getProperty(CommonConstants.Minion.DEPRECATED_CONFIG_OF_METRICS_PREFIX_KEY,
             CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX));
   }
-
-  public boolean isSeparateTaskLogs() {
-    return getProperty(CommonConstants.Minion.CONFIG_OF_SEPARATE_TASK_LOGS, false);
-  }
 }

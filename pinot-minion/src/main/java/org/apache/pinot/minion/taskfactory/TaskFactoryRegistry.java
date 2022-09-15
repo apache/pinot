@@ -36,7 +36,6 @@ import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.metrics.MinionQueryPhase;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.event.EventObserverFactoryRegistry;
 import org.apache.pinot.minion.event.MinionEventObserver;
@@ -62,8 +61,6 @@ public class TaskFactoryRegistry {
 
   public TaskFactoryRegistry(TaskExecutorFactoryRegistry taskExecutorFactoryRegistry,
       EventObserverFactoryRegistry eventObserverFactoryRegistry) {
-    MinionConf minionConf = taskExecutorFactoryRegistry.getMinionConf();
-    boolean separateTaskLogs = minionConf.isSeparateTaskLogs();
     for (String taskType : taskExecutorFactoryRegistry.getAllTaskTypes()) {
       PinotTaskExecutorFactory taskExecutorFactory = taskExecutorFactoryRegistry.getTaskExecutorFactory(taskType);
       MinionEventObserverFactory eventObserverFactory = eventObserverFactoryRegistry.getEventObserverFactory(taskType);
@@ -89,11 +86,8 @@ public class TaskFactoryRegistry {
                   .addPhaseTiming(taskType, MinionQueryPhase.TASK_QUEUEING, jobDequeueTimeMs - jobInQueueTimeMs,
                       TimeUnit.MILLISECONDS);
               try {
-                if (separateTaskLogs) {
-                  LOGGER.info("Routing logs to separate file for task: {}", _taskConfig.getId());
-                  // Setting MDC so that logger can route task logs to a separate file.
-                  MDC.put("taskId", _taskConfig.getId());
-                }
+                // Set taskId in MDC so that one may config logger to route task logs to separate file.
+                MDC.put("taskId", _taskConfig.getId());
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, 1L);
                 return runInternal();
               } finally {
@@ -102,11 +96,8 @@ public class TaskFactoryRegistry {
                 _minionMetrics
                     .addPhaseTiming(taskType, MinionQueryPhase.TASK_EXECUTION, executionTimeMs, TimeUnit.MILLISECONDS);
                 LOGGER.info("Task: {} completed in: {}ms", _taskConfig.getId(), executionTimeMs);
-                if (separateTaskLogs) {
-                  // Clearing MDC to stop routing logs to a separate file.
-                  MDC.remove("taskId");
-                  LOGGER.info("All logs routed to separate file for task: {}", _taskConfig.getId());
-                }
+                // Clear taskId from MDC to reset it.
+                MDC.remove("taskId");
               }
             }
 
