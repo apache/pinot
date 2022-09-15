@@ -24,8 +24,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.EqualityUtils;
-import org.apache.pinot.spi.utils.TimeUtils;
-
 
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -189,13 +187,15 @@ public final class DateTimeFieldSpec extends FieldSpec {
     }
 
     DateTimeFieldSpec that = (DateTimeFieldSpec) o;
-    return EqualityUtils.isEqual(_format, that._format) && EqualityUtils.isEqual(_granularity, that._granularity);
+    return EqualityUtils.isEqual(_format, that._format) && EqualityUtils.isEqual(_granularity, that._granularity)
+        && EqualityUtils.isEqual(_sampleValue, that._sampleValue);
   }
 
   @Override
   public int hashCode() {
     int result = EqualityUtils.hashCodeOf(super.hashCode(), _format);
     result = EqualityUtils.hashCodeOf(result, _granularity);
+    result = EqualityUtils.hashCodeOf(result, _sampleValue);
     return result;
   }
 }
