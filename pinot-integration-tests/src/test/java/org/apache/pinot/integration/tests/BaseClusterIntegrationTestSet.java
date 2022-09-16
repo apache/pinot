@@ -99,10 +99,27 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }, 600_000L, "Failed to delete table data managers");
   }
 
+  /**
+   * Test features supported in V2 Multi-stage Engine.
+   * - Some V1 features will not be supported.
+   * - Some V1 features will be added as V2 engine feature development progresses.
+   * @throws Exception
+   */
+  public void testHardcodedQueriesMultiStage()
+      throws Exception {
+    testHardcodedQueriesCommon();
+  }
+
+  /**
+   * Test hard-coded queries.
+   * @throws Exception
+   */
   public void testHardcodedQueries()
       throws Exception {
-    testHardcodedQueries(false);
+    testHardcodedQueriesCommon();
+    testHardCodedQueriesV1();
   }
+
   /**
    * Test hardcoded queries.
    * <p>NOTE:
@@ -122,7 +139,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    * TODO: Selection queries, Aggregation Group By queries, Order By, Distinct
    *  This list is very basic right now (aggregations only) and needs to be enriched
    */
-  protected void testHardcodedQueries(boolean testingMultistage)
+  private void testHardcodedQueriesCommon()
       throws Exception {
     String query;
     String h2Query;
@@ -208,88 +225,92 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT DaysSinceEpoch, MAX(ArrDelay) - MAX(AirTime) AS Diff FROM mytable GROUP BY DaysSinceEpoch HAVING "
         + "(Diff >= 300 AND Diff < 500) OR Diff < -500 ORDER BY Diff DESC";
     testQuery(query);
+  }
 
-    if (!testingMultistage) {
-      // Escape quotes
-      query = "SELECT DistanceGroup FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', "
-          + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
-      h2Query = "SELECT DistanceGroup FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
-      testQuery(query, h2Query);
+  private void testHardCodedQueriesV1()
+      throws Exception {
+    String query;
+    String h2Query;
+    // Escape quotes
+    // TODO: move to common when multistage support correct escaping strategy.
+    query = "SELECT DistanceGroup FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', "
+        + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
+    h2Query = "SELECT DistanceGroup FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
+    testQuery(query, h2Query);
 
-      // LIKE
-      // TODO: like not supported.
-      query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
-      testQuery(query);
-      query = "SELECT count(*) FROM mytable WHERE DestCityName LIKE 'C%'";
-      testQuery(query);
-      query = "SELECT count(*) FROM mytable WHERE DestCityName LIKE '_h%'";
-      testQuery(query);
+    // LIKE
+    // TODO: move to common when multistage support LIKE
+    query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
+    testQuery(query);
+    query = "SELECT count(*) FROM mytable WHERE DestCityName LIKE 'C%'";
+    testQuery(query);
+    query = "SELECT count(*) FROM mytable WHERE DestCityName LIKE '_h%'";
+    testQuery(query);
 
-      // Non-Standard functions
-      // TODO: mult is not a valid function
-      query =
-          "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ADD(ArrTime + 5, ArrDelay), ADD(ArrTime * 5, ArrDelay)"
-              + " FROM mytable WHERE mult((ArrTime - 100), (5 + ArrDelay))> 0";
-      h2Query =
-          "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ArrTime + 5 + ArrDelay, ArrTime * 5 + ArrDelay FROM "
-              + "mytable WHERE (ArrTime - 100) * (5 + ArrDelay)> 0";
-      testQuery(query, h2Query);
-      // TODO: CAST AS LONG is not supported, must use CAST AS BIGINT
-      query =
-          "SELECT SUM(CAST(CAST(ArrTime AS varchar) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
-              + "'DL'";
-      testQuery(query);
-      query =
-          "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL' "
-              + "ORDER BY ArrTime DESC";
-      testQuery(query);
-       // TODO: MV columns are not supported.
-      query =
-          "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND DivAirportSeqIDs IN (1078102, 1142303,"
-              + " 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
-      h2Query =
-          "SELECT DistanceGroup FROM mytable WHERE Month BETWEEN 1 AND 1 AND (DivAirportSeqIDs__MV0 IN (1078102, "
-              + "1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV1 IN (1078102, 1142303, 1530402, 1172102, "
-              + "1291503) OR DivAirportSeqIDs__MV2 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR "
-              + "DivAirportSeqIDs__MV3 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV4 IN "
-              + "(1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000";
-      testQuery(query, h2Query);
+    // Non-Standard functions
+    // mult is not a standard function.
+    query =
+        "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ADD(ArrTime + 5, ArrDelay), ADD(ArrTime * 5, ArrDelay)"
+            + " FROM mytable WHERE mult((ArrTime - 100), (5 + ArrDelay))> 0";
+    h2Query =
+        "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ArrTime + 5 + ArrDelay, ArrTime * 5 + ArrDelay FROM "
+            + "mytable WHERE (ArrTime - 100) * (5 + ArrDelay)> 0";
+    testQuery(query, h2Query);
+    // TODO: move to common when multistage support CAST AS 'LONG', for now it must use: CAST AS BIGINT
+    query =
+        "SELECT SUM(CAST(CAST(ArrTime AS varchar) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
+            + "'DL'";
+    testQuery(query);
+    query =
+        "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL' "
+            + "ORDER BY ArrTime DESC";
+    testQuery(query);
+    // TODO: move to common when multistage support MV columns
+    query =
+        "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND DivAirportSeqIDs IN (1078102, 1142303,"
+            + " 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
+    h2Query =
+        "SELECT DistanceGroup FROM mytable WHERE Month BETWEEN 1 AND 1 AND (DivAirportSeqIDs__MV0 IN (1078102, "
+            + "1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV1 IN (1078102, 1142303, 1530402, 1172102, "
+            + "1291503) OR DivAirportSeqIDs__MV2 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR "
+            + "DivAirportSeqIDs__MV3 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV4 IN "
+            + "(1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000";
+    testQuery(query, h2Query);
 
-      // Non-Standard SQL syntax:
-      // IN_ID_SET
-      {
-        IdSet idSet = IdSets.create(FieldSpec.DataType.LONG);
-        idSet.add(19690L);
-        idSet.add(20355L);
-        idSet.add(21171L);
-        // Also include a non-existing id
-        idSet.add(0L);
-        String serializedIdSet = idSet.toBase64String();
-        String inIdSetQuery = "SELECT COUNT(*) FROM mytable WHERE INIDSET(AirlineID, '" + serializedIdSet + "') = 1";
-        String inQuery = "SELECT COUNT(*) FROM mytable WHERE AirlineID IN (19690, 20355, 21171, 0)";
-        testQuery(inIdSetQuery, inQuery);
-        String notInIdSetQuery = "SELECT COUNT(*) FROM mytable WHERE INIDSET(AirlineID, '" + serializedIdSet + "') = 0";
-        String notInQuery = "SELECT COUNT(*) FROM mytable WHERE AirlineID NOT IN (19690, 20355, 21171, 0)";
-        testQuery(notInIdSetQuery, notInQuery);
-      }
+    // Non-Standard SQL syntax:
+    // IN_ID_SET
+    {
+      IdSet idSet = IdSets.create(FieldSpec.DataType.LONG);
+      idSet.add(19690L);
+      idSet.add(20355L);
+      idSet.add(21171L);
+      // Also include a non-existing id
+      idSet.add(0L);
+      String serializedIdSet = idSet.toBase64String();
+      String inIdSetQuery = "SELECT COUNT(*) FROM mytable WHERE INIDSET(AirlineID, '" + serializedIdSet + "') = 1";
+      String inQuery = "SELECT COUNT(*) FROM mytable WHERE AirlineID IN (19690, 20355, 21171, 0)";
+      testQuery(inIdSetQuery, inQuery);
+      String notInIdSetQuery = "SELECT COUNT(*) FROM mytable WHERE INIDSET(AirlineID, '" + serializedIdSet + "') = 0";
+      String notInQuery = "SELECT COUNT(*) FROM mytable WHERE AirlineID NOT IN (19690, 20355, 21171, 0)";
+      testQuery(notInIdSetQuery, notInQuery);
+    }
 
-      // IN_SUBQUERY
-      {
-        String inSubqueryQuery =
-            "SELECT COUNT(*) FROM mytable WHERE INSUBQUERY(DestAirportID, 'SELECT IDSET(DestAirportID) FROM mytable "
-                + "WHERE DaysSinceEpoch = 16430') = 1";
-        String inQuery = "SELECT COUNT(*) FROM mytable WHERE DestAirportID IN (SELECT DestAirportID FROM mytable WHERE "
-            + "DaysSinceEpoch = 16430)";
-        testQuery(inSubqueryQuery, inQuery);
+    // IN_SUBQUERY
+    {
+      String inSubqueryQuery =
+          "SELECT COUNT(*) FROM mytable WHERE INSUBQUERY(DestAirportID, 'SELECT IDSET(DestAirportID) FROM mytable "
+              + "WHERE DaysSinceEpoch = 16430') = 1";
+      String inQuery = "SELECT COUNT(*) FROM mytable WHERE DestAirportID IN (SELECT DestAirportID FROM mytable WHERE "
+          + "DaysSinceEpoch = 16430)";
+      testQuery(inSubqueryQuery, inQuery);
 
-        String notInSubqueryQuery =
-            "SELECT COUNT(*) FROM mytable WHERE INSUBQUERY(DestAirportID, 'SELECT IDSET(DestAirportID) FROM mytable "
-                + "WHERE DaysSinceEpoch = 16430') = 0";
-        String notInQuery =
-            "SELECT COUNT(*) FROM mytable WHERE DestAirportID NOT IN (SELECT DestAirportID FROM mytable WHERE "
-                + "DaysSinceEpoch = 16430)";
-        testQuery(notInSubqueryQuery, notInQuery);
-      }
+      String notInSubqueryQuery =
+          "SELECT COUNT(*) FROM mytable WHERE INSUBQUERY(DestAirportID, 'SELECT IDSET(DestAirportID) FROM mytable "
+              + "WHERE DaysSinceEpoch = 16430') = 0";
+      String notInQuery =
+          "SELECT COUNT(*) FROM mytable WHERE DestAirportID NOT IN (SELECT DestAirportID FROM mytable WHERE "
+              + "DaysSinceEpoch = 16430)";
+      testQuery(notInSubqueryQuery, notInQuery);
     }
   }
 

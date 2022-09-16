@@ -82,9 +82,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
   @Test
   @Override
-  public void testHardcodedQueries()
+  public void testHardcodedQueriesMultiStage()
       throws Exception {
-    super.testHardcodedQueries(true);
+    super.testHardcodedQueriesMultiStage();
   }
 
   @Override
