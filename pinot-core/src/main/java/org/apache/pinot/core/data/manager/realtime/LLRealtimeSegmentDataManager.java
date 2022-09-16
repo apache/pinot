@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
@@ -288,7 +289,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final SegmentCommitterFactory _segmentCommitterFactory;
   private final ConsumptionRateLimiter _rateLimiter;
 
-  private volatile StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime = null;
+  private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
@@ -1435,10 +1436,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs) {
-    try (StreamMetadataProvider metadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId,
-        _partitionGroupId)) {
-      return metadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs);
-    } catch (Exception e) {
+    if (_streamMetadataProvider == null) {
+      makeStreamMetadataProvider("Fetch latest stream offset");
+    }
+    try {
+      return _streamMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs);
+    } catch (TimeoutException e) {
       _segmentLogger.warn(
           "Cannot fetch latest stream offset for clientId {} and partitionGroupId {} with maxWaitTime {}", _clientId,
           _partitionGroupId, maxWaitTimeMs);
@@ -1535,7 +1538,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       closeStreamMetadataProvider();
     }
     _segmentLogger.info("Creating new stream metadata provider, reason: {}", reason);
-    _streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(_clientId);
+    _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....
