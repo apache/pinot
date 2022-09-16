@@ -1,0 +1,89 @@
+{
+  "metricFieldSpecs": [
+    {
+      "dataType": "BIG_DECIMAL",
+      "name": "overdueBalance"
+    },
+    {
+      "dataType": "BIG_DECIMAL",
+      "name": "baseUsage"
+    },
+    {
+      "dataType": "BIG_DECIMAL",
+      "name": "alternateUsage"
+    },
+    {
+      "dataType": "BIG_DECIMAL",
+      "name": "standingCharge"
+    },
+    {
+      "dataType": "BIG_DECIMAL",
+      "name": "baseCharge"
+    },
+    {
+      "dataType": "BIG_DECIMAL",
+      "name": "alternateCharge"
+    },
+    {
+      "dataType": "BIG_DECIMAL",
+      "name": "levy"
+    },
+    {
+      "dataType": "BIG_DECIMAL",
+      "name": "tax"
+    },
+    {
+      "dataType": "BIG_DECIMAL",
+      "name": "totalNet"
+    },
+    {
+      "dataType": "BIG_DECIMAL",
+      "name": "totalToPay"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "customerId"
+    },
+    {
+      "dataType": "STRING",
+      "name": "creditHistory"
+    },
+    {
+      "dataType": "STRING",
+      "name": "firstName"
+    },
+    {
+      "dataType": "STRING",
+      "name": "lastName"
+    },
+    {
+      "dataType": "BOOLEAN",
+      "name": "isCarOwner"
+    },
+    {
+      "dataType": "STRING",
+      "name": "city"
+    },    {
+      "dataType": "STRING",
+      "name": "maritalStatus"
+    },
+    {
+      "dataType": "STRING",
+      "name": "buildingType"
+    },
+    {
+      "dataType": "STRING",
+      "name": "missedPayment"
+    },    {
+      "dataType": "STRING",
+      "name": "billingMonth"
+    }
+  ],
+  "schemaName": "billing",
+  "primaryKeyColumns": [
+    "customerId"
+  ]
+}
+

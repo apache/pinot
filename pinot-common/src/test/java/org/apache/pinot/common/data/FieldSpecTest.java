@@ -155,17 +155,6 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "null");
 
-    // Multi-value dimension field with default null value.
-    fieldSpec1 = new DimensionFieldSpec();
-    fieldSpec1.setName("mvDimension");
-    fieldSpec1.setDataType(BIG_DECIMAL);
-    fieldSpec1.setSingleValueField(false);
-    fieldSpec1.setDefaultNullValue(BigDecimal.ZERO);
-    fieldSpec2 = new DimensionFieldSpec("mvDimension", BIG_DECIMAL, false, BigDecimal.ZERO);
-    Assert.assertEquals(fieldSpec1, fieldSpec2);
-    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
-    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
-    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), BigDecimal.ZERO);
 
     // Metric field with default null value.
     fieldSpec1 = new MetricFieldSpec();
