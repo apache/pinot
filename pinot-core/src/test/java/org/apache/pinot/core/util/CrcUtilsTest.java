@@ -77,8 +77,8 @@ public class CrcUtilsTest {
     final String filePath = TestUtils.getFileFromResourceUrl(CrcUtils.class.getClassLoader().getResource(AVRO_DATA));
 
     final SegmentGeneratorConfig config = SegmentTestUtils
-        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.DAYS,
-            "testTable");
+        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR,
+            "daysSinceEpoch", TimeUnit.SECONDS, "testTable");
     config.setSegmentNamePostfix("1");
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
