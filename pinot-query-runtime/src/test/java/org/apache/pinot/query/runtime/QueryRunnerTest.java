@@ -263,6 +263,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT a.col2, COUNT(*), MAX(a.col3), MIN(a.col3), SUM(a.col3) FROM a GROUP BY a.col2 "
             + "HAVING COUNT(*) < 5 OR (COUNT(*) > 5 AND SUM(a.col3) >= 10)"
             + "OR (MIN(a.col3) != 20 AND SUM(a.col3) = 100)"},
+        new Object[]{"SELECT COUNT(*) AS Count, MAX(a.col3) AS \"max\" FROM a GROUP BY a.col2 "
+            + "HAVING Count > 1 AND \"max\" < 50"},
 
         // Order-by
         new Object[]{"SELECT a.col1, a.col3, b.col3 FROM a JOIN b ON a.col1 = b.col1 ORDER BY a.col3, b.col3 DESC"},
