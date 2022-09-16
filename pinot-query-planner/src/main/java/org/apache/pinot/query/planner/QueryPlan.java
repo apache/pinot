@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.query.planner;
 
+import java.util.List;
 import java.util.Map;
+import org.apache.calcite.util.Pair;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.planner.stage.StageNode;
 
@@ -35,10 +37,13 @@ import org.apache.pinot.query.planner.stage.StageNode;
  * </ul>
  */
 public class QueryPlan {
-  private Map<Integer, StageNode> _queryStageMap;
-  private Map<Integer, StageMetadata> _stageMetadataMap;
+  private final List<Pair<Integer, String>> _queryResultFields;
+  private final Map<Integer, StageNode> _queryStageMap;
+  private final Map<Integer, StageMetadata> _stageMetadataMap;
 
-  public QueryPlan(Map<Integer, StageNode> queryStageMap, Map<Integer, StageMetadata> stageMetadataMap) {
+  public QueryPlan(List<Pair<Integer, String>> fields, Map<Integer, StageNode> queryStageMap,
+      Map<Integer, StageMetadata> stageMetadataMap) {
+    _queryResultFields = fields;
     _queryStageMap = queryStageMap;
     _stageMetadataMap = stageMetadataMap;
   }
@@ -57,5 +62,13 @@ public class QueryPlan {
    */
   public Map<Integer, StageMetadata> getStageMetadataMap() {
     return _stageMetadataMap;
+  }
+
+  /**
+   * Get the query result field.
+   * @return query result field.
+   */
+  public List<Pair<Integer, String>> getQueryResultFields() {
+    return _queryResultFields;
   }
 }

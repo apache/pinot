@@ -555,8 +555,15 @@ public class ClusterIntegrationTestUtils {
   static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection, @Nullable Map<String, String> headers)
       throws Exception {
+    testQuery(pinotQuery, brokerUrl, pinotConnection, h2Query, h2Connection, headers, null);
+  }
+
+  static void testQuery(String pinotQuery, String brokerUrl, org.apache.pinot.client.Connection pinotConnection,
+      String h2Query, Connection h2Connection, @Nullable Map<String, String> headers,
+      @Nullable Map<String, String> extraJsonProperties)
+      throws Exception {
     // broker response
-    JsonNode pinotResponse = ClusterTest.postQuery(pinotQuery, brokerUrl, headers);
+    JsonNode pinotResponse = ClusterTest.postQuery(pinotQuery, brokerUrl, headers, extraJsonProperties);
     if (!pinotResponse.get("exceptions").isEmpty()) {
       throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
     }
@@ -638,7 +645,7 @@ public class ClusterIntegrationTestUtils {
             return;
           }
           if (h2ResultSet.first()) {
-            for (int i = 0; i < brokerResponseRows.size(); i++) {
+            for (int i = 0; i < numRows; i++) {
               for (int c = 0; c < numColumns; c++) {
                 String h2Value = h2ResultSet.getString(c + 1);
                 String brokerValue = brokerResponseRows.get(i).get(c).asText();

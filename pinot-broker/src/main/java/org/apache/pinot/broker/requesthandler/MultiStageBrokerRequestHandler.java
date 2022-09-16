@@ -40,9 +40,7 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.catalog.PinotCatalog;
@@ -156,7 +154,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
     }
 
-    List<DataTable> queryResults = null;
+    ResultTable queryResults;
     try {
       queryResults = _queryDispatcher.submitAndReduce(requestId, queryPlan, _mailboxService, DEFAULT_TIMEOUT_NANO);
     } catch (Exception e) {
@@ -171,7 +169,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(sqlNodeAndOptions.getParseTimeNs()
         + (executionEndTimeNs - compilationStartTimeNs));
     brokerResponse.setTimeUsedMs(totalTimeMs);
-    brokerResponse.setResultTable(toResultTable(queryResults));
+    brokerResponse.setResultTable(queryResults);
     requestContext.setQueryProcessingTime(totalTimeMs);
     augmentStatistics(requestContext, brokerResponse);
     return brokerResponse;
@@ -195,27 +193,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       RequestContext requestContext)
       throws Exception {
     throw new UnsupportedOperationException();
-  }
-
-  private ResultTable toResultTable(List<DataTable> queryResult) {
-    DataSchema resultDataSchema = null;
-    List<Object[]> resultRows = new ArrayList<>();
-    for (DataTable dataTable : queryResult) {
-      resultDataSchema = resultDataSchema == null ? dataTable.getDataSchema() : resultDataSchema;
-      int numColumns = resultDataSchema.getColumnNames().length;
-      DataSchema.ColumnDataType[] resultColumnDataTypes = resultDataSchema.getColumnDataTypes();
-      List<Object[]> rows = new ArrayList<>(dataTable.getNumberOfRows());
-      for (int rowId = 0; rowId < dataTable.getNumberOfRows(); rowId++) {
-        Object[] row = new Object[numColumns];
-        Object[] rawRow = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-        for (int i = 0; i < numColumns; i++) {
-          row[i] = resultColumnDataTypes[i].convertAndFormat(rawRow[i]);
-        }
-        rows.add(row);
-      }
-      resultRows.addAll(rows);
-    }
-    return new ResultTable(resultDataSchema, resultRows);
   }
 
   @Override

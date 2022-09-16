@@ -125,7 +125,7 @@ public class QueryEnvironment {
   public QueryPlan planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      RelNode relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
+      RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
       return toDispatchablePlan(relRoot, plannerContext);
     } catch (Exception e) {
       throw new RuntimeException("Error composing query plan for: " + sqlQuery, e);
@@ -147,11 +147,11 @@ public class QueryEnvironment {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      RelNode relRoot = compileQuery(explain.getExplicandum(), plannerContext);
+      RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext);
       SqlExplainFormat format = explain.getFormat() == null ? SqlExplainFormat.DOT : explain.getFormat();
       SqlExplainLevel level =
           explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
-      return PlannerUtils.explainPlan(relRoot, format, level);
+      return PlannerUtils.explainPlan(relRoot.rel, format, level);
     } catch (Exception e) {
       throw new RuntimeException("Error explain query plan for: " + sqlQuery, e);
     }
@@ -172,11 +172,12 @@ public class QueryEnvironment {
   // --------------------------------------------------------------------------
 
   @VisibleForTesting
-  protected RelNode compileQuery(SqlNode sqlNode, PlannerContext plannerContext)
+  protected RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext)
       throws Exception {
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);
-    return optimize(relation, plannerContext);
+    RelNode optimized = optimize(relation, plannerContext);
+    return relation.withRel(optimized);
   }
 
   private SqlNode validate(SqlNode parsed, PlannerContext plannerContext)
@@ -212,7 +213,7 @@ public class QueryEnvironment {
     }
   }
 
-  private QueryPlan toDispatchablePlan(RelNode relRoot, PlannerContext plannerContext) {
+  private QueryPlan toDispatchablePlan(RelRoot relRoot, PlannerContext plannerContext) {
     // 5. construct a dispatchable query plan.
     StagePlanner queryStagePlanner = new StagePlanner(plannerContext, _workerManager);
     return queryStagePlanner.makePlan(relRoot);

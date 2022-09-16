@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
@@ -49,7 +48,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
-import static org.apache.pinot.core.query.selection.SelectionOperatorUtils.extractRowFromDataTable;
 
 
 public class QueryRunnerTestBase {
@@ -70,17 +68,6 @@ public class QueryRunnerTestBase {
   protected GrpcMailboxService _mailboxService;
 
   protected Connection _h2Connection;
-
-  protected static List<Object[]> toRows(List<DataTable> dataTables) {
-    List<Object[]> resultRows = new ArrayList<>();
-    for (DataTable dataTable : dataTables) {
-      int numRows = dataTable.getNumberOfRows();
-      for (int rowId = 0; rowId < numRows; rowId++) {
-        resultRows.add(extractRowFromDataTable(dataTable, rowId));
-      }
-    }
-    return resultRows;
-  }
 
   protected Connection getH2Connection() {
     Assert.assertNotNull(_h2Connection, "H2 Connection has not been initialized");
