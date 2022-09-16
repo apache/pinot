@@ -69,7 +69,7 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("breed", FieldSpec.DataType.STRING)
             .addSingleValueDimension("name", FieldSpec.DataType.STRING).build();
-    _helixResourceManager.addSchema(schema, true);
+    _helixResourceManager.addSchema(schema, true, false);
     _helixResourceManager.addTable(tableConfig);
 
     // Create a file with few records

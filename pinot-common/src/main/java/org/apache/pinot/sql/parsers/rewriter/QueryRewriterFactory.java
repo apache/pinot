@@ -53,7 +53,7 @@ public class QueryRewriterFactory {
     return getQueryRewriters(DEFAULT_QUERY_REWRITERS_CLASS_NAMES);
   }
 
-  private static List<QueryRewriter> getQueryRewriters(List<String> queryRewriterClasses) {
+  public static List<QueryRewriter> getQueryRewriters(List<String> queryRewriterClasses) {
     final ImmutableList.Builder<QueryRewriter> builder = ImmutableList.builder();
     for (String queryRewriterClassName : queryRewriterClasses) {
       try {

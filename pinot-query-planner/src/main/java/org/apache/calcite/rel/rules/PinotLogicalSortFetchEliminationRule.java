@@ -20,7 +20,6 @@ package org.apache.calcite.rel.rules;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.tools.RelBuilderFactory;
@@ -31,7 +30,7 @@ import org.apache.calcite.tools.RelBuilderFactory;
  */
 public class PinotLogicalSortFetchEliminationRule extends RelOptRule {
   public static final PinotLogicalSortFetchEliminationRule INSTANCE =
-      new PinotLogicalSortFetchEliminationRule(RelFactories.LOGICAL_BUILDER);
+      new PinotLogicalSortFetchEliminationRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
   public PinotLogicalSortFetchEliminationRule(RelBuilderFactory factory) {
     super(operand(LogicalSort.class, any()), factory, null);

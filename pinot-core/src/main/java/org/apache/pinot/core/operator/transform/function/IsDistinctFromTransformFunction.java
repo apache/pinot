@@ -16,31 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner;
-
-import org.apache.calcite.plan.RelOptUtil;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.sql.SqlExplainFormat;
-import org.apache.calcite.sql.SqlExplainLevel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+package org.apache.pinot.core.operator.transform.function;
 
 /**
- * Utilities used by planner.
+ * The <code>IsDistinctFromTransformFunction</code> extends <code>DistinctFromTransformFunction</code> to implement the
+ * IS_DISTINCT_FROM operator.
+ *
+ * The results are in boolean format and stored as an integer array with 1 represents true and 0 represents false.
+ * Expected result:
+ * NUll IS_DISTINCT_FROM Value: 1
+ * NUll IS_DISTINCT_FROM Null: 0
+ * ValueA IS_DISTINCT_FROM ValueB: NotEQUALS(ValueA, ValueB)
+ *
+ * Note this operator only takes column names for now.
+ * SQL Syntax:
+ *    columnA IS DISTINCT FROM columnB
+ *
+ * Sample Usage:
+ *    IS_DISTINCT_FROM(columnA, columnB)
  */
-public class PlannerUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PlannerUtils.class);
-
-  private PlannerUtils() {
-    // do not instantiate.
-  }
-
-  public static boolean isRootStage(int stageId) {
-    return stageId == 0;
-  }
-
-  public static String explainPlan(RelNode relRoot, SqlExplainFormat format, SqlExplainLevel explainLevel) {
-    return RelOptUtil.dumpPlan("Execution Plan", relRoot, format, explainLevel);
+public class IsDistinctFromTransformFunction extends DistinctFromTransformFunction {
+  public IsDistinctFromTransformFunction() {
+    super(true);
   }
 }

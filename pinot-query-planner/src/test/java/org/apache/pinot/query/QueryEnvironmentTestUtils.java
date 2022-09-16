@@ -66,7 +66,8 @@ public class QueryEnvironmentTestUtils {
     SCHEMA_BUILDER = new Schema.SchemaBuilder().addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
         .addSingleValueDimension("col2", FieldSpec.DataType.STRING, "")
         .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
-        .addMetric("col3", FieldSpec.DataType.INT, 0);
+        .addMetric("col3", FieldSpec.DataType.INT, 0)
+        .setSchemaName("defaultSchemaName");
   }
 
   private QueryEnvironmentTestUtils() {
@@ -75,7 +76,7 @@ public class QueryEnvironmentTestUtils {
 
   public static TableCache mockTableCache() {
     TableCache mock = mock(TableCache.class);
-    when(mock.getTableNameMap()).thenReturn(ImmutableMap.of("a_REALTIME", "a", "b_REALTIME", "b", "c_REALTIME", "c",
+    when(mock.getTableNameMap()).thenReturn(ImmutableMap.of("a_REALTIME", "a", "b_REALTIME", "b", "c_OFFLINE", "c",
         "d_OFFLINE", "d", "d_REALTIME", "d"));
     when(mock.getSchema("a")).thenReturn(SCHEMA_BUILDER.setSchemaName("a").build());
     when(mock.getSchema("b")).thenReturn(SCHEMA_BUILDER.setSchemaName("b").build());

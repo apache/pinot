@@ -39,7 +39,7 @@ public abstract class FilterOperand extends TransformOperand {
         return new Or(functionCall.getFunctionOperands(), dataSchema);
       case "NOT":
         return new Not(toFilterOperand(functionCall.getFunctionOperands().get(0), dataSchema));
-      case "EQ":
+      case "equals":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
@@ -47,8 +47,7 @@ public abstract class FilterOperand extends TransformOperand {
                 _lhs._resultType.convert(_rhs.apply(row))) == 0;
           }
         };
-      case "NE":
-      case "NE2":
+      case "notEquals":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
@@ -56,7 +55,7 @@ public abstract class FilterOperand extends TransformOperand {
                 _lhs._resultType.convert(_rhs.apply(row))) != 0;
           }
         };
-      case "GT":
+      case "greaterThan":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
@@ -64,7 +63,7 @@ public abstract class FilterOperand extends TransformOperand {
                 _lhs._resultType.convert(_rhs.apply(row))) > 0;
           }
         };
-      case "GE":
+      case "greaterThanOrEqual":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
@@ -72,7 +71,7 @@ public abstract class FilterOperand extends TransformOperand {
                 _lhs._resultType.convert(_rhs.apply(row))) >= 0;
           }
         };
-      case "LT":
+      case "lessThan":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {
@@ -80,7 +79,7 @@ public abstract class FilterOperand extends TransformOperand {
                 _lhs._resultType.convert(_rhs.apply(row))) < 0;
           }
         };
-      case "LE":
+      case "lessThanOrEqual":
         return new Predicate(functionCall.getFunctionOperands(), dataSchema) {
           @Override
           public Boolean apply(Object[] row) {

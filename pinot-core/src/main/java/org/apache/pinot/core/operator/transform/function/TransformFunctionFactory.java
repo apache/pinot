@@ -202,6 +202,9 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.IS_NULL, IsNullTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.IS_NOT_NULL,
         IsNotNullTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.COALESCE, CoalesceTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IS_DISTINCT_FROM, IsDistinctFromTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IS_NOT_DISTINCT_FROM, IsNotDistinctFromTransformFunction.class);
 
     // Trignometric functions
     typeToImplementation.put(TransformFunctionType.SIN, SinTransformFunction.class);
