@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.metrics.compound;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotMetric;
 
 
