@@ -71,17 +71,6 @@ public class QueryRunnerTestBase {
 
   protected Connection _h2Connection;
 
-  protected static List<Object[]> toRows(List<DataTable> dataTables) {
-    List<Object[]> resultRows = new ArrayList<>();
-    for (DataTable dataTable : dataTables) {
-      int numRows = dataTable.getNumberOfRows();
-      for (int rowId = 0; rowId < numRows; rowId++) {
-        resultRows.add(extractRowFromDataTable(dataTable, rowId));
-      }
-    }
-    return resultRows;
-  }
-
   protected Connection getH2Connection() {
     Assert.assertNotNull(_h2Connection, "H2 Connection has not been initialized");
     return _h2Connection;

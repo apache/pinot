@@ -76,7 +76,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       }
     }
     Preconditions.checkNotNull(mailboxReceiveOperator);
-    return toRows(QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator));
+    return QueryDispatcher.toResultTable(QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator),
+        queryPlan.getQueryResultFields()).getRows();
   }
 
   private List<Object[]> queryH2(String sql)
@@ -265,6 +266,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
         // Order-by
         new Object[]{"SELECT a.col1, a.col3, b.col3 FROM a JOIN b ON a.col1 = b.col1 ORDER BY a.col3, b.col3 DESC"},
+        new Object[]{"SELECT MAX(a.col3) FROM a GROUP BY a.col2 ORDER BY MAX(a.col3) - MIN(a.col3)"},
 
         // Test CAST
         //   - implicit CAST
