@@ -49,34 +49,26 @@ public class RealtimeSegmentConverter {
   private final String _segmentName;
   private final String _sortedColumn;
   private final List<String> _invertedIndexColumns;
-  private final List<String> _textIndexColumns;
-  private final List<String> _fstIndexColumns;
-  private final List<String> _noDictionaryColumns;
-  private final List<String> _varLengthDictionaryColumns;
+  private final ColumnDescriptionsContainer _columnDescriptionsContainer;
   private final boolean _nullHandlingEnabled;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
       String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
-      String sortedColumn, List<String> invertedIndexColumns, List<String> textIndexColumns,
-      List<String> fstIndexColumns, List<String> noDictionaryColumns, List<String> varLengthDictionaryColumns,
-      boolean nullHandlingEnabled) {
+      ColumnDescriptionsContainer cdc, boolean nullHandlingEnabled) {
     _realtimeSegmentImpl = realtimeSegment;
     _segmentZKPropsConfig = segmentZKPropsConfig;
     _outputPath = outputPath;
-    _invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
-    if (sortedColumn != null) {
-      _invertedIndexColumns.remove(sortedColumn);
+    _columnDescriptionsContainer = cdc;
+    _invertedIndexColumns = new ArrayList<>(_columnDescriptionsContainer.getInvertedIndexColumns());
+    if (cdc.getSortedColumn() != null) {
+      _invertedIndexColumns.remove(cdc.getSortedColumn());
     }
     _dataSchema = getUpdatedSchema(schema);
-    _sortedColumn = sortedColumn;
+    _sortedColumn = cdc.getSortedColumn();
     _tableName = tableName;
     _tableConfig = tableConfig;
     _segmentName = segmentName;
-    _noDictionaryColumns = noDictionaryColumns;
-    _varLengthDictionaryColumns = varLengthDictionaryColumns;
     _nullHandlingEnabled = nullHandlingEnabled;
-    _textIndexColumns = textIndexColumns;
-    _fstIndexColumns = fstIndexColumns;
   }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
@@ -94,8 +86,8 @@ public class RealtimeSegmentConverter {
       }
     }
 
-    if (_varLengthDictionaryColumns != null) {
-      genConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
+    if (_columnDescriptionsContainer.getVarLengthDictionaryColumns() != null) {
+      genConfig.setVarLengthDictionaryColumns(_columnDescriptionsContainer.getVarLengthDictionaryColumns());
     }
 
     if (segmentVersion != null) {
@@ -104,8 +96,8 @@ public class RealtimeSegmentConverter {
     genConfig.setTableName(_tableName);
     genConfig.setOutDir(_outputPath);
     genConfig.setSegmentName(_segmentName);
-    genConfig.setTextIndexCreationColumns(_textIndexColumns);
-    genConfig.setFSTIndexCreationColumns(_fstIndexColumns);
+    genConfig.setTextIndexCreationColumns(_columnDescriptionsContainer.getTextIndexColumns());
+    genConfig.setFSTIndexCreationColumns(_columnDescriptionsContainer.getFstIndexColumns());
     SegmentPartitionConfig segmentPartitionConfig = _realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
     genConfig.setNullHandlingEnabled(_nullHandlingEnabled);

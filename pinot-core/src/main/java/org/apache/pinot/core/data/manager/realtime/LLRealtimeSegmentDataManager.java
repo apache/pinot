@@ -49,6 +49,7 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.realtime.converter.ColumnDescriptionsContainer;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
@@ -264,12 +265,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private StreamMetadataProvider _streamMetadataProvider = null;
   private final File _resourceTmpDir;
   private final String _tableNameWithType;
-  private final List<String> _invertedIndexColumns;
-  private final List<String> _textIndexColumns;
-  private final List<String> _fstIndexColumns;
-  private final List<String> _noDictionaryColumns;
-  private final List<String> _varLengthDictionaryColumns;
-  private final String _sortedColumn;
+  private final ColumnDescriptionsContainer _columnDescriptionsContainer;
   private final Logger _segmentLogger;
   private final String _tableStreamName;
   private final PinotDataBufferMemoryManager _memoryManager;
@@ -871,9 +867,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // lets convert the segment now
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.getAbsolutePath(),
-              _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(), _sortedColumn,
-              _invertedIndexColumns, _textIndexColumns, _fstIndexColumns, _noDictionaryColumns,
-              _varLengthDictionaryColumns, _nullHandlingEnabled);
+              _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
+              _columnDescriptionsContainer, _nullHandlingEnabled);
       _segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -1272,8 +1267,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _partitionLevelStreamConfig =
         new PartitionLevelStreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMap(_tableConfig));
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_partitionLevelStreamConfig);
-    _streamPartitionMsgOffsetFactory =
-        StreamConsumerFactoryProvider.create(_partitionLevelStreamConfig).createStreamMsgOffsetFactory();
+    _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();
     String streamTopic = _partitionLevelStreamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _llcSegmentName = llcSegmentName;
@@ -1297,38 +1291,32 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         .createRateLimiter(_partitionLevelStreamConfig, _tableNameWithType, _serverMetrics, _metricKeyName);
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
+    String sortedColumn;
     if (sortedColumns.isEmpty()) {
       _segmentLogger.info("RealtimeDataResourceZKMetadata contains no information about sorted column for segment {}",
           _llcSegmentName);
-      _sortedColumn = null;
+      sortedColumn = null;
     } else {
       String firstSortedColumn = sortedColumns.get(0);
       if (_schema.hasColumn(firstSortedColumn)) {
         _segmentLogger.info("Setting sorted column name: {} from RealtimeDataResourceZKMetadata for segment {}",
             firstSortedColumn, _llcSegmentName);
-        _sortedColumn = firstSortedColumn;
+        sortedColumn = firstSortedColumn;
       } else {
         _segmentLogger
             .warn("Sorted column name: {} from RealtimeDataResourceZKMetadata is not existed in schema for segment {}.",
                 firstSortedColumn, _llcSegmentName);
-        _sortedColumn = null;
+        sortedColumn = null;
       }
     }
-
     // Inverted index columns
     Set<String> invertedIndexColumns = indexLoadingConfig.getInvertedIndexColumns();
     // We need to add sorted column into inverted index columns because when we convert realtime in memory segment into
     // offline segment, we use sorted column's inverted index to maintain the order of the records so that the records
     // are sorted on the sorted column.
-    if (_sortedColumn != null) {
-      invertedIndexColumns.add(_sortedColumn);
+    if (sortedColumn != null) {
+      invertedIndexColumns.add(sortedColumn);
     }
-    _invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
-
-    // No dictionary Columns
-    _noDictionaryColumns = new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns());
-
-    _varLengthDictionaryColumns = new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns());
 
     // Read the max number of rows
     int segmentMaxRowCount = _partitionLevelStreamConfig.getFlushThresholdRows();
@@ -1342,11 +1330,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
 
-    Set<String> textIndexColumns = indexLoadingConfig.getTextIndexColumns();
-    _textIndexColumns = new ArrayList<>(textIndexColumns);
-
-    Set<String> fstIndexColumns = indexLoadingConfig.getFSTIndexColumns();
-    _fstIndexColumns = new ArrayList<>(fstIndexColumns);
+    _columnDescriptionsContainer = new ColumnDescriptionsContainer(sortedColumn,
+        new ArrayList<>(invertedIndexColumns),
+        new ArrayList<>(indexLoadingConfig.getTextIndexColumns()),
+        new ArrayList<>(indexLoadingConfig.getFSTIndexColumns()),
+        new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns()),
+        new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns()));
 
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
@@ -1356,8 +1345,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setCapacity(_segmentMaxRowCount).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
-            .setInvertedIndexColumns(invertedIndexColumns).setTextIndexColumns(textIndexColumns)
-            .setFSTIndexColumns(fstIndexColumns).setJsonIndexColumns(indexLoadingConfig.getJsonIndexColumns())
+            .setInvertedIndexColumns(invertedIndexColumns).setTextIndexColumns(indexLoadingConfig.getTextIndexColumns())
+            .setFSTIndexColumns(indexLoadingConfig.getFSTIndexColumns()).setJsonIndexColumns(indexLoadingConfig.getJsonIndexColumns())
             .setH3IndexConfigs(indexLoadingConfig.getH3IndexConfigs()).setSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
