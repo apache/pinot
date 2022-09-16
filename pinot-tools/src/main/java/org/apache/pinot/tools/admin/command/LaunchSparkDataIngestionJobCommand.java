@@ -337,7 +337,8 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
 
   public static void main(String[] args) {
     PluginManager.get().init();
-    new CommandLine(new LaunchSparkDataIngestionJobCommand()).execute(args);
+    int exitCode = new CommandLine(new LaunchSparkDataIngestionJobCommand()).execute(args);
+    System.exit(exitCode);
   }
 
   enum SparkType {
