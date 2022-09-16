@@ -94,8 +94,6 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private final String _sortedColumn;
   private final List<String> _invertedIndexColumns;
-  private final List<String> _noDictionaryColumns;
-  private final List<String> _varLengthDictionaryColumns;
   private final Logger _segmentLogger;
   private final SegmentVersion _segmentVersion;
 
@@ -151,18 +149,12 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       invertedIndexColumns.add(_sortedColumn);
     }
     _invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
-
-    // No DictionaryColumns
-    _noDictionaryColumns = new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns());
-
-    _varLengthDictionaryColumns = new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns());
-
     _streamConfig = new StreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMap(tableConfig));
 
     _segmentLogger = LoggerFactory.getLogger(
         HLRealtimeSegmentDataManager.class.getName() + "_" + _segmentName + "_" + _streamConfig.getTopicName());
     _segmentLogger.info("Created segment data manager with Sorted column:{}, invertedIndexColumns:{}", _sortedColumn,
-        _invertedIndexColumns);
+        invertedIndexColumns);
 
     _segmentEndTimeThreshold = _start + _streamConfig.getFlushThresholdTimeMillis();
     _resourceTmpDir = new File(resourceDataDir, "_tmp");
@@ -286,7 +278,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + System.currentTimeMillis());
           // lets convert the segment now
           ColumnDescriptionsContainer cdc = new ColumnDescriptionsContainer(_sortedColumn, _invertedIndexColumns,
-              Collections.emptyList(), Collections.emptyList(), _noDictionaryColumns, _varLengthDictionaryColumns);
+              Collections.emptyList(), Collections.emptyList(),
+              new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns()),
+              new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns()));
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(_realtimeSegment, null, tempSegmentFolder.getAbsolutePath(),
                   schema, _tableNameWithType, tableConfig, segmentZKMetadata.getSegmentName(), cdc,
