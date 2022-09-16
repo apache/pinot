@@ -41,7 +41,8 @@ public class QueryPlan {
   private final Map<Integer, StageNode> _queryStageMap;
   private final Map<Integer, StageMetadata> _stageMetadataMap;
 
-  public QueryPlan(List<Pair<Integer, String>> fields, Map<Integer, StageNode> queryStageMap, Map<Integer, StageMetadata> stageMetadataMap) {
+  public QueryPlan(List<Pair<Integer, String>> fields, Map<Integer, StageNode> queryStageMap,
+      Map<Integer, StageMetadata> stageMetadataMap) {
     _queryResultFields = fields;
     _queryStageMap = queryStageMap;
     _stageMetadataMap = stageMetadataMap;
