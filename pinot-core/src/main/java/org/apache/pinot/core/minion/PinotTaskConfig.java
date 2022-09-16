@@ -41,6 +41,10 @@ public class PinotTaskConfig {
     return _taskType;
   }
 
+  public String getTaskId() {
+    return _configs.get(TASK_ID_KEY);
+  }
+
   public Map<String, String> getConfigs() {
     return _configs;
   }
@@ -53,7 +57,7 @@ public class PinotTaskConfig {
     Map<String, String> configs = new HashMap<>(helixTaskConfig.getConfigMap());
 
     // Inside Helix task config map, there are 3 extra Helix properties: TASK_COMMAND, TASK_ID, TASK_TARGET_PARTITION
-    configs.remove(TASK_ID_KEY);
+    // Note that TASK_ID_KEY is kept in configs so that task executor can retrieve the states associated with TaskId.
     configs.remove(TASK_COMMAND_KEY);
     configs.remove(TASK_TARGET_PARTITION_KEY);
 
