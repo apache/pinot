@@ -19,13 +19,12 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
@@ -58,8 +57,8 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
     _isSortedBlockConstructed = false;
     _numRowsToKeep = _fetch > 0 ? Math.min(SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY,
         _fetch + (Math.max(_offset, 0))) : SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY;
-    _rows = new PriorityQueue<>(_numRowsToKeep, SelectionOperatorUtils.getTypeCompatibleComparator(
-        toOrderByExpressions(collationKeys, collationDirections), dataSchema, false));
+    _rows = new PriorityQueue<>(_numRowsToKeep,
+        new SortComparator(collationKeys, collationDirections, dataSchema, false));
   }
 
   @Override
@@ -90,14 +89,10 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
       return _upstreamErrorBlock;
     }
     if (!_isSortedBlockConstructed) {
-      int currentOffset = 0;
-      List<Object[]> rows = new ArrayList<>(_rows.size());
-      while (_rows.size() > 0) {
+      LinkedList<Object[]> rows = new LinkedList<>();
+      while (_rows.size() > _offset) {
         Object[] row = _rows.poll();
-        if (currentOffset > _offset) {
-          rows.add(row);
-        }
-        currentOffset++;
+          rows.addFirst(row);
       }
       _isSortedBlockConstructed = true;
       if (rows.size() == 0) {
@@ -129,14 +124,44 @@ public class SortOperator extends BaseOperator<TransferableBlock> {
     }
   }
 
-  private List<OrderByExpressionContext> toOrderByExpressions(List<RexExpression> collationKeys,
-      List<RelFieldCollation.Direction> collationDirections) {
-    List<OrderByExpressionContext> orderByExpressionContextList = new ArrayList<>(collationKeys.size());
-    for (int i = 0; i < collationKeys.size(); i++) {
-      orderByExpressionContextList.add(new OrderByExpressionContext(ExpressionContext.forIdentifier(
-          _dataSchema.getColumnName(((RexExpression.InputRef) collationKeys.get(i)).getIndex())),
-          !collationDirections.get(i).isDescending()));
+  private static class SortComparator implements Comparator<Object[]> {
+    private final int _size;
+    private final int[] _valueIndices;
+    private final int[] _multipliers;
+    private final boolean[] _useDoubleComparison;
+
+    public SortComparator(List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
+        DataSchema dataSchema, boolean isNullHandlingEnabled) {
+      DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+      _size = collationKeys.size();
+      _valueIndices = new int[_size];
+      _multipliers = new int[_size];
+      _useDoubleComparison = new boolean[_size];
+      for (int i = 0; i < _size; i++) {
+        _valueIndices[i] = ((RexExpression.InputRef) collationKeys.get(i)).getIndex();
+        _multipliers[i] = collationDirections.get(i).isDescending() ? 1 : -1;
+        _useDoubleComparison[i] = columnDataTypes[_valueIndices[i]].isNumber();
+      }
     }
-    return orderByExpressionContextList;
+
+    @Override
+    public int compare(Object[] o1, Object[] o2) {
+      for (int i = 0; i < _size; i++) {
+        int index = _valueIndices[i];
+        Object v1 = o1[index];
+        Object v2 = o2[index];
+        int result;
+        if (_useDoubleComparison[i]) {
+          result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
+        } else {
+          //noinspection unchecked
+          result = ((Comparable) v1).compareTo(v2);
+        }
+        if (result != 0) {
+          return result * _multipliers[i];
+        }
+      }
+      return 0;
+    }
   }
 }

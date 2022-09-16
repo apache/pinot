@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.utils;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -47,6 +48,9 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
+import org.apache.pinot.sql.parsers.rewriter.PredicateComparisonRewriter;
+import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
+import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 
 
 /**
@@ -57,6 +61,10 @@ import org.apache.pinot.sql.FilterKind;
  */
 public class ServerRequestUtils {
   private static final int DEFAULT_LEAF_NODE_LIMIT = 10_000_000;
+  private static final List<String> QUERY_REWRITERS_CLASS_NAMES =
+      ImmutableList.of(PredicateComparisonRewriter.class.getName());
+  private static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(
+      QueryRewriterFactory.getQueryRewriters(QUERY_REWRITERS_CLASS_NAMES));
 
   private ServerRequestUtils() {
     // do not instantiate.
@@ -122,6 +130,9 @@ public class ServerRequestUtils {
     walkStageTree(distributedStagePlan.getStageRoot(), pinotQuery, tableType);
     if (timeBoundaryInfo != null) {
       attachTimeBoundary(pinotQuery, timeBoundaryInfo, tableType == TableType.OFFLINE);
+    }
+    for (QueryRewriter queryRewriter : QUERY_REWRITERS) {
+      pinotQuery = queryRewriter.rewrite(pinotQuery);
     }
     return pinotQuery;
   }

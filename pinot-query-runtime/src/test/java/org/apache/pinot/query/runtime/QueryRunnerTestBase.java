@@ -19,9 +19,13 @@
 package org.apache.pinot.query.runtime;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import java.io.File;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +40,12 @@ import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.GrpcMailboxService;
 import org.apache.pinot.query.routing.WorkerInstance;
 import org.apache.pinot.query.service.QueryConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.StringUtil;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
@@ -60,6 +69,8 @@ public class QueryRunnerTestBase {
   protected Map<ServerInstance, QueryServerEnclosure> _servers = new HashMap<>();
   protected GrpcMailboxService _mailboxService;
 
+  protected Connection _h2Connection;
+
   protected static List<Object[]> toRows(List<DataTable> dataTables) {
     List<Object[]> resultRows = new ArrayList<>();
     for (DataTable dataTable : dataTables) {
@@ -71,16 +82,74 @@ public class QueryRunnerTestBase {
     return resultRows;
   }
 
+  protected Connection getH2Connection() {
+    Assert.assertNotNull(_h2Connection, "H2 Connection has not been initialized");
+    return _h2Connection;
+  }
+
+  protected void setH2Connection()
+      throws Exception {
+    Assert.assertNull(_h2Connection);
+    Class.forName("org.h2.Driver");
+    _h2Connection = DriverManager.getConnection("jdbc:h2:mem:");
+  }
+
+  protected void addTableToH2(List<String> tables)
+      throws SQLException {
+    Schema schema = QueryEnvironmentTestUtils.SCHEMA_BUILDER.build();
+    List<String> h2FieldNamesAndTypes = toH2FieldNamesAndTypes(schema);
+    for (String tableName : tables) {
+      // create table
+      _h2Connection.prepareCall("DROP TABLE IF EXISTS " + tableName).execute();
+      _h2Connection.prepareCall("CREATE TABLE " + tableName + " (" + StringUtil.join(",",
+          h2FieldNamesAndTypes.toArray(new String[h2FieldNamesAndTypes.size()])) + ")").execute();
+    }
+  }
+
+  protected void addDataToH2(Map<String, List<GenericRow>> rowsMap)
+      throws SQLException {
+    Schema schema = QueryEnvironmentTestUtils.SCHEMA_BUILDER.build();
+    List<String> h2FieldNamesAndTypes = toH2FieldNamesAndTypes(schema);
+    for (Map.Entry<String, List<GenericRow>> entry : rowsMap.entrySet()) {
+      String tableName = entry.getKey();
+      // remove the "_O" and "_R" suffix b/c H2 doesn't understand realtime/offline split
+      if (tableName.contains("_")) {
+        tableName = tableName.substring(0, tableName.length() - 2);
+      }
+      // insert data into table
+      StringBuilder params = new StringBuilder("?");
+      for (int i = 0; i < h2FieldNamesAndTypes.size() - 1; i++) {
+        params.append(",?");
+      }
+      PreparedStatement h2Statement =
+          _h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params.toString() + ")");
+      for (GenericRow row : entry.getValue()) {
+        int h2Index = 1;
+        for (String fieldName : schema.getColumnNames()) {
+          Object value = row.getValue(fieldName);
+          h2Statement.setObject(h2Index++, value);
+        }
+        h2Statement.execute();
+      }
+    }
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
     DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
-    QueryServerEnclosure server1 = new QueryServerEnclosure(Lists.newArrayList("a", "b", "c", "d_O"),
+    QueryServerEnclosure server1 = new QueryServerEnclosure(
         ImmutableMap.of("a", INDEX_DIR_S1_A, "b", INDEX_DIR_S1_B, "c", INDEX_DIR_S1_C, "d_O", INDEX_DIR_S1_D),
         QueryEnvironmentTestUtils.SERVER1_SEGMENTS);
-    QueryServerEnclosure server2 = new QueryServerEnclosure(Lists.newArrayList("a", "c", "d_R", "d_O"),
+    QueryServerEnclosure server2 = new QueryServerEnclosure(
         ImmutableMap.of("a", INDEX_DIR_S2_A, "c", INDEX_DIR_S2_C, "d_R", INDEX_DIR_S2_D, "d_O", INDEX_DIR_S1_D),
         QueryEnvironmentTestUtils.SERVER2_SEGMENTS);
+
+    // Setting up H2 for validation
+    setH2Connection();
+    addTableToH2(Arrays.asList("a", "b", "c", "d"));
+    addDataToH2(server1.getRowsMap());
+    addDataToH2(server2.getRowsMap());
 
     _reducerGrpcPort = QueryEnvironmentTestUtils.getAvailablePort();
     _reducerHostname = String.format("Broker_%s", QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME);
@@ -109,5 +178,26 @@ public class QueryRunnerTestBase {
       server.shutDown();
     }
     _mailboxService.shutdown();
+  }
+
+  private static List<String> toH2FieldNamesAndTypes(org.apache.pinot.spi.data.Schema pinotSchema) {
+    List<String> fieldNamesAndTypes = new ArrayList<>(pinotSchema.size());
+    for (String fieldName : pinotSchema.getColumnNames()) {
+      FieldSpec.DataType dataType = pinotSchema.getFieldSpecFor(fieldName).getDataType();
+      String fieldType;
+      switch (dataType) {
+        case INT:
+        case LONG:
+          fieldType = "bigint";
+          break;
+        case STRING:
+          fieldType = "varchar(128)";
+          break;
+        default:
+          throw new UnsupportedOperationException("Unsupported type conversion to h2 type: " + dataType);
+      }
+      fieldNamesAndTypes.add(fieldName + " " + fieldType);
+    }
+    return fieldNamesAndTypes;
   }
 }

@@ -19,6 +19,8 @@
 package org.apache.pinot.common.function.scalar;
 
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.utils.BooleanUtils;
+
 
 public class ComparisonFunctions {
 
@@ -61,5 +63,10 @@ public class ComparisonFunctions {
   @ScalarFunction
   public static boolean between(double val, double a, double b) {
     return val > a && val < b;
+  }
+
+  @ScalarFunction
+  public static Object caseWhen(Object comparisonResult, Object left, Object right) {
+    return BooleanUtils.toBoolean(comparisonResult) ? left : right;
   }
 }

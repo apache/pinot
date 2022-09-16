@@ -40,6 +40,13 @@ public class RexExpressionUtils {
   private RexExpressionUtils() {
   }
 
+  static RexExpression handleCase(RexCall rexCall) {
+    List<RexExpression> operands =
+        rexCall.getOperands().stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
+    return new RexExpression.FunctionCall(rexCall.getKind(), RexExpression.toDataType(rexCall.getType()),
+        "caseWhen", operands);
+  }
+
   static RexExpression handleCast(RexCall rexCall) {
     // CAST is being rewritten into "rexCall.CAST<targetType>(inputValue)",
     //   - e.g. result type has already been converted into the CAST RexCall, so we assert single operand.

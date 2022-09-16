@@ -27,28 +27,18 @@ public class OperatorUtils {
   private static final Map<String, String> OPERATOR_TOKEN_MAPPING = new HashMap<>();
 
   static {
-    OPERATOR_TOKEN_MAPPING.put("=", "EQ");
-    OPERATOR_TOKEN_MAPPING.put(">", "GT");
-    OPERATOR_TOKEN_MAPPING.put("<", "LT");
-    OPERATOR_TOKEN_MAPPING.put("?", "HOOK");
-    OPERATOR_TOKEN_MAPPING.put(":", "COLON");
-    OPERATOR_TOKEN_MAPPING.put("<=", "LE");
-    OPERATOR_TOKEN_MAPPING.put(">=", "GE");
-    OPERATOR_TOKEN_MAPPING.put("<>", "NE");
-    OPERATOR_TOKEN_MAPPING.put("!=", "NE2");
-    OPERATOR_TOKEN_MAPPING.put("+", "PLUS");
-    OPERATOR_TOKEN_MAPPING.put("-", "MINUS");
-    OPERATOR_TOKEN_MAPPING.put("*", "STAR");
-    OPERATOR_TOKEN_MAPPING.put("/", "DIVIDE");
-    OPERATOR_TOKEN_MAPPING.put("%", "PERCENT_REMAINDER");
-    OPERATOR_TOKEN_MAPPING.put("||", "CONCAT");
-    OPERATOR_TOKEN_MAPPING.put("=>", "NAMED_ARGUMENT_ASSIGNMENT");
-    OPERATOR_TOKEN_MAPPING.put("..", "DOUBLE_PERIOD");
-    OPERATOR_TOKEN_MAPPING.put("'", "QUOTE");
-    OPERATOR_TOKEN_MAPPING.put("\"", "DOUBLE_QUOTE");
-    OPERATOR_TOKEN_MAPPING.put("|", "VERTICAL_BAR");
-    OPERATOR_TOKEN_MAPPING.put("^", "CARET");
-    OPERATOR_TOKEN_MAPPING.put("$", "DOLLAR");
+    OPERATOR_TOKEN_MAPPING.put("=", "equals");
+    OPERATOR_TOKEN_MAPPING.put(">", "greaterThan");
+    OPERATOR_TOKEN_MAPPING.put("<", "lessThan");
+    OPERATOR_TOKEN_MAPPING.put("<=", "lessThanOrEqual");
+    OPERATOR_TOKEN_MAPPING.put(">=", "greaterThanOrEqual");
+    OPERATOR_TOKEN_MAPPING.put("<>", "notEquals");
+    OPERATOR_TOKEN_MAPPING.put("!=", "notEquals");
+    OPERATOR_TOKEN_MAPPING.put("+", "plus");
+    OPERATOR_TOKEN_MAPPING.put("-", "minus");
+    OPERATOR_TOKEN_MAPPING.put("*", "times");
+    OPERATOR_TOKEN_MAPPING.put("/", "divide");
+    OPERATOR_TOKEN_MAPPING.put("||", "concat");
   }
 
   private OperatorUtils() {
