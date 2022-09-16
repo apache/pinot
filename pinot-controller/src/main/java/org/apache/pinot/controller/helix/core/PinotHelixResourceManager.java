@@ -1258,7 +1258,7 @@ public class PinotHelixResourceManager {
    * Schema APIs
    */
 
-  public void addSchema(Schema schema, boolean override)
+  public void addSchema(Schema schema, boolean override, boolean force)
       throws SchemaAlreadyExistsException, SchemaBackwardIncompatibleException {
     String schemaName = schema.getSchemaName();
     LOGGER.info("Adding schema: {} with override: {}", schemaName, override);
@@ -1267,7 +1267,7 @@ public class PinotHelixResourceManager {
     if (oldSchema != null) {
       // Update existing schema
       if (override) {
-        updateSchema(schema, oldSchema);
+        updateSchema(schema, oldSchema, force);
       } else {
         throw new SchemaAlreadyExistsException(String.format("Schema: %s already exists", schemaName));
       }
@@ -1288,7 +1288,7 @@ public class PinotHelixResourceManager {
       throw new SchemaNotFoundException(String.format("Schema: %s does not exist", schemaName));
     }
 
-    updateSchema(schema, oldSchema);
+    updateSchema(schema, oldSchema, false);
 
     if (reload) {
       LOGGER.info("Reloading tables with name: {}", schemaName);
@@ -1303,7 +1303,7 @@ public class PinotHelixResourceManager {
    * Helper method to update the schema, or throw SchemaBackwardIncompatibleException when the new schema is not
    * backward-compatible with the existing schema.
    */
-  private void updateSchema(Schema schema, Schema oldSchema)
+  private void updateSchema(Schema schema, Schema oldSchema, boolean force)
       throws SchemaBackwardIncompatibleException {
     String schemaName = schema.getSchemaName();
     schema.updateBooleanFieldsIfNeeded(oldSchema);
@@ -1311,10 +1311,15 @@ public class PinotHelixResourceManager {
       LOGGER.info("New schema: {} is the same as the existing schema, not updating it", schemaName);
       return;
     }
-    if (!schema.isBackwardCompatibleWith(oldSchema)) {
-      // TODO: Add the reason of the incompatibility
-      throw new SchemaBackwardIncompatibleException(
-          String.format("New schema: %s is not backward-compatible with the existing schema", schemaName));
+    boolean isBackwardCompatible = schema.isBackwardCompatibleWith(oldSchema);
+    if (!isBackwardCompatible) {
+      if (force) {
+        LOGGER.warn("Force updated schema: {} which is backward incompatible with the existing schema", oldSchema);
+      } else {
+        // TODO: Add the reason of the incompatibility
+        throw new SchemaBackwardIncompatibleException(
+                String.format("New schema: %s is not backward-compatible with the existing schema", schemaName));
+      }
     }
     ZKMetadataProvider.setSchema(_propertyStore, schema);
     LOGGER.info("Updated schema: {}", schemaName);

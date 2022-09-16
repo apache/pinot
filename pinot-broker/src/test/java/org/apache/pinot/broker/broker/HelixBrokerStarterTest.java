@@ -88,7 +88,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
 
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
         .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.INT, "EPOCH|DAYS", "1:DAYS").build();
-    _helixResourceManager.addSchema(schema, true);
+    _helixResourceManager.addSchema(schema, true, false);
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
             .setTimeType(TimeUnit.DAYS.name()).build();

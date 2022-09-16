@@ -401,7 +401,7 @@ public class SchemaTest {
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
-    Assert.assertFalse(schema3.isBackwardCompatibleWith(oldSchema));
+    Assert.assertTrue(schema3.isBackwardCompatibleWith(oldSchema));
 
     // change datetime column
     Schema schema4 = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
@@ -411,7 +411,7 @@ public class SchemaTest {
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "2:HOURS:EPOCH", "1:HOURS").build();  // timeUnit 1 -> 2
-    Assert.assertFalse(schema4.isBackwardCompatibleWith(oldSchema));
+    Assert.assertTrue(schema4.isBackwardCompatibleWith(oldSchema));
 
     // change default value
     Schema schema5 = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
@@ -421,7 +421,7 @@ public class SchemaTest {
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
-    Assert.assertFalse(schema5.isBackwardCompatibleWith(oldSchema));
+    Assert.assertTrue(schema5.isBackwardCompatibleWith(oldSchema));
 
     // add a new column
     Schema schema6 = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
@@ -464,12 +464,12 @@ public class SchemaTest {
     Assert.assertTrue(newSchema.isBackwardCompatibleWith(oldSchema));
     Assert.assertEquals(newSchema, oldSchema);
 
-    // STRING with default to BOOLEAN without default - incompatible
+    // STRING with default to BOOLEAN without default - backward compatible change
     newSchema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", FieldSpec.DataType.INT)
         .addSingleValueDimension("svString", FieldSpec.DataType.STRING)
         .addSingleValueDimension("svStringWithDefault", FieldSpec.DataType.BOOLEAN).build();
     newSchema.updateBooleanFieldsIfNeeded(oldSchema);
-    Assert.assertFalse(newSchema.isBackwardCompatibleWith(oldSchema));
+    Assert.assertTrue(newSchema.isBackwardCompatibleWith(oldSchema));
 
     // New added BOOLEAN - compatible
     newSchema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", FieldSpec.DataType.INT)

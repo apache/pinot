@@ -77,7 +77,7 @@ public class PinotInstanceAssignmentRestletResourceTest {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
         .addDateTime(TIME_COLUMN_NAME, DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
         .build();
-    TEST_INSTANCE.getHelixResourceManager().addSchema(schema, true);
+    TEST_INSTANCE.getHelixResourceManager().addSchema(schema, true, false);
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
         .setBrokerTenant(BROKER_TENANT_NAME)
         .setServerTenant(SERVER_TENANT_NAME)

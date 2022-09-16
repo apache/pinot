@@ -119,21 +119,37 @@ public class PinotSchemaRestletResourceTest {
     // Change the column data type from STRING to BOOLEAN
     newColumnFieldSpec.setDataType(DataType.BOOLEAN);
 
+    // Update the schema with addSchema api and override on, force on
+    resp = ControllerTest.sendMultipartPostRequest(addSchemaUrl + "?force=true", schema.toSingleLineJsonString());
+    Assert.assertEquals(resp.getStatusCode(), 200);
+
+    // Change another column max length from default 512 to 2000
+    newColumnFieldSpec2.setMaxLength(2000);
+    // Change another column default null value from default "null" to "0"
+    newColumnFieldSpec2.setDefaultNullValue("0");
+
     // Update the schema with addSchema api and override on
     resp = ControllerTest.sendMultipartPostRequest(addSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 200);
 
-    // Change another column data type from STRING to BOOLEAN
-    newColumnFieldSpec2.setDataType(DataType.BOOLEAN);
+    // Get the schema and verify the default null value and max length have been changed
+    remoteSchema = Schema.fromString(ControllerTest.sendGetRequest(getSchemaUrl));
+    Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getMaxLength(), 2000);
+    Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getDefaultNullValue(), "0");
 
-    // Update the schema with updateSchema api
+    // Change another column max length from 1000
+    newColumnFieldSpec2.setMaxLength(1000);
+    // Change another column default null value from default "null" to "1"
+    newColumnFieldSpec2.setDefaultNullValue("1");
+
+    // Update the schema with updateSchema api and override on
     resp = ControllerTest.sendMultipartPutRequest(updateSchemaUrl, schema.toSingleLineJsonString());
     Assert.assertEquals(resp.getStatusCode(), 200);
 
-    // Get the schema and verify the data types are not changed
+    // Get the schema and verify the default null value and max length have been changed
     remoteSchema = Schema.fromString(ControllerTest.sendGetRequest(getSchemaUrl));
-    Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec.getName()).getDataType(), DataType.STRING);
-    Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getDataType(), DataType.STRING);
+    Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getMaxLength(), 1000);
+    Assert.assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getDefaultNullValue(), "1");
 
     // Add a new BOOLEAN column
     DimensionFieldSpec newColumnFieldSpec3 = new DimensionFieldSpec("newColumn3", DataType.BOOLEAN, true);

@@ -690,7 +690,10 @@ public final class Schema implements Serializable {
 
   /**
    * Check whether the current schema is backward compatible with oldSchema.
-   * Backward compatibility requires all columns and fieldSpec in oldSchema should be retained.
+   *
+   * Backward compatibility requires
+   * (1) all columns in oldSchema should be retained.
+   * (2) all column fieldSpecs should be backward compatible with the old ones.
    *
    * @param oldSchema old schema
    */
@@ -703,7 +706,8 @@ public final class Schema implements Serializable {
       }
       FieldSpec oldSchemaFieldSpec = entry.getValue();
       FieldSpec fieldSpec = getFieldSpecFor(oldSchemaColumnName);
-      if (!fieldSpec.equals(oldSchemaFieldSpec)) {
+
+      if (!fieldSpec.isBackwardCompatibleWith(oldSchemaFieldSpec)) {
         return false;
       }
     }
