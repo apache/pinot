@@ -203,7 +203,7 @@ public class PinotSchemaRestletResource {
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
-  @Path("/schemas/fixDateTime/{schemaName}")
+  @Path("/schemas/fixDateTimeFormat/{schemaName}")
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update date time format in schema", notes = "Update date time format in schema")
   @ApiResponses(value = {
@@ -212,7 +212,7 @@ public class PinotSchemaRestletResource {
       @ApiResponse(code = 400, message = "Missing or invalid request body"),
       @ApiResponse(code = 500, message = "Internal error")
   })
-  public ConfigSuccessResponse updateDateTimeFormat(
+  public ConfigSuccessResponse fixDateTimeFormat(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
       @ApiParam(value = "Whether to refresh the segments after updating metadata") @DefaultValue("false")
       @QueryParam("refresh") boolean refresh, String schemaJsonString) {

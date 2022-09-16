@@ -69,16 +69,20 @@ public class ZKMetadataUtils {
 
       long startTime = segmentZKMetadata.getStartTimeMs();
       long endTime = segmentZKMetadata.getEndTimeMs();
+
       assert currentDateTimeFieldSpec != null;
-      String startTimeString = currentDateTimeFieldSpec.getFormatSpec().fromMillisToFormat(startTime);
-      String endTimeString = currentDateTimeFieldSpec.getFormatSpec().fromMillisToFormat(endTime);
-
       assert newDateTimeFieldSpec != null;
-      long updatedStartTime = newDateTimeFieldSpec.getFormatSpec().fromFormatToMillis(startTimeString);
-      long updatedEndTime = newDateTimeFieldSpec.getFormatSpec().fromFormatToMillis(endTimeString);
+      if (startTime != -1) {
+        String startTimeString = currentDateTimeFieldSpec.getFormatSpec().fromMillisToFormat(startTime);
+        long updatedStartTime = newDateTimeFieldSpec.getFormatSpec().fromFormatToMillis(startTimeString);
+        segmentZKMetadata.setStartTime(updatedStartTime);
+      }
 
-      segmentZKMetadata.setStartTime(updatedStartTime);
-      segmentZKMetadata.setEndTime(updatedEndTime);
+      if (endTime != -1) {
+        String endTimeString = currentDateTimeFieldSpec.getFormatSpec().fromMillisToFormat(endTime);
+        long updatedEndTime = newDateTimeFieldSpec.getFormatSpec().fromFormatToMillis(endTimeString);
+        segmentZKMetadata.setEndTime(updatedEndTime);
+      }
     }
   }
 

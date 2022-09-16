@@ -1297,13 +1297,10 @@ public class PinotHelixResourceManager {
     List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
     for (String tableNameWithType : tableNamesWithType) {
       List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
-      for(SegmentZKMetadata segmentZKMetadata: segmentZKMetadataList) {
-        String segmentName = segmentZKMetadata.getSegmentName();
-        updateSegmentMetadata(tableNameWithType, segmentZKMetadata, schema, oldSchema);
-        String segmentZKMetadataPath =
-            ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
-        Preconditions.checkState(_propertyStore.set(segmentZKMetadataPath, segmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT),
-            "Failed to update segment ZK metadata for table: " + tableNameWithType + ", segment: " + segmentName);
+      for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+        int version = segmentZKMetadata.toZNRecord().getVersion();
+        updateSegmentInterval(tableNameWithType, segmentZKMetadata, schema, oldSchema);
+        updateZkMetadata(tableNameWithType, segmentZKMetadata, version);
       }
     }
   }
@@ -2289,11 +2286,11 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void updateSegmentMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata,
+  public void updateSegmentInterval(String tableNameWithType, SegmentZKMetadata segmentZKMetadata,
       Schema newSchema, Schema oldSchema) {
     String segmentName = segmentZKMetadata.getSegmentName();
     TableConfig tableConfig = getTableConfig(tableNameWithType);
-    if(tableConfig != null && oldSchema !=null) {
+    if (tableConfig != null && oldSchema != null) {
       ZKMetadataUtils.updateSegmentZKMetadataInterval(tableConfig, segmentZKMetadata, oldSchema, newSchema);
     }
     LOGGER.info("Updated segment zookeeper metadata: {} of table: {}", segmentName, tableNameWithType);
