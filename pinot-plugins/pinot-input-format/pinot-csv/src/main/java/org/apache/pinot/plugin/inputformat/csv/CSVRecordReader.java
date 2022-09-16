@@ -26,6 +26,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.csv.QuoteMode;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -80,7 +81,7 @@ public class CSVRecordReader implements RecordReader {
         }
       }
       char delimiter = config.getDelimiter();
-      format = format.withDelimiter(delimiter).withIgnoreSurroundingSpaces(true);
+      format = format.withDelimiter(delimiter);
       String csvHeader = config.getHeader();
       if (csvHeader == null) {
         format = format.withHeader();
@@ -89,9 +90,22 @@ public class CSVRecordReader implements RecordReader {
         validateHeaderForDelimiter(delimiter, csvHeader, format);
         format = format.withHeader(StringUtils.split(csvHeader, delimiter));
       }
-      Character commentMarker = config.getCommentMarker();
-      format = format.withCommentMarker(commentMarker);
+
+      format = format.withCommentMarker(config.getCommentMarker());
       format = format.withEscape(config.getEscapeCharacter());
+      format = format.withIgnoreEmptyLines(config.isIgnoreEmptyLines());
+      format = format.withIgnoreSurroundingSpaces(config.isIgnoreSurroundingSpaces());
+      format = format.withSkipHeaderRecord(config.isSkipHeader());
+      format = format.withQuote(config.getQuoteCharacter());
+
+      if (config.getQuoteMode() != null) {
+        format = format.withQuoteMode(QuoteMode.valueOf(config.getQuoteMode()));
+      }
+
+      if (config.getRecordSeparator() != null) {
+        format = format.withRecordSeparator(config.getRecordSeparator());
+      }
+
       String nullString = config.getNullStringValue();
       if (nullString != null) {
         format = format.withNullString(nullString);

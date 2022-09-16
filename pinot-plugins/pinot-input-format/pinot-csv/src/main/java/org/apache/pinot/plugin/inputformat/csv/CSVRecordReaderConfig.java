@@ -36,6 +36,13 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
   private Character _commentMarker;   // Default is null
   private Character _escapeCharacter; // Default is null
   private String _nullStringValue;
+  private boolean _skipHeader;
+  private boolean _ignoreEmptyLines = true;
+  private boolean _ignoreSurroundingSpaces = true;
+  private Character _quoteCharacter = '"';
+  private String _quoteMode;
+  private String _recordSeparator;
+
 
   public String getFileFormat() {
     return _fileFormat;
@@ -99,6 +106,54 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
 
   public void setNullStringValue(String nullStringValue) {
     _nullStringValue = nullStringValue;
+  }
+
+  public boolean isSkipHeader() {
+    return _skipHeader;
+  }
+
+  public void setSkipHeader(boolean skipHeader) {
+    _skipHeader = skipHeader;
+  }
+
+  public boolean isIgnoreEmptyLines() {
+    return _ignoreEmptyLines;
+  }
+
+  public void setIgnoreEmptyLines(boolean ignoreEmptyLines) {
+    _ignoreEmptyLines = ignoreEmptyLines;
+  }
+
+  public boolean isIgnoreSurroundingSpaces() {
+    return _ignoreSurroundingSpaces;
+  }
+
+  public void setIgnoreSurroundingSpaces(boolean ignoreSurroundingSpaces) {
+    _ignoreSurroundingSpaces = ignoreSurroundingSpaces;
+  }
+
+  public Character getQuoteCharacter() {
+    return _quoteCharacter;
+  }
+
+  public void setQuoteCharacter(Character quoteCharacter) {
+    _quoteCharacter = quoteCharacter;
+  }
+
+  public String getQuoteMode() {
+    return _quoteMode;
+  }
+
+  public void setQuoteMode(String quoteMode) {
+    _quoteMode = quoteMode;
+  }
+
+  public String getRecordSeparator() {
+    return _recordSeparator;
+  }
+
+  public void setRecordSeparator(String recordSeparator) {
+    _recordSeparator = recordSeparator;
   }
 
   @Override
