@@ -43,7 +43,8 @@ public class BenchmarkThreadMXBeanThreadCPUTime {
   public static void main(String[] args)
       throws RunnerException {
     Options opt =
-        new OptionsBuilder().include(BenchmarkThreadMXBeanThreadCPUTime.class.getSimpleName()).warmupTime(TimeValue.seconds(5))
+        new OptionsBuilder().include(BenchmarkThreadMXBeanThreadCPUTime.class.getSimpleName())
+            .warmupTime(TimeValue.seconds(5))
             .warmupIterations(3).measurementTime(TimeValue.seconds(10)).measurementIterations(5).forks(1).build();
 
     new Runner(opt).run();
