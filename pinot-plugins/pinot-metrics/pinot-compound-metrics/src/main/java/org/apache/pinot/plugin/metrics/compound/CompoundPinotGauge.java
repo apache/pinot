@@ -16,25 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.metrics.dropwizard;
+package org.apache.pinot.plugin.metrics.compound;
 
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.jmx.JmxReporter;
-import org.apache.pinot.spi.metrics.PinotJmxReporter;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import java.util.List;
+import org.apache.pinot.spi.metrics.PinotGauge;
 
 
-public class DropwizardJmxReporter implements PinotJmxReporter {
-  private final JmxReporter _jmxReporter;
-
-  public DropwizardJmxReporter(PinotMetricsRegistry metricsRegistry, String domainName) {
-    _jmxReporter = JmxReporter.forRegistry((MetricRegistry) metricsRegistry.getMetricsRegistry())
-        .inDomain(domainName)
-        .build();
+public class CompoundPinotGauge<T> extends AbstractCompoundPinotMetric<PinotGauge<T>> implements PinotGauge<T> {
+  public CompoundPinotGauge(List<PinotGauge<T>> meters) {
+    super(meters);
   }
 
   @Override
-  public void start() {
-    _jmxReporter.start();
+  public Object getGauge() {
+    return getSomeMeter().getGauge();
+  }
+
+  @Override
+  public T value() {
+    return getSomeMeter().value();
   }
 }

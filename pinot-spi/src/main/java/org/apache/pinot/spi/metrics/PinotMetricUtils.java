@@ -103,7 +103,7 @@ public class PinotMetricUtils {
             + " the classpath.");
   }
 
-  private static Set<Class<?>> getPinotMetricsFactoryClasses() {
+  public static Set<Class<?>> getPinotMetricsFactoryClasses() {
     return PinotReflectionUtils.getClassesThroughReflection(METRICS_PACKAGE_REGEX_PATTERN, MetricsFactory.class);
   }
 

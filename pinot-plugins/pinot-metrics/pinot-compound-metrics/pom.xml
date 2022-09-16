@@ -19,36 +19,47 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>pinot-plugins</artifactId>
+    <artifactId>pinot-metrics</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.13.0-SNAPSHOT</version>
+    <version>0.12.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
-  <artifactId>pinot-metrics</artifactId>
-  <packaging>pom</packaging>
-  <name>Pinot Metrics</name>
+
+  <artifactId>pinot-compound-metrics</artifactId>
+  <name>Pinot Compound Metrics</name>
   <url>https://pinot.apache.org/</url>
   <properties>
-    <pinot.root>${basedir}/../..</pinot.root>
-    <plugin.type>pinot-metrics</plugin.type>
+    <pinot.root>${basedir}/../../..</pinot.root>
+    <phase.prop>package</phase.prop>
   </properties>
-  <modules>
-    <module>pinot-dropwizard</module>
-    <module>pinot-yammer</module>
-    <module>pinot-compound-metrics</module>
-  </modules>
+
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>test-jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
 
   <dependencies>
-    <!-- Test -->
     <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
-      <scope>test</scope>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-spi</artifactId>
     </dependency>
   </dependencies>
 </project>

@@ -16,25 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.metrics.dropwizard;
+package org.apache.pinot.plugin.metrics.compound;
 
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.jmx.JmxReporter;
-import org.apache.pinot.spi.metrics.PinotJmxReporter;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import com.google.common.base.Preconditions;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.pinot.spi.metrics.PinotGauge;
+import org.apache.pinot.spi.metrics.PinotMetric;
 
 
-public class DropwizardJmxReporter implements PinotJmxReporter {
-  private final JmxReporter _jmxReporter;
+public abstract class AbstractCompoundPinotMetric<M extends PinotMetric> implements PinotMetric {
+  protected final List<M> _metrics;
 
-  public DropwizardJmxReporter(PinotMetricsRegistry metricsRegistry, String domainName) {
-    _jmxReporter = JmxReporter.forRegistry((MetricRegistry) metricsRegistry.getMetricsRegistry())
-        .inDomain(domainName)
-        .build();
+  public AbstractCompoundPinotMetric(List<M> metrics) {
+    Preconditions.checkArgument(!metrics.isEmpty(), "At least one meter is needed");
+    _metrics = metrics;
   }
 
   @Override
-  public void start() {
-    _jmxReporter.start();
+  public Object getMetric() {
+    return _metrics.stream().map(PinotMetric::getMetric).collect(Collectors.toList());
+  }
+
+  protected M getSomeMeter() {
+    return _metrics.get(0);
+  }
+
+  public M getMeter(int index) {
+    return _metrics.get(index);
   }
 }

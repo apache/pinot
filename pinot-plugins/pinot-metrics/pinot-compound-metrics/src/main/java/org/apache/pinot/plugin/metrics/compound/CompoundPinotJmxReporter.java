@@ -16,25 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.metrics.dropwizard;
+package org.apache.pinot.plugin.metrics.compound;
 
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.jmx.JmxReporter;
+import java.util.List;
 import org.apache.pinot.spi.metrics.PinotJmxReporter;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
-public class DropwizardJmxReporter implements PinotJmxReporter {
-  private final JmxReporter _jmxReporter;
+public class CompoundPinotJmxReporter implements PinotJmxReporter {
+  private final List<PinotJmxReporter> _reporters;
 
-  public DropwizardJmxReporter(PinotMetricsRegistry metricsRegistry, String domainName) {
-    _jmxReporter = JmxReporter.forRegistry((MetricRegistry) metricsRegistry.getMetricsRegistry())
-        .inDomain(domainName)
-        .build();
+  public CompoundPinotJmxReporter(List<PinotJmxReporter> reporters) {
+    _reporters = reporters;
   }
 
   @Override
   public void start() {
-    _jmxReporter.start();
+    for (PinotJmxReporter reporter : _reporters) {
+      reporter.start();
+    }
   }
 }

@@ -30,10 +30,15 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 @MetricsFactory
 public class DropwizardMetricsFactory implements PinotMetricsFactory {
+  public static final String DOMAIN_PROP = "pinot.metrics.dropwizard.domain";
+  // this is the default in Dropwizard, which was used in Pinot <= 0.11
+  public static final String DEFAULT_DOMAIN_VALUE = "metrics";
   private PinotMetricsRegistry _pinotMetricsRegistry = null;
+  private String _domainName;
 
   @Override
   public void init(PinotConfiguration metricsConfiguration) {
+    _domainName = metricsConfiguration.getProperty(DOMAIN_PROP, DEFAULT_DOMAIN_VALUE);
   }
 
   @Override
@@ -56,7 +61,7 @@ public class DropwizardMetricsFactory implements PinotMetricsFactory {
 
   @Override
   public PinotJmxReporter makePinotJmxReporter(PinotMetricsRegistry metricsRegistry) {
-    return new DropwizardJmxReporter(metricsRegistry);
+    return new DropwizardJmxReporter(metricsRegistry, _domainName);
   }
 
   @Override
