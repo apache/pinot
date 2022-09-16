@@ -332,7 +332,7 @@ public class SchemaUtilsTest {
         "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"
             + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\","
             + "\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT\",\"granularity\":\"1:DAYS\"}]}");
-    checkValidationFails(schema);
+    SchemaUtils.validate(schema);
 
     schema = Schema.fromString(
         "{\"schemaName\":\"testSchema\"," + "\"dimensionFieldSpecs\":[ {\"name\":\"dim1\",\"dataType\":\"STRING\"}],"

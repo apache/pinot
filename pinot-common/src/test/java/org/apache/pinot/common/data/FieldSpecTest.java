@@ -262,7 +262,6 @@ public class FieldSpecTest {
     List<Object[]> entries = new ArrayList<>();
     entries.add(new Object[]{name, dataType, "1:hours", granularity, true, null});
     entries.add(new Object[]{name, dataType, "one_hours", granularity, true, null});
-    entries.add(new Object[]{name, dataType, "1:HOURS:SIMPLE_DATE_FORMAT", granularity, true, null});
     entries.add(new Object[]{name, dataType, "1:hour:EPOCH", granularity, true, null});
     entries.add(new Object[]{name, dataType, "1:HOUR:EPOCH:yyyyMMdd", granularity, true, null});
     entries.add(new Object[]{name, dataType, "0:HOURS:EPOCH", granularity, true, null});
@@ -272,6 +271,12 @@ public class FieldSpecTest {
         name, dataType, "1:HOURS:EPOCH", granularity, false,
         new DateTimeFieldSpec(name, dataType, "1:HOURS:EPOCH", granularity)
     });
+
+    entries.add(new Object[]{
+        name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT", granularity, false,
+        new DateTimeFieldSpec(name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT", granularity)
+    });
+
     entries.add(new Object[]{
         name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity, false,
         new DateTimeFieldSpec(name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity)

@@ -18,21 +18,24 @@
  */
 package org.apache.pinot.spi.data;
 
-import com.google.common.base.Preconditions;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.ISODateTimeFormat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class DateTimeFormatPatternSpec {
+  public static final Logger LOGGER = LoggerFactory.getLogger(DateTimeFormatPatternSpec.class);
+
   public static final DateTimeZone DEFAULT_DATE_TIME_ZONE = DateTimeZone.UTC;
   public static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
 
@@ -56,22 +59,33 @@ public class DateTimeFormatPatternSpec {
   public DateTimeFormatPatternSpec(TimeFormat timeFormat, @Nullable String sdfPatternWithTz) {
     _timeFormat = timeFormat;
     if (timeFormat == TimeFormat.SIMPLE_DATE_FORMAT) {
-      Preconditions.checkArgument(StringUtils.isNotEmpty(sdfPatternWithTz), "Must provide SIMPLE_DATE_FORMAT pattern");
-      Matcher m = SDF_PATTERN_WITH_TIMEZONE.matcher(sdfPatternWithTz);
-      if (m.find()) {
-        _sdfPattern = m.group(SDF_PATTERN_GROUP).trim();
-        String timeZone = m.group(TIME_ZONE_GROUP).trim();
-        try {
-          _dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timeZone));
-        } catch (Exception e) {
-          throw new IllegalArgumentException("Invalid time zone: " + timeZone);
+      if (sdfPatternWithTz != null) {
+        Matcher m = SDF_PATTERN_WITH_TIMEZONE.matcher(sdfPatternWithTz);
+        if (m.find()) {
+          _sdfPattern = m.group(SDF_PATTERN_GROUP).trim();
+          String timeZone = m.group(TIME_ZONE_GROUP).trim();
+          try {
+            _dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timeZone));
+          } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid time zone: " + timeZone);
+          }
+        } else {
+          _sdfPattern = sdfPatternWithTz;
+          _dateTimeZone = DEFAULT_DATE_TIME_ZONE;
         }
       } else {
-        _sdfPattern = sdfPatternWithTz;
+        _sdfPattern = null;
         _dateTimeZone = DEFAULT_DATE_TIME_ZONE;
       }
       try {
-        _dateTimeFormatter = DateTimeFormat.forPattern(_sdfPattern).withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
+        if (_sdfPattern == null) {
+          LOGGER.debug("SIMPLE_DATE_FORMAT pattern was found to be null. Using ISODateTimeFormat as default");
+          _dateTimeFormatter =
+              ISODateTimeFormat.dateOptionalTimeParser().withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
+        } else {
+          _dateTimeFormatter =
+              DateTimeFormat.forPattern(_sdfPattern).withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
+        }
       } catch (Exception e) {
         throw new IllegalArgumentException("Invalid SIMPLE_DATE_FORMAT pattern: " + _sdfPattern);
       }
@@ -85,7 +99,6 @@ public class DateTimeFormatPatternSpec {
   public DateTimeFormatPatternSpec(TimeFormat timeFormat, @Nullable String sdfPattern, @Nullable String timeZone) {
     _timeFormat = timeFormat;
     if (_timeFormat == TimeFormat.SIMPLE_DATE_FORMAT) {
-      Preconditions.checkArgument(StringUtils.isNotEmpty(sdfPattern), "Must provide SIMPLE_DATE_FORMAT pattern");
       _sdfPattern = sdfPattern;
       if (timeZone != null) {
         try {
@@ -97,7 +110,14 @@ public class DateTimeFormatPatternSpec {
         _dateTimeZone = DEFAULT_DATE_TIME_ZONE;
       }
       try {
-        _dateTimeFormatter = DateTimeFormat.forPattern(_sdfPattern).withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
+        if (_sdfPattern == null) {
+          LOGGER.debug("SIMPLE_DATE_FORMAT pattern was found to be null. Using ISODateTimeFormat as default");
+          _dateTimeFormatter =
+              ISODateTimeFormat.dateOptionalTimeParser().withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
+        } else {
+          _dateTimeFormatter =
+              DateTimeFormat.forPattern(_sdfPattern).withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
+        }
       } catch (Exception e) {
         throw new IllegalArgumentException("Invalid SIMPLE_DATE_FORMAT pattern: " + _sdfPattern);
       }
