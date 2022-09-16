@@ -22,12 +22,16 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -54,6 +58,28 @@ public class ZKMetadataUtils {
       SegmentMetadata segmentMetadata, String downloadUrl, @Nullable String crypterName, long segmentSizeInBytes) {
     updateSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl, crypterName,
         segmentSizeInBytes, false);
+  }
+
+  public static void updateSegmentZKMetadataInterval(TableConfig tableConfig, SegmentZKMetadata segmentZKMetadata,
+      Schema oldSchema, Schema newSchema) {
+    String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+    if (StringUtils.isNotEmpty(timeColumnName)) {
+      DateTimeFieldSpec currentDateTimeFieldSpec = oldSchema.getDateTimeSpec(timeColumnName);
+      DateTimeFieldSpec newDateTimeFieldSpec = newSchema.getDateTimeSpec(timeColumnName);
+
+      long startTime = segmentZKMetadata.getStartTimeMs();
+      long endTime = segmentZKMetadata.getEndTimeMs();
+      assert currentDateTimeFieldSpec != null;
+      String startTimeString = currentDateTimeFieldSpec.getFormatSpec().fromMillisToFormat(startTime);
+      String endTimeString = currentDateTimeFieldSpec.getFormatSpec().fromMillisToFormat(endTime);
+
+      assert newDateTimeFieldSpec != null;
+      long updatedStartTime = newDateTimeFieldSpec.getFormatSpec().fromFormatToMillis(startTimeString);
+      long updatedEndTime = newDateTimeFieldSpec.getFormatSpec().fromFormatToMillis(endTimeString);
+
+      segmentZKMetadata.setStartTime(updatedStartTime);
+      segmentZKMetadata.setEndTime(updatedEndTime);
+    }
   }
 
   private static void updateSegmentZKMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata,

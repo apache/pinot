@@ -1284,6 +1284,30 @@ public class PinotHelixResourceManager {
     }
   }
 
+  public void updateSchemaDateTime(Schema schema, boolean refresh)
+      throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
+    String schemaName = schema.getSchemaName();
+    LOGGER.info("Updating segment zookeeper metadata: {} with refresh: {}", schemaName, refresh);
+
+    Schema oldSchema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
+    if (oldSchema == null) {
+      throw new SchemaNotFoundException(String.format("Schema: %s does not exist", schemaName));
+    }
+
+    List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
+    for (String tableNameWithType : tableNamesWithType) {
+      List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
+      for(SegmentZKMetadata segmentZKMetadata: segmentZKMetadataList) {
+        String segmentName = segmentZKMetadata.getSegmentName();
+        updateSegmentMetadata(tableNameWithType, segmentZKMetadata, schema, oldSchema);
+        String segmentZKMetadataPath =
+            ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
+        Preconditions.checkState(_propertyStore.set(segmentZKMetadataPath, segmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT),
+            "Failed to update segment ZK metadata for table: " + tableNameWithType + ", segment: " + segmentName);
+      }
+    }
+  }
+
   public void updateSchema(Schema schema, boolean reload)
       throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
     String schemaName = schema.getSchemaName();
@@ -2263,6 +2287,16 @@ public class PinotHelixResourceManager {
     } else {
       LOGGER.warn("No delete table message sent for table: {}", tableNameWithType);
     }
+  }
+
+  public void updateSegmentMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata,
+      Schema newSchema, Schema oldSchema) {
+    String segmentName = segmentZKMetadata.getSegmentName();
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
+    if(tableConfig != null && oldSchema !=null) {
+      ZKMetadataUtils.updateSegmentZKMetadataInterval(tableConfig, segmentZKMetadata, oldSchema, newSchema);
+    }
+    LOGGER.info("Updated segment zookeeper metadata: {} of table: {}", segmentName, tableNameWithType);
   }
 
   @VisibleForTesting
