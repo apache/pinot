@@ -73,7 +73,7 @@ public abstract class QuickStartBase {
       "examples/batch/starbucksStores",
       "examples/batch/githubEvents",
       "examples/batch/githubComplexTypeEvents",
-      "example/batch/billing"
+      "examples/batch/billing"
   };
 
   protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = ImmutableMap.<String, String>builder()
