@@ -42,6 +42,7 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpStatus;
@@ -448,8 +449,22 @@ public abstract class ClusterTest extends ControllerTest {
    */
   public static JsonNode postQuery(String query, String brokerBaseApiUrl, Map<String, String> headers)
       throws Exception {
+    return postQuery(query, brokerBaseApiUrl, headers, null);
+  }
+
+  /**
+   * Queries the broker's sql query endpoint (/sql)
+   */
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl, Map<String, String> headers,
+      Map<String, String> extraJsonProperties)
+      throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
+    if (MapUtils.isNotEmpty(extraJsonProperties)) {
+      for (Map.Entry<String, String> extraProperty :extraJsonProperties.entrySet()) {
+        payload.put(extraProperty.getKey(), extraProperty.getValue());
+      }
+    }
     return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString(), headers));
   }
 
