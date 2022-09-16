@@ -29,12 +29,6 @@ public class ArrayCopyUtils {
   private ArrayCopyUtils() {
   }
 
-  public static void copy(int[] src, int[] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      dest[i] = src[i];
-    }
-  }
-
   public static void copy(int[] src, long[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = src[i];
@@ -56,6 +50,12 @@ public class ArrayCopyUtils {
   public static void copy(int[] src, BigDecimal[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = BigDecimal.valueOf(src[i]);
+    }
+  }
+
+  public static void copyToBoolean(int[] src, int[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = src[i] != 0 ? 1 : 0;
     }
   }
 
@@ -89,29 +89,15 @@ public class ArrayCopyUtils {
     }
   }
 
+  public static void copyToBoolean(long[] src, int[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = src[i] != 0 ? 1 : 0;
+    }
+  }
+
   public static void copy(long[] src, String[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = Long.toString(src[i]);
-    }
-  }
-
-  // specialize copy from timestamp array to string array
-  public static void copyTimestamp(long[] src, String[] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      dest[i] = new Timestamp(src[i]).toString();
-    }
-  }
-
-  // specialize copy from boolean array to string array
-  public static void copyBoolean(int[] src, String[] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      dest[i] = Boolean.toString(src[i] == 1);
-    }
-  }
-
-  public static void copy(long[] src, long[] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      dest[i] = src[i];
     }
   }
 
@@ -139,15 +125,15 @@ public class ArrayCopyUtils {
     }
   }
 
-  public static void copy(float[] src, String[] dest, int length) {
+  public static void copyToBoolean(float[] src, int[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = Float.toString(src[i]);
+      dest[i] = src[i] != 0 ? 1 : 0;
     }
   }
 
-  public static void copy(float[] src, float[] dest, int length) {
+  public static void copy(float[] src, String[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = src[i];
+      dest[i] = Float.toString(src[i]);
     }
   }
 
@@ -177,15 +163,15 @@ public class ArrayCopyUtils {
     }
   }
 
-  public static void copy(double[] src, String[] dest, int length) {
+  public static void copyToBoolean(double[] src, int[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = Double.toString(src[i]);
+      dest[i] = src[i] != 0 ? 1 : 0;
     }
   }
 
-  public static void copy(double[] src, double[] dest, int length) {
+  public static void copy(double[] src, String[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = src[i];
+      dest[i] = Double.toString(src[i]);
     }
   }
 
@@ -213,6 +199,12 @@ public class ArrayCopyUtils {
     }
   }
 
+  public static void copyToBoolean(BigDecimal[] src, int[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = !src[i].equals(BigDecimal.ZERO) ? 1 : 0;
+    }
+  }
+
   public static void copy(BigDecimal[] src, String[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = src[i].toPlainString();
@@ -222,6 +214,18 @@ public class ArrayCopyUtils {
   public static void copy(BigDecimal[] src, byte[][] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = BigDecimalUtils.serialize(src[i]);
+    }
+  }
+
+  public static void copyFromBoolean(int[] src, String[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = Boolean.toString(src[i] == 1);
+    }
+  }
+
+  public static void copyFromTimestamp(long[] src, String[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = new Timestamp(src[i]).toString();
     }
   }
 
@@ -255,21 +259,21 @@ public class ArrayCopyUtils {
     }
   }
 
+  public static void copyToBoolean(String[] src, int[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = BooleanUtils.toInt(src[i]);
+    }
+  }
+
+  public static void copyToTimestamp(String[] src, long[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = TimestampUtils.toMillisSinceEpoch(src[i]);
+    }
+  }
+
   public static void copy(String[] src, byte[][] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = BytesUtils.toBytes(src[i]);
-    }
-  }
-
-  public static void copy(String[] src, String[] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      dest[i] = src[i];
-    }
-  }
-
-  public static void copy(byte[][] src, String[] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      dest[i] = BytesUtils.toHexString(src[i]);
     }
   }
 
@@ -278,11 +282,10 @@ public class ArrayCopyUtils {
       dest[i] = BigDecimalUtils.deserialize(src[i]);
     }
   }
-  public static void copy(int[][] src, int[][] dest, int length) {
+
+  public static void copy(byte[][] src, String[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      dest[i] = new int[rowLength];
-      copy(src[i], dest[i], rowLength);
+      dest[i] = BytesUtils.toHexString(src[i]);
     }
   }
 
@@ -310,6 +313,22 @@ public class ArrayCopyUtils {
     }
   }
 
+  public static void copy(int[][] src, BigDecimal[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new BigDecimal[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copyToBoolean(int[][] src, int[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new int[rowLength];
+      copyToBoolean(src[i], dest[i], rowLength);
+    }
+  }
+
   public static void copy(int[][] src, String[][] dest, int length) {
     for (int i = 0; i < length; i++) {
       int rowLength = src[i].length;
@@ -318,10 +337,98 @@ public class ArrayCopyUtils {
     }
   }
 
-  public static void copy(int[][] src, BigDecimal[][] dest, int length) {
+  public static void copy(long[][] src, int[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new int[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(long[][] src, float[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new float[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(long[][] src, double[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new double[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(long[][] src, BigDecimal[][] dest, int length) {
     for (int i = 0; i < length; i++) {
       int rowLength = src[i].length;
       dest[i] = new BigDecimal[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copyToBoolean(long[][] src, int[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new int[rowLength];
+      copyToBoolean(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(long[][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new String[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(float[][] src, int[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new int[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(float[][] src, long[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new long[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(float[][] src, double[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new double[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(float[][] src, BigDecimal[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new BigDecimal[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copyToBoolean(float[][] src, int[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new int[rowLength];
+      copyToBoolean(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(float[][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new String[rowLength];
       copy(src[i], dest[i], rowLength);
     }
   }
@@ -350,11 +457,19 @@ public class ArrayCopyUtils {
     }
   }
 
-  public static void copy(double[][] src, double[][] dest, int length) {
+  public static void copy(double[][] src, BigDecimal[][] dest, int length) {
     for (int i = 0; i < length; i++) {
       int rowLength = src[i].length;
-      dest[i] = new double[rowLength];
+      dest[i] = new BigDecimal[rowLength];
       copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copyToBoolean(double[][] src, int[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new int[rowLength];
+      copyToBoolean(src[i], dest[i], rowLength);
     }
   }
 
@@ -366,11 +481,19 @@ public class ArrayCopyUtils {
     }
   }
 
-  public static void copy(double[][] src, BigDecimal[][] dest, int length) {
+  public static void copyFromBoolean(int[][] src, String[][] dest, int length) {
     for (int i = 0; i < length; i++) {
       int rowLength = src[i].length;
-      dest[i] = new BigDecimal[rowLength];
-      copy(src[i], dest[i], rowLength);
+      dest[i] = new String[rowLength];
+      copyFromBoolean(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copyFromTimestamp(long[][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new String[rowLength];
+      copyFromTimestamp(src[i], dest[i], rowLength);
     }
   }
 
@@ -406,14 +529,6 @@ public class ArrayCopyUtils {
     }
   }
 
-  public static void copy(String[][] src, String[][] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      dest[i] = new String[rowLength];
-      copy(src[i], dest[i], rowLength);
-    }
-  }
-
   public static void copy(String[][] src, BigDecimal[][] dest, int length) {
     for (int i = 0; i < length; i++) {
       int rowLength = src[i].length;
@@ -422,115 +537,19 @@ public class ArrayCopyUtils {
     }
   }
 
-  public static void copy(long[][] src, int[][] dest, int length) {
+  public static void copyToBoolean(String[][] src, int[][] dest, int length) {
     for (int i = 0; i < length; i++) {
       int rowLength = src[i].length;
       dest[i] = new int[rowLength];
-      copy(src[i], dest[i], rowLength);
+      copyToBoolean(src[i], dest[i], rowLength);
     }
   }
 
-  public static void copy(long[][] src, long[][] dest, int length) {
+  public static void copyToTimestamp(String[][] src, long[][] dest, int length) {
     for (int i = 0; i < length; i++) {
       int rowLength = src[i].length;
       dest[i] = new long[rowLength];
-      copy(src[i], dest[i], rowLength);
-    }
-  }
-
-  public static void copy(long[][] src, float[][] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      dest[i] = new float[rowLength];
-      copy(src[i], dest[i], rowLength);
-    }
-  }
-
-  public static void copy(long[][] src, double[][] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      dest[i] = new double[rowLength];
-      copy(src[i], dest[i], rowLength);
-    }
-  }
-
-  public static void copy(long[][] src, String[][] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      dest[i] = new String[rowLength];
-      copy(src[i], dest[i], rowLength);
-    }
-  }
-
-  public static void copy(long[][] src, BigDecimal[][] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      dest[i] = new BigDecimal[rowLength];
-      copy(src[i], dest[i], rowLength);
-    }
-  }
-
-  public static void copy(float[][] src, int[][] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      dest[i] = new int[rowLength];
-      copy(src[i], dest[i], rowLength);
-    }
-  }
-
-  public static void copy(float[][] src, long[][] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      dest[i] = new long[rowLength];
-      copy(src[i], dest[i], rowLength);
-    }
-  }
-
-  public static void copy(float[][] src, float[][] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      dest[i] = new float[rowLength];
-      copy(src[i], dest[i], rowLength);
-    }
-  }
-
-  public static void copy(float[][] src, double[][] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      dest[i] = new double[rowLength];
-      copy(src[i], dest[i], rowLength);
-    }
-  }
-
-  public static void copy(float[][] src, String[][] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      dest[i] = new String[rowLength];
-      copy(src[i], dest[i], rowLength);
-    }
-  }
-
-  public static void copy(float[][] src, BigDecimal[][] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      dest[i] = new BigDecimal[rowLength];
-      copy(src[i], dest[i], rowLength);
-    }
-  }
-
-  public static void copyTimestamp(long[][] src, String[][] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      dest[i] = new String[rowLength];
-      copyTimestamp(src[i], dest[i], rowLength);
-    }
-  }
-
-  public static void copyBoolean(int[][] src, String[][] dest, int length) {
-    for (int i = 0; i < length; i++) {
-      int rowLength = src[i].length;
-      dest[i] = new String[rowLength];
-      copyBoolean(src[i], dest[i], rowLength);
+      copyToTimestamp(src[i], dest[i], rowLength);
     }
   }
 }
