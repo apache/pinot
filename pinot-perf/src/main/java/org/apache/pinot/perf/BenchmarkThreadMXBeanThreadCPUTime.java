@@ -53,7 +53,7 @@ public class BenchmarkThreadMXBeanThreadCPUTime {
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public void benchAndFilterOperatorDegenerate(MyState myState, Blackhole bh) {
+  public void benchThreadMXBeanThreadCPUTime(MyState myState, Blackhole bh) {
     for (int i = 0; i < 1000; i++) {
       bh.consume(myState._threadMXBean.getCurrentThreadCpuTime());
     }
