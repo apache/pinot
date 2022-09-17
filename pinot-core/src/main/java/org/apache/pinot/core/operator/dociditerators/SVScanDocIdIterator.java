@@ -46,12 +46,13 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final int[] _batch = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
   private int _firstMismatch;
   private int _cursor;
+  private final int _cardinality;
 
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
   public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs,
-      @Nullable NullValueVectorReader nullValueReader) {
+      @Nullable NullValueVectorReader nullValueReader, int cardinality) {
     _predicateEvaluator = predicateEvaluator;
     _reader = reader;
     _readerContext = reader.createContext();
@@ -61,6 +62,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       nullBitmap = null;
     }
     _valueMatcher = getValueMatcher(nullBitmap);
+    _cardinality = cardinality;
   }
 
   @Override
@@ -127,6 +129,11 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   @Override
   public long getNumEntriesScanned() {
     return _numEntriesScanned;
+  }
+
+  @Override
+  public int getCardinality() {
+    return _cardinality;
   }
 
   private ValueMatcher getValueMatcher(@Nullable ImmutableRoaringBitmap nullBitmap) {

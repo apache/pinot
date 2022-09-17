@@ -808,6 +808,10 @@ public class CommonConstants {
       }
     }
 
+    public static class OptimizationSwitches {
+      public static final String AND_SCAN_CARDINALITY_BASED_REORDERING = "andScanCardinalityBasedReordering";
+    }
+
     public static class Range {
       public static final char DELIMITER = '\0';
       public static final char LOWER_EXCLUSIVE = '(';

@@ -44,4 +44,9 @@ public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
    * iteration. This method should be called after the iteration is done.
    */
   long getNumEntriesScanned();
+
+  /**
+   * Returns the cardinality of the underlying data source, -1 if not applicable.
+   */
+  int getCardinality();
 }

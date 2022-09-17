@@ -268,6 +268,12 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     return _numEntriesScanned;
   }
 
+  @Override
+  public int getCardinality() {
+    // return -1 when not applicable
+    return -1;
+  }
+
   /**
    * NOTE: This operator contains only one block.
    */

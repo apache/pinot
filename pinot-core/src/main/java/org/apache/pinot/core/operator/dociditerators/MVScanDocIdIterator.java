@@ -41,18 +41,20 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final int _numDocs;
   private final int _maxNumValuesPerMVEntry;
   private final ValueMatcher _valueMatcher;
+  private final int _cardinality;
 
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
   public MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs,
-      int maxNumValuesPerMVEntry) {
+      int maxNumValuesPerMVEntry, int cardinality) {
     _predicateEvaluator = predicateEvaluator;
     _reader = reader;
     _readerContext = reader.createContext();
     _numDocs = numDocs;
     _maxNumValuesPerMVEntry = maxNumValuesPerMVEntry;
     _valueMatcher = getValueMatcher();
+    _cardinality = cardinality;
   }
 
   @Override
@@ -102,6 +104,11 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   @Override
   public long getNumEntriesScanned() {
     return _numEntriesScanned;
+  }
+
+  @Override
+  public int getCardinality() {
+    return _cardinality;
   }
 
   private ValueMatcher getValueMatcher() {
