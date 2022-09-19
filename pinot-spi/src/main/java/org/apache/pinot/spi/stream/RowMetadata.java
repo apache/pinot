@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.stream;
 
+import java.util.Collections;
+import java.util.Map;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -33,7 +35,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 @InterfaceStability.Evolving
 public interface RowMetadata {
   GenericRow EMPTY_ROW = new GenericRow();
-
+  Map<String, String> EMPTY_COLLECTION = Collections.emptyMap();
 
   /**
    * Return the timestamp associated with when the row was ingested upstream.
@@ -52,5 +54,17 @@ public interface RowMetadata {
   default GenericRow getHeaders() {
     EMPTY_ROW.clear();
     return EMPTY_ROW;
+  }
+
+  /**
+   * Returns the metadata associated with the stream record
+   *
+   * Kafka's record offset would be an example of a metadata associated with the record. Record metadata is typically
+   * stream specific and hence, it is defined as a Map of strings.
+   *
+   * @return A Map of record metadata entries.
+   */
+  default Map<String, String> getRecordMetadata() {
+    return EMPTY_COLLECTION;
   }
 }

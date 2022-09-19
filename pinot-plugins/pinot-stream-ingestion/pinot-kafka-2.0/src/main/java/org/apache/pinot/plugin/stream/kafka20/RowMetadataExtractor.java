@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
@@ -41,7 +43,9 @@ public interface RowMetadataExtractor {
           headerGenericRow.putValue(header.key(), header.value());
         }
       }
-      return new StreamMessageMetadata(record.timestamp(), headerGenericRow);
+      Map<String, String> metadata = new HashMap<>();
+      metadata.put("offset", String.valueOf(record.offset()));
+      return new StreamMessageMetadata(record.timestamp(), headerGenericRow, metadata);
     };
   }
 

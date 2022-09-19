@@ -18,18 +18,20 @@
  */
 package org.apache.pinot.spi.stream;
 
-import java.util.Map;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class StreamDataDecoderImpl implements StreamDataDecoder {
-  private static final String KEY = "__key";
-  private static final String HEADER_KEY_PREFIX = "header$";
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamDataDecoderImpl.class);
 
+  private static final String KEY = "__key";
+  private static final String HEADER_KEY_PREFIX = "__header$";
+  private static final String METADATA_KEY_PREFIX = "__metadata$";
+
   private final StreamMessageDecoder _valueDecoder;
+  private final GenericRow _reuse = new GenericRow();
 
   // Maybe simplify by allowing only string keys ?
   public StreamDataDecoderImpl(StreamMessageDecoder valueDecoder) {
@@ -41,16 +43,18 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
     assert message.getValue() != null;
 
     try {
-      GenericRow row = _valueDecoder.decode(message.getValue(), 0, message.getValue().length, new GenericRow());
+      GenericRow row = _valueDecoder.decode(message.getValue(), 0, message.getValue().length, _reuse);
       if (row != null) {
         if (message.getKey() != null) {
-          row.putValue(KEY, message.getKey());
+          row.putValue(KEY, new String(message.getKey()));
         }
         RowMetadata metadata = message.getMetadata();
-        if (metadata != null && metadata.getHeaders() != null) {
-          for (Map.Entry<String, Object> entrySet : metadata.getHeaders().getFieldToValueMap().entrySet()) {
-            row.putValue(HEADER_KEY_PREFIX + entrySet.getKey(), entrySet.getValue());
-          }
+        if (metadata != null) {
+          metadata.getHeaders().getFieldToValueMap()
+              .forEach((key, value) -> row.putValue(HEADER_KEY_PREFIX + key, value));
+
+          metadata.getRecordMetadata()
+                  .forEach((key, value) -> row.putValue(METADATA_KEY_PREFIX + key, value));
         }
         return new StreamDataDecoderResult(row, null);
       } else {

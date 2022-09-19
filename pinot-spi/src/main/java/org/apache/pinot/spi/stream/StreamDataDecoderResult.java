@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.stream;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -34,10 +35,12 @@ public final class StreamDataDecoderResult {
     _exception = exception;
   }
 
+  @Nullable
   public GenericRow getResult() {
     return _result;
   }
 
+  @Nullable
   public Exception getException() {
     return _exception;
   }

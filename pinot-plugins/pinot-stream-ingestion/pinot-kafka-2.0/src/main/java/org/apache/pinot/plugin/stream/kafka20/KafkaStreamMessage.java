@@ -27,7 +27,6 @@ import org.apache.pinot.spi.stream.StreamMessageMetadata;
 public class KafkaStreamMessage extends StreamMessage {
   private static final GenericRow EMPTY_ROW_REUSE = new GenericRow();
 
-  // should distinguish stream-specific record metadata in the table??
   private final long _offset;
 
   public KafkaStreamMessage(@Nullable byte[] key, byte[] value, long offset, @Nullable StreamMessageMetadata metadata) {
@@ -37,7 +36,7 @@ public class KafkaStreamMessage extends StreamMessage {
 
   public GenericRow getHeaders() {
     EMPTY_ROW_REUSE.clear();
-    return getMetadata() != null ? getMetadata().getHeaders() : EMPTY_ROW_REUSE;
+    return _metadata != null ? getMetadata().getHeaders() : EMPTY_ROW_REUSE;
   }
 
   // for backward compatibility

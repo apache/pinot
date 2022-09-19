@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.stream;
 
+import java.util.Collections;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
@@ -32,15 +34,23 @@ public class StreamMessageMetadata implements RowMetadata {
 
   private final GenericRow _headers;
 
+  private final Map<String, String> _metadata;
+
+  public StreamMessageMetadata(long recordTimestampMs, @Nullable GenericRow headers) {
+    this(recordTimestampMs, headers, Collections.emptyMap());
+  }
   /**
    * Construct the stream based message/row message metadata
    *
    * @param recordTimestampMs  the time that the message was ingested by the stream provider
    *                         use Long.MIN_VALUE if not applicable
+   * @param metadata
    */
-  public StreamMessageMetadata(long recordTimestampMs, @Nullable GenericRow headers) {
+  public StreamMessageMetadata(long recordTimestampMs, @Nullable GenericRow headers,
+      Map<String, String> metadata) {
     _recordTimestampMs = recordTimestampMs;
     _headers = headers;
+    _metadata = metadata;
   }
 
   @Override
@@ -51,5 +61,10 @@ public class StreamMessageMetadata implements RowMetadata {
   @Override
   public GenericRow getHeaders() {
     return _headers;
+  }
+
+  @Override
+  public Map<String, String> getRecordMetadata() {
+    return _metadata;
   }
 }

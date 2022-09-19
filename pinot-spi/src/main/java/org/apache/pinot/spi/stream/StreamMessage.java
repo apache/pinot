@@ -41,7 +41,7 @@ import javax.annotation.Nullable;
 public abstract class StreamMessage {
   private final byte[] _key;
   private final byte[] _value;
-  private final StreamMessageMetadata _metadata;
+  protected final StreamMessageMetadata _metadata;
 
   public StreamMessage(@Nullable byte[] key, byte[] value, @Nullable StreamMessageMetadata metadata) {
     _key = key;
