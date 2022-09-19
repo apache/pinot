@@ -240,7 +240,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void removeSegment(String segmentName) {
     _logger.info("Removing segment: {} from table: {}", segmentName, _tableNameWithType);
-    SegmentDataManager segmentDataManager = deRegisterSegment(segmentName);
+    SegmentDataManager segmentDataManager = unregisterSegment(segmentName);
     if (segmentDataManager != null) {
       releaseSegment(segmentDataManager);
       _logger.info("Removed segment: {} from table: {}", segmentName, _tableNameWithType);
@@ -449,7 +449,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * identify this scenario.
    */
   @Nullable
-  protected SegmentDataManager deRegisterSegment(String segmentName) {
+  protected SegmentDataManager unregisterSegment(String segmentName) {
     _deletedSegments.put(segmentName, segmentName);
     return _segmentDataManagerMap.remove(segmentName);
   }

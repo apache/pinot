@@ -127,7 +127,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_SIZE = 10_000;
-  private static final int DEFAULT_DELETED_SEGMENTS_CACHE_TTL_MINUTES = 10;
+  private static final int DEFAULT_DELETED_SEGMENTS_CACHE_TTL_MINUTES = 2;
   private PinotConfiguration _instanceDataManagerConfiguration = null;
 
   public HelixInstanceDataManagerConfig(PinotConfiguration serverConfig)
