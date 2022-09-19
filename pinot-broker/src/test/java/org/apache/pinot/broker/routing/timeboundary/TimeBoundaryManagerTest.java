@@ -48,7 +48,6 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
-import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
@@ -112,7 +111,7 @@ public class TimeBoundaryManagerTest extends ControllerTest {
     Map<String, String> offlineInstanceStateMap = Collections.singletonMap("server", OFFLINE);
     Set<String> onlineSegments = new HashSet<>();
     // NOTE: Ideal state is not used in the current implementation.
-    IdealState idealState = mock(IdealState.class);
+    IdealState idealState = new IdealState("");
 
     // Start with no segment
     TimeBoundaryManager timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore);
@@ -175,7 +174,7 @@ public class TimeBoundaryManagerTest extends ControllerTest {
   private void testHourlyPushTable(String rawTableName, TableConfig tableConfig, TimeUnit timeUnit) {
     // NOTE: External view and ideal state are not used in the current implementation.
     ExternalView externalView = Mockito.mock(ExternalView.class);
-    IdealState idealState = Mockito.mock(IdealState.class);
+    IdealState idealState = new IdealState("");
 
     TimeBoundaryManager timeBoundaryManager = new TimeBoundaryManager(tableConfig, _propertyStore);
     Set<String> onlineSegments = new HashSet<>();
