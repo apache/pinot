@@ -69,34 +69,36 @@ public class SelectionPlanNode implements PlanNode {
       return new SelectionOnlyOperator(_indexSegment, _queryContext, expressions, transformOperator);
     }
     int numOrderByExpressions = orderByExpressions.size();
-    // Although it is a break of abstraction, some code, specially merging, assumes that if there is an order by
-    // expression the operator will return a block whose selection result is a priority queue.
-    int sortedColumnsPrefixSize = getSortedColumnsPrefix(orderByExpressions);
-    if (sortedColumnsPrefixSize > 0 && !isSkipOrderByOptimization()) {
-      // The first order by expressions are sorted (either asc or desc).
-      // ie: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column DESC LIMIT 10 OFFSET 5
-      // or: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column, not_sorted LIMIT 10 OFFSET 5
-      // but not SELECT ... FROM Table WHERE predicates ORDER BY not_sorted, sorted_column LIMIT 10 OFFSET 5
-      if (orderByExpressions.get(0).isAsc()) {
-        int actualLimit = Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
-        TransformPlanNode planNode = new TransformPlanNode(_indexSegment, _queryContext, expressions, actualLimit);
-        TransformOperator transformOperator = planNode.run();
-        return new SelectionPartiallyOrderedByAscOperator(_indexSegment, _queryContext, expressions, transformOperator,
-            sortedColumnsPrefixSize);
-      } else {
-        int actualLimit = DocIdSetPlanNode.MAX_DOC_PER_CALL;
-        TransformPlanNode planNode = new TransformPlanNode(_indexSegment, _queryContext, expressions, actualLimit);
-        TransformOperator transformOperator = planNode.run();
-        return new SelectionPartiallyOrderedByDescOperation(_indexSegment, _queryContext, expressions,
-            transformOperator, sortedColumnsPrefixSize);
+    if (!_queryContext.isNullHandlingEnabled()) {
+      // Although it is a break of abstraction, some code, specially merging, assumes that if there is an order by
+      // expression the operator will return a block whose selection result is a priority queue.
+      int sortedColumnsPrefixSize = getSortedColumnsPrefix(orderByExpressions);
+      if (sortedColumnsPrefixSize > 0 && !isSkipOrderByOptimization()) {
+        // The first order by expressions are sorted (either asc or desc).
+        // ie: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column DESC LIMIT 10 OFFSET 5
+        // or: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column, not_sorted LIMIT 10 OFFSET 5
+        // but not SELECT ... FROM Table WHERE predicates ORDER BY not_sorted, sorted_column LIMIT 10 OFFSET 5
+        if (orderByExpressions.get(0).isAsc()) {
+          int maxDocsPerCall = Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
+          TransformPlanNode planNode = new TransformPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall);
+          TransformOperator transformOperator = planNode.run();
+          return new SelectionPartiallyOrderedByAscOperator(_indexSegment, _queryContext, expressions,
+              transformOperator, sortedColumnsPrefixSize);
+        } else {
+          int maxDocsPerCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
+          TransformPlanNode planNode = new TransformPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall);
+          TransformOperator transformOperator = planNode.run();
+          return new SelectionPartiallyOrderedByDescOperation(_indexSegment, _queryContext, expressions,
+              transformOperator, sortedColumnsPrefixSize);
+        }
       }
-    }
-    if (numOrderByExpressions == expressions.size()) {
-      // All output expressions are ordered
-      // ie: SELECT not_sorted1, not_sorted2 FROM Table WHERE ... ORDER BY not_sorted1, not_sorted2 LIMIT 10 OFFSET 5
-      TransformOperator transformOperator =
-          new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
-      return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator);
+      if (numOrderByExpressions == expressions.size()) {
+        // All output expressions are ordered
+        // ie: SELECT not_sorted1, not_sorted2 FROM Table WHERE ... ORDER BY not_sorted1, not_sorted2 LIMIT 10 OFFSET 5
+        TransformOperator transformOperator =
+            new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+        return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator);
+      }
     }
     // Not all output expressions are ordered, only fetch the order-by expressions and docId to avoid the
     // unnecessary data fetch
