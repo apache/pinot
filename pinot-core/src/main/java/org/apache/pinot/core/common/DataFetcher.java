@@ -21,7 +21,6 @@ package org.apache.pinot.core.common;
 import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -67,11 +66,10 @@ public class DataFetcher {
     for (Map.Entry<String, DataSource> entry : dataSourceMap.entrySet()) {
       String column = entry.getKey();
       DataSource dataSource = entry.getValue();
-      DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
       ColumnValueReader columnValueReader =
-          new ColumnValueReader(dataSource.getForwardIndex(), dataSource.getDictionary(),
-              dataSourceMetadata.getDataType());
+          new ColumnValueReader(dataSource.getForwardIndex(), dataSource.getDictionary());
       _columnValueReaderMap.put(column, columnValueReader);
+      DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
       if (!dataSourceMetadata.isSingleValue()) {
         maxNumValuesPerMVEntry = Math.max(maxNumValuesPerMVEntry, dataSourceMetadata.getMaxNumValuesPerMVEntry());
       }
@@ -425,20 +423,22 @@ public class DataFetcher {
    * Helper class to read values for a column from forward index and dictionary. For raw (non-dictionary-encoded)
    * forward index, similar to Dictionary, type conversion among INT, LONG, FLOAT, DOUBLE, STRING is supported; type
    * conversion between STRING and BYTES via Hex encoding/decoding is supported.
+   *
+   * TODO: Type conversion for BOOLEAN and TIMESTAMP is not handled
    */
   private class ColumnValueReader implements Closeable {
     final ForwardIndexReader _reader;
     final Dictionary _dictionary;
-    final DataType _dataType;
+    final DataType _storedType;
     final boolean _singleValue;
 
     boolean _readerContextCreated;
     ForwardIndexReaderContext _readerContext;
 
-    ColumnValueReader(ForwardIndexReader reader, @Nullable Dictionary dictionary, DataType dataType) {
+    ColumnValueReader(ForwardIndexReader reader, @Nullable Dictionary dictionary) {
       _reader = reader;
       _dictionary = dictionary;
-      _dataType = dataType;
+      _storedType = reader.getStoredType();
       _singleValue = reader.isSingleValue();
     }
 
@@ -452,12 +452,12 @@ public class DataFetcher {
     }
 
     void readDictIds(int[] docIds, int length, int[] dictIdBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       _reader.readDictIds(docIds, length, dictIdBuffer, getReaderContext());
     }
 
     void readIntValues(int[] docIds, int length, int[] valueBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
         int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
@@ -469,13 +469,13 @@ public class DataFetcher {
     }
 
     void readIntValues(TransformEvaluator evaluator, int[] docIds, int length, int[] valueBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
           valueBuffer);
     }
 
     void readLongValues(int[] docIds, int length, long[] valueBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
         int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
@@ -487,13 +487,13 @@ public class DataFetcher {
     }
 
     void readLongValues(TransformEvaluator evaluator, int[] docIds, int length, long[] valueBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
           valueBuffer);
     }
 
     void readFloatValues(int[] docIds, int length, float[] valueBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
         int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
@@ -505,13 +505,13 @@ public class DataFetcher {
     }
 
     void readFloatValues(TransformEvaluator evaluator, int[] docIds, int length, float[] valueBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
           valueBuffer);
     }
 
     void readDoubleValues(int[] docIds, int length, double[] valueBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
         int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
@@ -523,13 +523,13 @@ public class DataFetcher {
     }
 
     void readDoubleValues(TransformEvaluator evaluator, int[] docIds, int length, double[] valueBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
           valueBuffer);
     }
 
     void readBigDecimalValues(int[] docIds, int length, BigDecimal[] valueBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
         int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
@@ -541,30 +541,20 @@ public class DataFetcher {
     }
 
     void readBigDecimalValues(TransformEvaluator evaluator, int[] docIds, int length, BigDecimal[] valueBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
           valueBuffer);
     }
 
     void readStringValues(int[] docIds, int length, String[] valueBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
         int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
-        if (_dataType == DataType.BOOLEAN) {
-          for (int i = 0; i < length; i++) {
-            valueBuffer[i] = Boolean.toString(_dictionary.getIntValue(dictIdBuffer[i]) == 1);
-          }
-        } else if (_dataType == DataType.TIMESTAMP) {
-          for (int i = 0; i < length; i++) {
-            valueBuffer[i] = new Timestamp(_dictionary.getLongValue(dictIdBuffer[i])).toString();
-          }
-        } else {
-          _dictionary.readStringValues(dictIdBuffer, length, valueBuffer);
-        }
+        _dictionary.readStringValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_dataType) {
+        switch (_storedType) {
           case INT:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = Integer.toString(_reader.getInt(docIds[i], readerContext));
@@ -590,18 +580,7 @@ public class DataFetcher {
               valueBuffer[i] = _reader.getBigDecimal(docIds[i], readerContext).toPlainString();
             }
             break;
-          case BOOLEAN:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = Boolean.toString(_reader.getInt(docIds[i], readerContext) == 1);
-            }
-            break;
-          case TIMESTAMP:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = new Timestamp(_reader.getLong(docIds[i], readerContext)).toString();
-            }
-            break;
           case STRING:
-          case JSON:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = _reader.getString(docIds[i], readerContext);
             }
@@ -618,20 +597,20 @@ public class DataFetcher {
     }
 
     void readStringValues(TransformEvaluator evaluator, int[] docIds, int length, String[] valueBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
           valueBuffer);
     }
 
     void readBytesValues(int[] docIds, int length, byte[][] valueBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
         int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readBytesValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_reader.getStoredType()) {
+        switch (_storedType) {
           case STRING:
             for (int i = 0; i < length; i++) {
               valueBuffer[i] = BytesUtils.toBytes(_reader.getString(docIds[i], readerContext));
@@ -649,7 +628,7 @@ public class DataFetcher {
     }
 
     void readDictIdsMV(int[] docIds, int length, int[][] dictIdsBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
       for (int i = 0; i < length; i++) {
         int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
@@ -658,7 +637,7 @@ public class DataFetcher {
     }
 
     void readIntValuesMV(int[] docIds, int length, int[][] valuesBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
         for (int i = 0; i < length; i++) {
@@ -673,13 +652,13 @@ public class DataFetcher {
     }
 
     void readIntValuesMV(TransformEvaluator evaluator, int[] docIds, int length, int[][] valuesBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
           valuesBuffer);
     }
 
     void readLongValuesMV(int[] docIds, int length, long[][] valuesBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
         for (int i = 0; i < length; i++) {
@@ -694,13 +673,13 @@ public class DataFetcher {
     }
 
     void readLongValuesMV(TransformEvaluator evaluator, int[] docIds, int length, long[][] valuesBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
           valuesBuffer);
     }
 
     void readFloatValuesMV(int[] docIds, int length, float[][] valuesBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
         for (int i = 0; i < length; i++) {
@@ -715,13 +694,13 @@ public class DataFetcher {
     }
 
     void readFloatValuesMV(TransformEvaluator evaluator, int[] docIds, int length, float[][] valuesBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
           valuesBuffer);
     }
 
     void readDoubleValuesMV(int[] docIds, int length, double[][] valuesBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
         for (int i = 0; i < length; i++) {
@@ -736,80 +715,34 @@ public class DataFetcher {
     }
 
     void readDoubleValuesMV(TransformEvaluator evaluator, int[] docIds, int length, double[][] valuesBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
           valuesBuffer);
     }
 
     void readStringValuesMV(int[] docIds, int length, String[][] valuesBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
       if (_dictionary != null) {
-        if (_dataType == DataType.BOOLEAN) {
-          for (int i = 0; i < length; i++) {
-            int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
-            int[] intValues = new int[numValues];
-            _dictionary.readIntValues(_reusableMVDictIds, numValues, intValues);
-            String[] values = new String[numValues];
-            for (int j = 0; j < numValues; j++) {
-              values[i] = Boolean.toString(intValues[i] == 1);
-            }
-            valuesBuffer[i] = values;
-          }
-        } else if (_dataType == DataType.TIMESTAMP) {
-          for (int i = 0; i < length; i++) {
-            int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
-            long[] longValues = new long[numValues];
-            _dictionary.readLongValues(_reusableMVDictIds, numValues, longValues);
-            String[] values = new String[numValues];
-            for (int j = 0; j < numValues; j++) {
-              values[i] = new Timestamp(longValues[i]).toString();
-            }
-            valuesBuffer[i] = values;
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
-            int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
-            String[] values = new String[numValues];
-            _dictionary.readStringValues(_reusableMVDictIds, numValues, values);
-            valuesBuffer[i] = values;
-          }
+        for (int i = 0; i < length; i++) {
+          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
+          String[] values = new String[numValues];
+          _dictionary.readStringValues(_reusableMVDictIds, numValues, values);
+          valuesBuffer[i] = values;
         }
       } else {
-        if (_dataType == DataType.BOOLEAN) {
-          int[] intValueBuffer = new int[_maxNumValuesPerMVEntry];
-          for (int i = 0; i < length; i++) {
-            int numValues = _reader.getIntMV(docIds[i], intValueBuffer, readerContext);
-            String[] values = new String[numValues];
-            for (int j = 0; j < numValues; j++) {
-              values[i] = Boolean.toString(intValueBuffer[i] == 1);
-            }
-            valuesBuffer[i] = values;
-          }
-        } else if (_dataType == DataType.TIMESTAMP) {
-          long[] longValueBuffer = new long[_maxNumValuesPerMVEntry];
-          for (int i = 0; i < length; i++) {
-            int numValues = _reader.getLongMV(docIds[i], longValueBuffer, readerContext);
-            String[] values = new String[numValues];
-            for (int j = 0; j < numValues; j++) {
-              values[i] = new Timestamp(longValueBuffer[i]).toString();
-            }
-            valuesBuffer[i] = values;
-          }
-        } else {
-          _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, readerContext);
-        }
+        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, readerContext);
       }
     }
 
     void readStringValuesMV(TransformEvaluator evaluator, int[] docIds, int length, String[][] valuesBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
           valuesBuffer);
     }
 
     public void readNumValuesMV(int[] docIds, int length, int[] numValuesBuffer) {
-      Tracing.activeRecording().setInputDataType(_dataType, _singleValue);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       for (int i = 0; i < length; i++) {
         numValuesBuffer[i] = _reader.getNumValuesMV(docIds[i], getReaderContext());
       }

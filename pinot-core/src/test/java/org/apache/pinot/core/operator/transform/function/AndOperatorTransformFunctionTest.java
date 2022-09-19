@@ -18,17 +18,18 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import org.apache.pinot.common.function.TransformFunctionType;
+
+
 public class AndOperatorTransformFunctionTest extends LogicalOperatorTransformFunctionTest {
+
   @Override
-  int getExpectedValue(boolean left, boolean right) {
-    if (left && right) {
-      return 1;
-    }
-    return 0;
+  boolean getExpectedValue(boolean left, boolean right) {
+    return left && right;
   }
 
   @Override
-  String getFuncName() {
-    return new AndOperatorTransformFunction().getName();
+  String getFunctionName() {
+    return TransformFunctionType.AND.getName();
   }
 }

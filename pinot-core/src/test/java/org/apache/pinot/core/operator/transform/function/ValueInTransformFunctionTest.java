@@ -22,11 +22,16 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
-import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class ValueInTransformFunctionTest extends BaseTransformFunctionTest {
@@ -35,15 +40,18 @@ public class ValueInTransformFunctionTest extends BaseTransformFunctionTest {
   public void testValueInTransformFunction(String expressionStr) {
     ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof ValueInTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), ValueInTransformFunction.FUNCTION_NAME);
-    Assert.assertTrue(transformFunction.getResultMetadata().hasDictionary());
-    int[][] dictIds = transformFunction.transformToDictIdsMV(_projectionBlock);
-    int[][] intValues = transformFunction.transformToIntValuesMV(_projectionBlock);
-    long[][] longValues = transformFunction.transformToLongValuesMV(_projectionBlock);
-    float[][] floatValues = transformFunction.transformToFloatValuesMV(_projectionBlock);
-    double[][] doubleValues = transformFunction.transformToDoubleValuesMV(_projectionBlock);
-    String[][] stringValues = transformFunction.transformToStringValuesMV(_projectionBlock);
+    assertTrue(transformFunction instanceof ValueInTransformFunction);
+    assertEquals(transformFunction.getName(), ValueInTransformFunction.FUNCTION_NAME);
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), DataType.INT);
+    assertFalse(resultMetadata.isSingleValue());
+    assertTrue(resultMetadata.hasDictionary());
+    int[][] dictIdsMV = transformFunction.transformToDictIdsMV(_projectionBlock);
+    int[][] intValuesMV = transformFunction.transformToIntValuesMV(_projectionBlock);
+    long[][] longValuesMV = transformFunction.transformToLongValuesMV(_projectionBlock);
+    float[][] floatValuesMV = transformFunction.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubleValuesMV = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+    String[][] stringValuesMV = transformFunction.transformToStringValuesMV(_projectionBlock);
 
     Dictionary dictionary = transformFunction.getDictionary();
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -56,14 +64,20 @@ public class ValueInTransformFunctionTest extends BaseTransformFunctionTest {
       int[] expectedValues = expectedList.toIntArray();
 
       int numValues = expectedValues.length;
+      assertEquals(dictIdsMV[i].length, numValues);
+      assertEquals(intValuesMV[i].length, numValues);
+      assertEquals(longValuesMV[i].length, numValues);
+      assertEquals(floatValuesMV[i].length, numValues);
+      assertEquals(doubleValuesMV[i].length, numValues);
+      assertEquals(stringValuesMV[i].length, numValues);
       for (int j = 0; j < numValues; j++) {
         int expected = expectedValues[j];
-        Assert.assertEquals(dictIds[i][j], dictionary.indexOf(Integer.toString(expected)));
-        Assert.assertEquals(intValues[i][j], expected);
-        Assert.assertEquals(longValues[i][j], (long) expected);
-        Assert.assertEquals(floatValues[i][j], (float) expected);
-        Assert.assertEquals(doubleValues[i][j], (double) expected);
-        Assert.assertEquals(stringValues[i][j], Integer.toString(expected));
+        assertEquals(dictIdsMV[i][j], dictionary.indexOf(expected));
+        assertEquals(intValuesMV[i][j], expected);
+        assertEquals(longValuesMV[i][j], expected);
+        assertEquals(floatValuesMV[i][j], (float) expected);
+        assertEquals(doubleValuesMV[i][j], (double) expected);
+        assertEquals(stringValuesMV[i][j], Integer.toString(expected));
       }
     }
   }

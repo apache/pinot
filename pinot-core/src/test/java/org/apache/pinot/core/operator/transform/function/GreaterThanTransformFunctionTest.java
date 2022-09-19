@@ -18,43 +18,15 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import java.math.BigDecimal;
-
-
 public class GreaterThanTransformFunctionTest extends BinaryOperatorTransformFunctionTest {
 
   @Override
-  int getExpectedValue(int value, int toCompare) {
-    return (value > toCompare) ? 1 : 0;
+  boolean getExpectedValue(int compareResult) {
+    return compareResult > 0;
   }
 
   @Override
-  int getExpectedValue(long value, long toCompare) {
-    return (value > toCompare) ? 1 : 0;
-  }
-
-  @Override
-  int getExpectedValue(float value, float toCompare) {
-    return (value > toCompare) ? 1 : 0;
-  }
-
-  @Override
-  int getExpectedValue(double value, double toCompare) {
-    return (value > toCompare) ? 1 : 0;
-  }
-
-  @Override
-  int getExpectedValue(BigDecimal value, BigDecimal toCompare) {
-    return value.compareTo(toCompare) > 0 ? 1 : 0;
-  }
-
-  @Override
-  int getExpectedValue(String value, String toCompare) {
-    return (value.compareTo(toCompare) > 0) ? 1 : 0;
-  }
-
-  @Override
-  String getFuncName() {
+  String getFunctionName() {
     return new GreaterThanTransformFunction().getName();
   }
 }

@@ -21,10 +21,14 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
-import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class DateTimeConversionTransformFunctionTest extends BaseTransformFunctionTest {
@@ -35,21 +39,16 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
     ExpressionContext expression = RequestContextUtils.getExpression(
         String.format("dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES')", TIME_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertTrue(transformFunction instanceof DateTimeConversionTransformFunction);
-    Assert.assertEquals(transformFunction.getName(), DateTimeConversionTransformFunction.FUNCTION_NAME);
-    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
-    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
-    float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
-    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
-    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    assertTrue(transformFunction instanceof DateTimeConversionTransformFunction);
+    assertEquals(transformFunction.getName(), DateTimeConversionTransformFunction.FUNCTION_NAME);
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertTrue(resultMetadata.isSingleValue());
+    assertEquals(resultMetadata.getDataType(), DataType.LONG);
+    long[] expectedValues = new long[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      long expected = TimeUnit.MILLISECONDS.toMinutes(_timeValues[i]);
-      Assert.assertEquals(intValues[i], (int) expected);
-      Assert.assertEquals(longValues[i], expected);
-      Assert.assertEquals(floatValues[i], (float) expected);
-      Assert.assertEquals(doubleValues[i], (double) expected);
-      Assert.assertEquals(stringValues[i], Long.toString(expected));
+      expectedValues[i] = TimeUnit.MILLISECONDS.toMinutes(_timeValues[i]);
     }
+    testTransformFunction(transformFunction, expectedValues);
   }
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})

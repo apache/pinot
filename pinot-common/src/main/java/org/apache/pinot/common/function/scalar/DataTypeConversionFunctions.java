@@ -43,6 +43,7 @@ public class DataTypeConversionFunctions {
   public static Object cast(Object value, String targetTypeLiteral) {
     try {
       Class<?> clazz = value.getClass();
+      // TODO: Support cast for MV
       Preconditions.checkArgument(!clazz.isArray() | clazz == byte[].class, "%s must not be an array type", clazz);
       PinotDataType sourceType = PinotDataType.getSingleValueType(clazz);
       String transformed = targetTypeLiteral.toUpperCase();

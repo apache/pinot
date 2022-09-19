@@ -436,7 +436,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
         TransformFunction transformFunction = _elseThenStatements.get(i);
         byte[][] bytesValues = transformFunction.transformToBytesValuesSV(projectionBlock);
         if (_numSelections == 1) {
-          System.arraycopy(bytesValues, 0, _byteValuesSV, 0, numDocs);
+          System.arraycopy(bytesValues, 0, _bytesValuesSV, 0, numDocs);
         } else {
           for (int j = 0; j < numDocs; j++) {
             if (selected[j] == i) {
