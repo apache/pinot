@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
@@ -43,11 +44,9 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     _dataSource = dataSource;
     _numDocs = numDocs;
     _nullHandlingEnabled = nullHandlingEnabled;
-    if (_dataSource.getForwardIndex() == null) {
-      throw new UnsupportedOperationException(
-          String.format("Forward index disabled for column: %s, creating ScanDocIdSet unsupported!",
-              _dataSource.getDataSourceMetadata().getFieldSpec().getName()));
-    }
+    Preconditions.checkState(_dataSource.getForwardIndex() != null,
+        "Forward index disabled for column: %s, creating ScanDocIdSet unsupported!",
+        _dataSource.getDataSourceMetadata().getFieldSpec().getName());
   }
 
   @Override

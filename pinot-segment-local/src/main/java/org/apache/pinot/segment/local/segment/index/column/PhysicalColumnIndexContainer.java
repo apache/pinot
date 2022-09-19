@@ -135,9 +135,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
     // Setting the 'fwdIndexBuffer' to null if forward index is enabled. No-op index readers will be setup for the
     // forward index disabled columns which doesn't require the 'fwdIndexBuffer'.
-    boolean forwardIndexDisabled = !segmentReader.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
-    PinotDataBuffer fwdIndexBuffer = forwardIndexDisabled ? null
-        : segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
+    PinotDataBuffer fwdIndexBuffer = segmentReader.hasIndexFor(columnName, ColumnIndexType.FORWARD_INDEX)
+        ? segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX) : null;
 
     if (metadata.hasDictionary()) {
       // Dictionary-based index
@@ -147,6 +146,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         // Single-value
         if (metadata.isSorted()) {
           // Sorted
+          // No need to check for null 'fwdIndexBuffer' as for sorted columns this is a no-op
           SortedIndexReader<?> sortedIndexReader = indexReaderProvider.newSortedIndexReader(fwdIndexBuffer, metadata);
           _forwardIndex = sortedIndexReader;
           _invertedIndex = sortedIndexReader;
@@ -154,11 +154,11 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
           return;
         }
       }
-      if (forwardIndexDisabled && !metadata.isSorted()) {
-        // Forward index disabled flag is a no-op for sorted columns
-        _forwardIndex = null;
-      } else {
+      if (fwdIndexBuffer != null) {
         _forwardIndex = indexReaderProvider.newForwardIndexReader(fwdIndexBuffer, metadata);
+      } else {
+        // Forward index disabled
+        _forwardIndex = null;
       }
       if (loadInvertedIndex) {
         _invertedIndex = indexReaderProvider.newInvertedIndexReader(

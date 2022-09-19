@@ -380,7 +380,7 @@ public class IndexLoadingConfig {
    * For tests only.
    */
   @VisibleForTesting
-  public void setSortedColumns(String sortedColumn) {
+  public void setSortedColumn(String sortedColumn) {
     if (sortedColumn != null) {
       _sortedColumns = new ArrayList<>();
       _sortedColumns.add(sortedColumn);

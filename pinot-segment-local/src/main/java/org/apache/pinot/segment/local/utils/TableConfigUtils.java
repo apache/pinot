@@ -923,8 +923,7 @@ public final class TableConfigUtils {
       return;
     }
 
-    boolean forwardIndexDisabled = Boolean.parseBoolean(fieldConfigProperties
-        .getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED, FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
+    boolean forwardIndexDisabled = Boolean.parseBoolean(fieldConfigProperties.get(FieldConfig.FORWARD_INDEX_DISABLED));
     if (!forwardIndexDisabled) {
       return;
     }

@@ -1542,7 +1542,7 @@ public class SegmentPreProcessorTest {
 
     // Add the column to the sorted list
     List<String> existingSortedColumns = _indexLoadingConfig.getSortedColumns();
-    _indexLoadingConfig.setSortedColumns(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV);
+    _indexLoadingConfig.setSortedColumn(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV);
 
     // Create a segment in V3, add a new column with no forward index enabled
     constructV3Segment();
@@ -1568,7 +1568,7 @@ public class SegmentPreProcessorTest {
         4, false, 1, null, false);
 
     // Reset the sorted column list
-    _indexLoadingConfig.setSortedColumns(existingSortedColumns.isEmpty() ? null : existingSortedColumns.get(0));
+    _indexLoadingConfig.setSortedColumn(existingSortedColumns.isEmpty() ? null : existingSortedColumns.get(0));
 
     // Remove the column from the inverted index column list and validate that it fails
     invertedIndexColumns.removeAll(forwardIndexDisabledColumns);
