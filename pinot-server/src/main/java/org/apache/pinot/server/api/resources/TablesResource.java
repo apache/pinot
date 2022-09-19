@@ -532,6 +532,7 @@ public class TablesResource {
 
   @GET
   @Path("tables/{tableNameWithType}/validate")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Validates if the ideal state matches with the segmentstate on this server", notes =
       "Validates if the ideal state matches with the segmentstate on this server")
   public TableSegmentValidationInfo validateTableIdealState(

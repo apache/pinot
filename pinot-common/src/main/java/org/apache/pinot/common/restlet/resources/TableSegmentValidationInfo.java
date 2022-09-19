@@ -19,11 +19,17 @@
 
 package org.apache.pinot.common.restlet.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+
 public class TableSegmentValidationInfo {
   private final boolean _valid;
   private final long _maxTimestamp;
 
-  public TableSegmentValidationInfo(boolean valid, long maxTimestamp) {
+  @JsonCreator
+  public TableSegmentValidationInfo(@JsonProperty("valid") boolean valid,
+      @JsonProperty("maxTimestamp") long maxTimestamp) {
     _valid = valid;
     _maxTimestamp = maxTimestamp;
   }

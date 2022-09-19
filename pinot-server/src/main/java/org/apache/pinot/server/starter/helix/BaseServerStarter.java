@@ -543,7 +543,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Start restlet server for admin API endpoint
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
-    _adminApiApplication = new AdminApiApplication(_serverInstance, accessControlFactory, _serverConf);
+    _adminApiApplication = new AdminApiApplication(_serverInstance, accessControlFactory, _serverConf, _helixManager);
     _adminApiApplication.start(_listenerConfigs);
 
     // Init QueryRewriterFactory
