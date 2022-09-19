@@ -30,7 +30,6 @@ import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.NullValueUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -82,18 +81,13 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       dataTableBuilder.startRow();
       for (int i = 0; i < numColumns; i++) {
         Object result = _results.get(i);
+        if (result == null) {
+          result = columnDataTypes[i].getNullPlaceholder();
+          nullBitmaps[i].add(0);
+        }
         if (!returnFinalResult) {
-          if (result == null && columnDataTypes[i] != ColumnDataType.OBJECT) {
-            result = NullValueUtils.getDefaultNullValue(columnDataTypes[i].toDataType());
-            nullBitmaps[i].add(0);
-          }
           setIntermediateResult(dataTableBuilder, columnDataTypes, i, result);
         } else {
-          result = _aggregationFunctions[i].extractFinalResult(result);
-          if (result == null) {
-            result = NullValueUtils.getDefaultNullValue(columnDataTypes[i].toDataType());
-            nullBitmaps[i].add(0);
-          }
           setFinalResult(dataTableBuilder, columnDataTypes, i, result);
         }
       }

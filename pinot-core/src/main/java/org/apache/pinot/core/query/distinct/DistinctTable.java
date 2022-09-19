@@ -40,7 +40,6 @@ import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.NullValueUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -277,16 +276,15 @@ public class DistinctTable {
   public byte[] toBytes()
       throws IOException {
     // NOTE: Serialize the DistinctTable as a DataTable
-    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(
-        _dataSchema);
+    DataTableBuilder dataTableBuilder = DataTableFactory.getDataTableBuilder(_dataSchema);
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
     RoaringBitmap[] nullBitmaps = null;
     if (_nullHandlingEnabled) {
       nullBitmaps = new RoaringBitmap[numColumns];
-      Object[] colDefaultNullValues = new Object[numColumns];
+      Object[] nullPlaceholders = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
-        colDefaultNullValues[colId] = NullValueUtils.getDefaultNullValue(storedColumnDataTypes[colId].toDataType());
+        nullPlaceholders[colId] = storedColumnDataTypes[colId].getNullPlaceholder();
         nullBitmaps[colId] = new RoaringBitmap();
       }
 
@@ -295,7 +293,7 @@ public class DistinctTable {
         Object[] values = record.getValues();
         for (int colId = 0; colId < numColumns; colId++) {
           if (values[colId] == null) {
-            values[colId] = colDefaultNullValues[colId];
+            values[colId] = nullPlaceholders[colId];
             nullBitmaps[colId].add(rowId);
           }
         }
