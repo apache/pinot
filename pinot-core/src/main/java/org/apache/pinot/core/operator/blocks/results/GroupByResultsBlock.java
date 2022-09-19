@@ -37,7 +37,6 @@ import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.NullValueUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -134,12 +133,10 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     Iterator<Record> iterator = _table.iterator();
     if (queryContext.isNullHandlingEnabled()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
-      Object[] defaultNullValues = new Object[numColumns];
+      Object[] nullPlaceholders = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {
         nullBitmaps[colId] = new RoaringBitmap();
-        if (storedColumnDataTypes[colId] != ColumnDataType.OBJECT) {
-          defaultNullValues[colId] = NullValueUtils.getDefaultNullValue(storedColumnDataTypes[colId].toDataType());
-        }
+        nullPlaceholders[colId] = storedColumnDataTypes[colId].getNullPlaceholder();
       }
       int rowId = 0;
       while (iterator.hasNext()) {
@@ -148,7 +145,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
         for (int colId = 0; colId < numColumns; colId++) {
           Object value = values[colId];
           if (value == null && storedColumnDataTypes[colId] != ColumnDataType.OBJECT) {
-            value = defaultNullValues[colId];
+            value = nullPlaceholders[colId];
             nullBitmaps[colId].add(rowId);
           }
           setDataTableColumn(storedColumnDataTypes[colId], dataTableBuilder, colId, value);
