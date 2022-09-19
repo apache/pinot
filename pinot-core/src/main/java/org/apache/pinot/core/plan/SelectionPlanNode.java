@@ -34,6 +34,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 
 /**
@@ -69,36 +71,34 @@ public class SelectionPlanNode implements PlanNode {
       return new SelectionOnlyOperator(_indexSegment, _queryContext, expressions, transformOperator);
     }
     int numOrderByExpressions = orderByExpressions.size();
-    if (!_queryContext.isNullHandlingEnabled()) {
-      // Although it is a break of abstraction, some code, specially merging, assumes that if there is an order by
-      // expression the operator will return a block whose selection result is a priority queue.
-      int sortedColumnsPrefixSize = getSortedColumnsPrefix(orderByExpressions);
-      if (sortedColumnsPrefixSize > 0 && !isSkipOrderByOptimization()) {
-        // The first order by expressions are sorted (either asc or desc).
-        // ie: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column DESC LIMIT 10 OFFSET 5
-        // or: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column, not_sorted LIMIT 10 OFFSET 5
-        // but not SELECT ... FROM Table WHERE predicates ORDER BY not_sorted, sorted_column LIMIT 10 OFFSET 5
-        if (orderByExpressions.get(0).isAsc()) {
-          int maxDocsPerCall = Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
-          TransformPlanNode planNode = new TransformPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall);
-          TransformOperator transformOperator = planNode.run();
-          return new SelectionPartiallyOrderedByAscOperator(_indexSegment, _queryContext, expressions,
-              transformOperator, sortedColumnsPrefixSize);
-        } else {
-          int maxDocsPerCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
-          TransformPlanNode planNode = new TransformPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall);
-          TransformOperator transformOperator = planNode.run();
-          return new SelectionPartiallyOrderedByDescOperation(_indexSegment, _queryContext, expressions,
-              transformOperator, sortedColumnsPrefixSize);
-        }
+    // Although it is a break of abstraction, some code, specially merging, assumes that if there is an order by
+    // expression the operator will return a block whose selection result is a priority queue.
+    int sortedColumnsPrefixSize = getSortedColumnsPrefix(orderByExpressions, _queryContext.isNullHandlingEnabled());
+    if (sortedColumnsPrefixSize > 0 && !isSkipOrderByOptimization()) {
+      // The first order by expressions are sorted (either asc or desc).
+      // ie: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column DESC LIMIT 10 OFFSET 5
+      // or: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column, not_sorted LIMIT 10 OFFSET 5
+      // but not SELECT ... FROM Table WHERE predicates ORDER BY not_sorted, sorted_column LIMIT 10 OFFSET 5
+      if (orderByExpressions.get(0).isAsc()) {
+        int maxDocsPerCall = Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
+        TransformPlanNode planNode = new TransformPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall);
+        TransformOperator transformOperator = planNode.run();
+        return new SelectionPartiallyOrderedByAscOperator(_indexSegment, _queryContext, expressions,
+            transformOperator, sortedColumnsPrefixSize);
+      } else {
+        int maxDocsPerCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
+        TransformPlanNode planNode = new TransformPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall);
+        TransformOperator transformOperator = planNode.run();
+        return new SelectionPartiallyOrderedByDescOperation(_indexSegment, _queryContext, expressions,
+            transformOperator, sortedColumnsPrefixSize);
       }
-      if (numOrderByExpressions == expressions.size()) {
-        // All output expressions are ordered
-        // ie: SELECT not_sorted1, not_sorted2 FROM Table WHERE ... ORDER BY not_sorted1, not_sorted2 LIMIT 10 OFFSET 5
-        TransformOperator transformOperator =
-            new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
-        return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator);
-      }
+    }
+    if (numOrderByExpressions == expressions.size()) {
+      // All output expressions are ordered
+      // ie: SELECT not_sorted1, not_sorted2 FROM Table WHERE ... ORDER BY not_sorted1, not_sorted2 LIMIT 10 OFFSET 5
+      TransformOperator transformOperator =
+          new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+      return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, transformOperator);
     }
     // Not all output expressions are ordered, only fetch the order-by expressions and docId to avoid the
     // unnecessary data fetch
@@ -129,10 +129,10 @@ public class SelectionPlanNode implements PlanNode {
    * @return the max number that guarantees that from the first expression to the returned number, the index is already
    * sorted.
    */
-  private int getSortedColumnsPrefix(List<OrderByExpressionContext> orderByExpressions) {
+  private int getSortedColumnsPrefix(List<OrderByExpressionContext> orderByExpressions, boolean isNullHandlingEnabled) {
     boolean asc = orderByExpressions.get(0).isAsc();
     for (int i = 0; i < orderByExpressions.size(); i++) {
-      if (!isSorted(orderByExpressions.get(i), asc)) {
+      if (!isSorted(orderByExpressions.get(i), asc, isNullHandlingEnabled)) {
         return i;
       }
     }
@@ -140,7 +140,7 @@ public class SelectionPlanNode implements PlanNode {
     return orderByExpressions.size();
   }
 
-  private boolean isSorted(OrderByExpressionContext orderByExpression, boolean asc) {
+  private boolean isSorted(OrderByExpressionContext orderByExpression, boolean asc, boolean isNullHandlingEnabled) {
     switch (orderByExpression.getExpression().getType()) {
       case LITERAL: {
         return true;
@@ -150,7 +150,15 @@ public class SelectionPlanNode implements PlanNode {
           return false;
         }
         String column = orderByExpression.getExpression().getIdentifier();
-        return _indexSegment.getDataSource(column).getDataSourceMetadata().isSorted();
+        DataSource dataSource = _indexSegment.getDataSource(column);
+        // If there are null values, we cannot trust DataSourceMetadata.isSorted
+        if (isNullHandlingEnabled) {
+          NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
+          if (nullValueVector != null && !nullValueVector.getNullBitmap().isEmpty()) {
+            return false;
+          }
+        }
+        return dataSource.getDataSourceMetadata().isSorted();
       }
       case FUNCTION: // we could optimize monotonically increasing functions
       default: {
