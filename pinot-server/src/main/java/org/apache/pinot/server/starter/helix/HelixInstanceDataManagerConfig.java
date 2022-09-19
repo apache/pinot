@@ -121,8 +121,13 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Size of cache that holds errors.
   private static final String ERROR_CACHE_SIZE = "error.cache.size";
 
+  private static final String DELETED_SEGMENTS_CACHE_SIZE = "table.deleted.segments.cache.size";
+  private static final String DELETED_SEGMENTS_CACHE_TTL_MINUTES = "table.deleted.segments.cache.ttl.minutes";
+
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
+  private static final int DEFAULT_DELETED_SEGMENTS_CACHE_SIZE = 10_000;
+  private static final int DEFAULT_DELETED_SEGMENTS_CACHE_TTL_MINUTES = 10;
   private PinotConfiguration _instanceDataManagerConfiguration = null;
 
   public HelixInstanceDataManagerConfig(PinotConfiguration serverConfig)
@@ -255,6 +260,18 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public long getStreamSegmentDownloadUntarRateLimit() {
     return _instanceDataManagerConfiguration.getProperty(STREAM_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT,
         DEFAULT_STREAM_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT);
+  }
+
+  @Override
+  public int getDeletedSegmentsCacheSize() {
+    return _instanceDataManagerConfiguration.getProperty(DELETED_SEGMENTS_CACHE_SIZE,
+        DEFAULT_DELETED_SEGMENTS_CACHE_SIZE);
+  }
+
+  @Override
+  public int getDeletedSegmentsCacheTtlMinutes() {
+    return _instanceDataManagerConfiguration.getProperty(DELETED_SEGMENTS_CACHE_TTL_MINUTES,
+        DEFAULT_DELETED_SEGMENTS_CACHE_TTL_MINUTES);
   }
 
   @Override
