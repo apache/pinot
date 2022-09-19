@@ -29,6 +29,7 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.ISODateTimeFormat;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -86,6 +87,19 @@ public class DateTimeFormatSpecTest {
         "TIMESTAMP", "2017-07-01 00:00:00", Timestamp.valueOf("2017-07-01 00:00:00").getTime()
     });
     entries.add(new Object[]{"TIMESTAMP", "1498892400000", 1498892400000L});
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT", "2017-07-01",
+        DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC().parseMillis("20170701")
+    });
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT", "2017-07-01T12:45:50",
+        DateTimeFormat.forPattern("yyyy-MM-dd'T'HH:mm:ss").withZoneUTC().parseMillis("2017-07-01T12:45:50")
+    });
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT", "2017",
+        DateTimeFormat.forPattern("yyyy").withZoneUTC().parseMillis("2017")
+    });
+
     entries.add(new Object[]{
         "SIMPLE_DATE_FORMAT|yyyyMMdd", "20170701",
         DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC().parseMillis("20170701")
@@ -200,6 +214,11 @@ public class DateTimeFormatSpecTest {
         "SIMPLE_DATE_FORMAT|M/d/yyyy h a", 1502066750000L,
         DateTimeFormat.forPattern("M/d/yyyy h a").withZoneUTC().withLocale(Locale.ENGLISH).print(1502066750000L)
     });
+
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT", 1502066750000L,
+        ISODateTimeFormat.dateTimeNoMillis().withZoneUTC().withLocale(Locale.ENGLISH).print(1502066750000L)
+    });
     return entries.toArray(new Object[entries.size()][]);
   }
 
@@ -298,10 +317,18 @@ public class DateTimeFormatSpecTest {
             DateTimeZone.UTC});
 
     entries.add(
+        new Object[]{"EPOCH", 1, TimeUnit.MILLISECONDS, DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC});
+
+    entries.add(
         new Object[]{"EPOCH|HOURS|1", 1, TimeUnit.HOURS, DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC});
 
     entries.add(new Object[]{
         "EPOCH|MINUTES|5", 5, TimeUnit.MINUTES, DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC
+    });
+
+    entries.add(new Object[]{
+        "SIMPLE_DATE_FORMAT", 1, TimeUnit.MILLISECONDS, DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+        null, DateTimeZone.UTC
     });
 
     entries.add(new Object[]{

@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -114,5 +116,49 @@ public class AggregationFunctionUtils {
     ExpressionContext expression = ExpressionContext.forIdentifier(aggregationFunctionColumnPair.getColumn());
     BlockValSet blockValSet = transformBlock.getBlockValueSet(aggregationFunctionColumnPair.toColumnName());
     return Collections.singletonMap(expression, blockValSet);
+  }
+
+  /**
+   * Reads the intermediate result from the {@link DataTable}.
+   */
+  public static Object getIntermediateResult(DataTable dataTable, ColumnDataType columnDataType, int rowId, int colId) {
+    switch (columnDataType) {
+      case LONG:
+        return dataTable.getLong(rowId, colId);
+      case DOUBLE:
+        return dataTable.getDouble(rowId, colId);
+      case OBJECT:
+        return dataTable.getObject(rowId, colId);
+      default:
+        throw new IllegalStateException("Illegal column data type in intermediate result: " + columnDataType);
+    }
+  }
+
+  /**
+   * Reads the converted final result from the {@link DataTable}. It should be equivalent to running
+   * {@link AggregationFunction#extractFinalResult(Object)} and {@link ColumnDataType#convert(Object)}.
+   */
+  public static Object getConvertedFinalResult(DataTable dataTable, ColumnDataType columnDataType, int rowId,
+      int colId) {
+    switch (columnDataType) {
+      case INT:
+        return dataTable.getInt(rowId, colId);
+      case LONG:
+        return dataTable.getLong(rowId, colId);
+      case FLOAT:
+        return dataTable.getFloat(rowId, colId);
+      case DOUBLE:
+        return dataTable.getDouble(rowId, colId);
+      case BIG_DECIMAL:
+        return dataTable.getBigDecimal(rowId, colId);
+      case STRING:
+        return dataTable.getString(rowId, colId);
+      case BYTES:
+        return dataTable.getBytes(rowId, colId).getBytes();
+      case DOUBLE_ARRAY:
+        return dataTable.getDoubleArray(rowId, colId);
+      default:
+        throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);
+    }
   }
 }

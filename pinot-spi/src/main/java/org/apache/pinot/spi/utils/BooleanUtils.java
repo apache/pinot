@@ -33,6 +33,18 @@ public class BooleanUtils {
     return booleanString.equalsIgnoreCase("true") || booleanString.equals("1");
   }
 
+  public static boolean toBoolean(Object booleanObject) {
+    if (booleanObject instanceof String) {
+      return BooleanUtils.toBoolean((String) booleanObject);
+    } else if (booleanObject instanceof Number) {
+      return ((Number) booleanObject).intValue() != 0;
+    } else if (booleanObject instanceof Boolean) {
+      return (boolean) booleanObject;
+    } else {
+      throw new IllegalArgumentException("Illegal type for boolean conversion: " + booleanObject.getClass());
+    }
+  }
+
   /**
    * Returns the int value (1 for true, 0 for false) for the given boolean string.
    * <ul>

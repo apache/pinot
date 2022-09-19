@@ -129,7 +129,7 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
     try {
       IngestionJobLauncher.runIngestionJob(spec);
     } catch (Exception e) {
-      LOGGER.error("Got exception to kick off standalone data ingestion job - ", e);
+      LOGGER.error("Got exception to kick off {} data ingestion job - ", spec.getExecutionFrameworkSpec().getName(), e);
       throw e;
     }
     return true;

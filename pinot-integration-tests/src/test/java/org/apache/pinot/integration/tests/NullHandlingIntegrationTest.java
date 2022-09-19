@@ -168,4 +168,22 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     String query = "SELECT CASE WHEN description IS NOT NULL THEN 1 ELSE 0 END FROM " + getTableName();
     testQuery(query);
   }
+
+  @Test
+  public void testCaseWithIsDistinctFrom()
+      throws Exception {
+    String query = "SELECT salary IS DISTINCT FROM salary FROM " + getTableName();
+    testQuery(query);
+    query = "SELECT salary FROM " + getTableName() + " where salary IS DISTINCT FROM salary";
+    testQuery(query);
+  }
+
+  @Test
+  public void testCaseWithIsNotDistinctFrom()
+      throws Exception {
+    String query = "SELECT description IS NOT DISTINCT FROM description FROM " + getTableName();
+    testQuery(query);
+    query = "SELECT description FROM " + getTableName() + " where description IS NOT DISTINCT FROM description";
+    testQuery(query);
+  }
 }

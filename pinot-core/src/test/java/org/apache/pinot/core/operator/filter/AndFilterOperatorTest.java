@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -82,6 +83,52 @@ public class AndFilterOperatorTest {
     Assert.assertEquals(iterator.next(), 3);
     Assert.assertEquals(iterator.next(), 6);
     Assert.assertEquals(iterator.next(), Constants.EOF);
+  }
+
+  @Test
+  void testAndDocIdSetReordering() {
+    int numDocs = 10_000;
+    int numFilters = 4;
+    int filterStart = 2;
+
+    MutableRoaringBitmap[] mutableRoaringBitmap = new MutableRoaringBitmap[numFilters];
+    for (int i = filterStart; i < filterStart + numFilters; i++) {
+      int k = i - filterStart;
+      mutableRoaringBitmap[k] = new MutableRoaringBitmap();
+      for (int j = 0; j < 10_000; j++) {
+        if (j % i == 0) {
+          mutableRoaringBitmap[k].add(j);
+        }
+      }
+    }
+
+    List<BaseFilterOperator> childOperators1 = new ArrayList<>();
+    List<BaseFilterOperator> childOperators2 = new ArrayList<>();
+    for (int i = 0; i < numFilters; i++) {
+      childOperators1.add(
+          new BitmapBasedFilterOperator(mutableRoaringBitmap[i].toImmutableRoaringBitmap(), false, numDocs));
+      childOperators2.add(
+          new BitmapBasedFilterOperator(mutableRoaringBitmap[numFilters - 1 - i].toImmutableRoaringBitmap(), false,
+              numDocs));
+    }
+
+    AndFilterOperator andFilterOperator1 = new AndFilterOperator(childOperators1);
+    AndFilterOperator andFilterOperator2 = new AndFilterOperator(childOperators2);
+    BlockDocIdIterator iterator1 = andFilterOperator1.getNextBlock().getBlockDocIdSet().iterator();
+    BlockDocIdIterator iterator2 = andFilterOperator2.getNextBlock().getBlockDocIdSet().iterator();
+    Assert.assertEquals(iterator1.next(), 0);
+    Assert.assertEquals(iterator1.next(), 60);
+    Assert.assertEquals(iterator1.next(), 120);
+    Assert.assertEquals(iterator1.next(), 180);
+
+    Assert.assertEquals(iterator2.next(), 0);
+    Assert.assertEquals(iterator2.next(), 60);
+    Assert.assertEquals(iterator2.next(), 120);
+    Assert.assertEquals(iterator2.next(), 180);
+
+    for (int i = 0; i < numDocs / 10; i++) {
+      Assert.assertEquals(iterator1.next(), iterator2.next());
+    }
   }
 
   @Test

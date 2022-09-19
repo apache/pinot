@@ -67,7 +67,8 @@ public class StagePlanner {
    * @param relRoot relational plan root.
    * @return dispatchable plan.
    */
-  public QueryPlan makePlan(RelNode relRoot) {
+  public QueryPlan makePlan(RelRoot relRoot) {
+    RelNode relRootNode = relRoot.rel;
     // clear the state
     _queryStageMap = new HashMap<>();
     _stageMetadataMap = new HashMap<>();
@@ -75,7 +76,7 @@ public class StagePlanner {
     _stageIdCounter = 1;
 
     // walk the plan and create stages.
-    StageNode globalStageRoot = walkRelPlan(relRoot, getNewStageId());
+    StageNode globalStageRoot = walkRelPlan(relRootNode, getNewStageId());
 
     // global root needs to send results back to the ROOT, a.k.a. the client response node. the last stage only has one
     // receiver so doesn't matter what the exchange type is. setting it to SINGLETON by default.
@@ -99,7 +100,7 @@ public class StagePlanner {
       _workerManager.assignWorkerToStage(e.getKey(), e.getValue());
     }
 
-    return new QueryPlan(_queryStageMap, _stageMetadataMap);
+    return new QueryPlan(relRoot.fields, _queryStageMap, _stageMetadataMap);
   }
 
   // non-threadsafe
@@ -215,10 +216,10 @@ public class StagePlanner {
         int leftIndex = leftJoinKeySelector.getColumnIndices().get(i);
         int rightIndex = rightJoinKeySelector.getColumnIndices().get(i);
         if (leftPartitionKeys.contains(leftIndex)) {
-          newPartitionKeys.add(i);
+          newPartitionKeys.add(leftIndex);
         }
         if (rightPartitionKeys.contains(rightIndex)) {
-          newPartitionKeys.add(leftDataSchemaSize + i);
+          newPartitionKeys.add(leftDataSchemaSize + rightIndex);
         }
       }
       node.setPartitionKeys(newPartitionKeys);

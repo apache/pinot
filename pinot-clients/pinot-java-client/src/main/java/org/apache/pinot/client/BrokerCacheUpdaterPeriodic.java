@@ -19,6 +19,7 @@
 package org.apache.pinot.client;
 
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -29,17 +30,22 @@ import org.slf4j.LoggerFactory;
  * Maintains broker cache this is updated periodically
  */
 public class BrokerCacheUpdaterPeriodic implements UpdatableBrokerCache {
+  public static final String BROKER_UPDATE_FREQUENCY_MILLIS = "brokerUpdateFrequencyInMillis";
+  public static final String DEFAULT_BROKER_UPDATE_FREQUENCY_MILLIS = "defaultBrokerUpdateFrequencyInMillis";
+
   private final BrokerCache _brokerCache;
   private final ScheduledExecutorService _scheduledExecutorService;
   private final long _brokerUpdateFreqInMillis;
+  private final Properties _properties;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerCacheUpdaterPeriodic.class);
 
-  public BrokerCacheUpdaterPeriodic(String scheme, String controllerHost,
-      int controllerPort, long brokerUpdateFreqInMillis) {
-    _brokerCache = new BrokerCache(scheme, controllerHost, controllerPort);
+  public BrokerCacheUpdaterPeriodic(Properties properties, String controllerUrl) {
+    _properties = properties;
+    _brokerCache = new BrokerCache(properties, controllerUrl);
     _scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
-    _brokerUpdateFreqInMillis = brokerUpdateFreqInMillis;
+    _brokerUpdateFreqInMillis = Long.parseLong(
+        properties.getProperty(BROKER_UPDATE_FREQUENCY_MILLIS, DEFAULT_BROKER_UPDATE_FREQUENCY_MILLIS));
   }
 
   public void init() throws Exception {

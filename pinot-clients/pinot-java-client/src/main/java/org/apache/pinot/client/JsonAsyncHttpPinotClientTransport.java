@@ -28,12 +28,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
+import org.apache.pinot.client.utils.ConnectionUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.asynchttpclient.AsyncHttpClient;
@@ -79,7 +79,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
             .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
             .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
-            .setUserAgent(getUserAgentVersionFromClassPath())
+            .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua"))
             .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }
@@ -98,23 +98,10 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
             .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
             .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
-            .setUserAgent(getUserAgentVersionFromClassPath())
+            .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua"))
             .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }
-
-  private String getUserAgentVersionFromClassPath() {
-    Properties userAgentProperties = new Properties();
-    try {
-      userAgentProperties.load(JsonAsyncHttpPinotClientTransport.class.getClassLoader()
-              .getResourceAsStream("version.properties"));
-    } catch (IOException e) {
-      LOGGER.warn("Unable to set user agent version");
-    }
-    return userAgentProperties.getProperty("ua", "pinot-java");
-  }
-
-
 
   @Override
   public BrokerResponse executeQuery(String brokerAddress, String query)

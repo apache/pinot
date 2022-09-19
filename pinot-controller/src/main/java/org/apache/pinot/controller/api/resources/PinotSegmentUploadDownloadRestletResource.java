@@ -326,7 +326,9 @@ public class PinotSegmentUploadDownloadRestletResource {
         throw new ControllerApplicationException(LOGGER, "Failed to find table: " + tableNameWithType,
             Response.Status.BAD_REQUEST);
       }
-      SegmentValidationUtils.validateTimeInterval(segmentMetadata, tableConfig);
+      if (tableConfig.getIngestionConfig() == null || tableConfig.getIngestionConfig().isSegmentTimeValueCheck()) {
+        SegmentValidationUtils.validateTimeInterval(segmentMetadata, tableConfig);
+      }
       if (uploadType != FileUploadDownloadClient.FileUploadType.METADATA) {
         SegmentValidationUtils.checkStorageQuota(tempSegmentDir, segmentMetadata, tableConfig,
             _pinotHelixResourceManager, _controllerConf, _controllerMetrics, _connectionManager, _executor,

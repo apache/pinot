@@ -43,13 +43,13 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private static final int LESS_THAN_OR_EQUAL = 4;
   private static final int NOT_EQUAL = 5;
 
-  private final int _op;
-  private final TransformFunctionType _transformFunctionType;
-  private TransformFunction _leftTransformFunction;
-  private TransformFunction _rightTransformFunction;
-  private DataType _leftStoredType;
-  private DataType _rightStoredType;
-  private int[] _results;
+  protected final int _op;
+  protected final TransformFunctionType _transformFunctionType;
+  protected TransformFunction _leftTransformFunction;
+  protected TransformFunction _rightTransformFunction;
+  protected DataType _leftStoredType;
+  protected DataType _rightStoredType;
+  protected int[] _results;
 
   protected BinaryOperatorTransformFunction(TransformFunctionType transformFunctionType) {
     // translate to integer in [0, 5] for guaranteed tableswitch

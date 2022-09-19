@@ -19,7 +19,10 @@
 package org.apache.pinot.controller.recommender.rules.impl;
 
 import com.google.common.util.concurrent.AtomicDouble;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
@@ -29,6 +32,7 @@ import org.apache.pinot.controller.recommender.rules.AbstractRule;
 import org.apache.pinot.controller.recommender.rules.io.params.BloomFilterRuleParams;
 import org.apache.pinot.controller.recommender.rules.utils.FixedLenBitset;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +45,9 @@ import org.slf4j.LoggerFactory;
 public class BloomFilterRule extends AbstractRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterRule.class);
   private final BloomFilterRuleParams _params;
+  // Derived from BloomFilterHandler
+  private static final Set<DataType> COMPATIBLE_DATA_TYPES = new HashSet<>(
+      Arrays.asList(DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE, DataType.STRING, DataType.BYTES));
 
   public BloomFilterRule(InputManager input, ConfigManager output) {
     super(input, output);
@@ -68,7 +75,9 @@ public class BloomFilterRule extends AbstractRule {
 
     for (int i = 0; i < numCols; i++) {
       String dimName = _input.intToColName(i);
-      if (((weights[i] / totalWeight.get()) > _params._thresholdMinPercentEqBloomfilter)
+      DataType columnType = _input.getFieldType(dimName);
+      if (COMPATIBLE_DATA_TYPES.contains(columnType)
+          && ((weights[i] / totalWeight.get()) > _params._thresholdMinPercentEqBloomfilter)
           //The partitioned dimension should be frequently > P used
           && (_input.getCardinality(dimName)
           < _params._thresholdMaxCardinalityBloomfilter)) { //The Cardinality < C (1 million for 1MB size)

@@ -46,9 +46,11 @@ public class ExpressionTransformer implements RecordTransformer {
 
   @VisibleForTesting
   final LinkedHashMap<String, FunctionEvaluator> _expressionEvaluators = new LinkedHashMap<>();
+  private final boolean _continueOnError;
 
   public ExpressionTransformer(TableConfig tableConfig, Schema schema) {
     Map<String, FunctionEvaluator> expressionEvaluators = new HashMap<>();
+    _continueOnError = tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().isContinueOnError();
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getTransformConfigs() != null) {
       for (TransformConfig transformConfig : tableConfig.getIngestionConfig().getTransformConfigs()) {
         FunctionEvaluator previous = expressionEvaluators.put(transformConfig.getColumnName(),
@@ -125,8 +127,15 @@ public class ExpressionTransformer implements RecordTransformer {
       // Skip transformation if column value already exist.
       // NOTE: column value might already exist for OFFLINE data
       if (record.getValue(column) == null) {
-        Object result = transformFunctionEvaluator.evaluate(record);
-        record.putValue(column, result);
+        if (_continueOnError) {
+          try {
+            record.putValue(column, transformFunctionEvaluator.evaluate(record));
+          } catch (Exception e) {
+            record.putValue(column, null);
+          }
+        } else {
+          record.putValue(column, transformFunctionEvaluator.evaluate(record));
+        }
       }
     }
     return record;

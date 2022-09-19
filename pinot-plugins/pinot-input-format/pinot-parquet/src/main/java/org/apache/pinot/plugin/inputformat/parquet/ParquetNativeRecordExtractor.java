@@ -36,6 +36,7 @@ import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.schema.DecimalMetadata;
 import org.apache.parquet.schema.GroupType;
 import org.apache.parquet.schema.OriginalType;
+import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.schema.Type;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -144,7 +145,8 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
   private Object extractValue(Group from, int fieldIndex, Type fieldType, int index) {
     OriginalType originalType = fieldType.getOriginalType();
     if (fieldType.isPrimitive()) {
-      switch (fieldType.asPrimitiveType().getPrimitiveTypeName()) {
+      PrimitiveType.PrimitiveTypeName primitiveTypeName = fieldType.asPrimitiveType().getPrimitiveTypeName();
+      switch (primitiveTypeName) {
         case INT32:
           return from.getInteger(fieldIndex, index);
         case INT64:
@@ -155,27 +157,32 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
           return from.getDouble(fieldIndex, index);
         case BOOLEAN:
           return from.getValueToString(fieldIndex, index);
-        case BINARY:
-        case FIXED_LEN_BYTE_ARRAY:
-          if (originalType == OriginalType.UTF8) {
-            return from.getValueToString(fieldIndex, index);
-          }
-          if (originalType == OriginalType.DECIMAL) {
-            DecimalMetadata decimalMetadata = fieldType.asPrimitiveType().getDecimalMetadata();
-            return binaryToDecimal(from.getBinary(fieldIndex, index), decimalMetadata.getPrecision(),
-                decimalMetadata.getScale());
-          }
-          return from.getBinary(fieldIndex, index).getBytes();
         case INT96:
           Binary int96 = from.getInt96(fieldIndex, index);
           ByteBuffer buf = ByteBuffer.wrap(int96.getBytes()).order(ByteOrder.LITTLE_ENDIAN);
           long dateTime = (buf.getInt(8) - JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH) * DateTimeConstants.MILLIS_PER_DAY
               + buf.getLong(0) / NANOS_PER_MILLISECOND;
           return dateTime;
+        case BINARY:
+        case FIXED_LEN_BYTE_ARRAY:
+          if (originalType != null) {
+            switch (originalType) {
+              case UTF8:
+              case ENUM:
+                return from.getValueToString(fieldIndex, index);
+              case DECIMAL:
+                DecimalMetadata decimalMetadata = fieldType.asPrimitiveType().getDecimalMetadata();
+                return binaryToDecimal(from.getBinary(fieldIndex, index), decimalMetadata.getPrecision(),
+                    decimalMetadata.getScale());
+              default:
+                break;
+            }
+          }
+          return from.getBinary(fieldIndex, index).getBytes();
         default:
           throw new IllegalArgumentException(
-              "Unsupported field type: " + fieldType + ", primitive type: " + fieldType.asPrimitiveType()
-                  .getPrimitiveTypeName());
+              String.format("Unsupported field type: %s, primitive type: %s, original type: %s", fieldType,
+                  primitiveTypeName, originalType));
       }
     } else if ((fieldType.isRepetition(Type.Repetition.OPTIONAL)) || (fieldType.isRepetition(Type.Repetition.REQUIRED))
         || (fieldType.isRepetition(Type.Repetition.REPEATED))) {

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.service;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.ArrayList;
@@ -26,14 +27,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.util.Pair;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datablock.BaseDataBlock;
 import org.apache.pinot.core.common.datablock.DataBlockUtils;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.QueryPlan;
@@ -59,7 +63,7 @@ public class QueryDispatcher {
   public QueryDispatcher() {
   }
 
-  public List<DataTable> submitAndReduce(long requestId, QueryPlan queryPlan,
+  public ResultTable submitAndReduce(long requestId, QueryPlan queryPlan,
       MailboxService<Mailbox.MailboxContent> mailboxService, long timeoutNano)
       throws Exception {
     // submit all the distributed stages.
@@ -70,7 +74,8 @@ public class QueryDispatcher {
         queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
         requestId, reduceNode.getSenderStageId(), reduceNode.getDataSchema(), mailboxService.getHostname(),
         mailboxService.getMailboxPort());
-    return reduceMailboxReceive(mailboxReceiveOperator, timeoutNano);
+    List<DataTable> resultDataBlocks = reduceMailboxReceive(mailboxReceiveOperator, timeoutNano);
+    return toResultTable(resultDataBlocks, queryPlan.getQueryResultFields());
   }
 
   public int submit(long requestId, QueryPlan queryPlan)
@@ -147,6 +152,41 @@ public class QueryDispatcher {
     return resultDataBlocks;
   }
 
+  public static ResultTable toResultTable(List<DataTable> queryResult, List<Pair<Integer, String>> fields) {
+    DataSchema resultSchema = null;
+    List<Object[]> resultRows = new ArrayList<>();
+    for (DataTable dataTable : queryResult) {
+      resultSchema = resultSchema == null ? toResultSchema(dataTable.getDataSchema(), fields) : resultSchema;
+      int numColumns = resultSchema.getColumnNames().length;
+      DataSchema.ColumnDataType[] resultColumnDataTypes = resultSchema.getColumnDataTypes();
+      List<Object[]> rows = new ArrayList<>(dataTable.getNumberOfRows());
+      for (int rowId = 0; rowId < dataTable.getNumberOfRows(); rowId++) {
+        Object[] row = new Object[numColumns];
+        Object[] rawRow = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+        // Only the masked fields should be selected out.
+        int colId = 0;
+        for (Pair<Integer, String> field : fields) {
+          int colRef = field.left;
+          row[colId++] = resultColumnDataTypes[colRef].convertAndFormat(rawRow[colRef]);
+        }
+        rows.add(row);
+      }
+      resultRows.addAll(rows);
+    }
+    return new ResultTable(resultSchema, resultRows);
+  }
+
+  private static DataSchema toResultSchema(DataSchema inputSchema, List<Pair<Integer, String>> fields) {
+    String[] colNames = new String[fields.size()];
+    DataSchema.ColumnDataType[] colTypes = new DataSchema.ColumnDataType[fields.size()];
+    for (int i = 0; i < fields.size(); i++) {
+      colNames[i] = fields.get(i).right;
+      colTypes[i] = inputSchema.getColumnDataType(fields.get(i).left);
+    }
+    return new DataSchema(colNames, colTypes);
+  }
+
+  @VisibleForTesting
   public static MailboxReceiveOperator createReduceStageOperator(MailboxService<Mailbox.MailboxContent> mailboxService,
       List<ServerInstance> sendingInstances, long jobId, int stageId, DataSchema dataSchema, String hostname,
       int port) {

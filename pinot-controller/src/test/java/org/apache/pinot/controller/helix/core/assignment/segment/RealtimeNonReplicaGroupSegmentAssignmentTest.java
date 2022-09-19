@@ -21,7 +21,6 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -223,17 +222,13 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
       });
     }
 
-    // Relocated segments should be balanced (each instance should have at least 29 segments assigned)
+    // The number of relocated segments should match with the number of the original segments.
     int[] numSegmentsAssignedPerInstance =
         SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(newAssignment, COMPLETED_INSTANCES);
     assertEquals(numSegmentsAssignedPerInstance.length, NUM_COMPLETED_INSTANCES);
     int expectedTotalNumSegmentsAssigned = (NUM_SEGMENTS - NUM_PARTITIONS + numUploadedSegments) * NUM_REPLICAS;
-    int expectedMinNumSegmentsPerInstance = expectedTotalNumSegmentsAssigned / NUM_COMPLETED_INSTANCES;
     int totalNumSegmentsAssigned = 0;
     for (int numSegmentsAssigned : numSegmentsAssignedPerInstance) {
-      assertTrue(numSegmentsAssigned >= expectedMinNumSegmentsPerInstance,
-          String.format("Expect at least: %d segments assigned per instance, got: %s",
-              expectedMinNumSegmentsPerInstance, Arrays.toString(numSegmentsAssignedPerInstance)));
       totalNumSegmentsAssigned += numSegmentsAssigned;
     }
     assertEquals(totalNumSegmentsAssigned, expectedTotalNumSegmentsAssigned);
@@ -284,6 +279,8 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     Map<InstancePartitionsType, InstancePartitions> onlyCompletedInstancePartitionMap =
         ImmutableMap.of(InstancePartitionsType.COMPLETED, _instancePartitionsMap.get(InstancePartitionsType.COMPLETED));
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+
+    //@formatter:off
     Map<String, List<String>> expectedUploadedSegmentToInstances = ImmutableMap.of(
         "uploadedSegment_0", ImmutableList.of("completedInstance_0", "completedInstance_1", "completedInstance_2"),
         "uploadedSegment_1", ImmutableList.of("completedInstance_3", "completedInstance_4", "completedInstance_5"),
@@ -291,6 +288,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
         "uploadedSegment_3", ImmutableList.of("completedInstance_9", "completedInstance_0", "completedInstance_1"),
         "uploadedSegment_4", ImmutableList.of("completedInstance_2", "completedInstance_3", "completedInstance_4")
     );
+    //@formatter:on
     expectedUploadedSegmentToInstances.forEach((segmentName, expectedInstances) -> {
       List<String> actualInstances =
           _segmentAssignment.assignSegment(segmentName, currentAssignment, onlyCompletedInstancePartitionMap);

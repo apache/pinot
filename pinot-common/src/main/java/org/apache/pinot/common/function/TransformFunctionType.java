@@ -62,9 +62,14 @@ public enum TransformFunctionType {
 
   IS_NULL("is_null"),
   IS_NOT_NULL("is_not_null"),
+  COALESCE("coalesce"),
+
+  IS_DISTINCT_FROM("is_distinct_from"),
+  IS_NOT_DISTINCT_FROM("is_not_distinct_from"),
 
   AND("and"),
   OR("or"),
+  NOT("not"),   // NOT operator doesn't cover the transform for NOT IN and NOT LIKE
 
   CAST("cast"),
   CASE("case"),
@@ -85,7 +90,9 @@ public enum TransformFunctionType {
   MINUTE("minute"),
   SECOND("second"),
   MILLISECOND("millisecond"),
-  ARRAYLENGTH("arrayLength"),
+  // The only column accepted by "cardinality" function is multi-value array, thus putting "cardinality" as alias.
+  // TODO: once we support other types of multiset, we should make CARDINALITY its own function
+  ARRAYLENGTH("arrayLength", "cardinality"),
   ARRAYAVERAGE("arrayAverage"),
   ARRAYMIN("arrayMin"),
   ARRAYMAX("arrayMax"),
@@ -95,6 +102,8 @@ public enum TransformFunctionType {
   INIDSET("inIdSet"),
   LOOKUP("lookUp"),
   GROOVY("groovy"),
+
+  EXTRACT("extract"),
 
   // Regexp functions
   REGEXP_EXTRACT("regexpExtract"),

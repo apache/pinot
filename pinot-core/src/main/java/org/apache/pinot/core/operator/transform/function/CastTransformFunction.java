@@ -47,40 +47,58 @@ public class CastTransformFunction extends BaseTransformFunction {
 
     _transformFunction = arguments.get(0);
     TransformFunction castFormatTransformFunction = arguments.get(1);
+    boolean isSVCol = _transformFunction.getResultMetadata().isSingleValue();
 
     if (castFormatTransformFunction instanceof LiteralTransformFunction) {
       String targetType = ((LiteralTransformFunction) castFormatTransformFunction).getLiteral().toUpperCase();
       switch (targetType) {
         case "INT":
         case "INTEGER":
-          _resultMetadata = INT_SV_NO_DICTIONARY_METADATA;
+          _resultMetadata = isSVCol ? INT_SV_NO_DICTIONARY_METADATA : INT_MV_NO_DICTIONARY_METADATA;
           break;
         case "LONG":
-          _resultMetadata = LONG_SV_NO_DICTIONARY_METADATA;
+          _resultMetadata = isSVCol ? LONG_SV_NO_DICTIONARY_METADATA : LONG_MV_NO_DICTIONARY_METADATA;
           break;
         case "FLOAT":
-          _resultMetadata = FLOAT_SV_NO_DICTIONARY_METADATA;
+          _resultMetadata = isSVCol ? FLOAT_SV_NO_DICTIONARY_METADATA : FLOAT_MV_NO_DICTIONARY_METADATA;
           break;
         case "DOUBLE":
-          _resultMetadata = DOUBLE_SV_NO_DICTIONARY_METADATA;
+          _resultMetadata = isSVCol ? DOUBLE_SV_NO_DICTIONARY_METADATA : DOUBLE_MV_NO_DICTIONARY_METADATA;
           break;
         case "DECIMAL":
         case "BIGDECIMAL":
         case "BIG_DECIMAL":
+          if (!isSVCol) {
+            // TODO: MV cast to BIG_DECIMAL type
+            throw new IllegalArgumentException(
+                "Cast is not supported on multi-value column to target type: " + targetType);
+          }
           _resultMetadata = BIG_DECIMAL_SV_NO_DICTIONARY_METADATA;
           break;
         case "BOOL":
         case "BOOLEAN":
+          if (!isSVCol) {
+            throw new IllegalArgumentException(
+                "Cast is not supported on multi-value column to target type: " + targetType);
+          }
           _resultMetadata = BOOLEAN_SV_NO_DICTIONARY_METADATA;
           break;
         case "TIMESTAMP":
+          if (!isSVCol) {
+            throw new IllegalArgumentException(
+                "Cast is not supported on multi-value column to target type: " + targetType);
+          }
           _resultMetadata = TIMESTAMP_SV_NO_DICTIONARY_METADATA;
           break;
         case "STRING":
         case "VARCHAR":
-          _resultMetadata = STRING_SV_NO_DICTIONARY_METADATA;
+          _resultMetadata = isSVCol ? STRING_SV_NO_DICTIONARY_METADATA : STRING_MV_NO_DICTIONARY_METADATA;
           break;
         case "JSON":
+          if (!isSVCol) {
+            throw new IllegalArgumentException(
+                "Cast is not supported on multi-value column to target type: " + targetType);
+          }
           _resultMetadata = JSON_SV_NO_DICTIONARY_METADATA;
           break;
         default:
@@ -94,6 +112,55 @@ public class CastTransformFunction extends BaseTransformFunction {
   @Override
   public TransformResultMetadata getResultMetadata() {
     return _resultMetadata;
+  }
+
+  @Override
+  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
+    DataType resultStoredType = _resultMetadata.getDataType().getStoredType();
+    if (resultStoredType == DataType.DOUBLE) {
+      return _transformFunction.transformToDoubleValuesMV(projectionBlock);
+    } else {
+      return super.transformToDoubleValuesMV(projectionBlock);
+    }
+  }
+
+  @Override
+  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
+    if (_resultMetadata.getDataType().getStoredType() == DataType.STRING) {
+      return _transformFunction.transformToStringValuesMV(projectionBlock);
+    } else {
+      return super.transformToStringValuesMV(projectionBlock);
+    }
+  }
+
+  @Override
+  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
+    DataType resultStoredType = _resultMetadata.getDataType().getStoredType();
+    if (resultStoredType == DataType.INT) {
+      return _transformFunction.transformToIntValuesMV(projectionBlock);
+    } else {
+      return super.transformToIntValuesMV(projectionBlock);
+    }
+  }
+
+  @Override
+  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
+    DataType resultStoredType = _resultMetadata.getDataType().getStoredType();
+    if (resultStoredType == DataType.FLOAT) {
+      return _transformFunction.transformToFloatValuesMV(projectionBlock);
+    } else {
+      return super.transformToFloatValuesMV(projectionBlock);
+    }
+  }
+
+  @Override
+  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
+    DataType resultStoredType = _resultMetadata.getDataType().getStoredType();
+    if (resultStoredType == DataType.LONG) {
+      return _transformFunction.transformToLongValuesMV(projectionBlock);
+    } else {
+      return super.transformToLongValuesMV(projectionBlock);
+    }
   }
 
   @Override

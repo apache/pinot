@@ -85,7 +85,8 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator<GroupByRe
     int minTrimSize = queryContext.getMinServerGroupTrimSize();
     if (minTrimSize > 0) {
       int limit = queryContext.getLimit();
-      if (queryContext.getOrderByExpressions() != null || queryContext.getHavingFilter() != null) {
+      if ((!queryContext.isServerReturnFinalResult() && queryContext.getOrderByExpressions() != null)
+          || queryContext.getHavingFilter() != null) {
         _trimSize = GroupByUtils.getTableCapacity(limit, minTrimSize);
       } else {
         // TODO: Keeping only 'LIMIT' groups can cause inaccurate result because the groups are randomly selected
@@ -128,9 +129,10 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator<GroupByRe
    * Executes query on one segment in a worker thread and merges the results into the indexed table.
    */
   @Override
-  protected void processSegments(int taskIndex) {
-    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
-      Operator operator = _operators.get(operatorIndex);
+  protected void processSegments() {
+    int operatorId;
+    while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
+      Operator operator = _operators.get(operatorId);
       try {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
@@ -252,7 +254,11 @@ public class GroupByOrderByCombineOperator extends BaseCombineOperator<GroupByRe
     }
 
     IndexedTable indexedTable = _indexedTable;
-    indexedTable.finish(false);
+    if (!_queryContext.isServerReturnFinalResult()) {
+      indexedTable.finish(false);
+    } else {
+      indexedTable.finish(true, true);
+    }
     GroupByResultsBlock mergedBlock = new GroupByResultsBlock(indexedTable);
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
     mergedBlock.setNumResizes(indexedTable.getNumResizes());

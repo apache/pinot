@@ -48,6 +48,15 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs related to record aggregation function applied during ingestion")
   private List<AggregationConfig> _aggregationConfigs;
 
+  @JsonPropertyDescription("Configs related to skip any row which has error and continue during ingestion")
+  private boolean _continueOnError;
+
+  @JsonPropertyDescription("Configs related to validate time value for each record during ingestion")
+  private boolean _rowTimeValueCheck = true;
+
+  @JsonPropertyDescription("Configs related to check time value for segment")
+  private boolean _segmentTimeValueCheck = true;
+
   @Deprecated
   public IngestionConfig(@Nullable BatchIngestionConfig batchIngestionConfig,
       @Nullable StreamIngestionConfig streamIngestionConfig, @Nullable FilterConfig filterConfig,
@@ -94,6 +103,18 @@ public class IngestionConfig extends BaseJsonConfig {
     return _aggregationConfigs;
   }
 
+  public boolean isContinueOnError() {
+    return _continueOnError;
+  }
+
+  public boolean isRowTimeValueCheck() {
+    return _rowTimeValueCheck;
+  }
+
+  public boolean isSegmentTimeValueCheck() {
+    return _segmentTimeValueCheck;
+  }
+
   public void setBatchIngestionConfig(BatchIngestionConfig batchIngestionConfig) {
     _batchIngestionConfig = batchIngestionConfig;
   }
@@ -116,5 +137,17 @@ public class IngestionConfig extends BaseJsonConfig {
 
   public void setAggregationConfigs(List<AggregationConfig> aggregationConfigs) {
     _aggregationConfigs = aggregationConfigs;
+  }
+
+  public void setContinueOnError(boolean continueOnError) {
+    _continueOnError = continueOnError;
+  }
+
+  public void setRowTimeValueCheck(boolean rowTimeValueCheck) {
+    _rowTimeValueCheck = rowTimeValueCheck;
+  }
+
+  public void setSegmentTimeValueCheck(boolean segmentTimeValueCheck) {
+    _segmentTimeValueCheck = segmentTimeValueCheck;
   }
 }

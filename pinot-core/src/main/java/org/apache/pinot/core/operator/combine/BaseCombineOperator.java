@@ -26,6 +26,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
@@ -60,7 +61,9 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   protected final ExecutorService _executorService;
   protected final int _numTasks;
   protected final Future[] _futures;
-  // Use a _blockingQueue to store the intermediate results blocks
+  // Use an AtomicInteger to track the next operator to execute
+  protected final AtomicInteger _nextOperatorId = new AtomicInteger();
+  // Use a BlockingQueue to store the intermediate results blocks
   protected final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
   protected final AtomicLong _totalWorkerThreadCpuTimeNs = new AtomicLong(0);
 
@@ -86,7 +89,6 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     Phaser phaser = new Phaser(1);
     Tracing.activeRecording().setNumTasks(_numTasks);
     for (int i = 0; i < _numTasks; i++) {
-      int taskIndex = i;
       _futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
@@ -100,7 +102,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
             return;
           }
           try {
-            processSegments(taskIndex);
+            processSegments();
           } catch (EarlyTerminationException e) {
             // Early-terminated by interruption (canceled by the main thread)
           } catch (Exception e) {
@@ -151,9 +153,10 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   /**
    * Executes query on one or more segments in a worker thread.
    */
-  protected void processSegments(int taskIndex) {
-    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
-      Operator operator = _operators.get(operatorIndex);
+  protected void processSegments() {
+    int operatorId;
+    while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
+      Operator operator = _operators.get(operatorId);
       T resultsBlock;
       try {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
@@ -176,14 +179,14 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   }
 
   /**
-   * Invoked when {@link #processSegments(int)} throws exception.
+   * Invoked when {@link #processSegments()} throws exception.
    */
   protected void onException(Exception e) {
     _blockingQueue.offer(new ExceptionResultsBlock(e));
   }
 
   /**
-   * Invoked when {@link #processSegments(int)} is finished (called in the finally block).
+   * Invoked when {@link #processSegments()} is finished (called in the finally block).
    */
   protected void onFinish() {
   }

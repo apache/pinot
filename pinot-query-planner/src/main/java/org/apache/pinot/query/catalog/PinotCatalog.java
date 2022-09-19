@@ -31,6 +31,7 @@ import org.apache.calcite.schema.SchemaVersion;
 import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static java.util.Objects.requireNonNull;
@@ -86,12 +87,12 @@ public class PinotCatalog implements Schema {
 
   @Override
   public Collection<Function> getFunctions(String name) {
-    return Collections.emptyList();
+    return FunctionRegistry.getRegisteredCalciteFunctions(name);
   }
 
   @Override
   public Set<String> getFunctionNames() {
-    return Collections.emptySet();
+    return FunctionRegistry.getRegisteredCalciteFunctionNames();
   }
 
   @Override

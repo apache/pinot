@@ -100,6 +100,27 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
 
   /**
+   * Test features supported in V2 Multi-stage Engine.
+   * - Some V1 features will not be supported.
+   * - Some V1 features will be added as V2 engine feature development progresses.
+   * @throws Exception
+   */
+  public void testHardcodedQueriesMultiStage()
+      throws Exception {
+    testHardcodedQueriesCommon();
+  }
+
+  /**
+   * Test hard-coded queries.
+   * @throws Exception
+   */
+  public void testHardcodedQueries()
+      throws Exception {
+    testHardcodedQueriesCommon();
+    testHardCodedQueriesV1();
+  }
+
+  /**
    * Test hardcoded queries.
    * <p>NOTE:
    * <p>For queries with <code>LIMIT</code>, need to remove limit or add <code>LIMIT 10000</code> to the H2 SQL query
@@ -118,9 +139,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    * TODO: Selection queries, Aggregation Group By queries, Order By, Distinct
    *  This list is very basic right now (aggregations only) and needs to be enriched
    */
-  public void testHardcodedQueries()
+  private void testHardcodedQueriesCommon()
       throws Exception {
-    String query = "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
+    String query;
+    String h2Query;
+    query = "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
     testQuery(query);
     query = "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE CarrierDelay=15 AND "
         + "ArrDelay > CarrierDelay ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
@@ -134,24 +157,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT count(*) FROM mytable WHERE AirlineID > 20355 AND OriginState BETWEEN 'PA' AND 'DE' AND DepTime <> "
         + "2202 LIMIT 21";
     testQuery(query);
-    query =
-        "SELECT SUM(CAST(CAST(ArrTime AS varchar) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
-            + "'DL'";
-    testQuery(query);
-    query =
-        "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL' "
-            + "ORDER BY ArrTime DESC";
-    testQuery(query);
-    query =
-        "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND DivAirportSeqIDs IN (1078102, 1142303,"
-            + " 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
-    String h2Query =
-        "SELECT DistanceGroup FROM mytable WHERE Month BETWEEN 1 AND 1 AND (DivAirportSeqIDs__MV0 IN (1078102, "
-            + "1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV1 IN (1078102, 1142303, 1530402, 1172102, "
-            + "1291503) OR DivAirportSeqIDs__MV2 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR "
-            + "DivAirportSeqIDs__MV3 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV4 IN "
-            + "(1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000";
-    testQuery(query, h2Query);
     query = "SELECT MAX(Quarter), MAX(FlightNum) FROM mytable LIMIT 8";
     h2Query = "SELECT MAX(Quarter),MAX(FlightNum) FROM mytable LIMIT 10000";
     testQuery(query, h2Query);
@@ -181,22 +186,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testQuery(query);
     query = "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10 FROM mytable WHERE ArrTime - 100 > 0";
     testQuery(query);
-    query =
-        "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ADD(ArrTime + 5, ArrDelay), ADD(ArrTime * 5, ArrDelay)"
-            + " FROM mytable WHERE mult((ArrTime - 100), (5 + ArrDelay))> 0";
-    h2Query =
-        "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ArrTime + 5 + ArrDelay, ArrTime * 5 + ArrDelay FROM "
-            + "mytable WHERE (ArrTime - 100) * (5 + ArrDelay)> 0";
-    testQuery(query, h2Query);
-    query = "SELECT COUNT(*) AS \"date\", MAX(ArrTime) AS \"group\", MIN(ArrTime) AS min FROM myTable";
-    testQuery(query);
-
-    // LIKE
-    query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
-    testQuery(query);
-    query = "SELECT count(*) FROM mytable WHERE DestCityName LIKE 'C%'";
-    testQuery(query);
-    query = "SELECT count(*) FROM mytable WHERE DestCityName LIKE '_h%'";
+    query = "SELECT COUNT(*) AS \"date\", MAX(ArrTime) AS \"group\", MIN(ArrTime) AS \"min\" FROM mytable";
     testQuery(query);
 
     // NOT
@@ -235,7 +225,59 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT DaysSinceEpoch, MAX(ArrDelay) - MAX(AirTime) AS Diff FROM mytable GROUP BY DaysSinceEpoch HAVING "
         + "(Diff >= 300 AND Diff < 500) OR Diff < -500 ORDER BY Diff DESC";
     testQuery(query);
+  }
 
+  private void testHardCodedQueriesV1()
+      throws Exception {
+    String query;
+    String h2Query;
+    // Escape quotes
+    // TODO: move to common when multistage support correct escaping strategy.
+    query = "SELECT DistanceGroup FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', "
+        + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
+    h2Query = "SELECT DistanceGroup FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
+    testQuery(query, h2Query);
+
+    // LIKE
+    // TODO: move to common when multistage support LIKE
+    query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
+    testQuery(query);
+    query = "SELECT count(*) FROM mytable WHERE DestCityName LIKE 'C%'";
+    testQuery(query);
+    query = "SELECT count(*) FROM mytable WHERE DestCityName LIKE '_h%'";
+    testQuery(query);
+
+    // Non-Standard functions
+    // mult is not a standard function.
+    query =
+        "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ADD(ArrTime + 5, ArrDelay), ADD(ArrTime * 5, ArrDelay)"
+            + " FROM mytable WHERE mult((ArrTime - 100), (5 + ArrDelay))> 0";
+    h2Query =
+        "SELECT ArrTime, ArrTime + ArrTime * 9 - ArrTime * 10, ArrTime + 5 + ArrDelay, ArrTime * 5 + ArrDelay FROM "
+            + "mytable WHERE (ArrTime - 100) * (5 + ArrDelay)> 0";
+    testQuery(query, h2Query);
+    // TODO: move to common when multistage support CAST AS 'LONG', for now it must use: CAST AS BIGINT
+    query =
+        "SELECT SUM(CAST(CAST(ArrTime AS varchar) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
+            + "'DL'";
+    testQuery(query);
+    query =
+        "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL' "
+            + "ORDER BY ArrTime DESC";
+    testQuery(query);
+    // TODO: move to common when multistage support MV columns
+    query =
+        "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND DivAirportSeqIDs IN (1078102, 1142303,"
+            + " 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
+    h2Query =
+        "SELECT DistanceGroup FROM mytable WHERE Month BETWEEN 1 AND 1 AND (DivAirportSeqIDs__MV0 IN (1078102, "
+            + "1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV1 IN (1078102, 1142303, 1530402, 1172102, "
+            + "1291503) OR DivAirportSeqIDs__MV2 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR "
+            + "DivAirportSeqIDs__MV3 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV4 IN "
+            + "(1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000";
+    testQuery(query, h2Query);
+
+    // Non-Standard SQL syntax:
     // IN_ID_SET
     {
       IdSet idSet = IdSets.create(FieldSpec.DataType.LONG);
@@ -270,12 +312,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
               + "DaysSinceEpoch = 16430)";
       testQuery(notInSubqueryQuery, notInQuery);
     }
-
-    // Escape quotes
-    query = "SELECT DistanceGroup FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', "
-        + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
-    h2Query = "SELECT DistanceGroup FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
-    testQuery(query, h2Query);
   }
 
   /**

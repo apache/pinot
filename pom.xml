@@ -126,7 +126,7 @@
     <helix.version>1.0.4</helix.version>
     <zkclient.version>0.7</zkclient.version>
     <jackson.version>2.12.7</jackson.version>
-    <zookeeper.version>3.5.8</zookeeper.version>
+    <zookeeper.version>3.5.10</zookeeper.version>
     <async-http-client.version>2.12.3</async-http-client.version>
     <jersey.version>2.35</jersey.version>
     <grizzly.version>2.4.4</grizzly.version>
@@ -154,7 +154,7 @@
     <netty.version>4.1.79.Final</netty.version>
     <reactivestreams.version>1.0.3</reactivestreams.version>
     <jts.version>1.16.1</jts.version>
-    <h3.version>3.7.2</h3.version>
+    <h3.version>4.0.0</h3.version>
     <jmh.version>1.26</jmh.version>
     <audienceannotations.version>0.13.0</audienceannotations.version>
 

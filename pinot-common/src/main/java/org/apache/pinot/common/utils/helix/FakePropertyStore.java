@@ -19,7 +19,9 @@
 package org.apache.pinot.common.utils.helix;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -38,6 +40,15 @@ public class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
   @Override
   public ZNRecord get(String path, Stat stat, int options) {
     return _contents.get(path);
+  }
+
+  @Override
+  public List<String> getChildNames(String parentPath, int options) {
+    return _contents.keySet().stream()
+        .filter(e -> e.startsWith(parentPath))
+        .map(e -> e.replaceFirst(parentPath + "/", "").split("/")[0])
+        .distinct()
+        .collect(Collectors.toList());
   }
 
   @Override
@@ -72,7 +83,8 @@ public class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
 
   @Override
   public boolean remove(String path, int options) {
-    _contents.remove(path);
+    List<String> descendants = _contents.keySet().stream().filter(e -> e.startsWith(path)).collect(Collectors.toList());
+    descendants.forEach(e -> _contents.remove(e));
     return true;
   }
 

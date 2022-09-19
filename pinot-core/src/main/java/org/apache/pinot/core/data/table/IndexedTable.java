@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -54,7 +55,7 @@ public abstract class IndexedTable extends BaseTable {
    *
    * @param dataSchema    Data schema of the table
    * @param queryContext  Query context
-   * @param resultSize    Number of records to keep in the final result after calling {@link #finish(boolean)}
+   * @param resultSize    Number of records to keep in the final result after calling {@link #finish(boolean, boolean)}
    * @param trimSize      Number of records to keep when trimming the table
    * @param trimThreshold Trim the table when the number of records exceeds the threshold
    * @param lookupMap     Map from keys to records
@@ -144,7 +145,7 @@ public abstract class IndexedTable extends BaseTable {
   }
 
   @Override
-  public void finish(boolean sort) {
+  public void finish(boolean sort, boolean storeFinalResult) {
     if (_hasOrderBy) {
       long startTimeNs = System.nanoTime();
       _topRecords = _tableResizer.getTopRecords(_lookupMap, _resultSize, sort);
@@ -153,6 +154,21 @@ public abstract class IndexedTable extends BaseTable {
       _resizeTimeNs += resizeTimeNs;
     } else {
       _topRecords = _lookupMap.values();
+    }
+    // TODO: Directly return final result in _tableResizer.getTopRecords to avoid extracting final result multiple times
+    if (storeFinalResult) {
+      ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
+      int numAggregationFunctions = _aggregationFunctions.length;
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        columnDataTypes[i + _numKeyColumns] = _aggregationFunctions[i].getFinalResultColumnType();
+      }
+      for (Record record : _topRecords) {
+        Object[] values = record.getValues();
+        for (int i = 0; i < numAggregationFunctions; i++) {
+          int colId = i + _numKeyColumns;
+          values[colId] = _aggregationFunctions[i].extractFinalResult(values[colId]);
+        }
+      }
     }
   }
 

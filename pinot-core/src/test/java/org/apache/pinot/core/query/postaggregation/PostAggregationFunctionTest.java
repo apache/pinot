@@ -25,6 +25,8 @@ import org.locationtech.jts.geom.Coordinate;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class PostAggregationFunctionTest {
@@ -63,5 +65,11 @@ public class PostAggregationFunctionTest {
     function = new PostAggregationFunction("cast", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
     assertEquals(function.getResultType(), ColumnDataType.OBJECT);
     assertEquals(function.invoke(new Object[]{1, "LONG"}), 1L);
+
+    // NOT
+    function = new PostAggregationFunction("not", new ColumnDataType[]{ColumnDataType.BOOLEAN});
+    assertEquals(function.getResultType(), ColumnDataType.BOOLEAN);
+    assertFalse((Boolean) function.invoke(new Object[]{true}));
+    assertTrue((Boolean) function.invoke(new Object[]{false}));
   }
 }

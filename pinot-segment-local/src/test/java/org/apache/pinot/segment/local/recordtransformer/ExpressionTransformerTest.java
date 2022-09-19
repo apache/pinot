@@ -67,7 +67,7 @@ public class ExpressionTransformerTest {
         .setIngestionConfig(ingestionConfig).build();
 
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
-    DataTypeTransformer dataTypeTransformer = new DataTypeTransformer(pinotSchema);
+    DataTypeTransformer dataTypeTransformer = new DataTypeTransformer(tableConfig, pinotSchema);
 
     // test functions from schema
     GenericRow genericRow = new GenericRow();
@@ -337,5 +337,67 @@ public class ExpressionTransformerTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testRecrusiveTransformFunctionSortOrder")
             .setIngestionConfig(ingestionConfig).build();
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+  }
+
+  @Test
+  public void testTransformFunctionWithWrongInput() {
+    Schema pinotSchema = new Schema();
+    DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("x", FieldSpec.DataType.INT, true);
+    pinotSchema.addField(dimensionFieldSpec);
+    List<TransformConfig> transformConfigs = Collections.singletonList(
+        new TransformConfig("y", "plus(x, 10)"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testTransformFunctionWithWrongInput")
+            .setIngestionConfig(ingestionConfig)
+            .build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
+    // Valid case: x is int, y is int
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("x", 10);
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("y"), 20.0);
+    // Invalid case: x is string, y is int
+    genericRow = new GenericRow();
+    genericRow.putValue("x", "abcd");
+    try {
+      expressionTransformer.transform(genericRow);
+      Assert.fail();
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "Caught exception while executing function: plus(x,'10')");
+    }
+  }
+
+  @Test
+  public void testTransformFunctionContinueOnError() {
+    Schema pinotSchema = new Schema();
+    DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("x", FieldSpec.DataType.INT, true);
+    pinotSchema.addField(dimensionFieldSpec);
+    List<TransformConfig> transformConfigs = Collections.singletonList(
+        new TransformConfig("y", "plus(x, 10)"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(transformConfigs);
+    ingestionConfig.setContinueOnError(true);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testTransformFunctionWithWrongInput")
+            .setIngestionConfig(ingestionConfig)
+            .build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
+    // Valid case: x is int, y is int
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("x", 10);
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("y"), 20.0);
+    // Invalid case: x is string, y is int
+    genericRow = new GenericRow();
+    genericRow.putValue("x", "abcd");
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("y"), null);
+    // Invalid case: x is null, y is int
+    genericRow = new GenericRow();
+    genericRow.putValue("x", null);
+    expressionTransformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("y"), null);
   }
 }

@@ -129,7 +129,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
    * documents to fulfill the LIMIT and OFFSET requirement.
    */
   @Override
-  protected void processSegments(int taskIndex) {
+  protected void processSegments() {
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     assert orderByExpressions != null;
     int numOrderByExpressions = orderByExpressions.size();
@@ -144,7 +144,8 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
     //       segment result is merged.
     Comparable threadBoundaryValue = null;
 
-    for (int operatorIndex = taskIndex; operatorIndex < _numOperators; operatorIndex += _numTasks) {
+    int operatorId;
+    while ((operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       // Calculate the boundary value from global boundary and thread boundary
       Comparable boundaryValue = _globalBoundaryValue.get();
       if (boundaryValue == null) {
@@ -164,7 +165,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
       }
 
       // Check if the segment can be skipped
-      MinMaxValueContext minMaxValueContext = _minMaxValueContexts.get(operatorIndex);
+      MinMaxValueContext minMaxValueContext = _minMaxValueContexts.get(operatorId);
       if (boundaryValue != null) {
         if (asc) {
           // For ascending order, no need to process more segments if the column min value is larger than the
@@ -172,7 +173,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
           if (minMaxValueContext._minValue != null) {
             int result = minMaxValueContext._minValue.compareTo(boundaryValue);
             if (result > 0 || (result == 0 && numOrderByExpressions == 1)) {
-              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numTasks);
+              _numOperatorsSkipped.getAndAdd((_numOperators - operatorId - 1) / _numTasks);
               _blockingQueue.offer(LAST_RESULTS_BLOCK);
               return;
             }
@@ -183,7 +184,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator extends BaseCombine
           if (minMaxValueContext._maxValue != null) {
             int result = minMaxValueContext._maxValue.compareTo(boundaryValue);
             if (result < 0 || (result == 0 && numOrderByExpressions == 1)) {
-              _numOperatorsSkipped.getAndAdd((_numOperators - operatorIndex - 1) / _numTasks);
+              _numOperatorsSkipped.getAndAdd((_numOperators - operatorId - 1) / _numTasks);
               _blockingQueue.offer(LAST_RESULTS_BLOCK);
               return;
             }

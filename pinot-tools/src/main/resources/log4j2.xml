@@ -39,6 +39,25 @@
       </Policies>
       <DefaultRolloverStrategy max="10"/>
     </RollingFile>
+    <Routing name="taskLogs" ignoreExceptions="false">
+      <Routes pattern="${ctx:taskId}">
+        <Route>
+          <RollingFile
+              name="minionTaskLogs-${ctx:taskId}"
+              fileName="${env:LOG_ROOT}/minionTaskLogs-${ctx:taskId:-default}.log"
+              filePattern="${env:LOG_ROOT}/minionTaskLogs-%d{yyyy-MM-dd}-%i.log"
+              immediateFlush="true">
+            <PatternLayout pattern="${env:LOG_PATTERN}"/>
+            <Policies>
+              <SizeBasedTriggeringPolicy size="19500KB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="50"/>
+          </RollingFile>
+        </Route>
+      </Routes>
+      <!-- Created appender TTL -->
+      <IdlePurgePolicy timeToLive="15" timeUnit="minutes"/>
+    </Routing>
   </Appenders>
   <Loggers>
     <Root level="info" additivity="false">

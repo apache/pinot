@@ -132,7 +132,7 @@ public class RecordTransformerTest {
 
   @Test
   public void testDataTypeTransformer() {
-    RecordTransformer transformer = new DataTypeTransformer(SCHEMA);
+    RecordTransformer transformer = new DataTypeTransformer(TABLE_CONFIG, SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);
@@ -158,6 +158,94 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
       assertTrue(record.getNullValueFields().isEmpty());
+    }
+  }
+
+  @Test
+  public void testDataTypeTransformerIncorrectDataTypes() {
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", DataType.BYTES)
+        .addSingleValueDimension("svLong", DataType.LONG).build();
+
+    RecordTransformer transformer = new DataTypeTransformer(TABLE_CONFIG, schema);
+    GenericRow record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      assertThrows(() -> transformer.transform(record));
+    }
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setContinueOnError(true);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setIngestionConfig(ingestionConfig).setTableName("testTable").build();
+
+    RecordTransformer transformerWithDefaultNulls = new DataTypeTransformer(tableConfig, schema);
+    GenericRow record1 = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record1 = transformerWithDefaultNulls.transform(record1);
+      assertNotNull(record1);
+      assertNull(record1.getValue("svInt"));
+    }
+  }
+
+  @Test
+  public void testDataTypeTransformerInvalidTimestamp() {
+    // Invalid Timestamp and Validation disabled
+    String timeCol = "timeCol";
+    Schema schema = new Schema.SchemaBuilder().addDateTime(timeCol, DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP",
+        "1:MILLISECONDS").build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(timeCol).setTableName("testTable").build();
+
+    RecordTransformer transformer = new DataTypeTransformer(tableConfig, schema);
+    GenericRow record = getRecord();
+    record.putValue(timeCol, 1L);
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue(timeCol), 1L);
+    }
+
+    // Invalid Timestamp and Validation enabled
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setRowTimeValueCheck(true);
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(timeCol)
+            .setIngestionConfig(ingestionConfig)
+            .setTableName("testTable").build();
+
+    RecordTransformer transformerWithValidation = new DataTypeTransformer(tableConfig, schema);
+    GenericRow record1 = getRecord();
+    record1.putValue(timeCol, 1L);
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      assertThrows(() -> transformerWithValidation.transform(record1));
+    }
+
+    // Invalid timestamp, validation enabled and ignoreErrors enabled
+    ingestionConfig = new IngestionConfig();
+    ingestionConfig.setRowTimeValueCheck(true);
+    ingestionConfig.setContinueOnError(true);
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTimeColumnName(timeCol)
+            .setIngestionConfig(ingestionConfig)
+            .setTableName("testTable").build();
+
+    transformer = new DataTypeTransformer(tableConfig, schema);
+    GenericRow record2 = getRecord();
+    record2.putValue(timeCol, 1L);
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record2 = transformer.transform(record2);
+      assertNotNull(record2);
+      assertNull(record2.getValue(timeCol));
+    }
+
+    // Valid timestamp
+    transformer = new DataTypeTransformer(TABLE_CONFIG, schema);
+    GenericRow record3 = getRecord();
+    Long currentTimeMillis = System.currentTimeMillis();
+    record3.putValue(timeCol, currentTimeMillis);
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record3 = transformer.transform(record3);
+      assertNotNull(record3);
+      assertEquals(record3.getValue(timeCol), currentTimeMillis);
     }
   }
 

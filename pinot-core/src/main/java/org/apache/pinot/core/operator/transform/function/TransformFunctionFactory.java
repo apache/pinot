@@ -125,12 +125,13 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.MINUTE, DateTimeTransformFunction.Minute.class);
     typeToImplementation.put(TransformFunctionType.SECOND, DateTimeTransformFunction.Second.class);
     typeToImplementation.put(TransformFunctionType.MILLISECOND, DateTimeTransformFunction.Millisecond.class);
-    typeToImplementation.put(TransformFunctionType.ARRAYLENGTH,
-        ArrayLengthTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAYLENGTH, ArrayLengthTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.VALUEIN, ValueInTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.MAPVALUE, MapValueTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.INIDSET, InIdSetTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOOKUP, LookupTransformFunction.class);
+
+    typeToImplementation.put(TransformFunctionType.EXTRACT, ExtractTransformFunction.class);
 
     // Regexp functions
     typeToImplementation.put(TransformFunctionType.REGEXP_EXTRACT,
@@ -160,6 +161,7 @@ public class TransformFunctionFactory {
     // logical functions
     typeToImplementation.put(TransformFunctionType.AND, AndOperatorTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.OR, OrOperatorTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.NOT, NotOperatorTransformFunction.class);
 
     // geo functions
     // geo constructors
@@ -200,6 +202,9 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.IS_NULL, IsNullTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.IS_NOT_NULL,
         IsNotNullTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.COALESCE, CoalesceTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IS_DISTINCT_FROM, IsDistinctFromTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IS_NOT_DISTINCT_FROM, IsNotDistinctFromTransformFunction.class);
 
     // Trignometric functions
     typeToImplementation.put(TransformFunctionType.SIN, SinTransformFunction.class);
