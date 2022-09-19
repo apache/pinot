@@ -20,23 +20,22 @@ package org.apache.pinot.spi.utils;
 
 import groovy.text.SimpleTemplateEngine;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
-
 
 public class GroovyTemplateUtils {
   private GroovyTemplateUtils() {
   }
 
   private static final SimpleTemplateEngine GROOVY_TEMPLATE_ENGINE = new SimpleTemplateEngine();
-  private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
+  private static final DateTimeFormatter DATE_FORMAT =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC);
 
   public static String renderTemplate(String template, Map<String, Object> newContext)
       throws IOException, ClassNotFoundException {
@@ -53,8 +52,8 @@ public class GroovyTemplateUtils {
   public static Map<String, Object> getDefaultContextMap() {
     Map<String, Object> defaultContextMap = new HashMap<>();
     Instant now = Instant.now();
-    defaultContextMap.put("today", DATE_FORMAT.format(new Date(now.toEpochMilli())));
-    defaultContextMap.put("yesterday", DATE_FORMAT.format(new Date(now.minus(1, ChronoUnit.DAYS).toEpochMilli())));
+    defaultContextMap.put("today", DATE_FORMAT.format(now));
+    defaultContextMap.put("yesterday", DATE_FORMAT.format(now.minus(1, ChronoUnit.DAYS)));
     return defaultContextMap;
   }
 
@@ -78,7 +77,6 @@ public class GroovyTemplateUtils {
   }
 
   static {
-    DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
     GROOVY_TEMPLATE_ENGINE.setEscapeBackslash(true);
   }
 }
