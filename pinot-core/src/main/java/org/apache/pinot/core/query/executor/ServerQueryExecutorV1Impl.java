@@ -297,7 +297,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     //
     // After step 2 but before step 4, segment will be missing on server side
     // TODO: Change broker to watch both IdealState and ExternalView to not query the removed segments
-    long numMissingSegments = missingSegments.size();
+    int numMissingSegments = missingSegments.size();
     if (numMissingSegments != 0) {
       dataTable.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR,
           String.format("%d segments %s missing on server: %s", numMissingSegments, missingSegments,

@@ -375,7 +375,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Override
   public void addSegment(ImmutableSegment immutableSegment) {
-    _deletedSegments.invalidate(immutableSegment.getSegmentName());
     if (isUpsertEnabled()) {
       handleUpsert(immutableSegment);
       return;
