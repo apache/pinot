@@ -69,6 +69,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -175,7 +176,7 @@ public class ClusterIntegrationTestUtils {
                 if (i < array.size()) {
                   value = array.get(i);
                   if (value instanceof Utf8) {
-                    value = value.toString();
+                    value = StringUtil.sanitizeStringValue(value.toString(), FieldSpec.DEFAULT_MAX_LENGTH);
                   }
                 } else {
                   value = null;
@@ -184,7 +185,7 @@ public class ClusterIntegrationTestUtils {
               }
             } else {
               if (value instanceof Utf8) {
-                value = value.toString();
+                value = StringUtil.sanitizeStringValue(value.toString(), FieldSpec.DEFAULT_MAX_LENGTH);
               }
               h2Statement.setObject(h2Index++, value);
             }
