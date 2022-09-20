@@ -36,7 +36,7 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.segment.local.realtime.converter.ColumnDescriptionsContainer;
+import org.apache.pinot.segment.local.realtime.converter.ColumnIndicesForRealtimeTable;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
@@ -276,15 +276,15 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           updateCurrentDocumentCountMetrics();
           _segmentLogger.info("Indexed {} raw events", _realtimeSegment.getNumDocsIndexed());
           File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + System.currentTimeMillis());
+          ColumnIndicesForRealtimeTable columnIndicesForRealtimeTable =
+              new ColumnIndicesForRealtimeTable(_sortedColumn, _invertedIndexColumns, Collections.emptyList(),
+                  Collections.emptyList(), new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns()),
+                  new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns()));
           // lets convert the segment now
-          ColumnDescriptionsContainer cdc = new ColumnDescriptionsContainer(_sortedColumn, _invertedIndexColumns,
-              Collections.emptyList(), Collections.emptyList(),
-              new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns()),
-              new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns()));
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(_realtimeSegment, null, tempSegmentFolder.getAbsolutePath(),
-                  schema, _tableNameWithType, tableConfig, segmentZKMetadata.getSegmentName(), cdc,
-                  indexingConfig.isNullHandlingEnabled());
+                  schema, _tableNameWithType, tableConfig, segmentZKMetadata.getSegmentName(),
+                  columnIndicesForRealtimeTable, indexingConfig.isNullHandlingEnabled());
 
           _segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();

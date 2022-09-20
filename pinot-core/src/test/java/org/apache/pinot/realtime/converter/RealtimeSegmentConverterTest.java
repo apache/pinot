@@ -27,7 +27,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
-import org.apache.pinot.segment.local.realtime.converter.ColumnDescriptionsContainer;
+import org.apache.pinot.segment.local.realtime.converter.ColumnIndicesForRealtimeTable;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
@@ -123,7 +123,7 @@ public class RealtimeSegmentConverterTest {
     SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
     segmentZKPropsConfig.setStartOffset("1");
     segmentZKPropsConfig.setEndOffset("100");
-    ColumnDescriptionsContainer cdc = new ColumnDescriptionsContainer(indexingConfig.getSortedColumn().get(0),
+    ColumnIndicesForRealtimeTable cdc = new ColumnIndicesForRealtimeTable(indexingConfig.getSortedColumn().get(0),
         indexingConfig.getInvertedIndexColumns(), null, null,
         indexingConfig.getNoDictionaryColumns(), indexingConfig.getVarLengthDictionaryColumns());
     RealtimeSegmentConverter converter =

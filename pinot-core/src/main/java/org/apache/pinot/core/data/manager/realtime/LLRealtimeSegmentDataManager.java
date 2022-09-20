@@ -49,7 +49,7 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.segment.local.realtime.converter.ColumnDescriptionsContainer;
+import org.apache.pinot.segment.local.realtime.converter.ColumnIndicesForRealtimeTable;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
@@ -265,7 +265,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private StreamMetadataProvider _streamMetadataProvider = null;
   private final File _resourceTmpDir;
   private final String _tableNameWithType;
-  private final ColumnDescriptionsContainer _columnDescriptionsContainer;
+  private final ColumnIndicesForRealtimeTable _columnIndicesForRealtimeTable;
   private final Logger _segmentLogger;
   private final String _tableStreamName;
   private final PinotDataBufferMemoryManager _memoryManager;
@@ -868,7 +868,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.getAbsolutePath(),
               _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
-              _columnDescriptionsContainer, _nullHandlingEnabled);
+              _columnIndicesForRealtimeTable, _nullHandlingEnabled);
       _segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -1330,7 +1330,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
 
-    _columnDescriptionsContainer = new ColumnDescriptionsContainer(sortedColumn,
+    _columnIndicesForRealtimeTable = new ColumnIndicesForRealtimeTable(sortedColumn,
         new ArrayList<>(invertedIndexColumns),
         new ArrayList<>(indexLoadingConfig.getTextIndexColumns()),
         new ArrayList<>(indexLoadingConfig.getFSTIndexColumns()),
@@ -1346,7 +1346,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns).setTextIndexColumns(indexLoadingConfig.getTextIndexColumns())
-            .setFSTIndexColumns(indexLoadingConfig.getFSTIndexColumns()).setJsonIndexColumns(indexLoadingConfig.getJsonIndexColumns())
+            .setFSTIndexColumns(indexLoadingConfig.getFSTIndexColumns())
+            .setJsonIndexColumns(indexLoadingConfig.getJsonIndexColumns())
             .setH3IndexConfigs(indexLoadingConfig.getH3IndexConfigs()).setSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
@@ -1526,7 +1527,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (_streamMetadataProvider != null) {
       closeStreamMetadataProvider();
     }
-    _segmentLogger.info("Creating new stream metadata provider, reason: {}", reason);
+    _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
     _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
   }
 

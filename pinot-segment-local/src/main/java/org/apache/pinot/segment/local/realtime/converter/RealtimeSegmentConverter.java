@@ -49,17 +49,17 @@ public class RealtimeSegmentConverter {
   private final String _segmentName;
   private final String _sortedColumn;
   private final List<String> _invertedIndexColumns;
-  private final ColumnDescriptionsContainer _columnDescriptionsContainer;
+  private final ColumnIndicesForRealtimeTable _columnIndicesForRealtimeTable;
   private final boolean _nullHandlingEnabled;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
       String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
-      ColumnDescriptionsContainer cdc, boolean nullHandlingEnabled) {
+      ColumnIndicesForRealtimeTable cdc, boolean nullHandlingEnabled) {
     _realtimeSegmentImpl = realtimeSegment;
     _segmentZKPropsConfig = segmentZKPropsConfig;
     _outputPath = outputPath;
-    _columnDescriptionsContainer = cdc;
-    _invertedIndexColumns = new ArrayList<>(_columnDescriptionsContainer.getInvertedIndexColumns());
+    _columnIndicesForRealtimeTable = cdc;
+    _invertedIndexColumns = new ArrayList<>(_columnIndicesForRealtimeTable.getInvertedIndexColumns());
     if (cdc.getSortedColumn() != null) {
       _invertedIndexColumns.remove(cdc.getSortedColumn());
     }
@@ -86,8 +86,8 @@ public class RealtimeSegmentConverter {
       }
     }
 
-    if (_columnDescriptionsContainer.getVarLengthDictionaryColumns() != null) {
-      genConfig.setVarLengthDictionaryColumns(_columnDescriptionsContainer.getVarLengthDictionaryColumns());
+    if (_columnIndicesForRealtimeTable.getVarLengthDictionaryColumns() != null) {
+      genConfig.setVarLengthDictionaryColumns(_columnIndicesForRealtimeTable.getVarLengthDictionaryColumns());
     }
 
     if (segmentVersion != null) {
@@ -96,8 +96,8 @@ public class RealtimeSegmentConverter {
     genConfig.setTableName(_tableName);
     genConfig.setOutDir(_outputPath);
     genConfig.setSegmentName(_segmentName);
-    genConfig.setTextIndexCreationColumns(_columnDescriptionsContainer.getTextIndexColumns());
-    genConfig.setFSTIndexCreationColumns(_columnDescriptionsContainer.getFstIndexColumns());
+    genConfig.setTextIndexCreationColumns(_columnIndicesForRealtimeTable.getTextIndexColumns());
+    genConfig.setFSTIndexCreationColumns(_columnIndicesForRealtimeTable.getFstIndexColumns());
     SegmentPartitionConfig segmentPartitionConfig = _realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
     genConfig.setNullHandlingEnabled(_nullHandlingEnabled);
