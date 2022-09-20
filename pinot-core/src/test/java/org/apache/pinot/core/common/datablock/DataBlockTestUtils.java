@@ -36,7 +36,7 @@ public class DataBlockTestUtils {
     // do not instantiate.
   }
 
-  public static Object[] getRandomRow(DataSchema dataSchema) {
+  public static Object[] getRandomRow(DataSchema dataSchema, int nullPercentile) {
     final int numColumns = dataSchema.getColumnNames().length;
     DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     Object[] row = new Object[numColumns];
@@ -114,7 +114,7 @@ public class DataBlockTestUtils {
       }
       // randomly set some entry to null
       if (columnDataTypes[colId].getStoredType() != DataSchema.ColumnDataType.OBJECT) {
-        row[colId] = randomlySettingNull(10) ? null : row[colId];
+        row[colId] = randomlySettingNull(nullPercentile) ? null : row[colId];
       }
     }
     return row;
@@ -162,10 +162,10 @@ public class DataBlockTestUtils {
     }
   }
 
-  public static List<Object[]> getRandomRows(DataSchema dataSchema, int numRows) {
+  public static List<Object[]> getRandomRows(DataSchema dataSchema, int numRows, int nullPercentile) {
     List<Object[]> rows = new ArrayList<>(numRows);
     for (int i = 0; i < numRows; i++) {
-      rows.add(getRandomRow(dataSchema));
+      rows.add(getRandomRow(dataSchema, nullPercentile));
     }
     return rows;
   }

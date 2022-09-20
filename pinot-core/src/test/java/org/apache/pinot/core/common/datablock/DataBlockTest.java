@@ -31,6 +31,7 @@ import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -65,8 +66,8 @@ public class DataBlockTest {
    *
    * @throws Exception
    */
-  @Test
-  public void testRowDataBlockCompatibleWithDataTableV4()
+  @Test(dataProvider = "testTypeNullPercentile")
+  public void testRowDataBlockCompatibleWithDataTableV4(int nullPercentile)
       throws Exception {
     DataSchema.ColumnDataType[] allDataTypes = DataSchema.ColumnDataType.values();
     List<DataSchema.ColumnDataType> columnDataTypes = new ArrayList<DataSchema.ColumnDataType>();
@@ -80,7 +81,7 @@ public class DataBlockTest {
 
     DataSchema dataSchema = new DataSchema(columnNames.toArray(new String[0]),
         columnDataTypes.toArray(new DataSchema.ColumnDataType[0]));
-    List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TEST_ROW_COUNT);
+    List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TEST_ROW_COUNT, nullPercentile);
     DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
     DataTable dataTableImpl = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema, true);
     DataTable dataBlockFromDataTable = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTableImpl.toBytes()));
@@ -102,8 +103,8 @@ public class DataBlockTest {
     }
   }
 
-  @Test
-  public void testAllDataTypes()
+  @Test(dataProvider = "testTypeNullPercentile")
+  public void testAllDataTypes(int nullPercentile)
       throws Exception {
 
     DataSchema.ColumnDataType[] allDataTypes = DataSchema.ColumnDataType.values();
@@ -118,7 +119,7 @@ public class DataBlockTest {
 
     DataSchema dataSchema = new DataSchema(columnNames.toArray(new String[]{}),
         columnDataTypes.toArray(new DataSchema.ColumnDataType[]{}));
-    List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TEST_ROW_COUNT);
+    List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TEST_ROW_COUNT, nullPercentile);
     List<Object[]> columnars = DataBlockTestUtils.convertColumnar(dataSchema, rows);
     RowDataBlock rowBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
     ColumnarDataBlock columnarBlock = DataBlockBuilder.buildFromColumns(columnars, dataSchema);
@@ -132,5 +133,10 @@ public class DataBlockTest {
             + " of Type: " + columnDataType + "! rowValue: [" + rowVal + "], columnarValue: [" + colVal + "]");
       }
     }
+  }
+
+  @DataProvider(name = "testTypeNullPercentile")
+  public Object[][] provideTestTypeNullPercentile() {
+    return new Object[][]{new Object[]{0}, new Object[]{10}, new Object[]{100}};
   }
 }
