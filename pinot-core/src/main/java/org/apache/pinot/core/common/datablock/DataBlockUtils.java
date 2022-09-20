@@ -28,6 +28,7 @@ import javax.annotation.Nonnull;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public final class DataBlockUtils {
@@ -74,7 +75,7 @@ public final class DataBlockUtils {
     }
   }
 
-  public static List<Object[]> extraRows(BaseDataBlock dataBlock) {
+  public static List<Object[]> extractRows(BaseDataBlock dataBlock) {
     DataSchema dataSchema = dataBlock.getDataSchema();
     DataSchema.ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     int numRows = dataBlock.getNumberOfRows();
@@ -132,6 +133,15 @@ public final class DataBlockUtils {
         }
       }
       rows.add(row);
+    }
+
+    for (int colId = 0; colId < numColumns; colId++) {
+      RoaringBitmap nullBitmap = dataBlock.getNullRowIds(colId);
+      if (nullBitmap != null) {
+        for (Integer rowId : nullBitmap) {
+          rows.get(rowId)[colId] = null;
+        }
+      }
     }
     return rows;
   }

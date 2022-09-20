@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -81,7 +82,7 @@ public class DataBlockTest {
         columnDataTypes.toArray(new DataSchema.ColumnDataType[0]));
     List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TEST_ROW_COUNT);
     DataTableFactory.setDataTableVersion(DataTableFactory.VERSION_4);
-    DataTable dataTableImpl = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema, false);
+    DataTable dataTableImpl = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema, true);
     DataTable dataBlockFromDataTable = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataTableImpl.toBytes()));
 
     for (int rowId = 0; rowId < TEST_ROW_COUNT; rowId++) {
@@ -93,23 +94,34 @@ public class DataBlockTest {
             + " from DataBlock: [" + rowFromBlock[rowId] + "], from DataTable: [" + rowFromDataTable[colId] + "]");
       }
     }
+
+    for (int colId = 0; colId < dataSchema.getColumnNames().length; colId++) {
+      RoaringBitmap dataBlockBitmap = dataBlockFromDataTable.getNullRowIds(colId);
+      RoaringBitmap dataTableBitmap = dataTableImpl.getNullRowIds(colId);
+      Assert.assertEquals(dataBlockBitmap, dataTableBitmap);
+    }
   }
 
   @Test
   public void testAllDataTypes()
       throws Exception {
-    DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
-    int numColumns = columnDataTypes.length;
-    String[] columnNames = new String[numColumns];
-    for (int i = 0; i < numColumns; i++) {
-      columnNames[i] = columnDataTypes[i].name();
+
+    DataSchema.ColumnDataType[] allDataTypes = DataSchema.ColumnDataType.values();
+    List<DataSchema.ColumnDataType> columnDataTypes = new ArrayList<DataSchema.ColumnDataType>();
+    List<String> columnNames = new ArrayList<String>();
+    for (int i = 0; i < allDataTypes.length; i++) {
+      if (!EXCLUDE_DATA_TYPES.contains(allDataTypes[i])) {
+        columnNames.add(allDataTypes[i].name());
+        columnDataTypes.add(allDataTypes[i]);
+      }
     }
 
-    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+    DataSchema dataSchema = new DataSchema(columnNames.toArray(new String[]{}),
+        columnDataTypes.toArray(new DataSchema.ColumnDataType[]{}));
     List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TEST_ROW_COUNT);
     List<Object[]> columnars = DataBlockTestUtils.convertColumnar(dataSchema, rows);
-    RowDataBlock rowBlock = DataBlockBuilder.buildFromRows(rows, null, dataSchema);
-    ColumnarDataBlock columnarBlock = DataBlockBuilder.buildFromColumns(columnars, null, dataSchema);
+    RowDataBlock rowBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
+    ColumnarDataBlock columnarBlock = DataBlockBuilder.buildFromColumns(columnars, dataSchema);
 
     for (int colId = 0; colId < dataSchema.getColumnNames().length; colId++) {
       DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(colId);

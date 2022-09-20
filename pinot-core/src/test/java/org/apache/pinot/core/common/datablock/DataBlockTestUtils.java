@@ -25,6 +25,7 @@ import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class DataBlockTestUtils {
@@ -100,7 +101,6 @@ public class DataBlockTestUtils {
           }
           row[colId] = doubleArray;
           break;
-        case BYTES_ARRAY:
         case STRING_ARRAY:
           length = RANDOM.nextInt(ARRAY_SIZE);
           String[] stringArray = new String[length];
@@ -112,12 +112,22 @@ public class DataBlockTestUtils {
         default:
           throw new UnsupportedOperationException("Can't fill random data for column type: " + columnDataTypes[colId]);
       }
+      // randomly set some entry to null
+      if (columnDataTypes[colId].getStoredType() != DataSchema.ColumnDataType.OBJECT) {
+        row[colId] = randomlySettingNull(10) ? null : row[colId];
+      }
     }
     return row;
   }
 
   public static Object getElement(BaseDataBlock dataBlock, int rowId, int colId,
       DataSchema.ColumnDataType columnDataType) {
+    RoaringBitmap nullBitmap = dataBlock.getNullRowIds(colId);
+    if (nullBitmap != null) {
+      if (nullBitmap.contains(rowId)) {
+        return null;
+      }
+    }
     switch (columnDataType.getStoredType()) {
       case INT:
         return dataBlock.getInt(rowId, colId);
@@ -145,7 +155,6 @@ public class DataBlockTestUtils {
         return dataBlock.getFloatArray(rowId, colId);
       case DOUBLE_ARRAY:
         return dataBlock.getDoubleArray(rowId, colId);
-      case BYTES_ARRAY:
       case STRING_ARRAY:
         return dataBlock.getStringArray(rowId, colId);
       default:
@@ -161,11 +170,6 @@ public class DataBlockTestUtils {
     return rows;
   }
 
-  public static List<Object[]> getRandomColumnar(DataSchema dataSchema, int numRows) {
-    List<Object[]> rows = getRandomRows(dataSchema, numRows);
-    return convertColumnar(dataSchema, rows);
-  }
-
   public static List<Object[]> convertColumnar(DataSchema dataSchema, List<Object[]> rows) {
     final int numRows = rows.size();
     final int numColumns = dataSchema.getColumnNames().length;
@@ -177,5 +181,9 @@ public class DataBlockTestUtils {
       }
     }
     return columnars;
+  }
+
+  public static boolean randomlySettingNull(int percentile) {
+    return RANDOM.nextInt(100) >= (100 - percentile);
   }
 }
