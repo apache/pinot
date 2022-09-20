@@ -20,9 +20,9 @@ package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BoundType;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Range;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -34,7 +34,6 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.Sarg;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.sql.FilterKind;
 
 
 public class RexExpressionUtils {
@@ -69,42 +68,64 @@ public class RexExpressionUtils {
     RexLiteral rexLiteral = (RexLiteral) operands.get(1);
     FieldSpec.DataType dataType = RexExpression.toDataType(rexLiteral.getType());
     Sarg sarg = rexLiteral.getValueAs(Sarg.class);
-    if (sarg.isPoints()) {
-      return new RexExpression.FunctionCall(SqlKind.IN, dataType, SqlKind.IN.name(), toFunctionOperands(SqlKind.IN,
-          rexInputRef, sarg.rangeSet.asRanges(), dataType));
-    } else if (sarg.isComplementedPoints()) {
-      return new RexExpression.FunctionCall(SqlKind.NOT_IN, dataType, SqlKind.NOT_IN.name(),
-          toFunctionOperands(SqlKind.NOT_IN, rexInputRef, sarg.rangeSet.complement().asRanges(), dataType));
+    if (sarg.isPoints() || sarg.isComplementedPoints()) {
+      SqlKind kind = sarg.isPoints() ? SqlKind.IN : SqlKind.NOT_IN;
+      Set<Range> rangeSet = kind.equals(SqlKind.IN) ? sarg.rangeSet.asRanges() : sarg.rangeSet.complement().asRanges();
+      List<RexExpression> functionOperands = new ArrayList<>(1 + rangeSet.size());
+      functionOperands.add(RexExpression.toRexExpression(rexInputRef));
+      functionOperands.addAll(rangeSet.stream().map(
+          range -> new RexExpression.Literal(dataType, RexExpression.toRexValue(dataType, range.lowerEndpoint()))
+      ).collect(Collectors.toList()));
+      return new RexExpression.FunctionCall(kind, dataType, kind.name(), functionOperands);
     } else {
-      return new RexExpression.FunctionCall(SqlKind.SEARCH, dataType, FilterKind.RANGE.name(),
-          toFunctionOperands(SqlKind.SEARCH, rexInputRef, sarg.rangeSet.asRanges(), dataType));
+      return buildRexExpressionRecursively(RexExpression.toRexExpression(rexInputRef), 0,
+          new ArrayList<>(sarg.rangeSet.asRanges()), dataType);
     }
   }
 
-  private static List<RexExpression> toFunctionOperands(SqlKind sqlKind, RexInputRef rexInputRef, Set<Range> ranges,
+  // Recursively build a tree of ORs where the left sub-tree is a range-check and the right sub-tree is the recursive OR
+  private static RexExpression buildRexExpressionRecursively(RexExpression rexInputRef, int index, List<Range> ranges,
       FieldSpec.DataType dataType) {
-    List<RexExpression> result = new ArrayList<>(ranges.size() + 1);
-    result.add(RexExpression.toRexExpression(rexInputRef));
-    for (Range range : ranges) {
-      if (sqlKind.equals(SqlKind.IN) || sqlKind.equals(SqlKind.NOT_IN)) {
-        result.add(new RexExpression.Literal(dataType, RexExpression.toRexValue(dataType, range.lowerEndpoint())));
-      } else {
-        result.add(new RexExpression.Literal(dataType, serialize(range)));
-      }
+    RexExpression rexExpression = toFunctionCall(rexInputRef, ranges.get(index), dataType);
+    if (index + 1 < ranges.size()) {
+      RexExpression rexExpressionSibling = buildRexExpressionRecursively(rexInputRef, index + 1, ranges, dataType);
+      rexExpression = new RexExpression.FunctionCall(SqlKind.OR, dataType, SqlKind.OR.name(),
+          ImmutableList.of(rexExpression, rexExpressionSibling));
     }
-    return result;
+    return rexExpression;
   }
 
-  /**
-   * Serializes a Guava range object using a Pinot Range object, so
-   * {@link org.apache.pinot.query.parser.CalciteRexExpressionParser} can deserialize and run it.
-   */
-  private static String serialize(Range range) {
-    Comparable lowerBound = range.hasLowerBound() ? range.lowerEndpoint() : null;
-    boolean lowerBoundInclusive = lowerBound != null ? range.lowerBoundType().equals(BoundType.CLOSED) : false;
-    Comparable upperBound = range.hasUpperBound() ? range.upperEndpoint() : null;
-    boolean upperBoundInclusive = upperBound != null ? range.upperBoundType().equals(BoundType.CLOSED) : false;
-    return new org.apache.pinot.core.query.optimizer.filter.Range(lowerBound, lowerBoundInclusive, upperBound,
-        upperBoundInclusive).getRangeString();
+  // Converts a single Range to a corresponding FunctionCall
+  private static RexExpression.FunctionCall toFunctionCall(RexExpression rexInputRef, Range range,
+      FieldSpec.DataType dataType) {
+    RexExpression.FunctionCall lowerBoundExpression = null;
+    RexExpression.FunctionCall upperBoundExpression = null;
+    if (range.hasLowerBound()) {
+      SqlKind kind = range.lowerBoundType().equals(BoundType.OPEN) ? SqlKind.GREATER_THAN
+          : SqlKind.GREATER_THAN_OR_EQUAL;
+      RexExpression value = new RexExpression.Literal(dataType, RexExpression.toRexValue(dataType,
+          range.lowerEndpoint()));
+      lowerBoundExpression = new RexExpression.FunctionCall(kind, dataType, kind.name(),
+          ImmutableList.of(rexInputRef, value));
+    }
+    if (range.hasUpperBound()) {
+      SqlKind kind = range.lowerBoundType().equals(BoundType.OPEN) ? SqlKind.LESS_THAN
+          : SqlKind.LESS_THAN_OR_EQUAL;
+      RexExpression value = new RexExpression.Literal(dataType, RexExpression.toRexValue(dataType,
+          range.upperEndpoint()));
+      upperBoundExpression = new RexExpression.FunctionCall(kind, dataType, kind.name(),
+          ImmutableList.of(rexInputRef, value));
+    }
+    if (lowerBoundExpression != null && upperBoundExpression != null) {
+      return new RexExpression.FunctionCall(SqlKind.AND, dataType, SqlKind.AND.name(),
+          ImmutableList.of(lowerBoundExpression, upperBoundExpression));
+    }
+    if (lowerBoundExpression != null) {
+      return lowerBoundExpression;
+    }
+    if (upperBoundExpression != null) {
+      return upperBoundExpression;
+    }
+    throw new IllegalStateException();
   }
 }
