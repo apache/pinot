@@ -20,10 +20,8 @@ package org.apache.pinot.minion.executor;
 
 import org.apache.helix.HelixManager;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.minion.BaseTaskMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
-import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
-import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
-
 
 /**
  * An abstraction on top of {@link HelixManager}, created for the {@link PinotTaskExecutor}, restricted to only
@@ -37,24 +35,24 @@ public class MinionTaskZkMetadataManager {
   }
 
   /**
-   * Fetch the ZNRecord under MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask for
+   * Fetch the ZNRecord under MINION_TASK_METADATA/${tableNameWithType}/${taskType} for
    * the given tableNameWithType
    */
-  public ZNRecord getRealtimeToOfflineSegmentsTaskZNRecord(String tableNameWithType) {
-    return MinionTaskMetadataUtils
-        .fetchTaskMetadata(_helixManager.getHelixPropertyStore(), RealtimeToOfflineSegmentsTask.TASK_TYPE,
-            tableNameWithType);
+  public ZNRecord getTaskMetadataZNRecord(String tableNameWithType, String taskType) {
+    return MinionTaskMetadataUtils.fetchTaskMetadata(_helixManager.getHelixPropertyStore(), taskType,
+        tableNameWithType);
   }
 
   /**
-   * Sets the {@link RealtimeToOfflineSegmentsTaskMetadata} into the ZNode at
-   * MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
-   * for the corresponding tableNameWithType
+   * Sets the {@link BaseTaskMetadata} ito the ZNode at
+   * MINION_TASK_METADATA/${tableNameWithType}/${taskType}
+   * for the corresponding tableNameWitType
+   * @param taskMetadata Task metadata which is to be written
+   * @param taskType taskType for which metadata is to be updated
    * @param expectedVersion Version expected to be updating, failing the call if there's a mismatch
    */
-  public void setRealtimeToOfflineSegmentsTaskMetadata(
-      RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata, int expectedVersion) {
-    MinionTaskMetadataUtils.persistTaskMetadata(_helixManager.getHelixPropertyStore(),
-        RealtimeToOfflineSegmentsTask.TASK_TYPE, realtimeToOfflineSegmentsTaskMetadata, expectedVersion);
+  public void setTaskMetadataZNRecord(BaseTaskMetadata taskMetadata, String taskType, int expectedVersion) {
+    MinionTaskMetadataUtils.persistTaskMetadata(_helixManager.getHelixPropertyStore(), taskType, taskMetadata,
+        expectedVersion);
   }
 }
