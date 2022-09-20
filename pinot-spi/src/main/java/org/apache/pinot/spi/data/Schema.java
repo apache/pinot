@@ -688,6 +688,11 @@ public final class Schema implements Serializable {
     }
   }
 
+
+  public boolean isBackwardCompatibleWith(Schema oldSchema) {
+    return isBackwardCompatibleWith(oldSchema, false);
+  }
+
   /**
    * Check whether the current schema is backward compatible with oldSchema.
    *
@@ -697,7 +702,7 @@ public final class Schema implements Serializable {
    *
    * @param oldSchema old schema
    */
-  public boolean isBackwardCompatibleWith(Schema oldSchema) {
+  public boolean isBackwardCompatibleWith(Schema oldSchema, boolean skipTimeColumn) {
     Set<String> columnNames = getColumnNames();
     for (Map.Entry<String, FieldSpec> entry : oldSchema.getFieldSpecMap().entrySet()) {
       String oldSchemaColumnName = entry.getKey();

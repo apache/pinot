@@ -70,6 +70,8 @@ public class V1Constants {
        */
       public static final String TIME_COLUMN_NAME = "segment.time.column.name";
       public static final String TIME_UNIT = "segment.time.unit";
+      public static final String RAW_SEGMENT_START_TIME = "segment.start.time.raw";
+      public static final String RAW_SEGMENT_END_TIME = "segment.end.time.raw";
       public static final String SEGMENT_START_TIME = "segment.start.time";
       public static final String SEGMENT_END_TIME = "segment.end.time";
       public static final String DATETIME_COLUMNS = "segment.datetime.column.names";

@@ -77,6 +77,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private Duration _timeGranularity;
   private long _segmentStartTime = Long.MAX_VALUE;
   private long _segmentEndTime = Long.MIN_VALUE;
+  private String _segmentRawStartTime = "";
+  private String _segmentRawEndTime = "";
+
   private Interval _timeInterval;
 
   private SegmentVersion _segmentVersion;
@@ -181,6 +184,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         _timeGranularity = new Duration(_timeUnit.toMillis(1));
         String startTimeString = segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_START_TIME);
         String endTimeString = segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_END_TIME);
+
+        _segmentRawStartTime = segmentMetadataPropertiesConfiguration.getString(Segment.RAW_SEGMENT_START_TIME);
+        _segmentRawEndTime = segmentMetadataPropertiesConfiguration.getString(Segment.RAW_SEGMENT_END_TIME);
+
         _segmentStartTime = Long.parseLong(startTimeString);
         _segmentEndTime = Long.parseLong(endTimeString);
         _timeInterval =
@@ -315,6 +322,16 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public long getEndTime() {
     return _segmentEndTime;
+  }
+
+  @Override
+  public String getRawStartTime() {
+    return _segmentRawStartTime;
+  }
+
+  @Override
+  public String getRawEndTime() {
+    return _segmentRawEndTime;
   }
 
   @Override

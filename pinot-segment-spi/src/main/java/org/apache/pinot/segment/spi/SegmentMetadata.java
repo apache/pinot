@@ -53,6 +53,10 @@ public interface SegmentMetadata {
 
   long getEndTime();
 
+  String getRawStartTime();
+
+  String getRawEndTime();
+
   TimeUnit getTimeUnit();
 
   Duration getTimeGranularity();

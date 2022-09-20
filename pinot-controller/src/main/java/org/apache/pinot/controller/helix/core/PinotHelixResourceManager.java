@@ -1289,23 +1289,25 @@ public class PinotHelixResourceManager {
     String schemaName = schema.getSchemaName();
     LOGGER.info("Updating segment zookeeper metadata: {} with refresh: {}", schemaName, refresh);
 
-    Schema oldSchema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
-    if (oldSchema == null) {
-      throw new SchemaNotFoundException(String.format("Schema: %s does not exist", schemaName));
-    }
-
     List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
     for (String tableNameWithType : tableNamesWithType) {
       List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
       for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
         int version = segmentZKMetadata.toZNRecord().getVersion();
-        updateSegmentInterval(tableNameWithType, segmentZKMetadata, schema, oldSchema);
+        updateSegmentInterval(tableNameWithType, segmentZKMetadata, schema);
         updateZkMetadata(tableNameWithType, segmentZKMetadata, version);
       }
     }
+
+    updateSchema(schema, false, true);
   }
 
   public void updateSchema(Schema schema, boolean reload)
+      throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
+    updateSchema(schema, reload, false);
+  }
+
+  public void updateSchema(Schema schema, boolean reload, boolean skipTimeColumn)
       throws SchemaNotFoundException, SchemaBackwardIncompatibleException, TableNotFoundException {
     String schemaName = schema.getSchemaName();
     LOGGER.info("Updating schema: {} with reload: {}", schemaName, reload);
@@ -2287,11 +2289,11 @@ public class PinotHelixResourceManager {
   }
 
   public void updateSegmentInterval(String tableNameWithType, SegmentZKMetadata segmentZKMetadata,
-      Schema newSchema, Schema oldSchema) {
+      Schema newSchema) {
     String segmentName = segmentZKMetadata.getSegmentName();
     TableConfig tableConfig = getTableConfig(tableNameWithType);
-    if (tableConfig != null && oldSchema != null) {
-      ZKMetadataUtils.updateSegmentZKMetadataInterval(tableConfig, segmentZKMetadata, oldSchema, newSchema);
+    if (tableConfig != null) {
+      ZKMetadataUtils.updateSegmentZKMetadataInterval(tableConfig, segmentZKMetadata, newSchema);
     }
     LOGGER.info("Updated segment zookeeper metadata: {} of table: {}", segmentName, tableNameWithType);
   }

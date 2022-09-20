@@ -727,6 +727,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           if (_totalDocs > 0) {
             String startTimeStr = timeColumnIndexCreationInfo.getMin().toString();
             String endTimeStr = timeColumnIndexCreationInfo.getMax().toString();
+            properties.setProperty(RAW_SEGMENT_START_TIME, startTimeStr);
+            properties.setProperty(RAW_SEGMENT_END_TIME, endTimeStr);
 
             if (_config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
               // For TimeColumnType.SIMPLE_DATE_FORMAT, convert time value into millis since epoch
@@ -746,6 +748,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           } else {
             // No records in segment. Use current time as start/end
             long now = System.currentTimeMillis();
+            properties.setProperty(RAW_SEGMENT_START_TIME, String.valueOf(now));
+            properties.setProperty(RAW_SEGMENT_END_TIME, String.valueOf(now));
+
             if (_config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
               startTime = now;
               endTime = now;

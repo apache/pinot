@@ -61,25 +61,20 @@ public class ZKMetadataUtils {
   }
 
   public static void updateSegmentZKMetadataInterval(TableConfig tableConfig, SegmentZKMetadata segmentZKMetadata,
-      Schema oldSchema, Schema newSchema) {
+      Schema newSchema) {
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     if (StringUtils.isNotEmpty(timeColumnName)) {
-      DateTimeFieldSpec currentDateTimeFieldSpec = oldSchema.getDateTimeSpec(timeColumnName);
       DateTimeFieldSpec newDateTimeFieldSpec = newSchema.getDateTimeSpec(timeColumnName);
 
-      long startTime = segmentZKMetadata.getStartTimeMs();
-      long endTime = segmentZKMetadata.getEndTimeMs();
-
-      assert currentDateTimeFieldSpec != null;
       assert newDateTimeFieldSpec != null;
-      if (startTime != -1) {
-        String startTimeString = currentDateTimeFieldSpec.getFormatSpec().fromMillisToFormat(startTime);
+      String startTimeString = segmentZKMetadata.getRawStartTime();
+      if (StringUtils.isNotEmpty(startTimeString)) {
         long updatedStartTime = newDateTimeFieldSpec.getFormatSpec().fromFormatToMillis(startTimeString);
         segmentZKMetadata.setStartTime(updatedStartTime);
       }
 
-      if (endTime != -1) {
-        String endTimeString = currentDateTimeFieldSpec.getFormatSpec().fromMillisToFormat(endTime);
+      String endTimeString = segmentZKMetadata.getRawEndTime();
+      if (StringUtils.isNotEmpty(endTimeString)) {
         long updatedEndTime = newDateTimeFieldSpec.getFormatSpec().fromFormatToMillis(endTimeString);
         segmentZKMetadata.setEndTime(updatedEndTime);
       }
@@ -99,10 +94,14 @@ public class ZKMetadataUtils {
       segmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
       segmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
       segmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
+      segmentZKMetadata.setRawStartTime(segmentMetadata.getRawStartTime());
+      segmentZKMetadata.setRawEndTime(segmentMetadata.getRawEndTime());
     } else {
       segmentZKMetadata.setStartTime(-1);
       segmentZKMetadata.setEndTime(-1);
       segmentZKMetadata.setTimeUnit(null);
+      segmentZKMetadata.setRawStartTime(null);
+      segmentZKMetadata.setRawEndTime(null);
     }
     segmentZKMetadata.setIndexVersion(
         segmentMetadata.getVersion() != null ? segmentMetadata.getVersion().name() : null);
