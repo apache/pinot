@@ -50,26 +50,27 @@ public class JsonIndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonIndexHandler.class);
 
   private final SegmentMetadata _segmentMetadata;
-  private final HashSet<String> _columnsToAddIdx;
+  private final Set<String> _columnsToAddIdx;
 
   public JsonIndexHandler(SegmentMetadata segmentMetadata, IndexLoadingConfig indexLoadingConfig) {
     _segmentMetadata = segmentMetadata;
-    _columnsToAddIdx = new HashSet<>(indexLoadingConfig.getJsonIndexColumns());
+    _columnsToAddIdx = indexLoadingConfig.getJsonIndexColumns();
   }
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     String segmentName = _segmentMetadata.getName();
+    Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.JSON_INDEX);
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
-      if (!_columnsToAddIdx.remove(column)) {
+      if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Need to remove existing json index from segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
     // Check if any new index need to be added.
-    for (String column : _columnsToAddIdx) {
+    for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (shouldCreateJsonIndex(columnMetadata)) {
         LOGGER.info("Need to create new json index for segment: {}, column: {}", segmentName, column);
@@ -84,15 +85,16 @@ public class JsonIndexHandler implements IndexHandler {
       throws Exception {
     // Remove indices not set in table config any more
     String segmentName = _segmentMetadata.getName();
+    Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.JSON_INDEX);
     for (String column : existingColumns) {
-      if (!_columnsToAddIdx.remove(column)) {
+      if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing json index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, ColumnIndexType.JSON_INDEX);
         LOGGER.info("Removed existing json index from segment: {}, column: {}", segmentName, column);
       }
     }
-    for (String column : _columnsToAddIdx) {
+    for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(column);
       if (shouldCreateJsonIndex(columnMetadata)) {
         createJsonIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider);
