@@ -612,13 +612,9 @@ public class DataFetcher {
       } else {
         switch (_storedType) {
           case STRING:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = BytesUtils.toBytes(_reader.getString(docIds[i], readerContext));
-            }
-            break;
           case BYTES:
             for (int i = 0; i < length; i++) {
-              valueBuffer[i] = _reader.getBytes(docIds[i], readerContext);
+              valueBuffer[i] =_reader.getBytes(docIds[i], readerContext);
             }
             break;
           default:

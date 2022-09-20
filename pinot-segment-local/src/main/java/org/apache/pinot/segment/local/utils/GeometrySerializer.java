@@ -23,6 +23,7 @@ import com.google.common.collect.Iterables;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -58,6 +59,10 @@ public final class GeometrySerializer {
   public static byte[] serialize(Geometry geometry) {
     return writeGeometry(geometry);
   }
+
+//  public static Geometry deserializeRawByte(byte[] bytes) {
+//    return deserialize();
+//  }
 
   /**
    * Deserializes bytes into a geometry object
