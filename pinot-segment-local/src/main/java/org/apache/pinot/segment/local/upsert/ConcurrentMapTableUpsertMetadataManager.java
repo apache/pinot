@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
@@ -39,7 +40,8 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
   }
 
   @Override
-  public void close() {
+  public void close()
+      throws IOException {
     for (ConcurrentMapPartitionUpsertMetadataManager partitionUpsertMetadataManager
         : _partitionMetadataManagerMap.values()) {
       partitionUpsertMetadataManager.close();
