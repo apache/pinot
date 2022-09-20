@@ -27,7 +27,6 @@ const TenantsTable = ({tenantsData}) => {
       title="Tenants"
       data={tenantsData}
       addLinks
-      isPagination
       baseURL="/tenants/"
       showSearchBox={true}
       inAccordionFormat={true}

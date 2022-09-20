@@ -44,7 +44,6 @@ const useTaskTypesTable = () => {
         data={taskTypes}
         showSearchBox={true}
         inAccordionFormat={true}
-        isPagination={false}
         addLinks
         baseURL='/task-queue/'
       />

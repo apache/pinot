@@ -119,7 +119,6 @@ const TaskDetail = (props) => {
               data={subtaskTableData}
               showSearchBox={true}
               inAccordionFormat={true}
-              isPagination={false}
               addLinks
               baseURL={`/task-queue/${taskType}/tables/${queueTableName}/task/${taskID}/sub-task/`}
             />

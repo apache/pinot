@@ -235,7 +235,6 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
           <CustomizedTables
             title="Replica Set"
             data={replica}
-            isPagination={true}
             showSearchBox={true}
             inAccordionFormat={true}
           />
@@ -262,7 +261,6 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
                 <CustomizedTables
                   title="Indexes"
                   data={indexes}
-                  isPagination={true}
                   showSearchBox={true}
                   inAccordionFormat={true}
                 />

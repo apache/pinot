@@ -53,9 +53,8 @@ import SimpleAccordion from './SimpleAccordion';
 type Props = {
   title?: string,
   data: TableData,
-  noOfRows?: number,
+  defaultRowsPerPage?: number,
   addLinks?: boolean,
-  isPagination?: boolean,
   cellClickCallback?: Function,
   isCellClickable?: boolean,
   highlightBackground?: boolean,
@@ -257,9 +256,8 @@ TablePaginationActions.propTypes = {
 export default function CustomizedTables({
   title,
   data,
-  noOfRows,
+  defaultRowsPerPage,
   addLinks,
-  isPagination,
   cellClickCallback,
   isCellClickable,
   highlightBackground,
@@ -278,7 +276,7 @@ export default function CustomizedTables({
   const [columnClicked, setColumnClicked] = React.useState('');
 
   const classes = useStyles();
-  const [rowsPerPage, setRowsPerPage] = React.useState(noOfRows || 10);
+  const [rowsPerPage, setRowsPerPage] = React.useState(defaultRowsPerPage || 10);
   const [page, setPage] = React.useState(0);
 
   const handleChangeRowsPerPage = (
@@ -291,14 +289,6 @@ export default function CustomizedTables({
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
   };
-
-  React.useEffect(() => {
-    if(isPagination) {
-      return;
-    }
-
-    setRowsPerPage(data?.records?.length);
-  }, [])
 
   const [search, setSearch] = React.useState<string>('');
 
@@ -537,7 +527,7 @@ export default function CustomizedTables({
             </TableBody>
           </Table>
         </TableContainer>
-        {isPagination && finalData.length > 10 ? (
+        {finalData.length > 10 ? (
           <TablePagination
             rowsPerPageOptions={[5, 10, 25]}
             component="div"
