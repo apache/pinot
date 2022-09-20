@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
+import org.apache.pinot.spi.metrics.AbstractMetrics;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.utils.CommonConstants;
 

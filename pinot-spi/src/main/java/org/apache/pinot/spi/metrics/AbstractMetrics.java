@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.spi.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
@@ -29,11 +29,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
-import org.apache.pinot.spi.metrics.PinotMeter;
-import org.apache.pinot.spi.metrics.PinotMetricName;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
-import org.apache.pinot.spi.metrics.PinotTimer;
 import org.apache.pinot.spi.utils.CommonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;

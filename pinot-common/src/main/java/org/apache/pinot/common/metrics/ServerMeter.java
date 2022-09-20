@@ -19,6 +19,7 @@
 package org.apache.pinot.common.metrics;
 
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.metrics.AbstractMetrics;
 
 
 /**
