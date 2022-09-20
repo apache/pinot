@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.routing.adaptiveserverselector;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -35,8 +34,8 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
  * This selector implementation is based on the ideas suggested in the paper -
  * https://www.usenix.org/system/files/conference/nsdi15/nsdi15-paper-suresh.pdf
  *
- * The C3 server score for each server is calculated as follows. The server with the lowest C3 score is picked.
- *       C3serverScore = Math.pow(A+B, N) * C
+ * The Hybrid score for each server is calculated as follows. The server with the lowest Hybrid score is picked.
+ *       HybridScore = Math.pow(A+B, N) * C
  * N -> Configurable exponent with default value of 3.
  */
 public class HybridSelector implements AdaptiveServerSelector {
@@ -51,11 +50,11 @@ public class HybridSelector implements AdaptiveServerSelector {
   @Override
   public String select(List<String> serverCandidates) {
     String selectedServer = null;
-    Double minValue = Double.MAX_VALUE;
+    Double minScore = Double.MAX_VALUE;
 
     // TODO: If two or more servers have the same score, break the tie intelligently.
     for (String server : serverCandidates) {
-      Double score = _serverRoutingStatsManager.fetchC3ScoreForServer(server);
+      Double score = _serverRoutingStatsManager.fetchHybridScoreForServer(server);
 
       // No stats for this server. That means this server hasn't received any queries yet.
       if (score == null) {
@@ -64,8 +63,8 @@ public class HybridSelector implements AdaptiveServerSelector {
         break;
       }
 
-      if (score < minValue) {
-        minValue = score;
+      if (score < minScore) {
+        minScore = score;
         selectedServer = server;
       }
     }
@@ -74,20 +73,10 @@ public class HybridSelector implements AdaptiveServerSelector {
   }
 
   @Override
-  public List<String> fetchServerRanking() {
-    List<Pair<String, Double>> pairList = fetchServerRankingWithValues();
+  public List<Pair<String, Double>> fetchAllServerRankingsWithScores() {
+    List<Pair<String, Double>> pairList = _serverRoutingStatsManager.fetchHybridScoreForAllServers();
 
-    List<String> serverRankList = new ArrayList<>();
-    for (Pair<String, Double> entry : pairList) {
-      serverRankList.add(entry.getLeft());
-    }
-    return serverRankList;
-  }
-
-  @Override
-  public List<Pair<String, Double>> fetchServerRankingWithValues() {
-    List<Pair<String, Double>> pairList = _serverRoutingStatsManager.fetchC3ScoreForAllServers();
-
+    // Let's shuffle the list before sorting. This helps with randomly choosing different servers if there is a tie.
     Collections.shuffle(pairList);
     Collections.sort(pairList, (o1, o2) -> {
       int val = Double.compare(o1.getRight(), o2.getRight());

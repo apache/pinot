@@ -33,25 +33,25 @@ public class ServerRoutingStatsEntry {
 
   // Fields related to number of in-flight requests.
   private volatile int _numInFlightRequests;
-  private final ExponentialMovingAverage _inFlighRequestsEma;
+  private final ExponentialMovingAverage _inFlighRequestsEMA;
 
   // Fields related to latency
-  private final ExponentialMovingAverage _emaLatencyMs;
+  private final ExponentialMovingAverage _latencyMsEMA;
 
-  // C3 score exponent.
-  private final int _c3ScoreExponent;
+  // Hybrid score exponent.
+  private final int _hybridScoreExponent;
 
   public ServerRoutingStatsEntry(String serverInstanceId, double alphaEMA, long autoDecayWindowMsEMA,
       long warmupDurationMsEMA, double avgInitializationValEMA, int scoreExponent) {
     _serverInstanceId = serverInstanceId;
     _serverLock = new ReentrantReadWriteLock();
 
-    _inFlighRequestsEma =
+    _inFlighRequestsEMA =
         new ExponentialMovingAverage(alphaEMA, autoDecayWindowMsEMA, warmupDurationMsEMA, avgInitializationValEMA);
-    _emaLatencyMs =
+    _latencyMsEMA =
         new ExponentialMovingAverage(alphaEMA, autoDecayWindowMsEMA, warmupDurationMsEMA, avgInitializationValEMA);
 
-    _c3ScoreExponent = scoreExponent;
+    _hybridScoreExponent = scoreExponent;
   }
 
   public ReentrantReadWriteLock.ReadLock getServerReadLock() {
@@ -66,23 +66,22 @@ public class ServerRoutingStatsEntry {
     return _numInFlightRequests;
   }
 
-  public Double getInFlightRequestsEma() {
-    return _inFlighRequestsEma.getAverage();
+  public Double getInFlightRequestsEMA() {
+    return _inFlighRequestsEMA.getAverage();
   }
 
-  public Double getEMALatency() {
-    return _emaLatencyMs.getAverage();
+  public Double getLatencyEMA() {
+    return _latencyMsEMA.getAverage();
   }
 
-  public double computeC3ServerScore() {
-    double estimatedQSize = _numInFlightRequests + _inFlighRequestsEma.getAverage();
-
-    return Math.pow(estimatedQSize, _c3ScoreExponent) * _emaLatencyMs.getAverage();
+  public double computeHybridScore() {
+    double estimatedQSize = _numInFlightRequests + _inFlighRequestsEMA.getAverage();
+    return Math.pow(estimatedQSize, _hybridScoreExponent) * _latencyMsEMA.getAverage();
   }
 
   public void updateNumInFlightRequestsForQuerySubmission() {
     ++_numInFlightRequests;
-    _inFlighRequestsEma.compute(_numInFlightRequests);
+    _inFlighRequestsEMA.compute(_numInFlightRequests);
   }
 
   public void updateNumInFlightRequestsForResponseArrival() {
@@ -90,6 +89,6 @@ public class ServerRoutingStatsEntry {
   }
 
   public void updateLatency(double latencyMs) {
-    _emaLatencyMs.compute(latencyMs);
+    _latencyMsEMA.compute(latencyMs);
   }
 }

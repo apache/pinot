@@ -63,7 +63,6 @@ public class QueryRoutingTest {
 
   @BeforeClass
   public void setUp() {
-    // TODO(Vivek): Check if any testing can be done here.
     _queryRouter = new QueryRouter("testBroker", mock(BrokerMetrics.class), mock(ServerRoutingStatsManager.class));
   }
 

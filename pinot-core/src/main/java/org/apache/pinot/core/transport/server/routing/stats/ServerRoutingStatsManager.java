@@ -30,16 +30,16 @@ import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.AdaptiveServerSelector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
  *
- *  {@code ServerRoutingStatsManager} manages the query routing stats for each server. The stats are maintained at
- *  the broker and are updated when a query is submitted to a server and when a server responds after processing a
- *  query.
+ *  {@code ServerRoutingStatsManager} manages the query routing stats for each server and used by the Adaptive
+ *  Server Selection feature (when enabled). The stats are maintained at the broker and are updated when a query is
+ *  submitted to a server and when a server responds after processing a query.
  */
 public class ServerRoutingStatsManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerRoutingStatsManager.class);
@@ -53,38 +53,35 @@ public class ServerRoutingStatsManager {
   private long _autoDecayWindowMs;
   private long _warmupDurationMs;
   private double _avgInitializationVal;
-  private int _c3ScoreExponent;
+  private int _hybridScoreExponent;
 
   public ServerRoutingStatsManager(PinotConfiguration pinotConfig) {
     _config = pinotConfig;
   }
 
   public void init() {
-    _isEnabled = _config.getProperty(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION,
-        CommonConstants.Broker.AdaptiveServerSelector.DEFAULT_ENABLE_STATS_COLLECTION);
+    _isEnabled = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION,
+        AdaptiveServerSelector.DEFAULT_ENABLE_STATS_COLLECTION);
     if (!_isEnabled) {
       LOGGER.info("Server stats collection for Adaptive Server Selection is not enabled.");
       return;
     }
 
-    _alpha = _config.getProperty(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ALPHA,
-        CommonConstants.Broker.AdaptiveServerSelector.DEFAULT_ALPHA);
-    _autoDecayWindowMs =
-        _config.getProperty(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS,
-            CommonConstants.Broker.AdaptiveServerSelector.DEFAULT_AUTODECAY_WINDOW_MS);
-    _warmupDurationMs = _config.getProperty(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS,
-        CommonConstants.Broker.AdaptiveServerSelector.DEFAULT_WARMUP_DURATION_MS);
-    _avgInitializationVal =
-        _config.getProperty(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL,
-            CommonConstants.Broker.AdaptiveServerSelector.DEFAULT_AVG_INITIALIZATION_VAL);
-    _c3ScoreExponent = _config.getProperty(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_C3_SCORE_EXPONENT,
-        CommonConstants.Broker.AdaptiveServerSelector.DEFAULT_C3_SCORE_EXPONENT);
-
     LOGGER.info("Initializing ServerRoutingStatsManager for Adaptive Server Selection.");
 
-    int threadPoolSize =
-        _config.getProperty(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE,
-            CommonConstants.Broker.AdaptiveServerSelector.DEFAULT_STATS_MANAGER_THREADPOOL_SIZE);
+    _alpha = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA,
+        AdaptiveServerSelector.DEFAULT_EWMA_ALPHA);
+    _autoDecayWindowMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS,
+        AdaptiveServerSelector.DEFAULT_AUTODECAY_WINDOW_MS);
+    _warmupDurationMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS,
+        AdaptiveServerSelector.DEFAULT_WARMUP_DURATION_MS);
+    _avgInitializationVal = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL,
+        AdaptiveServerSelector.DEFAULT_AVG_INITIALIZATION_VAL);
+    _hybridScoreExponent = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT,
+        AdaptiveServerSelector.DEFAULT_HYBRID_SCORE_EXPONENT);
+
+    int threadPoolSize = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE,
+        AdaptiveServerSelector.DEFAULT_STATS_MANAGER_THREADPOOL_SIZE);
     _executorService = Executors.newFixedThreadPool(threadPoolSize);
 
     // Entries in this map are never deleted unless the broker process restarts. This is okay for now because the
@@ -146,7 +143,7 @@ public class ServerRoutingStatsManager {
   private void updateStatsAfterQuerySubmission(String serverInstanceId) {
     ServerRoutingStatsEntry stats = _serverQueryStatsMap.computeIfAbsent(serverInstanceId,
         k -> new ServerRoutingStatsEntry(serverInstanceId, _alpha, _autoDecayWindowMs, _warmupDurationMs,
-            _avgInitializationVal, _c3ScoreExponent));
+            _avgInitializationVal, _hybridScoreExponent));
 
     try {
       stats.getServerWriteLock().lock();
@@ -159,7 +156,7 @@ public class ServerRoutingStatsManager {
   /**
    * Called when a query response is received from the server. Updates stats related to query completion.
    */
-  public void recordStatsUponResponseArrival(long requestId, String serverInstanceId, int latency) {
+  public void recordStatsUponResponseArrival(long requestId, String serverInstanceId, long latency) {
     if (!_isEnabled) {
       return;
     }
@@ -173,10 +170,10 @@ public class ServerRoutingStatsManager {
     });
   }
 
-  private void updateStatsUponResponseArrival(String serverInstanceId, int latencyMs) {
+  private void updateStatsUponResponseArrival(String serverInstanceId, long latencyMs) {
     ServerRoutingStatsEntry stats = _serverQueryStatsMap.computeIfAbsent(serverInstanceId,
         k -> new ServerRoutingStatsEntry(serverInstanceId, _alpha, _autoDecayWindowMs, _warmupDurationMs,
-            _avgInitializationVal, _c3ScoreExponent));
+            _avgInitializationVal, _hybridScoreExponent));
 
     try {
       stats.getServerWriteLock().lock();
@@ -192,7 +189,6 @@ public class ServerRoutingStatsManager {
 
   /**
    * Returns ServerRoutingStatsStr for debugging/logging.
-   * @return
    */
   public String getServerRoutingStatsStr() {
     if (!_isEnabled) {
@@ -209,9 +205,9 @@ public class ServerRoutingStatsManager {
 
       stats.getServerReadLock().lock();
       Integer numInFlightRequests = stats.getNumInFlightRequests();
-      Double numInFlightRequestsEMA = stats.getInFlightRequestsEma();
-      Double latencyEMA = stats.getEMALatency();
-      Double score = stats.computeC3ServerScore();
+      Double numInFlightRequestsEMA = stats.getInFlightRequestsEMA();
+      Double latencyEMA = stats.getLatencyEMA();
+      Double score = stats.computeHybridScore();
       stats.getServerReadLock().unlock();
 
       stringBuilder.append(";").append(server).append("=").append(numInFlightRequests.toString()).append(",")
@@ -231,7 +227,10 @@ public class ServerRoutingStatsManager {
    * 3. HybridSelector - fetchScoreForAllServers(), fetchScoreForServer()
    *
    * We avoid returning all the stats to each selector to keep the critical section (under locks) as small as
-   * possible).
+   * possible). ServerRoutingStatsManager does not sort the servers in any particular order while accumulating stats
+   * as it is not aware of what sorting strategy to use. This logic is contained in the various
+   * AdaptiveServerSelectors.
+   *
    * TODO: Explore if reads to the _serverQueryStatsMap can be done without locking.
    * ===================================================================================================================
    */
@@ -296,7 +295,7 @@ public class ServerRoutingStatsManager {
       ServerRoutingStatsEntry stats = entry.getValue();
 
       stats.getServerReadLock().lock();
-      double latency = stats.getEMALatency();
+      double latency = stats.getLatencyEMA();
       stats.getServerReadLock().unlock();
 
       response.add(new ImmutablePair<>(server, latency));
@@ -320,17 +319,17 @@ public class ServerRoutingStatsManager {
 
     try {
       stats.getServerReadLock().lock();
-      return stats.getEMALatency();
+      return stats.getLatencyEMA();
     } finally {
       stats.getServerReadLock().unlock();
     }
   }
 
   /**
-   * Returns a list containing each server and the corresponding C3 score for each server. The C3 score is calculated
-   * based on https://www.usenix.org/system/files/conference/nsdi15/nsdi15-paper-suresh.pdf.
+   * Returns a list containing each server and the corresponding Hybrid score for each server. The Hybrid score is
+   * calculated based on https://www.usenix.org/system/files/conference/nsdi15/nsdi15-paper-suresh.pdf.
    */
-  public List<Pair<String, Double>> fetchC3ScoreForAllServers() {
+  public List<Pair<String, Double>> fetchHybridScoreForAllServers() {
     List<Pair<String, Double>> response = new ArrayList<>();
     if (!_isEnabled) {
       return response;
@@ -342,7 +341,7 @@ public class ServerRoutingStatsManager {
       ServerRoutingStatsEntry stats = entry.getValue();
 
       stats.getServerReadLock().lock();
-      double score = stats.computeC3ServerScore();
+      double score = stats.computeHybridScore();
       stats.getServerReadLock().unlock();
 
       response.add(new ImmutablePair<>(server, score));
@@ -354,7 +353,7 @@ public class ServerRoutingStatsManager {
   /**
    * Same as above but returns the score for a single server.
    */
-  public Double fetchC3ScoreForServer(String server) {
+  public Double fetchHybridScoreForServer(String server) {
     if (!_isEnabled) {
       return null;
     }
@@ -366,7 +365,7 @@ public class ServerRoutingStatsManager {
 
     try {
       stats.getServerReadLock().lock();
-      return stats.computeC3ServerScore();
+      return stats.computeHybridScore();
     } finally {
       stats.getServerReadLock().unlock();
     }

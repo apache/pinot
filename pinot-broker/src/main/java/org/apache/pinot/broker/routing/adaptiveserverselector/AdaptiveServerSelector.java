@@ -37,19 +37,12 @@ public interface AdaptiveServerSelector {
   String select(List<String> serverCandidates);
 
   /**
-   * Returns the ranking of servers ordered from best to worst.
-   *
-   * @return List of servers ranked from best to worst.
-   */
-  List<String> fetchServerRanking();
-
-  /**
-   * Same as above but also returns the values based on which the servers are ranked from best to worst. Based on the
-   * implementation of the interface, the value could refer to different things. For NumInFlightReqSelector, value is
-   * the number of inflight requests. For LatencySelector, value is the EMA latency. For HybridSelector, value is the
-   * hybrid selector score which is computed by combining latency and # inflight requests.
+   * Returns the ranking of servers ordered from best to worst along with the absolute scores based on which the
+   * servers are ranked. Based on the implementation of the interface, the score could refer to different things. For
+   * NumInFlightReqSelector, score is the number of inflight requests. For LatencySelector, score is the EMA latency.
+   * For HybridSelector, score is the hybridScore which is computed by combining latency and # inflight requests.
    *
    * @return List of servers along with their values ranked from best to worst.
    */
-  List<Pair<String, Double>> fetchServerRankingWithValues();
+  List<Pair<String, Double>> fetchAllServerRankingsWithScores();
 }

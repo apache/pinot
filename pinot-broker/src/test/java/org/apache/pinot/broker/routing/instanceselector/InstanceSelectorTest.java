@@ -55,7 +55,6 @@ public class InstanceSelectorTest {
   public void testInstanceSelectorFactory() {
     TableConfig tableConfig = mock(TableConfig.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
-    // TODO(Vivek): Add tests for different non-null adaptive server selectors.
     AdaptiveServerSelector adaptiveServerSelector = null;
 
     // Routing config is missing

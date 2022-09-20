@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.routing.adaptiveserverselector;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -45,7 +44,7 @@ public class LatencySelector implements AdaptiveServerSelector {
   @Override
   public String select(List<String> serverCandidates) {
     String selectedServer = null;
-    Double minValue = Double.MAX_VALUE;
+    Double minLatency = Double.MAX_VALUE;
 
     // TODO: If two or more servers have same latency, break the tie intelligently.
     for (String server : serverCandidates) {
@@ -58,8 +57,8 @@ public class LatencySelector implements AdaptiveServerSelector {
         break;
       }
 
-      if (latency < minValue) {
-        minValue = latency;
+      if (latency < minLatency) {
+        minLatency = latency;
         selectedServer = server;
       }
     }
@@ -68,20 +67,10 @@ public class LatencySelector implements AdaptiveServerSelector {
   }
 
   @Override
-  public List<String> fetchServerRanking() {
-    List<Pair<String, Double>> pairList = fetchServerRankingWithValues();
-
-    List<String> serverRankList = new ArrayList<>();
-    for (Pair<String, Double> entry : pairList) {
-      serverRankList.add(entry.getLeft());
-    }
-    return serverRankList;
-  }
-
-  @Override
-  public List<Pair<String, Double>> fetchServerRankingWithValues() {
+  public List<Pair<String, Double>> fetchAllServerRankingsWithScores() {
     List<Pair<String, Double>> pairList = _serverRoutingStatsManager.fetchEMALatencyForAllServers();
 
+    // Let's shuffle the list before sorting. This helps with randomly choosing different servers if there is a tie.
     Collections.shuffle(pairList);
     Collections.sort(pairList, (o1, o2) -> {
       int val = Double.compare(o1.getRight(), o2.getRight());

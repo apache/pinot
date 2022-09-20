@@ -99,7 +99,7 @@ public class AsyncQueryResponse implements QueryResponse {
   }
 
   @Override
-  public int getServerResponseDelayMs(ServerRoutingInstance serverRoutingInstance) {
+  public long getServerResponseDelayMs(ServerRoutingInstance serverRoutingInstance) {
     return _responseMap.get(serverRoutingInstance).getResponseDelayMs();
   }
 

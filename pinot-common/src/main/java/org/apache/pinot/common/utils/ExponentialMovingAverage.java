@@ -37,7 +37,7 @@ public class ExponentialMovingAverage {
   private final long _warmUpDurationMs;
   private final long _initializationTimeMs;
 
-  private double _average;
+  private volatile double _average;
   private long _lastUpdatedTimeMs;
 
   /**

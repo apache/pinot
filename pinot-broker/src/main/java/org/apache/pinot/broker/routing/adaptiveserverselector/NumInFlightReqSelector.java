@@ -44,7 +44,7 @@ public class NumInFlightReqSelector implements AdaptiveServerSelector {
   @Override
   public String select(List<String> serverCandidates) {
     String selectedServer = null;
-    int minValue = Integer.MAX_VALUE;
+    int minNumInFlightRequests = Integer.MAX_VALUE;
 
     // TODO: If two or more servers have same number of in flight requests, break the tie intelligently.
     for (String server : serverCandidates) {
@@ -57,8 +57,8 @@ public class NumInFlightReqSelector implements AdaptiveServerSelector {
         break;
       }
 
-      if (numInFlightRequests < minValue) {
-        minValue = numInFlightRequests;
+      if (numInFlightRequests < minNumInFlightRequests) {
+        minNumInFlightRequests = numInFlightRequests;
         selectedServer = server;
       }
     }
@@ -67,18 +67,7 @@ public class NumInFlightReqSelector implements AdaptiveServerSelector {
   }
 
   @Override
-  public List<String> fetchServerRanking() {
-    List<Pair<String, Double>> pairList = fetchServerRankingWithValues();
-
-    List<String> serverRankList = new ArrayList<>();
-    for (Pair<String, Double> entry : pairList) {
-      serverRankList.add(entry.getLeft());
-    }
-    return serverRankList;
-  }
-
-  @Override
-  public List<Pair<String, Double>> fetchServerRankingWithValues() {
+  public List<Pair<String, Double>> fetchAllServerRankingsWithScores() {
     List<Pair<String, Integer>> tempPairList = _serverRoutingStatsManager.fetchNumInFlightRequestsForAllServers();
 
     List<Pair<String, Double>> pairList = new ArrayList<>();
@@ -87,6 +76,7 @@ public class NumInFlightReqSelector implements AdaptiveServerSelector {
       pairList.add(pair);
     }
 
+    // Let's shuffle the list before sorting. This helps with randomly choosing different servers if there is a tie.
     Collections.shuffle(pairList);
     Collections.sort(pairList, (o1, o2) -> {
       int val = Double.compare(o1.getRight(), o2.getRight());

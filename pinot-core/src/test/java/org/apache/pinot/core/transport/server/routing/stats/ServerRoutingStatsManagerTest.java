@@ -78,10 +78,10 @@ public class ServerRoutingStatsManagerTest {
     Double latency = manager.fetchEMALatencyForServer("testServer");
     assertNull(latency);
 
-    List<Pair<String, Double>> scoreList = manager.fetchC3ScoreForAllServers();
+    List<Pair<String, Double>> scoreList = manager.fetchHybridScoreForAllServers();
     assertTrue(scoreList.isEmpty());
 
-    Double score = manager.fetchC3ScoreForServer("testServer");
+    Double score = manager.fetchHybridScoreForServer("testServer");
     assertNull(score);
   }
 
@@ -89,11 +89,11 @@ public class ServerRoutingStatsManagerTest {
   public void testQuerySubmitAndCompletionStats() {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
-    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
-    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_C3_SCORE_EXPONENT, 3);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
     ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties));
     manager.init();
 
@@ -117,11 +117,11 @@ public class ServerRoutingStatsManagerTest {
     Double latency = manager.fetchEMALatencyForServer("server1");
     assertEquals(latency, 0.0);
 
-    List<Pair<String, Double>> scoreList = manager.fetchC3ScoreForAllServers();
+    List<Pair<String, Double>> scoreList = manager.fetchHybridScoreForAllServers();
     assertEquals(scoreList.get(0).getLeft(), "server1");
     assertEquals(scoreList.get(0).getRight().doubleValue(), 0.0);
 
-    Double score = manager.fetchC3ScoreForServer("server1");
+    Double score = manager.fetchHybridScoreForServer("server1");
     assertEquals(score, 0.0);
 
     // Submit more stats for server 1.
@@ -142,11 +142,11 @@ public class ServerRoutingStatsManagerTest {
     latency = manager.fetchEMALatencyForServer("server1");
     assertEquals(latency, 0.0);
 
-    scoreList = manager.fetchC3ScoreForAllServers();
+    scoreList = manager.fetchHybridScoreForAllServers();
     assertEquals(scoreList.get(0).getLeft(), "server1");
     assertEquals(scoreList.get(0).getRight().doubleValue(), 0.0);
 
-    score = manager.fetchC3ScoreForServer("server1");
+    score = manager.fetchHybridScoreForServer("server1");
     assertEquals(score, 0.0);
 
     // Add a new server server2.
@@ -176,15 +176,15 @@ public class ServerRoutingStatsManagerTest {
     latency = manager.fetchEMALatencyForServer("server1");
     assertEquals(latency, 0.0);
 
-    scoreList = manager.fetchC3ScoreForAllServers();
+    scoreList = manager.fetchHybridScoreForAllServers();
     assertEquals(scoreList.get(0).getLeft(), "server2");
     assertEquals(scoreList.get(0).getRight().doubleValue(), 0.0);
     assertEquals(scoreList.get(1).getLeft(), "server1");
     assertEquals(scoreList.get(1).getRight().doubleValue(), 0.0);
 
-    score = manager.fetchC3ScoreForServer("server2");
+    score = manager.fetchHybridScoreForServer("server2");
     assertEquals(score, 0.0);
-    score = manager.fetchC3ScoreForServer("server1");
+    score = manager.fetchHybridScoreForServer("server1");
     assertEquals(score, 0.0);
 
     // Record completion stats for server1
@@ -213,15 +213,15 @@ public class ServerRoutingStatsManagerTest {
     latency = manager.fetchEMALatencyForServer("server1");
     assertEquals(latency, 2.0);
 
-    scoreList = manager.fetchC3ScoreForAllServers();
+    scoreList = manager.fetchHybridScoreForAllServers();
     assertEquals(scoreList.get(0).getLeft(), "server2");
     assertEquals(scoreList.get(0).getRight().doubleValue(), 0.0);
     assertEquals(scoreList.get(1).getLeft(), "server1");
     assertEquals(scoreList.get(1).getRight().doubleValue(), 54.0);
 
-    score = manager.fetchC3ScoreForServer("server2");
+    score = manager.fetchHybridScoreForServer("server2");
     assertEquals(score, 0.0);
-    score = manager.fetchC3ScoreForServer("server1");
+    score = manager.fetchHybridScoreForServer("server1");
     assertEquals(score, 54.0);
 
     // Record completion stats for server2
@@ -250,15 +250,15 @@ public class ServerRoutingStatsManagerTest {
     latency = manager.fetchEMALatencyForServer("server1");
     assertEquals(latency, 2.0);
 
-    scoreList = manager.fetchC3ScoreForAllServers();
+    scoreList = manager.fetchHybridScoreForAllServers();
     assertEquals(scoreList.get(0).getLeft(), "server2");
     assertEquals(scoreList.get(0).getRight().doubleValue(), 10.0, manager.getServerRoutingStatsStr());
     assertEquals(scoreList.get(1).getLeft(), "server1");
     assertEquals(scoreList.get(1).getRight().doubleValue(), 54.0, manager.getServerRoutingStatsStr());
 
-    score = manager.fetchC3ScoreForServer("server2");
+    score = manager.fetchHybridScoreForServer("server2");
     assertEquals(score, 10.0);
-    score = manager.fetchC3ScoreForServer("server1");
+    score = manager.fetchHybridScoreForServer("server1");
     assertEquals(score, 54.0);
   }
 

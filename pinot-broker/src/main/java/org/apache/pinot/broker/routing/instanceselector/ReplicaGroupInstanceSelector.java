@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
@@ -72,7 +73,10 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     if (adaptiveServerSelector != null) {
       // Fetch serverRankList before looping through all the segments. This is important to make sure that we pick
       // the least amount of instances for a query by referring to a single snapshot of the rankings.
-      serverRankList = adaptiveServerSelector.fetchServerRanking();
+      List<Pair<String, Double>> serverRankListWithScores = adaptiveServerSelector.fetchAllServerRankingsWithScores();
+      for (Pair<String, Double> entry : serverRankListWithScores) {
+        serverRankList.add(entry.getLeft());
+      }
     }
 
     if (serverRankList.size() > 0) {

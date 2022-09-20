@@ -334,78 +334,78 @@ public class CommonConstants {
        * Routing Strategy is controlled by the config CONFIG_OF_TYPE.
        *
        *
-       * Stats Collection: Enabling/Disabling stats collection will dictate whether stats (like latency, #
-       *                   inflight requests) will be collected when queries are routed to/received from servers.
-       *                   It does not have any impact on the Server Selection Strategy used.
        *
-       * Routing Strategy: Decides what strategy should be used to pick a server. The available strategies are as
-       *                   follows:
-       *                   1. NO_OP: Uses the default roundrobin approach. Does NOT require Stats Collection to be
-       *                   enabled.
+       * Stats Collection: Enabling/Disabling stats collection will dictate whether stats (like latency, # of inflight
+       *                   requests) will be collected when queries are routed to/received from servers. It does not
+       *                   have any impact on the Server Selection Strategy used.
+       *
+       * Routing Strategy: Decides what strategy should be used to pick a server. Note that this
+       *                   routing strategy complements the existing Balanced/ReplicaGroup/StrictReplicaGroup
+       *                   strategies and is not a replacement.The available strategies are as follows:
+       *                   1. NO_OP: Uses the default behavior offered by Balanced/ReplicaGroup/StrictReplicaGroup
+       *                   instance selectors. Does NOT require Stats Collection to be enabled.
        *                   2. NUM_INFLIGHT_REQ: Picks the best server based on the number of inflight requests for
        *                   each server. Requires Stats Collection to be enabled.
        *                   3. LATENCY: Picks the best server based on the Exponential Weighted Moving Averge of Latency
        *                   for each server. Requires Stats Collection to be enabled.
        *                   4. HYBRID: Picks the best server by computing a custom hybrid score based on both latency
-       *                   and # inflight requests. Requires Stats Collection to be enabled.
+       *                   and # inflight requests. This is based on the approach described in the paper
+       *                   https://www.usenix.org/system/files/conference/nsdi15/nsdi15-paper-suresh.pdf. Requires Stats
+       *                   Collection to be enabled.
        */
 
       public enum Type {
-        // Adaptive Selectors are not used. Use default round-robin.
         NO_OP,
 
-        // Use selector that routes to servers based on number of inflight requests.
         NUM_INFLIGHT_REQ,
 
-        // Use selector that routes to servers based on observed latencies.
         LATENCY,
 
-        // Uses both latency and numInFlightRequests to select the best server based on C3 score. It is based on the
-        // approach described in https://www.usenix.org/system/files/conference/nsdi15/nsdi15-paper-suresh.pdf
         HYBRID
       }
 
+      private static final String CONFIG_PREFIX = "pinot.broker.adaptive.server.selector";
+
       // Determines the type of AdaptiveServerSelector to use.
-      public static final String CONFIG_OF_TYPE = "pinot.broker.adaptive.server.selector.type";
+      public static final String CONFIG_OF_TYPE = CONFIG_PREFIX + ".type";
       public static final String DEFAULT_TYPE = Type.NO_OP.name();
 
-      public static final String CONFIG_OF_ENABLE_STATS_COLLECTION = "pinot.broker.adaptive.server.selector.enable"
-          + ".stats.collection";
+      // Determines whether stats collection is enabled. This can be enabled independent of CONFIG_OF_TYPE. This is
+      // so that users have an option to just enable stats collection and analyze them before deciding and enabling
+      // adaptive server selection.
+      public static final String CONFIG_OF_ENABLE_STATS_COLLECTION = CONFIG_PREFIX + ".enable.stats.collection";
       public static final boolean DEFAULT_ENABLE_STATS_COLLECTION = false;
 
       // Parameters to tune exponential moving average.
 
       // The weightage to be given for a new incoming value. For example, alpha=0.30 will give 30% weightage to the
       // new value and 70% weightage to the existing value in the Exponential Weighted Moving Average calculation.
-      public static final String CONFIG_OF_ALPHA = "pinot.broker.adaptive.server.selector.alpha";
-      public static final double DEFAULT_ALPHA = 0.666;
+      public static final String CONFIG_OF_EWMA_ALPHA = CONFIG_PREFIX + ".ewma.alpha";
+      public static final double DEFAULT_EWMA_ALPHA = 0.666;
 
       // If the EMA average has not been updated during a specified time window (defined by this property), the
       // EMA average value is automatically decayed by an incoming value of zero. This is required to bring a server
       // back to healthy state gracefully after it has experienced some form of slowness.
-      public static final String CONFIG_OF_AUTODECAY_WINDOW_MS =
-          "pinot.broker.adaptive.server.selector.autodecay.window.ms";
+      public static final String CONFIG_OF_AUTODECAY_WINDOW_MS = CONFIG_PREFIX + ".autodecay.window.ms";
       public static final long DEFAULT_AUTODECAY_WINDOW_MS = 10 * 1000;
 
       // Determines the initial duration during which incoming values are skipped in the Exponential Moving Average
       // calculation. Until this duration has elapsed, average returned will be equal to AVG_INITIALIZATION_VAL.
-      public static final String CONFIG_OF_WARMUP_DURATION_MS = "pinot.broker.adaptive.server.selector.warmup.duration";
+      public static final String CONFIG_OF_WARMUP_DURATION_MS = CONFIG_PREFIX + ".warmup.duration";
       public static final long DEFAULT_WARMUP_DURATION_MS = 0;
 
       // Determines the initialization value for Exponential Moving Average.
-      public static final String CONFIG_OF_AVG_INITIALIZATION_VAL = "pinot.broker.adaptive.server.selector.avg"
-          + ".initialization.val";
+      public static final String CONFIG_OF_AVG_INITIALIZATION_VAL = CONFIG_PREFIX + ".avg.initialization.val";
       public static final double DEFAULT_AVG_INITIALIZATION_VAL = 1.0;
 
-      // Parameters related to C3 score.
-      public static final String CONFIG_OF_C3_SCORE_EXPONENT = "pinot.broker.adaptive.server.selector.c3.score"
-          + ".exponent";
-      public static final int DEFAULT_C3_SCORE_EXPONENT = 3;
+      // Parameters related to Hybrid score.
+      public static final String CONFIG_OF_HYBRID_SCORE_EXPONENT = CONFIG_PREFIX + ".hybrid.score.exponent";
+      public static final int DEFAULT_HYBRID_SCORE_EXPONENT = 3;
 
       // Threadpool size of ServerRoutingStatsManager. This controls the number of threads available to update routing
       // stats for servers upon query submission and response arrival.
-      public static final String CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE = "pinot.broker.adaptive.server.selector"
-          + ".stats.manager.threadpool.size";
+      public static final String CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE =
+          CONFIG_PREFIX + ".stats.manager.threadpool.size";
       public static final int DEFAULT_STATS_MANAGER_THREADPOOL_SIZE = 2;
     }
   }

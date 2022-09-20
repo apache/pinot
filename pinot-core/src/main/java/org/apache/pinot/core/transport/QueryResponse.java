@@ -65,8 +65,9 @@ public interface QueryResponse {
   /**
    * Returns the time taken for the server to respond to the query.
    * @param serverRoutingInstance
+   * @return
    */
-  int getServerResponseDelayMs(ServerRoutingInstance serverRoutingInstance);
+  long getServerResponseDelayMs(ServerRoutingInstance serverRoutingInstance);
 
   /**
    * Returns the failed server if the query fails.

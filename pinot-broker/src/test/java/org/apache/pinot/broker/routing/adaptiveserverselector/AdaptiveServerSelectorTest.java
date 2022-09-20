@@ -100,10 +100,7 @@ public class AdaptiveServerSelectorTest {
     Map<String, Integer> numInflightReqMap = new HashMap<>();
 
     // TEST 1: Try to fetch the best server when stats are not populated yet.
-    List<String> serverRanking = selector.fetchServerRanking();
-    assertTrue(serverRanking.isEmpty());
-
-    List<Pair<String, Double>> serverRankingWithVal = selector.fetchServerRankingWithValues();
+    List<Pair<String, Double>> serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
     assertTrue(serverRankingWithVal.isEmpty());
 
     // A random server will be returned if any of the candidate servers do not have stats.
@@ -126,10 +123,8 @@ public class AdaptiveServerSelectorTest {
       }
     }
 
-    serverRanking = selector.fetchServerRanking();
-    assertEquals(serverRanking.size(), _servers.size());
-
-    serverRankingWithVal = selector.fetchServerRankingWithValues();
+    serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
+    assertEquals(serverRankingWithVal.size(), _servers.size());
     for (Pair<String, Double> entry : serverRankingWithVal) {
       assertEquals(entry.getRight(), (double) numInflightReqMap.get(entry.getLeft()));
     }
@@ -155,7 +150,7 @@ public class AdaptiveServerSelectorTest {
       }
     }
 
-    serverRankingWithVal = selector.fetchServerRankingWithValues();
+    serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
     assertEquals(serverRankingWithVal.get(0).getLeft(), "server1");
     assertEquals(serverRankingWithVal.get(0).getRight(), (double) numInflightReqMap.get("server1"));
     assertEquals(serverRankingWithVal.get(1).getLeft(), "server2");
@@ -164,12 +159,6 @@ public class AdaptiveServerSelectorTest {
     assertEquals(serverRankingWithVal.get(2).getRight(), (double) numInflightReqMap.get("server3"));
     assertEquals(serverRankingWithVal.get(3).getLeft(), "server4");
     assertEquals(serverRankingWithVal.get(3).getRight(), (double) numInflightReqMap.get("server4"));
-
-    serverRanking = selector.fetchServerRanking();
-    assertEquals(serverRanking.get(0), "server1");
-    assertEquals(serverRanking.get(1), "server2");
-    assertEquals(serverRanking.get(2), "server3");
-    assertEquals(serverRanking.get(3), "server4");
 
     selectedServer = selector.select(_servers);
     assertEquals(selectedServer, "server1");
@@ -201,7 +190,7 @@ public class AdaptiveServerSelectorTest {
     serverRoutingStatsManager.recordStatsAfterQuerySubmission(-1, _servers.get(2));
     waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
 
-    serverRankingWithVal = selector.fetchServerRankingWithValues();
+    serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
     assertEquals(serverRankingWithVal.get(0).getLeft(), "server2");
     assertEquals(serverRankingWithVal.get(0).getRight(), (double) numInflightReqMap.get("server2"));
     assertEquals(serverRankingWithVal.get(1).getLeft(), "server1");
@@ -210,12 +199,6 @@ public class AdaptiveServerSelectorTest {
     assertEquals(serverRankingWithVal.get(2).getRight(), (double) numInflightReqMap.get("server4"));
     assertEquals(serverRankingWithVal.get(3).getLeft(), "server3");
     assertEquals(serverRankingWithVal.get(3).getRight(), (double) numInflightReqMap.get("server3"));
-
-    serverRanking = selector.fetchServerRanking();
-    assertEquals(serverRanking.get(0), "server2");
-    assertEquals(serverRanking.get(1), "server1");
-    assertEquals(serverRanking.get(2), "server4");
-    assertEquals(serverRanking.get(3), "server3");
 
     selectedServer = selector.select(_servers);
     assertEquals(selectedServer, "server2");
@@ -232,8 +215,7 @@ public class AdaptiveServerSelectorTest {
     // during every iteration.
     Random rand = new Random();
     for (int ii = 0; ii < 1000; ii++) {
-      // List<String> serverRanking = selector.fetchServerRanking();
-      serverRankingWithVal = selector.fetchServerRankingWithValues();
+      serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
 
       // Assert if the ranking is accurate.
       double prevVal = 0.0;
@@ -269,7 +251,7 @@ public class AdaptiveServerSelectorTest {
     double avgInitializationVal = 0.0;
 
     _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
-    _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ALPHA, alpha);
+    _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, alpha);
     _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, autodecayWindowMs);
     _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, warmupDurationMs);
     _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL,
@@ -285,10 +267,8 @@ public class AdaptiveServerSelectorTest {
     Random rand = new Random();
 
     // TEST 1: Try to fetch the best server when stats are not populated yet.
-    List<String> serverRanking = selector.fetchServerRanking();
-    assertTrue(serverRanking.isEmpty());
 
-    List<Pair<String, Double>> serverRankingWithVal = selector.fetchServerRankingWithValues();
+    List<Pair<String, Double>> serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
     assertTrue(serverRankingWithVal.isEmpty());
 
     // A random server will be returned if any of the candidate servers do not have stats.
@@ -307,11 +287,8 @@ public class AdaptiveServerSelectorTest {
       }
     }
 
-
-    serverRanking = selector.fetchServerRanking();
-    assertEquals(serverRanking.size(), _servers.size());
-
-    serverRankingWithVal = selector.fetchServerRankingWithValues();
+    serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
+    assertEquals(serverRankingWithVal.size(), _servers.size());
     for (Pair<String, Double> entry : serverRankingWithVal) {
       assertEquals(entry.getRight(), latencyMap.get(entry.getLeft()).getAverage());
     }
@@ -335,7 +312,7 @@ public class AdaptiveServerSelectorTest {
       }
     }
 
-    serverRankingWithVal = selector.fetchServerRankingWithValues();
+    serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
     double prevVal = 0.0;
     for (Pair<String, Double> entry : serverRankingWithVal) {
       String server = entry.getLeft();
@@ -357,7 +334,7 @@ public class AdaptiveServerSelectorTest {
     // Test 4: Simulate server selection code. Pick the best server using LatencySelector during every iteration.
     // Every iteration updates latency for a server. Verify if LatencySelector picks the best server in every iteration.
     for (int ii = 0; ii < 1000; ii++) {
-      serverRankingWithVal = selector.fetchServerRankingWithValues();
+      serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
 
       prevVal = 0.0;
       for (Pair<String, Double> entry : serverRankingWithVal) {
@@ -386,12 +363,12 @@ public class AdaptiveServerSelectorTest {
     int hybridSelectorExponent = 3;
 
     _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
-    _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ALPHA, alpha);
+    _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, alpha);
     _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, autodecayWindowMs);
     _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, warmupDurationMs);
     _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL,
         avgInitializationVal);
-    _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_C3_SCORE_EXPONENT,
+    _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT,
         hybridSelectorExponent);
 
     PinotConfiguration cfg = new PinotConfiguration(_properties);
@@ -403,10 +380,7 @@ public class AdaptiveServerSelectorTest {
     long taskCount = 0;
 
     // TEST 1: Try to fetch the best server when stats are not populated yet.
-    List<String> serverRanking = selector.fetchServerRanking();
-    assertTrue(serverRanking.isEmpty());
-
-    List<Pair<String, Double>> serverRankingWithVal = selector.fetchServerRankingWithValues();
+    List<Pair<String, Double>> serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
     assertTrue(serverRankingWithVal.isEmpty());
 
     // A random server will be returned if any of the candidate servers do not have stats.
@@ -428,12 +402,8 @@ public class AdaptiveServerSelectorTest {
       }
     }
 
-
-    serverRanking = selector.fetchServerRanking();
-    assertEquals(serverRanking.size(), _servers.size());
-    assertEquals(serverRoutingStatsManager.getQueueSize(), 0);
-
-    serverRankingWithVal = selector.fetchServerRankingWithValues();
+    serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
+    assertEquals(serverRankingWithVal.size(), _servers.size());
     StringBuilder debugStr = new StringBuilder();
     for (Pair<String, Double> entry : serverRankingWithVal) {
       debugStr.append(entry.getLeft()).append("=").append(entry.getRight().toString()).append("; ");
@@ -453,7 +423,7 @@ public class AdaptiveServerSelectorTest {
       }
     }
 
-    serverRankingWithVal = selector.fetchServerRankingWithValues();
+    serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
     double prevVal = 0.0;
     for (Pair<String, Double> entry : serverRankingWithVal) {
       String server = entry.getLeft();
@@ -476,8 +446,7 @@ public class AdaptiveServerSelectorTest {
     // server in every iteration.
     Random rand = new Random();
     for (int ii = 0; ii < 1000; ii++) {
-      // List<String> serverRanking = selector.fetchServerRanking();
-      serverRankingWithVal = selector.fetchServerRankingWithValues();
+      serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
 
       // Assert if the ranking is accurate.
       prevVal = 0.0;

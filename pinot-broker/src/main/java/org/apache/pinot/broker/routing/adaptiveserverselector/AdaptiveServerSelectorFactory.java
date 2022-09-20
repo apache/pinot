@@ -25,7 +25,10 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+/**
+ * The {@code AdaptiveServerSelectorFactory} determines the adaptive server selection strategy to use. The choice is
+ * made based on broker instance configs.
+ */
 public class AdaptiveServerSelectorFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(AdaptiveServerSelectorFactory.class);
 
@@ -49,7 +52,7 @@ public class AdaptiveServerSelectorFactory {
 
     switch (type) {
       case NO_OP: {
-        LOGGER.info("Using NoOp (round robin) selector.");
+        LOGGER.info("Adaptive server selection is disabled. Using default selection behavior.");
         return null;
       }
       case NUM_INFLIGHT_REQ: {
