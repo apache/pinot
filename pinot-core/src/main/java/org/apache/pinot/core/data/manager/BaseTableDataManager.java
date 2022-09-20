@@ -94,6 +94,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected Logger _logger;
   protected HelixManager _helixManager;
   protected AuthProvider _authProvider;
+  protected TableConfig _tableConfig;
+  protected Schema _schema;
   protected long _streamSegmentDownloadUntarRateLimitBytesPerSec;
   protected boolean _isStreamSegmentDownloadUntar;
 
@@ -212,8 +214,21 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    Schema schema = getAndPersistTableSchema();
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
+  }
+
+  protected TableConfig getAndPersistTableConfig(IndexLoadingConfig indexLoadingConfig) {
+    _tableConfig = indexLoadingConfig.getTableConfig();
+    return _tableConfig;
+  }
+
+  protected Schema getAndPersistTableSchema() {
+    Schema tableSchema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    if (tableSchema != null) {
+      _schema = tableSchema.clone();
+    }
+    return tableSchema;
   }
 
   @Override
@@ -323,6 +338,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return _errorCache.asMap().entrySet().stream().filter(map -> map.getKey().getLeft().equals(_tableNameWithType))
           .collect(Collectors.toMap(map -> map.getKey().getRight(), Map.Entry::getValue));
     }
+  }
+
+  @Override
+  @Nullable
+  public TableConfig getTableConfig() {
+    return _tableConfig;
+  }
+
+  @Override
+  @Nullable
+  public Schema getSchema() {
+    return _schema;
   }
 
   @Override
@@ -605,9 +632,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     File indexDir = getSegmentDataDir(segmentName);
     recoverReloadFailureQuietly(_tableNameWithType, segmentName, indexDir);
 
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    Schema schema = getAndPersistTableSchema();
     schema = SegmentGeneratorConfig.updateSchemaWithTimestampIndexes(schema,
-        SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(indexLoadingConfig.getTableConfig()));
+        SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(
+            getAndPersistTableConfig(indexLoadingConfig)));
 
     // Creates the SegmentDirectory object to access the segment metadata.
     // The metadata is null if the segment doesn't exist yet.
@@ -673,7 +701,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       IndexLoadingConfig indexLoadingConfig, Schema schema)
       throws Exception {
     SegmentDirectoryLoaderContext loaderContext =
-        new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
+        new SegmentDirectoryLoaderContext.Builder().setTableConfig(getAndPersistTableConfig(indexLoadingConfig))
             .setSchema(schema).setInstanceId(indexLoadingConfig.getInstanceId()).setSegmentName(segmentName)
             .setSegmentCrc(segmentCrc).setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs())
             .build();

@@ -187,4 +187,19 @@ public interface TableDataManager {
    * @return List of {@link SegmentErrorInfo}
    */
   Map<String, SegmentErrorInfo> getSegmentErrors();
+
+  /**
+   * Return the cached table config. It is updated when the segment list changes.
+   *
+   * @return {@link TableConfig}.
+   */
+  TableConfig getTableConfig();
+
+
+  /**
+   * Return the cached table schema. It is updated when the segment list changes.
+   *
+   * @return {@link Schema}.
+   */
+  Schema getSchema();
 }
