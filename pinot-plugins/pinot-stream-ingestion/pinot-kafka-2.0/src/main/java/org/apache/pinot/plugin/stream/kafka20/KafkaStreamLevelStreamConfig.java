@@ -39,7 +39,7 @@ public class KafkaStreamLevelStreamConfig {
   }};
 
   private String _kafkaTopicName;
-  private String _groupId;
+  private String _streamLevelGroupId;
   private String _bootstrapServers;
   private Map<String, String> _kafkaConsumerProperties;
 
@@ -59,9 +59,9 @@ public class KafkaStreamLevelStreamConfig {
     Preconditions.checkNotNull(_bootstrapServers,
         "Must specify bootstrap broker connect string " + hlcBootstrapBrokerUrlKey + " in high level kafka consumer");
 
-    _groupId = groupId;
-    if (_groupId == null) {
-      _groupId = tableName;
+    _streamLevelGroupId = groupId;
+    if (_streamLevelGroupId == null) {
+      _streamLevelGroupId = tableName;
     }
 
     _kafkaConsumerProperties = new HashMap<>();
@@ -79,8 +79,8 @@ public class KafkaStreamLevelStreamConfig {
     return _kafkaTopicName;
   }
 
-  public String getGroupId() {
-    return _groupId;
+  public String getStreamLevelGroupId() {
+    return _streamLevelGroupId;
   }
 
   public Properties getKafkaConsumerProperties() {
@@ -91,16 +91,16 @@ public class KafkaStreamLevelStreamConfig {
     for (String key : _kafkaConsumerProperties.keySet()) {
       props.put(key, _kafkaConsumerProperties.get(key));
     }
-    props.put("group.id", _groupId);
+    props.put("group.id", _streamLevelGroupId);
     props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, _bootstrapServers);
     return props;
   }
 
   @Override
   public String toString() {
-    return "KafkaStreamLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\'' + ", _groupId='" + _groupId
-        + '\'' + ", _bootstrapServers='" + _bootstrapServers + '\'' + ", _kafkaConsumerProperties="
-        + _kafkaConsumerProperties + '}';
+    return "KafkaStreamLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\'' + ", _groupId='"
+        + _streamLevelGroupId + '\'' + ", _bootstrapServers='" + _bootstrapServers + '\''
+        + ", _kafkaConsumerProperties=" + _kafkaConsumerProperties + '}';
   }
 
   @Override
@@ -115,15 +115,15 @@ public class KafkaStreamLevelStreamConfig {
 
     KafkaStreamLevelStreamConfig that = (KafkaStreamLevelStreamConfig) o;
 
-    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils.isEqual(_groupId,
-        that._groupId) && EqualityUtils.isEqual(_bootstrapServers, that._bootstrapServers) && EqualityUtils.isEqual(
-        _kafkaConsumerProperties, that._kafkaConsumerProperties);
+    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils.isEqual(_streamLevelGroupId,
+        that._streamLevelGroupId) && EqualityUtils.isEqual(_bootstrapServers, that._bootstrapServers)
+        && EqualityUtils.isEqual(_kafkaConsumerProperties, that._kafkaConsumerProperties);
   }
 
   @Override
   public int hashCode() {
     int result = EqualityUtils.hashCodeOf(_kafkaTopicName);
-    result = EqualityUtils.hashCodeOf(result, _groupId);
+    result = EqualityUtils.hashCodeOf(result, _streamLevelGroupId);
     result = EqualityUtils.hashCodeOf(result, _bootstrapServers);
     result = EqualityUtils.hashCodeOf(result, _kafkaConsumerProperties);
     return result;

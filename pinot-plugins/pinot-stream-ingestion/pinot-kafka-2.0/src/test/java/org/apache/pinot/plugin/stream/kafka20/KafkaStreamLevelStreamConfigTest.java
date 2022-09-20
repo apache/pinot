@@ -31,17 +31,6 @@ public class KafkaStreamLevelStreamConfigTest {
       "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder";
 
   private StreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer, String socketTimeout) {
-    return getStreamConfig(topic, bootstrapHosts, buffer, socketTimeout, null, null, null);
-  }
-
-  private StreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer, String socketTimeout,
-      String fetcherSize, String fetcherMinBytes, String isolationLevel) {
-    return getStreamConfig(topic, bootstrapHosts, buffer, socketTimeout, fetcherSize, fetcherMinBytes, isolationLevel,
-        null);
-  }
-
-  public StreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer, String socketTimeout,
-      String fetcherSize, String fetcherMinBytes, String isolationLevel, String populateRowMetadata) {
     Map<String, String> streamConfigMap = new HashMap<>();
     String streamType = "kafka";
     String consumerType = StreamConfig.ConsumerType.LOWLEVEL.toString();
@@ -65,18 +54,6 @@ public class KafkaStreamLevelStreamConfigTest {
     if (socketTimeout != null) {
       streamConfigMap.put("stream.kafka.socket.timeout", socketTimeout);
     }
-    if (fetcherSize != null) {
-      streamConfigMap.put("stream.kafka.fetcher.size", fetcherSize);
-    }
-    if (fetcherMinBytes != null) {
-      streamConfigMap.put("stream.kafka.fetcher.minBytes", fetcherMinBytes);
-    }
-    if (isolationLevel != null) {
-      streamConfigMap.put("stream.kafka.isolation.level", isolationLevel);
-    }
-    if (populateRowMetadata != null) {
-      streamConfigMap.put("stream.kafka.metadata.populate", populateRowMetadata);
-    }
 
     return new StreamConfig(tableNameWithType, streamConfigMap);
   }
@@ -85,13 +62,13 @@ public class KafkaStreamLevelStreamConfigTest {
   public void testGroupIdWhenNull() {
     StreamConfig streamConfig = getStreamConfig("topic", "bootstrapHosts", "", "");
     KafkaStreamLevelStreamConfig config = new KafkaStreamLevelStreamConfig(streamConfig, "tableName", null);
-    Assert.assertEquals("tableName", config.getGroupId());
+    Assert.assertEquals("tableName", config.getStreamLevelGroupId());
   }
 
   @Test
   public void testGroupId() {
     StreamConfig streamConfig = getStreamConfig("topic", "", "", "");
     KafkaStreamLevelStreamConfig config = new KafkaStreamLevelStreamConfig(streamConfig, "tableName", "groupId");
-    Assert.assertEquals("groupId", config.getGroupId());
+    Assert.assertEquals("groupId", config.getStreamLevelGroupId());
   }
 }

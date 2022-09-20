@@ -74,7 +74,7 @@ public class KafkaStreamLevelConsumerManager {
   public static KafkaConsumer acquireKafkaConsumerForConfig(KafkaStreamLevelStreamConfig kafkaStreamLevelStreamConfig) {
     final ImmutableTriple<String, String, String> configKey =
         new ImmutableTriple<>(kafkaStreamLevelStreamConfig.getKafkaTopicName(),
-            kafkaStreamLevelStreamConfig.getGroupId(),
+            kafkaStreamLevelStreamConfig.getStreamLevelGroupId(),
             kafkaStreamLevelStreamConfig.getBootstrapServers());
 
     synchronized (KafkaStreamLevelConsumerManager.class) {
