@@ -168,6 +168,7 @@ public class CalciteRexExpressionParser {
         return compileAndExpression(rexCall, pinotQuery);
       case OR:
         return compileOrExpression(rexCall, pinotQuery);
+      case SEARCH:
       case OTHER_FUNCTION:
         functionName = rexCall.getFunctionName();
         break;

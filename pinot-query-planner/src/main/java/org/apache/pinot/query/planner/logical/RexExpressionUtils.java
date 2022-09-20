@@ -19,8 +19,10 @@
 package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.BoundType;
 import com.google.common.collect.Range;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -31,8 +33,8 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.Sarg;
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.sql.FilterKind;
 
 
 public class RexExpressionUtils {
@@ -61,7 +63,6 @@ public class RexExpressionUtils {
         operands);
   }
 
-  // TODO: Add support for range filter expressions (e.g. a > 0 and a < 30)
   static RexExpression handleSearch(RexCall rexCall) {
     List<RexNode> operands = rexCall.getOperands();
     RexInputRef rexInputRef = (RexInputRef) operands.get(0);
@@ -69,23 +70,41 @@ public class RexExpressionUtils {
     FieldSpec.DataType dataType = RexExpression.toDataType(rexLiteral.getType());
     Sarg sarg = rexLiteral.getValueAs(Sarg.class);
     if (sarg.isPoints()) {
-      return new RexExpression.FunctionCall(SqlKind.IN, dataType, SqlKind.IN.name(), toFunctionOperands(rexInputRef,
-          sarg.rangeSet.asRanges(), dataType));
+      return new RexExpression.FunctionCall(SqlKind.IN, dataType, SqlKind.IN.name(), toFunctionOperands(SqlKind.IN,
+          rexInputRef, sarg.rangeSet.asRanges(), dataType));
     } else if (sarg.isComplementedPoints()) {
       return new RexExpression.FunctionCall(SqlKind.NOT_IN, dataType, SqlKind.NOT_IN.name(),
-          toFunctionOperands(rexInputRef, sarg.rangeSet.complement().asRanges(), dataType));
+          toFunctionOperands(SqlKind.NOT_IN, rexInputRef, sarg.rangeSet.complement().asRanges(), dataType));
     } else {
-      throw new NotImplementedException("Range is not implemented yet");
+      return new RexExpression.FunctionCall(SqlKind.SEARCH, dataType, FilterKind.RANGE.name(),
+          toFunctionOperands(SqlKind.SEARCH, rexInputRef, sarg.rangeSet.asRanges(), dataType));
     }
   }
 
-  private static List<RexExpression> toFunctionOperands(RexInputRef rexInputRef, Set<Range> ranges,
+  private static List<RexExpression> toFunctionOperands(SqlKind sqlKind, RexInputRef rexInputRef, Set<Range> ranges,
       FieldSpec.DataType dataType) {
     List<RexExpression> result = new ArrayList<>(ranges.size() + 1);
     result.add(RexExpression.toRexExpression(rexInputRef));
     for (Range range : ranges) {
-      result.add(new RexExpression.Literal(dataType, RexExpression.toRexValue(dataType, range.lowerEndpoint())));
+      if (sqlKind.equals(SqlKind.IN) || sqlKind.equals(SqlKind.NOT_IN)) {
+        result.add(new RexExpression.Literal(dataType, RexExpression.toRexValue(dataType, range.lowerEndpoint())));
+      } else {
+        result.add(new RexExpression.Literal(dataType, serialize(range)));
+      }
     }
     return result;
+  }
+
+  /**
+   * Serializes a Guava range object using a Pinot Range object, so
+   * {@link org.apache.pinot.query.parser.CalciteRexExpressionParser} can deserialize and run it.
+   */
+  private static String serialize(Range range) {
+    Comparable lowerBound = range.hasLowerBound() ? range.lowerEndpoint() : null;
+    boolean lowerBoundInclusive = lowerBound != null ? range.lowerBoundType().equals(BoundType.CLOSED) : false;
+    Comparable upperBound = range.hasUpperBound() ? range.upperEndpoint() : null;
+    boolean upperBoundInclusive = upperBound != null ? range.upperBoundType().equals(BoundType.CLOSED) : false;
+    return new org.apache.pinot.core.query.optimizer.filter.Range(lowerBound, lowerBoundInclusive, upperBound,
+        upperBoundInclusive).getRangeString();
   }
 }
