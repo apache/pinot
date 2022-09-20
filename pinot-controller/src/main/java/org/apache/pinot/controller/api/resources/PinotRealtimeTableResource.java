@@ -150,9 +150,8 @@ public class PinotRealtimeTableResource {
     }
   }
 
-  // TODO: remove consumingSegmentsInfo from SegmentRestletResource
   @GET
-  @Path("/tables/{tableName}/consumingSegmentsInfo2")
+  @Path("/tables/{tableName}/consumingSegmentsInfo")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Returns state of consuming segments", notes = "Gets the status of consumers from all servers")
   @ApiResponses(value = {
