@@ -525,7 +525,7 @@ public class TablesResource {
                       Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())
                   ),
                   partitionLagStateMap.entrySet().stream().collect(
-                      Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getOffsetLag())
+                      Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getRecordsLag())
                   ))
           );
 

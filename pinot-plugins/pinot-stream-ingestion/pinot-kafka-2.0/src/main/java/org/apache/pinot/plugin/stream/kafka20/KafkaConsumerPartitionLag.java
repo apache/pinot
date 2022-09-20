@@ -22,13 +22,13 @@ import org.apache.pinot.spi.stream.PartitionLagState;
 
 
 public class KafkaConsumerPartitionLag extends PartitionLagState {
-  private final String _offsetLag;
+  private final String _recordsLag;
 
-  public KafkaConsumerPartitionLag(String offsetLag) {
-    _offsetLag = offsetLag;
+  public KafkaConsumerPartitionLag(String recordsLag) {
+    _recordsLag = recordsLag;
   }
 
-  public String getOffsetLag() {
-    return _offsetLag;
+  public String getRecordsLag() {
+    return _recordsLag;
   }
 }
