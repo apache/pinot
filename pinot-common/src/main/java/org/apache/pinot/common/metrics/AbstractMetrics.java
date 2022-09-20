@@ -29,12 +29,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.metrics.PinotTimer;
+import org.apache.pinot.spi.utils.CommonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -491,7 +491,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
                 return valueCallback.call();
               } catch (Exception e) {
                 LOGGER.error("Caught exception", e);
-                Utils.rethrowException(e);
+                CommonUtils.rethrowException(e);
                 throw new AssertionError("Should not reach this");
               }
             }));
