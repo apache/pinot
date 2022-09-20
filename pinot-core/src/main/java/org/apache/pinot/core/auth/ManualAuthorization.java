@@ -17,21 +17,20 @@
  * under the License.
  */
 
-package org.apache.pinot.broker.api;
+package org.apache.pinot.core.auth;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import org.apache.pinot.spi.config.user.AccessType;
 
 
 /**
- * Annotation to be used on top of REST endpoints. Methods annotated with this annotation automatically get
- * authenticated in {@link AuthenticationFilter} and if validation passes, then the methods get executed.
+ * Annotation to be used on top of REST endpoints. Methods annotated with this annotation don't perform default
+ * authorization via AuthenticationFilter. This is useful when performing authorization manually via calls to
+ * {@code AuthenticationFiler.validatePermissions()}
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-public @interface Authenticate {
-  AccessType value();
+public @interface ManualAuthorization {
 }

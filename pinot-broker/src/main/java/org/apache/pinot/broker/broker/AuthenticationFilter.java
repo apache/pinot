@@ -35,15 +35,13 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import org.apache.pinot.broker.api.AccessControl;
-import org.apache.pinot.broker.api.Authenticate;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
-import org.apache.pinot.broker.api.ManualAuthorization;
+import org.apache.pinot.core.auth.ManualAuthorization;
 import org.glassfish.grizzly.http.server.Request;
 
-
 /**
- * A container filter class responsible for automatic authentication of REST endpoints. Any rest endpoints annotated
- * with {@link Authenticate} annotation, will go through authentication.
+ * A container filter class responsible for automatic authentication of REST endpoints. Any rest endpoints not annotated
+ * with {@link org.apache.pinot.core.auth.ManualAuthorization} annotation, will go through authentication.
  */
 @javax.ws.rs.ext.Provider
 public class AuthenticationFilter implements ContainerRequestFilter {
@@ -73,11 +71,6 @@ public class AuthenticationFilter implements ContainerRequestFilter {
 
     // exclude public/unprotected paths
     if (isBaseFile(uriInfo.getPath()) || UNPROTECTED_PATHS.contains(uriInfo.getPath())) {
-      return;
-    }
-
-    // check if authentication is required implicitly
-    if (accessControl.protectAnnotatedOnly() && !endpointMethod.isAnnotationPresent(Authenticate.class)) {
       return;
     }
 

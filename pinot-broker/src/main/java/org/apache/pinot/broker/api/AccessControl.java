@@ -47,13 +47,4 @@ public interface AccessControl {
    * @return {@code true} if authorized, {@code false} otherwise
    */
   boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest);
-
-  /**
-   * Determine whether authentication is required for annotated (controller) endpoints only
-   *
-   * @return {@code true} if annotated methods are protected only, {@code false} otherwise
-   */
-  default boolean protectAnnotatedOnly() {
-    return true;
-  }
 }
