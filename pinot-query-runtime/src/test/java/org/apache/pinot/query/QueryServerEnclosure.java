@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -92,7 +93,7 @@ public class QueryServerEnclosure {
   private final InstanceDataManager _instanceDataManager;
   private final Map<String, TableDataManager> _tableDataManagers = new HashMap<>();
   private final Map<String, File> _indexDirs;
-  private final ZkHelixPropertyStore<ZNRecord> _zkHelixPropertyStore;
+  private final HelixManager _helixManager;
 
   private QueryRunner _queryRunner;
 
@@ -110,7 +111,7 @@ public class QueryServerEnclosure {
         _segmentMap.put(tableName, segmentList);
       }
       _instanceDataManager = mockInstanceDataManager();
-      _zkHelixPropertyStore = mockZkHelixPropertyStore();
+      _helixManager = mockHelixManager();
       _queryRunnerPort = QueryEnvironmentTestUtils.getAvailablePort();
       _runnerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
       _runnerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME,
@@ -123,7 +124,7 @@ public class QueryServerEnclosure {
     }
   }
 
-  private ZkHelixPropertyStore<ZNRecord> mockZkHelixPropertyStore() {
+  private HelixManager mockHelixManager() {
     ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore = mock(ZkHelixPropertyStore.class);
     when(zkHelixPropertyStore.get(anyString(), any(), anyInt())).thenAnswer(invocationOnMock -> {
       String path = invocationOnMock.getArgument(0);
@@ -137,7 +138,9 @@ public class QueryServerEnclosure {
         return null;
       }
     });
-    return zkHelixPropertyStore;
+    HelixManager helixManager = mock(HelixManager.class);
+    when(helixManager.getHelixPropertyStore()).thenReturn(zkHelixPropertyStore);
+    return helixManager;
   }
 
   private ServerMetrics mockServiceMetrics() {
@@ -213,7 +216,7 @@ public class QueryServerEnclosure {
       throws Exception {
     PinotConfiguration configuration = new PinotConfiguration(_runnerConfig);
     _queryRunner = new QueryRunner();
-    _queryRunner.init(configuration, _instanceDataManager, _zkHelixPropertyStore, mockServiceMetrics());
+    _queryRunner.init(configuration, _instanceDataManager, _helixManager, mockServiceMetrics());
     _queryRunner.start();
   }
 

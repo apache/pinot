@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
+import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -64,6 +65,7 @@ public class QueryRunner {
   // This is a temporary before merging the 2 type of executor.
   private ServerQueryExecutorV1Impl _serverExecutor;
   private WorkerQueryExecutor _workerExecutor;
+  private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
   private MailboxService<Mailbox.MailboxContent> _mailboxService;
   private String _hostname;
@@ -74,12 +76,12 @@ public class QueryRunner {
    * <p>Should be called only once and before calling any other method.
    */
   public void init(PinotConfiguration config, InstanceDataManager instanceDataManager,
-      ZkHelixPropertyStore<ZNRecord> helixPropertyStore, ServerMetrics serverMetrics) {
+      HelixManager helixManager, ServerMetrics serverMetrics) {
     String instanceName = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME);
     _hostname = instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE) ? instanceName.substring(
         CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : instanceName;
     _port = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
-    _helixPropertyStore = helixPropertyStore;
+    _helixManager = helixManager;
     try {
       _mailboxService = new GrpcMailboxService(_hostname, _port, config);
       _serverExecutor = new ServerQueryExecutorV1Impl();
@@ -92,6 +94,7 @@ public class QueryRunner {
   }
 
   public void start() {
+    _helixPropertyStore = _helixManager.getHelixPropertyStore();
     _mailboxService.start();
     _serverExecutor.start();
     _workerExecutor.start();
