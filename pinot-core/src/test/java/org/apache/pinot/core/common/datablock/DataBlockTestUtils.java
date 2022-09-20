@@ -25,6 +25,7 @@ import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class DataBlockTestUtils {
@@ -35,7 +36,7 @@ public class DataBlockTestUtils {
     // do not instantiate.
   }
 
-  public static Object[] getRandomRow(DataSchema dataSchema) {
+  public static Object[] getRandomRow(DataSchema dataSchema, int nullPercentile) {
     final int numColumns = dataSchema.getColumnNames().length;
     DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     Object[] row = new Object[numColumns];
@@ -100,7 +101,6 @@ public class DataBlockTestUtils {
           }
           row[colId] = doubleArray;
           break;
-        case BYTES_ARRAY:
         case STRING_ARRAY:
           length = RANDOM.nextInt(ARRAY_SIZE);
           String[] stringArray = new String[length];
@@ -112,12 +112,22 @@ public class DataBlockTestUtils {
         default:
           throw new UnsupportedOperationException("Can't fill random data for column type: " + columnDataTypes[colId]);
       }
+      // randomly set some entry to null
+      if (columnDataTypes[colId].getStoredType() != DataSchema.ColumnDataType.OBJECT) {
+        row[colId] = randomlySettingNull(nullPercentile) ? null : row[colId];
+      }
     }
     return row;
   }
 
   public static Object getElement(BaseDataBlock dataBlock, int rowId, int colId,
       DataSchema.ColumnDataType columnDataType) {
+    RoaringBitmap nullBitmap = dataBlock.getNullRowIds(colId);
+    if (nullBitmap != null) {
+      if (nullBitmap.contains(rowId)) {
+        return null;
+      }
+    }
     switch (columnDataType.getStoredType()) {
       case INT:
         return dataBlock.getInt(rowId, colId);
@@ -145,7 +155,6 @@ public class DataBlockTestUtils {
         return dataBlock.getFloatArray(rowId, colId);
       case DOUBLE_ARRAY:
         return dataBlock.getDoubleArray(rowId, colId);
-      case BYTES_ARRAY:
       case STRING_ARRAY:
         return dataBlock.getStringArray(rowId, colId);
       default:
@@ -153,17 +162,12 @@ public class DataBlockTestUtils {
     }
   }
 
-  public static List<Object[]> getRandomRows(DataSchema dataSchema, int numRows) {
+  public static List<Object[]> getRandomRows(DataSchema dataSchema, int numRows, int nullPercentile) {
     List<Object[]> rows = new ArrayList<>(numRows);
     for (int i = 0; i < numRows; i++) {
-      rows.add(getRandomRow(dataSchema));
+      rows.add(getRandomRow(dataSchema, nullPercentile));
     }
     return rows;
-  }
-
-  public static List<Object[]> getRandomColumnar(DataSchema dataSchema, int numRows) {
-    List<Object[]> rows = getRandomRows(dataSchema, numRows);
-    return convertColumnar(dataSchema, rows);
   }
 
   public static List<Object[]> convertColumnar(DataSchema dataSchema, List<Object[]> rows) {
@@ -177,5 +181,9 @@ public class DataBlockTestUtils {
       }
     }
     return columnars;
+  }
+
+  public static boolean randomlySettingNull(int percentile) {
+    return RANDOM.nextInt(100) >= (100 - percentile);
   }
 }

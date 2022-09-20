@@ -83,7 +83,7 @@ public class TransferableBlock implements Block {
     if (_container == null) {
       switch (_type) {
         case ROW:
-          _container = DataBlockUtils.extraRows(_dataBlock);
+          _container = DataBlockUtils.extractRows(_dataBlock);
           break;
         case COLUMNAR:
         default:
@@ -105,10 +105,10 @@ public class TransferableBlock implements Block {
       try {
         switch (_type) {
           case ROW:
-            _dataBlock = DataBlockBuilder.buildFromRows(_container, null, _dataSchema);
+            _dataBlock = DataBlockBuilder.buildFromRows(_container, _dataSchema);
             break;
           case COLUMNAR:
-            _dataBlock = DataBlockBuilder.buildFromColumns(_container, null, _dataSchema);
+            _dataBlock = DataBlockBuilder.buildFromColumns(_container, _dataSchema);
             break;
           case METADATA:
             throw new UnsupportedOperationException("Metadata block cannot be constructed from container");

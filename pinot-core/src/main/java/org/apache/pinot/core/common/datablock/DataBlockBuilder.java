@@ -38,7 +38,7 @@ import org.roaringbitmap.RoaringBitmap;
 public class DataBlockBuilder {
   private final DataSchema _dataSchema;
   private final BaseDataBlock.Type _blockType;
-  private final DataSchema.ColumnDataType[] _columnDataType;
+  private final DataSchema.ColumnDataType[] _columnDataTypes;
 
   private int[] _columnOffsets;
   private int _rowSizeInBytes;
@@ -57,7 +57,7 @@ public class DataBlockBuilder {
 
   private DataBlockBuilder(DataSchema dataSchema, BaseDataBlock.Type blockType) {
     _dataSchema = dataSchema;
-    _columnDataType = dataSchema.getStoredColumnDataTypes();
+    _columnDataTypes = dataSchema.getStoredColumnDataTypes();
     _blockType = blockType;
     _numColumns = dataSchema.size();
     if (_blockType == BaseDataBlock.Type.COLUMNAR) {
@@ -87,16 +87,30 @@ public class DataBlockBuilder {
     }
   }
 
-  public static RowDataBlock buildFromRows(List<Object[]> rows, @Nullable RoaringBitmap[] colNullBitmaps,
-      DataSchema dataSchema)
+  public static RowDataBlock buildFromRows(List<Object[]> rows, DataSchema dataSchema)
       throws IOException {
     DataBlockBuilder rowBuilder = new DataBlockBuilder(dataSchema, BaseDataBlock.Type.ROW);
+    // TODO: consolidate these null utils into data table utils.
+    // Selection / Agg / Distinct all have similar code.
+    int numColumns = rowBuilder._numColumns;
+    RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
+    DataSchema.ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
+    Object[] nullPlaceholders = new Object[numColumns];
+    for (int colId = 0; colId < numColumns; colId++) {
+      nullBitmaps[colId] = new RoaringBitmap();
+      nullPlaceholders[colId] = storedColumnDataTypes[colId].getNullPlaceholder();
+    }
     rowBuilder._numRows = rows.size();
-    for (Object[] row : rows) {
+    for (int rowId = 0; rowId < rows.size(); rowId++) {
+      Object[] row = rows.get(rowId);
       ByteBuffer byteBuffer = ByteBuffer.allocate(rowBuilder._rowSizeInBytes);
-      for (int i = 0; i < rowBuilder._numColumns; i++) {
-        Object value = row[i];
-        switch (rowBuilder._columnDataType[i]) {
+      for (int colId = 0; colId < rowBuilder._numColumns; colId++) {
+        Object value = row[colId];
+        if (value == null) {
+          nullBitmaps[colId].add(rowId);
+          value = nullPlaceholders[colId];
+        }
+        switch (rowBuilder._columnDataTypes[colId]) {
           // Single-value column
           case INT:
             byteBuffer.putInt(((Number) value).intValue());
@@ -168,86 +182,147 @@ public class DataBlockBuilder {
             }
             break;
           case BYTES_ARRAY:
+            setColumn(rowBuilder, byteBuffer, (byte[][]) value);
+            break;
           case STRING_ARRAY:
             setColumn(rowBuilder, byteBuffer, (String[]) value);
             break;
           default:
             throw new IllegalStateException(
-                String.format("Unsupported data type: %s for column: %s", rowBuilder._columnDataType[i],
-                    rowBuilder._dataSchema.getColumnName(i)));
+                String.format("Unsupported data type: %s for column: %s", rowBuilder._columnDataTypes[colId],
+                    rowBuilder._dataSchema.getColumnName(colId)));
         }
       }
       rowBuilder._fixedSizeDataByteArrayOutputStream.write(byteBuffer.array(), 0, byteBuffer.position());
     }
     // Write null bitmaps after writing data.
-    if (colNullBitmaps != null) {
-      for (RoaringBitmap nullBitmap : colNullBitmaps) {
-        rowBuilder.setNullRowIds(nullBitmap);
-      }
+    for (RoaringBitmap nullBitmap : nullBitmaps) {
+      rowBuilder.setNullRowIds(nullBitmap);
     }
     return buildRowBlock(rowBuilder);
   }
 
-  public static ColumnarDataBlock buildFromColumns(List<Object[]> columns, @Nullable RoaringBitmap[] colNullBitmaps,
-      DataSchema dataSchema)
+  public static ColumnarDataBlock buildFromColumns(List<Object[]> columns, DataSchema dataSchema)
       throws IOException {
     DataBlockBuilder columnarBuilder = new DataBlockBuilder(dataSchema, BaseDataBlock.Type.COLUMNAR);
-    for (int i = 0; i < columns.size(); i++) {
-      Object[] column = columns.get(i);
+
+    // TODO: consolidate these null utils into data table utils.
+    // Selection / Agg / Distinct all have similar code.
+    int numColumns = columnarBuilder._numColumns;
+    RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
+    DataSchema.ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
+    Object[] nullPlaceholders = new Object[numColumns];
+    for (int colId = 0; colId < numColumns; colId++) {
+      nullBitmaps[colId] = new RoaringBitmap();
+      nullPlaceholders[colId] = storedColumnDataTypes[colId].getNullPlaceholder();
+    }
+    for (int colId = 0; colId < columns.size(); colId++) {
+      Object[] column = columns.get(colId);
       columnarBuilder._numRows = column.length;
-      ByteBuffer byteBuffer = ByteBuffer.allocate(columnarBuilder._numRows * columnarBuilder._columnSizeInBytes[i]);
-      switch (columnarBuilder._columnDataType[i]) {
+      ByteBuffer byteBuffer = ByteBuffer.allocate(columnarBuilder._numRows * columnarBuilder._columnSizeInBytes[colId]);
+      Object value;
+      switch (columnarBuilder._columnDataTypes[colId]) {
         // Single-value column
         case INT:
-          for (Object value : column) {
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            value = column[rowId];
+            if (value == null) {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
             byteBuffer.putInt(((Number) value).intValue());
           }
           break;
         case LONG:
-          for (Object value : column) {
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            value = column[rowId];
+            if (value == null) {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
             byteBuffer.putLong(((Number) value).longValue());
           }
           break;
         case FLOAT:
-          for (Object value : column) {
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            value = column[rowId];
+            if (value == null) {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
             byteBuffer.putFloat(((Number) value).floatValue());
           }
           break;
         case DOUBLE:
-          for (Object value : column) {
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            value = column[rowId];
+            if (value == null) {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
             byteBuffer.putDouble(((Number) value).doubleValue());
           }
           break;
         case BIG_DECIMAL:
-          for (Object value : column) {
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            value = column[rowId];
+            if (value == null) {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
             setColumn(columnarBuilder, byteBuffer, (BigDecimal) value);
           }
           break;
         case STRING:
-          for (Object value : column) {
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            value = column[rowId];
+            if (value == null) {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
             setColumn(columnarBuilder, byteBuffer, (String) value);
           }
           break;
         case BYTES:
-          for (Object value : column) {
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            value = column[rowId];
+            if (value == null) {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
             setColumn(columnarBuilder, byteBuffer, (ByteArray) value);
           }
           break;
         case OBJECT:
-          for (Object value : column) {
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            value = column[rowId];
+            if (value == null) {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
             setColumn(columnarBuilder, byteBuffer, value);
           }
           break;
         // Multi-value column
         case BOOLEAN_ARRAY:
         case INT_ARRAY:
-          for (Object value : column) {
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            value = column[rowId];
+            if (value == null) {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
             setColumn(columnarBuilder, byteBuffer, (int[]) value);
           }
           break;
         case TIMESTAMP_ARRAY:
         case LONG_ARRAY:
-          for (Object value : column) {
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            value = column[rowId];
+            if (value == null) {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
             if (value instanceof int[]) {
               // LONG_ARRAY type covers INT_ARRAY and LONG_ARRAY
               int[] ints = (int[]) value;
@@ -261,12 +336,22 @@ public class DataBlockBuilder {
           }
           break;
         case FLOAT_ARRAY:
-          for (Object value : column) {
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            value = column[rowId];
+            if (value == null) {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
             setColumn(columnarBuilder, byteBuffer, (float[]) value);
           }
           break;
         case DOUBLE_ARRAY:
-          for (Object value : column) {
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            value = column[rowId];
+            if (value == null) {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
             // DOUBLE_ARRAY type covers INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY and DOUBLE_ARRAY
             if (value instanceof int[]) {
               int[] ints = (int[]) value;
@@ -293,22 +378,25 @@ public class DataBlockBuilder {
           break;
         case BYTES_ARRAY:
         case STRING_ARRAY:
-          for (Object value : column) {
+          for (int rowId = 0; rowId < columnarBuilder._numRows; rowId++) {
+            value = column[rowId];
+            if (value == null) {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
             setColumn(columnarBuilder, byteBuffer, (String[]) value);
           }
           break;
         default:
           throw new IllegalStateException(
-              String.format("Unsupported data type: %s for column: %s", columnarBuilder._columnDataType[i],
-                  columnarBuilder._dataSchema.getColumnName(i)));
+              String.format("Unsupported data type: %s for column: %s", columnarBuilder._columnDataTypes[colId],
+                  columnarBuilder._dataSchema.getColumnName(colId)));
       }
       columnarBuilder._fixedSizeDataByteArrayOutputStream.write(byteBuffer.array(), 0, byteBuffer.position());
     }
     // Write null bitmaps after writing data.
-    if (colNullBitmaps != null) {
-      for (RoaringBitmap nullBitmap : colNullBitmaps) {
-        columnarBuilder.setNullRowIds(nullBitmap);
-      }
+    for (RoaringBitmap nullBitmap : nullBitmaps) {
+      columnarBuilder.setNullRowIds(nullBitmap);
     }
     return buildColumnarBlock(columnarBuilder);
   }
