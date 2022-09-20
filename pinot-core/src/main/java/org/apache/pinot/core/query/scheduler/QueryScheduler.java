@@ -62,7 +62,6 @@ public abstract class QueryScheduler {
   private static final String INVALID_NUM_RESIZES = "-1";
   private static final String INVALID_RESIZE_TIME_MS = "-1";
   private static final String QUERY_LOG_MAX_RATE_KEY = "query.log.maxRatePerSecond";
-  private static final String ENABLE_QUERY_CANCELLATION_KEY = "enable.query.cancellation";
   private static final double DEFAULT_QUERY_LOG_MAX_RATE = 10_000d;
   protected final ServerMetrics _serverMetrics;
   protected final QueryExecutor _queryExecutor;

@@ -190,28 +190,47 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   Set<ServerInstance> getRunningServers(long requestId) {
     Preconditions.checkState(_queriesById != null, "Query cancellation is not enabled on broker");
     QueryServers queryServers = _queriesById.get(requestId);
-    return (queryServers == null) ? Collections.emptySet() : queryServers._servers;
+    if (queryServers == null) {
+      return Collections.emptySet();
+    }
+    Set<ServerInstance> runningServers = new HashSet<>();
+    if (queryServers._offlineRoutingTable != null) {
+      runningServers.addAll(queryServers._offlineRoutingTable.keySet());
+    }
+    if (queryServers._realtimeRoutingTable != null) {
+      runningServers.addAll(queryServers._realtimeRoutingTable.keySet());
+    }
+    return runningServers;
   }
 
   @Override
-  public boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpConnectionManager connMgr,
+  public boolean cancelQuery(long requestId, int timeoutMs, Executor executor, HttpConnectionManager connMgr,
       Map<String, Integer> serverResponses)
       throws Exception {
     Preconditions.checkState(_queriesById != null, "Query cancellation is not enabled on broker");
-    QueryServers queryServers = _queriesById.get(queryId);
+    QueryServers queryServers = _queriesById.get(requestId);
     if (queryServers == null) {
       return false;
     }
-    String globalId = getGlobalQueryId(queryId);
     List<String> serverUrls = new ArrayList<>();
-    for (ServerInstance server : queryServers._servers) {
-      serverUrls.add(String.format("%s/query/%s", server.getAdminEndpoint(), globalId));
+    if (queryServers._offlineRoutingTable != null) {
+      for (ServerInstance server : queryServers._offlineRoutingTable.keySet()) {
+        serverUrls.add(String.format("%s/query/%s", server.getAdminEndpoint(), getGlobalQueryId(requestId)));
+      }
+    }
+    if (queryServers._realtimeRoutingTable != null) {
+      // NOTE: When the query is sent to both OFFLINE and REALTIME table, the REALTIME one has negative request id to
+      //       differentiate from the OFFLINE one
+      long realtimeRequestId = queryServers._offlineRoutingTable == null ? requestId : -requestId;
+      for (ServerInstance server : queryServers._realtimeRoutingTable.keySet()) {
+        serverUrls.add(String.format("%s/query/%s", server.getAdminEndpoint(), getGlobalQueryId(realtimeRequestId)));
+      }
     }
     if (serverUrls.isEmpty()) {
-      LOGGER.debug("No servers running the query: {} right now", globalId);
+      LOGGER.debug("No servers running the query: {} right now", queryServers._query);
       return true;
     }
-    LOGGER.debug("Cancelling the query: {} via server urls: {}", globalId, serverUrls);
+    LOGGER.debug("Cancelling the query: {} via server urls: {}", queryServers._query, serverUrls);
     CompletionService<DeleteMethod> completionService =
         new MultiHttpRequest(executor, connMgr).execute(serverUrls, null, timeoutMs, "DELETE", DeleteMethod::new);
     List<String> errMsgs = new ArrayList<>(serverUrls.size());
@@ -232,7 +251,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           serverResponses.put(uri.getHost() + ":" + uri.getPort(), status);
         }
       } catch (Exception e) {
-        LOGGER.error("Failed to cancel query: {}", globalId, e);
+        LOGGER.error("Failed to cancel query: {}", queryServers._query, e);
         // Can't just throw exception from here as there is a need to release the other connections.
         // So just collect the error msg to throw them together after the for-loop.
         errMsgs.add(e.getMessage());
@@ -271,16 +290,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (sql == null) {
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
     }
-    try {
-      String query = sql.asText();
-      requestContext.setQuery(query);
-      return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
-    } finally {
-      if (_queriesById != null) {
-        _queriesById.remove(requestId);
-        LOGGER.debug("Remove track of running query: {}", requestId);
-      }
-    }
+    String query = sql.asText();
+    requestContext.setQuery(query);
+    return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
   }
 
   private BrokerResponseNative handleRequest(long requestId, String query,
@@ -660,6 +672,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         realtimeRoutingTable = null;
       }
     }
+    BrokerResponseNative brokerResponse;
     if (_queriesById != null) {
       // Start to track the running query for cancellation just before sending it out to servers to avoid any potential
       // failures that could happen before sending it out, like failures to calculate the routing table etc.
@@ -669,14 +682,22 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       //       can always list the running queries and cancel query again until it ends. Just that such race
       //       condition makes cancel API less reliable. This should be rare as it assumes sending queries out to
       //       servers takes time, but will address later if needed.
-      QueryServers queryServers = _queriesById.computeIfAbsent(requestId, k -> new QueryServers(query));
+      _queriesById.put(requestId, new QueryServers(query, offlineRoutingTable, realtimeRoutingTable));
       LOGGER.debug("Keep track of running query: {}", requestId);
-      queryServers.addServers(offlineRoutingTable, realtimeRoutingTable);
+      try {
+        brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
+            offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
+            requestContext);
+      } finally {
+        _queriesById.remove(requestId);
+        LOGGER.debug("Remove track of running query: {}", requestId);
+      }
+    } else {
+      brokerResponse =
+          processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest, offlineRoutingTable,
+              realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats, requestContext);
     }
-    // TODO: Modify processBrokerRequest() to directly take PinotQuery
-    BrokerResponseNative brokerResponse =
-        processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest, offlineRoutingTable,
-            realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats, requestContext);
+
     brokerResponse.setExceptions(exceptions);
     brokerResponse.setNumSegmentsPrunedByBroker(numPrunedSegmentsTotal);
     long executionEndTimeNs = System.nanoTime();
@@ -777,7 +798,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING);
     String clientIp = CommonConstants.UNKNOWN;
     if (enableClientIpLogging && requesterIdentity != null) {
-        clientIp = requesterIdentity.getClientIp();
+      clientIp = requesterIdentity.getClientIp();
     }
 
     // Please keep the format as name=value comma-separated with no spaces
@@ -1654,6 +1675,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   /**
    * Processes the optimized broker requests for both OFFLINE and REALTIME table.
+   * TODO: Directly take PinotQuery
    */
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
@@ -1710,20 +1732,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    */
   private static class QueryServers {
     private final String _query;
-    private final Set<ServerInstance> _servers = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Map<ServerInstance, List<String>> _offlineRoutingTable;
+    private final Map<ServerInstance, List<String>> _realtimeRoutingTable;
 
-    public QueryServers(String query) {
+    public QueryServers(String query, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
+        @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable) {
       _query = query;
-    }
-
-    public void addServers(Map<ServerInstance, List<String>> offlineRoutingTable,
-        Map<ServerInstance, List<String>> realtimeRoutingTable) {
-      if (offlineRoutingTable != null) {
-        _servers.addAll(offlineRoutingTable.keySet());
-      }
-      if (realtimeRoutingTable != null) {
-        _servers.addAll(realtimeRoutingTable.keySet());
-      }
+      _offlineRoutingTable = offlineRoutingTable;
+      _realtimeRoutingTable = realtimeRoutingTable;
     }
   }
 }
