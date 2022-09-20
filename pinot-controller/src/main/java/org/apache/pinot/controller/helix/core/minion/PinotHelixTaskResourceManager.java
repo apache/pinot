@@ -463,7 +463,7 @@ public class PinotHelixTaskResourceManager {
 
   public synchronized Map<String, String> getSubtaskProgress(String taskName, @Nullable String subtaskNames,
       Executor executor, HttpConnectionManager connMgr, Map<String, String> workerEndpoints,
-      Map<String, String> requestHeaders)
+      Map<String, String> requestHeaders, int timeoutMs)
       throws Exception {
     String taskType = getTaskType(taskName);
     WorkflowContext workflowContext = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType));
@@ -475,57 +475,59 @@ public class PinotHelixTaskResourceManager {
     if (jobContext == null) {
       throw new NoTaskScheduledException("No task scheduled with name: " + helixJobName);
     }
-    Set<String> selected = new HashSet<>();
+    Set<String> selectedSubtasks = new HashSet<>();
     if (StringUtils.isNotEmpty(subtaskNames)) {
-      Collections.addAll(selected, StringUtils.split(subtaskNames, ','));
+      Collections.addAll(selectedSubtasks, StringUtils.split(subtaskNames, ','));
     }
     Map<String, String> allSubtaskWorkerMap = new HashMap<>();
-    Map<String, Set<String>> selectedSubtaskWorkerMap = new HashMap<>();
+    Map<String, Set<String>> workerSelectedSubtasksMap = new HashMap<>();
     for (int partition : jobContext.getPartitionSet()) {
       String subtaskName = jobContext.getTaskIdForPartition(partition);
       String worker = jobContext.getAssignedParticipant(partition);
       allSubtaskWorkerMap.put(subtaskName, worker);
-      if (selected.isEmpty() || selected.contains(subtaskName)) {
-        selectedSubtaskWorkerMap.computeIfAbsent(worker, k -> new HashSet<>()).add(subtaskName);
+      if (selectedSubtasks.isEmpty() || selectedSubtasks.contains(subtaskName)) {
+        workerSelectedSubtasksMap.computeIfAbsent(worker, k -> new HashSet<>()).add(subtaskName);
       }
     }
-    LOGGER.debug("Found subtasks on workers: {}", selectedSubtaskWorkerMap);
+    LOGGER.debug("Found subtasks on workers: {}", workerSelectedSubtasksMap);
     List<String> workerUrls = new ArrayList<>();
-    selectedSubtaskWorkerMap.forEach((workerId, subtasksOnWorker) -> workerUrls.add(String
+    workerSelectedSubtasksMap.forEach((workerId, subtasksOnWorker) -> workerUrls.add(String
         .format("%s/tasks/subtask/progress?subtaskNames=%s", workerEndpoints.get(workerId),
             StringUtils.join(subtasksOnWorker, ","))));
     LOGGER.debug("Getting task progress with workerUrls: {}", workerUrls);
     // Scatter and gather progress from multiple workers.
-    Map<String/*subtaskName*/, String/*progress info*/> progress = new HashMap<>();
+    Map<String, String> subtaskProgressMap = new HashMap<>();
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(executor, connMgr, HashBiMap.create(0));
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(workerUrls, null, true, requestHeaders, 10000);
+        completionServiceHelper.doMultiGetRequest(workerUrls, null, true, requestHeaders, timeoutMs);
     for (Map.Entry<String, String> entry : serviceResponse._httpResponses.entrySet()) {
       String worker = entry.getKey();
       String resp = entry.getValue();
       LOGGER.debug("Got resp: {} from worker: {}", resp, worker);
       if (StringUtils.isNotEmpty(resp)) {
-        progress.putAll(JsonUtils.stringToObject(resp, Map.class));
+        subtaskProgressMap.putAll(JsonUtils.stringToObject(resp, Map.class));
       }
     }
     // Check if any subtask missed their progress from the worker.
-    for (String subtaskName : selected) {
-      if (!progress.containsKey(subtaskName)) {
-        String worker = allSubtaskWorkerMap.get(subtaskName);
-        if (StringUtils.isEmpty(worker)) {
-          progress.put(subtaskName, "No worker has run this subtask");
-        } else {
-          progress.put(subtaskName, "No progress from worker: " + worker);
-        }
+    for (String subtaskName : selectedSubtasks) {
+      if (subtaskProgressMap.containsKey(subtaskName)) {
+        continue;
+      }
+      String worker = allSubtaskWorkerMap.get(subtaskName);
+      if (StringUtils.isEmpty(worker)) {
+        subtaskProgressMap.put(subtaskName, "No worker has run this subtask");
+      } else {
+        subtaskProgressMap.put(subtaskName, "No progress from worker: " + worker);
       }
     }
     // Raise error if any worker failed to report progress, with partial result.
     if (serviceResponse._failedResponseCount > 0) {
-      throw new RuntimeException(String.format("Workers: %d failed to report task progress. Partial progress info: %s",
-          serviceResponse._failedResponseCount, progress));
+      throw new RuntimeException(String
+          .format("There were %d workers failed to report task progress. Got partial progress info: %s",
+              serviceResponse._failedResponseCount, subtaskProgressMap));
     }
-    return progress;
+    return subtaskProgressMap;
   }
 
   /**

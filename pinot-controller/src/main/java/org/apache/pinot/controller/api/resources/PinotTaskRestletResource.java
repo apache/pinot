@@ -65,6 +65,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.minion.BaseTaskGeneratorInfo;
 import org.apache.pinot.common.minion.TaskManagerStatusCache;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -143,6 +144,9 @@ public class PinotTaskRestletResource {
 
   @Inject
   HttpConnectionManager _connectionManager;
+
+  @Inject
+  ControllerConf _controllerConf;
 
   @Context
   private UriInfo _uriInfo;
@@ -423,9 +427,11 @@ public class PinotTaskRestletResource {
     httpHeaders.getRequestHeaders().keySet().forEach(header -> {
       requestHeaders.put(header, httpHeaders.getHeaderString(header));
     });
+    int timeoutMs = _controllerConf.getMinionAdminRequestTimeoutSeconds() * 1000;
     try {
       return _pinotHelixTaskResourceManager
-          .getSubtaskProgress(taskName, subtaskNames, _executor, _connectionManager, workerEndpoints, requestHeaders);
+          .getSubtaskProgress(taskName, subtaskNames, _executor, _connectionManager, workerEndpoints, requestHeaders,
+              timeoutMs);
     } catch (UnknownTaskTypeException | NoTaskScheduledException e) {
       throw new ControllerApplicationException(LOGGER, "Not task with name: " + taskName, Response.Status.NOT_FOUND, e);
     } catch (Exception e) {
