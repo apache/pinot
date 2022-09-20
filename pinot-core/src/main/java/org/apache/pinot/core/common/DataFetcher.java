@@ -611,10 +611,10 @@ public class DataFetcher {
         _dictionary.readBytesValues(dictIdBuffer, length, valueBuffer);
       } else {
         switch (_storedType) {
-          case STRING:
           case BYTES:
+          case STRING:
             for (int i = 0; i < length; i++) {
-              valueBuffer[i] =_reader.getBytes(docIds[i], readerContext);
+              valueBuffer[i] = _reader.getBytes(docIds[i], readerContext);
             }
             break;
           default:

@@ -164,7 +164,6 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
           }
           break;
         case BYTES:
-
           byte[][] bytesValuesSV = blockValSet.getBytesValuesSV();
           for (int i = 0; i < length; i++) {
             idSet.add(bytesValuesSV[i]);

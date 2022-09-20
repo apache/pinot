@@ -25,7 +25,6 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 @SuppressWarnings("Duplicates")
@@ -157,7 +156,7 @@ public class StringOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
   @Override
   public byte[] getBytesValue(int dictId) {
-    return BytesUtils.toBytes(getStringValue(dictId));
+    return getBytesValue(dictId);
   }
 
   private void updateMinMax(String value) {
