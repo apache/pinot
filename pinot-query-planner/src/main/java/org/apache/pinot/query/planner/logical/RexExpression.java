@@ -110,6 +110,7 @@ public interface RexExpression {
         return value == null ? 0L : ((BigDecimal) value).longValue();
       case FLOAT:
         return value == null ? 0f : ((BigDecimal) value).floatValue();
+      case BIG_DECIMAL:
       case DOUBLE:
         return value == null ? 0d : ((BigDecimal) value).doubleValue();
       case STRING:
@@ -127,6 +128,7 @@ public interface RexExpression {
         return FieldSpec.DataType.LONG;
       case FLOAT:
         return FieldSpec.DataType.FLOAT;
+      case DECIMAL:
       case DOUBLE:
         return FieldSpec.DataType.DOUBLE;
       case CHAR:

@@ -20,6 +20,8 @@ package org.apache.pinot.server.worker;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -44,14 +46,14 @@ public class WorkerQueryServer {
   private ServerMetrics _serverMetrics;
 
   public WorkerQueryServer(PinotConfiguration configuration, InstanceDataManager instanceDataManager,
-      ServerMetrics serverMetrics) {
+      ZkHelixPropertyStore<ZNRecord> helixPropertyStore, ServerMetrics serverMetrics) {
     _configuration = toWorkerQueryConfig(configuration);
     _instanceDataManager = instanceDataManager;
     _serverMetrics = serverMetrics;
     _queryServicePort =
         _configuration.getProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, QueryConfig.DEFAULT_QUERY_SERVER_PORT);
     _queryRunner = new QueryRunner();
-    _queryRunner.init(_configuration, _instanceDataManager, _serverMetrics);
+    _queryRunner.init(_configuration, _instanceDataManager, helixPropertyStore, _serverMetrics);
     _queryWorkerService = new QueryServer(_queryServicePort, _queryRunner);
     _executor = Executors.newFixedThreadPool(DEFAULT_EXECUTOR_THREAD_NUM,
         new NamedThreadFactory("worker_query_server_enclosure_on_" + _queryServicePort + "_port"));

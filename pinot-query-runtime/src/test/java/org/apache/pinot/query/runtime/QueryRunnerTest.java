@@ -146,7 +146,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT * FROM a ORDER BY col1 LIMIT 20"},
 
         // No match filter
-        new Object[]{"SELECT * FROM b WHERE col3 < 0"},
+        new Object[]{"SELECT * FROM b WHERE col3 < 0.5"},
 
         // Hybrid table
         new Object[]{"SELECT * FROM d"},
