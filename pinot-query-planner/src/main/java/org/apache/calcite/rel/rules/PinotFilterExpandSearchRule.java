@@ -18,18 +18,14 @@
  */
 package org.apache.calcite.rel.rules;
 
-import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rex.RexCall;
-import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUtil;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.tools.RelBuilderFactory;
-import org.apache.calcite.util.Sarg;
 
 
 public class PinotFilterExpandSearchRule extends RelOptRule {
@@ -48,13 +44,7 @@ public class PinotFilterExpandSearchRule extends RelOptRule {
     }
     if (call.rel(0) instanceof Filter) {
       Filter filter = call.rel(0);
-      if (filter.getCondition().getKind() == SqlKind.SEARCH) {
-        RexCall rexCall = (RexCall) filter.getCondition();
-        List<RexNode> operands = rexCall.getOperands();
-        RexLiteral rexLiteral = (RexLiteral) operands.get(1);
-        Sarg sarg = rexLiteral.getValueAs(Sarg.class);
-        return sarg != null && !sarg.isPoints() && !sarg.isComplementedPoints();
-      }
+      return containsRangeSearch(filter.getCondition());
     }
     return false;
   }
@@ -64,5 +54,22 @@ public class PinotFilterExpandSearchRule extends RelOptRule {
     Filter filter = call.rel(0);
     RexNode newCondition = RexUtil.expandSearch(filter.getCluster().getRexBuilder(), null, filter.getCondition());
     call.transformTo(LogicalFilter.create(filter.getInput(), newCondition));
+  }
+
+  private boolean containsRangeSearch(RexNode condition) {
+    switch (condition.getKind()) {
+      case AND:
+      case OR:
+        for (RexNode operand : ((RexCall) condition).getOperands()) {
+          if (containsRangeSearch(operand)) {
+            return true;
+          }
+        }
+        return false;
+      case SEARCH:
+        return true;
+      default:
+        return false;
+    }
   }
 }
