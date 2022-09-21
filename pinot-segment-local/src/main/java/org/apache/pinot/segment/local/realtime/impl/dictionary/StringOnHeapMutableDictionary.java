@@ -22,6 +22,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.ints.IntSets;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -156,7 +157,7 @@ public class StringOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
   @Override
   public byte[] getBytesValue(int dictId) {
-    return getBytesValue(dictId);
+    return getStringValue(dictId).getBytes(StandardCharsets.UTF_8);
   }
 
   private void updateMinMax(String value) {

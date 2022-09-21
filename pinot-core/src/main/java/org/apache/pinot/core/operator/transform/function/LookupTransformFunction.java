@@ -72,6 +72,8 @@ public class LookupTransformFunction extends BaseTransformFunction {
   private static final double[] EMPTY_DOUBLES = new double[0];
   private static final String[] EMPTY_STRINGS = new String[0];
 
+  private static final byte[][] EMPTY_BYTES_ARRAY = new byte[0][0];
+
   private String _dimColumnName;
   private final List<String> _joinKeys = new ArrayList<>();
   private final List<FieldSpec> _joinValueFieldSpecs = new ArrayList<>();
@@ -368,6 +370,19 @@ public class LookupTransformFunction extends BaseTransformFunction {
     return _stringValuesMV;
   }
 
+  @Override
+  public byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock) {
+    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.BYTES) {
+      return super.transformToBytesValuesMV(projectionBlock);
+    }
+    int numDocs = projectionBlock.getNumDocs();
+    if (_bytesValuesMV == null) {
+      _bytesValuesMV = new byte[numDocs][][];
+    }
+    lookup(projectionBlock, this::setBytesMV);
+    return _bytesValuesMV;
+  }
+
   private void setIntSV(int index, Object value) {
     if (value instanceof Number) {
       _intValuesSV[index] = ((Number) value).intValue();
@@ -453,6 +468,14 @@ public class LookupTransformFunction extends BaseTransformFunction {
       _stringValuesMV[index] = (String[]) value;
     } else {
       _stringValuesMV[index] = EMPTY_STRINGS;
+    }
+  }
+
+  private void setBytesMV(int index, Object value) {
+    if (value instanceof byte[][]) {
+      _bytesValuesMV[index] = (byte[][]) value;
+    } else {
+      _bytesValuesMV[index] = EMPTY_BYTES_ARRAY;
     }
   }
 }

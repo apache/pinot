@@ -97,6 +97,11 @@ public class VarLengthValueReader implements ValueReader {
   }
 
   @Override
+  public byte[] getUnpaddedBytes(int index, int numBytesPerValue, byte paddingByte, byte[] buffer) {
+    return getBytes(index, numBytesPerValue);
+  }
+
+  @Override
   public String getPaddedString(int index, int numBytesPerValue, byte[] buffer) {
     throw new UnsupportedOperationException();
   }

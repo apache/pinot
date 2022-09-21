@@ -420,6 +420,18 @@ public class DataFetcher {
   }
 
   /**
+   * Fetch the bytes values for a multi-valued column.
+   *
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchBytesValues(String column, int[] inDocIds, int length, byte[][][] outValues) {
+    _columnValueReaderMap.get(column).readBytesValuesMV(inDocIds, length, outValues);
+  }
+
+  /**
    * Helper class to read values for a column from forward index and dictionary. For raw (non-dictionary-encoded)
    * forward index, similar to Dictionary, type conversion among INT, LONG, FLOAT, DOUBLE, STRING is supported; type
    * conversion between STRING and BYTES via Hex encoding/decoding is supported.
@@ -741,6 +753,20 @@ public class DataFetcher {
       Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       for (int i = 0; i < length; i++) {
         numValuesBuffer[i] = _reader.getNumValuesMV(docIds[i], getReaderContext());
+      }
+    }
+
+    void readBytesValuesMV(int[] docIds, int length, byte[][][] valuesBuffer) {
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
+      if (_dictionary != null) {
+        for (int i = 0; i < length; i++) {
+          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, getReaderContext());
+          byte[][] values = new byte[numValues][];
+          _dictionary.readBytesValues(_reusableMVDictIds, numValues, values);
+          valuesBuffer[i] = values;
+        }
+      } else {
+        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, getReaderContext());
       }
     }
 

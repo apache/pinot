@@ -493,6 +493,24 @@ public class DataBlockCache {
     return numValues;
   }
 
+  /**
+   * Get the bytes values for a multi-valued column.
+   *
+   * @param column Column name
+   * @return Array of bytes values
+   */
+  public byte[][][] getBytesValuesForMVColumn(String column) {
+    byte[][][] bytesValues = getValues(FieldSpec.DataType.BYTES, column);
+    if (markLoaded(FieldSpec.DataType.BYTES, column)) {
+      if (bytesValues == null) {
+        bytesValues = new byte[_length][][];
+        putValues(FieldSpec.DataType.BYTES, column, bytesValues);
+      }
+      _dataFetcher.fetchBytesValues(column, _docIds, _length, bytesValues);
+    }
+    return bytesValues;
+  }
+
   private boolean markLoaded(FieldSpec.DataType dataType, String column) {
     return _columnValueLoaded.computeIfAbsent(dataType, k -> new HashSet<>()).add(column);
   }

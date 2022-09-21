@@ -76,7 +76,8 @@ public class StringDictionary extends BaseImmutableDictionary {
 
   @Override
   public byte[] getBytesValue(int dictId) {
-    return getBytes(dictId);
+    byte[] buffer = getBuffer();
+    return getUnpaddedBytes(dictId, buffer);
   }
 
   @Override
@@ -121,8 +122,9 @@ public class StringDictionary extends BaseImmutableDictionary {
 
   @Override
   public void readBytesValues(int[] dictIds, int length, byte[][] outValues) {
+    byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {
-      outValues[i] = getBytes(dictIds[i]);
+      outValues[i] = getUnpaddedBytes(dictIds[i], buffer);
     }
   }
 }

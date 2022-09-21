@@ -209,6 +209,11 @@ public class RowBasedBlockValSet implements BlockValSet {
   }
 
   @Override
+  public byte[][][] getBytesValuesMV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public int[] getNumMVEntries() {
     throw new UnsupportedOperationException();
   }

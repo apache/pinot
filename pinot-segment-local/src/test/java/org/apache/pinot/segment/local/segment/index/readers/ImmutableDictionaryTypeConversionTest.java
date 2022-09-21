@@ -68,6 +68,8 @@ public class ImmutableDictionaryTypeConversionTest {
   private String[] _stringValues;
   private ByteArray[] _bytesValues;
 
+  private ByteArray[] _utf8BytesValues;
+
   private int[] _dictIds;
   private int[] _intValuesBuffer;
   private long[] _longValuesBuffer;
@@ -108,8 +110,10 @@ public class ImmutableDictionaryTypeConversionTest {
     ArrayCopyUtils.copy(_intValues, _stringValues, NUM_VALUES);
 
     _bytesValues = new ByteArray[NUM_VALUES];
+    _utf8BytesValues = new ByteArray[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
       _bytesValues[i] = BytesUtils.toByteArray(_stringValues[i]);
+      _utf8BytesValues[i] = BytesUtils.toUTF8ByeArray(_stringValues[i]);
     }
 
     try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(
@@ -333,7 +337,7 @@ public class ImmutableDictionaryTypeConversionTest {
       assertEquals(dictionary.getFloatValue(i), _floatValues[i]);
       assertEquals(dictionary.getDoubleValue(i), _doubleValues[i]);
       assertEquals(dictionary.getStringValue(i), _stringValues[i]);
-      assertEquals(dictionary.getBytesValue(i), _bytesValues[i].getBytes());
+      assertEquals(dictionary.getBytesValue(i), _utf8BytesValues[i].getBytes());
     }
     dictionary.readIntValues(_dictIds, NUM_VALUES, _intValuesBuffer);
     Assert.assertEquals(_intValuesBuffer, _intValues);
@@ -347,7 +351,7 @@ public class ImmutableDictionaryTypeConversionTest {
     Assert.assertEquals(_stringValuesBuffer, _stringValues);
     dictionary.readBytesValues(_dictIds, NUM_VALUES, _bytesValuesBuffer);
     for (int i = 0; i < NUM_VALUES; i++) {
-      Assert.assertEquals(_bytesValuesBuffer[i], _bytesValues[i].getBytes());
+      Assert.assertEquals(_bytesValuesBuffer[i], _utf8BytesValues[i].getBytes());
     }
   }
 

@@ -21,6 +21,7 @@ package org.apache.pinot.spi.utils;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * The class <code>ArrayCopyUtils</code> provides methods to copy values across arrays of different types.
@@ -273,7 +274,7 @@ public class ArrayCopyUtils {
 
   public static void copy(String[] src, byte[][] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = BytesUtils.toBytes(src[i]);
+      dest[i] = src[i].getBytes(UTF_8);
     }
   }
 
