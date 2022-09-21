@@ -72,8 +72,6 @@ public class LookupTransformFunction extends BaseTransformFunction {
   private static final double[] EMPTY_DOUBLES = new double[0];
   private static final String[] EMPTY_STRINGS = new String[0];
 
-  private static final byte[][] EMPTY_BYTES_ARRAY = new byte[0][0];
-
   private String _dimColumnName;
   private final List<String> _joinKeys = new ArrayList<>();
   private final List<FieldSpec> _joinValueFieldSpecs = new ArrayList<>();

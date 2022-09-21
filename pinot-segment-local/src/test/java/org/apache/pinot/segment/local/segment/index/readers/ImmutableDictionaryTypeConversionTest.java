@@ -67,7 +67,6 @@ public class ImmutableDictionaryTypeConversionTest {
   private int _bigDecimalByteLength;
   private String[] _stringValues;
   private ByteArray[] _bytesValues;
-
   private ByteArray[] _utf8BytesValues;
 
   private int[] _dictIds;

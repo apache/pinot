@@ -105,7 +105,6 @@ public final class FixedByteValueReaderWriter implements ValueReader {
     return new String(buffer, 0, length, UTF_8);
   }
 
-
   @Override
   public String getPaddedString(int index, int numBytesPerValue, byte[] buffer) {
     assert buffer.length >= numBytesPerValue;
