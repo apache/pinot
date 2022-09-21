@@ -192,9 +192,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
-    List<String> unAcquiredSegments = new ArrayList<>();
+    List<String> notAcquiredSegments = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(
-        segmentsToQuery, unAcquiredSegments);
+        segmentsToQuery, notAcquiredSegments);
     int numSegmentsAcquired = segmentDataManagers.size();
     List<IndexSegment> indexSegments = new ArrayList<>(numSegmentsAcquired);
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
@@ -293,9 +293,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     //
     // After step 2 but before step 4, segment will be missing on server side
     // TODO: Change broker to watch both IdealState and ExternalView to not query the removed segments
-    if (unAcquiredSegments.size() > 0) {
+    if (notAcquiredSegments.size() > 0) {
       List<String> missingSegments =
-          unAcquiredSegments.stream()
+          notAcquiredSegments.stream()
               .filter(segmentName -> !tableDataManager.isSegmentDeletedRecently(segmentName))
               .collect(Collectors.toList());
       int numMissingSegments = missingSegments.size();

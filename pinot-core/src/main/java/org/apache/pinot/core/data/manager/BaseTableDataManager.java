@@ -103,7 +103,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related
   // errors as the value.
   protected LoadingCache<Pair<String, String>, SegmentErrorInfo> _errorCache;
-  protected Cache<String, String> _deletedSegments;
+  // Cache used for identifying segments which could not be acquired since they were recently deleted.
+  protected Cache<String, String> _recentlyDeletedSegments;
 
   @Override
   public void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
@@ -141,7 +142,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _resourceTmpDir);
     }
     _errorCache = errorCache;
-    _deletedSegments =
+    _recentlyDeletedSegments =
         CacheBuilder.newBuilder()
             .maximumSize(tableDataManagerConfig.getTableDeletedSegmentsCacheSize())
             .expireAfterWrite(tableDataManagerConfig.getTableDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES)
@@ -255,7 +256,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    */
   @Override
   public boolean isSegmentDeletedRecently(String segmentName) {
-    return _deletedSegments.getIfPresent(segmentName) != null;
+    return _recentlyDeletedSegments.getIfPresent(segmentName) != null;
   }
 
   @Override
@@ -437,7 +438,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Nullable
   protected SegmentDataManager registerSegment(String segmentName, SegmentDataManager segmentDataManager) {
     SegmentDataManager oldSegmentDataManager = _segmentDataManagerMap.put(segmentName, segmentDataManager);
-    _deletedSegments.invalidate(segmentName);
+    _recentlyDeletedSegments.invalidate(segmentName);
     return oldSegmentDataManager;
   }
 
@@ -450,7 +451,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    */
   @Nullable
   protected SegmentDataManager unregisterSegment(String segmentName) {
-    _deletedSegments.put(segmentName, segmentName);
+    _recentlyDeletedSegments.put(segmentName, segmentName);
     return _segmentDataManagerMap.remove(segmentName);
   }
 
