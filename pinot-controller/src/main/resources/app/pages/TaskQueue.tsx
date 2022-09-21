@@ -184,7 +184,6 @@ const TaskQueue = (props) => {
           data={tables}
           showSearchBox={true}
           inAccordionFormat={true}
-          isPagination={false}
           addLinks
           baseURL={`/task-queue/${taskType}/tables/`}
         />

@@ -499,7 +499,6 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
           <CustomizedTables
             title={"Segments - " + segmentList.records.length}
             data={segmentList}
-            isPagination={true}
             baseURL={
               tenantName && `/tenants/${tenantName}/table/${tableName}/` ||
               instanceName && `/instance/${instanceName}/table/${tableName}/` ||
@@ -515,8 +514,6 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             <CustomizedTables
               title="Table Schema"
               data={tableSchema}
-              isPagination={false}
-              noOfRows={tableSchema.records.length}
               showSearchBox={true}
               inAccordionFormat={true}
               accordionToggleObject={{
@@ -548,8 +545,6 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
           <CustomizedTables
             title={"Instance Count - " + instanceCountData.records.length}
             data={instanceCountData}
-            isPagination={false}
-            noOfRows={instanceCountData.records.length}
             showSearchBox={true}
             inAccordionFormat={true}
           />
