@@ -370,19 +370,6 @@ public class LookupTransformFunction extends BaseTransformFunction {
     return _stringValuesMV;
   }
 
-  @Override
-  public byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock) {
-    if (_lookupColumnFieldSpec.getDataType().getStoredType() != DataType.BYTES) {
-      return super.transformToBytesValuesMV(projectionBlock);
-    }
-    int numDocs = projectionBlock.getNumDocs();
-    if (_bytesValuesMV == null) {
-      _bytesValuesMV = new byte[numDocs][][];
-    }
-    lookup(projectionBlock, this::setBytesMV);
-    return _bytesValuesMV;
-  }
-
   private void setIntSV(int index, Object value) {
     if (value instanceof Number) {
       _intValuesSV[index] = ((Number) value).intValue();
@@ -468,14 +455,6 @@ public class LookupTransformFunction extends BaseTransformFunction {
       _stringValuesMV[index] = (String[]) value;
     } else {
       _stringValuesMV[index] = EMPTY_STRINGS;
-    }
-  }
-
-  private void setBytesMV(int index, Object value) {
-    if (value instanceof byte[][]) {
-      _bytesValuesMV[index] = (byte[][]) value;
-    } else {
-      _bytesValuesMV[index] = EMPTY_BYTES_ARRAY;
     }
   }
 }

@@ -363,7 +363,12 @@ public class DataFetcherTest {
     _dataFetcher.fetchBytesValues(column, docIds, length, bytesValues);
 
     for (int i = 0; i < length; i++) {
-      Assert.assertEquals(new String(bytesValues[i], UTF_8), Integer.toString(_values[docIds[i]]), ERROR_MESSAGE);
+      String stringValue = Integer.toString(_values[docIds[i]]);
+      if (column != HEX_STRING_COLUMN && column != NO_DICT_HEX_STRING_COLUMN) {
+        Assert.assertEquals(new String(bytesValues[i], UTF_8), stringValue, ERROR_MESSAGE);
+      } else {
+        Assert.assertEquals(new String(bytesValues[i], UTF_8), BytesUtils.toHexString(stringValue.getBytes(UTF_8)));
+      }
     }
   }
 

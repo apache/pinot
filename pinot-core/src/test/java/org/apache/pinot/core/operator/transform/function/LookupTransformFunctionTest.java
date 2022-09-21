@@ -91,8 +91,6 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
         .thenReturn(new DimensionFieldSpec("teamLong_MV", FieldSpec.DataType.LONG, false));
     when(_tableManager.getColumnFieldSpec("teamBytes"))
         .thenReturn(new DimensionFieldSpec("teamNameBytes", FieldSpec.DataType.BYTES, true));
-    when(_tableManager.getColumnFieldSpec("teamBytes_MV"))
-        .thenReturn(new DimensionFieldSpec("teamNameBytes_MV", FieldSpec.DataType.BYTES, false));
     when(_tableManager.lookupRowByPrimaryKey(any(PrimaryKey.class))).thenAnswer(invocation -> {
       PrimaryKey key = invocation.getArgument(0);
       GenericRow row = new GenericRow();
@@ -108,8 +106,6 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
       row.putValue("teamLong", (long) key.hashCode());
       row.putValue("teamLong_MV", new long[]{(long) key.hashCode(), (long) key.hashCode()});
       row.putValue("teamBytes", ("teamBytes_for_" + key.toString()).getBytes());
-      row.putValue("teamBytes_MV", new byte[][]{("teamBytes_for_" + key.toString() + "_1").getBytes(),
-          ("teamBytes_for_" + key.toString() + "_2").getBytes()});
       return row;
     });
   }
@@ -285,21 +281,6 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
       };
     }
     testTransformFunctionMV(transformFunction, expectedStringMVValues);
-
-    // Lookup col: BytesMV
-    // PK: [Byte]
-    expression = RequestContextUtils
-        .getExpression(String.format("lookup('baseballTeams','teamBytes_MV','teamID',%s)", STRING_SV_COLUMN));
-    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-
-    byte[][][] expectedBytesMVValues = new byte[NUM_ROWS][][];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedBytesMVValues[i] = new byte[][]{
-          String.format("teamBytes_for_[%s]_1", _stringSVValues[i]).getBytes(),
-          String.format("teamBytes_for_[%s]_2", _stringSVValues[i]).getBytes(),
-      };
-    }
-    testTransformFunctionMV(transformFunction, expectedBytesMVValues);
 
     // Lookup col: IntegerMV
     // PK: [String]

@@ -466,14 +466,6 @@ public abstract class BaseTransformFunctionTest {
     }
   }
 
-  protected void testTransformFunctionMV(TransformFunction transformFunction, byte[][][] expectedValues) {
-    byte[][][] byteValuesMV = transformFunction.transformToBytesValuesMV(_projectionBlock);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(byteValuesMV[i][0], expectedValues[i][0]);
-      assertEquals(byteValuesMV[i][1], expectedValues[i][1]);
-    }
-  }
-
   @AfterClass
   public void tearDown() {
     FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
