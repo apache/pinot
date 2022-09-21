@@ -54,7 +54,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   public static final String TABLE_NAME_2 = "testTable2";
   public static final String TABLE_NAME_3 = "testTable3";
   public static final int NUM_TASKS = 2;
-  public static final int NUM_CONFIGS = 3;
+  public static final int NUM_CONFIGS = 4;
   public static final AtomicBoolean HOLD = new AtomicBoolean();
   public static final AtomicBoolean TASK_START_NOTIFIED = new AtomicBoolean();
   public static final AtomicBoolean TASK_SUCCESS_NOTIFIED = new AtomicBoolean();

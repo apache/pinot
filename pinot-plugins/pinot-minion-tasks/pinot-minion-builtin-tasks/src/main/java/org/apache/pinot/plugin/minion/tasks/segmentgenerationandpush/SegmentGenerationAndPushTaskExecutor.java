@@ -32,6 +32,8 @@ import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.minion.event.MinionEventObserver;
+import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutor;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
@@ -99,6 +101,9 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
   private static final int DEFAULT_PUSH_PARALLELISM = 1;
   private static final long DEFAULT_PUSH_RETRY_INTERVAL_MILLIS = 1000L;
 
+  private PinotTaskConfig _pinotTaskConfig;
+  private MinionEventObserver _eventObserver;
+
   @Override
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
       SegmentConversionResult segmentConversionResult) {
@@ -113,6 +118,9 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     SegmentGenerationAndPushResult.Builder resultBuilder = new SegmentGenerationAndPushResult.Builder();
     File localTempDir = new File(new File(MinionContext.getInstance().getDataDir(), "SegmentGenerationAndPushResult"),
         "tmp-" + UUID.randomUUID());
+    _pinotTaskConfig = pinotTaskConfig;
+    _eventObserver = MinionEventObservers.getInstance().getMinionEventObserver(pinotTaskConfig.getTaskId());
+    _eventObserver.notifyProgress(pinotTaskConfig, "Task running");
     try {
       SegmentGenerationTaskSpec taskSpec = generateTaskSpec(taskConfigs, localTempDir);
       return generateAndPushSegment(taskSpec, resultBuilder, taskConfigs);
@@ -128,19 +136,23 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       SegmentGenerationAndPushResult.Builder resultBuilder, Map<String, String> taskConfigs)
       throws Exception {
     // Generate Pinot Segment
+    _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segment");
     SegmentGenerationTaskRunner taskRunner = new SegmentGenerationTaskRunner(taskSpec);
     String segmentName = taskRunner.run();
 
     // Tar segment directory to compress file
+    _eventObserver.notifyProgress(_pinotTaskConfig, "Compressing segment: " + segmentName);
     File localSegmentTarFile = tarSegmentDir(taskSpec, segmentName);
 
     //move segment to output PinotFS
+    _eventObserver.notifyProgress(_pinotTaskConfig, String.format("Moving segment: %s to output dir", segmentName));
     URI outputSegmentTarURI = moveSegmentToOutputPinotFS(taskConfigs, localSegmentTarFile);
     LOGGER.info("Moved generated segment from [{}] to location: [{}]", localSegmentTarFile, outputSegmentTarURI);
 
     resultBuilder.setSegmentName(segmentName);
     // Segment push task
     // TODO: Make this use SegmentUploader
+    _eventObserver.notifyProgress(_pinotTaskConfig, "Pushing segment: " + segmentName);
     pushSegment(taskSpec.getTableConfig().getTableName(), taskConfigs, outputSegmentTarURI);
     resultBuilder.setSucceed(true);
 
@@ -265,6 +277,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     taskSpec.setOutputDirectoryPath(localOutputTempDir.getAbsolutePath());
 
     //copy input path to local
+    _eventObserver.notifyProgress(_pinotTaskConfig, String.format("Copying file: %s to local disk", inputFileURI));
     File localInputDataFile = new File(localInputTempDir, new File(inputFileURI.getPath()).getName());
     inputFileFS.copyToLocalFile(inputFileURI, localInputDataFile);
     taskSpec.setInputFilePath(localInputDataFile.getAbsolutePath());

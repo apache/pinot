@@ -65,6 +65,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.minion.BaseTaskGeneratorInfo;
 import org.apache.pinot.common.minion.TaskManagerStatusCache;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -143,6 +144,9 @@ public class PinotTaskRestletResource {
 
   @Inject
   HttpConnectionManager _connectionManager;
+
+  @Inject
+  ControllerConf _controllerConf;
 
   @Context
   private UriInfo _uriInfo;
@@ -402,6 +406,39 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Sub task names separated by comma") @QueryParam("subtaskNames") @Nullable
           String subtaskNames) {
     return _pinotHelixTaskResourceManager.getSubtaskConfigs(taskName, subtaskNames);
+  }
+
+  @GET
+  @Path("/tasks/subtask/{taskName}/progress")
+  @ApiOperation("Get progress of specified sub tasks for the given task tracked by worker in memory")
+  public Map<String, String> getSubtaskProgress(@Context HttpHeaders httpHeaders,
+      @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
+      @ApiParam(value = "Sub task names separated by comma") @QueryParam("subtaskNames") @Nullable
+          String subtaskNames) {
+    // Relying on original schema that was used to query the controller
+    String scheme = _uriInfo.getRequestUri().getScheme();
+    List<InstanceConfig> workers = _pinotHelixResourceManager.getAllMinionInstanceConfigs();
+    Map<String, String> workerEndpoints = new HashMap<>();
+    for (InstanceConfig worker : workers) {
+      workerEndpoints.put(worker.getId(),
+          String.format("%s://%s:%d", scheme, worker.getHostName(), Integer.parseInt(worker.getPort())));
+    }
+    Map<String, String> requestHeaders = new HashMap<>();
+    httpHeaders.getRequestHeaders().keySet().forEach(header -> {
+      requestHeaders.put(header, httpHeaders.getHeaderString(header));
+    });
+    int timeoutMs = _controllerConf.getMinionAdminRequestTimeoutSeconds() * 1000;
+    try {
+      return _pinotHelixTaskResourceManager
+          .getSubtaskProgress(taskName, subtaskNames, _executor, _connectionManager, workerEndpoints, requestHeaders,
+              timeoutMs);
+    } catch (UnknownTaskTypeException | NoTaskScheduledException e) {
+      throw new ControllerApplicationException(LOGGER, "Not task with name: " + taskName, Response.Status.NOT_FOUND, e);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, String
+          .format("Failed to get worker side progress for task: %s due to error: %s", taskName,
+              ExceptionUtils.getStackTrace(e)), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
   }
 
   @GET

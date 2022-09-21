@@ -59,6 +59,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
   private final boolean _useHttps;
   private final boolean _swaggerBrokerEnabled;
+  private final ExecutorService _executorService;
 
   private HttpServer _httpServer;
 
@@ -73,7 +74,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     if (brokerConf.getProperty(CommonConstants.Broker.BROKER_SERVICE_AUTO_DISCOVERY, false)) {
       register(ServiceAutoDiscoveryFeature.class);
     }
-    ExecutorService executor =
+    _executorService =
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
     MultiThreadedHttpConnectionManager connMgr = new MultiThreadedHttpConnectionManager();
     connMgr.getParams().setConnectionTimeout((int) brokerConf
@@ -83,7 +84,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
       @Override
       protected void configure() {
         bind(connMgr).to(HttpConnectionManager.class);
-        bind(executor).to(Executor.class);
+        bind(_executorService).to(Executor.class);
         bind(sqlQueryExecutor).to(SqlQueryExecutor.class);
         bind(routingManager).to(BrokerRoutingManager.class);
         bind(brokerRequestHandler).to(BrokerRequestHandler.class);
@@ -145,7 +146,10 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
   public void stop() {
     if (_httpServer != null) {
+      LOGGER.info("Shutting down http server");
       _httpServer.shutdownNow();
     }
+    LOGGER.info("Shutting down executor service");
+    _executorService.shutdownNow();
   }
 }

@@ -40,6 +40,7 @@ import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.event.EventObserverFactoryRegistry;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
+import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.exception.FatalException;
 import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
@@ -89,8 +90,10 @@ public class TaskFactoryRegistry {
                 // Set taskId in MDC so that one may config logger to route task logs to separate file.
                 MDC.put("taskId", _taskConfig.getId());
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, 1L);
+                MinionEventObservers.getInstance().addMinionEventObserver(_taskConfig.getId(), _eventObserver);
                 return runInternal();
               } finally {
+                MinionEventObservers.getInstance().removeMinionEventObserver(_taskConfig.getId());
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, -1L);
                 long executionTimeMs = System.currentTimeMillis() - jobDequeueTimeMs;
                 _minionMetrics
