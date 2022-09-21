@@ -90,6 +90,7 @@ public class PinotQueryRuleSets {
           PruneEmptyRules.UNION_INSTANCE,
 
           // Pinot specific rules
+          PinotFilterExpandSearchRule.INSTANCE,
           PinotJoinExchangeNodeInsertRule.INSTANCE,
           PinotAggregateExchangeNodeInsertRule.INSTANCE,
           PinotSortExchangeNodeInsertRule.INSTANCE
