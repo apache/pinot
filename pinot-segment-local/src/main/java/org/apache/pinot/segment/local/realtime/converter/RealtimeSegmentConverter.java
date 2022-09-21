@@ -19,8 +19,6 @@
 package org.apache.pinot.segment.local.realtime.converter;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -40,15 +38,13 @@ import org.apache.pinot.spi.data.Schema;
 
 
 public class RealtimeSegmentConverter {
-  private MutableSegmentImpl _realtimeSegmentImpl;
+  private final MutableSegmentImpl _realtimeSegmentImpl;
   private final SegmentZKPropsConfig _segmentZKPropsConfig;
   private final String _outputPath;
   private final Schema _dataSchema;
   private final String _tableName;
   private final TableConfig _tableConfig;
   private final String _segmentName;
-  private final String _sortedColumn;
-  private final List<String> _invertedIndexColumns;
   private final ColumnIndicesForRealtimeTable _columnIndicesForRealtimeTable;
   private final boolean _nullHandlingEnabled;
 
@@ -59,12 +55,10 @@ public class RealtimeSegmentConverter {
     _segmentZKPropsConfig = segmentZKPropsConfig;
     _outputPath = outputPath;
     _columnIndicesForRealtimeTable = cdc;
-    _invertedIndexColumns = new ArrayList<>(_columnIndicesForRealtimeTable.getInvertedIndexColumns());
     if (cdc.getSortedColumn() != null) {
-      _invertedIndexColumns.remove(cdc.getSortedColumn());
+      _columnIndicesForRealtimeTable.getInvertedIndexColumns().remove(cdc.getSortedColumn());
     }
     _dataSchema = getUpdatedSchema(schema);
-    _sortedColumn = cdc.getSortedColumn();
     _tableName = tableName;
     _tableConfig = tableConfig;
     _segmentName = segmentName;
@@ -80,8 +74,8 @@ public class RealtimeSegmentConverter {
     // is thrown) and thus the time validity check is explicitly disabled for
     // realtime segment generation
     genConfig.setSegmentTimeValueCheck(false);
-    if (_invertedIndexColumns != null && !_invertedIndexColumns.isEmpty()) {
-      for (String column : _invertedIndexColumns) {
+    if (_columnIndicesForRealtimeTable.getInvertedIndexColumns() != null) {
+      for (String column : _columnIndicesForRealtimeTable.getInvertedIndexColumns()) {
         genConfig.createInvertedIndexForColumn(column);
       }
     }
@@ -106,8 +100,9 @@ public class RealtimeSegmentConverter {
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
       int[] sortedDocIds =
-          _sortedColumn != null ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(_sortedColumn)
-              : null;
+          _columnIndicesForRealtimeTable.getSortedColumn() != null
+              ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(
+                  _columnIndicesForRealtimeTable.getSortedColumn()) : null;
       recordReader.init(_realtimeSegmentImpl, sortedDocIds);
       RealtimeSegmentSegmentCreationDataSource dataSource =
           new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
