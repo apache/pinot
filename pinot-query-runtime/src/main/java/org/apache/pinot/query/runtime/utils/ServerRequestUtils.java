@@ -90,6 +90,9 @@ public class ServerRequestUtils {
     List<ServerQueryRequest> requests = new ArrayList<>();
     for (Map.Entry<String, List<String>> tableEntry : tableToSegmentListMap.entrySet()) {
       String tableType = tableEntry.getKey();
+      // ZkHelixPropertyStore extends from ZkCacheBaseDataAccessor so it should not cause too much out-of-the-box
+      // network traffic. but there's chance to improve this:
+      // TODO: use TableDataManager: it is already getting tableConfig and Schema when processing segments.
       if (TableType.OFFLINE.name().equals(tableType)) {
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
             TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
