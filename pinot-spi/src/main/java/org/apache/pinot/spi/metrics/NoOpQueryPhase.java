@@ -16,25 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.stream;
+package org.apache.pinot.spi.metrics;
 
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.metrics.StreamConsumerMetrics;
-
-
-/**
- * Factory for a stream which provides a consumer and a metadata provider for the stream
- */
-public abstract class StreamConsumerFactory implements BaseStreamConsumerFactory {
-  protected StreamConfig _streamConfig;
-  protected StreamConsumerMetrics _streamConsumerMetrics;
-
-  /**
-   * Initializes the stream consumer factory with the stream metadata for the table
-   * @param streamConfig the stream config object from the table config
-   */
-  void init(StreamConfig streamConfig, @Nullable StreamConsumerMetrics streamConsumerMetrics) {
-    _streamConfig = streamConfig;
-    _streamConsumerMetrics = streamConsumerMetrics;
+public class NoOpQueryPhase implements AbstractMetrics.QueryPhase {
+  @Override
+  public String getQueryPhaseName() {
+    return "NO_OP";
   }
 }

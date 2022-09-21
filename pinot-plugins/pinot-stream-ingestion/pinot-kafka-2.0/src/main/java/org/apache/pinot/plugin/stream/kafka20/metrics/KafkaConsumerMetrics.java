@@ -18,30 +18,47 @@
  */
 package org.apache.pinot.plugin.stream.kafka20.metrics;
 
-import org.apache.pinot.spi.metrics.AbstractMetrics;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.kafka.common.Metric;
+import org.apache.kafka.common.MetricName;
+import org.apache.pinot.spi.metrics.StreamConsumerGauge;
+import org.apache.pinot.spi.metrics.StreamConsumerMetrics;
 
 
-public class KafkaConsumerMetrics extends AbstractMetrics<AbstractMetrics.QueryPhase,
-    AbstractMetrics.Meter, AbstractMetrics.Gauge, AbstractMetrics.Timer> {
+public class KafkaConsumerMetrics {
+  private final StreamConsumerMetrics _streamConsumerMetrics;
+  private final String _clientId;
+  private final String _topicName;
+  private final int _partitionId;
 
-  public KafkaConsumerMetrics(String metricPrefix, PinotMetricsRegistry metricsRegistry,
-      Class clazz) {
-    super(metricPrefix, metricsRegistry, clazz);
+  private final Map<String, String> _metricAttributes;
+
+  public KafkaConsumerMetrics(String clientId, String topicName, int partitionId,
+      StreamConsumerMetrics streamConsumerMetrics) {
+    _streamConsumerMetrics = streamConsumerMetrics;
+    _clientId = clientId;
+    _topicName = topicName;
+    _partitionId = partitionId;
+    _metricAttributes = new HashMap<>();
+    _metricAttributes.put("client-id", _clientId);
+    _metricAttributes.put("topic", _topicName);
+    _metricAttributes.put("partition", String.valueOf(_partitionId));
   }
 
-  @Override
-  protected QueryPhase[] getQueryPhases() {
-    return new QueryPhase[0];
+  public void updateLag(Map<MetricName, ? extends Metric> metricsMap) {
+    final MetricName name = new MetricName("records-lag", "consumer-fetch-manager-metrics",
+        "ignore", _metricAttributes);
+    // TODO: this expects tablename . but we are using topic name
+
+    long lag = (long) ((double) metricsMap.get(name).metricValue());
+//    System.out.println("Lag for " + _topicName + "-" + _partitionId + " = " + lag);
+    _streamConsumerMetrics.setValueOfPartitionGauge(_topicName, _partitionId,
+        StreamConsumerGauge.PARITTION_RECORDS_LAG, lag);
   }
 
-  @Override
-  protected Meter[] getMeters() {
-    return new Meter[0];
-  }
-
-  @Override
-  protected Gauge[] getGauges() {
-    return new Gauge[0];
+  public void updateReceivedRecords(long count) {
+    _streamConsumerMetrics.setValueOfPartitionGauge(_topicName, _partitionId,
+        StreamConsumerGauge.RECEIVED_RECORDS, count);
   }
 }

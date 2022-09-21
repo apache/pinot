@@ -16,25 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.stream;
+package org.apache.pinot.spi.metrics;
 
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.metrics.StreamConsumerMetrics;
+import org.apache.pinot.spi.utils.CommonUtils;
 
 
-/**
- * Factory for a stream which provides a consumer and a metadata provider for the stream
- */
-public abstract class StreamConsumerFactory implements BaseStreamConsumerFactory {
-  protected StreamConfig _streamConfig;
-  protected StreamConsumerMetrics _streamConsumerMetrics;
+public enum StreamConsumerGauge implements AbstractMetrics.Gauge {
+  PARITTION_RECORDS_LAG("count", false),
+  RECEIVED_RECORDS("count", false);
 
-  /**
-   * Initializes the stream consumer factory with the stream metadata for the table
-   * @param streamConfig the stream config object from the table config
-   */
-  void init(StreamConfig streamConfig, @Nullable StreamConsumerMetrics streamConsumerMetrics) {
-    _streamConfig = streamConfig;
-    _streamConsumerMetrics = streamConsumerMetrics;
+  private final String _gaugeName;
+  private final String _unit;
+  private final boolean _global;
+
+  StreamConsumerGauge(String unit, boolean global) {
+    _unit = unit;
+    _global = global;
+    _gaugeName = CommonUtils.toCamelCase(name().toLowerCase());
+  }
+
+  @Override
+  public String getGaugeName() {
+    return _gaugeName;
+  }
+
+  @Override
+  public String getUnit() {
+    return _unit;
+  }
+
+  @Override
+  public boolean isGlobal() {
+    return _global;
   }
 }

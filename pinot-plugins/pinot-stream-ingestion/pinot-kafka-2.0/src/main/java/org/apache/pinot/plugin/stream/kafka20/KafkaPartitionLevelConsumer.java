@@ -18,13 +18,26 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
+import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import javax.management.InstanceNotFoundException;
+import javax.management.IntrospectionException;
+import javax.management.MBeanInfo;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
+import javax.management.ReflectionException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.common.Metric;
+import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.utils.Bytes;
+import org.apache.pinot.plugin.stream.kafka20.metrics.KafkaConsumerMetrics;
+import org.apache.pinot.spi.metrics.StreamConsumerMetrics;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
@@ -40,10 +53,16 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     implements PartitionLevelConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
+  private final KafkaConsumerMetrics _metrics;
+
   private long _lastFetchedOffset = -1;
 
-  public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
+  public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition,
+      StreamConsumerMetrics streamConsumerMetrics) {
     super(clientId, streamConfig, partition);
+    // TODO: check for null streamConsumerMetrics
+    String topicName = streamConfig.getTopicName();
+    _metrics = new KafkaConsumerMetrics(clientId, topicName, partition, streamConsumerMetrics);
   }
 
   @Override
@@ -89,6 +108,23 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
             endOffset);
       }
     }
+
+    _metrics.updateLag(_consumer.metrics());
+    _metrics.updateReceivedRecords(messageAndOffsets.size());
+
     return new KafkaMessageBatch(messageAndOffsets.size(), lastOffset, filtered);
+  }
+
+  private void dumpJMXMbeans() {
+    MBeanServer server = ManagementFactory.getPlatformMBeanServer();
+    Set<ObjectName> objectNames = server.queryNames(null, null);
+    for (ObjectName name : objectNames) {
+      try {
+        MBeanInfo info = server.getMBeanInfo(name);
+        System.out.println(info);
+      } catch (InstanceNotFoundException | IntrospectionException | ReflectionException e) {
+        e.printStackTrace();
+      }
+    }
   }
 }

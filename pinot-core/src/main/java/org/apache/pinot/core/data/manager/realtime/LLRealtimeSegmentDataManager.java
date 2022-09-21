@@ -71,6 +71,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
+import org.apache.pinot.spi.metrics.StreamConsumerMetrics;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -81,6 +82,7 @@ import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamDataDecoder;
@@ -1287,14 +1289,23 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    _partitionLevelStreamConfig =
-        new PartitionLevelStreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMap(_tableConfig));
-    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_partitionLevelStreamConfig);
-    _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();
-    String streamTopic = _partitionLevelStreamConfig.getTopicName();
-    _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _llcSegmentName = llcSegmentName;
     _partitionGroupId = _llcSegmentName.getPartitionGroupId();
+
+    _partitionLevelStreamConfig =
+        new PartitionLevelStreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMap(_tableConfig));
+    String streamTopic = _partitionLevelStreamConfig.getTopicName();
+    _clientId = streamTopic + "-" + _partitionGroupId;
+
+    // "consumerType-streamType-partitionGroupId-serverInstanceId"
+    String consumerMetricsPrefix = StreamConfig.ConsumerType.LOWLEVEL + "-"
+        + _partitionLevelStreamConfig.getConsumerFactoryClassName() + "-" + _clientId + "-" + _instanceId;
+    StreamConsumerMetrics streamConsumerMetrics = new StreamConsumerMetrics(consumerMetricsPrefix,
+        _serverMetrics.getMetricsRegistry(), StreamConsumerMetrics.class);
+    StreamConsumerMetrics.register(streamConsumerMetrics);
+    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_partitionLevelStreamConfig, streamConsumerMetrics);
+    _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();
+    _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _partitionGroupConsumptionStatus =
         new PartitionGroupConsumptionStatus(_partitionGroupId, _llcSegmentName.getSequenceNumber(),
             _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
@@ -1387,7 +1398,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
     StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, fieldsToRead);
     _streamDataDecoder = new StreamDataDecoderImpl(streamMessageDecoder);
-    _clientId = streamTopic + "-" + _partitionGroupId;
 
     _transformPipeline = new TransformPipeline(tableConfig, schema);
     // Acquire semaphore to create stream consumers
