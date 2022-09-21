@@ -22,8 +22,10 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -155,7 +157,11 @@ public class BaseTableDataManagerTest {
     tmgr.reloadSegment(segName, loadingCfg, zkmd, llmd, null, false);
     File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg);
     assertTrue(segDirOnTier.exists());
-    assertFalse(defaultSegDir.exists());
+    // A tier track file is put into the default seg dir, and nothing else.
+    Collection<File> filesInDefaultSegDir = FileUtils.listFiles(defaultSegDir, null, true);
+    assertEquals(filesInDefaultSegDir.size(), 1);
+    File tierTrackFile = filesInDefaultSegDir.iterator().next();
+    assertEquals(FileUtils.readFileToString(tierTrackFile, StandardCharsets.UTF_8), tierName);
     llmd = new SegmentMetadataImpl(segDirOnTier);
     assertEquals(llmd.getTotalDocs(), 5);
     assertEquals(llmd.getIndexDir(), segDirOnTier);
@@ -224,7 +230,11 @@ public class BaseTableDataManagerTest {
     tmgr.reloadSegment(segName, loadingCfg, zkmd, llmd, null, false);
     File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg);
     assertTrue(segDirOnTier.exists());
-    assertFalse(localSegDir.exists());
+    // A tier track file is put into the default seg dir, and nothing else.
+    Collection<File> filesInDefaultSegDir = FileUtils.listFiles(localSegDir, null, true);
+    assertEquals(filesInDefaultSegDir.size(), 1);
+    File tierTrackFile = filesInDefaultSegDir.iterator().next();
+    assertEquals(FileUtils.readFileToString(tierTrackFile, StandardCharsets.UTF_8), tierName);
     llmd = new SegmentMetadataImpl(segDirOnTier);
     assertEquals(llmd.getTotalDocs(), 5);
     assertEquals(llmd.getIndexDir(), segDirOnTier);
@@ -369,7 +379,11 @@ public class BaseTableDataManagerTest {
     tmgr.addOrReplaceSegment(segName, loadingCfg, zkmd, llmd);
     File segDirOnTier = tmgr.getSegmentDataDir(segName, tierName, loadingCfg);
     assertTrue(segDirOnTier.exists());
-    assertFalse(defaultSegDir.exists());
+    // A tier track file is put into the default seg dir, and nothing else.
+    Collection<File> filesInDefaultSegDir = FileUtils.listFiles(defaultSegDir, null, true);
+    assertEquals(filesInDefaultSegDir.size(), 1);
+    File tierTrackFile = filesInDefaultSegDir.iterator().next();
+    assertEquals(FileUtils.readFileToString(tierTrackFile, StandardCharsets.UTF_8), tierName);
     llmd = new SegmentMetadataImpl(segDirOnTier);
     assertEquals(llmd.getTotalDocs(), 5);
     assertEquals(llmd.getIndexDir(), segDirOnTier);

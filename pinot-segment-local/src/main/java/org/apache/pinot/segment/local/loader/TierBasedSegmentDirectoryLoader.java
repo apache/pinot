@@ -19,7 +19,9 @@
 package org.apache.pinot.segment.local.loader;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -40,6 +42,7 @@ import org.slf4j.LoggerFactory;
 @SegmentLoader(name = "tierBased")
 public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
   private static final Logger LOGGER = LoggerFactory.getLogger(TierBasedSegmentDirectoryLoader.class);
+  private static final String SEGMENT_TIER_TRACK_FILE_NAME = "segment.tier";
 
   /**
    * Creates and loads the {@link SegmentLocalFSDirectory} which is the default implementation of
@@ -52,23 +55,36 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
   @Override
   public SegmentDirectory load(URI indexDir, SegmentDirectoryLoaderContext segmentLoaderContext)
       throws Exception {
-    File srcDir = new File(indexDir);
     String segmentName = segmentLoaderContext.getSegmentName();
-    String segmentTier = segmentLoaderContext.getSegmentTier();
-    File destDir = getTargetDataDir(segmentTier, segmentLoaderContext);
+    File srcDir = new File(indexDir);
+    // The srcDir should exist for most cases, otherwise use data dir on the last known tier as tracked by server.
+    if (!srcDir.exists()) {
+      String lastTier = getSegmentTierPersistedLocally(segmentLoaderContext);
+      LOGGER.info("The srcDir: {} does not exist for segment: {}. Try data dir on last known tier: {}", srcDir,
+          segmentName, lastTier);
+      File lastDataDir = getSegmentDataDirOrDefault(lastTier, segmentLoaderContext);
+      if (lastDataDir.equals(srcDir)) {
+        LOGGER.info("The dataDir: {} on last known tier: {} is same as srcDir", lastDataDir, lastTier);
+      } else {
+        LOGGER.warn("Use dataDir: {} on last known tier: {} as the srcDir", lastDataDir, lastTier);
+        srcDir = lastDataDir;
+      }
+    }
+    String targetTier = segmentLoaderContext.getSegmentTier();
+    File destDir = getSegmentDataDir(targetTier, segmentLoaderContext);
     if (destDir == null) {
       destDir = getDefaultDataDir(segmentLoaderContext);
-      LOGGER.info("Use destDir: {} on default tier for segment: {} as no dataDir for target tier: {}", destDir,
-          segmentName, segmentTier);
-      segmentTier = null;
+      LOGGER.info("Use destDir: {} on default tier for segment: {} as no dataDir for targetTier: {}", destDir,
+          segmentName, targetTier);
+      targetTier = null;
     }
     if (srcDir.equals(destDir)) {
-      LOGGER.info("Keep segment: {} in current dataDir: {} on current tier: {}", segmentName, destDir, segmentTier);
+      LOGGER.info("Keep segment: {} in current dataDir: {} on currentTier: {}", segmentName, destDir, targetTier);
     } else {
-      LOGGER.info("Move segment: {} from srcDir: {} to destDir: {} on tier: {}", segmentName, srcDir, destDir,
-          segmentTier);
+      LOGGER.info("Move segment: {} from srcDir: {} to destDir: {} on targetTier: {}", segmentName, srcDir, destDir,
+          targetTier);
       if (destDir.exists()) {
-        LOGGER.warn("The destDir: {} exists on tier: {} and cleans it firstly", destDir, segmentTier);
+        LOGGER.warn("The destDir: {} exists on targetTier: {} and cleans it firstly", destDir, targetTier);
         FileUtils.deleteQuietly(destDir);
       }
       FileUtils.moveDirectory(srcDir, destDir);
@@ -80,17 +96,52 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
       segmentDirectory = new SegmentLocalFSDirectory(destDir, ReadMode
           .valueOf(segmentLoaderContext.getSegmentDirectoryConfigs().getProperty(IndexLoadingConfig.READ_MODE_KEY)));
     }
-    LOGGER.info("Created segmentDirectory object for segment: {} with dataDir: {} on tier: {}", segmentName, destDir,
-        segmentTier);
-    segmentDirectory.setTier(segmentTier);
+    LOGGER.info("Created segmentDirectory object for segment: {} with dataDir: {} on targetTier: {}", segmentName,
+        destDir, targetTier);
+    // Track current tier in SegmentDirectory object and also persist it in a file in the segment dir on default tier.
+    segmentDirectory.setTier(targetTier);
+    persistSegmentTierLocally(targetTier, segmentLoaderContext);
     return segmentDirectory;
+  }
+
+  // Note that there is no need to synchronize the r/w on the segment tier track file, as the whole load() method is
+  // called while holding a segmentLock, so at any time, only one thread is accessing the track file for a segment.
+  private void persistSegmentTierLocally(String segmentTier, SegmentDirectoryLoaderContext segmentLoaderContext)
+      throws IOException {
+    File defaultSegDir = getDefaultDataDir(segmentLoaderContext);
+    File trackFile = new File(defaultSegDir, SEGMENT_TIER_TRACK_FILE_NAME);
+    if (segmentTier != null) {
+      LOGGER.info("Persist segment tier: {} in tier track file: {}", segmentTier, trackFile);
+      FileUtils.writeStringToFile(trackFile, segmentTier, StandardCharsets.UTF_8, false);
+    } else {
+      LOGGER.info("Delete tier track file: {} for using default segment tier", trackFile);
+      FileUtils.deleteQuietly(trackFile);
+    }
+  }
+
+  private String getSegmentTierPersistedLocally(SegmentDirectoryLoaderContext segmentLoaderContext)
+      throws IOException {
+    File trackFile = new File(getDefaultDataDir(segmentLoaderContext), SEGMENT_TIER_TRACK_FILE_NAME);
+    String segmentTier = null;
+    if (trackFile.exists() && trackFile.length() > 0) {
+      segmentTier = FileUtils.readFileToString(trackFile, StandardCharsets.UTF_8);
+      LOGGER.info("Got segment tier: {} from tier track file: {}", segmentTier, trackFile);
+    } else {
+      LOGGER.info("No tier track file: {} so using default segment tier", trackFile);
+    }
+    return segmentTier;
+  }
+
+  private File getSegmentDataDirOrDefault(String segmentTier, SegmentDirectoryLoaderContext loaderContext) {
+    File dataDir = getSegmentDataDir(segmentTier, loaderContext);
+    return dataDir != null ? dataDir : getDefaultDataDir(loaderContext);
   }
 
   private File getDefaultDataDir(SegmentDirectoryLoaderContext loaderContext) {
     return new File(loaderContext.getTableDataDir(), loaderContext.getSegmentName());
   }
 
-  private File getTargetDataDir(String segmentTier, SegmentDirectoryLoaderContext loaderContext) {
+  private File getSegmentDataDir(String segmentTier, SegmentDirectoryLoaderContext loaderContext) {
     if (segmentTier == null) {
       return null;
     }
