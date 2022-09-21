@@ -1030,10 +1030,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   private void closeStreamMetadataProvider() {
-    try {
-      _streamMetadataProvider.close();
-    } catch (Exception e) {
-      _segmentLogger.warn("Could not close stream metadata provider", e);
+    if (_streamMetadataProvider != null) {
+      try {
+        _streamMetadataProvider.close();
+      } catch (Exception e) {
+        _segmentLogger.warn("Could not close stream metadata provider", e);
+      }
     }
   }
 
@@ -1380,7 +1382,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _startOffset = _partitionGroupConsumptionStatus.getStartOffset();
       _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
       makeStreamConsumer("Starting");
-      makeStreamMetadataProvider("Starting");
+      createPartitionMetadataProvider("Starting");
       setPartitionParameters(realtimeSegmentConfigBuilder, indexingConfig.getSegmentPartitionConfig());
       _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
       _resourceTmpDir = new File(resourceDataDir, "_tmp");
@@ -1427,7 +1429,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs) {
     if (_streamMetadataProvider == null) {
-      makeStreamMetadataProvider("Fetch latest stream offset");
+      createPartitionMetadataProvider("Fetch latest stream offset");
     }
     try {
       return _streamMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs);
@@ -1481,7 +1483,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         } catch (Exception e) {
           _segmentLogger.warn("Failed to get number of stream partitions in 5s, "
               + "using number of partitions in the partition config: {}", numPartitions, e);
-          makeStreamMetadataProvider("Timeout getting number of stream partitions");
+          createPartitionMetadataProvider("Timeout getting number of stream partitions");
         }
 
         realtimeSegmentConfigBuilder.setPartitionColumn(partitionColumn);
@@ -1523,10 +1525,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   /**
    * Creates a new stream metadata provider
    */
-  private void makeStreamMetadataProvider(String reason) {
-    if (_streamMetadataProvider != null) {
-      closeStreamMetadataProvider();
-    }
+  private void createPartitionMetadataProvider(String reason) {
+    closeStreamMetadataProvider();
     _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
     _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
   }
