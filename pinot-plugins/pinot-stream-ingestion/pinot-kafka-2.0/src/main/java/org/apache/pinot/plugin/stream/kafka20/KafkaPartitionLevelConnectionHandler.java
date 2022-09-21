@@ -60,6 +60,7 @@ public abstract class KafkaPartitionLevelConnectionHandler {
     if (_config.getKafkaIsolationLevel() != null) {
       consumerProp.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, _config.getKafkaIsolationLevel());
     }
+    consumerProp.put(ConsumerConfig.CLIENT_ID_CONFIG, _clientId);
     _consumer = new KafkaConsumer<>(consumerProp);
     _topicPartition = new TopicPartition(_topic, _partition);
     _consumer.assign(Collections.singletonList(_topicPartition));
