@@ -25,34 +25,36 @@ package org.apache.pinot.spi.trace;
  */
 public interface Tracer {
 
-    /**
-     * Registers the requestId on the current thread. This means the request will be traced.
-     * @param requestId the requestId
-     */
-    void register(long requestId);
+  /**
+   * Registers the requestId on the current thread. This means the request will be traced.
+   * TODO: Consider using string id or random id. Currently different broker might send query with the same request id.
+   *
+   * @param requestId the requestId
+   */
+  void register(long requestId);
 
-    /**
-     * Detach a trace from the current thread.
-     */
-    void unregister();
+  /**
+   * Detach a trace from the current thread.
+   */
+  void unregister();
 
-    /**
-     *
-     * @param clazz the enclosing context, e.g. Operator, PlanNode, BlockValSet...
-     * @return a new scope which MUST be closed on the current thread.
-     */
-    InvocationScope createScope(Class<?> clazz);
+  /**
+   *
+   * @param clazz the enclosing context, e.g. Operator, PlanNode, BlockValSet...
+   * @return a new scope which MUST be closed on the current thread.
+   */
+  InvocationScope createScope(Class<?> clazz);
 
-    /**
-     * Starts
-     * @return the request record
-     */
-    default RequestScope createRequestScope() {
-        return new DefaultRequestContext();
-    }
+  /**
+   * Starts
+   * @return the request record
+   */
+  default RequestScope createRequestScope() {
+    return new DefaultRequestContext();
+  }
 
-    /**
-     * @return the active recording
-     */
-    InvocationRecording activeRecording();
+  /**
+   * @return the active recording
+   */
+  InvocationRecording activeRecording();
 }

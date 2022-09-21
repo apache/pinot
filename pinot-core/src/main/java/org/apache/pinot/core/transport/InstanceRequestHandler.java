@@ -152,9 +152,9 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
 
       // Send error response
       String hexString = requestBytes != null ? BytesUtils.toHexString(requestBytes) : "";
-      long reqestId = instanceRequest != null ? instanceRequest.getRequestId() : 0;
+      long requestId = instanceRequest != null ? instanceRequest.getRequestId() : 0;
       LOGGER.error("Exception while processing instance request: {}", hexString, e);
-      sendErrorResponse(ctx, reqestId, tableNameWithType, queryArrivalTimeMs, DataTableFactory.getEmptyDataTable(), e);
+      sendErrorResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, DataTableFactory.getEmptyDataTable(), e);
     }
   }
 

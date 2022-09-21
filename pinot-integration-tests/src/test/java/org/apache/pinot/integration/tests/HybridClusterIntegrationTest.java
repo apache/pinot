@@ -210,6 +210,18 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test
+  public void testQueryTracing()
+      throws Exception {
+    JsonNode jsonNode = postQuery("SET trace = true; SELECT COUNT(*) FROM " + getTableName());
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+    Assert.assertTrue(jsonNode.get("exceptions").isEmpty());
+    JsonNode traceInfo = jsonNode.get("traceInfo");
+    Assert.assertEquals(traceInfo.size(), 2);
+    Assert.assertTrue(traceInfo.has("localhost_O"));
+    Assert.assertTrue(traceInfo.has("localhost_R"));
+  }
+
+  @Test
   @Override
   public void testHardcodedQueries()
       throws Exception {

@@ -161,7 +161,7 @@ public abstract class BaseReduceService {
       Map<String, String> metadata = dataTable.getMetadata();
       // Reduce on trace info.
       if (_enableTrace) {
-        _traceInfo.put(routingInstance.getHostname(), metadata.get(MetadataKey.TRACE_INFO.getName()));
+        _traceInfo.put(routingInstance.getShortName(), metadata.get(MetadataKey.TRACE_INFO.getName()));
       }
 
       // Reduce on exceptions.
