@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.metrics;
 
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.metrics.AbstractMetrics;
+import org.apache.pinot.spi.utils.CommonUtils;
 
 
 /**
@@ -39,7 +39,7 @@ public enum BrokerQueryPhase implements AbstractMetrics.QueryPhase {
   private final String _queryPhaseName;
 
   BrokerQueryPhase() {
-    _queryPhaseName = Utils.toCamelCase(name().toLowerCase());
+    _queryPhaseName = CommonUtils.toCamelCase(name().toLowerCase());
   }
 
   @Override

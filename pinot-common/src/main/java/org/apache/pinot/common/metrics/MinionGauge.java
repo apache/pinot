@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.metrics;
 
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.metrics.AbstractMetrics;
+import org.apache.pinot.spi.utils.CommonUtils;
 
 
 public enum MinionGauge implements AbstractMetrics.Gauge {
@@ -31,7 +31,7 @@ public enum MinionGauge implements AbstractMetrics.Gauge {
   private final boolean _global;
 
   MinionGauge(String unit, boolean global) {
-    _gaugeName = Utils.toCamelCase(name().toLowerCase());
+    _gaugeName = CommonUtils.toCamelCase(name().toLowerCase());
     _unit = unit;
     _global = global;
   }

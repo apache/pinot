@@ -19,7 +19,7 @@
 package org.apache.pinot.common.utils;
 
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.Utils;
+import org.apache.pinot.spi.utils.CommonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -36,9 +36,9 @@ public class UtilsTest {
 
   @Test
   public void testToCamelCase() {
-    assertEquals(Utils.toCamelCase("Hello world!"), "HelloWorld");
-    assertEquals(Utils.toCamelCase("blah blah blah"), "blahBlahBlah");
-    assertEquals(Utils.toCamelCase("the quick __--???!!! brown   fox?"), "theQuickBrownFox");
+    assertEquals(CommonUtils.toCamelCase("Hello world!"), "HelloWorld");
+    assertEquals(CommonUtils.toCamelCase("blah blah blah"), "blahBlahBlah");
+    assertEquals(CommonUtils.toCamelCase("the quick __--???!!! brown   fox?"), "theQuickBrownFox");
   }
 
   @Test

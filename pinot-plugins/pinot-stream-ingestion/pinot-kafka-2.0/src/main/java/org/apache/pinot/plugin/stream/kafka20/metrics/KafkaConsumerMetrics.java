@@ -16,33 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.plugin.stream.kafka20.metrics;
 
 import org.apache.pinot.spi.metrics.AbstractMetrics;
-import org.apache.pinot.spi.utils.CommonUtils;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
-public enum MinionTimer implements AbstractMetrics.Timer {
-  // Remove below checkstyle comment filter when first enum is created.
-  // CHECKSTYLE:OFF: checkstyle:coding
-  ;
-  // CHECKSTYLE:OFF: checkstyle:coding
+public class KafkaConsumerMetrics extends AbstractMetrics<AbstractMetrics.QueryPhase,
+    AbstractMetrics.Meter, AbstractMetrics.Gauge, AbstractMetrics.Timer> {
 
-  private final String _timerName;
-  private final boolean _global;
-
-  MinionTimer(boolean global) {
-    _timerName = CommonUtils.toCamelCase(name().toLowerCase());
-    _global = global;
+  public KafkaConsumerMetrics(String metricPrefix, PinotMetricsRegistry metricsRegistry,
+      Class clazz) {
+    super(metricPrefix, metricsRegistry, clazz);
   }
 
   @Override
-  public String getTimerName() {
-    return _timerName;
+  protected QueryPhase[] getQueryPhases() {
+    return new QueryPhase[0];
   }
 
   @Override
-  public boolean isGlobal() {
-    return _global;
+  protected Meter[] getMeters() {
+    return new Meter[0];
+  }
+
+  @Override
+  protected Gauge[] getGauges() {
+    return new Gauge[0];
   }
 }

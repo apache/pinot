@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.metrics;
 
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.metrics.AbstractMetrics;
+import org.apache.pinot.spi.utils.CommonUtils;
 
 
 public enum MinionMeter implements AbstractMetrics.Meter {
@@ -37,7 +37,7 @@ public enum MinionMeter implements AbstractMetrics.Meter {
   private final boolean _global;
 
   MinionMeter(String unit, boolean global) {
-    _meterName = Utils.toCamelCase(name().toLowerCase());
+    _meterName = CommonUtils.toCamelCase(name().toLowerCase());
     _unit = unit;
     _global = global;
   }
