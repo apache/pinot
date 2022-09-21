@@ -585,6 +585,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.minion.logger.root.dir";
     public static final String CONFIG_OF_EVENT_OBSERVER_CLEANUP_DELAY_IN_SEC =
         "pinot.minion.event.observer.cleanupDelayInSec";
+    public static final char TASK_LIST_SEPARATOR = ',';
   }
 
   public static class ControllerJob {

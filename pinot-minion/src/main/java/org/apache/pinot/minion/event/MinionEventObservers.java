@@ -48,8 +48,7 @@ public class MinionEventObservers {
   private final ExecutorService _cleanupExecutor;
 
   private MinionEventObservers() {
-    _cleanupExecutor = null;
-    _eventObserverCleanupDelayMs = 0;
+    this(0, null);
   }
 
   private MinionEventObservers(long eventObserverCleanupDelayInSec, ExecutorService executorService) {

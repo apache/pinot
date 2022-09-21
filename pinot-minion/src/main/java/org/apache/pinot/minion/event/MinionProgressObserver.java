@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 /**
  * A minion event observer that can track task progress status in memory.
  */
-public class MinionProgressObserver implements MinionEventObserver {
+public class MinionProgressObserver extends DefaultMinionEventObserver {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionProgressObserver.class);
 
   private static volatile long _startTs;
@@ -38,6 +38,7 @@ public class MinionProgressObserver implements MinionEventObserver {
   @Override
   public void notifyTaskStart(PinotTaskConfig pinotTaskConfig) {
     _startTs = System.currentTimeMillis();
+    super.notifyTaskStart(pinotTaskConfig);
   }
 
   public void notifyProgress(PinotTaskConfig pinotTaskConfig, @Nullable Object progress) {
@@ -45,6 +46,7 @@ public class MinionProgressObserver implements MinionEventObserver {
       LOGGER.debug("Update progress: {} for task: {}", progress, pinotTaskConfig.getTaskId());
     }
     _lastStatus = progress;
+    super.notifyProgress(pinotTaskConfig, progress);
   }
 
   @Nullable
@@ -56,18 +58,21 @@ public class MinionProgressObserver implements MinionEventObserver {
   public void notifyTaskSuccess(PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
     long endTs = System.currentTimeMillis();
     _lastStatus = "Task succeeded in " + (endTs - _startTs) + "ms";
+    super.notifyTaskSuccess(pinotTaskConfig, executionResult);
   }
 
   @Override
   public void notifyTaskCancelled(PinotTaskConfig pinotTaskConfig) {
     long endTs = System.currentTimeMillis();
     _lastStatus = "Task got cancelled after " + (endTs - _startTs) + "ms";
+    super.notifyTaskCancelled(pinotTaskConfig);
   }
 
   @Override
   public void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception e) {
     long endTs = System.currentTimeMillis();
     _lastStatus = "Task failed in " + (endTs - _startTs) + "ms, with error:\n" + makeStringFromException(e);
+    super.notifyTaskError(pinotTaskConfig, e);
   }
 
   private static String makeStringFromException(Exception exp) {

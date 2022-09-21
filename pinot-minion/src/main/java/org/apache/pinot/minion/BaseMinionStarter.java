@@ -319,6 +319,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     _helixManager.disconnect();
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);
+    LOGGER.info("Shutting down executor service");
+    _executorService.shutdownNow();
     LOGGER.info("Clean up Minion data directory");
     try {
       FileUtils.cleanDirectory(MinionContext.getInstance().getDataDir());

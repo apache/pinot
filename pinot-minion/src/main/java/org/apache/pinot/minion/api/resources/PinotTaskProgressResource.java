@@ -38,6 +38,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,10 +63,11 @@ public class PinotTaskProgressResource {
   })
   public Object getSubtaskProgress(
       @ApiParam(value = "Sub task names separated by comma") @QueryParam("subtaskNames") String subtaskNames) {
+
     try {
       LOGGER.debug("Get progress for subtasks: {}", subtaskNames);
       Map<String, Object> progress = new HashMap<>();
-      for (String subtaskName : StringUtils.split(subtaskNames, ',')) {
+      for (String subtaskName : StringUtils.split(subtaskNames, CommonConstants.Minion.TASK_LIST_SEPARATOR)) {
         MinionEventObserver observer = MinionEventObservers.getInstance().getMinionEventObserver(subtaskName);
         if (observer != null) {
           progress.put(subtaskName, observer.getProgress());
