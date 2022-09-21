@@ -24,8 +24,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -60,8 +62,9 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
  */
 public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSelector {
 
-  public StrictReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics) {
-    super(tableNameWithType, brokerMetrics);
+  public StrictReplicaGroupInstanceSelector(String tableNameWithType, BrokerMetrics brokerMetrics, @Nullable
+      AdaptiveServerSelector adaptiveServerSelector) {
+    super(tableNameWithType, brokerMetrics, adaptiveServerSelector);
   }
 
   /**
@@ -80,6 +83,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
   void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
       Map<String, List<String>> segmentToOnlineInstancesMap, Map<String, List<String>> segmentToOfflineInstancesMap,
       Map<String, List<String>> instanceToSegmentsMap) {
+    // TODO: Add support for AdaptiveServerSelection.
     // Iterate over the ideal state to fill up 'idealStateSegmentToInstancesMap' which is a map from segment to set of
     // instances hosting the segment in the ideal state
     int segmentMapCapacity = HashUtil.getHashMapCapacity(onlineSegments.size());

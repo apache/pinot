@@ -41,6 +41,7 @@ import org.apache.pinot.core.transport.QueryRouter;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerResponse;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -196,10 +197,12 @@ public class PinotScatterGatherQueryClient {
     _brokerMetrics = new BrokerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     _brokerMetrics.initializeGlobalMeters();
     TlsConfig tlsConfig = getTlsConfig(pinotConfig);
+    ServerRoutingStatsManager serverRoutingStatsManager = new ServerRoutingStatsManager(new PinotConfiguration());
 
     // Setup QueryRouters
     for (int i = 0; i < pinotConfig.getThreadPoolSize(); i++) {
-      _queryRouters.add(new QueryRouter(String.format("%s-%d", _prestoHostId, i), _brokerMetrics, null, tlsConfig));
+      _queryRouters.add(new QueryRouter(String.format("%s-%d", _prestoHostId, i), _brokerMetrics, null, tlsConfig,
+          serverRoutingStatsManager));
     }
 
     _config = pinotConfig;

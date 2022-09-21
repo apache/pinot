@@ -657,6 +657,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // Execute the query
+    // TODO: Replace ServerStats with ServerRoutingStatsEntry.
     ServerStats serverStats = new ServerStats();
     // TODO: Handle broker specific operations for explain plan queries such as:
     //       - Alias handling

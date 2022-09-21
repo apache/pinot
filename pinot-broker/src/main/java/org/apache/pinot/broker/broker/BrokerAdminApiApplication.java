@@ -36,6 +36,7 @@ import org.apache.pinot.common.utils.LoggerFileServer;
 import org.apache.pinot.core.api.ServiceAutoDiscoveryFeature;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -62,7 +63,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   private HttpServer _httpServer;
 
   public BrokerAdminApiApplication(BrokerRoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
-      BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor) {
+      BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor,
+      ServerRoutingStatsManager serverRoutingStatsManager) {
     packages(RESOURCE_PACKAGE);
     property(PINOT_CONFIGURATION, brokerConf);
     _useHttps = Boolean.parseBoolean(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_SWAGGER_USE_HTTPS));
@@ -91,6 +93,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
           bind(new LoggerFileServer(loggerRootDir)).to(LoggerFileServer.class);
         }
         bind(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID)).named(BROKER_INSTANCE_ID);
+        bind(serverRoutingStatsManager).to(ServerRoutingStatsManager.class);
       }
     });
     register(JacksonFeature.class);

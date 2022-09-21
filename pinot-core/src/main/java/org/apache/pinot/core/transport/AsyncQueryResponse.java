@@ -42,6 +42,7 @@ public class AsyncQueryResponse implements QueryResponse {
   private final ConcurrentHashMap<ServerRoutingInstance, ServerResponse> _responseMap;
   private final CountDownLatch _countDownLatch;
   private final long _maxEndTimeMs;
+  private final long _queryTimeoutMs;
 
   private volatile ServerRoutingInstance _failedServer;
   private volatile Exception _exception;
@@ -56,6 +57,7 @@ public class AsyncQueryResponse implements QueryResponse {
       _responseMap.put(serverRoutingInstance, new ServerResponse(startTimeMs));
     }
     _countDownLatch = new CountDownLatch(numServersQueried);
+    _queryTimeoutMs = timeoutMs;
     _maxEndTimeMs = startTimeMs + timeoutMs;
   }
 
@@ -96,6 +98,11 @@ public class AsyncQueryResponse implements QueryResponse {
     return stringBuilder.toString();
   }
 
+  @Override
+  public long getServerResponseDelayMs(ServerRoutingInstance serverRoutingInstance) {
+    return _responseMap.get(serverRoutingInstance).getResponseDelayMs();
+  }
+
   @Nullable
   @Override
   public ServerRoutingInstance getFailedServer() {
@@ -105,6 +112,16 @@ public class AsyncQueryResponse implements QueryResponse {
   @Override
   public Exception getException() {
     return _exception;
+  }
+
+  @Override
+  public long getRequestId() {
+    return _requestId;
+  }
+
+  @Override
+  public long getTimeOutMs() {
+    return _queryTimeoutMs;
   }
 
   void markRequestSubmitted(ServerRoutingInstance serverRoutingInstance) {
