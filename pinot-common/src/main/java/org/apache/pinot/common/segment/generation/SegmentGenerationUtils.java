@@ -66,6 +66,7 @@ public class SegmentGenerationUtils {
   public static Schema getSchema(String schemaURIString, String authToken) {
     URI schemaURI;
     try {
+      schemaURIString = sanitizeURIString(schemaURIString);
       schemaURI = new URI(schemaURIString);
     } catch (URISyntaxException e) {
       throw new RuntimeException("Schema URI is not valid - '" + schemaURIString + "'", e);
@@ -161,7 +162,7 @@ public class SegmentGenerationUtils {
     Preconditions.checkState(relativePath.getPath().length() > 0 && !relativePath.equals(inputFile),
         "Unable to extract out the relative path for input file '" + inputFile + "', based on base input path: "
             + baseInputDir);
-    String outputDirStr = outputDir.toString();
+    String outputDirStr = sanitizeURIString(outputDir.toString());
     outputDir = !outputDirStr.endsWith("/") ? URI.create(outputDirStr.concat("/")) : outputDir;
     URI relativeOutputURI = outputDir.resolve(relativePath).resolve(".");
     return relativeOutputURI;
@@ -192,6 +193,7 @@ public class SegmentGenerationUtils {
    */
   public static URI getFileURI(String uriStr, URI fullUriForPathOnlyUriStr)
       throws URISyntaxException {
+    uriStr = sanitizeURIString(uriStr);
     URI fileURI = URI.create(uriStr);
     if (fileURI.getScheme() == null) {
       return new URI(fullUriForPathOnlyUriStr.getScheme(), fullUriForPathOnlyUriStr.getUserInfo(),
@@ -211,6 +213,7 @@ public class SegmentGenerationUtils {
    */
   public static URI getDirectoryURI(String uriStr)
       throws URISyntaxException {
+    uriStr = sanitizeURIString(uriStr);
     URI uri = new URI(uriStr);
     if (uri.getScheme() == null) {
       uri = new File(uriStr).toURI();
@@ -275,7 +278,7 @@ public class SegmentGenerationUtils {
           continue;
         }
       }
-      if (!pinotFs.isDirectory(new URI(file))) {
+      if (!pinotFs.isDirectory(new URI(sanitizeURIString(file)))) {
         // In case PinotFS implementations list files without a scheme (e.g. hdfs://), then we may lose it in the
         // input file path. Call SegmentGenerationUtils.getFileURI() to fix this up.
         // getFileURI throws URISyntaxException
@@ -288,5 +291,9 @@ public class SegmentGenerationUtils {
               + " excludeFileNamePattern: %s", fileUri, includePattern, excludePattern));
     }
     return filteredFiles;
+  }
+
+  public static String sanitizeURIString(String path) {
+    return path.replace(" ", "%20");
   }
 }
