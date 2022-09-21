@@ -155,7 +155,6 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), "null");
 
-
     // Metric field with default null value.
     fieldSpec1 = new MetricFieldSpec();
     fieldSpec1.setName("metric");
@@ -274,8 +273,8 @@ public class FieldSpecTest {
     });
 
     entries.add(new Object[]{
-        name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT", granularity, false,
-        new DateTimeFieldSpec(name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT", granularity)
+        name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT", granularity, false, new DateTimeFieldSpec(name, dataType,
+        "1:DAYS:SIMPLE_DATE_FORMAT", granularity)
     });
 
     entries.add(new Object[]{
@@ -310,8 +309,8 @@ public class FieldSpecTest {
 
     // Multi-value dimension field with default null value.
     dimensionFields = new String[]{
-        "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false", "\"defaultNullValue"
-        + "\":\"default\""
+        "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false",
+        "\"defaultNullValue" + "\":\"default\""
     };
     dimensionFieldSpec1 = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
     dimensionFieldSpec2 = new DimensionFieldSpec("dimension", STRING, false, "default");
@@ -349,8 +348,8 @@ public class FieldSpecTest {
 
     // Multi-value dimension field with default null value.
     dimensionFields = new String[]{
-        "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false", "\"defaultNullValue"
-        + "\":\"default\""
+        "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false",
+        "\"defaultNullValue" + "\":\"default\""
     };
     first = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
     second = JsonUtils.stringToObject(first.toJsonObject().toString(), DimensionFieldSpec.class);

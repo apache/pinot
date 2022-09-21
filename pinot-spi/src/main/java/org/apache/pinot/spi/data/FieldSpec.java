@@ -343,11 +343,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     FieldSpec that = (FieldSpec) o;
-    return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType)
-        && EqualityUtils.isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils.isEqual(
-        getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils.isEqual(_maxLength,
-        that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction) && EqualityUtils.isEqual(
-        _virtualColumnProvider, that._virtualColumnProvider);
+    return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
+        .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
+        .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
+        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
+        && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider);
   }
 
   @Override
