@@ -391,7 +391,7 @@ public class AdaptiveServerSelectorTest {
     for (int ii = 0; ii < 10; ii++) {
       for (String server : _servers) {
         serverRoutingStatsManager.recordStatsAfterQuerySubmission(-1, server);
-        ++taskCount;
+        waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
       }
     }
 

@@ -177,7 +177,6 @@ public class ServerRoutingStatsManager {
 
     try {
       stats.getServerWriteLock().lock();
-
       stats.updateNumInFlightRequestsForResponseArrival();
       if (latencyMs >= 0.0) {
         stats.updateLatency(latencyMs);
